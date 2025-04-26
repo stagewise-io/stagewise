@@ -1,0 +1,67 @@
+{
+  "name": "cursor-agent-injector",
+  "displayName": "Cursor Agent Injector",
+  "description": "Inject Cursor Agent into your code",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "1.96.2"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cursor-agent-injector.injectAgent",
+        "title": "Inject Agent"
+      },
+      {
+        "command": "cursor-agent-injector.test",
+        "title": "Test Cursor Agent Injector"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "cursor-agent-injector.test",
+        "key": "cmd+alt+v",
+        "mac": "cmd+alt+v"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "pnpm run compile && pnpm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "run-server": "node ./out/server.js",
+    "build": "pnpm run compile",
+    "dev": "pnpm run watch"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.99.0",
+    "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^8.28.0",
+    "@typescript-eslint/parser": "^8.28.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.23.0",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.10.2",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "ws": "^8.18.1",
+    "zod": "^3.24.3"
+  }
+} 
