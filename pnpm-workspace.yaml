@@ -1,5 +1,3 @@
 packages:
-  - "apps/*"
-  - "packages/*"
-  - "toolbar/*"
-  - "plug-ins/*"
+- apps/*
+- packages/*
