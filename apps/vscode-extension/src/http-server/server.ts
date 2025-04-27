@@ -3,7 +3,7 @@ import cors from 'cors';
 import { handleStreamableHttp } from './handlers/mcp';
 import { handleSse, handleSsePost } from './handlers/sse';
 import { errorHandler } from './middleware/error';
-import { WebSocketManager } from '../toolbar-websocket/websocket';
+import { WebSocketManager } from '../websocket/extension-socket';
 
 export const DEFAULT_PORT = 5746;
 

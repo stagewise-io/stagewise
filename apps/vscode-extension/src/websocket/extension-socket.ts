@@ -8,7 +8,7 @@ import {
   type ToolUsageRequest,
   type PromptTriggerResponse,
   type ToolUsageResponse,
-} from '@stagewise/extension-websocket-contract';
+} from '../../../../packages/socket-rcp/src';
 import { randomUUID } from 'node:crypto';
 import { callCursorAgent } from '../utils/call-cursor-agent';
 

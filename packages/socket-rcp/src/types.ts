@@ -1,23 +1,8 @@
-// We have: toolUsage requests -> toolUsage responses
-// --> getConsoleLogs
-// --> getCurrentUrl
-// --> getAccessibilityStats (aria roles, alt text coverage, heading structure, tab order)
-// We have: promptTrigger requests -> No response
-
 // Type for pending requests
 export type PendingRequest<T = any> = {
   resolve: (value: T) => void;
   reject: (reason: any) => void;
   timeout: NodeJS.Timeout;
-};
-
-// Toolbar -> Extension
-export type ToolRegistrationRequest = {
-  type: 'tool_registration_request';
-  id: string;
-  payload: {
-    toolName: string;
-  };
 };
 
 // Add this type to distinguish between request and response messages
@@ -65,6 +50,15 @@ export type PromptTriggerResponse = BaseWebSocketMessage & {
   payload: {
     status: 'pending' | 'success' | 'error';
     progressText?: string;
+  };
+};
+
+// Toolbar -> Extension
+export type ToolRegistrationRequest = {
+  type: 'tool_registration_request';
+  id: string;
+  payload: {
+    toolName: string;
   };
 };
 

@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach, beforeAll } from 'vitest';
-import { WebSocketClient } from '../index';
-import type { PromptTriggerRequest } from '@stagewise/extension-websocket-contract';
+import { WebSocketClient } from '../toolbar-socket';
+import type { PromptTriggerRequest } from '../../../socket-rcp/src';
 
 describe('WebSocketClient Integration Tests', () => {
   let client: WebSocketClient;

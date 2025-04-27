@@ -11,9 +11,7 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@stagewise/extension-websocket-contract": [
-        "../extension-websocket-contract/src"
-      ]
+      "@stagewise/websocket-core": ["../websocket-bridge/src"]
     }
   },
   "include": ["src/**/*"],

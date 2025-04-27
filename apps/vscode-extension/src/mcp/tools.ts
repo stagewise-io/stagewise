@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import z from 'zod';
-import { getConsoleLogsData } from '../toolbar-websocket/handlers/console-logs';
+import { getConsoleLogsData } from '../websocket/handlers/console-logs';
 
 export async function registerConsoleLogsTool(server: McpServer) {
   return server.tool(

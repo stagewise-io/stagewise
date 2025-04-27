@@ -12,7 +12,7 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@stagewise/extension-websocket-contract": "workspace:*",
+    "@stagewise/websocket-core": "workspace:*",
     "ws": "^8.16.0"
   },
   "devDependencies": {
