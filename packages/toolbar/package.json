@@ -1,0 +1,49 @@
+{
+  "name": "@stagewise-io/toolbar",
+  "private": false,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/index.umd.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsc -b && vite build --watch --mode development",
+    "build": "tsc -b && vite build --mode production",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.2.2",
+    "@tailwindcss/vite": "^4.1.4",
+    "clsx": "^2.1.1",
+    "javascript-time-ago": "^2.5.11",
+    "lucide-react": "^0.503.0",
+    "preact": "^10.26.4",
+    "react-remove-scroll": "^2.6.3",
+    "superjson": "^2.2.2",
+    "tailwind-merge": "^3.2.0",
+    "tsup": "^8.4.0",
+    "ua-parser-js": "^2.0.3",
+    "vite-plugin-css-injected-by-js": "^3.5.2",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.1",
+    "@tailwindcss/postcss": "^4.1.4",
+    "@types/node": "^22.15.2",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^4.1.4",
+    "typescript": "~5.7.2",
+    "vite": "^6.3.1",
+    "vite-bundle-analyzer": "^0.19.0",
+    "vite-plugin-dts": "^4.5.3"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@headlessui/react": "patches/@headlessui__react.patch"
+    }
+  }
+}
