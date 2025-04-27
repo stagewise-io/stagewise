@@ -6,12 +6,8 @@
   "engines": {
     "vscode": "1.96.2"
   },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "*"
-  ],
+  "categories": ["Other"],
+  "activationEvents": ["*"],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -69,12 +65,8 @@
   "turbo": {
     "tasks": {
       "build": {
-        "dependsOn": [
-          "^build"
-        ],
-        "outputs": [
-          "out/**"
-        ]
+        "dependsOn": ["^build"],
+        "outputs": ["out/**"]
       }
     }
   }

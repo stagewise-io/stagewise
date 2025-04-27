@@ -1,115 +1,133 @@
-import { WebSocket, WebSocketServer } from 'ws';
-import { Server } from 'http';
-import { 
-    WebSocketMessage,
-    WebSocketConnectionManager,
-    ExtensionToToolbarMessage,
-    ToolbarToExtensionMessage,
-    ToolUsageRequest,
-    PromptTriggerResponse
+import { type WebSocket, WebSocketServer } from 'ws';
+import type { Server } from 'node:http';
+import {
+  type WebSocketMessage,
+  WebSocketConnectionManager,
+  type ExtensionToToolbarMessage,
+  type ToolbarToExtensionMessage,
+  type ToolUsageRequest,
+  type PromptTriggerResponse,
 } from '@stagewise/extension-websocket-contract';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 
 export class WebSocketManager extends WebSocketConnectionManager {
-    private wss: WebSocketServer;
+  private wss: WebSocketServer;
 
-    constructor(server: Server) {
-        super();
-        this.wss = new WebSocketServer({ server });
+  constructor(server: Server) {
+    super();
+    this.wss = new WebSocketServer({ server });
 
-        this.wss.on('connection', (ws: WebSocket) => {
-            // If there's an existing connection, close it first
-            if (this.ws) {
-                console.warn('New WebSocket connection attempted while one is already active. Closing existing connection first.');
-                const oldWs = this.ws;
-                this.ws = null;
-                oldWs.close();
-            }
+    this.wss.on('connection', (ws: WebSocket) => {
+      // If there's an existing connection, close it first
+      if (this.ws) {
+        console.warn(
+          'New WebSocket connection attempted while one is already active. Closing existing connection first.',
+        );
+        const oldWs = this.ws;
+        this.ws = null;
+        oldWs.close();
+      }
 
-            this.ws = ws;
-            this.setupWebSocketHandlers(ws);
+      this.ws = ws;
+      this.setupWebSocketHandlers(ws);
 
-            // Add cleanup handler when connection closes
-            ws.on('close', () => {
-                if (this.ws === ws) {
-                    this.ws = null;
-                }
-            });
-        });
-    }
-
-    protected handleMessage(message: WebSocketMessage) {
-        if (this.isToolbarToExtensionMessage(message)) {
-            this.handleToolbarMessage(message);
-        } else {
-            this.handleExtensionMessage(message);
+      // Add cleanup handler when connection closes
+      ws.on('close', () => {
+        if (this.ws === ws) {
+          this.ws = null;
         }
-    }
+      });
+    });
+  }
 
-    private isToolbarToExtensionMessage(message: WebSocketMessage): message is ToolbarToExtensionMessage {
-        return message.type === 'prompt_trigger_request' || message.type === 'tool_usage_response';
+  protected handleMessage(message: WebSocketMessage) {
+    if (this.isToolbarToExtensionMessage(message)) {
+      this.handleToolbarMessage(message);
+    } else {
+      this.handleExtensionMessage(message);
     }
+  }
 
-    private async handleToolbarMessage(message: ToolbarToExtensionMessage) {
-        switch (message.type) {
-            case 'prompt_trigger_request':
-                // Handle prompt trigger request from toolbar
-                console.log(`Received prompt trigger request: ${message.payload.prompt}`);
-                break;
-            case 'tool_usage_response':
-                // Handle tool usage response from toolbar
-                console.log(`Received tool usage response for ${message.payload.toolName}`);
-                this.handleResponse(message.id, message.payload.toolOutput);
-                break;
-        }
-    }
+  private isToolbarToExtensionMessage(
+    message: WebSocketMessage,
+  ): message is ToolbarToExtensionMessage {
+    return (
+      message.type === 'prompt_trigger_request' ||
+      message.type === 'tool_usage_response'
+    );
+  }
 
-    private handleExtensionMessage(message: ExtensionToToolbarMessage) {
-        switch (message.type) {
-            case 'tool_usage_request':
-                // Handle tool usage request to toolbar
-                console.log(`Sending tool usage request for ${message.payload.toolName}`);
-                break;
-            case 'prompt_trigger_response':
-                // Handle prompt trigger response to toolbar
-                console.log(`Sending prompt trigger response: ${message.payload.status}`);
-                break;
-        }
+  private async handleToolbarMessage(message: ToolbarToExtensionMessage) {
+    switch (message.type) {
+      case 'prompt_trigger_request':
+        // Handle prompt trigger request from toolbar
+        console.log(
+          `Received prompt trigger request: ${message.payload.prompt}`,
+        );
+        break;
+      case 'tool_usage_response':
+        // Handle tool usage response from toolbar
+        console.log(
+          `Received tool usage response for ${message.payload.toolName}`,
+        );
+        this.handleResponse(message.id, message.payload.toolOutput);
+        break;
     }
+  }
 
-    public sendToolUsageRequest<T>(toolName: string, toolInput: T): Promise<any> {
-        const message: ToolUsageRequest<T> = {
-            type: 'tool_usage_request',
-            id: randomUUID(),
-            payload: {
-                toolName,
-                toolInput
-            }
-        };
-        return this.sendRequest(message);
+  private handleExtensionMessage(message: ExtensionToToolbarMessage) {
+    switch (message.type) {
+      case 'tool_usage_request':
+        // Handle tool usage request to toolbar
+        console.log(
+          `Sending tool usage request for ${message.payload.toolName}`,
+        );
+        break;
+      case 'prompt_trigger_response':
+        // Handle prompt trigger response to toolbar
+        console.log(
+          `Sending prompt trigger response: ${message.payload.status}`,
+        );
+        break;
     }
+  }
 
-    public sendPromptTriggerResponse(status: 'pending' | 'success' | 'error', progressText?: string) {
-        const message: PromptTriggerResponse = {
-            type: 'prompt_trigger_response',
-            id: randomUUID(),
-            payload: {
-                status,
-                progressText
-            }
-        };
-        if (this.ws) {
-            this.ws.send(JSON.stringify(message));
-        }
-    }
+  public sendToolUsageRequest<T>(toolName: string, toolInput: T): Promise<any> {
+    const message: ToolUsageRequest<T> = {
+      type: 'tool_usage_request',
+      id: randomUUID(),
+      payload: {
+        toolName,
+        toolInput,
+      },
+    };
+    return this.sendRequest(message);
+  }
 
-    protected reconnect() {
-        // Server doesn't need to reconnect
-        throw new Error('Server WebSocket manager does not support reconnection');
+  public sendPromptTriggerResponse(
+    status: 'pending' | 'success' | 'error',
+    progressText?: string,
+  ) {
+    const message: PromptTriggerResponse = {
+      type: 'prompt_trigger_response',
+      id: randomUUID(),
+      payload: {
+        status,
+        progressText,
+      },
+    };
+    if (this.ws) {
+      this.ws.send(JSON.stringify(message));
     }
+  }
 
-    public close() {
-        super.close();
-        this.wss.close();
-    }
-} 
+  protected reconnect() {
+    // Server doesn't need to reconnect
+    throw new Error('Server WebSocket manager does not support reconnection');
+  }
+
+  public close() {
+    super.close();
+    this.wss.close();
+  }
+}

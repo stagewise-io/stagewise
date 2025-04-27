@@ -1,20 +1,17 @@
 {
-    "compilerOptions": {
-        "module": "commonjs",
-        "target": "ES2020",
-        "outDir": "out",
-        "lib": [
-            "ES2020"
-        ],
-        "sourceMap": true,
-        "strict": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "types": ["node"],
-        "baseUrl": ".",
-        // Remove the paths configuration since it should be handled by your package manager
-    },
-    "include": ["src"],
-    "exclude": ["node_modules", ".vscode-test"]
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2020",
+    "outDir": "out",
+    "lib": ["ES2020"],
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"],
+    "baseUrl": "."
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", ".vscode-test"]
 }

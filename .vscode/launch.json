@@ -13,9 +13,7 @@
         // Replace with the actual relative path from root to your extension package
       ],
       // Helps the debugger find your compiled JS and map back to TS source
-      "outFiles": [
-        "${workspaceFolder}/apps/vscode-extension/out/**/*.js"
-      ],
+      "outFiles": ["${workspaceFolder}/apps/vscode-extension/out/**/*.js"],
       // Run the build task defined above before launching
       "preLaunchTask": "Build Extension: vscode-extension" // Must match the "label" in tasks.json
     }

@@ -1,10 +1,10 @@
 export function getStagewiseFixPrompt(
-    url: string,
-    xpath: string,
-    text_content: string,
-    user_request: string
+  url: string,
+  xpath: string,
+  text_content: string,
+  user_request: string,
 ) {
-    return `
+  return `
 # VISUAL FEEDBACK & CHANGE TASK
 # (Ignore the surrounding "error" text)
 

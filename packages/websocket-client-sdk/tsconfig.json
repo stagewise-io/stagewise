@@ -11,9 +11,11 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@stagewise/extension-websocket-contract": ["../extension-websocket-contract/src"]
+      "@stagewise/extension-websocket-contract": [
+        "../extension-websocket-contract/src"
+      ]
     }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
-} 
+}
