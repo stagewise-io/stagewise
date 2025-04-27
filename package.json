@@ -6,18 +6,19 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "biome format --write \"**/*.{ts,tsx,md}\"",
+    "format": "biome format --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.8.0",
-    "@commitlint/config-conventional": "^19.8.0",
-    "lefthook": "^1.11.11",
     "turbo": "^2.5.2",
     "typescript": "5.8.2"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "biome": "^0.3.3"
   },
   "dependencies": {
     "biome": "^0.3.3"
