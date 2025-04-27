@@ -30,7 +30,7 @@ export const DropdownMenuContent = forwardRef(
         portal
         {...props}
         className={cn(
-          "min-w-24 max-w-90 w-fit z-50 rounded-lg p-2 border border-border bg-background/60 backdrop-blur-md flex flex-col gap-1 items-stretch justify-start",
+          "min-w-24 max-w-90 w-fit z-50 rounded-lg p-2 border border-border/30 bg-background/60 backdrop-blur-md flex flex-col gap-1 items-stretch justify-start",
           props.className
         )}
       />

@@ -31,7 +31,7 @@ export const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
         ref={ref}
         {...props}
         className={cn(
-          "flex items-center justify-center p-1",
+          "flex items-center justify-center p-1 hover:bg-zinc-950/5 rounded-full",
           variant === "default" ? "size-8" : "h-8 rounded-full"
         )}
       />

@@ -1,20 +1,5 @@
 import { ComponentChildren, createContext } from "preact";
-import {
-  useContext,
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-} from "preact/hooks";
-
-type ChatChangeHandler = (chat: Chat) => void;
-
-interface ChatInputHandle {
-  setInputActive: (active: boolean) => void;
-  setInputValue: (value: string) => void;
-  onChatChange: (handler: ChatChangeHandler) => void;
-  submitMessage: (content: string) => void;
-}
+import { useContext, useState, useCallback, useEffect } from "preact/hooks";
 
 interface Message {
   id: string;
@@ -27,203 +12,160 @@ interface Message {
 type ChatId = string;
 
 interface Chat {
-  id: ChatId | "new_chat";
-  name: string | null;
+  id: ChatId;
+  title: string | null;
   messages: Message[];
-  responseLoading: boolean;
-  lastInput: string | null; // This stores the last value of the input field that was given by the user.
+  inputValue: string;
 }
 
 type ChatAreaState = "hidden" | "compact" | "expanded";
 
 interface ChatContext {
-  getChatInputHandle: () => ChatInputHandle;
-  isInputActive: boolean;
-  availableChats: Chat[];
-  currentChatId: ChatId | "new_chat";
-  setCurrentChatId: (chatId: ChatId) => void;
-  closeChat: (chatId: ChatId) => void;
-  setChatAreaState: (state: ChatAreaState) => void;
+  // Chat list management
+  chats: Chat[];
+  currentChatId: ChatId | null;
+
+  // Chat operations
+  createChat: () => ChatId;
+  deleteChat: (chatId: ChatId) => void;
+  setCurrentChat: (chatId: ChatId) => void;
+
+  // Chat content operations
+  setChatInput: (chatId: ChatId, value: string) => void;
+  addMessage: (chatId: ChatId, content: string) => void;
+
+  // UI state
   chatAreaState: ChatAreaState;
+  setChatAreaState: (state: ChatAreaState) => void;
+  inputFocus: boolean;
+  setInputFocus: (focus: boolean) => void;
 }
 
 const ChatContext = createContext<ChatContext>({
-  getChatInputHandle: () => null,
-  isInputActive: false,
-  availableChats: [],
+  chats: [],
   currentChatId: null,
-  setCurrentChatId: () => null,
-  closeChat: () => null,
-  setChatAreaState: () => null,
+  createChat: () => "",
+  deleteChat: () => {},
+  setCurrentChat: () => {},
+  setChatInput: () => {},
+  addMessage: () => {},
   chatAreaState: "hidden",
+  setChatAreaState: () => {},
+  inputFocus: false,
+  setInputFocus: () => {},
 });
-
-interface ChatServerSyncer {
-  // Fetch all chats from the server
-  fetchChats: () => Promise<Chat[]>;
-  // Save a single chat to the server
-  saveChat: (chat: Chat) => Promise<void>;
-  // Delete a chat from the server
-  deleteChat: (chatId: ChatId) => Promise<void>;
-  // Subscribe to chat updates from the server
-  subscribeToUpdates: (onUpdate: (chat: Chat) => void) => () => void;
-}
 
 interface ChatStateProviderProps {
   children: ComponentChildren;
-  syncer: ChatServerSyncer;
 }
 
-export const ChatStateProvider = ({
-  children,
-  syncer,
-}: ChatStateProviderProps) => {
-  const [isInputActive, setIsInputActive] = useState(false);
-  const [availableChats, setAvailableChats] = useState<Chat[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<ChatId | null>(null);
-  const [chatAreaState, setChatAreaState] = useState<ChatAreaState>("expanded");
-  const chatChangeHandlers = useRef<ChatChangeHandler[]>([]);
+export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
+  const [chats, setChats] = useState<Chat[]>([
+    {
+      id: "new_chat",
+      messages: [],
+      title: "New chat",
+      inputValue: "",
+    },
+  ]);
+  const [currentChatId, setCurrentChatId] = useState<ChatId>("new_chat");
+  const [chatAreaState, setChatAreaState] = useState<ChatAreaState>("hidden");
+  const [inputFocus, setInputFocus] = useState<boolean>(false);
 
-  // Initialize chats from server
-  useEffect(() => {
-    const loadChats = async () => {
-      try {
-        const chats = await syncer.fetchChats();
-        setAvailableChats(chats);
-      } catch (error) {
-        console.error("Failed to load chats:", error);
-      }
+  const createChat = useCallback(() => {
+    const newChatId = crypto.randomUUID();
+    const newChat: Chat = {
+      id: newChatId,
+      title: null,
+      messages: [],
+      inputValue: "",
     };
-    loadChats();
-  }, [syncer]);
+    setChats((prev) => [...prev, newChat]);
+    setCurrentChatId(newChatId);
+    return newChatId;
+  }, []);
 
-  // Subscribe to server updates
-  useEffect(() => {
-    const unsubscribe = syncer.subscribeToUpdates((updatedChat) => {
-      setAvailableChats((prevChats) => {
-        const existingChatIndex = prevChats.findIndex(
-          (chat) => chat.id === updatedChat.id
-        );
-        if (existingChatIndex === -1) {
-          return [...prevChats, updatedChat];
-        }
-        return prevChats.map((chat) =>
-          chat.id === updatedChat.id ? updatedChat : chat
-        );
-      });
-    });
-
-    return () => unsubscribe();
-  }, [syncer]);
-
-  const getChatInputHandle = useCallback((): ChatInputHandle => {
-    return {
-      setInputActive: setIsInputActive,
-      setInputValue: (value: string) => {
-        setAvailableChats((prevChats) => {
-          const currentChat = prevChats.find(
-            (chat) => chat.id === currentChatId
-          );
-          if (!currentChat) return prevChats;
-
-          const updatedChat = { ...currentChat, lastInput: value };
-          // Save to server
-          syncer.saveChat(updatedChat).catch((error) => {
-            console.error("Failed to save chat:", error);
-          });
-
-          // If the chat area is hidden, automatically set it to compact
-          if (chatAreaState === "hidden") {
-            setChatAreaState("compact");
-          }
-
-          return prevChats.map((chat) =>
-            chat.id === currentChatId ? updatedChat : chat
-          );
-        });
-      },
-      onChatChange: (handler: ChatChangeHandler) => {
-        chatChangeHandlers.current.push(handler);
-      },
-      submitMessage: (content: string) => {
-        if (!content.trim()) return;
-
-        setAvailableChats((prevChats) => {
-          const currentChat = prevChats.find(
-            (chat) => chat.id === currentChatId
-          );
-          if (!currentChat) return prevChats;
-
-          const newMessage: Message = {
-            id: crypto.randomUUID(),
-            content: content.trim(),
-            sender: "user",
-            type: "regular",
-            timestamp: new Date(),
-          };
-
-          const updatedChat = {
-            ...currentChat,
-            messages: [...currentChat.messages, newMessage],
-            lastInput: "",
-          };
-
-          // Save to server
-          syncer.saveChat(updatedChat).catch((error) => {
-            console.error("Failed to save chat:", error);
-          });
-
-          // If the chat area is hidden, automatically set it to compact
-          if (chatAreaState === "hidden") {
-            setChatAreaState("compact");
-          }
-
-          return prevChats.map((chat) =>
-            chat.id === currentChatId ? updatedChat : chat
-          );
-        });
-      },
-    };
-  }, [currentChatId, syncer, chatAreaState]);
-
-  const handleSetCurrentChatId = useCallback(
+  const deleteChat = useCallback(
     (chatId: ChatId) => {
-      setCurrentChatId(chatId);
-      const chat = availableChats.find((c) => c.id === chatId);
-      if (chat) {
-        chatChangeHandlers.current.forEach((handler) => handler(chat));
+      setChats((prev) => {
+        const filteredChats = prev.filter((chat) => chat.id !== chatId);
+        if (filteredChats.length === 0) {
+          return [
+            {
+              id: "new_chat",
+              messages: [],
+              title: "New chat",
+              inputValue: "",
+            },
+          ];
+        }
+        return filteredChats;
+      });
+      if (currentChatId === chatId) {
+        setChats((prev) => {
+          setCurrentChatId(prev[0].id);
+          return prev;
+        });
       }
     },
-    [availableChats]
+    [currentChatId]
   );
 
-  const closeChat = useCallback(
-    (chatId: ChatId) => {
-      // Delete from server first
-      syncer.deleteChat(chatId).catch((error) => {
-        console.error("Failed to delete chat:", error);
-      });
+  const setCurrentChat = useCallback((chatId: ChatId) => {
+    setCurrentChatId(chatId);
+  }, []);
 
-      setAvailableChats((prevChats) =>
-        prevChats.filter((chat) => chat.id !== chatId)
-      );
+  const setChatInput = useCallback((chatId: ChatId, value: string) => {
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === chatId ? { ...chat, inputValue: value } : chat
+      )
+    );
+  }, []);
 
-      if (currentChatId === chatId) {
-        setCurrentChatId(null);
+  const addMessage = useCallback(
+    (chatId: ChatId, content: string) => {
+      if (!content.trim()) return;
+
+      const newMessage: Message = {
+        id: crypto.randomUUID(),
+        content: content.trim(),
+        sender: "user",
+        type: "regular",
+        timestamp: new Date(),
+      };
+
+      if (chatAreaState === "hidden") {
+        setChatAreaState("compact");
       }
+
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === chatId
+            ? {
+                ...chat,
+                messages: [...chat.messages, newMessage],
+                inputValue: "",
+              }
+            : chat
+        )
+      );
     },
-    [currentChatId, syncer]
+    [chatAreaState]
   );
 
   const value: ChatContext = {
-    getChatInputHandle,
-    isInputActive,
-    availableChats,
+    chats,
     currentChatId,
-    setCurrentChatId: handleSetCurrentChatId,
-    closeChat,
-    setChatAreaState,
+    createChat,
+    deleteChat,
+    setCurrentChat,
+    setChatInput,
+    addMessage,
     chatAreaState,
+    setChatAreaState,
+    inputFocus,
+    setInputFocus,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
@@ -231,5 +173,8 @@ export const ChatStateProvider = ({
 
 export function useChatState() {
   const context = useContext(ChatContext);
+  if (!context) {
+    throw new Error("useChatState must be used within a ChatStateProvider");
+  }
   return context;
 }

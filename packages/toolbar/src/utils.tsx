@@ -135,12 +135,10 @@ export interface HotkeyActionDefinition {
 export enum HotkeyActions {
   ESCAPE,
   ALT_SHIFT_C,
+  CTRL_K,
 }
 
-export const hotkeyActionDefinitions: Record<
-  HotkeyActions,
-  HotkeyActionDefinition
-> = {
+export const hotkeyActionDefinitions: Record<HotkeyActions, HotkeyActionDefinition> = {
   [HotkeyActions.ESCAPE]: {
     keyComboDefault: "Esc",
     keyComboMac: "esc",
@@ -150,6 +148,11 @@ export const hotkeyActionDefinitions: Record<
     keyComboDefault: "Alt+⇧+C",
     keyComboMac: "⌥+⇧+C",
     isEventMatching: (ev) => ev.code === "KeyC" && ev.altKey && ev.shiftKey,
+  },
+  [HotkeyActions.CTRL_K]: {
+    keyComboDefault: "Ctrl+K",
+    keyComboMac: "⌘+K",
+    isEventMatching: (ev) => ev.code === "KeyK" && (ev.ctrlKey || ev.metaKey),
   },
 };
 

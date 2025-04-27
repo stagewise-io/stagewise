@@ -1,3 +1,4 @@
+import { ChatStateProvider } from "@/hooks/use-chat-state";
 import { LocationProvider } from "../hooks/use-location";
 import { type ComponentChildren } from "preact";
 
@@ -7,5 +8,9 @@ export function ContextProviders({
   children?: ComponentChildren;
 }) {
   console.log("ContextProviders rendered!");
-  return <LocationProvider>{children}</LocationProvider>;
+  return (
+    <LocationProvider>
+      <ChatStateProvider>{children}</ChatStateProvider>
+    </LocationProvider>
+  );
 }

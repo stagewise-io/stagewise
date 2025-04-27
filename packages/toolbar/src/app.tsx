@@ -3,7 +3,6 @@ import "./app.css";
 import { ContextProviders } from "./components/context-providers";
 import { HotkeyListener } from "./components/hotkey-listener";
 import { DesktopLayout } from "./components/layouts/desktop";
-import { RemoveScroll } from "react-remove-scroll";
 import { ClickBlocker } from "./components/click-blocker";
 import { FocusLock } from "./components/focus-lock";
 import { VisibilityManager } from "./components/visibility-manager";
@@ -20,8 +19,8 @@ export function App() {
         enable={isMainAppBlocked}
       />
 
-      <HotkeyListener />
       <ContextProviders>
+        <HotkeyListener />
         <VisibilityManager>
           {/* Depending on the screen size, load either the mobile or the desktop companion layout */}
           {/* Until the mobile layout is ready, we will always load the desktop layout */}

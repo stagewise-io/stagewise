@@ -2,16 +2,22 @@ import { useAppState } from "@/hooks/use-app-state";
 import { useEventListener } from "@/hooks/use-event-listener";
 import { useCallback, useMemo } from "preact/hooks";
 import { hotkeyActionDefinitions, HotkeyActions } from "../utils";
+import { useChatState } from "@/hooks/use-chat-state";
 
 // This listener is responsible for listening to hotkeys and triggering the appropriate actions in the global app state.
 export function HotkeyListener() {
-  console.log("HotkeyListener rendered!");
+  const { setInputFocus } = useChatState();
+
   const hotKeyHandlerMap: Record<HotkeyActions, () => void> = useMemo(
     () => ({
       [HotkeyActions.ESCAPE]: null,
       [HotkeyActions.ALT_SHIFT_C]: null,
+      [HotkeyActions.CTRL_K]: () => {
+        console.log("CTRL + K got triggered!");
+        setInputFocus(true);
+      },
     }),
-    []
+    [setInputFocus]
   );
 
   const hotKeyListener = useCallback(
