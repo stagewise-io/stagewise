@@ -6,8 +6,6 @@ import {
     ExtensionToToolbarMessage,
     ToolbarToExtensionMessage,
     ToolUsageRequest,
-    ToolUsageResponse,
-    PromptTriggerRequest,
     PromptTriggerResponse
 } from '@stagewise/extension-websocket-contract';
 import { randomUUID } from 'crypto';
@@ -20,14 +18,23 @@ export class WebSocketManager extends WebSocketConnectionManager {
         this.wss = new WebSocketServer({ server });
 
         this.wss.on('connection', (ws: WebSocket) => {
+            // If there's an existing connection, close it first
             if (this.ws) {
-                console.warn('New WebSocket connection attempted while one is already active. Closing new connection.');
-                ws.close();
-                return;
+                console.warn('New WebSocket connection attempted while one is already active. Closing existing connection first.');
+                const oldWs = this.ws;
+                this.ws = null;
+                oldWs.close();
             }
 
             this.ws = ws;
             this.setupWebSocketHandlers(ws);
+
+            // Add cleanup handler when connection closes
+            ws.on('close', () => {
+                if (this.ws === ws) {
+                    this.ws = null;
+                }
+            });
         });
     }
 

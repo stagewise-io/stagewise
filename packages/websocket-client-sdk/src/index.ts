@@ -4,7 +4,9 @@ import {
     ExtensionCommand,
     ExtensionToToolbarMessage,
     ToolbarToExtensionMessage,
-    WebSocketConnectionManager
+    WebSocketConnectionManager,
+    ToolbarCommand,
+    CommandToPayloadMap
 } from '@stagewise/extension-websocket-contract';
 
 export class WebSocketClient extends WebSocketConnectionManager {
@@ -60,9 +62,9 @@ export class WebSocketClient extends WebSocketConnectionManager {
         }
     }
 
-    public async sendCommand<K extends ExtensionCommand>(
+    public async sendCommand<K extends ToolbarCommand>(
         command: K,
-        payload: ExtensionToToolbarMessage[K],
+        payload: CommandToPayloadMap[K],
         timeoutMs: number = 5000
     ): Promise<void> {
         const message = {

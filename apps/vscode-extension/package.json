@@ -1,7 +1,7 @@
 {
-  "name": "cursor-agent-injector",
-  "displayName": "Cursor Agent Injector",
-  "description": "Inject Cursor Agent into your code",
+  "name": "@stagewise/vscode-extension",
+  "displayName": "Stagewise",
+  "description": "Stagewise is a tool that helps you write code faster and smarter.",
   "version": "1.0.0",
   "engines": {
     "vscode": "1.96.2"
@@ -62,7 +62,20 @@
     "@types/express": "^5.0.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "vitest": "^1.3.1",
     "ws": "^8.18.1",
     "zod": "^3.24.3"
+  },
+  "turbo": {
+    "tasks": {
+      "build": {
+        "dependsOn": [
+          "^build"
+        ],
+        "outputs": [
+          "out/**"
+        ]
+      }
+    }
   }
-} 
+}

@@ -16,5 +16,13 @@
     "@types/node": "20.x",
     "@types/ws": "^8.5.10",
     "typescript": "^5.0.0"
+  },
+  "turbo": {
+    "tasks": {
+      "build": {
+        "dependsOn": ["^build"],
+        "outputs": ["dist/**"]
+      }
+    }
   }
 }

@@ -99,10 +99,18 @@ export type ToolbarToExtensionMessage =
   | ToolUsageResponse
 
 
-export type ExtensionCommand = keyof ExtensionToToolbarMessage;
-export type ToolbarCommand = keyof ToolbarToExtensionMessage;
+export type ExtensionCommand = ExtensionToToolbarMessage['type'];
+export type ToolbarCommand = ToolbarToExtensionMessage['type']; 
 
 // Combined type for easier handling in generic message handlers
 export type WebSocketMessage = 
   | ExtensionToToolbarMessage 
   | ToolbarToExtensionMessage
+
+// Add this type mapping
+export type CommandToPayloadMap = {
+    'prompt_trigger_request': PromptTriggerRequest;
+    'tool_usage_response': ToolUsageResponse;
+    'tool_usage_request': ToolUsageRequest;
+    'prompt_trigger_response': PromptTriggerResponse;
+}

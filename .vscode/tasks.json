@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Extension: vscode-extension",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "run",
+        "build",
+        "--filter",
+        "@stagewise/vscode-extension"
+      ],
+      "group": "build",
+      "problemMatcher": [
+        "$tsc"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "clear": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    }
+  ]
+}
