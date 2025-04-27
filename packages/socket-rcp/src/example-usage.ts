@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import {
-  createTypedServer,
-  createTypedClient,
+  createSRPCServer,
+  createSRPCClient,
   type BridgeContract,
 } from './type-helpers';
 
@@ -36,7 +36,7 @@ interface ExtensionClientContract extends BridgeContract {
 async function setupExtension() {
   const httpServer = createServer();
   // The Extension serves ExtensionServerContract and consumes ExtensionClientContract
-  const bridge = createTypedServer<
+  const bridge = createSRPCServer<
     ExtensionServerContract,
     ExtensionClientContract
   >(httpServer);
@@ -88,7 +88,7 @@ async function setupExtension() {
 // Client-side (Toolbar) setup
 async function setupToolbar() {
   // The Toolbar serves ExtensionClientContract and consumes ExtensionServerContract
-  const bridge = createTypedClient<
+  const bridge = createSRPCClient<
     ExtensionClientContract,
     ExtensionServerContract
   >('ws://localhost:3000');
