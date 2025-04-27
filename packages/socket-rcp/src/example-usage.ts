@@ -5,8 +5,8 @@ import {
   type BridgeContract,
 } from './type-helpers';
 
-// Define the contract between extension and toolbar
-interface CodingAgentContract extends BridgeContract {
+// Define the contract for what the Extension serves
+interface ExtensionServerContract extends BridgeContract {
   // Define the triggerCodingAgent method
   triggerCodingAgent: {
     request: { prompt: string };
@@ -22,12 +22,26 @@ interface CodingAgentContract extends BridgeContract {
   };
 }
 
+// Define the contract for what the Extension consumes
+interface ExtensionClientContract extends BridgeContract {
+  // Define the testReadibility method that the Extension can call
+  testReadibility: {
+    request: { text: string };
+    response: { score: number; feedback: string };
+    update: never;
+  };
+}
+
 // Server-side (Extension) setup
 async function setupExtension() {
   const httpServer = createServer();
-  const bridge = createTypedServer<CodingAgentContract>(httpServer);
+  // The Extension serves ExtensionServerContract and consumes ExtensionClientContract
+  const bridge = createTypedServer<
+    ExtensionServerContract,
+    ExtensionClientContract
+  >(httpServer);
 
-  // Register method implementations
+  // Register method implementations for what the Extension serves
   bridge.register({
     triggerCodingAgent: async (request, sendUpdate) => {
       console.log(`Triggering agent with prompt: ${request.prompt}`);
@@ -71,20 +85,31 @@ async function setupExtension() {
   return bridge;
 }
 
-// Client-side (Toolbar) usage
+// Client-side (Toolbar) setup
 async function setupToolbar() {
-  const bridge = createTypedClient<CodingAgentContract>('ws://localhost:3000');
+  // The Toolbar serves ExtensionClientContract and consumes ExtensionServerContract
+  const bridge = createTypedClient<
+    ExtensionClientContract,
+    ExtensionServerContract
+  >('ws://localhost:3000');
 
   // Connect to the extension
   await bridge.connect();
   console.log('Connected to extension');
 
-  // Register handlers for methods the toolbar implements
+  // Register method implementations for what the Toolbar serves
   bridge.register({
-    // Any methods that extension might call
+    testReadibility: async (request) => {
+      // Simple readability test implementation
+      const score = Math.random() * 100;
+      return {
+        score,
+        feedback: `Text readability score: ${score.toFixed(2)}`,
+      };
+    },
   });
 
-  // Example: Call the triggerCodingAgent method
+  // Example: Call the triggerCodingAgent method (which the Toolbar consumes)
   try {
     const result = await bridge.call(
       'triggerCodingAgent',
@@ -99,7 +124,7 @@ async function setupToolbar() {
     console.error('Error calling agent:', error);
   }
 
-  // Example: Get console logs
+  // Example: Get console logs (which the Toolbar consumes)
   try {
     const logs = await bridge.call('getConsoleLogs', { limit: 5 });
     console.log('Console logs:', logs);

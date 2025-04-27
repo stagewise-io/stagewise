@@ -27,9 +27,18 @@ export type MethodImplementations<T extends BridgeContract> = {
   ) => Promise<T[K]['response']>;
 };
 
+// Type for method calls
+export type MethodCalls<T extends BridgeContract> = {
+  [K in keyof T]: (
+    request: T[K]['request'],
+    onUpdate?: (update: T[K]['update']) => void,
+  ) => Promise<T[K]['response']>;
+};
+
 // TypedBridge wraps WebSocketRpcClient or WebSocketRpcServer with type safety
 export class TypedBridge<
-  T extends BridgeContract,
+  TServer extends BridgeContract,
+  TClient extends BridgeContract,
   B extends WebSocketRpcClient | WebSocketRpcServer,
 > {
   protected bridge: B;
@@ -39,11 +48,11 @@ export class TypedBridge<
   }
 
   // Call a method with type safety
-  public call<K extends keyof T>(
+  public call<K extends keyof TClient>(
     method: K,
-    request: T[K]['request'],
-    onUpdate?: (update: T[K]['update']) => void,
-  ): Promise<T[K]['response']> {
+    request: TClient[K]['request'],
+    onUpdate?: (update: TClient[K]['update']) => void,
+  ): Promise<TClient[K]['response']> {
     return this.bridge.call(
       method as string,
       request,
@@ -52,24 +61,26 @@ export class TypedBridge<
   }
 
   // Register methods with type safety
-  public register(implementations: Partial<MethodImplementations<T>>): void {
+  public register(
+    implementations: Partial<MethodImplementations<TServer>>,
+  ): void {
     this.bridge.register(implementations as any);
   }
 }
 
-export class TypedServer<T extends BridgeContract> extends TypedBridge<
-  T,
-  WebSocketRpcServer
-> {
+export class TypedServer<
+  TServer extends BridgeContract,
+  TClient extends BridgeContract,
+> extends TypedBridge<TServer, TClient, WebSocketRpcServer> {
   constructor(server: Server) {
     super(new WebSocketRpcServer(server));
   }
 }
 
-export class TypedClient<T extends BridgeContract> extends TypedBridge<
-  T,
-  WebSocketRpcClient
-> {
+export class TypedClient<
+  TServer extends BridgeContract,
+  TClient extends BridgeContract,
+> extends TypedBridge<TServer, TClient, WebSocketRpcClient> {
   constructor(url: string, options?: WebSocketBridgeOptions) {
     super(new WebSocketRpcClient(url, options));
   }
@@ -79,15 +90,19 @@ export class TypedClient<T extends BridgeContract> extends TypedBridge<
 }
 
 // Helper functions to create typed bridges
-export function createTypedServer<T extends BridgeContract>(
-  server: Server,
-): TypedServer<T> {
-  return new TypedServer<T>(server);
+export function createTypedServer<
+  TServer extends BridgeContract,
+  TClient extends BridgeContract,
+>(server: Server): TypedServer<TServer, TClient> {
+  return new TypedServer<TServer, TClient>(server);
 }
 
-export function createTypedClient<T extends BridgeContract>(
+export function createTypedClient<
+  TServer extends BridgeContract,
+  TClient extends BridgeContract,
+>(
   url: string,
   options?: WebSocketBridgeOptions,
-): TypedClient<T> {
-  return new TypedClient<T>(url, options);
+): TypedClient<TServer, TClient> {
+  return new TypedClient<TServer, TClient>(url, options);
 }
