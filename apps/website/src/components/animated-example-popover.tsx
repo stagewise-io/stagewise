@@ -6,7 +6,7 @@ interface AnimatedPopoverProps {
   onClose: () => void;
 }
 
-export  function ToggleButton() {
+export function ToggleButton() {
   const [isActive, setIsActive] = useState(false);
   const [showBorder, setShowBorder] = useState(true);
 
@@ -28,7 +28,6 @@ export  function ToggleButton() {
     </div>
   );
 }
-
 
 export function AnimatedPopover({ onClose }: AnimatedPopoverProps) {
   const [text, setText] = useState('');
@@ -103,7 +102,7 @@ export function AnimatedPopover({ onClose }: AnimatedPopoverProps) {
   if (isSubmitted) return null;
 
   return (
-    <div className="-translate-y-1/2 absolute top-1/2 left-full z-10 ml-4">
+    <div className='-translate-x-1/2 sm:-translate-y-1/2 sm:-translate-x-0 absolute top-full left-1/2 z-10 mt-4 sm:top-1/2 sm:left-full sm:mt-0 sm:ml-4'>
       <div className="h-20 w-xs rounded-lg bg-white p-4 shadow-lg">
         <div className="flex items-start justify-between gap-2">
           <div className="w-full font-mono text-gray-700 text-sm">
