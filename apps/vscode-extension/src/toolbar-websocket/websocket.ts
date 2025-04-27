@@ -1,193 +1,108 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { Server } from 'http';
-import { processPrompt } from './handlers/prompt';
-import { addLogEntry, LogEntry } from './handlers/console-logs';
 import { 
-    WebSocketMessage, 
-    ServerCommand, 
-    ServerRequestMap, 
-    PendingRequest,
-    ClientToServerMessage,
-    ServerToClientMessage,
-    ServerGetRequestMessage
-} from './types';
+    WebSocketMessage,
+    WebSocketConnectionManager,
+    ExtensionToToolbarMessage,
+    ToolbarToExtensionMessage,
+    ToolUsageRequest,
+    ToolUsageResponse,
+    PromptTriggerRequest,
+    PromptTriggerResponse
+} from '@stagewise/extension-websocket-contract';
+import { randomUUID } from 'crypto';
 
-// Type declarations for ws module
-declare module 'ws' {
-    interface WebSocket {
-        send(data: string): void;
-    }
-}
-
-export class WebSocketManager {
+export class WebSocketManager extends WebSocketConnectionManager {
     private wss: WebSocketServer;
-    private activeConnection: WebSocket | null = null;
-    private pendingRequests: Map<string, PendingRequest> = new Map();
 
     constructor(server: Server) {
+        super();
         this.wss = new WebSocketServer({ server });
 
         this.wss.on('connection', (ws: WebSocket) => {
-            if (this.activeConnection) {
+            if (this.ws) {
                 console.warn('New WebSocket connection attempted while one is already active. Closing new connection.');
                 ws.close();
                 return;
             }
 
-            this.activeConnection = ws;
-            console.log('WebSocket client connected');
-
-            ws.on('message', async (data: Buffer) => {
-                try {
-                    const message = JSON.parse(data.toString()) as WebSocketMessage;
-                    await this.handleMessage(message);
-                } catch (error) {
-                    console.error('Error handling WebSocket message:', error);
-                }
-            });
-
-            ws.on('close', () => {
-                console.log('WebSocket client disconnected');
-                this.activeConnection = null;
-                // Clear all pending requests
-                this.pendingRequests.forEach(({ reject, timeout }) => {
-                    clearTimeout(timeout);
-                    reject(new Error('Connection closed'));
-                });
-                this.pendingRequests.clear();
-            });
-
-            ws.on('error', (error: Error) => {
-                console.error('WebSocket error:', error);
-                this.activeConnection = null;
-            });
+            this.ws = ws;
+            this.setupWebSocketHandlers(ws);
         });
     }
 
-    private async handleMessage(message: WebSocketMessage) {
-        if (this.isClientToServerMessage(message)) {
-            await this.handleClientMessage(message);
+    protected handleMessage(message: WebSocketMessage) {
+        if (this.isToolbarToExtensionMessage(message)) {
+            this.handleToolbarMessage(message);
         } else {
-            this.handleServerMessage(message);
+            this.handleExtensionMessage(message);
         }
     }
 
-    private isClientToServerMessage(message: WebSocketMessage): message is ClientToServerMessage {
-        return message.type === 'prompt' || 
-               message.type === 'logBatch' || 
-               message.type === 'response' || 
-               message.type === 'errorResponse';
+    private isToolbarToExtensionMessage(message: WebSocketMessage): message is ToolbarToExtensionMessage {
+        return message.type === 'prompt_trigger_request' || message.type === 'tool_usage_response';
     }
 
-    private async handleClientMessage(message: ClientToServerMessage) {
+    private async handleToolbarMessage(message: ToolbarToExtensionMessage) {
         switch (message.type) {
-            case 'prompt':
-                try {
-                    const result = await processPrompt(message.payload.prompt);
-                    this.sendResponse(message.id, { success: true, result });
-                } catch (error) {
-                    this.sendError(message.id, error instanceof Error ? error.message : 'Unknown error occurred');
-                }
+            case 'prompt_trigger_request':
+                // Handle prompt trigger request from toolbar
+                console.log(`Received prompt trigger request: ${message.payload.prompt}`);
                 break;
-            case 'logBatch':
-                try {
-                    // Process each log entry individually
-                    const results = message.payload.logs.map(log => addLogEntry(log));
-                    this.sendResponse(message.id, { success: true, receivedCount: results.length });
-                } catch (error) {
-                    this.sendError(message.id, error instanceof Error ? error.message : 'Unknown error occurred');
-                }
-                break;
-            case 'response':
-            case 'errorResponse':
-                this.handleResponse(message);
+            case 'tool_usage_response':
+                // Handle tool usage response from toolbar
+                console.log(`Received tool usage response for ${message.payload.toolName}`);
+                this.handleResponse(message.id, message.payload.toolOutput);
                 break;
         }
     }
 
-    private handleServerMessage(message: ServerToClientMessage) {
-        if (message.type === 'getRequest') {
-            this.handleServerRequest(message);
-        } else if (message.type === 'ack') {
-            // Handle acknowledgments if needed
-            console.log(`Received acknowledgment for message ${message.id}: ${message.success ? 'success' : 'failed'}`);
-        } else if (message.type === 'info') {
-            console.log(`Server info: ${message.message}`);
+    private handleExtensionMessage(message: ExtensionToToolbarMessage) {
+        switch (message.type) {
+            case 'tool_usage_request':
+                // Handle tool usage request to toolbar
+                console.log(`Sending tool usage request for ${message.payload.toolName}`);
+                break;
+            case 'prompt_trigger_response':
+                // Handle prompt trigger response to toolbar
+                console.log(`Sending prompt trigger response: ${message.payload.status}`);
+                break;
         }
     }
 
-    private handleServerRequest(message: ServerGetRequestMessage) {
-        // Handle server-initiated requests
-        // This would be implemented based on the specific command
-        console.log(`Received server request: ${message.command}`);
+    public sendToolUsageRequest<T>(toolName: string, toolInput: T): Promise<any> {
+        const message: ToolUsageRequest<T> = {
+            type: 'tool_usage_request',
+            id: randomUUID(),
+            payload: {
+                toolName,
+                toolInput
+            }
+        };
+        return this.sendRequest(message);
     }
 
-    private sendResponse(id: string, payload: any) {
-        if (!this.activeConnection) {return;}
-        this.activeConnection.send(JSON.stringify({
-            type: 'response',
-            id,
-            payload
-        }));
-    }
-
-    private sendError(id: string, error: string) {
-        if (!this.activeConnection) {return;}
-        this.activeConnection.send(JSON.stringify({
-            type: 'errorResponse',
-            id,
-            error
-        }));
-    }
-
-    private handleResponse(message: { type: 'response' | 'errorResponse', id: string, payload?: any, error?: string }) {
-        const pendingRequest = this.pendingRequests.get(message.id);
-        if (!pendingRequest) {
-            console.warn(`Received response for unknown request ID: ${message.id}`);
-            return;
-        }
-
-        clearTimeout(pendingRequest.timeout);
-        this.pendingRequests.delete(message.id);
-
-        if (message.type === 'errorResponse') {
-            pendingRequest.reject(new Error(message.error));
-        } else {
-            pendingRequest.resolve(message.payload);
+    public sendPromptTriggerResponse(status: 'pending' | 'success' | 'error', progressText?: string) {
+        const message: PromptTriggerResponse = {
+            type: 'prompt_trigger_response',
+            id: randomUUID(),
+            payload: {
+                status,
+                progressText
+            }
+        };
+        if (this.ws) {
+            this.ws.send(JSON.stringify(message));
         }
     }
 
-    public async sendRequest<K extends ServerCommand>(
-        command: K,
-        payload: ServerRequestMap[K]['request'],
-        timeoutMs: number = 5000
-    ): Promise<ServerRequestMap[K]['response']> {
-        if (!this.activeConnection) {
-            throw new Error('No active WebSocket connection');
-        }
-
-        const id = crypto.randomUUID();
-        const message = {
-            type: 'getRequest' as const,
-            id,
-            command,
-            payload
-        } as const;
-
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                this.pendingRequests.delete(id);
-                reject(new Error('Request timed out'));
-            }, timeoutMs);
-
-            this.pendingRequests.set(id, { resolve, reject, timeout });
-            this.activeConnection?.send(JSON.stringify(message));
-        });
+    protected reconnect() {
+        // Server doesn't need to reconnect
+        throw new Error('Server WebSocket manager does not support reconnection');
     }
 
     public close() {
+        super.close();
         this.wss.close();
-        this.activeConnection = null;
-        this.pendingRequests.clear();
     }
 } 

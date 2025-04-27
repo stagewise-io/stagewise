@@ -1,0 +1,20 @@
+{
+  "name": "@stagewise/extension-websocket-contract",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.0.0"
+  }
+}

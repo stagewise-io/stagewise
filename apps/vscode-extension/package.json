@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.10.2",
+    "@stagewise/extension-websocket-contract": "workspace:*",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
     "cors": "^2.8.5",

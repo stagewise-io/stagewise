@@ -14,3 +14,34 @@ export async function registerConsoleLogsTool(server: McpServer) {
         };
     });
 }
+
+
+// TOOD: Use them for dynamic tool registration later
+// Types for tool registration
+export type ToolRequestSchema<T extends z.ZodType> = {
+    request: T;
+};
+
+export type ToolResponse = {
+    content: Array<{
+        type: string;
+        text: string;
+    }>;
+};
+
+export type ToolHandler<T extends z.ZodType> = (params: z.infer<T>) => Promise<ToolResponse>;
+
+export type ToolRegistration<T extends z.ZodType> = {
+    name: string;
+    description: string;
+    schema: ToolRequestSchema<T>;
+    handler: ToolHandler<T>;
+};
+
+// This type can be used by other components to declare new tools
+export type ToolDeclaration<T extends z.ZodType> = {
+    name: string;
+    description: string;
+    schema: T;
+    handler: ToolHandler<T>;
+};
