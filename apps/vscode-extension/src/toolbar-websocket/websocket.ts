@@ -7,8 +7,10 @@ import {
   type ToolbarToExtensionMessage,
   type ToolUsageRequest,
   type PromptTriggerResponse,
+  type ToolUsageResponse,
 } from '@stagewise/extension-websocket-contract';
 import { randomUUID } from 'node:crypto';
+import { callCursorAgent } from '../utils/call-cursor-agent';
 
 /**
  * Server-side WebSocket implementation that extends the base WebSocketConnectionManager.
@@ -53,15 +55,76 @@ export class WebSocketManager extends WebSocketConnectionManager {
   }
 
   /**
-   * Handles incoming WebSocket messages by routing them to appropriate handlers
-   * @param message The received WebSocket message
+   * Handles incoming requests from the toolbar
+   * @param message The request message to handle
    */
-  protected handleMessage(message: WebSocketMessage) {
-    console.log('THIS IS A MESSAGE', message);
+  protected async handleRequest(message: WebSocketMessage) {
     if (this.isToolbarToExtensionMessage(message)) {
-      this.handleToolbarMessage(message);
+      this.handleToolbarRequest(message);
     } else {
-      this.handleExtensionMessage(message);
+      this.handleExtensionRequest(message);
+    }
+  }
+
+  /**
+   * Handles requests received from the toolbar
+   * @param message The toolbar request to handle
+   */
+  private async handleToolbarRequest(message: ToolbarToExtensionMessage) {
+    switch (message.type) {
+      case 'prompt_trigger_request': {
+        await callCursorAgent(message.payload.prompt);
+        // Handle prompt trigger request from toolbar
+        // Send response back to toolbar
+        const response: PromptTriggerResponse = {
+          type: 'prompt_trigger_response',
+          messageType: 'response',
+          id: message.id,
+          payload: {
+            status: 'success',
+            progressText: 'Prompt processed successfully',
+          },
+        };
+        if (this.ws) {
+          this.ws.send(JSON.stringify(response));
+        }
+        break;
+      }
+      case 'tool_usage_response': {
+        // This should never happen as tool_usage_response is a response type
+        break;
+      }
+    }
+  }
+
+  /**
+   * Handles requests received from the extension
+   * @param message The extension request to handle
+   */
+  private handleExtensionRequest(message: ExtensionToToolbarMessage) {
+    switch (message.type) {
+      case 'tool_usage_request': {
+        // Handle tool usage request to toolbar
+        // Send response back to extension
+        const response: ToolUsageResponse = {
+          type: 'tool_usage_response',
+          messageType: 'response',
+          id: message.id,
+          payload: {
+            toolName: message.payload.toolName,
+            toolOutput: null, // This should be filled with actual tool output
+          },
+        };
+        if (this.ws) {
+          this.ws.send(JSON.stringify(response));
+        }
+        break;
+      }
+      case 'prompt_trigger_response': {
+        // This should never happen as prompt_trigger_response is a response type
+        console.error('Received prompt_trigger_response as a request');
+        break;
+      }
     }
   }
 
@@ -80,50 +143,6 @@ export class WebSocketManager extends WebSocketConnectionManager {
   }
 
   /**
-   * Handles messages received from the toolbar
-   * @param message The toolbar message to handle
-   */
-  private async handleToolbarMessage(message: ToolbarToExtensionMessage) {
-    switch (message.type) {
-      case 'prompt_trigger_request':
-        // Handle prompt trigger request from toolbar
-        console.log(
-          `Received prompt trigger request: ${message.payload.prompt}`,
-        );
-        this.handleResponse(message.id, 'test');
-        break;
-      case 'tool_usage_response':
-        // Handle tool usage response from toolbar
-        console.log(
-          `Received tool usage response for ${message.payload.toolName}`,
-        );
-        this.handleResponse(message.id, message.payload.toolOutput);
-        break;
-    }
-  }
-
-  /**
-   * Handles messages received from the extension
-   * @param message The extension message to handle
-   */
-  private handleExtensionMessage(message: ExtensionToToolbarMessage) {
-    switch (message.type) {
-      case 'tool_usage_request':
-        // Handle tool usage request to toolbar
-        console.log(
-          `Sending tool usage request for ${message.payload.toolName}`,
-        );
-        break;
-      case 'prompt_trigger_response':
-        // Handle prompt trigger response to toolbar
-        console.log(
-          `Sending prompt trigger response: ${message.payload.status}`,
-        );
-        break;
-    }
-  }
-
-  /**
    * Sends a tool usage request to the toolbar
    * @param toolName The name of the tool to use
    * @param toolInput The input parameters for the tool
@@ -132,6 +151,7 @@ export class WebSocketManager extends WebSocketConnectionManager {
   public sendToolUsageRequest<T>(toolName: string, toolInput: T): Promise<any> {
     const message: ToolUsageRequest<T> = {
       type: 'tool_usage_request',
+      messageType: 'request',
       id: randomUUID(),
       payload: {
         toolName,
@@ -152,6 +172,7 @@ export class WebSocketManager extends WebSocketConnectionManager {
   ) {
     const message: PromptTriggerResponse = {
       type: 'prompt_trigger_response',
+      messageType: 'response',
       id: randomUUID(),
       payload: {
         status,

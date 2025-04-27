@@ -74,6 +74,9 @@ export abstract class WebSocketConnectionManager {
    * if within the maximum reconnection attempts limit
    */
   protected handleDisconnect() {
+    // TODO: Remove this
+    const t = 1;
+    if (t === 1) return;
     if (this.reconnectAttempts < this.options.maxReconnectAttempts!) {
       this.reconnectAttempts++;
       console.log(
@@ -101,11 +104,25 @@ export abstract class WebSocketConnectionManager {
   }
 
   /**
-   * Abstract method to handle incoming WebSocket messages
-   * Must be implemented by subclasses
+   * Handles incoming WebSocket messages by routing them to appropriate handlers
    * @param message The received WebSocket message
    */
-  protected abstract handleMessage(message: WebSocketMessage): void;
+  protected handleMessage(message: WebSocketMessage) {
+    if (message.messageType === 'response') {
+      // This is a response to a request we sent
+      this.handleResponse(message.id, message.payload);
+    } else {
+      // This is a new request that needs to be handled
+      this.handleRequest(message);
+    }
+  }
+
+  /**
+   * Abstract method to handle incoming requests
+   * Must be implemented by subclasses
+   * @param message The received request message
+   */
+  protected abstract handleRequest(message: WebSocketMessage): void;
 
   /**
    * Abstract method to handle reconnection logic
@@ -134,7 +151,10 @@ export abstract class WebSocketConnectionManager {
       id,
     };
 
+    console.log('\n Sending request');
+
     return new Promise((resolve, reject) => {
+      console.log('\n\n Returning promise');
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(id);
         reject(new Error('Request timed out'));
@@ -151,6 +171,7 @@ export abstract class WebSocketConnectionManager {
    * @param payload The response payload
    */
   protected handleResponse(id: string, payload: any) {
+    console.log('\n\n XXXHandling response \n\n');
     const pendingRequest = this.pendingRequests.get(id);
     if (!pendingRequest) {
       console.warn(`Received response for unknown request ID: ${id}`);
@@ -188,5 +209,26 @@ export abstract class WebSocketConnectionManager {
       this.ws = null;
     }
     this.clearPendingRequests(new Error('Connection closed by user'));
+  }
+
+  /**
+   * Sends a response to a request over the WebSocket connection
+   * @param requestId The ID of the original request
+   * @param response The response message to send
+   */
+  protected sendResponse(requestId: string, response: any) {
+    if (!this.ws) {
+      throw new Error('WebSocket is not connected');
+    }
+
+    console.log('\n Sending response back');
+
+    const responseMessage = {
+      ...response,
+      id: requestId,
+      messageType: 'response' as const,
+    };
+
+    this.ws.send(JSON.stringify(responseMessage));
   }
 }

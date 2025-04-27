@@ -33,14 +33,14 @@ describe('WebSocketClient Integration Tests', () => {
     await client.connect();
     const payload: PromptTriggerRequest = {
       type: 'prompt_trigger_request',
+      messageType: 'request',
       id: 'test-id',
       payload: {
         prompt: 'test-prompt',
       },
     };
-    await client.sendCommand('prompt_trigger_request', payload);
-    // Use a flag to verify we reached this point
-    const commandSent = true;
-    expect(commandSent).toBe(true);
+    await expect(
+      client.sendCommand('prompt_trigger_request', payload),
+    ).resolves.not.toThrow();
   });
 });

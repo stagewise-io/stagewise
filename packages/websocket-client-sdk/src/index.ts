@@ -47,14 +47,14 @@ export class WebSocketClient extends WebSocketConnectionManager {
   }
 
   /**
-   * Handles incoming WebSocket messages by routing them to appropriate handlers
-   * @param message The received WebSocket message
+   * Handles incoming requests from the extension
+   * @param message The request message to handle
    */
-  protected handleMessage(message: WebSocketMessage) {
-    if (this.isToolbarMessage(message)) {
-      this.handleToolbarMessage(message);
-    } else if (this.isExtensionMessage(message)) {
-      this.handleExtensionMessage(message);
+  protected handleRequest(message: WebSocketMessage) {
+    if (this.isExtensionRequest(message)) {
+      this.handleExtensionRequest(message);
+    } else if (this.isToolbarRequest(message)) {
+      this.handleToolbarRequest(message);
     }
   }
 
@@ -63,7 +63,7 @@ export class WebSocketClient extends WebSocketConnectionManager {
    * @param message The message to check
    * @returns true if the message is from the toolbar
    */
-  private isToolbarMessage(
+  private isToolbarRequest(
     message: WebSocketMessage,
   ): message is ToolbarToExtensionMessage {
     return (
@@ -77,7 +77,7 @@ export class WebSocketClient extends WebSocketConnectionManager {
    * @param message The message to check
    * @returns true if the message is from the extension
    */
-  private isExtensionMessage(
+  private isExtensionRequest(
     message: WebSocketMessage,
   ): message is ExtensionToToolbarMessage {
     return (
@@ -90,20 +90,36 @@ export class WebSocketClient extends WebSocketConnectionManager {
    * Handles messages received from the toolbar
    * @param message The toolbar message to handle
    */
-  private handleToolbarMessage(message: ToolbarToExtensionMessage) {
+  private handleToolbarRequest(message: ToolbarToExtensionMessage) {
     // Handle toolbar messages if needed
-    console.log('Received toolbar message:', message);
+    // TODO: Implement this and send response back
   }
 
   /**
    * Handles messages received from the extension
    * @param message The extension message to handle
    */
-  private handleExtensionMessage(message: ExtensionToToolbarMessage) {
+  private handleExtensionRequest(message: ExtensionToToolbarMessage) {
     if (message.type === 'tool_usage_request') {
-      // TODO: Handle tool usage request
+      const response = {
+        type: 'tool_usage_response',
+        messageType: 'response',
+        id: message.id,
+        payload: {
+          status: 'success',
+        },
+      };
+      this.ws?.send(JSON.stringify(response));
     } else if (message.type === 'prompt_trigger_response') {
-      // TODO: Handle prompt trigger response
+      const response = {
+        type: 'prompt_trigger_response',
+        messageType: 'response',
+        id: message.id,
+        payload: {
+          status: 'success',
+        },
+      };
+      this.ws?.send(JSON.stringify(response));
     }
   }
 

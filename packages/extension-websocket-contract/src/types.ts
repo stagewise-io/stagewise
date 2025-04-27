@@ -20,10 +20,19 @@ export type ToolRegistrationRequest = {
   };
 };
 
-// Extension -> toolbar
-export type ToolUsageRequest<T = unknown> = {
-  type: 'tool_usage_request';
+// Add this type to distinguish between request and response messages
+export type WebSocketMessageType = 'request' | 'response';
+
+// Base type for all messages
+export type BaseWebSocketMessage = {
+  messageType: WebSocketMessageType;
   id: string;
+};
+
+// Extension -> toolbar
+export type ToolUsageRequest<T = unknown> = BaseWebSocketMessage & {
+  type: 'tool_usage_request';
+  messageType: 'request';
   payload: {
     toolName: string;
     toolInput: T;
@@ -31,9 +40,9 @@ export type ToolUsageRequest<T = unknown> = {
 };
 
 // toolbar -> Extension
-export type ToolUsageResponse<T = unknown> = {
+export type ToolUsageResponse<T = unknown> = BaseWebSocketMessage & {
   type: 'tool_usage_response';
-  id: string;
+  messageType: 'response';
   payload: {
     toolName: string;
     toolOutput: T;
@@ -41,18 +50,18 @@ export type ToolUsageResponse<T = unknown> = {
 };
 
 // toolbar -> Extension
-export type PromptTriggerRequest = {
+export type PromptTriggerRequest = BaseWebSocketMessage & {
   type: 'prompt_trigger_request';
-  id: string;
+  messageType: 'request';
   payload: {
     prompt: string;
   };
 };
 
 // Extension -> toolbar
-export type PromptTriggerResponse = {
+export type PromptTriggerResponse = BaseWebSocketMessage & {
   type: 'prompt_trigger_response';
-  id: string;
+  messageType: 'response';
   payload: {
     status: 'pending' | 'success' | 'error';
     progressText?: string;
