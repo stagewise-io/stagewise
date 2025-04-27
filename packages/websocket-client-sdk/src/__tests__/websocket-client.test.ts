@@ -1,11 +1,12 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, afterEach, beforeAll } from 'vitest';
 import { WebSocketClient } from '../index';
+import type { PromptTriggerRequest } from '@stagewise/extension-websocket-contract';
 
 describe('WebSocketClient Integration Tests', () => {
   let client: WebSocketClient;
   const serverUrl = 'ws://localhost:5746';
 
-  beforeEach(() => {
+  beforeAll(() => {
     client = new WebSocketClient(serverUrl);
   });
 
@@ -30,15 +31,16 @@ describe('WebSocketClient Integration Tests', () => {
 
   test('should send a prompt trigger request', async () => {
     await client.connect();
-
-    // const payload: PromptTriggerRequest = {
-    //     type: 'prompt_trigger_request',
-    //     id: 'test-id',
-    //     payload: {
-    //         prompt: 'test-prompt'
-    //     }
-    // }
-
-    // await expect(client.sendCommand('prompt_trigger_request', payload)).resolves.not.toThrow();
+    const payload: PromptTriggerRequest = {
+      type: 'prompt_trigger_request',
+      id: 'test-id',
+      payload: {
+        prompt: 'test-prompt',
+      },
+    };
+    await client.sendCommand('prompt_trigger_request', payload);
+    // Use a flag to verify we reached this point
+    const commandSent = true;
+    expect(commandSent).toBe(true);
   });
 });

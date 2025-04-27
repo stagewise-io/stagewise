@@ -1,28 +1,54 @@
 import type { WebSocket } from 'ws';
 import type { WebSocketMessage, PendingRequest } from './types';
 
+/**
+ * Configuration options for WebSocket connections
+ */
 export interface WebSocketConnectionOptions {
+  /** Maximum number of reconnection attempts before giving up */
   maxReconnectAttempts?: number;
+  /** Delay between reconnection attempts in milliseconds */
   reconnectDelay?: number;
+  /** Timeout for request responses in milliseconds */
   requestTimeout?: number;
 }
 
+/**
+ * Default configuration values for WebSocket connections
+ */
 export const DEFAULT_OPTIONS: WebSocketConnectionOptions = {
   maxReconnectAttempts: 5,
   reconnectDelay: 1000,
   requestTimeout: 5000,
 };
 
-export class WebSocketConnectionManager {
+/**
+ * Base class for managing WebSocket connections with built-in reconnection logic
+ * and request/response handling. This class provides core functionality for
+ * WebSocket communication including:
+ * - Connection management
+ * - Automatic reconnection
+ * - Request/response handling with timeouts
+ * - Error handling
+ */
+export abstract class WebSocketConnectionManager {
   protected ws: WebSocket | null = null;
   protected pendingRequests: Map<string, PendingRequest> = new Map();
   protected reconnectAttempts = 0;
   protected options: WebSocketConnectionOptions;
 
+  /**
+   * Creates a new WebSocketConnectionManager instance
+   * @param options Configuration options for the WebSocket connection
+   */
   constructor(options: WebSocketConnectionOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
   }
 
+  /**
+   * Sets up event handlers for a WebSocket connection
+   * @param ws The WebSocket instance to set up handlers for
+   */
   protected setupWebSocketHandlers(ws: WebSocket) {
     ws.on('message', (data: Buffer) => {
       try {
@@ -43,6 +69,10 @@ export class WebSocketConnectionManager {
     });
   }
 
+  /**
+   * Handles WebSocket disconnection events and attempts to reconnect
+   * if within the maximum reconnection attempts limit
+   */
   protected handleDisconnect() {
     if (this.reconnectAttempts < this.options.maxReconnectAttempts!) {
       this.reconnectAttempts++;
@@ -59,6 +89,10 @@ export class WebSocketConnectionManager {
     }
   }
 
+  /**
+   * Clears all pending requests with an error
+   * @param error The error to reject pending requests with
+   */
   protected clearPendingRequests(error: Error) {
     this.pendingRequests.forEach(({ reject }) => {
       reject(error);
@@ -66,14 +100,26 @@ export class WebSocketConnectionManager {
     this.pendingRequests.clear();
   }
 
-  protected handleMessage(message: WebSocketMessage) {
-    // To be implemented by subclasses
-  }
+  /**
+   * Abstract method to handle incoming WebSocket messages
+   * Must be implemented by subclasses
+   * @param message The received WebSocket message
+   */
+  protected abstract handleMessage(message: WebSocketMessage): void;
 
-  protected reconnect() {
-    // To be implemented by subclasses
-  }
+  /**
+   * Abstract method to handle reconnection logic
+   * Must be implemented by subclasses
+   */
+  protected abstract reconnect(): void;
 
+  /**
+   * Sends a request over the WebSocket connection and returns a promise
+   * that resolves with the response or rejects on timeout/error
+   * @param message The message to send
+   * @param timeoutMs Optional timeout in milliseconds
+   * @returns Promise that resolves with the response
+   */
   protected sendRequest<T = any>(
     message: any,
     timeoutMs: number = this.options.requestTimeout!,
@@ -99,6 +145,11 @@ export class WebSocketConnectionManager {
     });
   }
 
+  /**
+   * Handles successful responses to requests
+   * @param id The request ID
+   * @param payload The response payload
+   */
   protected handleResponse(id: string, payload: any) {
     const pendingRequest = this.pendingRequests.get(id);
     if (!pendingRequest) {
@@ -111,6 +162,11 @@ export class WebSocketConnectionManager {
     pendingRequest.resolve(payload);
   }
 
+  /**
+   * Handles error responses to requests
+   * @param id The request ID
+   * @param error The error message
+   */
   protected handleError(id: string, error: string) {
     const pendingRequest = this.pendingRequests.get(id);
     if (!pendingRequest) {
@@ -123,6 +179,9 @@ export class WebSocketConnectionManager {
     pendingRequest.reject(new Error(error));
   }
 
+  /**
+   * Closes the WebSocket connection and cleans up pending requests
+   */
   public close() {
     if (this.ws) {
       this.ws.close();

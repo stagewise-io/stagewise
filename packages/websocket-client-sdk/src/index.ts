@@ -4,18 +4,34 @@ import {
   type ExtensionToToolbarMessage,
   type ToolbarToExtensionMessage,
   WebSocketConnectionManager,
-  type ToolbarCommand,
+  type ToolbarCommandType,
   type CommandToPayloadMap,
 } from '@stagewise/extension-websocket-contract';
 
+/**
+ * Client-side WebSocket implementation that extends the base WebSocketConnectionManager.
+ * This class provides specific functionality for client-side WebSocket communication
+ * with the toolbar, including:
+ * - Connection establishment
+ * - Message type handling
+ * - Command sending
+ */
 export class WebSocketClient extends WebSocketConnectionManager {
   private url: string;
 
+  /**
+   * Creates a new WebSocketClient instance
+   * @param url The WebSocket server URL to connect to
+   */
   constructor(url: string) {
     super();
     this.url = url;
   }
 
+  /**
+   * Establishes a connection to the WebSocket server
+   * @returns Promise that resolves when the connection is established
+   */
   public connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(this.url);
@@ -30,6 +46,10 @@ export class WebSocketClient extends WebSocketConnectionManager {
     });
   }
 
+  /**
+   * Handles incoming WebSocket messages by routing them to appropriate handlers
+   * @param message The received WebSocket message
+   */
   protected handleMessage(message: WebSocketMessage) {
     if (this.isToolbarMessage(message)) {
       this.handleToolbarMessage(message);
@@ -38,6 +58,11 @@ export class WebSocketClient extends WebSocketConnectionManager {
     }
   }
 
+  /**
+   * Type guard to check if a message is from the toolbar
+   * @param message The message to check
+   * @returns true if the message is from the toolbar
+   */
   private isToolbarMessage(
     message: WebSocketMessage,
   ): message is ToolbarToExtensionMessage {
@@ -47,6 +72,11 @@ export class WebSocketClient extends WebSocketConnectionManager {
     );
   }
 
+  /**
+   * Type guard to check if a message is from the extension
+   * @param message The message to check
+   * @returns true if the message is from the extension
+   */
   private isExtensionMessage(
     message: WebSocketMessage,
   ): message is ExtensionToToolbarMessage {
@@ -56,11 +86,19 @@ export class WebSocketClient extends WebSocketConnectionManager {
     );
   }
 
+  /**
+   * Handles messages received from the toolbar
+   * @param message The toolbar message to handle
+   */
   private handleToolbarMessage(message: ToolbarToExtensionMessage) {
     // Handle toolbar messages if needed
     console.log('Received toolbar message:', message);
   }
 
+  /**
+   * Handles messages received from the extension
+   * @param message The extension message to handle
+   */
   private handleExtensionMessage(message: ExtensionToToolbarMessage) {
     if (message.type === 'tool_usage_request') {
       // TODO: Handle tool usage request
@@ -69,21 +107,26 @@ export class WebSocketClient extends WebSocketConnectionManager {
     }
   }
 
-  public async sendCommand<K extends ToolbarCommand>(
-    command: K,
-    payload: CommandToPayloadMap[K],
+  /**
+   * Sends a command to the toolbar with optional payload
+   * @param command The command to send
+   * @param payload The command payload
+   * @param timeoutMs Optional timeout in milliseconds
+   * @returns Promise that resolves when the command is sent
+   */
+  public async sendCommand<K extends ToolbarCommandType>(
+    type: K,
+    message: CommandToPayloadMap[K],
     timeoutMs = 5000,
-  ): Promise<void> {
-    const message = {
-      type: 'getRequest' as const,
-      command,
-      payload,
-    } as const;
-
-    await this.sendRequest(message, timeoutMs);
+  ): Promise<unknown> {
+    return await this.sendRequest(message, timeoutMs);
   }
 
-  protected reconnect() {
+  /**
+   * Implements the reconnection logic by attempting to reconnect to the server
+   * @returns Promise that resolves when reconnection is complete
+   */
+  protected reconnect(): Promise<void> {
     return this.connect();
   }
 }

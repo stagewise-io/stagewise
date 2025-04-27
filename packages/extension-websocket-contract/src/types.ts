@@ -59,36 +59,6 @@ export type PromptTriggerResponse = {
   };
 };
 
-export type ServerResponse = {
-  type: 'response';
-  id: string;
-  payload: any;
-};
-
-export type ServerErrorResponse = {
-  type: 'errorResponse';
-  id: string;
-  error: string;
-};
-
-export type ServerAckMessage = {
-  type: 'ack';
-  id: string;
-  success: boolean;
-};
-
-export type ServerInfoMessage = {
-  type: 'info';
-  message: string;
-};
-
-export type ServerGetRequest = {
-  type: 'getRequest';
-  id: string;
-  command: string;
-  payload: any;
-};
-
 export type ExtensionToToolbarMessage =
   | ToolUsageRequest
   | PromptTriggerResponse;
@@ -97,8 +67,8 @@ export type ToolbarToExtensionMessage =
   | PromptTriggerRequest
   | ToolUsageResponse;
 
-export type ExtensionCommand = ExtensionToToolbarMessage['type'];
-export type ToolbarCommand = ToolbarToExtensionMessage['type'];
+export type ExtensionCommandType = ExtensionToToolbarMessage['type'];
+export type ToolbarCommandType = ToolbarToExtensionMessage['type'];
 
 // Combined type for easier handling in generic message handlers
 export type WebSocketMessage =
