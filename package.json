@@ -6,7 +6,6 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "biome format --write \"**/*.{ts,tsx,md}\"",
-    "format": "biome format --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
@@ -24,7 +23,9 @@
   "dependencies": {
     "biome": "^0.3.3"
   },
-  "dependencies": {
-    "biome": "^0.3.3"
+  "pnpm": {
+    "patchedDependencies": {
+      "@headlessui/react@2.2.2": "patches/@headlessui__react.patch"
+    }
   }
 }
