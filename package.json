@@ -14,7 +14,8 @@
     "@commitlint/config-conventional": "^19.8.0",
     "lefthook": "^1.11.11",
     "turbo": "^2.5.2",
-    "typescript": "5.8.2"
+    "typescript": "5.8.2",
+    "ts-node": "10.9.2"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {

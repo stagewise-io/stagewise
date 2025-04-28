@@ -13,16 +13,14 @@
     "format": "biome format --write \"**/*.{ts,tsx,md}\""
   },
   "dependencies": {
-    "@stagewise/srpc": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.10.2"
+    "@stagewise/srpc": "workspace:*"
   },
   "devDependencies": {
     "biome": "^0.3.3",
     "typescript": "^5.0.0",
     "rimraf": "^5.0.0",
     "vitest": "3.1.2",
-    "@types/node": "20.x",
-    "@types/ws": "^8.5.10"
+    "@types/node": "20.x"
   },
   "files": ["dist", "src"],
   "publishConfig": {

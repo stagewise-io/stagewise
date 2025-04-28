@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
-export async function registerMcpServer(port: number): Promise<void> {
+export function updateCursorMcpConfig(port: number): void {
   const serverName = 'cursor-agent-injector';
   const serverConfig = {
     url: `http://localhost:${port}/sse`,

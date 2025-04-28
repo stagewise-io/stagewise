@@ -8,10 +8,14 @@ import type {
   ToolbarServesContract,
 } from './contract';
 
-export const getExtensionBridge = (server: Server) =>
-  createSRPCServerBridge<ExtensionServesContract, ToolbarServesContract>(
+export function getExtensionBridge(server: Server) {
+  return createSRPCServerBridge<ExtensionServesContract, ToolbarServesContract>(
     server,
   );
+}
 
-export const getToolbarBridge = (url: string) =>
-  createSRPCClientBridge<ToolbarServesContract, ExtensionServesContract>(url);
+export function getToolbarBridge(url: string) {
+  return createSRPCClientBridge<ToolbarServesContract, ExtensionServesContract>(
+    url,
+  );
+}

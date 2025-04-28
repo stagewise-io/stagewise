@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Server } from 'node:http';
 import cors from 'cors';
 import { handleStreamableHttp } from './handlers/mcp';
 import { handleSse, handleSsePost } from './handlers/sse';
@@ -47,17 +48,10 @@ const createServer = (port: number) => {
 
 let server: ReturnType<typeof express.application.listen> | null = null;
 
-export const startServer = (port: number): Promise<void> => {
+export const startServer = async (port: number): Promise<Server> => {
   const app = createServer(port);
-  return new Promise((resolve) => {
-    server = app.listen(port, () => {
-      console.error(`>>> HTTP server listening on port ${port}`);
-      // TODO: initialize bridge
-      // if (server) {
-      //   webSocketManager = new WebSocketManager(server);
-      // }
-      resolve();
-    });
+  return await app.listen(port, () => {
+    console.error(`>>> HTTP server listening on port ${port}`);
   });
 };
 
@@ -67,11 +61,6 @@ export const stopServer = (): Promise<void> => {
       resolve();
       return;
     }
-    // TODO: implement with the real bridge
-    // if (webSocketManager) {
-    //   webSocketManager.close();
-    //   webSocketManager = null;
-    // }
     server.close((err) => {
       if (err) {
         reject(err);

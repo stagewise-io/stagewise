@@ -54,12 +54,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.10.2",
-    "@stagewise/srpc": "workspace:*",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "zod": "^3.24.3"
+    "zod": "^3.24.3",
+    "@stagewise/extension-toolbar-srpc-contract": "workspace:*"
   },
   "turbo": {
     "tasks": {
