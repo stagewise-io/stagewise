@@ -18,14 +18,14 @@ export interface RpcMethodContract<TRequest, TResponse, TUpdate = never> {
 export type BridgeContract = Record<string, RpcMethodContract<any, any, any>>;
 
 export type CreateBridgeContract<
-  T extends Record<string, RpcMethodContract<any, any, any>>,
-> = {
-  [K in keyof T]: RpcMethodContract<
-    T[K]['request'],
-    T[K]['response'],
-    T[K]['update'] extends undefined ? never : T[K]['update']
-  >;
-};
+  T extends Record<string, RpcMethodContract<any, any, any>> | null,
+> = T extends null
+  ? Record<string, never>
+  : {
+      [K in keyof T]: T[K] extends RpcMethodContract<any, any, any>
+        ? T[K]
+        : never;
+    };
 
 export type MethodImplementations<T> = {
   [K in keyof T]: T[K] extends RpcMethodContract<
