@@ -20,42 +20,43 @@ function ToggleButton({ isActive }: ToggleButtonProps) {
   );
 }
 
+type Status = 'typing' | 'loading' | 'hidden';
+
 export function WebsiteDemo() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<Status>('typing');
   const [isActive, setIsActive] = useState(false);
   const [text, setText] = useState('');
   const [messageIndex, setMessageIndex] = useState(0);
-  const [showPopover, setShowPopover] = useState(true);
 
   const messages = [
     'make the button blue and remove the corner radius',
     'make the button rounded and black',
   ];
 
-  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
+  const typingInterval = useRef<NodeJS.Timeout | null>(null);
+
+  const isLoading = status === 'loading';
 
   useEffect(() => {
-    if (!showPopover) return;
+    if (status !== 'typing') return;
 
     let currentIndex = 0;
-    typingTimeout.current = setInterval(() => {
+    typingInterval.current = setInterval(() => {
       if (currentIndex < messages[messageIndex].length) {
         setText(messages[messageIndex].slice(0, currentIndex + 1));
         currentIndex++;
       } else {
-        if (typingTimeout.current) clearInterval(typingTimeout.current);
+        if (typingInterval.current) clearInterval(typingInterval.current);
 
-        setIsLoading(true);
-
+        setStatus('loading');
         setTimeout(() => {
-          setIsActive((prev) => !prev); // toggle button
+          setIsActive((prev) => !prev); // Toggle the button style
           setTimeout(() => {
-            setShowPopover(false);
-            setIsLoading(false);
+            setStatus('hidden');
             setTimeout(() => {
               setMessageIndex((prev) => (prev + 1) % messages.length);
               setText('');
-              setShowPopover(true);
+              setStatus('typing'); // Restart the cycle
             }, 1000);
           }, 500);
         }, 2000);
@@ -63,9 +64,9 @@ export function WebsiteDemo() {
     }, 100);
 
     return () => {
-      if (typingTimeout.current) clearInterval(typingTimeout.current);
+      if (typingInterval.current) clearInterval(typingInterval.current);
     };
-  }, [messageIndex, showPopover]);
+  }, [messageIndex, status]);
 
   return (
     <div
@@ -73,6 +74,7 @@ export function WebsiteDemo() {
         isLoading ? 'scale-75' : 'scale-100'
       }`}
     >
+      {/* Browser Top Bar */}
       <div className="flex items-center justify-between border-gray-200 border-b px-6 py-4">
         <div className="flex items-center gap-2">
           <div className="h-4 w-4 rounded-full bg-blue-500" />
@@ -106,7 +108,7 @@ export function WebsiteDemo() {
           <div className="h-10 w-32 rounded bg-gray-100" />
           <div className="relative">
             <ToggleButton isActive={isActive} />
-            {showPopover && (
+            {status !== 'hidden' && (
               <div className="-translate-x-1/2 sm:-translate-y-1/2 sm:-translate-x-0 absolute top-full left-1/2 z-10 mt-4 w-xs sm:top-1/2 sm:left-full sm:mt-0 sm:ml-4">
                 <div className="h-20 rounded-lg bg-white p-4 shadow-lg">
                   <div className="flex items-start justify-between gap-2">
@@ -118,14 +120,10 @@ export function WebsiteDemo() {
                       type="button"
                       disabled
                       className={`flex h-6 w-6 items-center justify-center rounded-full p-1 transition-colors ${
-                        text === messages[messageIndex]
-                          ? isLoading
-                            ? 'bg-blue-100'
-                            : 'bg-blue-500'
-                          : 'bg-blue-500'
+                        status === 'loading' ? 'bg-blue-100' : 'bg-blue-500'
                       }`}
                     >
-                      {isLoading ? (
+                      {status === 'loading' ? (
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
                       ) : (
                         <svg
