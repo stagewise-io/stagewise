@@ -22,7 +22,7 @@ export function ToggleButton() {
             : 'rounded-full bg-black px-8 py-3 text-white'
         } font-medium ring-2 ring-blue-500 ring-offset-2 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
       >
-        {isActive ? 'Active State' : 'Default State'}
+        Download now
       </button>
       <AnimatedPopover onClose={() => {}} />
     </div>
@@ -33,8 +33,8 @@ export function AnimatedPopover({ onClose }: AnimatedPopoverProps) {
   const [text, setText] = useState('');
   const [messageIndex, setMessageIndex] = useState(0);
   const messages = [
-    'make the button rounded and blue',
-    'make the button black and remove the corner radius',
+    'make the button blue and remove the corner radius',
+    'make the button rounded and black',
   ];
   const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -102,7 +102,7 @@ export function AnimatedPopover({ onClose }: AnimatedPopoverProps) {
   if (isSubmitted) return null;
 
   return (
-    <div className='-translate-x-1/2 sm:-translate-y-1/2 sm:-translate-x-0 absolute top-full left-1/2 z-10 mt-4 sm:top-1/2 sm:left-full sm:mt-0 sm:ml-4'>
+    <div className="-translate-x-1/2 sm:-translate-y-1/2 sm:-translate-x-0 absolute top-full left-1/2 z-10 mt-4 sm:top-1/2 sm:left-full sm:mt-0 sm:ml-4">
       <div className="h-20 w-xs rounded-lg bg-white p-4 shadow-lg">
         <div className="flex items-start justify-between gap-2">
           <div className="w-full font-mono text-gray-700 text-sm">
