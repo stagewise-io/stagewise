@@ -48,9 +48,12 @@ server.register({
     await new Promise((resolve) => setTimeout(resolve, 500));
     return { message: `Hello, ${request.name}!` };
   },
-
   getData: async (request) => {
-    return { data: `Data for ID ${request.id}` };
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ data: `Data for ID ${request.id}` });
+      }, 1000);
+    });
   },
 });
 
@@ -67,13 +70,6 @@ async function runClient() {
   await client.connect();
 
   try {
-    // OLD STYLE:
-    // const response = await client.call('greet', { name: 'John' }, (update) => {
-    //   console.log('Update received:', update);
-    // });
-
-    // NEW STYLE:
-    // Using the new method calling syntax
     const response = await client.call.greet({ name: 'John' }, (update) => {
       console.log('Update received:', update);
     });
