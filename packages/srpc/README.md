@@ -38,12 +38,12 @@ interface ClientContract extends BridgeContract {}
 ### 2. Server Implementation
 
 ```typescript
-import { createSRPCServer } from '@your-org/srpc';
+import { createSRPCServerBridge } from '@your-org/srpc';
 import http from 'node:http';
 
 // Create HTTP server
 const httpServer = http.createServer();
-const server = createSRPCServer<ServerContract, ClientContract>(httpServer);
+const server = createSRPCServerBridge<ServerContract, ClientContract>(httpServer);
 
 // Implement and register methods
 server.register({
@@ -72,11 +72,11 @@ httpServer.listen(3000, () => {
 ### 3. Client Usage
 
 ```typescript
-import { createSRPCClient } from '@your-org/srpc';
+import { createSRPCClientBrdige } from '@your-org/srpc';
 
 async function main() {
   // Create and connect the client
-  const client = createSRPCClient<ClientContract, ServerContract>('ws://localhost:3000');
+  const client = createSRPCClientBridge<ClientContract, ServerContract>('ws://localhost:3000');
   await client.connect();
   
   try {
@@ -103,7 +103,7 @@ main().catch(console.error);
 The library supports various configuration options for reconnection behavior and timeouts:
 
 ```typescript
-const client = createSRPCClient<ClientContract, ServerContract>(
+const client = createSRPCClientBridge<ClientContract, ServerContract>(
   'ws://localhost:3000',
   {
     maxReconnectAttempts: 5,    // Maximum reconnection attempts

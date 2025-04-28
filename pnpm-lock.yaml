@@ -48,9 +48,6 @@ importers:
       express:
         specifier: ^5.1.0
         version: 5.1.0
-      ws:
-        specifier: ^8.18.1
-        version: 8.18.1
       zod:
         specifier: ^3.24.3
         version: 3.24.3
@@ -89,6 +86,34 @@ importers:
         specifier: 3.1.2
         version: 3.1.2(@types/node@20.17.31)
 
+  packages/extension-toolbar-srpc-contract:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.10.2
+        version: 1.10.2
+      '@stagewise/srpc':
+        specifier: workspace:*
+        version: link:../srpc
+    devDependencies:
+      '@types/node':
+        specifier: 20.x
+        version: 20.17.31
+      '@types/ws':
+        specifier: ^8.5.10
+        version: 8.18.1
+      biome:
+        specifier: ^0.3.3
+        version: 0.3.3
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.0.0
+        version: 5.8.2
+      vitest:
+        specifier: 3.1.2
+        version: 3.1.2(@types/node@20.17.31)
+
   packages/srpc:
     dependencies:
       ws:
@@ -109,28 +134,6 @@ importers:
         version: 3.1.2(@types/node@20.17.31)
 
   packages/typescript-config: {}
-
-  packages/websocket-client-sdk:
-    dependencies:
-      '@stagewise/srpc':
-        specifier: workspace:*
-        version: link:../srpc
-      ws:
-        specifier: ^8.16.0
-        version: 8.18.1
-    devDependencies:
-      '@types/node':
-        specifier: 20.x
-        version: 20.17.31
-      '@types/ws':
-        specifier: ^8.5.10
-        version: 8.18.1
-      typescript:
-        specifier: ^5.0.0
-        version: 5.8.2
-      vitest:
-        specifier: 3.1.2
-        version: 3.1.2(@types/node@20.17.31)
 
 packages:
 
@@ -2026,6 +2029,10 @@ packages:
   rimraf@2.7.1:
     resolution: {integrity: sha512-uWjbaKIK3T1OSVptzX7Nl6PvQ3qAGtKEtVRjRuazjfL3Bx5eI409VZSqgND+4UNnmzLVdPj9FqFJNPqBZFve4w==}
     deprecated: Rimraf versions prior to v4 are no longer supported
+    hasBin: true
+
+  rimraf@5.0.10:
+    resolution: {integrity: sha512-l0OE8wL34P4nJH/H2ffoaniAokM2qSmrtXHmlpvYr5AVVX8msAyW0l8NVJFDxlSK4u3Uh/f41cQheDVdnYijwQ==}
     hasBin: true
 
   rollup@4.40.0:
@@ -4419,6 +4426,10 @@ snapshots:
   rimraf@2.7.1:
     dependencies:
       glob: 7.2.3
+
+  rimraf@5.0.10:
+    dependencies:
+      glob: 10.4.5
 
   rollup@4.40.0:
     dependencies:

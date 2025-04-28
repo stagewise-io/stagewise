@@ -11,9 +11,9 @@ import http from 'node:http';
 import {
   type BridgeContract,
   type RpcMethodContract,
-  createSRPCClient,
-  createSRPCServer,
-} from '../src';
+  createSRPCClientBridge,
+  createSRPCServerBridge,
+} from '..';
 
 // Define test contracts similar to the example
 interface GreetingRequest {
@@ -45,7 +45,9 @@ interface ClientContract extends BridgeContract {
 describe('sRPC Package', () => {
   // Server setup
   const httpServer = http.createServer();
-  const server = createSRPCServer<ServerContract, ClientContract>(httpServer);
+  const server = createSRPCServerBridge<ServerContract, ClientContract>(
+    httpServer,
+  );
   const TEST_PORT = 3001;
 
   // Original server method implementations to restore after tests
@@ -95,11 +97,11 @@ describe('sRPC Package', () => {
   // Client setup and tests
   describe('Client-Server Communication', () => {
     let client: ReturnType<
-      typeof createSRPCClient<ClientContract, ServerContract>
+      typeof createSRPCClientBridge<ClientContract, ServerContract>
     >;
 
     beforeAll(async () => {
-      client = createSRPCClient<ClientContract, ServerContract>(
+      client = createSRPCClientBridge<ClientContract, ServerContract>(
         `ws://localhost:${TEST_PORT}`,
       );
       await client.connect();
@@ -173,11 +175,11 @@ describe('sRPC Package', () => {
 
   describe('Error Handling', () => {
     let client: ReturnType<
-      typeof createSRPCClient<ClientContract, ServerContract>
+      typeof createSRPCClientBridge<ClientContract, ServerContract>
     >;
 
     beforeAll(async () => {
-      client = createSRPCClient<ClientContract, ServerContract>(
+      client = createSRPCClientBridge<ClientContract, ServerContract>(
         `ws://localhost:${TEST_PORT}`,
       );
       await client.connect();
@@ -231,11 +233,11 @@ describe('sRPC Package', () => {
 
   describe('Reconnection', () => {
     let client: ReturnType<
-      typeof createSRPCClient<ClientContract, ServerContract>
+      typeof createSRPCClientBridge<ClientContract, ServerContract>
     >;
 
     beforeAll(async () => {
-      client = createSRPCClient<ClientContract, ServerContract>(
+      client = createSRPCClientBridge<ClientContract, ServerContract>(
         `ws://localhost:${TEST_PORT}`,
         {
           maxReconnectAttempts: 3,
@@ -284,7 +286,9 @@ describe('sRPC Package', () => {
 
       // Verify response type from greet method matches GreetingResponse
       async function testTypes() {
-        const client = createSRPCClient<ClientContract, ServerContract>('');
+        const client = createSRPCClientBridge<ClientContract, ServerContract>(
+          '',
+        );
         const response = await client.call.greet({ name: 'Type Test' });
 
         type ResponseType = typeof response;

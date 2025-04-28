@@ -102,14 +102,14 @@ export class TypedClient<
 }
 
 // Helper functions to create typed bridges
-export function createSRPCServer<
+export function createSRPCServerBridge<
   Serves extends BridgeContract,
   Consumes extends BridgeContract,
 >(server: Server): TypedServer<Serves, Consumes> {
   return new TypedServer<Serves, Consumes>(server);
 }
 
-export function createSRPCClient<
+export function createSRPCClientBridge<
   Serves extends BridgeContract,
   Consumes extends BridgeContract,
 >(

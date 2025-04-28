@@ -13,13 +13,13 @@ export {
   type WebSocketMessage,
   type WebSocketBridgeOptions,
   type PendingRequest,
-} from './core';
+} from './src/core';
 
 // Export server
-export { WebSocketRpcServer } from './server';
+export { WebSocketRpcServer } from './src/server';
 
 // Export client
-export { WebSocketRpcClient } from './client';
+export { WebSocketRpcClient } from './src/client';
 
 // Export type helpers
 export {
@@ -30,10 +30,6 @@ export {
   TypedBridge,
   TypedServer,
   TypedClient,
-  createSRPCServer,
-  createSRPCClient,
-} from './type-helpers';
-
-// If there are any legacy types or utils needed
-export * from './legacy.types';
-export * from './legacy.utils';
+  createSRPCServerBridge,
+  createSRPCClientBridge,
+} from './src/type-helpers';

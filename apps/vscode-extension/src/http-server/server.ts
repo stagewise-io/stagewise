@@ -3,11 +3,8 @@ import cors from 'cors';
 import { handleStreamableHttp } from './handlers/mcp';
 import { handleSse, handleSsePost } from './handlers/sse';
 import { errorHandler } from './middleware/error';
-import { WebSocketManager } from '../websocket/extension-socket';
 
 export const DEFAULT_PORT = 5746;
-
-let webSocketManager: WebSocketManager | null = null;
 
 const createServer = (port: number) => {
   const app = express();
@@ -55,10 +52,10 @@ export const startServer = (port: number): Promise<void> => {
   return new Promise((resolve) => {
     server = app.listen(port, () => {
       console.error(`>>> HTTP server listening on port ${port}`);
-      // Initialize WebSocket server after HTTP server is started
-      if (server) {
-        webSocketManager = new WebSocketManager(server);
-      }
+      // TODO: initialize bridge
+      // if (server) {
+      //   webSocketManager = new WebSocketManager(server);
+      // }
       resolve();
     });
   });
@@ -70,10 +67,11 @@ export const stopServer = (): Promise<void> => {
       resolve();
       return;
     }
-    if (webSocketManager) {
-      webSocketManager.close();
-      webSocketManager = null;
-    }
+    // TODO: implement with the real bridge
+    // if (webSocketManager) {
+    //   webSocketManager.close();
+    //   webSocketManager = null;
+    // }
     server.close((err) => {
       if (err) {
         reject(err);
@@ -83,8 +81,4 @@ export const stopServer = (): Promise<void> => {
     });
     server = null;
   });
-};
-
-export const getWebSocketManager = (): WebSocketManager | null => {
-  return webSocketManager;
 };

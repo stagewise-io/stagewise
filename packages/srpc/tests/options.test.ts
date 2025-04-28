@@ -3,9 +3,9 @@ import http from 'node:http';
 import {
   type BridgeContract,
   type RpcMethodContract,
-  createSRPCClient,
-  createSRPCServer,
-} from '../src';
+  createSRPCClientBridge,
+  createSRPCServerBridge,
+} from '..';
 
 // Define simple contracts for testing options
 interface ServerContract extends BridgeContract {
@@ -16,7 +16,9 @@ interface ClientContract extends BridgeContract {}
 
 describe('WebSocketBridgeOptions', () => {
   const httpServer = http.createServer();
-  const server = createSRPCServer<ServerContract, ClientContract>(httpServer);
+  const server = createSRPCServerBridge<ServerContract, ClientContract>(
+    httpServer,
+  );
   const TEST_PORT = 3002;
 
   beforeAll(() => {
@@ -46,7 +48,7 @@ describe('WebSocketBridgeOptions', () => {
   describe('Custom Timeout', () => {
     it('should respect custom request timeout', async () => {
       // Create client with very short timeout
-      const shortTimeoutClient = createSRPCClient<
+      const shortTimeoutClient = createSRPCClientBridge<
         ClientContract,
         ServerContract
       >(
@@ -92,7 +94,7 @@ describe('WebSocketBridgeOptions', () => {
 
     it('should succeed with sufficient timeout', async () => {
       // Create client with normal timeout
-      const normalTimeoutClient = createSRPCClient<
+      const normalTimeoutClient = createSRPCClientBridge<
         ClientContract,
         ServerContract
       >(
@@ -131,7 +133,7 @@ describe('WebSocketBridgeOptions', () => {
   describe('Reconnection Options', () => {
     it('should respect maxReconnectAttempts', async () => {
       // Create client with custom reconnect settings
-      const client = createSRPCClient<ClientContract, ServerContract>(
+      const client = createSRPCClientBridge<ClientContract, ServerContract>(
         `ws://localhost:${TEST_PORT}`,
         {
           maxReconnectAttempts: 2,
@@ -164,7 +166,7 @@ describe('WebSocketBridgeOptions', () => {
 
   describe('Default Options', () => {
     it('should use default options when none provided', async () => {
-      const client = createSRPCClient<ClientContract, ServerContract>(
+      const client = createSRPCClientBridge<ClientContract, ServerContract>(
         `ws://localhost:${TEST_PORT}`,
       );
 

@@ -1,9 +1,9 @@
 import {
   type BridgeContract,
   type RpcMethodContract,
-  createSRPCClient,
-  createSRPCServer,
-} from '../src';
+  createSRPCClientBridge,
+  createSRPCServerBridge,
+} from '..';
 import http from 'node:http';
 
 // Step 1: Define your method contracts
@@ -37,7 +37,9 @@ interface ClientContract extends BridgeContract {
 
 // Step 3: Set up a server
 const httpServer = http.createServer();
-const server = createSRPCServer<ServerContract, ClientContract>(httpServer);
+const server = createSRPCServerBridge<ServerContract, ClientContract>(
+  httpServer,
+);
 
 // Step 4: Implement and register methods
 server.register({
@@ -70,7 +72,7 @@ httpServer.listen(3000, () => {
 
 // Step 5: Create a client
 async function runClient() {
-  const client = createSRPCClient<ClientContract, ServerContract>(
+  const client = createSRPCClientBridge<ClientContract, ServerContract>(
     'ws://localhost:3000',
   );
   await client.connect();
