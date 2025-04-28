@@ -1,5 +1,8 @@
-import type { CreateBridgeContract } from '@stagewise/srpc';
-
+import {
+  type CreateBridgeContract,
+  createBridgeContract,
+} from '@stagewise/srpc';
+import { z } from 'zod';
 export type Contract = CreateBridgeContract<{
   server: {
     triggerAgentPrompt: {
@@ -9,3 +12,20 @@ export type Contract = CreateBridgeContract<{
     };
   };
 }>;
+
+export const contract = createBridgeContract({
+  server: {
+    triggerAgentPrompt: {
+      request: z.object({
+        prompt: z.string(),
+      }),
+      response: z.object({
+        result: z.object({
+          success: z.boolean(),
+          error: z.string().optional(),
+          output: z.string().optional(),
+        }),
+      }),
+    },
+  },
+});

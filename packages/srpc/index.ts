@@ -34,3 +34,7 @@ export {
   createSRPCClientBridge,
   type CreateBridgeContract,
 } from './src/type-helpers';
+
+export { createBridgeContract } from './src/zod-contract';
+
+export { ZodServer, ZodClient } from './src/zod-bridge';

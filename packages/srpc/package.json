@@ -11,13 +11,14 @@
     "test": "vitest"
   },
   "dependencies": {
-    "ws": "^8.16.0"
+    "ws": "^8.16.0",
+    "zod": "^3.24.3"
   },
   "devDependencies": {
-    "vitest": "3.1.2",
     "@types/node": "20.x",
     "@types/ws": "^8.5.10",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "3.1.2"
   },
   "turbo": {
     "tasks": {

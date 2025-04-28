@@ -13,16 +13,20 @@
     "format": "biome format --write \"**/*.{ts,tsx,md}\""
   },
   "dependencies": {
-    "@stagewise/srpc": "workspace:*"
+    "@stagewise/srpc": "workspace:*",
+    "zod": "^3.24.3"
   },
   "devDependencies": {
+    "@types/node": "20.x",
     "biome": "^0.3.3",
-    "typescript": "^5.0.0",
     "rimraf": "^5.0.0",
-    "vitest": "3.1.2",
-    "@types/node": "20.x"
+    "typescript": "^5.0.0",
+    "vitest": "3.1.2"
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "publishConfig": {
     "access": "public"
   }

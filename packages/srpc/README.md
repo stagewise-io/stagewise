@@ -1,141 +1,197 @@
-# sRPC 🚀
+# SRPC: Schema-validated RPC over WebSocket
 
-> Strongly-typed, bidirectional RPC over WebSockets with real-time streaming capabilities
+A TypeScript framework for type-safe, schema-validated Remote Procedure Calls (RPC) over WebSocket connections. Built with Zod for runtime validation and strong TypeScript type inference.
 
-## Why sRPC? 🤔
+## Features
 
-In modern web applications, real-time bidirectional communication is crucial for creating responsive, interactive experiences. Traditional REST APIs fall short when you need:
+- 🔒 **Type Safety**: Full TypeScript support with type inference from Zod schemas
+- ✅ **Runtime Validation**: Automatic request/response validation using Zod schemas
+- 🔄 **Bi-directional Communication**: Both client and server can call methods on each other
+- 📝 **Progress Updates**: Support for sending progress updates during long-running operations
+- 🏃 **Auto-Reconnection**: Client automatically reconnects on connection loss
+- 📚 **Developer-Friendly**: Clear error messages and type hints in your IDE
 
-- 🔄 Real-time updates from server to client
-- 📱 Live collaboration features
-- 📊 Real-time data streaming
+## Installation
 
-sRPC combines the simplicity of RPC with the power of WebSockets, all wrapped in a fully type-safe package. No more dealing with complex WebSocket event handling or manual type checking!
-
-## Features ✨
-
-- 🔒 **Fully Type-Safe**: End-to-end TypeScript types for requests, responses, and streaming updates
-- 🔗 **Bidirectional Communication**: Both client and server can expose and call methods
-- 📡 **Real-time Streaming**: Built-in support for progress updates and live data streams
-- 🔄 **Auto-Reconnection**: Robust connection handling with configurable retry policies
-- 🎯 **Simple API**: Intuitive method-based calling convention
-- 📦 **Zero Dependencies**: Lightweight and fast
-
-## Usage Example 🚀
-
-### 1. Define Your Contract
-
-```typescript
-import { CreateBridgeContract, RpcMethodContract } from 'srpc';
-
-// Define a single contract type for both server and client methods
-type Contract = CreateBridgeContract<{
-  server: {
-    executePrompt: RpcMethodContract<
-      { prompt: string },
-      { result: { success: boolean; error?: string } },
-      { updateText: string }
-    >;
-    getSelectedModel: RpcMethodContract<
-      never,
-      { model: string; provider: string },
-      never
-    >;
-    changeAgentMode: RpcMethodContract<
-      { mode: 'agent' | 'ask' },
-      { result: { success: boolean; error?: string } },
-      never
-    >;
-  };
-  client: {
-    getCurrentUrl: RpcMethodContract<never, { url: string }, never>;
-    getConsoleLogs: RpcMethodContract<
-      { amount: string },
-      { logs: string[] },
-      never
-    >;
-  };
-}>;
+```bash
+npm install @stagewise/srpc zod
 ```
 
-### 2. Server Implementation
+## Quick Start
+
+1. Define your RPC contract using Zod schemas:
 
 ```typescript
-import { createSRPCServerBridge } from 'srpc';
+import { z } from 'zod';
+import { createBridgeContract } from '@stagewise/srpc';
+
+const contract = createBridgeContract({
+  server: {
+    triggerAgentPrompt: {
+      request: z.object({
+        prompt: z.string(),
+        options: z.object({
+          temperature: z.number().min(0).max(1).optional(),
+        }).optional(),
+      }),
+      response: z.object({
+        result: z.object({
+          success: z.boolean(),
+          output: z.string().optional(),
+        }),
+      }),
+      update: z.object({
+        updateText: z.string(),
+        progress: z.number().min(0).max(100).optional(),
+      }),
+    },
+  },
+  client: {
+    getCurrentUrl: {
+      request: z.object({}).optional(),
+      response: z.object({
+        url: z.string().url(),
+        title: z.string().optional(),
+      }),
+    },
+  },
+});
+```
+
+2. Set up the server:
+
+```typescript
 import http from 'node:http';
+import { createSRPCServerBridge } from '@stagewise/srpc';
 
 const httpServer = http.createServer();
-const agentBridge = createSRPCServerBridge<Contract>(httpServer);
+const server = createSRPCServerBridge(httpServer, contract);
 
-agentBridge.register({
-  executePrompt: async (request, sendUpdate) => {
-    sendUpdate({ updateText: 'Executing prompt...' });
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    return { result: { success: true } };
-  },
-  getSelectedModel: async () => {
-    return { model: 'gpt-4', provider: 'openai' };
-  },
-  changeAgentMode: async (request) => {
-    return { result: { success: true } };
+server.register({
+  triggerAgentPrompt: async (request, { sendUpdate }) => {
+    console.log('Processing prompt:', request.prompt);
+
+    // Send progress updates
+    await sendUpdate({
+      updateText: 'Processing...',
+      progress: 50,
+    });
+
+    return {
+      result: {
+        success: true,
+        output: 'Example response',
+      },
+    };
   },
 });
 
 httpServer.listen(3000);
 ```
 
-### 3. Client Implementation
+3. Set up the client:
 
 ```typescript
-const browserBridge = createSRPCClientBridge<Contract>('ws://localhost:3000');
+import { createSRPCClientBridge } from '@stagewise/srpc';
 
-// Register client methods
-browserBridge.register({
-  getCurrentUrl: async () => {
-    return { url: 'https://www.google.com' };
-  },
-  getConsoleLogs: async (request) => {
-    return { logs: ['log1', 'log2', 'log3'] };
-  },
+const client = createSRPCClientBridge('ws://localhost:3000', contract);
+
+// Implement client-side methods
+client.register({
+  getCurrentUrl: async () => ({
+    url: 'https://example.com',
+    title: 'Example Page',
+  }),
 });
 
 // Connect and make calls
-await browserBridge.connect();
+await client.connect();
 
-try {
-  const response = await browserBridge.call.executePrompt(
-    {
-      prompt: 'Hello, world!',
+const result = await client.call.triggerAgentPrompt(
+  {
+    prompt: 'Hello, agent!',
+    options: { temperature: 0.7 },
+  },
+  {
+    onUpdate: (update) => {
+      console.log('Progress:', update.updateText, update.progress);
     },
-    (update) => {
-      console.log('Agent updates:', update);
-    },
-  );
+  },
+);
 
-  console.log('Response:', response);
-} catch (error) {
-  console.error('Error:', error);
-}
+console.log('Result:', result);
 ```
 
-## Advanced Usage 🛠️
+## Features in Detail
 
-### Custom Configuration
+### Type Safety
+
+The framework provides full TypeScript type inference from your Zod schemas:
+
+- Method names are type-checked
+- Request/response payloads are type-checked
+- Update messages are type-checked
+- IDE autocompletion for all types
+
+### Runtime Validation
+
+All messages are validated at runtime using Zod:
+
+- Incoming requests are validated before reaching your handler
+- Outgoing responses are validated before being sent
+- Update messages are validated before being sent
+- Clear error messages when validation fails
+
+### Progress Updates
+
+Long-running operations can send progress updates:
 
 ```typescript
-const client = createSRPCClientBridge<Contract>('ws://localhost:3000', {
-  // Reconnection settings
-  maxReconnectAttempts: 5,
-  reconnectDelay: 1000,  // ms
-  
-  // Request timeout
-  requestTimeout: 30000, // ms
-  
-  // Custom WebSocket options
-  webSocketOptions: {
-    headers: {
-      'Authorization': 'Bearer token'
-    }
-  }
+server.register({
+  longOperation: async (request, { sendUpdate }) => {
+    await sendUpdate({ progress: 0, status: 'Starting...' });
+    // ... do work ...
+    await sendUpdate({ progress: 50, status: 'Processing...' });
+    // ... do more work ...
+    return { success: true };
+  },
 });
 ```
+
+### Auto-Reconnection
+
+The client automatically handles reconnection:
+
+```typescript
+const client = createSRPCClientBridge('ws://localhost:3000', contract, {
+  reconnectDelay: 1000, // milliseconds
+  maxReconnectAttempts: 5,
+});
+```
+
+## Error Handling
+
+The framework provides clear error messages for various failure cases:
+
+- Schema validation errors include the exact validation failure
+- Connection errors include relevant network details
+- Method not found errors include the attempted method name
+- Implementation errors include the original error stack
+
+## Examples
+
+Check out the `examples/` directory for more detailed examples:
+
+- Basic usage: `examples/basic.ts`
+- Progress updates: `examples/progress.ts`
+- Error handling: `examples/error-handling.ts`
+- Complex schemas: `examples/complex-schemas.ts`
+- Full application: `examples/zod-example.ts`
+
+## Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

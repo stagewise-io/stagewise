@@ -94,6 +94,9 @@ importers:
       '@stagewise/srpc':
         specifier: workspace:*
         version: link:../srpc
+      zod:
+        specifier: ^3.24.3
+        version: 3.24.3
     devDependencies:
       '@types/node':
         specifier: 20.x
@@ -116,6 +119,9 @@ importers:
       ws:
         specifier: ^8.16.0
         version: 8.18.1
+      zod:
+        specifier: ^3.24.3
+        version: 3.24.3
     devDependencies:
       '@types/node':
         specifier: 20.x
