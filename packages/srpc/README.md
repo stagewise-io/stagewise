@@ -8,9 +8,7 @@ In modern web applications, real-time bidirectional communication is crucial for
 
 - 🔄 Real-time updates from server to client
 - 📱 Live collaboration features
-- 🎮 Interactive gaming experiences
 - 📊 Real-time data streaming
-- 🤖 AI/ML progress monitoring
 
 sRPC combines the simplicity of RPC with the power of WebSockets, all wrapped in a fully type-safe package. No more dealing with complex WebSocket event handling or manual type checking!
 
