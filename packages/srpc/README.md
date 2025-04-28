@@ -23,39 +23,39 @@ sRPC combines the simplicity of RPC with the power of WebSockets, all wrapped in
 
 ## Usage Example 🚀
 
-### 1. Define Your Contracts
+### 1. Define Your Contract
 
 ```typescript
-import { BridgeContract, RpcMethodContract } from 'srpc';
+import { CreateBridgeContract, RpcMethodContract } from 'srpc';
 
-// Server methods that the client can call
-interface CodingAgentServesContract extends BridgeContract {
-  executePrompt: RpcMethodContract<
-    { prompt: string },
-    { result: { success: boolean; error?: string } },
-    { updateText: string }
-  >;
-  getSelectedModel: RpcMethodContract<
-    never,
-    { model: string; provider: string },
-    never
-  >;
-  changeAgentMode: RpcMethodContract<
-    { mode: 'agent' | 'ask' },
-    { result: { success: boolean; error?: string } },
-    never
-  >;
-}
-
-// Client methods that the server can call
-interface BrowserClientServesContract extends BridgeContract {
-  getCurrentUrl: RpcMethodContract<undefined, { url: string }, never>;
-  getConsoleLogs: RpcMethodContract<
-    { amount: string },
-    { logs: string[] },
-    never
-  >;
-}
+// Define a single contract type for both server and client methods
+type Contract = CreateBridgeContract<{
+  server: {
+    executePrompt: RpcMethodContract<
+      { prompt: string },
+      { result: { success: boolean; error?: string } },
+      { updateText: string }
+    >;
+    getSelectedModel: RpcMethodContract<
+      never,
+      { model: string; provider: string },
+      never
+    >;
+    changeAgentMode: RpcMethodContract<
+      { mode: 'agent' | 'ask' },
+      { result: { success: boolean; error?: string } },
+      never
+    >;
+  };
+  client: {
+    getCurrentUrl: RpcMethodContract<never, { url: string }, never>;
+    getConsoleLogs: RpcMethodContract<
+      { amount: string },
+      { logs: string[] },
+      never
+    >;
+  };
+}>;
 ```
 
 ### 2. Server Implementation
@@ -65,10 +65,7 @@ import { createSRPCServerBridge } from 'srpc';
 import http from 'node:http';
 
 const httpServer = http.createServer();
-const agentBridge = createSRPCServerBridge<
-  CodingAgentServesContract, // <-- This is what the agent serves
-  BrowserClientServesContract // <-- This is what the agent consumes
->(httpServer);
+const agentBridge = createSRPCServerBridge<Contract>(httpServer);
 
 agentBridge.register({
   executePrompt: async (request, sendUpdate) => {
@@ -84,19 +81,13 @@ agentBridge.register({
   },
 });
 
-// Assume that the client has connected
-const currentUrl = agentBridge.call.getCurrentUrl(undefined)
-
 httpServer.listen(3000);
 ```
 
 ### 3. Client Implementation
 
 ```typescript
-const browserBridge = createSRPCClientBridge<
-  BrowserClientServesContract, // <-- This is what the browser client serves
-  CodingAgentServesContract // <-- This is what the browser client consumes
->('ws://localhost:3000');
+const browserBridge = createSRPCClientBridge<Contract>('ws://localhost:3000');
 
 // Register client methods
 browserBridge.register({
@@ -132,39 +123,19 @@ try {
 ### Custom Configuration
 
 ```typescript
-const client = createSRPCClientBridge<BrowserClientServesContract, CodingAgentServesContract>(
-  'ws://localhost:3000',
-  {
-    // Reconnection settings
-    maxReconnectAttempts: 5,
-    reconnectDelay: 1000,  // ms
-    
-    // Request timeout
-    requestTimeout: 30000, // ms
-    
-    // Custom WebSocket options
-    webSocketOptions: {
-      headers: {
-        'Authorization': 'Bearer token'
-      }
+const client = createSRPCClientBridge<Contract>('ws://localhost:3000', {
+  // Reconnection settings
+  maxReconnectAttempts: 5,
+  reconnectDelay: 1000,  // ms
+  
+  // Request timeout
+  requestTimeout: 30000, // ms
+  
+  // Custom WebSocket options
+  webSocketOptions: {
+    headers: {
+      'Authorization': 'Bearer token'
     }
   }
-);
-```
-
-### Error Handling
-
-```typescript
-try {
-  const result = await client.call.executePrompt(
-    { prompt: "Execute this task" },
-    (update) => console.log(update)
-  );
-} catch (error) {
-  if (error instanceof RPCError) {
-    console.error(`RPC Error: ${error.code} - ${error.message}`);
-  } else {
-    console.error('Unexpected error:', error);
-  }
-}
+});
 ```
