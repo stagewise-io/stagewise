@@ -6,62 +6,58 @@ import {
 } from '..';
 import http from 'node:http';
 
-// Step 1: Define your method contracts
-interface GreetingRequest {
-  name: string;
-}
-
-interface GreetingResponse {
-  message: string;
-}
-
-interface GreetingProgress {
-  status: string;
-  progress: number;
-}
-
 // Step 2: Define your complete API contract
-interface ServerContract extends BridgeContract {
-  greet: RpcMethodContract<GreetingRequest, GreetingResponse, GreetingProgress>;
-  getData: RpcMethodContract<{ id: number }, { data: string }>;
+interface CodingAgentServesContract extends BridgeContract {
+  executePrompt: RpcMethodContract<
+    { prompt: string },
+    { result: { success: boolean; error?: string } },
+    { updateText: string }
+  >;
+  getSelectedModel: RpcMethodContract<
+    never,
+    { model: string; provider: string },
+    never
+  >;
+  changeAgentMode: RpcMethodContract<
+    { mode: 'agent' | 'ask' },
+    { result: { success: boolean; error?: string } },
+    never
+  >;
 }
 
 // Empty client contract since client doesn't expose methods in this example
-interface ClientContract extends BridgeContract {
-  sayHello: RpcMethodContract<
-    { name: string },
-    { message: string },
-    { progress: number }
+interface BrowserClientServesContract extends BridgeContract {
+  getCurrentUrl: RpcMethodContract<never, { url: string }, never>;
+  getConsoleLogs: RpcMethodContract<
+    { amount: string },
+    { logs: string[] },
+    never
   >;
 }
 
 // Step 3: Set up a server
 const httpServer = http.createServer();
-const server = createSRPCServerBridge<ServerContract, ClientContract>(
-  httpServer,
-);
+const server = createSRPCServerBridge<
+  CodingAgentServesContract,
+  BrowserClientServesContract
+>(httpServer);
 
 // Step 4: Implement and register methods
 server.register({
-  greet: async (request, sendUpdate) => {
-    // Simulate progress updates
-    sendUpdate({ status: 'Starting', progress: 0 });
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    sendUpdate({ status: 'Processing', progress: 50 });
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    sendUpdate({ status: 'Finishing', progress: 90 });
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return { message: `Hello, ${request.name}!` };
+  executePrompt: async (request, sendUpdate) => {
+    sendUpdate({ updateText: 'Executing prompt...' });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return { result: { success: true } };
   },
-  getData: async (request) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ data: `Data for ID ${request.id}` });
-      }, 1000);
-    });
+  getSelectedModel: async () => {
+    // Return the current model and provider
+    // const model = agent.getSelectedModel();
+    return { model: 'gpt-4', provider: 'openai' };
+  },
+  changeAgentMode: async (request) => {
+    // Change the agent mode to the requested mode
+    // agent.changeMode(request.mode);
+    return { result: { success: true } };
   },
 });
 
@@ -72,34 +68,36 @@ httpServer.listen(3000, () => {
 
 // Step 5: Create a client
 async function runClient() {
-  const client = createSRPCClientBridge<ClientContract, ServerContract>(
-    'ws://localhost:3000',
-  );
-  await client.connect();
+  const browserBridge = createSRPCClientBridge<
+    BrowserClientServesContract,
+    CodingAgentServesContract
+  >('ws://localhost:3000');
+  await browserBridge.connect();
 
-  client.register({
-    sayHello: async (request, sendUpdate) => {
-      sendUpdate({ progress: 0 });
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      sendUpdate({ progress: 50 });
-      return { message: `Hello, ${request.name}!` };
+  browserBridge.register({
+    getCurrentUrl: async () => {
+      return { url: 'https://www.google.com' };
+    },
+    getConsoleLogs: async (request) => {
+      return { logs: ['log1', 'log2', 'log3'] };
     },
   });
 
   try {
-    const response = await client.call.greet({ name: 'John' }, (update) => {
-      console.log('Update received:', update);
-    });
+    const response = await browserBridge.call.executePrompt(
+      {
+        prompt: 'Hello, world!',
+      },
+      (update) => {
+        console.log('Update:', update);
+      },
+    );
 
-    console.log('Response:', response);
-
-    // Another example with getData
-    const dataResponse = await client.call.getData({ id: 123 });
-    console.log('Data response:', dataResponse);
+    console.log('Response of the agent call:', response);
   } catch (error) {
     console.error('Error:', error);
   } finally {
-    client.close();
+    browserBridge.close();
     httpServer.close();
   }
 }

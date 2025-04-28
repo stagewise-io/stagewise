@@ -1,8 +1,5 @@
 import * as vscode from 'vscode';
 
-// Helper function for a short delay
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 // Define the name for the diagnostic collection
 const DIAGNOSTIC_COLLECTION_NAME = 'customPromptInjector';
 
@@ -76,9 +73,6 @@ export async function callCursorAgent(prompt: string): Promise<void> {
       selectionOrFullDocRange.start,
       selectionOrFullDocRange.start,
     );
-
-    // 4. Optional brief delay before executing the command
-    await delay(150); // Slightly increased delay, adjust if needed
 
     // 5. Execute the command
     console.error('>>> Executing composer.fixerrormessage');

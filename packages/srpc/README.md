@@ -1,122 +1,172 @@
-# sRPC
+# sRPC 🚀
 
-A strongly-typed, bidirectional RPC library for WebSocket connections with support for streaming updates.
+> Strongly-typed, bidirectional RPC over WebSockets with real-time streaming capabilities
 
-## Features
+## Why sRPC? 🤔
 
-- 🔒 **Strong typing** for requests, responses, and streaming updates
-- 📡 **WebSocket transport** for bidirectional communication
-- 📊 **Streaming updates** for progress reporting and real-time data
-- 🔄 **Automatic reconnection** with configurable retry policies
-- 📝 **Simple API** with method chaining for an intuitive developer experience
+In modern web applications, real-time bidirectional communication is crucial for creating responsive, interactive experiences. Traditional REST APIs fall short when you need:
 
-## Basic Usage
+- 🔄 Real-time updates from server to client
+- 📱 Live collaboration features
+- 🎮 Interactive gaming experiences
+- 📊 Real-time data streaming
+- 🤖 AI/ML progress monitoring
 
-### 1. Define Your Contract
+sRPC combines the simplicity of RPC with the power of WebSockets, all wrapped in a fully type-safe package. No more dealing with complex WebSocket event handling or manual type checking!
+
+## Features ✨
+
+- 🔒 **Fully Type-Safe**: End-to-end TypeScript types for requests, responses, and streaming updates
+- 🔗 **Bidirectional Communication**: Both client and server can expose and call methods
+- 📡 **Real-time Streaming**: Built-in support for progress updates and live data streams
+- 🔄 **Auto-Reconnection**: Robust connection handling with configurable retry policies
+- 🎯 **Simple API**: Intuitive method-based calling convention
+- 📦 **Zero Dependencies**: Lightweight and fast
+
+## Usage Example 🚀
+
+### 1. Define Your Contracts
 
 ```typescript
-import { BridgeContract, RpcMethodContract } from '@your-org/srpc';
+import { BridgeContract, RpcMethodContract } from 'srpc';
 
-// Define your API contract with typed methods
-interface ServerContract extends BridgeContract {
-  greet: RpcMethodContract<
-    { name: string },            // Request type
-    { message: string },         // Response type
-    { status: string, progress: number }  // Update type (for streaming)
+// Server methods that the client can call
+interface CodingAgentServesContract extends BridgeContract {
+  executePrompt: RpcMethodContract<
+    { prompt: string },
+    { result: { success: boolean; error?: string } },
+    { updateText: string }
   >;
-  
-  getData: RpcMethodContract<
-    { id: number },
-    { data: string }
+  getSelectedModel: RpcMethodContract<
+    never,
+    { model: string; provider: string },
+    never
+  >;
+  changeAgentMode: RpcMethodContract<
+    { mode: 'agent' | 'ask' },
+    { result: { success: boolean; error?: string } },
+    never
   >;
 }
 
-// If client doesn't expose methods, use an empty contract
-interface ClientContract extends BridgeContract {}
+// Client methods that the server can call
+interface BrowserClientServesContract extends BridgeContract {
+  getCurrentUrl: RpcMethodContract<undefined, { url: string }, never>;
+  getConsoleLogs: RpcMethodContract<
+    { amount: string },
+    { logs: string[] },
+    never
+  >;
+}
 ```
 
 ### 2. Server Implementation
 
 ```typescript
-import { createSRPCServerBridge } from '@your-org/srpc';
+import { createSRPCServerBridge } from 'srpc';
 import http from 'node:http';
 
-// Create HTTP server
 const httpServer = http.createServer();
-const server = createSRPCServerBridge<ServerContract, ClientContract>(httpServer);
+const agentBridge = createSRPCServerBridge<
+  CodingAgentServesContract,
+  BrowserClientServesContract
+>(httpServer);
 
-// Implement and register methods
-server.register({
-  greet: async (request, sendUpdate) => {
-    // Send progress updates
-    sendUpdate({ status: 'Starting', progress: 0 });
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    sendUpdate({ status: 'Processing', progress: 50 });
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return { message: `Hello, ${request.name}!` };
+agentBridge.register({
+  executePrompt: async (request, sendUpdate) => {
+    sendUpdate({ updateText: 'Executing prompt...' });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return { result: { success: true } };
   },
-  
-  getData: async (request) => {
-    return { data: `Data for ID ${request.id}` };
-  }
+  getSelectedModel: async () => {
+    return { model: 'gpt-4', provider: 'openai' };
+  },
+  changeAgentMode: async (request) => {
+    return { result: { success: true } };
+  },
 });
 
-// Start the server
-httpServer.listen(3000, () => {
-  console.log('Server running on port 3000');
-});
+// Assume that the client has connected
+const currentUrl = agentBridge.call.getCurrentUrl(undefined)
+
+httpServer.listen(3000);
 ```
 
-### 3. Client Usage
+### 3. Client Implementation
 
 ```typescript
-import { createSRPCClientBrdige } from '@your-org/srpc';
+const browserBridge = createSRPCClientBridge<
+  BrowserClientServesContract,
+  CodingAgentServesContract
+>('ws://localhost:3000');
 
-async function main() {
-  // Create and connect the client
-  const client = createSRPCClientBridge<ClientContract, ServerContract>('ws://localhost:3000');
-  await client.connect();
-  
-  try {
-    // Call method with property access syntax and handle streaming updates
-    const response = await client.call.greet({ name: 'World' }, (update) => {
-      console.log(`Progress: ${update.status} - ${update.progress}%`);
-    });
-    
-    console.log(response.message); // "Hello, World!"
-    
-    // Call another method without streaming updates
-    const data = await client.call.getData({ id: 123 });
-    console.log(data.data); // "Data for ID 123"
-  } finally {
-    client.close();
-  }
+// Register client methods
+browserBridge.register({
+  getCurrentUrl: async () => {
+    return { url: 'https://www.google.com' };
+  },
+  getConsoleLogs: async (request) => {
+    return { logs: ['log1', 'log2', 'log3'] };
+  },
+});
+
+// Connect and make calls
+await browserBridge.connect();
+
+try {
+  const response = await browserBridge.call.executePrompt(
+    {
+      prompt: 'Hello, world!',
+    },
+    (update) => {
+      console.log('Agent updates:', update);
+    },
+  );
+
+  console.log('Response:', response);
+} catch (error) {
+  console.error('Error:', error);
 }
-
-main().catch(console.error);
 ```
 
-## Advanced Configuration
+## Advanced Usage 🛠️
 
-The library supports various configuration options for reconnection behavior and timeouts:
+### Custom Configuration
 
 ```typescript
-const client = createSRPCClientBridge<ClientContract, ServerContract>(
+const client = createSRPCClientBridge<BrowserClientServesContract, CodingAgentServesContract>(
   'ws://localhost:3000',
   {
-    maxReconnectAttempts: 5,    // Maximum reconnection attempts
-    reconnectDelay: 1000,       // Delay between reconnections (ms)
-    requestTimeout: 30000,      // Request timeout (ms)
+    // Reconnection settings
+    maxReconnectAttempts: 5,
+    reconnectDelay: 1000,  // ms
+    
+    // Request timeout
+    requestTimeout: 30000, // ms
+    
+    // Custom WebSocket options
+    webSocketOptions: {
+      headers: {
+        'Authorization': 'Bearer token'
+      }
+    }
   }
 );
 ```
 
-## Contributing
+### Error Handling
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 
+```typescript
+try {
+  const result = await client.call.executePrompt(
+    { prompt: "Execute this task" },
+    (update) => console.log(update)
+  );
+} catch (error) {
+  if (error instanceof RPCError) {
+    console.error(`RPC Error: ${error.code} - ${error.message}`);
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```

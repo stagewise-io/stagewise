@@ -152,7 +152,8 @@ export abstract class WebSocketRpcBridge {
 
     ws.onclose = () => {
       console.log('WebSocket disconnected');
-      this.handleDisconnect();
+      // TODO: Re-Enable this
+      // this.handleDisconnect();
     };
 
     ws.onerror = (event: ErrorEvent) => {
