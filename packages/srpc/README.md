@@ -66,8 +66,8 @@ import http from 'node:http';
 
 const httpServer = http.createServer();
 const agentBridge = createSRPCServerBridge<
-  CodingAgentServesContract,
-  BrowserClientServesContract
+  CodingAgentServesContract, // <-- This is what the agent serves
+  BrowserClientServesContract // <-- This is what the agent consumes
 >(httpServer);
 
 agentBridge.register({
@@ -94,8 +94,8 @@ httpServer.listen(3000);
 
 ```typescript
 const browserBridge = createSRPCClientBridge<
-  BrowserClientServesContract,
-  CodingAgentServesContract
+  BrowserClientServesContract, // <-- This is what the browser client serves
+  CodingAgentServesContract // <-- This is what the browser client consumes
 >('ws://localhost:3000');
 
 // Register client methods
