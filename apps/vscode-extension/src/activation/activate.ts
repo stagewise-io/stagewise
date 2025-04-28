@@ -34,26 +34,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     bridge.register({
       triggerAgentPrompt: async (request, sendUpdate) => {
-        console.error(
-          '\n\n   EXTENSION RECEIVED REQUEST "triggerAgentPrompt":',
-          request,
-          '\n\n',
-        );
         await callCursorAgent(request.prompt);
         sendUpdate({ updateText: 'Called the agent' });
 
-        const result = await bridge.call.test({ prompt: 'moin' }, (update) => {
-          console.error(
-            '\n\n   EXTENSION RECEIVED UPDATE "triggerAgentPrompt":',
-            update.updateText,
-            '\n\n',
-          );
-        });
-        console.error(
-          '\n\n   EXTENSION RECEIVED RESPONSE "triggerAgentPrompt":',
-          result,
-          '\n\n',
-        );
         return { result: { success: true } };
       },
     });

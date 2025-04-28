@@ -72,7 +72,7 @@ export class TypedBridge<
 
   // Register methods with type safety
   public register(implementations: MethodImplementations<Serves>): void {
-    this.bridge.register(implementations as any);
+    this.bridge.register(implementations);
   }
 }
 
