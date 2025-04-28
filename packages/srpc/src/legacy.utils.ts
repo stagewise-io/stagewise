@@ -1,5 +1,5 @@
 import type { WebSocket } from 'ws';
-import type { WebSocketMessage, PendingRequest } from './types';
+import type { WebSocketMessage, PendingRequest } from './legacy.types';
 
 /**
  * Configuration options for WebSocket connections

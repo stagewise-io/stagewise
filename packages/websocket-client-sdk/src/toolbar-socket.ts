@@ -6,7 +6,7 @@ import {
   WebSocketConnectionManager,
   type ToolbarCommandType,
   type CommandToPayloadMap,
-} from '../../socket-rcp';
+} from '@stagewise/srpc';
 
 /**
  * Client-side WebSocket implementation that extends the base WebSocketConnectionManager.

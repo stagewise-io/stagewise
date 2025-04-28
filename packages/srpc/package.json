@@ -1,5 +1,5 @@
 {
-  "name": "@stagewise/websocket-core",
+  "name": "@stagewise/srpc",
   "version": "0.0.1",
   "private": true,
   "main": "./dist/index.js",

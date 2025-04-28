@@ -33,9 +33,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.10.2
         version: 1.10.2
-      '@stagewise/websocket-core':
+      '@stagewise/srpc':
         specifier: workspace:*
-        version: link:../../packages/websocket-core
+        version: link:../../packages/srpc
       '@types/cors':
         specifier: ^2.8.17
         version: 2.8.17
@@ -89,13 +89,29 @@ importers:
         specifier: ^5.8.2
         version: 5.8.2
 
+  packages/srpc:
+    dependencies:
+      ws:
+        specifier: ^8.16.0
+        version: 8.18.1
+    devDependencies:
+      '@types/node':
+        specifier: 20.x
+        version: 20.17.31
+      '@types/ws':
+        specifier: ^8.5.10
+        version: 8.18.1
+      typescript:
+        specifier: ^5.0.0
+        version: 5.8.2
+
   packages/typescript-config: {}
 
   packages/websocket-client-sdk:
     dependencies:
-      '@stagewise/websocket-core':
+      '@stagewise/srpc':
         specifier: workspace:*
-        version: link:../websocket-core
+        version: link:../srpc
       ws:
         specifier: ^8.16.0
         version: 8.18.1
@@ -112,22 +128,6 @@ importers:
       vitest:
         specifier: ^1.3.1
         version: 1.6.1(@types/node@20.17.31)
-
-  packages/websocket-core:
-    dependencies:
-      ws:
-        specifier: ^8.16.0
-        version: 8.18.1
-    devDependencies:
-      '@types/node':
-        specifier: 20.x
-        version: 20.17.31
-      '@types/ws':
-        specifier: ^8.5.10
-        version: 8.18.1
-      typescript:
-        specifier: ^5.0.0
-        version: 5.8.2
 
 packages:
 

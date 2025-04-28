@@ -8,7 +8,7 @@ import {
   type ToolUsageRequest,
   type PromptTriggerResponse,
   type ToolUsageResponse,
-} from '../../../../packages/socket-rcp/src';
+} from '@stagewise/srpc';
 import { randomUUID } from 'node:crypto';
 import { callCursorAgent } from '../utils/call-cursor-agent';
 

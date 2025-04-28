@@ -11,7 +11,7 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@stagewise/websocket-core": ["../websocket-bridge/src"]
+      "@stagewise/srpc": ["../srpc/src"]
     }
   },
   "include": ["src/**/*"],

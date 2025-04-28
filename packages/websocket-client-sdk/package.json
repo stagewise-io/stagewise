@@ -12,7 +12,7 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@stagewise/websocket-core": "workspace:*",
+    "@stagewise/srpc": "workspace:*",
     "ws": "^8.16.0"
   },
   "devDependencies": {
