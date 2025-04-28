@@ -42,13 +42,23 @@ export class TypedBridge<
   B extends WebSocketRpcClient | WebSocketRpcServer,
 > {
   protected bridge: B;
+  public call: MethodCalls<Consumes>;
 
   constructor(bridge: B) {
     this.bridge = bridge;
+
+    // Create a proxy for method calling
+    this.call = new Proxy({} as MethodCalls<Consumes>, {
+      get: (target, prop) => {
+        return (request: any, onUpdate?: (update: any) => void) => {
+          return this.callMethod(prop as keyof Consumes, request, onUpdate);
+        };
+      },
+    });
   }
 
-  // Call a method with type safety
-  public call<K extends keyof Consumes>(
+  // Private method to handle actual method calls
+  private callMethod<K extends keyof Consumes>(
     method: K,
     request: Consumes[K]['request'],
     onUpdate?: (update: Consumes[K]['update']) => void,
@@ -61,9 +71,7 @@ export class TypedBridge<
   }
 
   // Register methods with type safety
-  public register(
-    implementations: Partial<MethodImplementations<Serves>>,
-  ): void {
+  public register(implementations: MethodImplementations<Serves>): void {
     this.bridge.register(implementations as any);
   }
 }
@@ -86,6 +94,10 @@ export class TypedClient<
   }
   public connect(): Promise<void> {
     return this.bridge.connect();
+  }
+
+  public close(): void {
+    this.bridge.close();
   }
 }
 

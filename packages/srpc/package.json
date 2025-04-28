@@ -7,12 +7,14 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "vitest"
   },
   "dependencies": {
     "ws": "^8.16.0"
   },
   "devDependencies": {
+    "vitest": "^1.3.1",
     "@types/node": "20.x",
     "@types/ws": "^8.5.10",
     "typescript": "^5.0.0"
