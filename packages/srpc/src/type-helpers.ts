@@ -21,8 +21,8 @@ export type EndpointMethodMap = Record<
 >;
 
 export type BridgeContract = {
-  client: EndpointMethodMap;
-  server: EndpointMethodMap;
+  client?: EndpointMethodMap;
+  server?: EndpointMethodMap;
 };
 
 export type CreateBridgeContract<
@@ -43,15 +43,17 @@ export type MethodImplementations<T> = {
 };
 
 // Type for method calls
-export type MethodCalls<T> = {
-  [K in keyof T]: T[K] extends RpcMethodContract<
-    infer Req,
-    infer Res,
-    infer Upd
-  >
-    ? (request: Req, onUpdate?: (update: Upd) => void) => Promise<Res>
-    : never;
-};
+export type MethodCalls<T> = [T] extends [EmptyEndpointMap]
+  ? Record<never, never>
+  : {
+      [K in keyof T]: T[K] extends RpcMethodContract<
+        infer Req,
+        infer Res,
+        infer Upd
+      >
+        ? (request: Req, onUpdate?: (update: Upd) => void) => Promise<Res>
+        : never;
+    };
 
 // TypedBridge wraps WebSocketRpcClient or WebSocketRpcServer with type safety
 export class TypedBridge<
@@ -119,16 +121,24 @@ export class TypedClient<
   }
 }
 
+// Empty endpoint map type for when server/client is undefined
+type EmptyEndpointMap = null;
+
 // Helper functions to create typed bridges
 export function createSRPCServerBridge<C extends BridgeContract>(
   server: Server,
-): TypedServer<C['server'], C['client']> {
-  return new TypedServer<C['server'], C['client']>(server);
+): TypedServer<NonNullable<C['server']>, NonNullable<C['client']>> {
+  return new TypedServer<NonNullable<C['server']>, NonNullable<C['client']>>(
+    server,
+  );
 }
 
 export function createSRPCClientBridge<C extends BridgeContract>(
   url: string,
   options?: WebSocketBridgeOptions,
-): TypedClient<C['client'], C['server']> {
-  return new TypedClient<C['client'], C['server']>(url, options);
+): TypedClient<NonNullable<C['client']>, NonNullable<C['server']>> {
+  return new TypedClient<NonNullable<C['client']>, NonNullable<C['server']>>(
+    url,
+    options,
+  );
 }
