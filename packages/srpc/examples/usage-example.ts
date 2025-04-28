@@ -27,7 +27,13 @@ interface ServerContract extends BridgeContract {
 }
 
 // Empty client contract since client doesn't expose methods in this example
-interface ClientContract extends BridgeContract {}
+interface ClientContract extends BridgeContract {
+  sayHello: RpcMethodContract<
+    { name: string },
+    { message: string },
+    { progress: number }
+  >;
+}
 
 // Step 3: Set up a server
 const httpServer = http.createServer();
@@ -68,6 +74,15 @@ async function runClient() {
     'ws://localhost:3000',
   );
   await client.connect();
+
+  client.register({
+    sayHello: async (request, sendUpdate) => {
+      sendUpdate({ progress: 0 });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      sendUpdate({ progress: 50 });
+      return { message: `Hello, ${request.name}!` };
+    },
+  });
 
   try {
     const response = await client.call.greet({ name: 'John' }, (update) => {
