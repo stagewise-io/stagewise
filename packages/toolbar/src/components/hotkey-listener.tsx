@@ -10,8 +10,6 @@ export function HotkeyListener() {
 
   const hotKeyHandlerMap: Record<HotkeyActions, () => void> = useMemo(
     () => ({
-      [HotkeyActions.ESCAPE]: null,
-      [HotkeyActions.ALT_SHIFT_C]: null,
       [HotkeyActions.CTRL_K]: () => {
         console.log("CTRL + K got triggered!");
         setInputFocus(true);

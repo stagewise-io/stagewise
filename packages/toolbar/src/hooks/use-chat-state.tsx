@@ -16,6 +16,7 @@ interface Chat {
   title: string | null;
   messages: Message[];
   inputValue: string;
+  domContextElements: HTMLElement[];
 }
 
 type ChatAreaState = "hidden" | "compact" | "expanded";
@@ -33,6 +34,8 @@ interface ChatContext {
   // Chat content operations
   setChatInput: (chatId: ChatId, value: string) => void;
   addMessage: (chatId: ChatId, content: string) => void;
+  addChatDomContext: (chatId: ChatId, element: HTMLElement) => void;
+  removeChatDomContext: (chatId: ChatId, element: HTMLElement) => void;
 
   // UI state
   chatAreaState: ChatAreaState;
@@ -48,6 +51,8 @@ const ChatContext = createContext<ChatContext>({
   deleteChat: () => {},
   setCurrentChat: () => {},
   setChatInput: () => {},
+  addChatDomContext: () => {},
+  removeChatDomContext: () => {},
   addMessage: () => {},
   chatAreaState: "hidden",
   setChatAreaState: () => {},
@@ -66,6 +71,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       messages: [],
       title: "New chat",
       inputValue: "",
+      domContextElements: [],
     },
   ]);
   const [currentChatId, setCurrentChatId] = useState<ChatId>("new_chat");
@@ -80,6 +86,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       title: null,
       messages: [],
       inputValue: "",
+      domContextElements: [],
     };
     setChats((prev) => [...prev, newChat]);
     setCurrentChatId(newChatId);
@@ -97,6 +104,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
               messages: [],
               title: "New chat",
               inputValue: "",
+              domContextElements: [],
             },
           ];
         }
@@ -134,6 +142,40 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     [internalSetChatAreaState, setInputFocus]
   );
 
+  const addChatDomContext = useCallback(
+    (chatId: ChatId, element: HTMLElement) => {
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === chatId
+            ? {
+                ...chat,
+                domContextElements: [...chat.domContextElements, element],
+              }
+            : chat
+        )
+      );
+    },
+    []
+  );
+
+  const removeChatDomContext = useCallback(
+    (chatId: ChatId, element: HTMLElement) => {
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === chatId
+            ? {
+                ...chat,
+                domContextElements: chat.domContextElements.filter(
+                  (e) => e !== element
+                ),
+              }
+            : chat
+        )
+      );
+    },
+    []
+  );
+
   const addMessage = useCallback(
     (chatId: ChatId, content: string) => {
       if (!content.trim()) return;
@@ -157,6 +199,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
                 ...chat,
                 messages: [...chat.messages, newMessage],
                 inputValue: "",
+                domContext: [],
               }
             : chat
         )
@@ -177,6 +220,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     setChatAreaState,
     inputFocus,
     setInputFocus,
+    addChatDomContext,
+    removeChatDomContext,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

@@ -2,21 +2,15 @@
 // information about the element that was hovered or clicked.
 // It ignores the companion itself.
 
-import {
-  getElementAtPoint,
-  getOffsetsFromPointToElement,
-  getXPathForElement,
-} from "@/utils";
+import { getElementAtPoint } from "@/utils";
 import { useCallback, useRef } from "preact/hooks";
 import { MouseEventHandler } from "preact/compat";
 
 export interface ElementSelectorProps {
-  onElementHovered: (referencePath: string) => void;
-  onElementSelected: (
-    referencePath: string,
-    offsetTop: number,
-    offsetLeft: number
-  ) => void;
+  onElementHovered: (element: HTMLElement) => void;
+  onElementUnhovered: () => void;
+  onElementSelected: (element: HTMLElement) => void;
+  ignoreList: HTMLElement[];
 }
 
 export function ElementSelector(props: ElementSelectorProps) {
@@ -27,35 +21,35 @@ export function ElementSelector(props: ElementSelectorProps) {
       const target = event.target as HTMLElement;
       if (target.closest(".companion")) return;
       const refElement = getElementAtPoint(event.clientX, event.clientY);
+      if (props.ignoreList.includes(refElement)) return;
       if (lastHoveredElement.current !== refElement) {
         lastHoveredElement.current = refElement;
-        props.onElementHovered(getXPathForElement(refElement, false));
+        props.onElementHovered(refElement);
       }
     },
     [props]
   );
 
-  const handleMouseClick = useCallback<MouseEventHandler<HTMLDivElement>>(
-    (event) => {
-      if (!lastHoveredElement.current) return;
-      const offsets = getOffsetsFromPointToElement(
-        lastHoveredElement.current,
-        event.clientX,
-        event.clientY
-      );
-      props.onElementSelected(
-        getXPathForElement(lastHoveredElement.current, false),
-        offsets.offsetTop,
-        offsets.offsetLeft
-      );
-    },
-    [props]
-  );
+  const handleMouseLeave = useCallback<
+    MouseEventHandler<HTMLDivElement>
+  >(() => {
+    lastHoveredElement.current = null;
+    props.onElementUnhovered();
+  }, [props]);
+
+  const handleMouseClick = useCallback<
+    MouseEventHandler<HTMLDivElement>
+  >(() => {
+    if (!lastHoveredElement.current) return;
+    if (props.ignoreList.includes(lastHoveredElement.current)) return;
+    props.onElementSelected(lastHoveredElement.current);
+  }, [props]);
 
   return (
     <div
       className="pointer-events-auto fixed inset-0 h-screen w-screen"
       onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       onClick={handleMouseClick}
     ></div>
   );

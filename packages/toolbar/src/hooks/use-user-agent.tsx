@@ -1,5 +1,5 @@
 import { useMemo } from "preact/hooks";
-import UAParser from "ua-parser-js";
+import { UAParser } from "ua-parser-js";
 
 const useBrowserInfo = () => {
   const browserInfo = useMemo(() => {

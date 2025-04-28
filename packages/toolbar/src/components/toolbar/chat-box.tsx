@@ -1,5 +1,6 @@
 import { useChatState } from "@/hooks/use-chat-state";
-import { cn } from "@/utils";
+import { useHotkeyListenerComboText } from "@/hooks/use-hotkey-listener-combo-text";
+import { cn, hotkeyActionDefinitions, HotkeyActions } from "@/utils";
 import { Button, Textarea } from "@headlessui/react";
 import { Send } from "lucide-react";
 import { useEffect, useMemo, useRef, useCallback } from "preact/hooks";
@@ -88,6 +89,8 @@ export function ChatBox() {
     [showBigBox]
   );
 
+  const ctrlKText = useHotkeyListenerComboText(HotkeyActions.CTRL_K);
+
   return (
     <div className="w-80 flex-1 h-fit rounded-2xl ">
       <div className="w-full h-full flex flex-row gap-1 p-1.5 rounded-2xl border border-border/10 bg-zinc-950/5 shadow-inner items-end text-sm placeholder:text-zinc-950/50 text-zinc-950">
@@ -98,7 +101,7 @@ export function ChatBox() {
           value={currentInput}
           onChange={(e) => handleInputChange(e.currentTarget.value)}
           onKeyDown={handleKeyDown}
-          placeholder="What do you want to change?"
+          placeholder={`What do you want to change? (${ctrlKText})`}
         />
         <Button
           className={buttonClassName}

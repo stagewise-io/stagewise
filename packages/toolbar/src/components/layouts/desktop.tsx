@@ -4,8 +4,9 @@ import { ToolbarArea } from "@/components/toolbar/desktop-only/area";
 import { useAppState } from "@/hooks/use-app-state";
 import { cn } from "@/utils";
 import { ExpandButton } from "../expand-button";
-import { useRef } from "preact/hooks";
-import { DraggableProvider } from "@/hooks/use-draggable";
+import { useChatState } from "@/hooks/use-chat-state";
+import { SelectorCanvas } from "../dom-context/selector-canvas";
+import { useMemo } from "preact/hooks";
 
 export function DesktopLayout() {
   console.log("DesktopLayout rendered!");
@@ -13,6 +14,7 @@ export function DesktopLayout() {
 
   return (
     <div className={cn("fixed inset-0 h-screen w-screen")}>
+      <SelectorCanvas />
       {!minimized && <ToolbarArea />}
       {minimized && <ExpandButton />}
     </div>
