@@ -84,6 +84,7 @@ export abstract class WebSocketRpcBridge {
   protected reconnectAttempts = 0;
   protected options: WebSocketBridgeOptions;
   protected methods: RpcMethods = {};
+  protected isIntentionalClose = false;
 
   constructor(options: WebSocketBridgeOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -152,8 +153,7 @@ export abstract class WebSocketRpcBridge {
 
     ws.onclose = () => {
       console.log('WebSocket disconnected');
-      // TODO: Re-Enable this
-      // this.handleDisconnect();
+      this.handleDisconnect();
     };
 
     ws.onerror = (event: ErrorEvent) => {
@@ -339,6 +339,14 @@ export abstract class WebSocketRpcBridge {
    * Handle disconnection by attempting to reconnect
    */
   protected handleDisconnect(): void {
+    if (this.isIntentionalClose) {
+      console.log(
+        'WebSocket closed intentionally, not attempting to reconnect',
+      );
+      this.clearPendingRequests(new Error('Connection closed by user'));
+      return;
+    }
+
     if (this.reconnectAttempts < this.options.maxReconnectAttempts!) {
       this.reconnectAttempts++;
       console.log(
@@ -372,8 +380,10 @@ export abstract class WebSocketRpcBridge {
 
   /**
    * Close the WebSocket connection
+   * @returns Promise that resolves when the connection is closed
    */
-  public close(): void {
+  public async close(): Promise<void> {
+    this.isIntentionalClose = true;
     if (this.ws) {
       this.ws.close();
       this.ws = null;

@@ -70,8 +70,8 @@ export class WebSocketRpcServer extends WebSocketRpcBridge {
   /**
    * Close the WebSocket server
    */
-  public close(): void {
-    super.close();
+  public async close(): Promise<void> {
+    await super.close();
     this.wss.close();
   }
 }

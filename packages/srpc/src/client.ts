@@ -29,6 +29,7 @@ export class WebSocketRpcClient extends WebSocketRpcBridge {
         ws.onopen = () => {
           this.ws = ws;
           this.reconnectAttempts = 0;
+          this.isIntentionalClose = false;
           this.setupWebSocketHandlers(ws);
           resolve();
         };

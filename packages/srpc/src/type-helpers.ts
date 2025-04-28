@@ -116,8 +116,8 @@ export class TypedClient<
     return this.bridge.connect();
   }
 
-  public close(): void {
-    this.bridge.close();
+  public async close(): Promise<void> {
+    await this.bridge.close();
   }
 }
 
