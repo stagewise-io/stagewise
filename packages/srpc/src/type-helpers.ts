@@ -15,24 +15,37 @@ export interface RpcMethodContract<TRequest, TResponse, TUpdate = never> {
 }
 
 // Define a bridge contract with multiple methods
-export type BridgeContract = {
-  [methodName: string]: RpcMethodContract<any, any, any>;
+export type BridgeContract = Record<string, RpcMethodContract<any, any, any>>;
+
+export type CreateBridgeContract<
+  T extends Record<string, RpcMethodContract<any, any, any>>,
+> = {
+  [K in keyof T]: RpcMethodContract<
+    T[K]['request'],
+    T[K]['response'],
+    T[K]['update'] extends undefined ? never : T[K]['update']
+  >;
 };
 
-// Type for method implementations
-export type MethodImplementations<T extends BridgeContract> = {
-  [K in keyof T]: (
-    request: T[K]['request'],
-    sendUpdate: (update: T[K]['update']) => void,
-  ) => Promise<T[K]['response']>;
+export type MethodImplementations<T> = {
+  [K in keyof T]: T[K] extends RpcMethodContract<
+    infer Req,
+    infer Res,
+    infer Upd
+  >
+    ? (request: Req, sendUpdate: (update: Upd) => void) => Promise<Res>
+    : never;
 };
 
 // Type for method calls
-export type MethodCalls<T extends BridgeContract> = {
-  [K in keyof T]: (
-    request: T[K]['request'],
-    onUpdate?: (update: T[K]['update']) => void,
-  ) => Promise<T[K]['response']>;
+export type MethodCalls<T> = {
+  [K in keyof T]: T[K] extends RpcMethodContract<
+    infer Req,
+    infer Res,
+    infer Upd
+  >
+    ? (request: Req, onUpdate?: (update: Upd) => void) => Promise<Res>
+    : never;
 };
 
 // TypedBridge wraps WebSocketRpcClient or WebSocketRpcServer with type safety

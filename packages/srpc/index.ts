@@ -32,4 +32,5 @@ export {
   TypedClient,
   createSRPCServerBridge,
   createSRPCClientBridge,
+  type CreateBridgeContract,
 } from './src/type-helpers';

@@ -1,18 +1,17 @@
-import type { BridgeContract, RpcMethodContract } from '@stagewise/srpc';
+import type { CreateBridgeContract } from '@stagewise/srpc';
 
-export interface ToolbarServesContract extends BridgeContract {
-  test: RpcMethodContract<
-    { prompt: string },
-    { result: { success: boolean; error?: string } },
-    { updateText: string }
-  >;
-  getCurrentUrl: RpcMethodContract<undefined, { url: string }, never>;
-}
+export type ToolbarServesContract = CreateBridgeContract<{
+  test: {
+    request: { prompt: string };
+    response: { result: { success: boolean; error?: string } };
+    update: { updateText: string };
+  };
+}>;
 
-export interface ExtensionServesContract extends BridgeContract {
-  triggerAgentPrompt: RpcMethodContract<
-    { prompt: string },
-    { result: { success: boolean; error?: string } },
-    { updateText: string }
-  >;
-}
+export type ExtensionServesContract = CreateBridgeContract<{
+  triggerAgentPrompt: {
+    request: { prompt: string };
+    response: { result: { success: boolean; error?: string } };
+    update: { updateText: string };
+  };
+}>;
