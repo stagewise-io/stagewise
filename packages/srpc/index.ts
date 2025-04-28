@@ -23,7 +23,7 @@ export { WebSocketRpcClient } from './src/client';
 
 // Export type helpers
 export {
-  type BridgeContract,
+  type EndpointMethodMap,
   type RpcMethodContract,
   type MethodImplementations,
   type MethodCalls,

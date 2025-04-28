@@ -1,24 +1,20 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import {
-  type BridgeContract,
+  type CreateBridgeContract,
   type RpcMethodContract,
   createSRPCClientBridge,
   createSRPCServerBridge,
 } from '..';
 
-// Define simple contracts for testing options
-interface ServerContract extends BridgeContract {
-  ping: RpcMethodContract<void, { pong: true }>;
-}
-
-interface ClientContract extends BridgeContract {}
+type Contract = CreateBridgeContract<{
+  server: { ping: RpcMethodContract<void, { pong: true }> };
+  client: { ping: RpcMethodContract<void, { pong: true }> };
+}>;
 
 describe('WebSocketBridgeOptions', () => {
   const httpServer = http.createServer();
-  const server = createSRPCServerBridge<ServerContract, ClientContract>(
-    httpServer,
-  );
+  const server = createSRPCServerBridge<Contract>(httpServer);
   const TEST_PORT = 3002;
 
   beforeAll(() => {
@@ -48,10 +44,7 @@ describe('WebSocketBridgeOptions', () => {
   describe('Custom Timeout', () => {
     it('should respect custom request timeout', async () => {
       // Create client with very short timeout
-      const shortTimeoutClient = createSRPCClientBridge<
-        ClientContract,
-        ServerContract
-      >(
+      const shortTimeoutClient = createSRPCClientBridge<Contract>(
         `ws://localhost:${TEST_PORT}`,
         { requestTimeout: 50 }, // 50ms timeout
       );
@@ -94,10 +87,7 @@ describe('WebSocketBridgeOptions', () => {
 
     it('should succeed with sufficient timeout', async () => {
       // Create client with normal timeout
-      const normalTimeoutClient = createSRPCClientBridge<
-        ClientContract,
-        ServerContract
-      >(
+      const normalTimeoutClient = createSRPCClientBridge<Contract>(
         `ws://localhost:${TEST_PORT}`,
         { requestTimeout: 500 }, // 500ms timeout
       );
@@ -133,7 +123,7 @@ describe('WebSocketBridgeOptions', () => {
   describe('Reconnection Options', () => {
     it('should respect maxReconnectAttempts', async () => {
       // Create client with custom reconnect settings
-      const client = createSRPCClientBridge<ClientContract, ServerContract>(
+      const client = createSRPCClientBridge<Contract>(
         `ws://localhost:${TEST_PORT}`,
         {
           maxReconnectAttempts: 2,
@@ -166,7 +156,7 @@ describe('WebSocketBridgeOptions', () => {
 
   describe('Default Options', () => {
     it('should use default options when none provided', async () => {
-      const client = createSRPCClientBridge<ClientContract, ServerContract>(
+      const client = createSRPCClientBridge<Contract>(
         `ws://localhost:${TEST_PORT}`,
       );
 

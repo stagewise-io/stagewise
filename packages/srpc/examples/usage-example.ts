@@ -1,5 +1,5 @@
 import {
-  type BridgeContract,
+  type CreateBridgeContract,
   type RpcMethodContract,
   createSRPCClientBridge,
   createSRPCServerBridge,
@@ -7,40 +7,37 @@ import {
 import http from 'node:http';
 
 // Step 2: Define your complete API contract
-interface CodingAgentServesContract extends BridgeContract {
-  executePrompt: RpcMethodContract<
-    { prompt: string },
-    { result: { success: boolean; error?: string } },
-    { updateText: string }
-  >;
-  getSelectedModel: RpcMethodContract<
-    never,
-    { model: string; provider: string },
-    never
-  >;
-  changeAgentMode: RpcMethodContract<
-    { mode: 'agent' | 'ask' },
-    { result: { success: boolean; error?: string } },
-    never
-  >;
-}
-
-// Empty client contract since client doesn't expose methods in this example
-interface BrowserClientServesContract extends BridgeContract {
-  getCurrentUrl: RpcMethodContract<never, { url: string }, never>;
-  getConsoleLogs: RpcMethodContract<
-    { amount: string },
-    { logs: string[] },
-    never
-  >;
-}
+type Contract = CreateBridgeContract<{
+  server: {
+    executePrompt: RpcMethodContract<
+      { prompt: string },
+      { result: { success: boolean; error?: string } },
+      { updateText: string }
+    >;
+    getSelectedModel: RpcMethodContract<
+      never,
+      { model: string; provider: string },
+      never
+    >;
+    changeAgentMode: RpcMethodContract<
+      { mode: 'agent' | 'ask' },
+      { result: { success: boolean; error?: string } },
+      never
+    >;
+  };
+  client: {
+    getCurrentUrl: RpcMethodContract<never, { url: string }, never>;
+    getConsoleLogs: RpcMethodContract<
+      { amount: string },
+      { logs: string[] },
+      never
+    >;
+  };
+}>;
 
 // Step 3: Set up a server
 const httpServer = http.createServer();
-const server = createSRPCServerBridge<
-  CodingAgentServesContract,
-  BrowserClientServesContract
->(httpServer);
+const server = createSRPCServerBridge<Contract>(httpServer);
 
 // Step 4: Implement and register methods
 server.register({
@@ -68,10 +65,7 @@ httpServer.listen(3000, () => {
 
 // Step 5: Create a client
 async function runClient() {
-  const browserBridge = createSRPCClientBridge<
-    BrowserClientServesContract,
-    CodingAgentServesContract
-  >('ws://localhost:3000');
+  const browserBridge = createSRPCClientBridge<Contract>('ws://localhost:3000');
   await browserBridge.connect();
 
   browserBridge.register({

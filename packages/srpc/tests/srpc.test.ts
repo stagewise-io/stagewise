@@ -9,7 +9,7 @@ import {
 } from 'vitest';
 import http from 'node:http';
 import {
-  type BridgeContract,
+  type CreateBridgeContract,
   type RpcMethodContract,
   createSRPCClientBridge,
   createSRPCServerBridge,
@@ -29,25 +29,28 @@ interface GreetingProgress {
   progress: number;
 }
 
-interface ServerContract extends BridgeContract {
-  greet: RpcMethodContract<GreetingRequest, GreetingResponse, GreetingProgress>;
-  getData: RpcMethodContract<{ id: number }, { data: string }>;
-}
-
-interface ClientContract extends BridgeContract {
-  sayHello: RpcMethodContract<
-    { name: string },
-    { message: string },
-    { progress: number }
-  >;
-}
+type Contract = CreateBridgeContract<{
+  server: {
+    greet: RpcMethodContract<
+      GreetingRequest,
+      GreetingResponse,
+      GreetingProgress
+    >;
+    getData: RpcMethodContract<{ id: number }, { data: string }>;
+  };
+  client: {
+    sayHello: RpcMethodContract<
+      { name: string },
+      { message: string },
+      { progress: number }
+    >;
+  };
+}>;
 
 describe('sRPC Package', () => {
   // Server setup
   const httpServer = http.createServer();
-  const server = createSRPCServerBridge<ServerContract, ClientContract>(
-    httpServer,
-  );
+  const server = createSRPCServerBridge<Contract>(httpServer);
   const TEST_PORT = 3001;
 
   // Original server method implementations to restore after tests
@@ -96,14 +99,10 @@ describe('sRPC Package', () => {
 
   // Client setup and tests
   describe('Client-Server Communication', () => {
-    let client: ReturnType<
-      typeof createSRPCClientBridge<ClientContract, ServerContract>
-    >;
+    let client: ReturnType<typeof createSRPCClientBridge<Contract>>;
 
     beforeAll(async () => {
-      client = createSRPCClientBridge<ClientContract, ServerContract>(
-        `ws://localhost:${TEST_PORT}`,
-      );
+      client = createSRPCClientBridge<Contract>(`ws://localhost:${TEST_PORT}`);
       await client.connect();
 
       // Register client methods
@@ -174,14 +173,10 @@ describe('sRPC Package', () => {
   });
 
   describe('Error Handling', () => {
-    let client: ReturnType<
-      typeof createSRPCClientBridge<ClientContract, ServerContract>
-    >;
+    let client: ReturnType<typeof createSRPCClientBridge<Contract>>;
 
     beforeAll(async () => {
-      client = createSRPCClientBridge<ClientContract, ServerContract>(
-        `ws://localhost:${TEST_PORT}`,
-      );
+      client = createSRPCClientBridge<Contract>(`ws://localhost:${TEST_PORT}`);
       await client.connect();
     });
 
@@ -232,18 +227,13 @@ describe('sRPC Package', () => {
   });
 
   describe('Reconnection', () => {
-    let client: ReturnType<
-      typeof createSRPCClientBridge<ClientContract, ServerContract>
-    >;
+    let client: ReturnType<typeof createSRPCClientBridge<Contract>>;
 
     beforeAll(async () => {
-      client = createSRPCClientBridge<ClientContract, ServerContract>(
-        `ws://localhost:${TEST_PORT}`,
-        {
-          maxReconnectAttempts: 3,
-          reconnectDelay: 100,
-        },
-      );
+      client = createSRPCClientBridge<Contract>(`ws://localhost:${TEST_PORT}`, {
+        maxReconnectAttempts: 3,
+        reconnectDelay: 100,
+      });
       await client.connect();
     });
 
@@ -286,9 +276,7 @@ describe('sRPC Package', () => {
 
       // Verify response type from greet method matches GreetingResponse
       async function testTypes() {
-        const client = createSRPCClientBridge<ClientContract, ServerContract>(
-          '',
-        );
+        const client = createSRPCClientBridge<Contract>('');
         const response = await client.call.greet({ name: 'Type Test' });
 
         type ResponseType = typeof response;

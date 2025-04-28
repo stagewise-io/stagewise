@@ -1,5 +1,2 @@
 export { getExtensionBridge, getToolbarBridge } from './src/bridge';
-export type {
-  ExtensionServesContract,
-  ToolbarServesContract,
-} from './src/contract';
+export type { Contract } from './src/contract';

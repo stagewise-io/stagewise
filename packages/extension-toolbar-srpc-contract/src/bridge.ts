@@ -3,19 +3,12 @@ import {
   createSRPCServerBridge,
 } from '@stagewise/srpc';
 import type { Server } from 'node:http';
-import type {
-  ExtensionServesContract,
-  ToolbarServesContract,
-} from './contract';
+import type { BridgeContract } from '@stagewise/srpc/dist/src/type-helpers';
 
 export function getExtensionBridge(server: Server) {
-  return createSRPCServerBridge<ExtensionServesContract, ToolbarServesContract>(
-    server,
-  );
+  return createSRPCServerBridge<BridgeContract>(server);
 }
 
 export function getToolbarBridge(url: string) {
-  return createSRPCClientBridge<ToolbarServesContract, ExtensionServesContract>(
-    url,
-  );
+  return createSRPCClientBridge<BridgeContract>(url);
 }

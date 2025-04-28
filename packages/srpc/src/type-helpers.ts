@@ -15,17 +15,22 @@ export interface RpcMethodContract<TRequest, TResponse, TUpdate = never> {
 }
 
 // Define a bridge contract with multiple methods
-export type BridgeContract = Record<string, RpcMethodContract<any, any, any>>;
+export type EndpointMethodMap = Record<
+  string,
+  RpcMethodContract<any, any, any>
+>;
+
+export type BridgeContract = {
+  client: EndpointMethodMap;
+  server: EndpointMethodMap;
+};
 
 export type CreateBridgeContract<
-  T extends Record<string, RpcMethodContract<any, any, any>> | null,
-> = T extends null
-  ? Record<string, never>
-  : {
-      [K in keyof T]: T[K] extends RpcMethodContract<any, any, any>
-        ? T[K]
-        : never;
-    };
+  T extends {
+    server?: Record<string, RpcMethodContract<any, any, any>>;
+    client?: Record<string, RpcMethodContract<any, any, any>>;
+  },
+> = T;
 
 export type MethodImplementations<T> = {
   [K in keyof T]: T[K] extends RpcMethodContract<
@@ -50,8 +55,8 @@ export type MethodCalls<T> = {
 
 // TypedBridge wraps WebSocketRpcClient or WebSocketRpcServer with type safety
 export class TypedBridge<
-  Serves extends BridgeContract,
-  Consumes extends BridgeContract,
+  Serves extends EndpointMethodMap,
+  Consumes extends EndpointMethodMap,
   B extends WebSocketRpcClient | WebSocketRpcServer,
 > {
   protected bridge: B;
@@ -90,8 +95,8 @@ export class TypedBridge<
 }
 
 export class TypedServer<
-  Serves extends BridgeContract,
-  Consumes extends BridgeContract,
+  Serves extends EndpointMethodMap,
+  Consumes extends EndpointMethodMap,
 > extends TypedBridge<Serves, Consumes, WebSocketRpcServer> {
   constructor(server: Server) {
     super(new WebSocketRpcServer(server));
@@ -99,8 +104,8 @@ export class TypedServer<
 }
 
 export class TypedClient<
-  Serves extends BridgeContract,
-  Consumes extends BridgeContract,
+  Serves extends EndpointMethodMap,
+  Consumes extends EndpointMethodMap,
 > extends TypedBridge<Serves, Consumes, WebSocketRpcClient> {
   constructor(url: string, options?: WebSocketBridgeOptions) {
     super(new WebSocketRpcClient(url, options));
@@ -115,19 +120,15 @@ export class TypedClient<
 }
 
 // Helper functions to create typed bridges
-export function createSRPCServerBridge<
-  Serves extends BridgeContract,
-  Consumes extends BridgeContract,
->(server: Server): TypedServer<Serves, Consumes> {
-  return new TypedServer<Serves, Consumes>(server);
+export function createSRPCServerBridge<C extends BridgeContract>(
+  server: Server,
+): TypedServer<C['server'], C['client']> {
+  return new TypedServer<C['server'], C['client']>(server);
 }
 
-export function createSRPCClientBridge<
-  Serves extends BridgeContract,
-  Consumes extends BridgeContract,
->(
+export function createSRPCClientBridge<C extends BridgeContract>(
   url: string,
   options?: WebSocketBridgeOptions,
-): TypedClient<Serves, Consumes> {
-  return new TypedClient<Serves, Consumes>(url, options);
+): TypedClient<C['client'], C['server']> {
+  return new TypedClient<C['client'], C['server']>(url, options);
 }
