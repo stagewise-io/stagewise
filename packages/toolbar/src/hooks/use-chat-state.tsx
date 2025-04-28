@@ -69,7 +69,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     },
   ]);
   const [currentChatId, setCurrentChatId] = useState<ChatId>("new_chat");
-  const [chatAreaState, setChatAreaState] = useState<ChatAreaState>("hidden");
+  const [chatAreaState, internalSetChatAreaState] =
+    useState<ChatAreaState>("hidden");
   const [inputFocus, setInputFocus] = useState<boolean>(false);
 
   const createChat = useCallback(() => {
@@ -123,6 +124,16 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     );
   }, []);
 
+  const setChatAreaState = useCallback(
+    (state: ChatAreaState) => {
+      internalSetChatAreaState(state);
+      if (state !== "hidden") {
+        setInputFocus(true);
+      }
+    },
+    [internalSetChatAreaState, setInputFocus]
+  );
+
   const addMessage = useCallback(
     (chatId: ChatId, content: string) => {
       if (!content.trim()) return;
@@ -136,7 +147,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       };
 
       if (chatAreaState === "hidden") {
-        setChatAreaState("compact");
+        internalSetChatAreaState("compact");
       }
 
       setChats((prev) =>

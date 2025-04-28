@@ -31,7 +31,6 @@ const ChatAreaResizeBar = memo(() => {
 
   const handleResizeBarClick = useCallback(() => {
     setChatAreaState(chatAreaState === "compact" ? "expanded" : "compact");
-    setInputFocus(true);
   }, [chatAreaState, setChatAreaState, setInputFocus]);
 
   const handleCloseChatArea = useCallback(() => {
@@ -87,7 +86,7 @@ const ChatAreaExpanded = memo(() => {
   );
 
   return (
-    <div className="w-full flex flex-col gap-3 p-3 max-h-[50vh]">
+    <div className="w-full flex flex-col gap-3 p-3 pb-0 max-h-[50vh]">
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto p-1">
         {currentChat?.messages.map((message) => (
           <div
@@ -108,7 +107,7 @@ const ChatAreaExpanded = memo(() => {
           </div>
         ))}
       </div>
-      <div className="flex flex-row gap-2 items-center justify-start overflow-x-auto pt-2 border-t border-border/10">
+      <div className="flex flex-row gap-2 items-center justify-start overflow-x-auto overflow-y-visible pb-2 pt-2 border-t border-border/10">
         {!hasNewChat && (
           <Button
             className="text-xs px-2 h-6 rounded-full bg-zinc-950/5 text-foreground font-semibold flex-shrink-0"
@@ -122,7 +121,8 @@ const ChatAreaExpanded = memo(() => {
             key={chat.id}
             className={cn(
               "text-xs px-2 h-5 rounded-full bg-zinc-950/5 text-muted-foreground flex-shrink-0 max-w-48 overflow-hidden truncate",
-              chat.id === currentChatId && "bg-blue-600 text-white"
+              chat.id === currentChatId &&
+                "bg-white/60 text-zinc-950 shadow-sm shadow-blue-600/50"
             )}
             onClick={() => handleSetCurrentChat(chat.id)}
           >

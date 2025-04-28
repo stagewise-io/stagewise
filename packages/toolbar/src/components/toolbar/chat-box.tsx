@@ -46,8 +46,10 @@ export function ChatBox() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    const focusHandler = () => chatState.setInputFocus(true);
-    const blurHandler = () => chatState.setInputFocus(false);
+    const focusHandler = () =>
+      setTimeout(() => chatState.setInputFocus(true), 0);
+    const blurHandler = () =>
+      setTimeout(() => chatState.setInputFocus(false), 0);
 
     inputRef.current?.addEventListener("focus", focusHandler);
     inputRef.current?.addEventListener("blur", blurHandler);
@@ -87,7 +89,7 @@ export function ChatBox() {
   );
 
   return (
-    <div className="w-80 flex-1 h-fit rounded-2xl focus-within:shadow-sm shadow-blue-600/100">
+    <div className="w-80 flex-1 h-fit rounded-2xl ">
       <div className="w-full h-full flex flex-row gap-1 p-1.5 rounded-2xl border border-border/10 bg-zinc-950/5 shadow-inner items-end text-sm placeholder:text-zinc-950/50 text-zinc-950">
         <Textarea
           ref={inputRef}

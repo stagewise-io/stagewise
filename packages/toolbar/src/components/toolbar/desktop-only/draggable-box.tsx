@@ -6,25 +6,20 @@ import { GripVertical, Plus } from "lucide-react";
 import { ChatArea } from "../chat-area";
 import { ChatBox } from "../chat-box";
 import { MoreActionsButton } from "../more-actions-button";
-export interface ToolbarDraggableBoxProps {
-  inDragMode?: boolean; // Pass this information to prevent issues with the state of referencdes used for anchoring other elements. The draggable cannot act as an anchor to prevent concurrency issues.
-}
+import { useDraggable } from "@/hooks/use-draggable";
+import { MutableRef } from "preact/hooks";
 
-export function ToolbarDraggableBox({
-  inDragMode: inDragMode,
-}: ToolbarDraggableBoxProps) {
+export function ToolbarDraggableBox() {
   return (
-    <div>
-      <div className="p-0.5">
-        {/* This is the complete toolbar area where we can stack different stuff. The main toolbar content stands out. */}
-        <div className="pointer-events-auto flex flex-col p-0 items-start justify-center rounded-3xl border border-border/30 bg-zinc-50/60 shadow-lg backdrop-blur-lg transition-colors w-96 max-w-[80vw]">
-          <ChatArea />
-          {/* <ToolbarDraggingGrip /> */}
-          {/* If the app state is right, we also render the button that enables dragging the toolbar around */}
-          <div className="w-full flex flex-row items-center justify-center rounded-3xl first:border-none border-t border-border/30 bg-background/40 p-1.5 shadow-lg transition-colors">
-            <ChatBox />
-            <MoreActionsButton />
-          </div>
+    <div className="absolute p-0.5 pointer-events-auto bottom-5 left-1/2 -translate-x-1/2">
+      {/* This is the complete toolbar area where we can stack different stuff. The main toolbar content stands out. */}
+      <div className="pointer-events-auto flex flex-col p-0 items-start justify-center rounded-3xl border border-border/30 bg-zinc-50/60 shadow-lg backdrop-blur-lg transition-colors w-96 max-w-[80vw]">
+        <ChatArea />
+        {/* <ToolbarDraggingGrip /> */}
+        {/* If the app state is right, we also render the button that enables dragging the toolbar around */}
+        <div className="w-full flex flex-row items-center justify-center rounded-3xl first:border-none border-t border-border/30 bg-background/40 p-1.5 shadow-lg transition-colors">
+          <ChatBox />
+          <MoreActionsButton />
         </div>
       </div>
     </div>
