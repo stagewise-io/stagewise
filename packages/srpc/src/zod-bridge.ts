@@ -41,7 +41,7 @@ export class ZodTypedBridge<
     });
   }
 
-  private callMethod<K extends keyof Consumes>(
+  private async callMethod<K extends keyof Consumes>(
     method: K,
     request: InferRequestType<Consumes[K]>,
     options?: { onUpdate?: (update: InferUpdateType<Consumes[K]>) => void },
@@ -63,25 +63,33 @@ export class ZodTypedBridge<
       options?.onUpdate && methodContract.update
         ? (update: unknown) => {
             if (!methodContract.update) return; // TypeScript check
-            const validatedUpdate = validateWithZod(
-              methodContract.update,
-              update,
-              `update for method ${String(method)}`,
-            );
-            options.onUpdate?.(validatedUpdate);
+            try {
+              const validatedUpdate = validateWithZod(
+                methodContract.update,
+                update,
+                `update for method ${String(method)}`,
+                true, // silently log validation errors
+              );
+              options.onUpdate?.(validatedUpdate);
+            } catch (error) {
+              // Log validation error but don't throw
+              console.error('Update validation failed:', error);
+            }
           }
         : undefined;
 
     // Call method and validate response
-    return (this.bridge as any)
-      .call(method as string, validatedRequest, onUpdate)
-      .then((response: unknown) => {
-        return validateWithZod(
-          methodContract.response,
-          response,
-          `response for method ${String(method)}`,
-        );
-      });
+    const response = await (this.bridge as any).callMethod(
+      method as string,
+      validatedRequest,
+      onUpdate,
+    );
+
+    return validateWithZod(
+      methodContract.response,
+      response,
+      `response for method ${String(method)}`,
+    );
   }
 
   public register(implementations: ZodMethodImplementations<Serves>): void {
@@ -109,12 +117,18 @@ export class ZodTypedBridge<
           methodContract.update && sendUpdate
             ? (update: unknown) => {
                 if (!methodContract.update) return; // TypeScript check
-                const validatedUpdate = validateWithZod(
-                  methodContract.update,
-                  update,
-                  `update for method ${method}`,
-                );
-                sendUpdate(validatedUpdate);
+                try {
+                  const validatedUpdate = validateWithZod(
+                    methodContract.update,
+                    update,
+                    `update for method ${method}`,
+                    true, // silently log validation errors
+                  );
+                  sendUpdate(validatedUpdate);
+                } catch (error) {
+                  // Log validation error but don't throw
+                  console.error('Update validation failed:', error);
+                }
               }
             : undefined;
 
@@ -131,7 +145,11 @@ export class ZodTypedBridge<
       };
     }
 
-    (this.bridge as any).register(wrappedImplementations);
+    this.bridge.register(wrappedImplementations);
+  }
+
+  public async close(): Promise<void> {
+    await this.bridge.close();
   }
 }
 
@@ -168,6 +186,14 @@ class ServerBridge extends WebSocketRpcBridge {
     });
   }
 
+  public call<TRequest, TResponse, TUpdate>(
+    method: string,
+    payload: TRequest,
+    onUpdate?: (update: TUpdate) => void,
+  ): Promise<TResponse> {
+    return this.callMethod(method, payload, onUpdate);
+  }
+
   protected reconnect(): void {
     throw new Error('Server does not support reconnection');
   }
@@ -188,6 +214,14 @@ class ClientBridge extends WebSocketRpcBridge {
   constructor(url: string, options?: WebSocketBridgeOptions) {
     super(options);
     this.url = url;
+  }
+
+  public call<TRequest, TResponse, TUpdate>(
+    method: string,
+    payload: TRequest,
+    onUpdate?: (update: TUpdate) => void,
+  ): Promise<TResponse> {
+    return this.callMethod(method, payload, onUpdate);
   }
 
   protected reconnect(): void {
@@ -260,10 +294,6 @@ export class ZodClient<C extends ZodBridgeContract> extends ZodTypedBridge<
 
   public connect(): Promise<void> {
     return (this.bridge as ClientBridge).connect();
-  }
-
-  public async close(): Promise<void> {
-    await this.bridge.close();
   }
 }
 

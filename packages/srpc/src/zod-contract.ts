@@ -93,12 +93,18 @@ export function validateWithZod<T extends z.ZodType>(
   schema: T,
   data: unknown,
   context: string,
+  silent = false,
 ): z.infer<T> {
   const result = schema.safeParse(data);
   if (!result.success) {
-    throw new Error(
+    const error = new Error(
       `Validation failed for ${context}: ${result.error.message}`,
     );
+    if (silent) {
+      console.error(error);
+      return data as z.infer<T>; // Return original data for silent validation
+    }
+    throw error;
   }
   return result.data;
 }
