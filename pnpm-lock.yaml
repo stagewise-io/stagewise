@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  '@headlessui/react':
+  '@headlessui/react@2.2.2':
     hash: btrvoxivhfohvhfe7w4r7zyyou
     path: patches/@headlessui__react.patch
 
@@ -163,7 +163,7 @@ importers:
         version: 10.26.5
       react-remove-scroll:
         specifier: ^2.6.3
-        version: 2.6.3(react@19.1.0)
+        version: 2.6.3(@types/react@19.1.2)(react@19.1.0)
       superjson:
         specifier: ^2.2.2
         version: 2.2.2
@@ -184,8 +184,11 @@ importers:
         version: 3.24.3
       zustand:
         specifier: ^5.0.3
-        version: 5.0.3(react@19.1.0)(use-sync-external-store@1.5.0(react@19.1.0))
+        version: 5.0.3(@types/react@19.1.2)(react@19.1.0)(use-sync-external-store@1.5.0(react@19.1.0))
     devDependencies:
+      '@preact/compat':
+        specifier: 18.3.1
+        version: 18.3.1(preact@10.26.5)
       '@preact/preset-vite':
         specifier: ^2.10.1
         version: 2.10.1(@babel/core@7.26.10)(preact@10.26.5)(vite@6.3.3(@types/node@22.15.2)(jiti@2.4.2)(lightningcss@1.29.2))
@@ -830,6 +833,11 @@ packages:
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
 
+  '@preact/compat@18.3.1':
+    resolution: {integrity: sha512-Kog4PSRxtT4COtOXjsuQPV1vMXpUzREQfv+6Dmcy9/rMk0HOPK0HTE9fspFjAmY8R80T/T8gtgmZ68u5bOSngw==}
+    peerDependencies:
+      preact: '*'
+
   '@preact/preset-vite@2.10.1':
     resolution: {integrity: sha512-59lyGBXNfZIr5OOuBUB4/IB8AqF/ULbvYnyItgK/2BJnsGJqaeaJobRVtMp1129obHQuj8oZ/dVxB9inmH8Xig==}
     peerDependencies:
@@ -1195,6 +1203,9 @@ packages:
 
   '@types/range-parser@1.2.7':
     resolution: {integrity: sha512-hKormJbkJqzQGhziax5PItDUTMAM9uE2XXQmM37dyd4hVM+5aVl7oVxMVUiVQn2oCQFN/LKCZdvSM0pFRqbSmQ==}
+
+  '@types/react@19.1.2':
+    resolution: {integrity: sha512-oxLPMytKchWGbnQM9O7D67uPa9paTNxO7jVoNMXgkkErULBPhPARCfkKL9ytcIJJRGjbsVwW4ugJzyFFvm/Tiw==}
 
   '@types/send@0.17.4':
     resolution: {integrity: sha512-x2EM6TJOybec7c52BX0ZspPodMsQUd5L6PRwOunVyVUhXiBSKf3AezDL8Dgvgt5o0UfKNfuA0eMLr2wLT4AiBA==}
@@ -1720,6 +1731,9 @@ packages:
   css-what@6.1.0:
     resolution: {integrity: sha512-HTUrgRJ7r4dsZKU6GjmpfRK1O76h97Z8MfS1G0FozR+oF2kG6Vfe8JE6zwrkbxigziPHinCJ+gCPjA9EaBDtRw==}
     engines: {node: '>= 6'}
+
+  csstype@3.1.3:
+    resolution: {integrity: sha512-M1uQkMl8rQK/szD0LNhtqxIPLpimGm8sOBwU7lLnCpSbTyY3yeU1Vc7l4KT5zT4s/yOxHH5O7tIuuLOCnLADRw==}
 
   dargs@8.1.0:
     resolution: {integrity: sha512-wAV9QHOsNbwnWdNW2FYvE1P56wtgSbM+3SZcdGiWQILwVjACCXDCI3Ai8QlCjMDB8YK5zySiXZYBiwGmNY3lnw==}
@@ -4423,6 +4437,10 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
+  '@preact/compat@18.3.1(preact@10.26.5)':
+    dependencies:
+      preact: 10.26.5
+
   '@preact/preset-vite@2.10.1(@babel/core@7.26.10)(preact@10.26.5)(vite@6.3.3(@types/node@22.15.2)(jiti@2.4.2)(lightningcss@1.29.2))':
     dependencies:
       '@babel/core': 7.26.10
@@ -4754,7 +4772,7 @@ snapshots:
 
   '@types/node-fetch@2.6.12':
     dependencies:
-      '@types/node': 22.15.2
+      '@types/node': 20.17.31
       form-data: 4.0.2
 
   '@types/node@20.17.31':
@@ -4768,6 +4786,11 @@ snapshots:
   '@types/qs@6.9.18': {}
 
   '@types/range-parser@1.2.7': {}
+
+  '@types/react@19.1.2':
+    dependencies:
+      csstype: 3.1.3
+    optional: true
 
   '@types/send@0.17.4':
     dependencies:
@@ -5367,6 +5390,9 @@ snapshots:
       nth-check: 2.1.1
 
   css-what@6.1.0: {}
+
+  csstype@3.1.3:
+    optional: true
 
   dargs@8.1.0: {}
 
@@ -6618,26 +6644,32 @@ snapshots:
       react: 19.1.0
       scheduler: 0.26.0
 
-  react-remove-scroll-bar@2.3.8(react@19.1.0):
+  react-remove-scroll-bar@2.3.8(@types/react@19.1.2)(react@19.1.0):
     dependencies:
       react: 19.1.0
-      react-style-singleton: 2.2.3(react@19.1.0)
+      react-style-singleton: 2.2.3(@types/react@19.1.2)(react@19.1.0)
       tslib: 2.8.1
+    optionalDependencies:
+      '@types/react': 19.1.2
 
-  react-remove-scroll@2.6.3(react@19.1.0):
+  react-remove-scroll@2.6.3(@types/react@19.1.2)(react@19.1.0):
     dependencies:
       react: 19.1.0
-      react-remove-scroll-bar: 2.3.8(react@19.1.0)
-      react-style-singleton: 2.2.3(react@19.1.0)
+      react-remove-scroll-bar: 2.3.8(@types/react@19.1.2)(react@19.1.0)
+      react-style-singleton: 2.2.3(@types/react@19.1.2)(react@19.1.0)
       tslib: 2.8.1
-      use-callback-ref: 1.3.3(react@19.1.0)
-      use-sidecar: 1.1.3(react@19.1.0)
+      use-callback-ref: 1.3.3(@types/react@19.1.2)(react@19.1.0)
+      use-sidecar: 1.1.3(@types/react@19.1.2)(react@19.1.0)
+    optionalDependencies:
+      '@types/react': 19.1.2
 
-  react-style-singleton@2.2.3(react@19.1.0):
+  react-style-singleton@2.2.3(@types/react@19.1.2)(react@19.1.0):
     dependencies:
       get-nonce: 1.0.1
       react: 19.1.0
       tslib: 2.8.1
+    optionalDependencies:
+      '@types/react': 19.1.2
 
   react@19.1.0: {}
 
@@ -7172,16 +7204,20 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  use-callback-ref@1.3.3(react@19.1.0):
+  use-callback-ref@1.3.3(@types/react@19.1.2)(react@19.1.0):
     dependencies:
       react: 19.1.0
       tslib: 2.8.1
+    optionalDependencies:
+      '@types/react': 19.1.2
 
-  use-sidecar@1.1.3(react@19.1.0):
+  use-sidecar@1.1.3(@types/react@19.1.2)(react@19.1.0):
     dependencies:
       detect-node-es: 1.1.0
       react: 19.1.0
       tslib: 2.8.1
+    optionalDependencies:
+      '@types/react': 19.1.2
 
   use-sync-external-store@1.5.0(react@19.1.0):
     dependencies:
@@ -7419,7 +7455,8 @@ snapshots:
 
   zod@3.24.3: {}
 
-  zustand@5.0.3(react@19.1.0)(use-sync-external-store@1.5.0(react@19.1.0)):
+  zustand@5.0.3(@types/react@19.1.2)(react@19.1.0)(use-sync-external-store@1.5.0(react@19.1.0)):
     optionalDependencies:
+      '@types/react': 19.1.2
       react: 19.1.0
       use-sync-external-store: 1.5.0(react@19.1.0)
