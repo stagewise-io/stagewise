@@ -27,11 +27,11 @@ const ChatAreaBox = memo(({ children }: { children: ComponentChildren }) => (
 ));
 
 const ChatAreaResizeBar = memo(() => {
-  const { chatAreaState, setChatAreaState, setInputFocus } = useChatState();
+  const { chatAreaState, setChatAreaState } = useChatState();
 
   const handleResizeBarClick = useCallback(() => {
     setChatAreaState(chatAreaState === "compact" ? "expanded" : "compact");
-  }, [chatAreaState, setChatAreaState, setInputFocus]);
+  }, [chatAreaState, setChatAreaState]);
 
   const handleCloseChatArea = useCallback(() => {
     setChatAreaState("hidden");
