@@ -1,7 +1,7 @@
 ---
-description: 
+description: Always use this on commit generation
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 We use Lefthook with Commitlint and Conventional Commits to enforce consistent commit message formats in our project. Scopes are REQUIRED for all commits and MUST be one of the following: "cursor-rules", "toolbar", "docs", "deps", or "root". These scopes are defined in commitlint.config.js and no other scopes are allowed.
 
