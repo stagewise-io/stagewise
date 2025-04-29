@@ -182,16 +182,4 @@ The framework provides clear error messages for various failure cases:
 
 Check out the `examples/` directory for more detailed examples:
 
-- Basic usage: `examples/basic.ts`
-- Progress updates: `examples/progress.ts`
-- Error handling: `examples/error-handling.ts`
-- Complex schemas: `examples/complex-schemas.ts`
 - Full application: `examples/zod-example.ts`
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
