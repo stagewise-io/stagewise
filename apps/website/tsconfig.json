@@ -1,9 +1,9 @@
 {
   "extends": "@stagewise/typescript-config/nextjs.json",
   "compilerOptions": {
-    "baseUrl": "./src",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
+      "@/*": ["./src/*"],
       "@stagewise/ui/*": ["../../packages/ui/src/*"]
     },
     "plugins": [
