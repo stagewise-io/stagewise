@@ -26,6 +26,9 @@ export const contract = createBridgeContract({
           output: z.string().optional(),
         }),
       }),
+      update: z.object({
+        updateText: z.string(),
+      }),
     },
   },
 });

@@ -35,7 +35,7 @@ export async function activate(context: vscode.ExtensionContext) {
     bridge.register({
       triggerAgentPrompt: async (request, sendUpdate) => {
         await callCursorAgent(request.prompt);
-        sendUpdate({ updateText: 'Called the agent' });
+        sendUpdate.sendUpdate({ updateText: 'Called the agent' });
 
         return { result: { success: true } };
       },

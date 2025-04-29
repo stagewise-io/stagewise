@@ -30,11 +30,14 @@ export {
   TypedBridge,
   TypedServer,
   TypedClient,
-  createSRPCServerBridge,
-  createSRPCClientBridge,
   type CreateBridgeContract,
 } from './src/type-helpers';
 
 export { createBridgeContract } from './src/zod-contract';
 
-export { ZodServer, ZodClient } from './src/zod-bridge';
+export {
+  ZodServer,
+  ZodClient,
+  createSRPCServerBridge,
+  createSRPCClientBridge,
+} from './src/zod-bridge';

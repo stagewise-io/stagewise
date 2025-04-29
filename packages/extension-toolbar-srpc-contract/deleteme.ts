@@ -17,8 +17,10 @@ async function main() {
     {
       prompt: 'Hello, world!',
     },
-    (update) => {
-      console.error('\n\n   TOOLBAR RECEIVED UPDATE:', update, '\n\n');
+    {
+      onUpdate: (update) => {
+        console.error('\n\n   TOOLBAR RECEIVED UPDATE:', update, '\n\n');
+      },
     },
   );
   console.error('\n\n   TOOLBAR RECEIVED RESPONSE:', result, '\n\n');
