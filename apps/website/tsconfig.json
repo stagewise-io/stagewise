@@ -1,10 +1,10 @@
 {
   "extends": "@stagewise/typescript-config/nextjs.json",
   "compilerOptions": {
-    "baseUrl": ".",
+    "baseUrl": "./src",
     "paths": {
       "@/*": ["./*"],
-      "@workspace/ui/*": ["../../packages/ui/src/*"]
+      "@stagewise/ui/*": ["../../packages/ui/src/*"]
     },
     "plugins": [
       {
