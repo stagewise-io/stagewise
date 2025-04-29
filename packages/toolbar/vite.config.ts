@@ -4,8 +4,9 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
+import { analyzer } from "vite-bundle-analyzer";
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url))
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -15,11 +16,11 @@ export default defineConfig({
     }),
     tailwindcss(),
     dts({ rollupTypes: true }),
-    //analyzer(),
+    analyzer(),
   ],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
+      "@": resolve(__dirname, "src"),
     },
   },
   esbuild: {
@@ -28,20 +29,22 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
-      name: 'StagewiseToolbar',
-      fileName: 'index',
-      formats: ['es', 'umd'],
+      entry: resolve(__dirname, "src/index.ts"),
+      name: "StagewiseToolbar",
+      fileName: "index",
+      formats: ["es", "umd"],
     },
     rollupOptions: {
       output: {
         manualChunks: undefined,
         preserveModules: false,
         globals: {
-          preact: 'Preact',
+          preact: "Preact",
         },
       },
       treeshake: true,
     },
+    minify: false,
+    cssMinify: false,
   },
-})
+});
