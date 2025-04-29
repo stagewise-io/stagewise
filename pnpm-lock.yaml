@@ -99,6 +99,9 @@ importers:
       '@headlessui/react':
         specifier: ^2.2.2
         version: 2.2.2(patch_hash=btrvoxivhfohvhfe7w4r7zyyou)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@stagewise/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       lucide-react:
         specifier: ^0.503.0
         version: 0.503.0(react@19.1.0)
@@ -115,6 +118,9 @@ importers:
         specifier: ^5.5.0
         version: 5.5.0(react@19.1.0)
     devDependencies:
+      '@stagewise/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.1.4
