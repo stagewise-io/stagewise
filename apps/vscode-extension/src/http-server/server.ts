@@ -4,8 +4,11 @@ import cors from 'cors';
 import { handleStreamableHttp } from './handlers/mcp';
 import { handleSse, handleSsePost } from './handlers/sse';
 import { errorHandler } from './middleware/error';
-
-export const DEFAULT_PORT = 5746;
+import {
+  DEFAULT_PORT,
+  PING_ENDPOINT,
+  PING_RESPONSE,
+} from '@stagewise/extension-toolbar-srpc-contract';
 
 const createServer = (port: number) => {
   const app = express();
@@ -22,8 +25,8 @@ const createServer = (port: number) => {
 
   // Routes
   // Ping-route which will allow the toolbar to find out the correct port, starting with DEFAULT_PORT
-  app.get('/ping/stagewise', (_req: express.Request, res: express.Response) => {
-    res.send('stagewise');
+  app.get(PING_ENDPOINT, (_req: express.Request, res: express.Response) => {
+    res.send(PING_RESPONSE);
   });
   app.all('/mcp', handleStreamableHttp);
   app.get('/sse', handleSse);
@@ -48,7 +51,9 @@ const createServer = (port: number) => {
 
 let server: ReturnType<typeof express.application.listen> | null = null;
 
-export const startServer = async (port: number): Promise<Server> => {
+export const startServer = async (
+  port: number = DEFAULT_PORT,
+): Promise<Server> => {
   const app = createServer(port);
   return await app.listen(port, () => {
     console.error(`>>> HTTP server listening on port ${port}`);

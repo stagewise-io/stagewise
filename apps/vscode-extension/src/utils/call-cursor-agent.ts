@@ -1,7 +1,5 @@
 import * as vscode from 'vscode';
-
-// Define the name for the diagnostic collection
-const DIAGNOSTIC_COLLECTION_NAME = 'customPromptInjector';
+import { DIAGNOSTIC_COLLECTION_NAME } from '../constants';
 
 export async function callCursorAgent(prompt: string): Promise<void> {
   console.error('>>> triggerAgentWithPrompt started'); // Use console.error for visibility
@@ -61,7 +59,7 @@ export async function callCursorAgent(prompt: string): Promise<void> {
       prompt,
       vscode.DiagnosticSeverity.Error,
     );
-    fakeDiagnostic.source = 'CustomPromptInjector'; // Optional source identifier
+    fakeDiagnostic.source = DIAGNOSTIC_COLLECTION_NAME;
 
     console.error('>>> Setting fake diagnostic:', fakeDiagnostic.message);
     // 2. Set the diagnostic using the collection created outside the try block

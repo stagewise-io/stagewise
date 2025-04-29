@@ -1,13 +1,16 @@
 import * as vscode from 'vscode';
-import { startServer, stopServer, DEFAULT_PORT } from '../http-server/server';
+import { startServer, stopServer } from '../http-server/server';
 import { updateCursorMcpConfig } from './register-mcp-server';
 import { findAvailablePort } from '../utils/find-available-port';
 import { callCursorAgent } from '../utils/call-cursor-agent';
-import { getExtensionBridge } from '@stagewise/extension-toolbar-srpc-contract';
+import {
+  getExtensionBridge,
+  DEFAULT_PORT,
+} from '@stagewise/extension-toolbar-srpc-contract';
+
 // Diagnostic collection specifically for our fake prompt
-const fakeDiagCollection = vscode.languages.createDiagnosticCollection(
-  'customPromptInjector',
-);
+const fakeDiagCollection =
+  vscode.languages.createDiagnosticCollection('stagewise');
 
 export async function activate(context: vscode.ExtensionContext) {
   const isCursorIDE = vscode.env.appName.toLowerCase().includes('cursor');

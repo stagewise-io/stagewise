@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import z from 'zod';
-import { getConsoleLogsData } from '../websocket/handlers/console-logs';
+// TODO: This is mocked, will be replaced with dynamic tool registration via sRPC from the toolbar
+// Types and functions will be defined in @stagewise/extension-toolbar-srpc-contract/src/contract.ts
 
 export async function registerConsoleLogsTool(server: McpServer) {
   return server.tool(
@@ -12,7 +13,7 @@ export async function registerConsoleLogsTool(server: McpServer) {
       }),
     },
     async ({ request }) => {
-      const logs = getConsoleLogsData(request.amount);
+      const logs: string[] = [];
       return {
         content: [{ type: 'text', text: JSON.stringify(logs, null, 2) }],
       };

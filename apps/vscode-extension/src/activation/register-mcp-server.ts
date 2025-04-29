@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 
 export function updateCursorMcpConfig(port: number): void {
-  const serverName = 'cursor-agent-injector';
+  const serverName = 'stagewise';
   const serverConfig = {
     url: `http://localhost:${port}/sse`,
     env: {}, // No environment variables needed for now
