@@ -6,9 +6,7 @@
   "main": "dist/index.umd.cjs",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "dev": "tsc -b && vite build --watch --mode development",
     "build": "tsc -b && vite build --mode production",
@@ -32,6 +30,7 @@
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.1",
+    "@preact/compat": "18.3.1",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/node": "^22.15.2",
     "autoprefixer": "^10.4.21",
