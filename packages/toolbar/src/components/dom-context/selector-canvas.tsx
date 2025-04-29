@@ -5,16 +5,15 @@ import { ContextItemProposal } from "./item-proposal";
 import { ContextItem } from "./item";
 
 export function SelectorCanvas() {
-  const { chats, currentChatId, addChatDomContext } = useChatState();
+  const { chats, currentChatId, addChatDomContext, isPromptCreationActive } =
+    useChatState();
 
   const currentChat = useMemo(
     () => chats.find((chat) => chat.id === currentChatId),
     [currentChatId, chats]
   );
 
-  const shouldShow =
-    currentChat.inputValue.length > 0 ||
-    currentChat.domContextElements.length > 0;
+  const shouldShow = isPromptCreationActive;
 
   const contextElements = useMemo(() => {
     return currentChat?.domContextElements || [];

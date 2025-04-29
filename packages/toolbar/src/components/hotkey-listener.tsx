@@ -6,16 +6,19 @@ import { useChatState } from "@/hooks/use-chat-state";
 
 // This listener is responsible for listening to hotkeys and triggering the appropriate actions in the global app state.
 export function HotkeyListener() {
-  const { setInputFocus } = useChatState();
+
+  const { startPromptCreation, stopPromptCreation } = useChatState();
 
   const hotKeyHandlerMap: Record<HotkeyActions, () => void> = useMemo(
     () => ({
-      [HotkeyActions.CTRL_K]: () => {
-        console.log("CTRL + K got triggered!");
-        setInputFocus(true);
+      [HotkeyActions.CTRL_ALT_C]: () => {
+        startPromptCreation();
+      },
+      [HotkeyActions.ESC]: () => {
+        stopPromptCreation();
       },
     }),
-    [setInputFocus]
+    [startPromptCreation, stopPromptCreation]
   );
 
   const hotKeyListener = useCallback(

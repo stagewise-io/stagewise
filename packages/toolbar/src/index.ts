@@ -4,7 +4,12 @@ import { App } from "./app.tsx";
 
 import { companionAnchorTagName } from "./utils.tsx";
 
-export function initToolbar() {
+import { type ToolbarConfig } from "./config.ts";
+
+export { type ToolbarPlugin, type MCPTool } from "./plugin.ts";
+export { type ToolbarConfig } from "./config.ts";
+
+export function initToolbar(config: ToolbarConfig) {
   console.log("Stagewise Toolbar Main");
 
   if (!document.body)
@@ -57,5 +62,5 @@ export function initToolbar() {
   const styleNode = document.createElement("style");
   styleNode.append(document.createTextNode(appStyle));
   shadow.appendChild(styleNode);
-  render(createElement(App, null), shadow);
+  render(createElement(App, config), shadow);
 }

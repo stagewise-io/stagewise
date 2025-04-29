@@ -47,29 +47,19 @@ export function ChatBox() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    const focusHandler = () =>
-      setTimeout(() => chatState.setInputFocus(true), 0);
-    const blurHandler = () =>
-      setTimeout(() => chatState.setInputFocus(false), 0);
+    const blurHandler = () => inputRef.current?.focus();
 
-    inputRef.current?.addEventListener("focus", focusHandler);
-    inputRef.current?.addEventListener("blur", blurHandler);
+    if (chatState.isPromptCreationActive) {
+      inputRef.current?.focus();
+      inputRef.current?.addEventListener("blur", blurHandler);
+    } else {
+      inputRef.current?.blur();
+    }
 
     return () => {
-      inputRef.current?.removeEventListener("focus", focusHandler);
       inputRef.current?.removeEventListener("blur", blurHandler);
     };
-  }, [chatState.setInputFocus]);
-
-  useEffect(() => {
-    if (inputRef.current) {
-      if (chatState.inputFocus) {
-        inputRef.current.focus();
-      } else {
-        inputRef.current.blur();
-      }
-    }
-  }, [chatState.inputFocus]);
+  }, [chatState.isPromptCreationActive]);
 
   const buttonClassName = useMemo(
     () =>
@@ -89,28 +79,26 @@ export function ChatBox() {
     [showBigBox]
   );
 
-  const ctrlKText = useHotkeyListenerComboText(HotkeyActions.CTRL_K);
+  const ctrlKText = useHotkeyListenerComboText(HotkeyActions.CTRL_ALT_C);
 
   return (
-    <div className="w-80 flex-1 h-fit rounded-2xl ">
-      <div className="w-full h-full flex flex-row gap-1 p-1.5 rounded-2xl border border-border/10 bg-zinc-950/5 shadow-inner items-end text-sm placeholder:text-zinc-950/50 text-zinc-950">
-        <Textarea
-          ref={inputRef}
-          className={textareaClassName}
-          rows={showBigBox ? 4 : 1}
-          value={currentInput}
-          onChange={(e) => handleInputChange(e.currentTarget.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={`What do you want to change? (${ctrlKText})`}
-        />
-        <Button
-          className={buttonClassName}
-          disabled={currentInput.length === 0}
-          onClick={handleSubmit}
-        >
-          <Send className="size-3" />
-        </Button>
-      </div>
+    <div className="flex-1 h-fit w-80 flex flex-row gap-1 p-1.5 rounded-2xl border border-border/10 bg-zinc-950/5 shadow-inner items-end text-sm placeholder:text-zinc-950/50 text-zinc-950 focus-within:outline-2 outline-blue-600 transition-all duration-150">
+      <Textarea
+        ref={inputRef}
+        className={textareaClassName}
+        rows={showBigBox ? 4 : 1}
+        value={currentInput}
+        onChange={(e) => handleInputChange(e.currentTarget.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={`What do you want to change? (${ctrlKText})`}
+      />
+      <Button
+        className={buttonClassName}
+        disabled={currentInput.length === 0}
+        onClick={handleSubmit}
+      >
+        <Send className="size-3" />
+      </Button>
     </div>
   );
 }

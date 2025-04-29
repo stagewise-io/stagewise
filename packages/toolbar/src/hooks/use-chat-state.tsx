@@ -40,8 +40,9 @@ interface ChatContext {
   // UI state
   chatAreaState: ChatAreaState;
   setChatAreaState: (state: ChatAreaState) => void;
-  inputFocus: boolean;
-  setInputFocus: (focus: boolean) => void;
+  isPromptCreationActive: boolean;
+  startPromptCreation: () => void;
+  stopPromptCreation: () => void;
 }
 
 const ChatContext = createContext<ChatContext>({
@@ -56,8 +57,9 @@ const ChatContext = createContext<ChatContext>({
   addMessage: () => {},
   chatAreaState: "hidden",
   setChatAreaState: () => {},
-  inputFocus: false,
-  setInputFocus: () => {},
+  isPromptCreationActive: false,
+  startPromptCreation: () => {},
+  stopPromptCreation: () => {},
 });
 
 interface ChatStateProviderProps {
@@ -77,7 +79,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const [currentChatId, setCurrentChatId] = useState<ChatId>("new_chat");
   const [chatAreaState, internalSetChatAreaState] =
     useState<ChatAreaState>("hidden");
-  const [inputFocus, setInputFocus] = useState<boolean>(false);
+  const [isPromptCreationMode, setIsPromptCreationMode] =
+    useState<boolean>(false);
 
   const createChat = useCallback(() => {
     const newChatId = crypto.randomUUID();
@@ -135,12 +138,26 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const setChatAreaState = useCallback(
     (state: ChatAreaState) => {
       internalSetChatAreaState(state);
-      if (state !== "hidden") {
-        setInputFocus(true);
-      }
     },
-    [internalSetChatAreaState, setInputFocus]
+    [internalSetChatAreaState]
   );
+
+  const startPromptCreation = useCallback(() => {
+    setIsPromptCreationMode(true);
+    if (chatAreaState === "hidden") {
+      internalSetChatAreaState("compact");
+    }
+  }, [chatAreaState]);
+
+  const stopPromptCreation = useCallback(() => {
+    setIsPromptCreationMode(false);
+    // clear dom context for this chat so that it doesn't get too weird when re-starting prompt creation mode
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === currentChatId ? { ...chat, domContextElements: [] } : chat
+      )
+    );
+  }, [currentChatId]);
 
   const addChatDomContext = useCallback(
     (chatId: ChatId, element: HTMLElement) => {
@@ -199,7 +216,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
                 ...chat,
                 messages: [...chat.messages, newMessage],
                 inputValue: "",
-                domContext: [],
+                domContextElements: [],
               }
             : chat
         )
@@ -218,8 +235,9 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     addMessage,
     chatAreaState,
     setChatAreaState,
-    inputFocus,
-    setInputFocus,
+    isPromptCreationActive: isPromptCreationMode,
+    startPromptCreation,
+    stopPromptCreation,
     addChatDomContext,
     removeChatDomContext,
   };

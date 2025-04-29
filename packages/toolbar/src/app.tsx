@@ -7,8 +7,9 @@ import { ClickBlocker } from "./components/click-blocker";
 import { FocusLock } from "./components/focus-lock";
 import { VisibilityManager } from "./components/visibility-manager";
 import { useAppState } from "./hooks/use-app-state";
+import { ToolbarConfig } from "./config";
 
-export function App() {
+export function App({ plugins }: ToolbarConfig) {
   const isMainAppBlocked = useAppState((state) => state.isMainAppBlocked);
 
   return (
