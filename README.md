@@ -1,123 +1,172 @@
-## About the Project
+# stagewise Toolbar
 
-`Video showing the toolbar with a comment on an element and how the changes are applied atfer rerender`
+<!-- Add images and links to discord and npm here -->
 
-# Eyesight for your AI-powered code editor
+## 👀 About the project
+
+**stagewise is an AI-aware browser toolbar that connects your frontend UI to your code editor.**
+
+* 🧠 Select any element(s) in your web app
+* 💬 Leave a comment on it
+* 💡 Wait for your changes to be applied
+
+> Perfect for devs tired of pasting folder paths into prompts. stagewise gives your AI real-time, browser-powered context.
 
 ---
 
-An open source solution to provide AI code editors like Cursor or Github Copilot with actual data from the browser. Just comment on an element and your code editor receives the element with your comment as prompt. No more linking of subfolders and components in your prompts.
+## 🎬 About the Project
 
-Using AI agents to code was a paradigm shift. Everything you can put into words, can now be turned into code. However, often times it takes a lot of iterations or very precise prompts to make sure the agent edits the right files.
+🎥 *\[Video showing the toolbar with a comment on an element and how the changes are applied after re-render]*
 
-That’s where Stagewise comes in. With our toolbar you can send detailed information about the elements and components you want to have changed.  Prompt precision by design.
+### Eyesight for your AI-powered code editor
+
+An open-source solution to provide AI code editors like Cursor or GitHub Copilot with actual data from the browser. Just comment on an element and your code editor receives the DOM element, your comment, and supporting data as prompt context. No more pasting code, linking folders, or navigating deep trees.
 
 ---
 
-## Features
+## ✨ Features
 
-The Stagewise Toolbar makes it incredibly easy to edit your frontend code with AI agents. Simply select an element from the DOM using the Toolbar and provide a prompt. The Toolbar sends your prompt with additional information about the marked elements to your selected coding agent and requests a fix.
+The stagewise Toolbar makes it incredibly easy to edit your frontend code with AI agents:
 
-Alongside the DOM element you can provide your agent with further information.
+* ⚡ Works out of the box
+* 🛠️ Customise using your own configuration file
+* 🔌 Connect to your own MCP server
+* 📦 Does not impact bundle size
+* 🧠 Sends DOM elements, screenshots & metadata to your AI agent
+* 👇 Comment directly on live elements in the browser
+* 🧪 Comes with playgrounds for React, Vue, and Svelte (`./playgrounds`)
+
+---
+
+## 🧑‍💻 Quickstart
+
+### 1. Install the Chrome Extension
+
+👉 [Download from Chrome Web Store](#)
+
+### 2. Install the VS Code Extension
+
+Coming soon! (or provide `.vsix` file link here)
+
+### 3. Run a Playground (Optional)
+
+```bash
+cd playgrounds/react
+pnpm install
+pnpm dev
+```
+
+### 4. Start Editing
+
+* Open your app in the browser
+* Select an element using the Toolbar
+* Leave a comment with your desired change
+* Watch your code editor suggest a fix ✨
+
+🎥 [Watch a 30-second demo](#)
+
+---
+
+## ⚙️ How it Works
+
+stagewise connects your browser and code editor via:
+
+* Toolbar in Chrome →
+* stagewise Extension →
+* Cursor IDE or compatible agent
+
+Each comment includes:
+
+* DOM element
+* Your comment
+* Screenshot
+* Accessibility and performance hints (coming soon)
+
+---
+
+## 🧩 Code Editor Support
+
+| **Agent**      | **Supported**  |
+| -------------- | -------------- |
+| Cursor         | ✅              |
+| GitHub Copilot | 🚧 In Progress |
+| Windsurf       | ❌              |
+| Cline          | ❌              |
+| BLACKBOXAI     | ❌              |
+| Console Ninja  | ❌              |
+| Continue.dev   | ❌              |
+| Amazon Q       | ❌              |
+| Cody           | ❌              |
+| Qodo           | ❌              |
+
+---
+
+## 🧠 Deep Dives
 
 ### Logs
 
-Coming soon @Julian
+Coming soon — @Julian
 
 ### Accessibility
 
+Coming soon
+
 ### Performance
 
-### Community tools
+Coming soon
+
+### Community Tools
+
+Coming soon
 
 ---
 
-## Contact us
+## 📬 Contact Us
 
-Talk to us for any commercial inquiries or enterprise licenses.
+Got questions or want to license stagewise for commercial or enterprise use?
 
-sales@stagewise.io
+📧 **[sales@stagewise.io](mailto:sales@stagewise.io)**
 
----
-
-## Getting started
-
-With the release of version 1.0 we only support the Cursor IDE via a VSCode extension. We are working on a Github Copilot integration at the moment.
-
-// Todo: we might need to change that, depending on whether we support the Chrome Extension
-
-You can use Stagewise either with our Chrome Extension or with the SDK. We highly recommend using the Chrome Extension, since the Chrome Extension does include detailed data like screenshots.
-
-### Chrome Extension
-
-Download the latest version of our Chrome Extension from the Chrome Web Store. 
-
-// @Julian
-
-### SDK
-
-// @Julian @Glenn ?
-
-### Code editor
-
-**Visual Studio Code and Cursor** 
-
-To use Stagewise with VS Code or Cursor you need our VS Code Extension. This way the Stagewise Toolbar communicates directly with your AI coding agent. 
-
-At the moment we only support the Cursor Agent mode. We are working on a Github Copilot and other integrations.
-
-| **Agent** | **Supported** |
-| --- | --- |
-| Cursor | ✅ |
-| Copilot | ❌ |
-| Windsurf | ❌ |
-| Cline | ❌ |
-| BLACKBOXAI | ❌ |
-| Console Ninja | ❌ |
-| Continue.dev | ❌ |
-| Amazon Q | ❌ |
-| Cody | ❌ |
-| Qodo | ❌ |
-
-The Stagewise Toolbar automatically connects with the VS Code Extension. 
+💬 [Join our Discord](#) or open an [issue on GitHub](#) for dev support.
 
 ---
 
-### **Prerequisites**
+## 🛠️ Prerequisites
 
-// @Julian
-
----
-
-## Roadmap
-
-See the roadmap project for a list of planned features (and known issues). 
+Coming soon — @Julian
 
 ---
 
-### License
+## 🛣️ Roadmap
 
-The Goetze, Scharpff & Toews GbR is a commercial open source company, which means some parts of this open source repository require a commercial license. The concept is called “Open Core” where the core technology (99%) is fully open source, licensed under AGPLv3 and the 1% is covered under a commercial license which we believe is entirely relevant for larger organizations that plan to implement our technology into proprietary software.
-
-We are deeply committed to the principles of open source and aspire to make our product as open as possible. However, to ensure the long-term sustainability and continued development of the project, we are adopting an **open core** model.
-
-In this model, the core functionalities of our software will remain **open source**, allowing the community to use, modify, and contribute to the project freely. Advanced features, particularly those facilitating integration into proprietary software, will be offered under a **commercial license**.
-
-This approach enables us to: 
-
-- Maintain a robust and secure open source core.
-- Ensure the project's financial viability and resource allocation.
-- Prevent potential misuse or exploitation that could jeopardize the project's future.
-
-We believe this balance between open source and commercial offerings will foster a healthy ecosystem, encouraging community involvement while supporting the project's growth and stability.
+Check out our [project roadmap](./.github/ROADMAP.md) for upcoming features, bug fixes, and progress.
 
 ---
 
-## Contributing
+## 📜 License
 
-Please see our contributing guide.
+stagewise is developed by Goetze, Scharpff & Toews GbR under an **Open Core** model:
 
-### Good first Issues
+* 🧩 99% is open-source under AGPLv3
+* 🏢 1% (enterprise features) is commercial
+
+This allows us to:
+
+* Keep core tech open and transparent
+* Ensure sustainability and quality
+* Prevent misuse by closed-source platforms
+
+We believe this model creates a fair, open ecosystem that benefits both individuals and companies.
+
+---
+
+## 🤝 Contributing
+
+We welcome contributors of all levels!
+
+📖 [See the contributing guide](./CONTRIBUTING.md)
+
+### Good First Issues
 
 Coming soon
 
