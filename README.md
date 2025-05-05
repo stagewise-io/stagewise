@@ -1,28 +1,23 @@
-# stagewise Toolbar
+# <img src="https://github.com/stagewise-io/assets/blob/main/media/logo.png?raw=true" alt="stagewise logo" width="48" height="48" style="border-radius: 50%; vertical-align: middle; margin-right: 8px;" /> stagewise
 
-<!-- Add images and links to discord and npm here -->
+# Eyesight for your AI-powered code editor.
 
-## 👀 About the project
+[![VS Code Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/stagewise.stagewise-vscode-extension?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=stagewise.stagewise-vscode-extension) [![GitHub Repo stars](https://img.shields.io/github/stars/stagewise-io/stagewise)](https://github.com/stagewise-io/stagewise) [![Join us on Discord](https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white)](https://discord.gg/vsDjhubRbh) <!-- [![Build Status](https://img.shields.io/github/actions/workflow/status/stagewise-io/stagewise/ci.yml?branch=main)](https://github.com/stagewise-io/stagewise/actions) -->
 
-**stagewise is an AI-aware browser toolbar that connects your frontend UI to your code editor.**
+
+![stagewise demo](https://github.com/stagewise-io/assets/blob/main/media/demo.gif?raw=true)
+
+
+## About the project
+
+**stagewise is a browser toolbar that connects your frontend UI to your code ai agents in your code editor.**
 
 * 🧠 Select any element(s) in your web app
 * 💬 Leave a comment on it
-* 💡 Wait for your changes to be applied
+* 💡 Let your AI agent do the magic
 
 > Perfect for devs tired of pasting folder paths into prompts. stagewise gives your AI real-time, browser-powered context.
 
----
-
-## 🎬 About the Project
-
-🎥 *\[Video showing the toolbar with a comment on an element and how the changes are applied after re-render]*
-
-### Eyesight for your AI-powered code editor
-
-An open-source solution to provide AI code editors like Cursor or GitHub Copilot with actual data from the browser. Just comment on an element and your code editor receives the DOM element, your comment, and supporting data as prompt context. No more pasting code, linking folders, or navigating deep trees.
-
----
 
 ## ✨ Features
 
@@ -36,36 +31,76 @@ The stagewise Toolbar makes it incredibly easy to edit your frontend code with A
 * 👇 Comment directly on live elements in the browser
 * 🧪 Comes with playgrounds for React, Vue, and Svelte (`./playgrounds`)
 
----
 
-## 🧑‍💻 Quickstart
 
-### 1. Install the Chrome Extension
 
-👉 [Download from Chrome Web Store](#)
+## 📖 Quickstart 
 
-### 2. Install the VS Code Extension
+### 1. 🧩 **Install the vs-code extension** 
 
-Coming soon! (or provide `.vsix` file link here)
+Install the extension here: https://marketplace.visualstudio.com/items?itemName=stagewise.stagewise-vscode-extension
 
-### 3. Run a Playground (Optional)
+> [!NOTE]
+> 💬 **Enable MCP support (Cursor):** 
+> - The extension will auto-install a **stagewise MCP server**.
+> - Cursor will prompt you to *enable* the server.
+> - Click *enable* to let your agent call MCP-tools that the toolbar provides. ([Read more](#write-custom-mcp-tools))
 
+### 2. 👨🏽‍💻 **Install and inject the toolbar**
+
+Install [@stagewise/toolbar](https://www.npmjs.com/package/@stagewise/toolbar):
 ```bash
-cd playgrounds/react
-pnpm install
-pnpm dev
+pnpm i -D @stagewise/toolbar
 ```
 
-### 4. Start Editing
+Inject the toolbar into your app dev-mode:
 
-* Open your app in the browser
-* Select an element using the Toolbar
-* Leave a comment with your desired change
-* Watch your code editor suggest a fix ✨
+```js
+// 1. Import the toolbar
+import { initToolbar } from '@stagewise/toolbar';
 
-🎥 [Watch a 30-second demo](#)
+// 2. Define your toolbar configuration
+const stagewiseConfig = {
+  plugins: [
+    {
+      name: 'example-plugin',
+      description: 'Adds additional context for your components',
+      shortInfoForPrompt: () => {
+        return "Context information about the selected element";
+      },
+      mcp: null,
+      actions: [
+        {
+          name: 'Example Action',
+          description: 'Demonstrates a custom action',
+          execute: () => {
+            window.alert('This is a custom action!');
+          },
+        },
+      ],
+    },
+  ],
+};
 
----
+// 3. Initialize the toolbar when your app starts
+// Framework-agnostic approach - call this when your app initializes
+function setupStagewise() {
+  // Only initialize once and only in development mode
+  if (process.env.NODE_ENV === 'development') {
+    initToolbar(stagewiseConfig);
+  }
+}
+
+// Call the setup function when appropriate for your framework
+setupStagewise();
+```
+
+### Framework-specific integration examples
+> ⚡️ The toolbar will **automatically connect** to the extension!
+
+Check out our framework-specific integration [examples](https://github.com/stagewise-io/stagewise/tree/main/examples) for Next.js, Nuxt and SveleKit.
+
+
 
 ## ⚙️ How it Works
 
@@ -82,9 +117,8 @@ Each comment includes:
 * Screenshot
 * Accessibility and performance hints (coming soon)
 
----
 
-## 🧩 Code Editor Support
+## 🤖 Agent support 
 
 | **Agent**      | **Supported**  |
 | -------------- | -------------- |
@@ -99,49 +133,10 @@ Each comment includes:
 | Cody           | ❌              |
 | Qodo           | ❌              |
 
----
-
-## 🧠 Deep Dives
-
-### Logs
-
-Coming soon — @Julian
-
-### Accessibility
-
-Coming soon
-
-### Performance
-
-Coming soon
-
-### Community Tools
-
-Coming soon
-
----
-
-## 📬 Contact Us
-
-Got questions or want to license stagewise for commercial or enterprise use?
-
-📧 **[sales@stagewise.io](mailto:sales@stagewise.io)**
-
-💬 [Join our Discord](#) or open an [issue on GitHub](#) for dev support.
-
----
-
-## 🛠️ Prerequisites
-
-Coming soon — @Julian
-
----
 
 ## 🛣️ Roadmap
 
 Check out our [project roadmap](./.github/ROADMAP.md) for upcoming features, bug fixes, and progress.
-
----
 
 ## 📜 License
 
@@ -158,18 +153,20 @@ This allows us to:
 
 We believe this model creates a fair, open ecosystem that benefits both individuals and companies.
 
----
-
 ## 🤝 Contributing
 
-We welcome contributors of all levels!
+We're just getting started and love contributions! Check out our [CONTRIBUTING.md](https://github.com/stagewise-io/stagewise/blob/main/CONTRIBUTING.md) guide to get involved. For bugs and fresh ideas, please [Open an issue!](https://github.com/stagewise-io/stagewise/issues) 
 
-📖 [See the contributing guide](./CONTRIBUTING.md)
+## 💬 Community & Support 
 
-### Good First Issues
+* [Join our Discord](https://discord.gg/vsDjhubRbh)
+* Open an [issue on GitHub](https://github.com/stagewise-io/stagewise/issues) for dev support.
 
-Coming soon
 
-### Contributors
+## 📬 Contact Us
 
-Coming soon
+Got questions or want to license stagewise for commercial or enterprise use?
+
+📧 **[sales@stagewise.io](mailto:sales@stagewise.io)**
+
+
