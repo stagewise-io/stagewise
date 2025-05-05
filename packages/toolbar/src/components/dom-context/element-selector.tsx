@@ -68,6 +68,8 @@ export function ElementSelector(props: ElementSelectorProps) {
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={handleMouseClick}
+      role="button"
+      tabIndex={0}
     />
   );
 }

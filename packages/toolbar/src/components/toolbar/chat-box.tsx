@@ -105,6 +105,8 @@ export function ChatBox() {
         chatState.isPromptCreationActive && 'ring-2 ring-blue-600',
       )}
       onClick={() => chatState.startPromptCreation()}
+      role="button"
+      tabIndex={0}
     >
       <Textarea
         ref={inputRef}

@@ -32,6 +32,8 @@ export function ClickBlocker(props: {
         props.className,
       )}
       onClick={props.onClick}
+      role="button"
+      tabIndex={0}
     />
   );
 }

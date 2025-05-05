@@ -67,6 +67,8 @@ export function ContextItem({ refElement, ...props }: ContextItemProps) {
       }
       ref={boxRef}
       onClick={handleDeleteClick}
+      role="button"
+      tabIndex={0}
     >
       <Trash2 className="size-6 drop-shadow-black drop-shadow-md" />
     </div>
