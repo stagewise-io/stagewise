@@ -1,0 +1,67 @@
+---
+title: Quickstart
+---
+
+## 1. Install the VS Code Extension
+
+Install the extension here: [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=stagewise.stagewise-vscode-extension)
+
+> 💬 **Enable MCP support (Cursor):**
+> - The extension will auto-install a **stagewise MCP server**.
+> - Cursor will prompt you to *enable* the server.
+> - Click *enable* to let your agent call MCP-tools that the toolbar provides. ([Read more](#write-custom-mcp-tools))
+
+## 2. Install and Inject the Toolbar
+
+> 🪄 **Auto-Install the toolbar (AI-guided):**
+> 1. In Cursor, Press `CMD + Shift + P`
+> 2. Enter `setupToolbar`
+> 3. Execute the command and the toolbar will init automatically 🦄
+
+Or follow the manual way:
+
+```bash
+pnpm i -D @stagewise/toolbar
+```
+
+Inject the toolbar into your app dev-mode:
+
+```js
+import { initToolbar } from '@stagewise/toolbar';
+
+const stagewiseConfig = {
+  plugins: [
+    {
+      name: 'example-plugin',
+      description: 'Adds additional context for your components',
+      shortInfoForPrompt: () => {
+        return "Context information about the selected element";
+      },
+      mcp: null,
+      actions: [
+        {
+          name: 'Example Action',
+          description: 'Demonstrates a custom action',
+          execute: () => {
+            window.alert('This is a custom action!');
+          },
+        },
+      ],
+    },
+  ],
+};
+
+function setupStagewise() {
+  if (process.env.NODE_ENV === 'development') {
+    initToolbar(stagewiseConfig);
+  }
+}
+
+setupStagewise();
+```
+
+> ⚡️ The toolbar will **automatically connect** to the extension!
+
+### Framework-specific integration examples
+
+Check out our [examples repo](https://github.com/stagewise-io/stagewise/tree/main/examples) for Next.js, Nuxt and SvelteKit. 
