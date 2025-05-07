@@ -2,7 +2,7 @@ pre-commit:
   parallel: true
   jobs:
     - name: check
-      run: biome check --write --unsafe --staged     
+      run: biome check --write --unsafe --staged --no-errors-on-unmatched
       glob: "*.{js,ts,jsx,tsx}"
 
 commit-msg:
