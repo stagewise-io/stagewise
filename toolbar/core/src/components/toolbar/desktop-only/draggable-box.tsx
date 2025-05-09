@@ -28,6 +28,7 @@ import { useDraggable } from '@/hooks/use-draggable';
 export function ToolbarDraggableBox() {
   const draggable = useDraggable({
     startThreshold: 10,
+    initialRelativeCenter: { x: 0.5, y: 0.9 },
   });
   return (
     <div
