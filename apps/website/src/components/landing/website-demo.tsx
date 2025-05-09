@@ -12,8 +12,8 @@ function ToggleButton({ isActive }: ToggleButtonProps) {
       className={`cursor-default select-none transition-all duration-300 ease-in-out ${
         isActive
           ? 'bg-blue-500 px-6 py-3 text-white'
-          : 'rounded-full bg-black px-8 py-3 text-white'
-      } font-medium ring-2 ring-blue-500 ring-offset-2`}
+          : 'rounded-full bg-black px-8 py-3 text-white dark:bg-slate-200 dark:text-slate-900'
+      } font-medium ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-blue-400 dark:ring-offset-slate-800`}
     >
       Download now
     </div>
@@ -74,44 +74,44 @@ export function WebsiteDemo() {
   return (
     <div
       className={
-        'w-full max-w-4xl rounded-lg border border-gray-200 bg-white shadow-lg transition-transform duration-500'
+        'w-full max-w-4xl rounded-lg border border-gray-200 bg-white shadow-lg transition-transform duration-500 dark:border-gray-700 dark:bg-slate-800'
       }
     >
       {/* Browser Top Bar */}
-      <div className="flex items-center justify-between border-gray-200 border-b px-6 py-4">
+      <div className="flex items-center justify-between border-gray-200 border-b px-6 py-4 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <div className="h-4 w-4 rounded-full bg-blue-500" />
           <div className="h-4 w-4 rounded-full bg-green-500" />
           <div className="h-4 w-4 rounded-full bg-yellow-500" />
         </div>
         <div className="flex items-center gap-4">
-          <div className="h-4 w-20 rounded bg-gray-100" />
-          <div className="h-4 w-4 rounded-full bg-gray-100" />
+          <div className="h-4 w-20 rounded bg-gray-100 dark:bg-slate-700" />
+          <div className="h-4 w-4 rounded-full bg-gray-100 dark:bg-slate-700" />
         </div>
       </div>
-      <div className="flex items-center gap-6 border-gray-200 border-b px-6 py-3">
-        <div className="h-4 w-16 rounded bg-gray-100" />
-        <div className="h-4 w-16 rounded bg-gray-100" />
-        <div className="h-4 w-16 rounded bg-gray-100" />
-        <div className="h-4 w-16 rounded bg-gray-100" />
+      <div className="flex items-center gap-6 border-gray-200 border-b px-6 py-3 dark:border-gray-700">
+        <div className="h-4 w-16 rounded bg-gray-100 dark:bg-slate-700" />
+        <div className="h-4 w-16 rounded bg-gray-100 dark:bg-slate-700" />
+        <div className="h-4 w-16 rounded bg-gray-100 dark:bg-slate-700" />
+        <div className="h-4 w-16 rounded bg-gray-100 dark:bg-slate-700" />
       </div>
       <div className="p-6">
         <div className="mb-6">
-          <div className="mb-4 h-6 w-48 rounded bg-gray-100" />
-          <div className="mb-2 h-4 w-3/4 rounded bg-gray-100" />
-          <div className="mb-2 h-4 w-1/2 rounded bg-gray-100" />
-          <div className="h-4 w-2/3 rounded bg-gray-100" />
+          <div className="mb-4 h-6 w-48 rounded bg-gray-100 dark:bg-slate-700" />
+          <div className="mb-2 h-4 w-3/4 rounded bg-gray-100 dark:bg-slate-700" />
+          <div className="mb-2 h-4 w-1/2 rounded bg-gray-100 dark:bg-slate-700" />
+          <div className="h-4 w-2/3 rounded bg-gray-100 dark:bg-slate-700" />
         </div>
 
         <div className="mb-6 flex items-center gap-4">
-          <div className="h-10 w-32 rounded bg-gray-100" />
+          <div className="h-10 w-32 rounded bg-gray-100 dark:bg-slate-700" />
           <div className="relative">
             <ToggleButton isActive={isActive} />
             {status !== 'hidden' && (
               <div className="-translate-x-1/2 sm:-translate-y-1/2 sm:-translate-x-0 absolute top-full left-1/2 z-10 mt-4 w-xs sm:top-1/2 sm:left-full sm:mt-0 sm:ml-4">
-                <div className="h-20 rounded-lg bg-white p-4 shadow-lg">
+                <div className="h-20 rounded-lg bg-white p-4 shadow-lg ring-1 ring-black/5 dark:bg-slate-700 dark:ring-white/10">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="w-full font-mono text-gray-700 text-sm">
+                    <div className="w-full font-mono text-gray-700 text-sm dark:text-slate-200">
                       {text}
                       <span className="animate-pulse">|</span>
                     </div>
@@ -119,11 +119,13 @@ export function WebsiteDemo() {
                       type="button"
                       disabled
                       className={`flex h-6 w-6 items-center justify-center rounded-full p-1 transition-colors ${
-                        status === 'loading' ? 'bg-blue-100' : 'bg-blue-500'
+                        status === 'loading'
+                          ? 'bg-blue-100 dark:bg-blue-800/50'
+                          : 'bg-blue-500'
                       }`}
                     >
                       {status === 'loading' ? (
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent dark:border-blue-400 dark:border-t-transparent" />
                       ) : (
                         <svg
                           className="h-4 w-4 text-white"
@@ -148,15 +150,15 @@ export function WebsiteDemo() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border border-gray-200 p-4">
-            <div className="mb-2 h-4 w-24 rounded bg-gray-100" />
-            <div className="mb-2 h-4 w-full rounded bg-gray-100" />
-            <div className="h-4 w-3/4 rounded bg-gray-100" />
+          <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+            <div className="mb-2 h-4 w-24 rounded bg-gray-100 dark:bg-slate-700" />
+            <div className="mb-2 h-4 w-full rounded bg-gray-100 dark:bg-slate-700" />
+            <div className="h-4 w-3/4 rounded bg-gray-100 dark:bg-slate-700" />
           </div>
-          <div className="rounded-lg border border-gray-200 p-4">
-            <div className="mb-2 h-4 w-24 rounded bg-gray-100" />
-            <div className="mb-2 h-4 w-full rounded bg-gray-100" />
-            <div className="h-4 w-3/4 rounded bg-gray-100" />
+          <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+            <div className="mb-2 h-4 w-24 rounded bg-gray-100 dark:bg-slate-700" />
+            <div className="mb-2 h-4 w-full rounded bg-gray-100 dark:bg-slate-700" />
+            <div className="h-4 w-3/4 rounded bg-gray-100 dark:bg-slate-700" />
           </div>
         </div>
       </div>

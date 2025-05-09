@@ -1,23 +1,475 @@
+import Image from 'next/image';
+import Link from 'next/link';
+import {
+  ArrowRight,
+  Github,
+  Zap,
+  Settings,
+  Link2,
+  Feather,
+  Layers,
+  MessageSquare,
+  ExternalLink,
+} from 'lucide-react';
 import { WebsiteDemo } from '@/components/landing/website-demo';
-import { ActionButtons } from '@/components/landing/action-buttons';
-import type { Metadata } from 'next';
-
-export const metadata: Metadata = {
-  title: 'Stagewise | Eyesight for AI-powered Code Editors',
-  description:
-    'Stagewise enables coders to connect their AI-powered Code Editor to your browser environment.',
-};
+import { AnimatedBackground } from '@/components/landing/animated-background';
+import { ScrollReveal } from '@/components/landing/scroll-reveal';
+import { Logo3D } from '@/components/landing/3d-logo';
+import { GradientButton } from '@/components/landing/gradient-button';
 
 export default function Home() {
   return (
-    <div className="grid min-h-screen grid-rows-[20px_1fr_20px] items-center justify-items-center gap-16 p-8 pb-20 font-[family-name:var(--font-geist-sans)] sm:p-20">
-      <main className="row-start-2 flex flex-col items-center gap-[32px] sm:items-start">
-        <h1 className="text-balance font-bold text-6xl lg:text-8xl">
-          Eyesight for your AI-powered Code Editor
-        </h1>
-        <ActionButtons />
-        <WebsiteDemo />
-      </main>
+    <div className="relative min-h-screen overflow-hidden bg-white text-slate-900 dark:bg-black dark:text-white">
+      <AnimatedBackground />
+
+      {/* Header */}
+      <header className="container relative z-10 mx-auto flex items-center justify-between px-4 py-6">
+        <div className="flex items-center gap-3">
+          <Logo3D />
+          <span className="font-semibold text-xl">stagewise</span>
+        </div>
+        <nav className="hidden items-center gap-8 md:flex">
+          <Link
+            href="#features"
+            className="text-gray-500 transition-colors hover:text-slate-900 dark:text-gray-400 dark:hover:text-white"
+          >
+            Features
+          </Link>
+          <Link
+            href="#quickstart"
+            className="text-gray-500 transition-colors hover:text-slate-900 dark:text-gray-400 dark:hover:text-white"
+          >
+            Quickstart
+          </Link>
+          <Link
+            href="https://github.com/stagewise-io/stagewise"
+            className="text-gray-500 transition-colors hover:text-slate-900 dark:text-gray-400 dark:hover:text-white"
+          >
+            GitHub
+          </Link>
+        </nav>
+        <div className="flex items-center gap-4">
+          <Link href="https://marketplace.visualstudio.com/items?itemName=stagewise.stagewise-vscode-extension">
+            <GradientButton>Install Extension</GradientButton>
+          </Link>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="container relative z-10 mx-auto px-4 py-24 md:py-32">
+        <div className="mx-auto max-w-4xl">
+          <ScrollReveal>
+            <div className="mb-12 text-center">
+              <h1 className="mb-6 font-bold text-4xl tracking-tight md:text-6xl">
+                Eyesight for your
+                <span className="bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
+                  {' '}
+                  AI-powered{' '}
+                </span>
+                Code Editor
+              </h1>
+              <p className="mx-auto mb-8 max-w-2xl text-gray-600 text-lg dark:text-gray-400">
+                Connect your frontend UI to your code AI agents. Select
+                elements, leave comments, and let your AI do the magic.
+              </p>
+              <div className="mb-8 flex flex-col justify-center gap-4 sm:flex-row">
+                <Link href="#quickstart">
+                  <GradientButton size="lg">
+                    Get Started
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </GradientButton>
+                </Link>
+                <Link href="https://github.com/stagewise-io/stagewise">
+                  <GradientButton variant="outline" size="lg">
+                    <Github className="mr-2 h-4 w-4" />
+                    Star on GitHub
+                  </GradientButton>
+                </Link>
+              </div>
+              <div className="flex items-center justify-center gap-4 text-gray-600 text-sm dark:text-gray-400">
+                <div className="flex items-center">
+                  <div className="mr-2 h-2 w-2 rounded-full bg-green-500" />
+                  VS Code Extension
+                </div>
+                <div className="flex items-center">
+                  <div className="mr-2 h-2 w-2 rounded-full bg-green-500" />
+                  Cursor Support
+                </div>
+                <div className="flex items-center">
+                  <div className="mr-2 h-2 w-2 rounded-full bg-green-500" />
+                  Open Source
+                </div>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal delay={300}>
+            <div className="mx-auto max-w-3xl transform transition-transform duration-300 hover:scale-[1.01] hover:shadow-[0_0_50px_rgba(128,90,213,0.3)]">
+              <WebsiteDemo />
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* Demo Section */}
+      <section className="container relative z-10 mx-auto border-gray-200 border-t px-4 py-16 md:py-24 dark:border-gray-800">
+        <ScrollReveal>
+          <div className="mx-auto mb-12 max-w-4xl text-center">
+            <h2 className="mb-6 font-bold text-3xl md:text-4xl">
+              See It In Action
+            </h2>
+            <p className="mx-auto max-w-2xl text-gray-600 text-lg dark:text-gray-400">
+              Watch how stagewise connects your browser UI to your code editor,
+              providing real-time context for your AI agents.
+            </p>
+          </div>
+        </ScrollReveal>
+
+        <ScrollReveal delay={200}>
+          <div className="mx-auto max-w-4xl transform overflow-hidden rounded-xl border border-purple-900/50 shadow-[0_0_40px_rgba(128,90,213,0.25)] transition-transform duration-500 hover:scale-[1.02]">
+            <Image
+              src="/demo.gif"
+              alt="Stagewise Demo"
+              width={1200}
+              height={675}
+              className="w-full"
+            />
+          </div>
+        </ScrollReveal>
+      </section>
+
+      {/* Features Section */}
+      <section
+        id="features"
+        className="container relative z-10 mx-auto border-gray-200 border-t px-4 py-24 md:py-32 dark:border-gray-800"
+      >
+        <ScrollReveal>
+          <div className="mx-auto mb-16 max-w-4xl">
+            <h2 className="mb-6 font-bold text-3xl md:text-4xl">Features</h2>
+            <p className="text-gray-600 text-lg dark:text-gray-400">
+              The stagewise Toolbar makes it incredibly easy to edit your
+              frontend code with AI agents
+            </p>
+          </div>
+        </ScrollReveal>
+
+        <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-3">
+          {[
+            {
+              icon: <Zap className="h-6 w-6" />,
+              title: 'Works out of the box',
+              description: 'Simple setup with minimal configuration required',
+              delay: 100,
+            },
+            {
+              icon: <Settings className="h-6 w-6" />,
+              title: 'Customizable',
+              description:
+                'Use your own configuration file to tailor the experience',
+              delay: 200,
+            },
+            {
+              icon: <Link2 className="h-6 w-6" />,
+              title: 'Connect to MCP',
+              description:
+                'Connect to your own MCP server for enhanced capabilities',
+              delay: 300,
+            },
+            {
+              icon: <Feather className="h-6 w-6" />,
+              title: 'Zero impact',
+              description: 'Does not impact bundle size of your production app',
+              delay: 400,
+            },
+            {
+              icon: <Layers className="h-6 w-6" />,
+              title: 'Rich context',
+              description:
+                'Sends DOM elements, screenshots & metadata to your AI agent',
+              delay: 500,
+            },
+            {
+              icon: <MessageSquare className="h-6 w-6" />,
+              title: 'Live comments',
+              description: 'Comment directly on live elements in the browser',
+              delay: 600,
+            },
+          ].map((feature, i) => (
+            <ScrollReveal key={feature.title} delay={feature.delay}>
+              <div className="group hover:-translate-y-1 rounded-lg border border-gray-200 bg-gray-100 p-6 transition-all duration-300 hover:border-purple-600 hover:shadow-[0_0_30px_rgba(128,90,213,0.15)] dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-800">
+                <div className="mb-4 inline-flex rounded-lg bg-gray-200 p-3 transition-colors group-hover:bg-purple-100 dark:bg-gray-800 dark:group-hover:bg-purple-900/20">
+                  {feature.icon}
+                </div>
+                <h3 className="mb-2 font-semibold text-xl">{feature.title}</h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {feature.description}
+                </p>
+              </div>
+            </ScrollReveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Framework Support Section */}
+      <section className="container relative z-10 mx-auto border-gray-200 border-t px-4 py-16 md:py-24 dark:border-gray-800">
+        <ScrollReveal>
+          <div className="mx-auto mb-16 max-w-4xl text-center">
+            <h2 className="mb-6 font-bold text-3xl md:text-4xl">
+              Works With Your Stack
+            </h2>
+            <p className="mx-auto max-w-2xl text-gray-600 text-lg dark:text-gray-400">
+              Stagewise integrates seamlessly with popular frontend frameworks
+            </p>
+          </div>
+        </ScrollReveal>
+
+        <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-8">
+          {[
+            { name: 'React', color: 'bg-blue-500' },
+            { name: 'Vue', color: 'bg-green-500' },
+            { name: 'Svelte', color: 'bg-orange-500' },
+            { name: 'Next.js', color: 'bg-gray-500' },
+            { name: 'Nuxt', color: 'bg-green-600' },
+          ].map((framework, i) => (
+            <ScrollReveal key={framework.name} delay={i * 100} direction="up">
+              <div className="group flex items-center gap-2 rounded-full border border-gray-200 bg-gray-100 px-6 py-3 transition-all duration-300 hover:border-purple-600 hover:shadow-[0_0_20px_rgba(128,90,213,0.15)] dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-800">
+                <div className={`h-3 w-3 rounded-full ${framework.color}`} />
+                <span className="font-medium">{framework.name}</span>
+              </div>
+            </ScrollReveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Quickstart Section */}
+      <section
+        id="quickstart"
+        className="container relative z-10 mx-auto border-gray-200 border-t px-4 py-24 md:py-32 dark:border-gray-800"
+      >
+        <ScrollReveal>
+          <div className="mx-auto max-w-4xl">
+            <h2 className="mb-10 font-bold text-3xl md:text-4xl">Quickstart</h2>
+
+            <div className="space-y-12">
+              <div className="flex flex-col items-start gap-8 md:flex-row">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-200 font-bold text-slate-900 text-xl dark:bg-gray-800 dark:text-white">
+                  1
+                </div>
+                <div>
+                  <h3 className="mb-4 font-semibold text-2xl">
+                    Install the VS Code extension
+                  </h3>
+                  <p className="mb-4 text-gray-600 dark:text-gray-400">
+                    Install the extension from the Visual Studio Marketplace.
+                  </p>
+                  <Link href="https://marketplace.visualstudio.com/items?itemName=stagewise.stagewise-vscode-extension">
+                    <GradientButton>Get Extension</GradientButton>
+                  </Link>
+                  <div className="mt-4 rounded-lg border border-gray-200 bg-gray-100 p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <p className="font-medium text-gray-700 dark:text-gray-300">
+                      Enable MCP support (Cursor):
+                    </p>
+                    <ul className="mt-2 list-disc pl-5 text-gray-600 dark:text-gray-400">
+                      <li>
+                        The extension will auto-install a{' '}
+                        <strong>stagewise MCP server</strong>.
+                      </li>
+                      <li>
+                        Cursor will prompt you to <em>enable</em> the server.
+                      </li>
+                      <li>
+                        Click <em>enable</em> to let your agent call MCP-tools
+                        that the toolbar provides.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-start gap-8 md:flex-row">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-200 font-bold text-slate-900 text-xl dark:bg-gray-800 dark:text-white">
+                  2
+                </div>
+                <div>
+                  <h3 className="mb-4 font-semibold text-2xl">
+                    Install and inject the toolbar
+                  </h3>
+                  <div className="mb-4 rounded-lg border border-gray-200 bg-gray-100 p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <p className="font-medium text-gray-700 dark:text-gray-300">
+                      Auto-Install the toolbar (AI-guided):
+                    </p>
+                    <ol className="mt-2 list-decimal pl-5 text-gray-600 dark:text-gray-400">
+                      <li>
+                        In Cursor, Press{' '}
+                        <code className="rounded bg-gray-200 px-1 dark:bg-gray-800">
+                          CMD + Shift + P
+                        </code>
+                      </li>
+                      <li>
+                        Enter{' '}
+                        <code className="rounded bg-gray-200 px-1 dark:bg-gray-800">
+                          setupToolbar
+                        </code>
+                      </li>
+                      <li>
+                        Execute the command and the toolbar will init
+                        automatically
+                      </li>
+                    </ol>
+                  </div>
+                  <p className="mb-4 text-gray-600 dark:text-gray-400">
+                    Or follow the manual way:
+                  </p>
+                  <div className="mb-4 overflow-x-auto rounded-lg bg-gray-100 p-4 font-mono text-gray-700 text-sm dark:bg-gray-900 dark:text-gray-300">
+                    pnpm i -D @stagewise/toolbar
+                  </div>
+                  <p className="mb-2 text-gray-600 dark:text-gray-400">
+                    Inject the toolbar into your app dev-mode:
+                  </p>
+                  <div className="overflow-x-auto rounded-lg bg-gray-100 p-4 font-mono text-gray-700 text-sm dark:bg-gray-900 dark:text-gray-300">
+                    {`// 1. Import the toolbar
+import { initToolbar } from '@stagewise/toolbar';
+
+// 2. Define your toolbar configuration
+const stagewiseConfig = {
+  // Configuration options...
+};
+
+// 3. Initialize the toolbar when your app starts
+function setupStagewise() {
+  if (process.env.NODE_ENV === 'development') {
+    initToolbar(stagewiseConfig);
+  }
+}
+
+// Call the setup function
+setupStagewise();`}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ScrollReveal>
+      </section>
+
+      {/* Agent Support Section */}
+      <section className="container relative z-10 mx-auto border-gray-200 border-t px-4 py-24 md:py-32 dark:border-gray-800">
+        <ScrollReveal>
+          <div className="mx-auto mb-16 max-w-4xl">
+            <h2 className="mb-6 font-bold text-3xl md:text-4xl">
+              Agent Support
+            </h2>
+            <p className="text-gray-600 text-lg dark:text-gray-400">
+              Compatible with popular AI coding assistants
+            </p>
+          </div>
+        </ScrollReveal>
+
+        <ScrollReveal delay={200}>
+          <div className="mx-auto max-w-2xl rounded-lg border border-gray-200 bg-gray-100 p-6 transition-all duration-300 hover:shadow-[0_0_30px_rgba(128,90,213,0.15)] dark:border-gray-800 dark:bg-gray-900">
+            <table className="w-full">
+              <thead>
+                <tr className="border-gray-200 border-b dark:border-gray-800">
+                  <th className="px-4 py-3 text-left font-semibold">Agent</th>
+                  <th className="px-4 py-3 text-left font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-gray-300 border-b dark:border-gray-700">
+                  <td className="px-4 py-3">Cursor</td>
+                  <td className="px-4 py-3 text-green-500">Supported</td>
+                </tr>
+                <tr className="border-gray-300 border-b dark:border-gray-700">
+                  <td className="px-4 py-3">GitHub Copilot</td>
+                  <td className="px-4 py-3 text-yellow-500">In Progress</td>
+                </tr>
+                <tr className="border-gray-300 border-b dark:border-gray-700">
+                  <td className="px-4 py-3">Windsurf</td>
+                  <td className="px-4 py-3 text-red-500">Not Supported</td>
+                </tr>
+                <tr className="border-gray-300 border-b dark:border-gray-700">
+                  <td className="px-4 py-3">Cline</td>
+                  <td className="px-4 py-3 text-red-500">Not Supported</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3">BLACKBOXAI</td>
+                  <td className="px-4 py-3 text-red-500">Not Supported</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ScrollReveal>
+      </section>
+
+      {/* CTA Section */}
+      <section className="container relative z-10 mx-auto border-gray-200 border-t px-4 py-16 md:py-24 dark:border-gray-800">
+        <ScrollReveal>
+          <div className="mx-auto max-w-4xl rounded-lg bg-gradient-to-br from-gray-100 to-purple-200/30 p-12 transition-all duration-500 hover:shadow-[0_0_50px_rgba(128,90,213,0.2)] dark:from-gray-900 dark:to-purple-900/30">
+            <h2 className="mb-6 text-center font-bold text-3xl md:text-4xl">
+              Ready to enhance your AI coding experience?
+            </h2>
+            <p className="mx-auto mb-8 max-w-2xl text-center text-gray-700 text-xl dark:text-gray-300">
+              Join our growing community of developers using stagewise to
+              supercharge their AI-powered coding workflow.
+            </p>
+            <div className="flex flex-col justify-center gap-4 sm:flex-row">
+              <Link href="https://marketplace.visualstudio.com/items?itemName=stagewise.stagewise-vscode-extension">
+                <GradientButton size="lg">
+                  Install VS Code Extension
+                </GradientButton>
+              </Link>
+              <Link href="https://github.com/stagewise-io/stagewise">
+                <GradientButton variant="outline" size="lg">
+                  <Github className="mr-2 h-4 w-4" />
+                  View on GitHub
+                </GradientButton>
+              </Link>
+            </div>
+          </div>
+        </ScrollReveal>
+      </section>
+
+      {/* Footer */}
+      <footer className="container relative z-10 mx-auto border-gray-200 border-t px-4 py-12 dark:border-gray-800">
+        <div className="flex flex-col items-center justify-between md:flex-row">
+          <div className="mb-4 flex items-center gap-2 md:mb-0">
+            <Image
+              src="/logo.png"
+              alt="Stagewise Logo"
+              width={24}
+              height={24}
+              className="rounded-full"
+            />
+            <span className="font-semibold">stagewise</span>
+            <span className="ml-2 text-gray-600 text-sm dark:text-gray-500">
+              © 2024 Goetze, Scharpff & Toews GbR
+            </span>
+          </div>
+          <div className="flex gap-8">
+            <Link
+              href="https://github.com/stagewise-io/stagewise"
+              className="group flex items-center text-gray-600 transition-colors hover:text-slate-900 dark:text-gray-500 dark:hover:text-white"
+            >
+              GitHub
+              <ExternalLink className="ml-1 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+            </Link>
+            <Link
+              href="https://discord.gg/vsDjhubRbh"
+              className="group flex items-center text-gray-600 transition-colors hover:text-slate-900 dark:text-gray-500 dark:hover:text-white"
+            >
+              Discord
+              <ExternalLink className="ml-1 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+            </Link>
+            <Link
+              href="mailto:sales@stagewise.io"
+              className="group flex items-center text-gray-600 transition-colors hover:text-slate-900 dark:text-gray-500 dark:hover:text-white"
+            >
+              Contact
+              <ExternalLink className="ml-1 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

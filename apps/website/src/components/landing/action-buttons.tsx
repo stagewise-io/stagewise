@@ -40,7 +40,7 @@ export default function CopyNPMInstallCommandButton() {
 
   const handleCopy = async () => {
     try {
-      // await navigator.clipboard.writeText("string to copy");
+      await navigator.clipboard.writeText('npm install @stagewise/toolbar');
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch (err) {
@@ -54,7 +54,7 @@ export default function CopyNPMInstallCommandButton() {
         <TooltipTrigger asChild>
           <Button
             variant="outline"
-            className="flex disabled:opacity-100"
+            className="flex border-slate-300 text-slate-900 hover:bg-slate-100 disabled:opacity-100 dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
             onClick={handleCopy}
             aria-label={copied ? 'Copied' : 'Copy to clipboard'}
             disabled={copied}
@@ -86,7 +86,7 @@ export default function CopyNPMInstallCommandButton() {
             </div>
           </Button>
         </TooltipTrigger>
-        <TooltipContent className="px-2 py-1 text-xs">
+        <TooltipContent className="border border-slate-200 bg-white px-2 py-1 text-slate-900 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
           Click to copy
         </TooltipContent>
       </Tooltip>
