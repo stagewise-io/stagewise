@@ -200,26 +200,6 @@ export function useDraggable(config: DraggableConfig) {
       targetViewportCenterY =
         currentMousePosRef.current.y -
         mouseToDraggableCenterOffsetRef.current.y;
-
-      // Persist the new relative center if dragging
-      if (
-        parentWidth > 0 &&
-        parentHeight > 0 &&
-        targetViewportCenterX !== null &&
-        targetViewportCenterY !== null
-      ) {
-        const newRelativeX =
-          (targetViewportCenterX - parentViewportLeft) / parentWidth;
-        const newRelativeY =
-          (targetViewportCenterY - parentViewportTop) / parentHeight;
-        // Check for NaN or Infinity to prevent invalid values if parentWidth/Height is transiently zero
-        if (Number.isFinite(newRelativeX) && Number.isFinite(newRelativeY)) {
-          persistedRelativeCenterRef.current = {
-            x: newRelativeX,
-            y: newRelativeY,
-          };
-        }
-      }
     } else {
       // Not dragging: use the persisted or initial relative center
       if (currentDesiredRelativeCenter && parentWidth > 0 && parentHeight > 0) {
@@ -267,6 +247,63 @@ export function useDraggable(config: DraggableConfig) {
 
     if (targetViewportCenterX === null || targetViewportCenterY === null) {
       return;
+    }
+
+    // Clamp the position to the provider's boundaries
+    const { borderLocation } = latestProviderDataRef.current || {
+      borderLocation: undefined,
+    };
+
+    if (borderLocation && draggableWidth > 0 && draggableHeight > 0) {
+      const providerRectWidth = borderLocation.right - borderLocation.left;
+      const providerRectHeight = borderLocation.bottom - borderLocation.top;
+
+      let clampedCenterX = targetViewportCenterX;
+      let clampedCenterY = targetViewportCenterY;
+
+      // Handle X-axis clamping
+      if (draggableWidth >= providerRectWidth) {
+        // If draggable is wider or same width as provider
+        clampedCenterX = borderLocation.left + providerRectWidth / 2; // Center it
+      } else {
+        const minX = borderLocation.left + draggableWidth / 2;
+        const maxX = borderLocation.right - draggableWidth / 2;
+        clampedCenterX = Math.max(minX, Math.min(clampedCenterX, maxX));
+      }
+
+      // Handle Y-axis clamping
+      if (draggableHeight >= providerRectHeight) {
+        // If draggable is taller or same height as provider
+        clampedCenterY = borderLocation.top + providerRectHeight / 2; // Center it
+      } else {
+        const minY = borderLocation.top + draggableHeight / 2;
+        const maxY = borderLocation.bottom - draggableHeight / 2;
+        clampedCenterY = Math.max(minY, Math.min(clampedCenterY, maxY));
+      }
+
+      targetViewportCenterX = clampedCenterX;
+      targetViewportCenterY = clampedCenterY;
+    }
+
+    if (
+      isDraggingRef.current &&
+      parentWidth > 0 &&
+      parentHeight > 0
+      // targetViewportCenterX and targetViewportCenterY are guaranteed non-null
+      // here due to the earlier check and subsequent clamping.
+    ) {
+      // Persist the new relative center if dragging, using the CLAMPED viewport coordinates
+      const newRelativeX =
+        (targetViewportCenterX - parentViewportLeft) / parentWidth;
+      const newRelativeY =
+        (targetViewportCenterY - parentViewportTop) / parentHeight;
+
+      if (Number.isFinite(newRelativeX) && Number.isFinite(newRelativeY)) {
+        persistedRelativeCenterRef.current = {
+          x: newRelativeX,
+          y: newRelativeY,
+        };
+      }
     }
 
     const elStyle = draggableEl.style;
