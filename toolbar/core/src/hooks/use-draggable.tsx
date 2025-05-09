@@ -1,20 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Toolbar draggable hook
-// Copyright (C) 2025 Goetze, Scharpff & Toews GbR
-
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
-
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 import { type ComponentChildren, createContext, type RefObject } from 'preact';
 import {
   useState,
@@ -22,6 +5,7 @@ import {
   useContext,
   useRef,
   type MutableRef,
+  useCallback,
 } from 'preact/hooks';
 
 interface DraggableContextType {
@@ -137,302 +121,333 @@ export interface DraggableConfig {
   initialSnapArea?: keyof DraggableContextType['snapAreas'];
 }
 
-export function useDraggable(config?: DraggableConfig): IDraggable {
-  const context = useContext(DraggableContext);
-  if (!context) {
-    throw new Error('useDraggable must be used within a DraggableProvider');
-  }
+export function useDraggable(config: {
+  startThreshold?: number;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+}) {
+  const providerData = useContext(DraggableContext);
+  const latestProviderDataRef = useRef(providerData);
 
-  const {
-    startThreshold = 5,
-    areaSnapThreshold = 20,
-    areaBorderSnap = true,
-    onDragStart,
-    onDragEnd,
-    initialSnapArea,
-  } = config || {};
+  useEffect(() => {
+    latestProviderDataRef.current = providerData;
+  }, [providerData]);
 
-  const draggableRef = useRef<HTMLElement | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const transformRef = useRef({ x: 0, y: 0 });
-  const [position, setPosition] = useState({
-    snapArea: null as keyof DraggableContextType['snapAreas'] | null,
-    isTopHalf: true,
-    isLeftHalf: true,
-  });
-  const dragStartRef = useRef<{
+  // Renamed from draggableRef to movingElementRef for internal clarity
+  const movingElementRef = useRef<HTMLElement | null>(null);
+  // New ref for the drag handle initiator
+  const dragInitiatorRef = useRef<HTMLElement | null>(null);
+
+  // State to hold the actual DOM nodes to trigger effect updates
+  const [movingElementNode, setMovingElementNode] =
+    useState<HTMLElement | null>(null);
+  const [dragInitiatorNode, setDragInitiatorNode] =
+    useState<HTMLElement | null>(null);
+
+  const initialDraggableViewportPosRef = useRef<{
     x: number;
     y: number;
-    elementX: number;
-    elementY: number;
   } | null>(null);
+  const mouseAndDraggablePosDeltaRef = useRef<{ x: number; y: number } | null>(
+    null,
+  );
+  const draggableTargetPosRef = useRef<{ x: number; y: number } | null>(null);
+  const draggableReachedTargetPosRef = useRef(false);
+  const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
+  const currentMousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
 
-  // Apply necessary styles to the draggable element
-  const applyDraggableStyles = (element: HTMLElement) => {
-    element.style.position = 'absolute';
-    element.style.left = '0';
-    element.style.top = '0';
-    element.style.transform = 'translate(0px, 0px)';
-    element.style.cursor = 'move';
-    element.style.userSelect = 'none';
-    element.style.touchAction = 'none';
-  };
+  const { startThreshold = 3, onDragStart, onDragEnd } = config;
 
-  // Apply styles whenever the ref changes
-  useEffect(() => {
-    if (draggableRef.current) {
-      applyDraggableStyles(draggableRef.current);
+  const updateDraggablePosition = useCallback(() => {
+    if (
+      !movingElementRef.current ||
+      !currentMousePosRef.current ||
+      !mouseAndDraggablePosDeltaRef.current
+    )
+      return;
+
+    // Calculate the new target viewport position of the draggable element
+    draggableTargetPosRef.current = {
+      x:
+        currentMousePosRef.current!.x - mouseAndDraggablePosDeltaRef.current!.x,
+      y:
+        currentMousePosRef.current!.y - mouseAndDraggablePosDeltaRef.current!.y,
+    };
+
+    const draggableEl = movingElementRef.current!;
+    const elStyle = draggableEl.style;
+
+    // Get current visual position for comparison later
+    const currentRect = draggableEl.getBoundingClientRect();
+    const targetViewportX = draggableTargetPosRef.current!.x;
+    const targetViewportY = draggableTargetPosRef.current!.y;
+
+    // Check if the draggable element is at the target position
+    draggableReachedTargetPosRef.current =
+      Math.round(currentRect.left) === Math.round(targetViewportX) &&
+      Math.round(currentRect.top) === Math.round(targetViewportY);
+
+    // Log if the current position is not the same as the target position
+    if (!draggableReachedTargetPosRef.current) {
+      console.log(
+        'Targeting new position. Rounded Target Viewport X/Y:',
+        Math.round(targetViewportX),
+        Math.round(targetViewportY),
+        'Current Viewport Left/Top:',
+        Math.round(currentRect.left),
+        Math.round(currentRect.top),
+      );
     }
-  }, [draggableRef.current]);
 
-  // Calculate position as percentage within container
-  const calculatePosition = (x: number, y: number) => {
-    if (!draggableRef.current || !context) return { x: 0, y: 0 };
+    // Start of new positioning logic
+    const draggableWidth = draggableEl.offsetWidth;
+    const draggableHeight = draggableEl.offsetHeight;
+    const offsetParent = draggableEl.offsetParent as HTMLElement | null;
 
-    const containerWidth =
-      context.borderLocation.right - context.borderLocation.left;
-    const containerHeight =
-      context.borderLocation.bottom - context.borderLocation.top;
+    let parentViewportLeft = 0;
+    let parentViewportTop = 0;
+    let parentWidth = window.innerWidth;
+    let parentHeight = window.innerHeight;
 
-    // Calculate percentage position relative to container
-    const xPercent = ((x - context.borderLocation.left) / containerWidth) * 100;
-    const yPercent = ((y - context.borderLocation.top) / containerHeight) * 100;
+    if (offsetParent) {
+      const opRect = offsetParent.getBoundingClientRect();
+      parentViewportLeft = opRect.left;
+      parentViewportTop = opRect.top;
+      parentWidth = offsetParent.offsetWidth;
+      parentHeight = offsetParent.offsetHeight;
+    }
+    // End of new positioning logic preamble - actual style application to come next
 
-    // Clamp values between 0 and 100
-    return {
-      x: Math.max(0, Math.min(100, xPercent)),
-      y: Math.max(0, Math.min(100, yPercent)),
-    };
-  };
+    // Clear previous positioning styles
+    elStyle.left = '';
+    elStyle.right = '';
+    elStyle.top = '';
+    elStyle.bottom = '';
 
-  // Check if position is near a snap area
-  const checkSnapAreas = (x: number, y: number) => {
-    if (!context) return null;
+    const currentProviderData = latestProviderDataRef.current;
+    if (currentProviderData) {
+      const containerRect = currentProviderData.borderLocation;
+      const targetAbsCenterX = targetViewportX + draggableWidth / 2;
+      const targetAbsCenterY = targetViewportY + draggableHeight / 2;
 
-    const snapDistances = {
-      topLeft: Math.hypot(x - 0, y - 0),
-      topCenter: Math.hypot(x - 50, y - 0),
-      topRight: Math.hypot(x - 100, y - 0),
-      centerLeft: Math.hypot(x - 0, y - 50),
-      center: Math.hypot(x - 50, y - 50),
-      centerRight: Math.hypot(x - 100, y - 50),
-      bottomLeft: Math.hypot(x - 0, y - 100),
-      bottomCenter: Math.hypot(x - 50, y - 100),
-      bottomRight: Math.hypot(x - 100, y - 100),
-    };
+      const containerAbsCenterX =
+        (containerRect.left + containerRect.right) / 2;
+      const containerAbsCenterY =
+        (containerRect.top + containerRect.bottom) / 2;
 
-    // Find the closest enabled snap area
-    let closestArea: keyof typeof snapDistances | null = null;
-    let minDistance = areaSnapThreshold;
+      const isInLeftHalf = targetAbsCenterX < containerAbsCenterX;
+      const isInTopHalf = targetAbsCenterY < containerAbsCenterY;
 
-    Object.entries(snapDistances).forEach(([area, distance]) => {
-      if (
-        context.snapAreas[area as keyof typeof context.snapAreas] &&
-        distance < minDistance
-      ) {
-        minDistance = distance;
-        closestArea = area as keyof typeof snapDistances;
+      if (isInLeftHalf) {
+        elStyle.left = `${Math.round(targetViewportX - parentViewportLeft)}px`;
+      } else {
+        const parentAbsRight = parentViewportLeft + parentWidth;
+        const draggableAbsRight = targetViewportX + draggableWidth;
+        elStyle.right = `${Math.round(parentAbsRight - draggableAbsRight)}px`;
       }
-    });
 
-    if (closestArea) {
-      const [vertical, horizontal] = closestArea.split(/(?=[A-Z])/);
-      return {
-        x: horizontal === 'Left' ? 0 : horizontal === 'Right' ? 100 : 50,
-        y: vertical === 'Top' ? 0 : vertical === 'Bottom' ? 100 : 50,
+      if (isInTopHalf) {
+        elStyle.top = `${Math.round(targetViewportY - parentViewportTop)}px`;
+      } else {
+        const parentAbsBottom = parentViewportTop + parentHeight;
+        const draggableAbsBottom = targetViewportY + draggableHeight;
+        elStyle.bottom = `${Math.round(parentAbsBottom - draggableAbsBottom)}px`;
+      }
+    } else {
+      // Fallback: if no providerData, position relative to offsetParent (or viewport for fixed)
+      // using left/top only.
+      console.warn(
+        'useDraggable: DraggableProvider context not available. Using basic positioning.',
+      );
+      elStyle.left = `${Math.round(targetViewportX - parentViewportLeft)}px`;
+      elStyle.top = `${Math.round(targetViewportY - parentViewportTop)}px`;
+    }
+
+    // If dragging, or if the element hasn't reached its final target position after mouse up,
+    // continue animating.
+    if (isDraggingRef.current) {
+      requestAnimationFrame(updateDraggablePosition);
+    }
+  }, []);
+
+  // This will be listened to globally if the mouse was pressed down on the draggable element
+  const mouseUpHandler = useCallback(
+    (e: MouseEvent) => {
+      if (isDraggingRef.current && onDragEnd) {
+        onDragEnd();
+      }
+      mouseDownPosRef.current = null;
+      isDraggingRef.current = false;
+      console.log('Stop moving');
+      window.removeEventListener('mousemove', mouseMoveHandler, {
+        capture: true,
+      });
+      window.removeEventListener('mouseup', mouseUpHandler, {
+        capture: true,
+      });
+      if (movingElementRef.current) {
+        movingElementRef.current.style.userSelect = '';
+      }
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    },
+    [onDragEnd],
+  );
+
+  // This will be listened to globally if the mouse was pressed down on the draggable element
+  const mouseMoveHandler = useCallback(
+    (e: MouseEvent) => {
+      if (!mouseDownPosRef.current) return;
+
+      const distance = Math.hypot(
+        e.clientX - mouseDownPosRef.current!.x,
+        e.clientY - mouseDownPosRef.current!.y,
+      );
+      if (distance > startThreshold && !isDraggingRef.current) {
+        isDraggingRef.current = true;
+        if (movingElementRef.current) {
+          movingElementRef.current.style.userSelect = 'none';
+        }
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'grabbing';
+        if (onDragStart) {
+          onDragStart();
+        }
+        requestAnimationFrame(updateDraggablePosition);
+        console.log('Start dragging');
+      }
+
+      currentMousePosRef.current = { x: e.clientX, y: e.clientY };
+    },
+    [startThreshold, onDragStart, updateDraggablePosition],
+  );
+
+  // This is attached to the draggable item or its handle
+  const mouseDownHandler = useCallback(
+    (e: MouseEvent) => {
+      console.log('Mouse down on draggable/handle area');
+
+      // Only proceed if it's the main mouse button (usually left-click)
+      if (e.button !== 0) {
+        return;
+      }
+
+      const handleNode = dragInitiatorRef.current;
+      const draggableItemNode = movingElementRef.current;
+
+      if (handleNode) {
+        // A specific handle is defined. Drag only if the mousedown is ON the handle itself.
+        if (e.target !== handleNode) {
+          console.log(
+            'Mousedown was not directly on the handle element. Current target:',
+            e.target,
+            'Expected handle:',
+            handleNode,
+            'Ignoring drag start.',
+          );
+          return;
+        }
+      } else {
+        // No specific handle. The draggable item is its own handle.
+        // Drag only if the mousedown is ON the draggable item itself.
+        if (e.target !== draggableItemNode) {
+          console.log(
+            'Mousedown was not directly on the draggable item (no handle specified). Current target:',
+            e.target,
+            'Expected draggable item:',
+            draggableItemNode,
+            'Ignoring drag start.',
+          );
+          return;
+        }
+      }
+
+      // If we've reached here, the click was on the correct drag-initiating element.
+      console.log('Valid drag target. Proceeding with drag setup.');
+
+      mouseDownPosRef.current = { x: e.clientX, y: e.clientY };
+
+      if (!movingElementRef.current) {
+        console.error('Draggable element ref not set in mouseDownHandler');
+        return;
+      }
+      const rect = movingElementRef.current!.getBoundingClientRect();
+      initialDraggableViewportPosRef.current = {
+        x: rect.left,
+        y: rect.top,
       };
+      mouseAndDraggablePosDeltaRef.current = {
+        x:
+          mouseDownPosRef.current!.x -
+          initialDraggableViewportPosRef.current!.x,
+        y:
+          mouseDownPosRef.current!.y -
+          initialDraggableViewportPosRef.current!.y,
+      };
+      window.addEventListener('mousemove', mouseMoveHandler, {
+        capture: true,
+      });
+      window.addEventListener('mouseup', mouseUpHandler, {
+        capture: true,
+      });
+    },
+    [mouseMoveHandler, mouseUpHandler],
+  );
+
+  useEffect(() => {
+    const elementToListenOn = dragInitiatorNode || movingElementNode;
+
+    if (elementToListenOn) {
+      elementToListenOn.addEventListener('mousedown', mouseDownHandler);
     }
 
-    return null;
-  };
-
-  // Check if position is near borders
-  const checkBorders = (x: number, y: number) => {
-    const snapped = {
-      top: y <= areaSnapThreshold,
-      left: x <= areaSnapThreshold,
-      right: x >= 100 - areaSnapThreshold,
-      bottom: y >= 100 - areaSnapThreshold,
-    };
-
-    return {
-      x: snapped.left ? 0 : snapped.right ? 100 : x,
-      y: snapped.top ? 0 : snapped.bottom ? 100 : y,
-      snapped,
-    };
-  };
-
-  // Update element position using CSS transform
-  const updateElementPosition = (
-    x: number,
-    y: number,
-    snapArea: keyof DraggableContextType['snapAreas'] | null = null,
-  ) => {
-    if (!draggableRef.current) return;
-
-    const containerWidth =
-      context.borderLocation.right - context.borderLocation.left;
-    const containerHeight =
-      context.borderLocation.bottom - context.borderLocation.top;
-
-    const translateX = (x / 100) * containerWidth;
-    const translateY = (y / 100) * containerHeight;
-
-    draggableRef.current.style.transform = `translate(${translateX}px, ${translateY}px)`;
-    transformRef.current = { x, y };
-
-    // Update position information
-    const newPosition = {
-      snapArea,
-      isTopHalf: y < 50,
-      isLeftHalf: x < 50,
-    };
-
-    setPosition(newPosition);
-  };
-
-  // Initialize position if initialSnapArea is provided
-  useEffect(() => {
-    if (initialSnapArea && context.snapAreas[initialSnapArea]) {
-      const [vertical, horizontal] = initialSnapArea.split(/(?=[A-Z])/);
-      const x = horizontal === 'Left' ? 0 : horizontal === 'Right' ? 100 : 50;
-      const y = vertical === 'Top' ? 0 : vertical === 'Bottom' ? 100 : 50;
-      updateElementPosition(x, y, initialSnapArea);
-    }
-  }, [initialSnapArea]);
-
-  // Handle mouse down
-  const handleMouseDown = (e: MouseEvent) => {
-    if (!draggableRef.current) return;
-
-    dragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      elementX: transformRef.current.x,
-      elementY: transformRef.current.y,
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!dragStartRef.current) return;
-
-      const deltaX = e.clientX - dragStartRef.current.x;
-      const deltaY = e.clientY - dragStartRef.current.y;
-
-      // Check if we've moved enough to start dragging
-      if (!isDragging && Math.hypot(deltaX, deltaY) > startThreshold) {
-        setIsDragging(true);
-        onDragStart?.();
-      }
-
-      if (isDragging) {
-        const newPosition = calculatePosition(e.clientX, e.clientY);
-
-        // Check for snap areas first
-        const snapArea = checkSnapAreas(newPosition.x, newPosition.y);
-        if (snapArea) {
-          const snapAreaKey = Object.entries(context.snapAreas).find(
-            ([key, enabled]) => {
-              if (!enabled) return false;
-              const [vertical, horizontal] = key.split(/(?=[A-Z])/);
-              const x =
-                horizontal === 'Left' ? 0 : horizontal === 'Right' ? 100 : 50;
-              const y =
-                vertical === 'Top' ? 0 : vertical === 'Bottom' ? 100 : 50;
-              return x === snapArea.x && y === snapArea.y;
-            },
-          )?.[0] as keyof DraggableContextType['snapAreas'] | undefined;
-
-          updateElementPosition(snapArea.x, snapArea.y, snapAreaKey || null);
-          return;
-        }
-
-        // Then check borders if areaBorderSnap is enabled
-        if (areaBorderSnap) {
-          const { x, y } = checkBorders(newPosition.x, newPosition.y);
-          updateElementPosition(x, y, null);
-          return;
-        }
-
-        // If no snapping, use the calculated position
-        updateElementPosition(newPosition.x, newPosition.y, null);
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (isDragging) {
-        onDragEnd?.();
-      }
-      setIsDragging(false);
-      dragStartRef.current = null;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  // Set up mouse down listener
-  useEffect(() => {
-    const element = draggableRef.current;
-    if (!element) return;
-
-    element.addEventListener('mousedown', handleMouseDown);
     return () => {
-      element.removeEventListener('mousedown', handleMouseDown);
-    };
-  }, [isDragging]);
-
-  // Handle window resize and scroll
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleResize = () => {
-      if (!draggableRef.current) return;
-      const rect = draggableRef.current.getBoundingClientRect();
-      const newPosition = calculatePosition(rect.left, rect.top);
-
-      // Recheck snap areas and borders after resize
-      const snapArea = checkSnapAreas(newPosition.x, newPosition.y);
-      if (snapArea) {
-        const snapAreaKey = Object.entries(context.snapAreas).find(
-          ([key, enabled]) => {
-            if (!enabled) return false;
-            const [vertical, horizontal] = key.split(/(?=[A-Z])/);
-            const x =
-              horizontal === 'Left' ? 0 : horizontal === 'Right' ? 100 : 50;
-            const y = vertical === 'Top' ? 0 : vertical === 'Bottom' ? 100 : 50;
-            return x === snapArea.x && y === snapArea.y;
-          },
-        )?.[0] as keyof DraggableContextType['snapAreas'] | undefined;
-
-        updateElementPosition(snapArea.x, snapArea.y, snapAreaKey || null);
-        return;
+      if (elementToListenOn) {
+        elementToListenOn.removeEventListener('mousedown', mouseDownHandler);
       }
-
-      if (areaBorderSnap) {
-        const { x, y } = checkBorders(newPosition.x, newPosition.y);
-        updateElementPosition(x, y, null);
-        return;
+      // Cleanup if hook unmounts or elementToListenOn changes mid-drag
+      if (isDraggingRef.current) {
+        if (onDragEnd) {
+          onDragEnd();
+        }
+        isDraggingRef.current = false;
+        if (movingElementNode) {
+          // Reset styles on the MOVED element
+          movingElementNode.style.userSelect = '';
+        }
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        // Clean up global listeners
+        window.removeEventListener('mousemove', mouseMoveHandler, {
+          capture: true,
+        });
+        window.removeEventListener('mouseup', mouseUpHandler, {
+          capture: true,
+        });
       }
-
-      updateElementPosition(newPosition.x, newPosition.y, null);
     };
+  }, [
+    movingElementNode,
+    dragInitiatorNode,
+    mouseDownHandler,
+    onDragEnd,
+    mouseMoveHandler,
+    mouseUpHandler,
+  ]);
 
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('scroll', handleResize, true);
+  const draggableRefCallback = useCallback((node: HTMLElement | null) => {
+    setMovingElementNode(node);
+    movingElementRef.current = node;
+  }, []);
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('scroll', handleResize, true);
-    };
-  }, [isDragging, areaBorderSnap]);
+  const handleRefCallback = useCallback((node: HTMLElement | null) => {
+    setDragInitiatorNode(node);
+    dragInitiatorRef.current = node;
+  }, []);
 
   return {
-    draggableRef,
-    isDragging,
-    onDragStart,
-    onDragEnd,
-    position,
+    draggableRef: draggableRefCallback,
+    handleRef: handleRefCallback,
   };
 }
