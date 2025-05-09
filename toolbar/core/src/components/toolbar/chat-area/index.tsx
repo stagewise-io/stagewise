@@ -69,11 +69,11 @@ const ChatAreaResizeBar = memo(() => {
         )}
       </Button>
       <Button
-        className="absolute right-2 flex h-fit w-fit flex-row items-center gap-1 bg-transparent p-1 text-xs opacity-50 transition-all duration-100 hover:opacity-100"
+        className="absolute right-2 flex h-fit w-fit flex-row items-center gap-1 bg-transparent p-1 text-xs text-zinc-950 opacity-50 transition-all duration-100 hover:opacity-100"
         onClick={handleCloseChatArea}
       >
         Close menu
-        <div className="rounded-md bg-muted-foreground px-0.5 py-0 text-xs text-zinc-50">
+        <div className="rounded-md bg-zinc-600 px-0.5 py-0 text-xs text-zinc-50">
           esc
         </div>
       </Button>
