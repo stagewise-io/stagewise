@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@stagewise/typescript-config": "workspace:*",
+    "@stagewise/toolbar-next": "workspace:*",
     "@tailwindcss/postcss": "^4.1.5",
     "@types/mdx": "^2.0.13",
     "@types/node": "22.15.2",
