@@ -5,7 +5,7 @@
   "scripts": {
     "clean": "rm -rf .turbo .nuxt .output node_modules",
     "build": "nuxt build",
-    "dev": "nuxt dev --port 3001",
+    "dev": "nuxt dev --port 3002",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare"

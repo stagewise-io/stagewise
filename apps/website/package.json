@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev --turbo",
+    "dev": "next dev --turbo --port 3000",
     "start": "next start",
     "postinstall": "fumadocs-mdx"
   },
