@@ -23,23 +23,25 @@ export function ToolbarArea() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="absolute size-full" ref={containerRef}>
-      <DraggableProvider
-        containerRef={containerRef}
-        snapAreas={{
-          topLeft: true,
-          topCenter: true,
-          topRight: true,
-          centerLeft: true,
-          center: true,
-          centerRight: true,
-          bottomLeft: true,
-          bottomCenter: true,
-          bottomRight: true,
-        }}
-      >
-        <ToolbarDraggableBox />
-      </DraggableProvider>
+    <div className="absolute size-full">
+      <div className="absolute inset-4" ref={containerRef}>
+        <DraggableProvider
+          containerRef={containerRef}
+          snapAreas={{
+            topLeft: true,
+            topCenter: true,
+            topRight: true,
+            centerLeft: true,
+            center: true,
+            centerRight: true,
+            bottomLeft: true,
+            bottomCenter: true,
+            bottomRight: true,
+          }}
+        >
+          <ToolbarDraggableBox />
+        </DraggableProvider>
+      </div>
     </div>
   );
 }
