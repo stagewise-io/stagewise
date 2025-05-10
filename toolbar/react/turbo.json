@@ -3,7 +3,8 @@
   "tasks": {
     "dev": {
       "persistent": false,
-      "dependsOn": ["^dev"]
+      "dependsOn": ["^dev"],
+      "outputs": ["dist/**"]
     }
   }
 }

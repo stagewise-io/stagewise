@@ -18,11 +18,10 @@
     "build:toolbar": "tsc -b && vite build"
   },
   "dependencies": {
-    "@stagewise/toolbar": "latest"
+    "@stagewise/toolbar": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^9.26.0",
-    "@stagewise/toolbar": "workspace:*",
     "@vitejs/plugin-vue": "^5.2.4",
     "eslint": "^9.26.0",
     "globals": "^16.1.0",

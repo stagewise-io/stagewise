@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "clean": "rm -rf .turbo .svelte-kit node_modules",
-    "dev": "vite dev --port 3003",
+    "dev": "vite dev --port 3004",
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
