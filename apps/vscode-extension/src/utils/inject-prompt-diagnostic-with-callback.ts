@@ -1,6 +1,17 @@
 import * as vscode from 'vscode';
 import { DIAGNOSTIC_COLLECTION_NAME } from '../constants';
 
+/**
+ * Injects a diagnostic with a prompt into the active editor and executes a callback.
+ * If no editor is active, it attempts to open the first file in the workspace.
+ * The diagnostic is displayed as an error, and the cursor is moved to the diagnostic's range.
+ * After the callback is executed, the diagnostic is cleared.
+ *
+ * @param params - The parameters for the function.
+ * @param params.prompt - The prompt message to display in the diagnostic.
+ * @param params.callback - The callback function to execute after injecting the diagnostic.
+ * @returns A promise that resolves when the operation is complete.
+ */
 export async function injectPromptDiagnosticWithCallback(params: {
   prompt: string;
   callback: () => Promise<any>;
