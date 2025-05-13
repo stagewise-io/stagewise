@@ -1,6 +1,6 @@
 {
   "name": "@stagewise/plugin-a11y",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "A11y plugin",
   "scripts": {
     "build": "tsc"
