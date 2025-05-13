@@ -1,0 +1,3 @@
+{
+  "extends": "@stagewise/typescript-config/base.json"
+}
