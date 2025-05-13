@@ -1,23 +1,42 @@
 {
   "name": "@stagewise/plugin-a11y",
   "version": "0.0.0",
-  "description": "A11y plugin",
-  "scripts": {
-    "build": "tsc"
-  },
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
+  "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
+  "author": "Goetze, Scharpff & Toews GbR",
+  "homepage": "https://stagewise.io",
+  "bugs": {
+    "url": "https://github.com/stagewise-io/stagewise/issues"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.10.0",
-  "devDependencies": {
-    "@stagewise/toolbar": "workspace:*",
-    "@stagewise/typescript-config": "workspace:*"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stagewise-io/stagewise.git",
+    "directory": "packages/toolbar"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.umd.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "clean": "rm -rf .turbo node_modules",
+    "dev": "tsc -b && vite build --mode development",
+    "build": "tsc -b && vite build --mode production"
   },
   "dependencies": {
     "axe-core": "^4.10.3"
-  }
+  },
+  "devDependencies": {
+    "@stagewise/typescript-config": "workspace:*",
+    "@stagewise/toolbar": "workspace:*",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.3",
+    "@vitejs/plugin-react-swc": "^3.7.0",
+    "rollup-preserve-directives": "^1.0.0"
+  },
+  "packageManager": "pnpm@10.10.0"
 }
