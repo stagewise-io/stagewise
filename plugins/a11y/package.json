@@ -1,0 +1,23 @@
+{
+  "name": "@stagewise/plugin-a11y",
+  "version": "1.0.0",
+  "description": "A11y plugin",
+  "scripts": {
+    "build": "tsc"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.10.0",
+  "devDependencies": {
+    "@stagewise/toolbar": "workspace:*",
+    "@stagewise/typescript-config": "workspace:*"
+  },
+  "dependencies": {
+    "axe-core": "^4.10.3"
+  }
+}
