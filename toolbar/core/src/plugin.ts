@@ -10,6 +10,8 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
+import type { FunctionComponent } from 'preact';
+import type { DraggableContextType } from './hooks/use-draggable';
 
 export type MCPPrompt = {
   name: string;
@@ -150,10 +152,35 @@ export interface UIHandle {
   remove: () => void;
 }
 
-import type { FunctionComponent } from 'preact';
+/** Represents a UI panel that can be opened by a plugin */
+export interface PanelOptions {
+  /** Title of the panel */
+  title: string;
+  /** Width of the panel in pixels (default: 400) */
+  width?: number;
+  /** Height of the panel in pixels (default: auto) */
+  height?: number;
+  /** Position of the panel (default: 'right') */
+  position?: keyof DraggableContextType['snapAreas'];
+  /** Whether the panel can be resized by the user (default: true) */
+  resizable?: boolean;
+}
+
+export interface PanelHandle extends UIHandle {
+  /** Updates the panel content with a new component */
+  updateContent: (component: FunctionComponent) => void;
+  /** Updates the panel title */
+  updateTitle: (title: string) => void;
+}
+
 export interface ToolbarContext {
   sendPrompt: (prompt: string) => void;
   renderToolbarAction: (component: FunctionComponent) => UIHandle;
+  /** Opens a UI panel with the provided component and options */
+  openPanel: (
+    component: FunctionComponent,
+    options?: PanelOptions,
+  ) => PanelHandle;
 }
 
 /** A context snippet that get's added into the prompt. */

@@ -4,7 +4,14 @@
   "version": "0.2.1",
   "type": "module",
   "description": "stagewise toolbar SDK for AI Agent interaction.",
-  "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
+  "keywords": [
+    "stagewise",
+    "toolbar",
+    "ai",
+    "devtool",
+    "agent",
+    "interaction"
+  ],
   "author": "Goetze, Scharpff & Toews GbR",
   "homepage": "https://stagewise.io",
   "bugs": {
@@ -35,7 +42,9 @@
       "types": "./dist/plugin-ui/jsx-runtime.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "license": "AGPL-3.0-only",
   "scripts": {
     "clean": "rm -rf .turbo node_modules",
@@ -45,7 +54,6 @@
     "build": "tsc -b && vite build --mode production"
   },
   "dependencies": {
-    "@headlessui/react": "2.2.2",
     "@preact/compat": "18.3.1",
     "clsx": "^2.1.1",
     "javascript-time-ago": "^2.5.11",
@@ -63,6 +71,7 @@
     "zustand": "^5.0.4"
   },
   "devDependencies": {
+    "@headlessui/react": "2.2.2",
     "@preact/compat": "18.3.1",
     "@preact/preset-vite": "^2.10.1",
     "@stagewise/extension-toolbar-srpc-contract": "workspace:*",

@@ -21,13 +21,26 @@ import {
   type FunctionComponent,
 } from 'preact';
 import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { ToolbarContext, ToolbarPlugin } from '@/plugin';
+import type {
+  ToolbarContext,
+  ToolbarPlugin,
+  PanelOptions,
+  PanelHandle,
+} from '@/plugin';
 import { useSRPCBridge } from './use-srpc-bridge';
 
 export interface PluginContextType {
   plugins: ToolbarPlugin[];
   toolbarContext: ToolbarContext;
   pluginToolbarActions: Record<string, FunctionComponent>;
+  pluginPanels: Record<
+    string,
+    {
+      component: FunctionComponent;
+      options: PanelOptions;
+    }
+  >;
+  panelHandles: Record<string, PanelHandle>;
 }
 
 const PluginContext = createContext<PluginContextType>({
@@ -35,8 +48,15 @@ const PluginContext = createContext<PluginContextType>({
   toolbarContext: {
     sendPrompt: () => {},
     renderToolbarAction: () => ({ remove: () => {} }),
+    openPanel: () => ({
+      remove: () => {},
+      updateContent: () => {},
+      updateTitle: () => {},
+    }),
   },
   pluginToolbarActions: {},
+  pluginPanels: {},
+  panelHandles: {},
 });
 
 export function PluginProvider({
@@ -51,6 +71,20 @@ export function PluginProvider({
   const [pluginToolbarActions, setPluginToolbarActions] = useState<
     Record<string, FunctionComponent>
   >({});
+
+  const [pluginPanels, setPluginPanels] = useState<
+    Record<
+      string,
+      {
+        component: FunctionComponent;
+        options: PanelOptions;
+      }
+    >
+  >({});
+
+  const [panelHandles, setPanelHandles] = useState<Record<string, PanelHandle>>(
+    {},
+  );
 
   const toolbarContext = useMemo(() => {
     return {
@@ -77,6 +111,87 @@ export function PluginProvider({
           },
         };
       },
+      openPanel: (
+        component: FunctionComponent,
+        options: PanelOptions = { title: 'Plugin Panel' },
+      ) => {
+        const key =
+          Date.now().toString() + Math.random().toString(36).substring(2);
+
+        const defaultOptions: PanelOptions = {
+          title: options.title || 'Plugin Panel',
+          width: options.width || 400,
+          height: options.height,
+          position: options.position || 'centerRight',
+          resizable: options.resizable !== undefined ? options.resizable : true,
+        };
+
+        // Create the panel handle first
+        const panelHandle: PanelHandle = {
+          remove: () => {
+            console.log('Removing panel:', key);
+            setPluginPanels((prev) => {
+              const newState = { ...prev };
+              delete newState[key];
+              return newState;
+            });
+            setPanelHandles((prev) => {
+              const newState = { ...prev };
+              delete newState[key];
+              return newState;
+            });
+          },
+          updateContent: (newComponent: FunctionComponent) => {
+            setPluginPanels((prev) => {
+              const panel = prev[key];
+              if (!panel) return prev;
+
+              return {
+                ...prev,
+                [key]: {
+                  ...panel,
+                  component: newComponent,
+                },
+              };
+            });
+          },
+          updateTitle: (newTitle: string) => {
+            setPluginPanels((prev) => {
+              const panel = prev[key];
+              if (!panel) return prev;
+
+              return {
+                ...prev,
+                [key]: {
+                  ...panel,
+                  options: {
+                    ...panel.options,
+                    title: newTitle,
+                  },
+                },
+              };
+            });
+          },
+        };
+
+        // Store the handle
+        setPanelHandles((prev) => ({
+          ...prev,
+          [key]: panelHandle,
+        }));
+
+        // Add the panel to state
+        setPluginPanels((prev) => ({
+          ...prev,
+          [key]: {
+            component,
+            options: defaultOptions,
+          },
+        }));
+
+        console.log('Created panel:', key, panelHandle);
+        return panelHandle;
+      },
     };
   }, [bridge]);
 
@@ -95,8 +210,16 @@ export function PluginProvider({
       plugins,
       toolbarContext,
       pluginToolbarActions,
+      pluginPanels,
+      panelHandles,
     };
-  }, [plugins, toolbarContext, pluginToolbarActions]);
+  }, [
+    plugins,
+    toolbarContext,
+    pluginToolbarActions,
+    pluginPanels,
+    panelHandles,
+  ]);
 
   return (
     <PluginContext.Provider value={value}>{children}</PluginContext.Provider>
