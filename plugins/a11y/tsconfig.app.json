@@ -16,6 +16,7 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "jsx": "react-jsx",
+    "jsxImportSource": "@stagewise/toolbar/plugin-ui",
     "noEmit": true,
 
     /* Linting */
