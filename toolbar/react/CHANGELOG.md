@@ -1,5 +1,15 @@
 # @stagewise/toolbar-react
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [bca204b]
+- Updated dependencies [0897284]
+- Updated dependencies [16fe652]
+- Updated dependencies [ce71a0d]
+  - @stagewise/toolbar@0.3.0
+
 ## 0.1.2
 
 ### Patch Changes
