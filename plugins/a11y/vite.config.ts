@@ -27,7 +27,9 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    react(),
+    react({
+      jsxImportSource: '@stagewise/toolbar/plugin-ui',
+    }),
     dts({
       rollupTypes: true,
     }) as PluginOption,
@@ -36,6 +38,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      'react/jsx-runtime': '@stagewise/toolbar/plugin-ui/jsx-runtime',
+      react: '@stagewise/toolbar/plugin-ui',
     },
     mainFields: ['module', 'main'],
     extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
@@ -48,20 +52,24 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'StagewisePluginA11y',
-      fileName: 'index',
-      formats: ['es', 'umd'],
+      fileName: (format) => `index.${format}.js`,
+      formats: ['es', 'cjs'],
     },
     rollupOptions: {
       output: {
         manualChunks: undefined,
         preserveModules: false,
         globals: {
-          react: 'react',
-          'react-dom': 'react-dom',
+          react: '@stagewise/toolbar/plugin-ui',
+          'react/jsx-runtime': '@stagewise/toolbar/plugin-ui/jsx-runtime',
           '@stagewise/toolbar': '@stagewise/toolbar',
         },
       },
-      external: ['@stagewise/toolbar', 'react', 'react-dom'],
+      external: [
+        '@stagewise/toolbar',
+        '@stagewise/toolbar/plugin-ui',
+        '@stagewise/toolbar/plugin-ui/jsx-runtime',
+      ],
       treeshake: true,
     },
     minify: false,
