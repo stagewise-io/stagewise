@@ -1,0 +1,39 @@
+{
+  "name": "create-stagewise-plugin",
+  "version": "0.0.1",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "author": "Goetze, Scharpff & Toews",
+  "bin": {
+    "create-stagewise-plugin": "index.js",
+    "cva": "index.js"
+  },
+  "files": ["index.js", "template-*", "dist"],
+  "scripts": {
+    "dev": "unbuild --stub",
+    "build": "unbuild",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": "^18.0.0 || ^20.0.0 || >=22.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stagewiseio/stagewise.git",
+    "directory": "packages/create-stagewise-plugin"
+  },
+  "bugs": {
+    "url": "https://github.com/stagewiseio/stagewise/issues"
+  },
+  "homepage": "https://github.com/stagewiseio/stagewise/tree/main/packages/create-stagewise-plugin#readme",
+  "funding": "https://github.com/stagewiseio/stagewise?sponsor=1",
+  "devDependencies": {
+    "@clack/prompts": "^0.10.1",
+    "@types/cross-spawn": "^6.0.6",
+    "cross-spawn": "^7.0.6",
+    "mri": "^1.2.0",
+    "picocolors": "^1.1.1",
+    "unbuild": "^3.5.0"
+  }
+}
