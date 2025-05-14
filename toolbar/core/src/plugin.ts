@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Toolbar plugin
-// Copyright (C) 2025 Goetze, Scharpff & Toews GbR
-
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
 // published by the Free Software Foundation, either version 3 of the
@@ -150,8 +146,14 @@ export interface UserMessage {
   sentByPlugin: boolean;
 }
 
+export interface UIHandle {
+  remove: () => void;
+}
+
+import type { FunctionComponent } from 'preact';
 export interface ToolbarContext {
   sendPrompt: (prompt: string) => void;
+  renderToolbarAction: (component: FunctionComponent) => UIHandle;
 }
 
 /** A context snippet that get's added into the prompt. */
@@ -197,16 +199,11 @@ export interface ToolbarPlugin {
   /** A monochrome svg icon that will be rendered in places where the plugin is shown */
   iconSvg: string | null;
 
-  /** If defined, a button for this plugin is rendered in the toolbar. */
-  toolbarAction: {
-    onClick: (context: ToolbarContext) => void;
-  } | null;
-
   /** Add a MCP server to the plugin that will be accessible to the agent. */
   mcp?: MCP | null;
 
   /** Called when the toolbar and the plugin is loaded. */
-  onLoad?: (() => void) | null;
+  onLoad?: ((toolbar: ToolbarContext) => void) | null;
 
   /** Called when the prompting mode get's started. Plugins may provide some additional */
   onPromptingStart?: (() => PromptingExtension | null) | null;
