@@ -24,11 +24,10 @@ import { ChatArea } from '../chat-area';
 import { ChatBox } from '../chat-box';
 import { MoreActionsButton } from '../more-actions-button';
 import { useDraggable } from '@/hooks/use-draggable';
-import { useContext, useMemo } from 'preact/hooks';
+import { useContext } from 'preact/hooks';
 import { DraggableContext } from '@/hooks/use-draggable';
 import type { DraggableContextType } from '@/hooks/use-draggable';
 import { usePlugins } from '@/hooks/use-plugins';
-import { ToolbarButton } from '../button';
 import { ToolbarSection } from '../section';
 
 export function ToolbarDraggableBox() {
@@ -47,13 +46,6 @@ export function ToolbarDraggableBox() {
 
   const plugins = usePlugins();
 
-  console.log(plugins);
-
-  const pluginsWithActions = useMemo(
-    () => plugins.plugins.filter((plugin) => plugin.toolbarAction !== null),
-    [plugins],
-  );
-
   return (
     <div
       ref={draggable.draggableRef}
@@ -71,22 +63,13 @@ export function ToolbarDraggableBox() {
           <ToolbarSection>
             <ChatBox />
           </ToolbarSection>
-          {pluginsWithActions.length > 0 && (
+          {Object.values(plugins.pluginToolbarActions).length > 0 && (
             <ToolbarSection>
-              {pluginsWithActions.map((plugin) => (
-                <ToolbarButton
-                  key={plugin.displayName}
-                  onClick={() => {
-                    plugin.toolbarAction!.onClick(plugins.toolbarContext);
-                  }}
-                >
-                  <img
-                    src={plugin.iconSvg}
-                    alt={plugin.displayName}
-                    className="size-5"
-                  />
-                </ToolbarButton>
-              ))}
+              {Object.entries(plugins.pluginToolbarActions).map(
+                ([key, Action]) => (
+                  <Action key={key} />
+                ),
+              )}
             </ToolbarSection>
           )}
           <ToolbarSection>
