@@ -30,7 +30,6 @@
     "axe-core": "^4.10.3"
   },
   "devDependencies": {
-    "@stagewise/typescript-config": "workspace:*",
     "@stagewise/toolbar": "workspace:*",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
