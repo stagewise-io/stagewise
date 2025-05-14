@@ -27,16 +27,18 @@
     "build": "tsc -b && vite build --mode production"
   },
   "dependencies": {
-    "axe-core": "^4.10.3"
+    "@tailwindcss/vite": "^4.1.6",
+    "axe-core": "^4.10.3",
+    "tailwindcss": "^4.1.5"
   },
   "devDependencies": {
-    "@stagewise/typescript-config": "workspace:*",
     "@stagewise/toolbar": "workspace:*",
+    "@stagewise/typescript-config": "workspace:*",
+    "@vitejs/plugin-react-swc": "^3.7.0",
+    "rollup-preserve-directives": "^1.0.0",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "vite-plugin-dts": "^4.5.3",
-    "@vitejs/plugin-react-swc": "^3.7.0",
-    "rollup-preserve-directives": "^1.0.0"
+    "vite-plugin-dts": "^4.5.3"
   },
   "packageManager": "pnpm@10.10.0"
 }

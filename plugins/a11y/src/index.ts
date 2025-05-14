@@ -2,7 +2,7 @@
 
 import type { ToolbarPlugin } from '@stagewise/toolbar';
 import { ToolbarAction } from './ui/actionButton';
-
+import './style.css';
 export const A11yPlugin: ToolbarPlugin = {
   displayName: 'A11y',
   description: 'Accessibility Checker',
@@ -11,10 +11,5 @@ export const A11yPlugin: ToolbarPlugin = {
 
   onLoad: (toolbar) => {
     toolbar.renderToolbarAction(ToolbarAction);
-    toolbar.renderToolbarAction(ToolbarAction);
-    toolbar.renderToolbarAction(ToolbarAction);
-    const handle = toolbar.renderToolbarAction(ToolbarAction);
-
-    handle.remove();
   },
 };

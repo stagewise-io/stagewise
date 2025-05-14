@@ -21,6 +21,7 @@ import { defineConfig, type PluginOption } from 'vite';
 import dts from 'vite-plugin-dts';
 import react from '@vitejs/plugin-react-swc';
 import preserveDirectives from 'rollup-preserve-directives';
+import tailwindcss from '@tailwindcss/vite';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -34,6 +35,7 @@ export default defineConfig({
       rollupTypes: true,
     }) as PluginOption,
     preserveDirectives(),
+    tailwindcss(),
   ],
   resolve: {
     alias: {
