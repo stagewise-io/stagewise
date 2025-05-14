@@ -49,10 +49,17 @@ export default defineConfig({
       requireReturnsDefault: 'auto',
     },
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      entry: {
+        index: resolve(__dirname, 'src/index.ts'),
+        'plugin-ui': resolve(__dirname, 'src/plugin-ui/index.tsx'),
+        'plugin-ui/jsx-runtime': resolve(
+          __dirname,
+          'src/plugin-ui/jsx-runtime.ts',
+        ),
+      },
       name: 'StagewiseToolbar',
-      fileName: 'index',
-      formats: ['es', 'umd'],
+      fileName: (format, entryName) => `${entryName}.${format}.js`,
+      formats: ['es', 'cjs'],
     },
     rollupOptions: {
       output: {
