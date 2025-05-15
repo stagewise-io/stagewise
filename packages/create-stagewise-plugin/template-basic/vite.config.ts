@@ -19,7 +19,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type PluginOption } from 'vite';
 import dts from 'vite-plugin-dts';
-import react from '@vitejs/plugin-react-swc';
+import preact from '@preact/preset-vite';
 import preserveDirectives from 'rollup-preserve-directives';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -27,7 +27,7 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    react(),
+    preact(),
     dts({
       rollupTypes: true,
     }) as PluginOption,
@@ -56,12 +56,11 @@ export default defineConfig({
         manualChunks: undefined,
         preserveModules: false,
         globals: {
-          react: 'react',
-          'react-dom': 'react-dom',
+          preact: 'preact',
           '@stagewise/toolbar': '@stagewise/toolbar',
         },
       },
-      external: ['@stagewise/toolbar', 'react', 'react-dom'],
+      external: ['@stagewise/toolbar', 'preact'],
       treeshake: true,
     },
     minify: false,
