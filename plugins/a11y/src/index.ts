@@ -5,16 +5,36 @@ import { ToolbarAction } from './ui/actionButton';
 
 export const A11yPlugin: ToolbarPlugin = {
   displayName: 'A11y',
+  pluginName: 'a11y',
   description: 'Accessibility Checker',
-  iconSvg: null,
-  promptContextName: 'a11y',
+  iconSvg: 'https://www.iconpacks.net/icons/2/free-random-icon-3814-thumb.png',
 
   onLoad: (toolbar) => {
     toolbar.renderToolbarAction(ToolbarAction);
-    toolbar.renderToolbarAction(ToolbarAction);
-    toolbar.renderToolbarAction(ToolbarAction);
-    const handle = toolbar.renderToolbarAction(ToolbarAction);
+  },
 
-    handle.remove();
+  onPromptSend: (prompt) => {
+    console.log('prompt send');
+    return {
+      contextSnippets: [
+        {
+          promptContextName: 'console-errors',
+          content: 'Check the console for errors',
+        },
+      ],
+    };
+  },
+
+  onContextElementSelect: (element) => {
+    console.log('context element select', element);
+    return {
+      annotation: 'Check the console for errors',
+    };
+  },
+
+  onPromptingStart: () => {
+    return {
+      contextSnippetOffers: [],
+    };
   },
 };

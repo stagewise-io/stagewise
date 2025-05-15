@@ -216,12 +216,12 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const addChatDomContext = useCallback(
     (chatId: ChatId, element: HTMLElement) => {
+      const pluginsWithContextGetters = plugins.filter(
+        (plugin) => plugin.onContextElementSelect,
+      );
+
       setChats((prev) =>
         prev.map((chat) => {
-          const pluginsWithContextGetters = plugins.filter(
-            (plugin) => plugin.onContextElementSelect,
-          );
-
           return chat.id === chatId
             ? {
                 ...chat,
@@ -230,7 +230,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
                   {
                     element,
                     pluginContext: pluginsWithContextGetters.map((plugin) => ({
-                      pluginName: plugin.promptContextName,
+                      pluginName: plugin.pluginName,
                       context: plugin.onContextElementSelect?.(element),
                     })),
                   },
@@ -240,7 +240,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         }),
       );
     },
-    [],
+    [plugins],
   );
 
   const removeChatDomContext = useCallback(
@@ -295,7 +295,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
                 ? snippet.content
                 : await snippet.content();
             return {
-              tagName: snippet.promptContextName,
+              promptContextName: snippet.promptContextName,
               content: resolvedContent,
             };
           },
@@ -305,7 +305,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
         if (resolvedSnippets.length > 0) {
           const pluginSnippets: PluginContextSnippets = {
-            pluginName: plugin.displayName,
+            pluginName: plugin.pluginName,
             contextSnippets: resolvedSnippets,
           };
           return pluginSnippets;

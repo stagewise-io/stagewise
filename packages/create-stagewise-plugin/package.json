@@ -8,11 +8,7 @@
     "create-stagewise-plugin": "index.js",
     "cva": "index.js"
   },
-  "files": [
-    "index.js",
-    "template-*",
-    "dist"
-  ],
+  "files": ["index.js", "template-*", "dist"],
   "scripts": {
     "dev": "unbuild --stub",
     "build": "unbuild",
