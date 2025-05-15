@@ -2,6 +2,8 @@
 // Toolbar prompts
 // Copyright (C) 2025 Goetze, Scharpff & Toews GbR
 
+import type { ContextSnippet } from './plugin';
+
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
 // published by the Free Software Foundation, either version 3 of the
@@ -14,7 +16,6 @@
 
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 /**
  * Extracts React component names and source location from an HTMLElement.
  * @param element - The HTMLElement to extract React info from.
@@ -185,10 +186,7 @@ function generateElementContext(element: HTMLElement, index: number): string {
 
 export interface PluginContextSnippets {
   pluginName: string;
-  contextSnippets: {
-    tagName: string;
-    content: string;
-  }[];
+  contextSnippets: ContextSnippet[];
 }
 [];
 
@@ -212,7 +210,7 @@ export function createPrompt(
       `
       <plugin_contexts>
 <${snippet.pluginName}>
-${snippet.contextSnippets.map((snippet) => `    <${snippet.tagName}>${snippet.content}</${snippet.tagName}>`).join('\n')}
+${snippet.contextSnippets.map((snippet) => `    <${snippet.promptContextName}>${snippet.content}</${snippet.promptContextName}>`).join('\n')}
 </${snippet.pluginName}>
 </plugin_contexts>
 `.trim(),

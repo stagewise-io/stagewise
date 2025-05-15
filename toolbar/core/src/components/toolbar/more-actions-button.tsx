@@ -25,11 +25,9 @@ import { DropdownMenu } from '../ui/dropdown-menu';
 import { ToolbarButton } from './button';
 import { useAppState } from '@/hooks/use-app-state';
 import { ToolbarSection } from './section';
-import { usePlugins } from '@/hooks/use-plugins';
-export function MoreActionsButton() {
-  const minimizeCompanion = useAppState((state) => state.minimize);
 
-  const plugins = usePlugins();
+export function ToolbarMoreActionsButton() {
+  const minimizeCompanion = useAppState((state) => state.minimize);
 
   return (
     <ToolbarSection>

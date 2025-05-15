@@ -87,7 +87,7 @@ export function ContextItem({ refElement, ...props }: ContextItemProps) {
               className="size-3 rounded-sm bg-white"
               alt=""
               src={
-                plugins.find((p) => p.promptContextName === plugin.pluginName)
+                plugins.find((p) => p.pluginName === plugin.pluginName)
                   ?.iconSvg ?? ''
               }
             />
