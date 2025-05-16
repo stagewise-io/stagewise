@@ -16,11 +16,10 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import { WebSocketRpcBridge, type WebSocketBridgeOptions } from './core';
-import { WebSocket as NodeWebSocket } from 'ws';
 
 // Use the appropriate WebSocket implementation based on the environment
 const WebSocketImpl =
-  typeof window !== 'undefined' ? window.WebSocket : NodeWebSocket;
+  typeof window !== 'undefined' ? window.WebSocket : require('ws').WebSocket;
 
 /**
  * Client implementation of the WebSocket RPC Bridge

@@ -21,7 +21,7 @@ import { WebSocketServer, type WebSocket as NodeWebSocket } from 'ws';
 
 // Use the appropriate WebSocket implementation based on the environment
 const WebSocketImpl =
-  typeof window !== 'undefined' ? window.WebSocket : WebSocket;
+  typeof window !== 'undefined' ? window.WebSocket : require('ws').WebSocket;
 
 import type {
   ZodBridgeContract,
