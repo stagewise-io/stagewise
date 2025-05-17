@@ -1,0 +1,1 @@
+export { ExamplePlugin } from './plugin';
