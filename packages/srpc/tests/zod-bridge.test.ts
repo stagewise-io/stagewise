@@ -19,12 +19,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
 import { createServer } from 'node:http';
 import { createBridgeContract } from '../src/zod-contract';
-import {
-  createSRPCServerBridge,
-  createSRPCClientBridge,
-  type ZodServer,
-  type ZodClient,
-} from '../src/zod-bridge';
+import { createSRPCServerBridge, type ZodServer } from '../src/server';
+import { createSRPCClientBridge, type ZodClient } from '../src/client';
 
 // Define test contract schemas
 const testContract = createBridgeContract({

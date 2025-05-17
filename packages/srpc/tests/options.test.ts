@@ -21,7 +21,7 @@ import {
   createBridgeContract,
   createSRPCClientBridge,
   createSRPCServerBridge,
-} from '..';
+} from '../src/index';
 import { z } from 'zod';
 
 const contract = createBridgeContract({
