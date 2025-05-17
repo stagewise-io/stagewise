@@ -1,4 +1,5 @@
 'use client';
+
 import type { ToolbarPlugin } from '@stagewise/toolbar';
 import {
   type FunctionalComponent,
