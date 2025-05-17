@@ -20,15 +20,13 @@
 
 import { Button } from '@headlessui/react';
 import { GripVertical } from 'lucide-react';
-import { ChatArea } from '../chat-area';
-import { ChatBox } from '../chat-box';
-import { MoreActionsButton } from '../more-actions-button';
+import { ToolbarChatBox } from '../chat-box';
+import { ToolbarMoreActionsButton } from '../more-actions-button';
 import { useDraggable } from '@/hooks/use-draggable';
-import { useContext, useMemo } from 'preact/hooks';
+import { useContext } from 'preact/hooks';
 import { DraggableContext } from '@/hooks/use-draggable';
 import type { DraggableContextType } from '@/hooks/use-draggable';
 import { usePlugins } from '@/hooks/use-plugins';
-import { ToolbarButton } from '../button';
 import { ToolbarSection } from '../section';
 
 export function ToolbarDraggableBox() {
@@ -47,13 +45,6 @@ export function ToolbarDraggableBox() {
 
   const plugins = usePlugins();
 
-  console.log(plugins);
-
-  const pluginsWithActions = useMemo(
-    () => plugins.plugins.filter((plugin) => plugin.toolbarAction !== null),
-    [plugins],
-  );
-
   return (
     <div
       ref={draggable.draggableRef}
@@ -61,7 +52,6 @@ export function ToolbarDraggableBox() {
     >
       {/* This is the complete toolbar area where we can stack different stuff. The main toolbar content stands out. */}
       <div className="pointer-events-auto flex w-min max-w-[80vw] flex-col items-stretch justify-center rounded-3xl border border-border/30 border-solid bg-zinc-50/80 p-0 shadow-lg backdrop-blur-lg transition-colors">
-        <ChatArea />
         {/* <ToolbarDraggingGrip /> */}
         {/* If the app state is right, we also render the button that enables dragging the toolbar around */}
         <div
@@ -69,28 +59,19 @@ export function ToolbarDraggableBox() {
           className="flex w-fit flex-row items-center justify-center rounded-3xl border-border/30 border-t bg-background/40 p-1.5 shadow-lg transition-colors first:border-none"
         >
           <ToolbarSection>
-            <ChatBox />
+            <ToolbarChatBox />
           </ToolbarSection>
-          {pluginsWithActions.length > 0 && (
+          {Object.values(plugins.pluginToolbarActions).length > 0 && (
             <ToolbarSection>
-              {pluginsWithActions.map((plugin) => (
-                <ToolbarButton
-                  key={plugin.displayName}
-                  onClick={() => {
-                    plugin.toolbarAction!.onClick(plugins.toolbarContext);
-                  }}
-                >
-                  <img
-                    src={plugin.iconSvg}
-                    alt={plugin.displayName}
-                    className="size-5"
-                  />
-                </ToolbarButton>
-              ))}
+              {Object.entries(plugins.pluginToolbarActions).map(
+                ([key, Action]) => (
+                  <Action key={key} />
+                ),
+              )}
             </ToolbarSection>
           )}
           <ToolbarSection>
-            <MoreActionsButton />
+            <ToolbarMoreActionsButton />
           </ToolbarSection>
         </div>
       </div>

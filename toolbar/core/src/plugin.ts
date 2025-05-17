@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Toolbar plugin
-// Copyright (C) 2025 Goetze, Scharpff & Toews GbR
-
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as
 // published by the Free Software Foundation, either version 3 of the
@@ -150,8 +146,14 @@ export interface UserMessage {
   sentByPlugin: boolean;
 }
 
+export interface UIHandle {
+  remove: () => void;
+}
+
+import type { FunctionComponent } from 'preact';
 export interface ToolbarContext {
   sendPrompt: (prompt: string) => void;
+  renderToolbarAction: (component: FunctionComponent) => UIHandle;
 }
 
 /** A context snippet that get's added into the prompt. */
@@ -170,7 +172,7 @@ export interface ContextSnippetOffer extends ContextSnippet {
  * Used to provide user selectable context snippets that get added to the prompt once it's sent.
  */
 export interface PromptingExtension {
-  contextSnippetOffers: ContextSnippet[];
+  contextSnippetOffers: ContextSnippetOffer[];
 }
 
 /** Additional information that a plugin can provide automatically (without user triggering) when the user sends a prompt */
@@ -188,8 +190,8 @@ export interface ToolbarPlugin {
   /** The name of the plugin shown to the user. */
   displayName: string;
 
-  /** This name is used in the tag that wraps the context provided by this plugin. */
-  promptContextName: string;
+  /** The name of the plugin used for internal identification. */
+  pluginName: string;
 
   /** A short description of what the plugin does. */
   description: string;
@@ -197,16 +199,11 @@ export interface ToolbarPlugin {
   /** A monochrome svg icon that will be rendered in places where the plugin is shown */
   iconSvg: string | null;
 
-  /** If defined, a button for this plugin is rendered in the toolbar. */
-  toolbarAction: {
-    onClick: (context: ToolbarContext) => void;
-  } | null;
-
-  /** Add a MCP server to the plugin that will be accessible to the agent. */
+  /** Not yet implemented. Add a MCP server to the plugin that will be accessible to the agent. */
   mcp?: MCP | null;
 
   /** Called when the toolbar and the plugin is loaded. */
-  onLoad?: (() => void) | null;
+  onLoad?: ((toolbar: ToolbarContext) => void) | null;
 
   /** Called when the prompting mode get's started. Plugins may provide some additional */
   onPromptingStart?: (() => PromptingExtension | null) | null;
@@ -217,7 +214,7 @@ export interface ToolbarPlugin {
   /** Not implemented right now. */
   onResponse?: (() => void) | null;
 
-  /** Called when a prompt is sent. Plugins can use this to automatically provide additional context for the prompt or simply listen to some change. */
+  /** Called just before a prompt is sent. Plugins can use this to automatically provide additional context for the prompt or simply listen to some change. */
   onPromptSend?:
     | ((prompt: UserMessage) => PromptContext | Promise<PromptContext> | null)
     | null;

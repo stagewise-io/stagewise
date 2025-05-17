@@ -15,21 +15,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-import preact from '@preact/preset-vite';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, type PluginOption } from 'vite';
 import dts from 'vite-plugin-dts';
+import preact from '@preact/preset-vite';
+import preserveDirectives from 'rollup-preserve-directives';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    preact({
-      reactAliasesEnabled: true,
-    }),
-    dts({ rollupTypes: true }),
+    preact(),
+    dts({
+      rollupTypes: true,
+    }) as PluginOption,
+    preserveDirectives(),
   ],
   resolve: {
     alias: {
@@ -43,39 +45,28 @@ export default defineConfig({
     treeShaking: true,
   },
   build: {
-    commonjsOptions: {
-      transformMixedEsModules: true,
-      include: [/node_modules/, /\@stagewise\/extension-toolbar-srpc-contract/],
-      requireReturnsDefault: 'auto',
-    },
     lib: {
-      entry: {
-        index: resolve(__dirname, 'src/index.ts'),
-        'plugin-ui': resolve(__dirname, 'src/plugin-ui/index.tsx'),
-        'plugin-ui/jsx-runtime': resolve(
-          __dirname,
-          'src/plugin-ui/jsx-runtime.ts',
-        ),
-      },
-      name: 'StagewiseToolbar',
-      fileName: (format, entryName) => `${entryName}.${format}.js`,
-      formats: ['es', 'cjs'],
+      entry: resolve(__dirname, 'src/index.ts'),
+      name: 'StagewisePluginA11y',
+      fileName: 'index',
+      formats: ['es', 'umd'],
     },
     rollupOptions: {
       output: {
         manualChunks: undefined,
         preserveModules: false,
         globals: {
-          preact: 'Preact',
+          preact: 'preact',
+          '@stagewise/toolbar': '@stagewise/toolbar',
         },
       },
+      external: ['@stagewise/toolbar', 'preact'],
       treeshake: true,
     },
     minify: false,
     cssMinify: false,
   },
   optimizeDeps: {
-    include: ['@stagewise/extension-toolbar-srpc-contract'],
     esbuildOptions: {
       mainFields: ['module', 'main'],
     },

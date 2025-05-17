@@ -18,9 +18,23 @@
   "publishConfig": {
     "access": "public"
   },
-  "main": "dist/index.umd.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "module": "./dist/index.es.js",
+      "main": "./dist/index.umd.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./plugin-ui": {
+      "module": "./dist/plugin-ui.es.js",
+      "main": "./dist/plugin-ui.umd.js",
+      "types": "./dist/plugin-ui.d.ts"
+    },
+    "./plugin-ui/jsx-runtime": {
+      "module": "./dist/plugin-ui/jsx-runtime.es.js",
+      "main": "./dist/plugin-ui/jsx-runtime.umd.js",
+      "types": "./dist/plugin-ui/jsx-runtime.d.ts"
+    }
+  },
   "files": ["dist"],
   "license": "AGPL-3.0-only",
   "scripts": {

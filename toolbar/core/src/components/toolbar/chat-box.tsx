@@ -22,7 +22,7 @@ import { Button, Textarea } from '@headlessui/react';
 import { Send } from 'lucide-react';
 import { useEffect, useMemo, useRef, useCallback } from 'preact/hooks';
 
-export function ChatBox() {
+export function ToolbarChatBox() {
   const chatState = useChatState();
 
   const currentChat = useMemo(

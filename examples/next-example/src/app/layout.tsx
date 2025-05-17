@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { StagewiseToolbar } from '@stagewise/toolbar-next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-
+import { A11yPlugin } from '@stagewise/plugin-a11y';
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
@@ -28,7 +28,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <StagewiseToolbar config={{ plugins: [] }} />
+        <StagewiseToolbar config={{ plugins: [A11yPlugin] }} />
         {children}
       </body>
     </html>

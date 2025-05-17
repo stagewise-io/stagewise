@@ -1,0 +1,43 @@
+{
+  "name": "@stagewise/plugin-a11y",
+  "version": "0.0.0",
+  "type": "module",
+  "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
+  "author": "Goetze, Scharpff & Toews GbR",
+  "homepage": "https://stagewise.io",
+  "bugs": {
+    "url": "https://github.com/stagewise-io/stagewise/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stagewise-io/stagewise.git",
+    "directory": "packages/toolbar"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.umd.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "clean": "rm -rf .turbo node_modules",
+    "dev": "tsc -b && vite build --mode development",
+    "build": "tsc -b && vite build --mode production"
+  },
+  "dependencies": {
+    "@stagewise/plugin-a11y": "link:",
+    "axe-core": "^4.10.3",
+    "preact": "^10.26.6"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.1",
+    "@stagewise/toolbar": "workspace:*",
+    "rollup-preserve-directives": "^1.0.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.3"
+  },
+  "packageManager": "pnpm@10.10.0"
+}
