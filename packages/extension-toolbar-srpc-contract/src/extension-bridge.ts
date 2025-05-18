@@ -15,17 +15,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-import {
-  createSRPCClientBridge,
-  createSRPCServerBridge,
-} from '@stagewise/srpc';
+import { createSRPCServerBridge } from '@stagewise/srpc/server';
 import type { Server } from 'node:http';
 import { contract } from './contract';
 
 export function getExtensionBridge(server: Server) {
   return createSRPCServerBridge(server, contract);
-}
-
-export function getToolbarBridge(url: string) {
-  return createSRPCClientBridge(url, contract);
 }

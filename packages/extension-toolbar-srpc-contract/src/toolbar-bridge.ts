@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Entry point for the extension-toolbar-srpc-contract package
+// SRPC bridge implementation for VS Code extension and toolbar communication
 // Copyright (C) 2025 Goetze, Scharpff & Toews GbR
 
 // This program is free software: you can redistribute it and/or modify
@@ -15,8 +15,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-export { getExtensionBridge } from './src/extension-bridge';
-export { getToolbarBridge } from './src/toolbar-bridge';
-export { contract } from './src/contract';
-export { DEFAULT_PORT, PING_ENDPOINT, PING_RESPONSE } from './src/contract';
-export type { TriggerAgentPromptRequest } from './src/contract';
+import { createSRPCClientBridge } from '@stagewise/srpc/client';
+import { contract } from './contract';
+
+export function getToolbarBridge(url: string) {
+  return createSRPCClientBridge(url, contract);
+}

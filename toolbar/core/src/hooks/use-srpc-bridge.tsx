@@ -17,7 +17,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'preact/compat';
 import type { ComponentChildren } from 'preact';
-import { createSRPCClientBridge, type ZodClient } from '@stagewise/srpc';
+import { createSRPCClientBridge, type ZodClient } from '@stagewise/srpc/client';
 import { contract } from '@stagewise/extension-toolbar-srpc-contract';
 import { findPort } from '../srpc';
 

@@ -33,6 +33,16 @@
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
       "import": "./dist/index.mjs"
+    },
+    "./toolbar-bridge": {
+      "types": "./dist/toolbar-bridge.d.ts",
+      "require": "./dist/toolbar-bridge.js",
+      "import": "./dist/toolbar-bridge.mjs"
+    },
+    "./extension-bridge": {
+      "types": "./dist/extension-bridge.d.ts",
+      "require": "./dist/extension-bridge.js",
+      "import": "./dist/extension-bridge.mjs"
     }
   }
 }
