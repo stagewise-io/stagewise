@@ -17,8 +17,14 @@ export const useToolbar = () => {
 };
 
 export {
+  PluginBox as Panel,
+  PluginBoxHeader as Header,
+  PluginBoxContent as Content,
+  PluginBoxFooter as Footer,
   PluginBox,
   PluginBoxHeader,
   PluginBoxContent,
   PluginBoxFooter,
+  Button,
+  Badge,
 } from '@/plugin-ui/components/plugin-box';

@@ -80,12 +80,12 @@ export function ToolbarDraggableBox() {
   return (
     <div
       ref={draggable.draggableRef}
-      className="pointer-events-auto absolute p-0.5"
+      className="pointer-events-auto absolute h-full p-0.5"
     >
       {/* This is the complete toolbar area where we can stack different stuff. The main toolbar content stands out. */}
       <div
         className={cn(
-          'flex justify-end',
+          'flex h-full justify-end',
           draggable.position.isLeftHalf ? 'flex-row-reverse' : 'flex-row',
           draggable.position.isTopHalf ? 'items-start' : 'items-end',
         )}
@@ -96,25 +96,27 @@ export function ToolbarDraggableBox() {
             draggable.position.isTopHalf && 'flex-col',
           )}
         >
+          {/* This is the plugin box. It is only visible when a plugin is selected. */}
           <div
             className={cn(
-              'z-20 origin-bottom-right px-2 transition-all duration-300 ease-out',
+              'h-full min-h-0 origin-bottom-right px-2 transition-all duration-300 ease-out',
+              pluginBox
+                ? 'pointer-events-auto scale-100 opacity-100 blur-none'
+                : 'pointer-events-none h-0 scale-0 opacity-0 blur-md',
+            )}
+          >
+            {pluginBox?.component}
+          </div>
+          {/* This is the chat area. It is only visible when the prompt creation is active. */}
+          <div
+            className={cn(
+              'z-20 w-full origin-bottom-right px-2 transition-all duration-300 ease-out',
               chatState.isPromptCreationActive
-                ? 'pointer-events-auto h-[calc-size(auto,size)] scale-100 opacity-100 blur-none'
+                ? 'pointer-events-auto mt-2 scale-100 opacity-100 blur-none'
                 : 'pointer-events-none h-0 scale-0 opacity-0 blur-md',
             )}
           >
             <ToolbarChatArea />
-          </div>
-          <div
-            className={cn(
-              'origin-bottom-right px-2 transition-all duration-300 ease-out',
-              pluginBox
-                ? 'pointer-events-auto h-[calc-size(auto,size)] scale-100 opacity-100 blur-none'
-                : 'pointer-events-none h-0 scale-50 opacity-0 blur-md',
-            )}
-          >
-            {pluginBox?.component}
           </div>
         </div>
         <div
@@ -143,7 +145,7 @@ export function ToolbarDraggableBox() {
           </Button>
           <div
             className={cn(
-              'flex h-[calc-size(auto)] h-auto scale-100 items-center justify-center divide-y divide-border/30 transition-all duration-300 ease-out',
+              'flex h-[calc-size(auto)] scale-100 items-center justify-center divide-y divide-border/30 transition-all duration-300 ease-out',
               draggable.position.isTopHalf
                 ? 'origin-top-center flex-col-reverse divide-y-reverse'
                 : 'origin-bottom-center flex-col',

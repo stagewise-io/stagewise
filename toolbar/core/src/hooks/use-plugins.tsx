@@ -19,6 +19,7 @@ import { type ComponentChildren, createContext } from 'preact';
 import { useContext, useEffect, useMemo, useRef } from 'preact/hooks';
 import type { ToolbarContext, ToolbarPlugin } from '@/plugin';
 import { useSRPCBridge } from './use-srpc-bridge';
+import type { TriggerAgentPromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 
 export interface PluginContextType {
   plugins: ToolbarPlugin[];
@@ -43,10 +44,18 @@ export function PluginProvider({
 
   const toolbarContext = useMemo(() => {
     return {
-      sendPrompt: async (prompt: string) => {
+      sendPrompt: async (prompt: string | TriggerAgentPromptRequest) => {
         if (!bridge) throw new Error('No connection to the agent');
         const result = await bridge.call.triggerAgentPrompt(
-          { prompt },
+          typeof prompt === 'string'
+            ? { prompt }
+            : {
+                prompt: prompt.prompt,
+                model: prompt.model,
+                files: prompt.files,
+                images: prompt.images,
+                mode: prompt.mode,
+              },
           {
             onUpdate: (update) => {},
           },
