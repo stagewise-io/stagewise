@@ -1,7 +1,7 @@
 import { cn } from '@/utils';
 import type { ComponentChildren } from 'preact';
 
-function PluginBox({ children }: { children: ComponentChildren }) {
+function Panel({ children }: { children: ComponentChildren }) {
   return (
     <section className="flex h-full max-h-auto max-h-full min-h-48 w-auto flex-col items-center justify-center rounded-2xl border border-border/30 bg-white/80 p-4 backdrop-blur-md">
       {children}
@@ -9,10 +9,13 @@ function PluginBox({ children }: { children: ComponentChildren }) {
   );
 }
 
-function PluginBoxHeader({
+Panel.Header = function PanelHeader({
   title,
   description,
-}: { title?: string; description?: string }) {
+}: {
+  title?: string;
+  description?: string;
+}) {
   return (
     <header className="mb-3 flex w-full flex-col gap-1 bg-white text-zinc-950">
       {title && <h3 className="font-semibold text-lg ">{title}</h3>}
@@ -21,28 +24,32 @@ function PluginBoxHeader({
       )}
     </header>
   );
-}
+};
 
-function PluginBoxContent({ children }: { children: ComponentChildren }) {
+Panel.Content = function PanelContent({
+  children,
+}: { children: ComponentChildren }) {
   return (
     <div className="-mx-4 flex flex-1 flex-col gap-2 overflow-y-auto border-border/30 border-t px-4 pt-4 text-zinc-950">
       {children}
     </div>
   );
-}
+};
 
-function PluginBoxFooter({ children }: { children: ComponentChildren }) {
+Panel.Footer = function PanelFooter({
+  children,
+}: { children: ComponentChildren }) {
   return (
     <footer className="flex flex-row items-end justify-end gap-2 text-sm text-zinc-600">
       {children}
     </footer>
   );
-}
+};
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: ComponentChildren;
-  style: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size: 'sm' | 'md' | 'lg';
+  style?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  size?: 'sm' | 'md' | 'lg';
   onClick: () => void;
   asChild?: boolean;
   disabled?: boolean;
@@ -50,8 +57,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 function Button({
   children,
-  style,
-  size,
+  style = 'primary',
+  size = 'md',
   onClick,
   asChild,
   disabled,
@@ -127,15 +134,4 @@ function Badge({ children, color, style }: BadgeProps) {
   );
 }
 
-export {
-  PluginBox,
-  PluginBox as Panel,
-  PluginBoxHeader,
-  PluginBoxHeader as Header,
-  PluginBoxContent,
-  PluginBoxContent as Content,
-  PluginBoxFooter,
-  PluginBoxFooter as Footer,
-  Button,
-  Badge,
-};
+export { Panel, Panel as UIPanel, Button, Badge };
