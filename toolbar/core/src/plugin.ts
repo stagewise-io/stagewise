@@ -151,7 +151,7 @@ export interface UIHandle {
 }
 
 import type { TriggerAgentPromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
-import type { VNode } from 'preact';
+import type { UIPanel } from './plugin-ui/components/plugin-box';
 export interface ToolbarContext {
   sendPrompt: (prompt: string | TriggerAgentPromptRequest) => void;
 }
@@ -199,7 +199,7 @@ export interface ToolbarPlugin {
   /** A monochrome svg icon that will be rendered in places where the plugin is shown */
   iconSvg: string | null;
 
-  onActionClick?: () => undefined | VNode;
+  onActionClick?: () => undefined | UIPanel;
 
   /** Not yet implemented. Add a MCP server to the plugin that will be accessible to the agent. */
   mcp?: MCP | null;

@@ -9,6 +9,8 @@ function Panel({ children }: { children: ComponentChildren }) {
   );
 }
 
+export type UIPanel = typeof Panel;
+
 Panel.Header = function PanelHeader({
   title,
   description,
