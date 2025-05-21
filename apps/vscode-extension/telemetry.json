@@ -1,0 +1,67 @@
+{
+  "events": {
+    "extension_activated": {
+      "classification": "EndUserPseudonymizedInformation",
+      "purpose": "FeatureInsight",
+      "comment": "Tracks when the extension is activated",
+      "properties": {
+        "ide": {
+          "classification": "SystemMetaData",
+          "purpose": "FeatureInsight",
+          "comment": "The IDE being used (VS Code, etc.)"
+        }
+      }
+    },
+    "server_started": {
+      "classification": "EndUserPseudonymizedInformation",
+      "purpose": "PerformanceAndHealth",
+      "comment": "Tracks when the server is successfully started",
+      "properties": {
+        "port": {
+          "classification": "SystemMetaData",
+          "purpose": "PerformanceAndHealth",
+          "comment": "The port number the server is running on"
+        }
+      }
+    },
+    "toolbar_setup_completed": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Tracks when the toolbar setup is completed successfully"
+    },
+    "toolbar_setup_failed": {
+      "classification": "CallstackOrException",
+      "purpose": "PerformanceAndHealth",
+      "comment": "Tracks when the toolbar setup fails",
+      "properties": {
+        "error": {
+          "classification": "CallstackOrException",
+          "purpose": "PerformanceAndHealth",
+          "comment": "The error message (scrubbed of PII)"
+        }
+      }
+    },
+    "agent_prompt_triggered": {
+      "classification": "EndUserPseudonymizedInformation",
+      "purpose": "FeatureInsight",
+      "comment": "Tracks when an agent prompt is triggered by the user"
+    },
+    "activation_error": {
+      "classification": "CallstackOrException",
+      "purpose": "PerformanceAndHealth",
+      "comment": "Tracks when the extension activation fails",
+      "properties": {
+        "error": {
+          "classification": "CallstackOrException",
+          "purpose": "PerformanceAndHealth",
+          "comment": "The error message (scrubbed of PII)"
+        }
+      }
+    },
+    "extension_deactivated": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Tracks when the extension is deactivated"
+    }
+  }
+}
