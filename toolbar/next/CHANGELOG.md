@@ -1,5 +1,13 @@
 # @stagewise/toolbar-next
 
+## 0.1.3
+
+### Patch Changes
+
+- 938d2b9: enable toolbar only in development environment
+- Updated dependencies [938d2b9]
+  - @stagewise/toolbar-react@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes

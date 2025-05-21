@@ -1,6 +1,6 @@
 {
   "name": "@stagewise/srpc",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "license": "AGPL-3.0-only",
   "type": "module",
   "private": false,

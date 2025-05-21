@@ -1,5 +1,19 @@
 # stagewise-vscode-extension
 
+## 0.3.0
+
+### Minor Changes
+
+- bde4944: Add images, files, mode and model properties to the srpc contract and agent call dispatches
+
+### Patch Changes
+
+- 1575df4: Renaming variables to improve clarity.
+- Updated dependencies [bde4944]
+- Updated dependencies [1575df4]
+- Updated dependencies [058d70b]
+  - @stagewise/extension-toolbar-srpc-contract@0.1.0
+
 ## 0.2.2
 
 ### Patch Changes
