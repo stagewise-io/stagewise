@@ -20,17 +20,10 @@
 // This hook provides information to all components about whether certain parts of the companion layout should be rendered or not.
 // Components can use this information to hide themselves or show additional information.
 
-import { DropAreaZone } from '@/components/toolbar/desktop-only/drop-zones';
 import { createRef, type RefObject } from 'preact';
 import { create, type StateCreator } from 'zustand';
 import SuperJSON from 'superjson';
 import { persist, type PersistStorage } from 'zustand/middleware';
-
-export enum ResolvedFilter {
-  ALL = 0,
-  RESOLVED = 1,
-  UNRESOLVED = 2,
-}
 
 export interface AppState {
   requestMainAppBlock: () => number;
@@ -39,11 +32,6 @@ export interface AppState {
   discardMainAppUnblock: (handle: number) => void;
 
   isMainAppBlocked: boolean;
-
-  toolbarPosition: (typeof DropAreaZone)[keyof typeof DropAreaZone];
-  setToolbarPosition: (
-    position: (typeof DropAreaZone)[keyof typeof DropAreaZone],
-  ) => void;
 
   toolbarBoxRef: RefObject<HTMLElement | null>; // used to place popovers in case the reference is not available
   setToolbarBoxRef: (ref: RefObject<HTMLElement | null>) => void;
@@ -138,11 +126,6 @@ const createAppStore: StateCreator<AppState> = (s) => {
       });
     },
 
-    toolbarPosition: DropAreaZone.BOTTOM_CENTER,
-    setToolbarPosition: (
-      position: (typeof DropAreaZone)[keyof typeof DropAreaZone],
-    ) => set(() => ({ toolbarPosition: position })),
-
     toolbarBoxRef: createRef(),
     setToolbarBoxRef: (ref) => set(() => ({ toolbarBoxRef: ref })),
     unsetToolbarBoxRef: () => set(() => ({ toolbarBoxRef: createRef() })),
@@ -176,7 +159,7 @@ export const useAppState = create(
     storage: createSuperJSONStorage(sessionStorage),
     partialize: (state) => {
       return {
-        toolbarPosition: state.toolbarPosition,
+        minimized: state.minimized,
       };
     },
   }),

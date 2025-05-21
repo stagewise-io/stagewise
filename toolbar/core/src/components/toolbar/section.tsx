@@ -19,7 +19,7 @@ import type { ComponentChildren } from 'preact';
 
 export function ToolbarSection({ children }: { children?: ComponentChildren }) {
   return (
-    <div className="fade-in slide-in-from-bottom-2 flex max-h-full max-w-sm animate-in snap-start flex-row items-center justify-between gap-1 border-x border-r-border/30 border-l-transparent px-1.5 first:pl-0 last:border-r-transparent last:pr-0">
+    <div className="fade-in slide-in-from-right-2 flex max-h-sm max-w-full animate-in snap-start flex-col items-center justify-between gap-1 py-0.5">
       {children}
     </div>
   );

@@ -83,14 +83,9 @@ export function ContextItem({ refElement, ...props }: ContextItemProps) {
       <div className="absolute bottom-[100%] flex w-full flex-row items-start justify-start gap-1 py-1">
         {props.pluginContext.map((plugin) => (
           <div className="flex flex-row items-center justify-center gap-0.5 rounded-md bg-blue-500 px-1 py-0 font-medium text-white text-xs">
-            <img
-              className="size-3 rounded-sm bg-white"
-              alt=""
-              src={
-                plugins.find((p) => p.pluginName === plugin.pluginName)
-                  ?.iconSvg ?? ''
-              }
-            />
+            <span className="size-3 rounded-sm bg-white">
+              {plugins.find((p) => p.pluginName === plugin.pluginName)?.iconSvg}
+            </span>
             <span>{plugin.context.annotation}</span>
           </div>
         ))}

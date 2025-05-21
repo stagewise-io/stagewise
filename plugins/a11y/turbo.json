@@ -1,0 +1,13 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "dev": {
+      "persistent": false,
+      "outputs": ["dist/**"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    }
+  }
+}

@@ -2,9 +2,9 @@ import { getCurrentIDE } from './get-current-ide';
 import { callCursorAgent } from './call-cursor-agent';
 import { callWindsurfAgent } from './call-windsurf-agent';
 import * as vscode from 'vscode';
-import type { TriggerAgentPromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
+import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 
-export async function dispatchAgentCall(request: TriggerAgentPromptRequest) {
+export async function dispatchAgentCall(request: PromptRequest) {
   const ide = getCurrentIDE();
   switch (ide) {
     case 'CURSOR':

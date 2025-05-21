@@ -1,14 +1,12 @@
 import * as vscode from 'vscode';
 import { injectPromptDiagnosticWithCallback } from './inject-prompt-diagnostic-with-callback';
-import type { TriggerAgentPromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
+import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 
 const CURSOR_PROMPT_PREFIX = `\`\`\`
     Ah, sorry, it wasn't an error. The user has submitted a change request. Here is the request, please implement it:
     \`\`\``;
 
-export async function callCursorAgent(
-  request: TriggerAgentPromptRequest,
-): Promise<void> {
+export async function callCursorAgent(request: PromptRequest): Promise<void> {
   const prompt =
     `${request.prompt}` +
     `${request.files ? `\n\n use the following files: ${request.files.join('\n')}` : ''}` +

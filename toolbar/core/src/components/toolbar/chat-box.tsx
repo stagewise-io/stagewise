@@ -19,10 +19,10 @@ import { useChatState } from '@/hooks/use-chat-state';
 import { useHotkeyListenerComboText } from '@/hooks/use-hotkey-listener-combo-text';
 import { cn, HotkeyActions } from '@/utils';
 import { Button, Textarea } from '@headlessui/react';
-import { Send } from 'lucide-react';
+import { SendIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useCallback } from 'preact/hooks';
 
-export function ToolbarChatBox() {
+export function ToolbarChatArea() {
   const chatState = useChatState();
 
   const currentChat = useMemo(
@@ -34,10 +34,6 @@ export function ToolbarChatBox() {
     () => currentChat?.inputValue || '',
     [currentChat?.inputValue],
   );
-
-  const showBigBox = useMemo(() => {
-    return currentInput.split('\n').length > 1 || currentInput.length > 30;
-  }, [currentInput]);
 
   const handleInputChange = useCallback(
     (value: string) => {
@@ -81,7 +77,7 @@ export function ToolbarChatBox() {
   const buttonClassName = useMemo(
     () =>
       cn(
-        'flex size-6 items-center justify-center rounded-full bg-transparent p-1 text-zinc-950 opacity-20',
+        'flex size-8 items-center justify-center rounded-full bg-transparent p-1 text-zinc-950 opacity-20',
         currentInput.length > 0 && 'bg-blue-600 text-white opacity-100',
       ),
     [currentInput.length],
@@ -90,10 +86,9 @@ export function ToolbarChatBox() {
   const textareaClassName = useMemo(
     () =>
       cn(
-        'w-full flex-1 resize-none bg-transparent text-zinc-950 placeholder:text-zinc-950/50 focus:outline-none',
-        showBigBox ? 'h-[4.5em]' : 'h-6',
+        'h-full w-full flex-1 resize-none bg-transparent text-zinc-950 placeholder:text-zinc-950/50 focus:outline-none',
       ),
-    [showBigBox],
+    [],
   );
 
   const ctrlAltCText = useHotkeyListenerComboText(HotkeyActions.CTRL_ALT_C);
@@ -101,8 +96,7 @@ export function ToolbarChatBox() {
   return (
     <div
       className={cn(
-        'flex h-fit w-80 flex-1 flex-row items-end gap-1 rounded-2xl border border-border/10 bg-zinc-950/5 p-1.5 pl-2 text-sm text-zinc-950 shadow-inner transition-all duration-150 placeholder:text-zinc-950/70',
-        chatState.isPromptCreationActive && 'ring-2 ring-blue-600',
+        'flex h-24 w-full flex-1 flex-row items-end gap-1 rounded-2xl border border-border/30 bg-zinc-50/80 p-4 text-sm text-zinc-950 shadow-md backdrop-blur transition-all duration-150 placeholder:text-zinc-950/70',
       )}
       onClick={() => chatState.startPromptCreation()}
       role="button"
@@ -111,7 +105,6 @@ export function ToolbarChatBox() {
       <Textarea
         ref={inputRef}
         className={textareaClassName}
-        rows={showBigBox ? 4 : 1}
         value={currentInput}
         onChange={(e) => handleInputChange(e.currentTarget.value)}
         onKeyDown={handleKeyDown}
@@ -126,7 +119,7 @@ export function ToolbarChatBox() {
         disabled={currentInput.length === 0}
         onClick={handleSubmit}
       >
-        <Send className="size-3" />
+        <SendIcon className="size-4" />
       </Button>
     </div>
   );

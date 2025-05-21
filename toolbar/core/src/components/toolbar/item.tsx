@@ -28,14 +28,14 @@ export interface ToolbarItemProps {
 
 export function ToolbarItem(props: ToolbarItemProps) {
   return (
-    <div className="flex h-full shrink-0 items-center justify-center">
+    <div className="relative flex w-full shrink-0 items-center justify-center">
       {props.children}
       {props.badgeContent && (
         <div
           className={cn(
             'bg-blue-600 text-white',
             props.badgeClassName,
-            '-bottom-0.5 -right-1 pointer-events-none absolute flex h-4 w-max min-w-4 max-w-8 select-none items-center justify-center truncate rounded-full px-1 font-semibold text-xs',
+            'pointer-events-none absolute right-0 bottom-0 flex h-3 w-max min-w-3 max-w-8 select-none items-center justify-center truncate rounded-full px-0.5 font-semibold text-[0.5em]',
           )}
         >
           {props.badgeContent}

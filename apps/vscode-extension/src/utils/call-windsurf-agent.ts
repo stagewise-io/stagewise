@@ -1,13 +1,11 @@
 import * as vscode from 'vscode';
 import { injectPromptDiagnosticWithCallback } from './inject-prompt-diagnostic-with-callback';
-import type { TriggerAgentPromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
+import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 
 const WINDSURF_PROMPT_PREFIX =
   "Ah wait, it's not a problem. The user has instead submitted a change request. Please implement it: \n\n";
 
-export async function callWindsurfAgent(
-  request: TriggerAgentPromptRequest,
-): Promise<void> {
+export async function callWindsurfAgent(request: PromptRequest): Promise<void> {
   const prompt =
     `${request.prompt}` +
     `${request.files ? `\n\n use the following files: ${request.files.join('\n')}` : ''}` +

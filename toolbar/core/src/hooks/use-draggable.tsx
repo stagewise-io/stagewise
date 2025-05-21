@@ -4,7 +4,6 @@ import {
   useEffect,
   useContext,
   useRef,
-  type MutableRef,
   useCallback,
 } from 'preact/hooks';
 
@@ -19,9 +18,6 @@ export interface DraggableContextType {
     topLeft: boolean;
     topCenter: boolean;
     topRight: boolean;
-    centerLeft: boolean;
-    center: boolean;
-    centerRight: boolean;
     bottomLeft: boolean;
     bottomCenter: boolean;
     bottomRight: boolean;
@@ -55,6 +51,42 @@ export const DraggableProvider = ({
     right: 0,
     bottom: 0,
   });
+
+  // Update border location when container dimensions change
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const updateBorderLocation = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setBorderLocation({
+          top: rect.top,
+          left: rect.left,
+          right: rect.right,
+          bottom: rect.bottom,
+        });
+      }
+    };
+
+    // Initial update
+    updateBorderLocation();
+
+    // Create ResizeObserver to watch for container size changes
+    const resizeObserver = new ResizeObserver(updateBorderLocation);
+    resizeObserver.observe(containerRef.current);
+
+    // Watch for window resize events
+    window.addEventListener('resize', updateBorderLocation);
+
+    return () => {
+      if (containerRef.current) {
+        resizeObserver.unobserve(containerRef.current);
+      }
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateBorderLocation);
+    };
+  }, [containerRef]);
+
   const dragStartListeners = useRef<Set<() => void>>(new Set());
   const dragEndListeners = useRef<Set<() => void>>(new Set());
 
@@ -85,52 +117,7 @@ export const DraggableProvider = ({
     emitDragEnd,
   };
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const updateBorderLocation = () => {
-      const rect = containerRef.current!.getBoundingClientRect();
-      setBorderLocation({
-        top: rect.top,
-        left: rect.left,
-        right: rect.right,
-        bottom: rect.bottom,
-      });
-    };
-
-    // Initial update
-    updateBorderLocation();
-
-    // Create ResizeObserver to track size changes
-    const resizeObserver = new ResizeObserver(updateBorderLocation);
-    resizeObserver.observe(containerRef.current);
-
-    // Track scroll events on window and all parent elements
-    const handleScroll = () => {
-      requestAnimationFrame(updateBorderLocation);
-    };
-
-    window.addEventListener('scroll', handleScroll, true);
-
-    // Find all scrollable parents and add scroll listeners
-    let parent = containerRef.current.parentElement;
-    while (parent) {
-      parent.addEventListener('scroll', handleScroll);
-      parent = parent.parentElement;
-    }
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('scroll', handleScroll, true);
-
-      // Clean up parent scroll listeners
-      parent = containerRef.current?.parentElement;
-      while (parent) {
-        parent.removeEventListener('scroll', handleScroll);
-        parent = parent.parentElement;
-      }
-    };
-  }, [containerRef]);
+  // Removed useEffect for scroll/resize/ResizeObserver
 
   return (
     <DraggableContext.Provider value={contextValue}>
@@ -139,22 +126,9 @@ export const DraggableProvider = ({
   );
 };
 
-export interface IDraggable {
-  draggableRef: MutableRef<HTMLElement | null>;
-  isDragging: boolean;
-  onDragStart?: () => void;
-  onDragEnd?: () => void;
-  position: {
-    snapArea: keyof DraggableContextType['snapAreas'] | null;
-    isTopHalf: boolean;
-    isLeftHalf: boolean;
-  };
-}
-
 export interface DraggableConfig {
   startThreshold?: number;
   areaSnapThreshold?: number;
-  areaBorderSnap?: boolean;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   initialSnapArea?: keyof DraggableContextType['snapAreas'];
@@ -206,8 +180,8 @@ export function useDraggable(config: DraggableConfig) {
     onDragStart,
     onDragEnd,
     initialSnapArea,
-    springStiffness = 0.3, // Default spring stiffness
-    springDampness = 0.5, // Default spring dampness
+    springStiffness = 0.2, // Default spring stiffness
+    springDampness = 0.55, // Default spring dampness
     // initialRelativeCenter is used to initialize persistedRelativeCenterRef
   } = config;
 
@@ -235,21 +209,22 @@ export function useDraggable(config: DraggableConfig) {
       const height = bottom - top;
       const areaCenters = {
         topLeft: { x: left, y: top },
-        topCenter: { x: left + width / 2, y: top },
         topRight: { x: right, y: top },
-        centerLeft: { x: left, y: top + height / 2 },
-        center: { x: left + width / 2, y: top + height / 2 },
-        centerRight: { x: right, y: top + height / 2 },
         bottomLeft: { x: left, y: bottom },
-        bottomCenter: { x: left + width / 2, y: bottom },
         bottomRight: { x: right, y: bottom },
       };
       const center = areaCenters[initialSnapArea];
-      if (center && window.innerWidth > 0 && window.innerHeight > 0) {
+      if (center && width > 0 && height > 0) {
         // Convert absolute center to relative (0-1) coordinates
-        const relX = (center.x - left) / (right - left);
-        const relY = (center.y - top) / (bottom - top);
+        const relX = (center.x - left) / width;
+        const relY = (center.y - top) / height;
         persistedRelativeCenterRef.current = { x: relX, y: relY };
+      } else if (center) {
+        console.warn(
+          'useDraggable: Container for initialSnapArea has zero width or height. Cannot calculate relative center from snap area. Falling back to initialRelativeCenter or undefined.',
+        );
+        // Do not set persistedRelativeCenterRef.current to NaN values.
+        // It will retain its value from config.initialRelativeCenter or remain undefined if that was also undefined.
       }
     }
   }, [initialSnapArea, providerData]);
@@ -259,17 +234,13 @@ export function useDraggable(config: DraggableConfig) {
     borderLocation: DraggableContextType['borderLocation'],
   ) {
     const { top, left, right, bottom } = borderLocation;
-    const width = right - left;
-    const height = bottom - top;
+    const centerX = (left + right) / 2;
     return {
       topLeft: { x: left, y: top },
-      topCenter: { x: left + width / 2, y: top },
+      topCenter: { x: centerX, y: top },
       topRight: { x: right, y: top },
-      centerLeft: { x: left, y: top + height / 2 },
-      center: { x: left + width / 2, y: top + height / 2 },
-      centerRight: { x: right, y: top + height / 2 },
       bottomLeft: { x: left, y: bottom },
-      bottomCenter: { x: left + width / 2, y: bottom },
+      bottomCenter: { x: centerX, y: bottom },
       bottomRight: { x: right, y: bottom },
     };
   }
@@ -306,6 +277,8 @@ export function useDraggable(config: DraggableConfig) {
     let snapArea: keyof DraggableContextType['snapAreas'] | null = null;
     let snapTarget: { x: number; y: number } | null = null;
     const provider = latestProviderDataRef.current;
+    let isTopHalf = true;
+    let isLeftHalf = true;
     if (
       isDraggingRef.current &&
       mouseToDraggableCenterOffsetRef.current &&
@@ -348,6 +321,9 @@ export function useDraggable(config: DraggableConfig) {
         snapArea = closestArea;
         snapTarget = closestCenter;
       }
+      // Determine halves based on current drag center
+      isLeftHalf = (dragCenter.x - parentViewportLeft) / parentWidth <= 0.5;
+      isTopHalf = (dragCenter.y - parentViewportTop) / parentHeight <= 0.5;
     }
     // --- END SNAP LOGIC ---
 
@@ -356,6 +332,9 @@ export function useDraggable(config: DraggableConfig) {
       targetViewportCenterX = snapTarget.x;
       targetViewportCenterY = snapTarget.y;
       setCurrentSnapArea(snapArea);
+      // Determine halves based on snap target
+      isLeftHalf = (snapTarget.x - parentViewportLeft) / parentWidth <= 0.5;
+      isTopHalf = (snapTarget.y - parentViewportTop) / parentHeight <= 0.5;
     } else if (
       isDraggingRef.current &&
       mouseToDraggableCenterOffsetRef.current &&
@@ -368,13 +347,16 @@ export function useDraggable(config: DraggableConfig) {
         currentMousePosRef.current.y -
         mouseToDraggableCenterOffsetRef.current.y;
       setCurrentSnapArea(null);
+      // Determine halves based on current drag center
+      isLeftHalf =
+        (targetViewportCenterX - parentViewportLeft) / parentWidth <= 0.5;
+      isTopHalf =
+        (targetViewportCenterY - parentViewportTop) / parentHeight <= 0.5;
     } else {
       // Not dragging: use the persisted or initial relative center
       if (currentDesiredRelativeCenter && parentWidth > 0 && parentHeight > 0) {
-        // Determine if the element is in the top/left or bottom/right halves
-        const isTopHalf = currentDesiredRelativeCenter.y <= 0.5;
-        const isLeftHalf = currentDesiredRelativeCenter.x <= 0.5;
-
+        isTopHalf = currentDesiredRelativeCenter.y <= 0.5;
+        isLeftHalf = currentDesiredRelativeCenter.x <= 0.5;
         if (isLeftHalf) {
           const targetCenterXInParent =
             parentWidth * currentDesiredRelativeCenter.x;
@@ -466,12 +448,6 @@ export function useDraggable(config: DraggableConfig) {
       // On first render, jump to position and skip animation
       const targetElementStyleX = targetViewportCenterX - draggableWidth / 2;
       const targetElementStyleY = targetViewportCenterY - draggableHeight / 2;
-      const isTopHalf = currentDesiredRelativeCenter
-        ? currentDesiredRelativeCenter.y <= 0.5
-        : true; // Default to top if undefined
-      const isLeftHalf = currentDesiredRelativeCenter
-        ? currentDesiredRelativeCenter.x <= 0.5
-        : true; // Default to left if undefined
       const elStyle = draggableEl.style;
       elStyle.right = '';
       elStyle.bottom = '';
@@ -554,14 +530,6 @@ export function useDraggable(config: DraggableConfig) {
     const targetElementStyleX = pos.x - draggableWidth / 2;
     const targetElementStyleY = pos.y - draggableHeight / 2;
 
-    // Determine if the element is in the top/left or bottom/right halves for styling
-    const isTopHalf = currentDesiredRelativeCenter
-      ? currentDesiredRelativeCenter.y <= 0.5
-      : true; // Default to top if undefined
-    const isLeftHalf = currentDesiredRelativeCenter
-      ? currentDesiredRelativeCenter.x <= 0.5
-      : true; // Default to left if undefined
-
     const elStyle = draggableEl.style;
     elStyle.right = '';
     elStyle.bottom = '';
@@ -618,6 +586,8 @@ export function useDraggable(config: DraggableConfig) {
     }
   }, [areaSnapThreshold, springStiffness, springDampness]);
 
+  const [wasDragged, setWasDragged] = useState(false);
+
   // This will be listened to globally if the mouse was pressed down on the draggable element
   const mouseUpHandler = useCallback(
     (e: MouseEvent) => {
@@ -626,6 +596,10 @@ export function useDraggable(config: DraggableConfig) {
         if (latestProviderDataRef.current?.emitDragEnd) {
           latestProviderDataRef.current.emitDragEnd();
         }
+        // Set wasDragged to true when a drag operation ends
+        setWasDragged(true);
+        // Reset wasDragged after a short delay to allow click handlers to check it
+        setTimeout(() => setWasDragged(false), 0);
         // --- Persist the new position on drag end ---
         const draggableEl = movingElementRef.current;
         const provider = latestProviderDataRef.current;
@@ -673,7 +647,7 @@ export function useDraggable(config: DraggableConfig) {
           releasedCenterX = Math.max(minX, Math.min(releasedCenterX, maxX));
           releasedCenterY = Math.max(minY, Math.min(releasedCenterY, maxY));
 
-          // Check if released within a snap area
+          // Always snap to the closest snap area, regardless of distance
           const areaCenters = getSnapAreaCenters(borderLocation);
           let minDist = Number.POSITIVE_INFINITY;
           let closestArea: keyof DraggableContextType['snapAreas'] | null =
@@ -694,15 +668,17 @@ export function useDraggable(config: DraggableConfig) {
               }
             }
           }
-          if (closestArea && closestCenter && minDist <= areaSnapThreshold) {
-            // Snap to the area
+          // Snap to the closest area, but only if within threshold
+          if (closestArea && closestCenter) {
             setCurrentSnapArea(closestArea);
             // Convert to relative
             const relX = (closestCenter.x - parentViewportLeft) / parentWidth;
             const relY = (closestCenter.y - parentViewportTop) / parentHeight;
             persistedRelativeCenterRef.current = { x: relX, y: relY };
           } else {
-            // Free floating: use released position
+            // Fallback: use released position
+            // This else branch should ideally not be reached if a closestArea and closestCenter are always found.
+            // However, keeping it as a fallback or for cases where no snap areas are defined/valid.
             setCurrentSnapArea(null);
             const relX = (releasedCenterX - parentViewportLeft) / parentWidth;
             const relY = (releasedCenterY - parentViewportTop) / parentHeight;
@@ -725,7 +701,7 @@ export function useDraggable(config: DraggableConfig) {
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
     },
-    [onDragEnd, areaSnapThreshold],
+    [onDragEnd],
   );
 
   // This will be listened to globally if the mouse was pressed down on the draggable element
@@ -871,20 +847,33 @@ export function useDraggable(config: DraggableConfig) {
     mouseUpHandler,
   ]);
 
-  // Effect for initial positioning and reacting to container/config changes
+  // Effect to set initial position
   useEffect(() => {
+    const el = movingElementRef.current;
     if (
-      movingElementNode &&
-      persistedRelativeCenterRef.current &&
-      !isDraggingRef.current
+      el &&
+      providerData &&
+      providerData.borderLocation && // Needed for calculations within updateDraggablePosition
+      persistedRelativeCenterRef.current && // Ensure we have a center to position to
+      !isDraggingRef.current && // Not currently dragging
+      !hasAnimatedOnceRef.current // Only run for the very first setup
     ) {
-      requestAnimationFrame(updateDraggablePosition);
+      requestAnimationFrame(() => {
+        // Ensure element still exists in rAF callback
+        if (movingElementRef.current) {
+          updateDraggablePosition();
+          // updateDraggablePosition will set hasAnimatedOnceRef.current to true
+          // if it's the first run and it successfully positions (in the !animatedPositionRef.current block).
+        }
+      });
     }
   }, [
-    movingElementNode,
-    providerData, // Triggers on container resize/scroll via DraggableProvider
-    persistedRelativeCenterRef, // Triggers if the persistedRelativeCenterRef changes
-    updateDraggablePosition, // Stable callback
+    movingElementNode, // Run when element is available/changes
+    providerData, // Run if provider context changes (for borderLocation)
+    config.initialRelativeCenter, // If this changes, persistedRelativeCenterRef might be re-initialized
+    initialSnapArea, // If this changes, an effect updates persistedRelativeCenterRef
+    updateDraggablePosition, // Memoized callback for positioning
+    // hasAnimatedOnceRef is intentionally not a dep, its current value is checked inside.
   ]);
 
   const draggableRefCallback = useCallback((node: HTMLElement | null) => {
@@ -909,5 +898,6 @@ export function useDraggable(config: DraggableConfig) {
         ? persistedRelativeCenterRef.current.x <= 0.5
         : true,
     },
+    wasDragged,
   };
 }

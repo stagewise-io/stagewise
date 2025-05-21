@@ -14,7 +14,7 @@ export const ExamplePlugin: ToolbarPlugin = {
   description: 'Example Plugin',
   iconSvg: null,
   pluginName: 'example',
-  onLoad: (toolbar) => {
-    toolbar.renderToolbarAction(ExampleToolbarAction);
+  onActionClick: () => {
+    window.alert('Hello from plugin!');
   },
 };

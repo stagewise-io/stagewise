@@ -60,6 +60,6 @@ export const contract = createBridgeContract({
   },
 });
 
-export type TriggerAgentPromptRequest = z.infer<
+export type PromptRequest = z.infer<
   typeof contract.server.triggerAgentPrompt.request
 >;

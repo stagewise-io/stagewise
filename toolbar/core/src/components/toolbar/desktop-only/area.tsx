@@ -29,14 +29,11 @@ export function ToolbarArea() {
           containerRef={containerRef}
           snapAreas={{
             topLeft: true,
-            topCenter: true,
             topRight: true,
-            centerLeft: true,
-            center: true,
-            centerRight: true,
             bottomLeft: true,
-            bottomCenter: true,
             bottomRight: true,
+            topCenter: true,
+            bottomCenter: true,
           }}
         >
           <ToolbarDraggableBox />

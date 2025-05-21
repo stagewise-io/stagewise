@@ -19,15 +19,25 @@
 // It is only used in desktop cases, since the mobile toolbar is placed inside a modal card.
 
 import { Button } from '@headlessui/react';
-import { GripVertical } from 'lucide-react';
-import { ToolbarChatBox } from '../chat-box';
-import { ToolbarMoreActionsButton } from '../more-actions-button';
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  MessageCircleIcon,
+  PuzzleIcon,
+} from 'lucide-react';
+import { ToolbarChatArea } from '../chat-box';
 import { useDraggable } from '@/hooks/use-draggable';
-import { useContext } from 'preact/hooks';
+import { useContext, useEffect, useState } from 'preact/hooks';
 import { DraggableContext } from '@/hooks/use-draggable';
 import type { DraggableContextType } from '@/hooks/use-draggable';
 import { usePlugins } from '@/hooks/use-plugins';
 import { ToolbarSection } from '../section';
+import { ToolbarButton } from '../button';
+import { useChatState } from '@/hooks/use-chat-state';
+import { cn } from '@/utils';
+import { useAppState } from '@/hooks/use-app-state';
+import { Logo } from '@/components/ui/logo';
+import type { VNode } from 'preact';
 
 export function ToolbarDraggableBox() {
   const provider = useContext(DraggableContext) as DraggableContextType | null;
@@ -39,11 +49,44 @@ export function ToolbarDraggableBox() {
 
   const draggable = useDraggable({
     startThreshold: 10,
-    initialSnapArea: 'bottomCenter',
+    initialSnapArea: 'bottomRight',
   });
+
+  // Create a wrapper function to handle button clicks
+  const handleButtonClick = (handler: () => void) => (e: MouseEvent) => {
+    // If we just finished dragging, prevent the click
+    if (draggable.wasDragged) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    handler();
+  };
+
   if (!isReady) return null; // Wait until borderLocation is valid
 
   const plugins = usePlugins();
+
+  const pluginsWithActions = plugins.plugins.filter(
+    (plugin) => plugin.onActionClick,
+  );
+
+  const [pluginBox, setPluginBox] = useState<null | {
+    component: VNode;
+    pluginName: string;
+  }>(null);
+
+  const chatState = useChatState();
+
+  const minimized = useAppState((state) => state.minimized);
+  const minimize = useAppState((state) => state.minimize);
+  const expand = useAppState((state) => state.expand);
+
+  useEffect(() => {
+    if (minimized) {
+      setPluginBox(null);
+    }
+  }, [minimized]);
 
   return (
     <div
@@ -51,41 +94,146 @@ export function ToolbarDraggableBox() {
       className="pointer-events-auto absolute p-0.5"
     >
       {/* This is the complete toolbar area where we can stack different stuff. The main toolbar content stands out. */}
-      <div className="pointer-events-auto flex w-min max-w-[80vw] flex-col items-stretch justify-center rounded-3xl border border-border/30 border-solid bg-zinc-50/80 p-0 shadow-lg backdrop-blur-lg transition-colors">
-        {/* <ToolbarDraggingGrip /> */}
-        {/* If the app state is right, we also render the button that enables dragging the toolbar around */}
+      <div
+        className={cn(
+          'absolute flex h-[calc(100vh-32px)] w-96 max-w-[40vw] items-stretch justify-end transition-all duration-300 ease-out',
+          draggable.position.isTopHalf
+            ? 'top-0 flex-col-reverse'
+            : 'bottom-0 flex-col',
+          draggable.position.isLeftHalf ? 'left-[100%]' : 'right-[100%]',
+        )}
+      >
+        {/* This is the plugin box. It is only visible when a plugin is selected. */}
         <div
-          ref={draggable.handleRef}
-          className="flex w-fit flex-row items-center justify-center rounded-3xl border-border/30 border-t bg-background/40 p-1.5 shadow-lg transition-colors first:border-none"
+          className={cn(
+            'flex min-h-0 flex-1 origin-bottom-right flex-col items-stretch px-2 transition-all duration-300 ease-out',
+            pluginBox
+              ? 'pointer-events-auto scale-100 opacity-100 blur-none'
+              : 'pointer-events-none h-0 scale-50 opacity-0 blur-md',
+            draggable.position.isTopHalf ? 'justify-start' : 'justify-end',
+            draggable.position.isTopHalf
+              ? draggable.position.isLeftHalf
+                ? 'origin-top-left'
+                : 'origin-top-right'
+              : draggable.position.isLeftHalf
+                ? 'origin-bottom-left'
+                : 'origin-bottom-right',
+          )}
         >
-          <ToolbarSection>
-            <ToolbarChatBox />
-          </ToolbarSection>
-          {Object.values(plugins.pluginToolbarActions).length > 0 && (
+          {pluginBox?.component}
+        </div>
+        {/* This is the chat area. It is only visible when the prompt creation is active. */}
+        <div
+          className={cn(
+            'z-20 w-full px-2 transition-all duration-300 ease-out',
+            chatState.isPromptCreationActive
+              ? 'pointer-events-auto scale-100 opacity-100 blur-none'
+              : 'pointer-events-none h-0 scale-50 opacity-0 blur-md',
+            draggable.position.isTopHalf ? 'mb-2' : 'mt-2',
+            draggable.position.isTopHalf
+              ? draggable.position.isLeftHalf
+                ? 'origin-top-left'
+                : 'origin-top-right'
+              : draggable.position.isLeftHalf
+                ? 'origin-bottom-left'
+                : 'origin-bottom-right',
+          )}
+        >
+          <ToolbarChatArea />
+        </div>
+      </div>
+      <div
+        ref={draggable.handleRef}
+        className={cn(
+          'z-50 rounded-full border border-border/30 bg-zinc-50/80 px-0.5 shadow-md backdrop-blur transition-all duration-300 ease-out',
+          draggable.position.isTopHalf
+            ? 'flex-col-reverse divide-y-reverse'
+            : 'flex-col',
+          minimized ? 'h-9.5 w-9.5' : 'h-[calc-size(auto,size)] h-auto w-auto',
+        )}
+      >
+        <Button
+          onClick={() => expand()}
+          className={cn(
+            'absolute right-0 left-0 z-50 flex size-9 origin-center cursor-pointer items-center justify-center rounded-full bg-gradient-to-tr from-sky-700 to-fuchsia-700 transition-all duration-300 ease-out',
+            minimized
+              ? 'pointer-events-auto scale-100 opacity-100 blur-none'
+              : 'pointer-events-none scale-25 opacity-0 blur-md',
+            draggable.position.isTopHalf ? 'top-0' : 'bottom-0',
+          )}
+        >
+          <Logo className="size-4.5" color="white" />
+        </Button>
+        <div
+          className={cn(
+            'flex h-[calc-size(auto)] scale-100 items-center justify-center divide-y divide-border/20 transition-all duration-300 ease-out',
+            draggable.position.isTopHalf
+              ? 'origin-top flex-col-reverse divide-y-reverse'
+              : 'origin-bottom flex-col',
+            minimized && 'pointer-events-none h-0 scale-50 opacity-0 blur-md',
+          )}
+        >
+          {pluginsWithActions.length > 0 && (
             <ToolbarSection>
-              {Object.entries(plugins.pluginToolbarActions).map(
-                ([key, Action]) => (
-                  <Action key={key} />
-                ),
-              )}
+              {pluginsWithActions.map((plugin) => (
+                <ToolbarButton
+                  key={plugin.pluginName}
+                  onClick={handleButtonClick(() => {
+                    if (pluginBox?.pluginName !== plugin.pluginName) {
+                      const component = plugin.onActionClick();
+
+                      if (component) {
+                        setPluginBox({
+                          component: plugin.onActionClick(),
+                          pluginName: plugin.pluginName,
+                        });
+                      }
+                    } else {
+                      setPluginBox(null);
+                    }
+                  })}
+                  active={pluginBox?.pluginName === plugin.pluginName}
+                >
+                  {plugin.iconSvg ? (
+                    <span>{plugin.iconSvg}</span>
+                  ) : (
+                    <PuzzleIcon className="size-4" />
+                  )}
+                </ToolbarButton>
+              ))}
             </ToolbarSection>
           )}
           <ToolbarSection>
-            <ToolbarMoreActionsButton />
+            <ToolbarButton
+              onClick={handleButtonClick(() =>
+                chatState.isPromptCreationActive
+                  ? chatState.stopPromptCreation()
+                  : chatState.startPromptCreation(),
+              )}
+              active={chatState.isPromptCreationActive}
+            >
+              <MessageCircleIcon className="size-4 stroke-zinc-950" />
+            </ToolbarButton>
+          </ToolbarSection>
+          <ToolbarSection>
+            <ToolbarButton
+              onClick={handleButtonClick(() => minimize())}
+              className={cn(
+                'h-5',
+                draggable.position.isTopHalf
+                  ? 'rounded-t-3xl rounded-b-lg'
+                  : 'rounded-t-lg rounded-b-3xl',
+              )}
+            >
+              {draggable.position.isTopHalf ? (
+                <ChevronUpIcon className="size-4 text-zinc-500/80" />
+              ) : (
+                <ChevronDownIcon className="size-4 text-zinc-500/80" />
+              )}
+            </ToolbarButton>
           </ToolbarSection>
         </div>
       </div>
     </div>
-  );
-}
-
-export function ToolbarDraggingGrip(props: object) {
-  return (
-    <Button
-      {...props}
-      className="flex h-8 w-6 shrink-0 cursor-grab items-center justify-center bg-transparent focus:cursor-grabbing"
-    >
-      <GripVertical className="size-5 text-border/60" />
-    </Button>
   );
 }
