@@ -250,6 +250,9 @@ importers:
       '@angular/compiler-cli':
         specifier: ^19.2.0
         version: 19.2.12(@angular/compiler@19.2.12)(typescript@5.7.3)
+      '@stagewise/toolbar':
+        specifier: workspace:*
+        version: link:../../toolbar/core
       '@types/jasmine':
         specifier: ~5.1.0
         version: 5.1.8
