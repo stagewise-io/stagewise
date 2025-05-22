@@ -1,5 +1,6 @@
 const path = require('node:path');
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
+const webpack = require('webpack');
 
 /** @type {import('webpack').Configuration} */
 const config = {
@@ -13,6 +14,14 @@ const config = {
     filename: 'extension.js',
     libraryTarget: 'commonjs2', // Required for VS Code extensions
   },
+  plugins: [
+    new webpack.DefinePlugin({
+      'process.env.POSTHOG_API_KEY': JSON.stringify(
+        process.env.POSTHOG_API_KEY,
+      ),
+      'process.env.POSTHOG_HOST': JSON.stringify(process.env.POSTHOG_HOST),
+    }),
+  ],
   externals: {
     vscode: 'commonjs vscode', // The vscode-module is created on-the-fly and must be excluded -> https://webpack.js.org/configuration/externals/
     // Add other modules that cannot be webpack'ed, if any. E.g., native Node modules.
