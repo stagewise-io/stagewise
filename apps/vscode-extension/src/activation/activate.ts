@@ -73,6 +73,7 @@ export async function activate(context: vscode.ExtensionContext) {
     'stagewise.setupToolbar',
     async () => {
       try {
+        await trackEvent('toolbar_auto_setup_started');
         await setupToolbarHandler();
       } catch (error) {
         console.error(
