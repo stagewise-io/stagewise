@@ -21,6 +21,7 @@ import { ChatStateProvider } from '@/hooks/use-chat-state';
 import { LocationProvider } from '../hooks/use-location';
 import type { ComponentChildren } from 'preact';
 import { SRPCBridgeProvider } from '@/hooks/use-srpc-bridge';
+import { SessionProvider } from '@/hooks/use-session';
 
 export function ContextProviders({
   children,
@@ -33,7 +34,9 @@ export function ContextProviders({
     <LocationProvider>
       <SRPCBridgeProvider>
         <PluginProvider plugins={config?.plugins || []}>
-          <ChatStateProvider>{children}</ChatStateProvider>
+          <SessionProvider>
+            <ChatStateProvider>{children}</ChatStateProvider>
+          </SessionProvider>
         </PluginProvider>
       </SRPCBridgeProvider>
     </LocationProvider>
