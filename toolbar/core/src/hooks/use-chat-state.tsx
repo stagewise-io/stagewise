@@ -374,33 +374,50 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
             // Handle response based on success/error
             if (result.result.success) {
-              setPromptState('success');
-              // Auto-reset to idle and close prompt creation after success animation
-              setTimeout(() => {
-                setPromptState('idle');
-                setIsPromptCreationMode(false);
-              }, 2000);
+              // On success, stay in loading state (will be handled by reload)
+              setPromptState('loading');
             } else {
+              // On error, go to error state
               setPromptState('error');
               // Auto-reset to idle and close prompt creation after error animation
               setTimeout(() => {
                 setPromptState('idle');
                 setIsPromptCreationMode(false);
+                // Clear input after error completion
+                setChats((prev) =>
+                  prev.map((chat) =>
+                    chat.id === chatId ? { ...chat, inputValue: '' } : chat,
+                  ),
+                );
               }, 3000);
             }
           } catch (error) {
+            // On exception, go to error state
             setPromptState('error');
             // Auto-reset to idle and close prompt creation after error animation
             setTimeout(() => {
               setPromptState('idle');
               setIsPromptCreationMode(false);
+              // Clear input after error completion
+              setChats((prev) =>
+                prev.map((chat) =>
+                  chat.id === chatId ? { ...chat, inputValue: '' } : chat,
+                ),
+              );
             }, 3000);
           }
         } else {
+          // No bridge available, go to error state
           setPromptState('error');
           setTimeout(() => {
             setPromptState('idle');
             setIsPromptCreationMode(false);
+            // Clear input after error completion
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === chatId ? { ...chat, inputValue: '' } : chat,
+              ),
+            );
           }, 3000);
         }
       }
@@ -419,7 +436,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
             ? {
                 ...chat,
                 messages: [...chat.messages, newMessage],
-                inputValue: '',
+                inputValue: content.trim(), // Keep the original prompt instead of clearing
                 domContextElements: [],
               }
             : chat,
@@ -433,6 +450,9 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       setIsPromptCreationMode,
       internalSetChatAreaState,
       selectedSession,
+      promptState,
+      setPromptState,
+      plugins,
     ],
   );
 

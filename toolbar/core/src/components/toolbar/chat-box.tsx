@@ -79,7 +79,8 @@ export function ToolbarChatArea() {
       cn(
         'flex size-8 items-center justify-center rounded-full bg-transparent p-1 text-zinc-950 opacity-20 transition-all duration-150',
         currentInput.length > 0 && 'bg-blue-600 text-white opacity-100',
-        chatState.promptState === 'loading' && 'cursor-not-allowed opacity-50',
+        chatState.promptState === 'loading' &&
+          'cursor-not-allowed bg-zinc-300 text-zinc-500 opacity-30',
       ),
     [currentInput.length, chatState.promptState],
   );
@@ -87,9 +88,11 @@ export function ToolbarChatArea() {
   const textareaClassName = useMemo(
     () =>
       cn(
-        'h-full w-full flex-1 resize-none bg-transparent text-zinc-950 placeholder:text-zinc-950/50 focus:outline-none',
+        'h-full w-full flex-1 resize-none bg-transparent text-zinc-950 transition-all duration-150 placeholder:text-zinc-950/50 focus:outline-none',
+        chatState.promptState === 'loading' &&
+          'text-zinc-500 placeholder:text-zinc-400',
       ),
-    [],
+    [chatState.promptState],
   );
 
   // Container styles based on prompt state
