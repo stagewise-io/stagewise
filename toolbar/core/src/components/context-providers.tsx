@@ -21,6 +21,7 @@ import { ChatStateProvider } from '@/hooks/use-chat-state';
 import { LocationProvider } from '../hooks/use-location';
 import type { ComponentChildren } from 'preact';
 import { SRPCBridgeProvider } from '@/hooks/use-srpc-bridge';
+import { VSCodeProvider } from '@/hooks/use-vscode';
 
 export function ContextProviders({
   children,
@@ -32,9 +33,11 @@ export function ContextProviders({
   return (
     <LocationProvider>
       <SRPCBridgeProvider>
-        <PluginProvider plugins={config?.plugins || []}>
-          <ChatStateProvider>{children}</ChatStateProvider>
-        </PluginProvider>
+        <VSCodeProvider>
+          <PluginProvider plugins={config?.plugins || []}>
+            <ChatStateProvider>{children}</ChatStateProvider>
+          </PluginProvider>
+        </VSCodeProvider>
       </SRPCBridgeProvider>
     </LocationProvider>
   );

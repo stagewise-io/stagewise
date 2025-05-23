@@ -8,6 +8,8 @@ import {
 import { setupToolbar } from './setup-toolbar';
 import { getCurrentIDE } from 'src/utils/get-current-ide';
 import { dispatchAgentCall } from 'src/utils/dispatch-agent-call';
+import { getCurrentWindowInfo } from '../utils/window-discovery';
+import { getWindowShortId } from '../utils/window-discovery';
 
 // Diagnostic collection specifically for our fake prompt
 const fakeDiagCollection =
@@ -32,6 +34,10 @@ export async function activate(context: vscode.ExtensionContext) {
     // Find an available port
     const port = await findAvailablePort(DEFAULT_PORT);
 
+    console.log(
+      `[Stagewise] Starting extension on port ${port} for window: ${getWindowShortId()}`,
+    );
+
     // Register MCP server with the actual port
     // updateCursorMcpConfig(port); // Disabled for now, since MCP tools are not available yet
 
@@ -39,12 +45,41 @@ export async function activate(context: vscode.ExtensionContext) {
     const server = await startServer(port);
     const bridge = getExtensionBridge(server);
 
-    bridge.register({
-      triggerAgentPrompt: async (request, sendUpdate) => {
-        await dispatchAgentCall(request);
-        sendUpdate.sendUpdate({ updateText: 'Called the agent' });
+    console.log(`[Stagewise] Extension bridge ready on port ${port}`);
 
-        return { result: { success: true } };
+    bridge.register({
+      getSessionInfo: async (request, sendUpdate) => {
+        return getCurrentWindowInfo(port);
+      },
+      triggerAgentPrompt: async (request, sendUpdate) => {
+        // If sessionId is provided, validate it matches this window
+        // If no sessionId provided, accept the request (backward compatibility)
+        if (request.sessionId && request.sessionId !== vscode.env.sessionId) {
+          const error = `Session mismatch: Request for ${request.sessionId} but this window is ${vscode.env.sessionId}`;
+          console.warn(`[Stagewise] ${error}`);
+          return {
+            sessionId: vscode.env.sessionId,
+            result: {
+              success: false,
+              error: error,
+            },
+          };
+        }
+
+        console.log(
+          `[Stagewise] Processing agent prompt for window: ${getWindowShortId()}`,
+        );
+
+        await dispatchAgentCall(request);
+        sendUpdate.sendUpdate({
+          sessionId: vscode.env.sessionId,
+          updateText: 'Called the agent',
+        });
+
+        return {
+          sessionId: vscode.env.sessionId,
+          result: { success: true },
+        };
       },
     });
   } catch (error) {
