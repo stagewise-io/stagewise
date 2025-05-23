@@ -38,7 +38,7 @@ Panel.Content = function PanelContent({
   children,
 }: { children: ComponentChildren }) {
   return (
-    <div className="-mx-4 flex flex-1 flex-col gap-2 overflow-y-auto border-border/30 border-t px-4 pt-4 text-zinc-950">
+    <div className="-mx-4 flex flex-col gap-2 overflow-y-auto border-border/30 border-t px-4 pt-4 text-zinc-950">
       {children}
     </div>
   );
