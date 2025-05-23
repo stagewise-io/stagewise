@@ -62,29 +62,11 @@ stagewise-companion-anchor {
 @layer components {
   /* Chat box loading gradient border */
   .chat-loading-gradient {
-    position: relative;
-    /* Ensure we have a stacking context */
-    z-index: 0;
-  }
-
-  .chat-loading-gradient::before {
-    content: "";
-    position: absolute;
-    inset: -2px;
-    background: linear-gradient(45deg, #8b5cf6, #06b6d4, #8b5cf6);
-    background-size: 200% 200%;
+    background: linear-gradient(rgb(248 250 252 / 0.8), rgb(248 250 252 / 0.8)) padding-box,
+                linear-gradient(45deg, #8b5cf6, #06b6d4, #8b5cf6) border-box;
+    background-size: auto, 400% 400%;
     animation: gradient-animation 2s ease infinite;
-    z-index: -2;
-    border-radius: inherit;
-  }
-
-  .chat-loading-gradient::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: rgb(248 250 252 / 0.8); /* zinc-50/80 */
-    border-radius: inherit;
-    z-index: -1;
+    border: 2px solid transparent;
   }
 
   /* Success and error animations */
