@@ -26,8 +26,27 @@ export const PING_RESPONSE = 'stagewise'; // The response to the ping request
 
 export const contract = createBridgeContract({
   server: {
+    getSessionInfo: {
+      request: z.object({}),
+      response: z.object({
+        sessionId: z.string(),
+        workspaceName: z.string().nullable(),
+        workspaceFolders: z.array(z.string()),
+        activeFile: z.string().nullable(),
+        appName: z.string(),
+        windowFocused: z.boolean(),
+        displayName: z
+          .string()
+          .describe('Human-readable window identifier for UI display'),
+        port: z
+          .number()
+          .describe('Port number this VS Code instance is running on'),
+      }),
+      update: z.object({}),
+    },
     triggerAgentPrompt: {
       request: z.object({
+        sessionId: z.string().optional(),
         prompt: z.string(),
         model: z
           .string()
@@ -47,6 +66,7 @@ export const contract = createBridgeContract({
           .describe('Upload files like images, videos, etc.'),
       }),
       response: z.object({
+        sessionId: z.string(),
         result: z.object({
           success: z.boolean(),
           error: z.string().optional(),
@@ -54,6 +74,7 @@ export const contract = createBridgeContract({
         }),
       }),
       update: z.object({
+        sessionId: z.string(),
         updateText: z.string(),
       }),
     },
