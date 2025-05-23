@@ -89,6 +89,7 @@ export function ToolbarDraggableBox() {
   useEffect(() => {
     if (minimized) {
       setPluginBox(null);
+      setOpenPanel(null);
     }
   }, [minimized]);
 
