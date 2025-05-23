@@ -22,7 +22,7 @@ import { createPrompt, type PluginContextSnippets } from '@/prompts';
 import { useAppState } from './use-app-state';
 import { usePlugins } from './use-plugins';
 import type { ContextElementContext } from '@/plugin';
-import { useSession } from './use-session';
+import { useVSCode } from './use-vscode';
 
 interface Message {
   id: string;
@@ -113,7 +113,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const isMinimized = useAppState((state) => state.minimized);
 
-  const sessionId = useSession();
+  const { selectedSession } = useVSCode();
 
   useEffect(() => {
     if (isMinimized) {
@@ -342,7 +342,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       async function triggerAgentPrompt() {
         if (bridge) {
           const result = await bridge.call.triggerAgentPrompt(
-            { prompt, sessionId },
+            { prompt, sessionId: selectedSession?.sessionId },
             { onUpdate: (update) => {} },
           );
         }
@@ -375,7 +375,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       chats,
       setIsPromptCreationMode,
       internalSetChatAreaState,
-      sessionId,
+      selectedSession,
     ],
   );
 
