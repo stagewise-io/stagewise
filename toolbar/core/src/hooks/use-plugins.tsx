@@ -20,7 +20,7 @@ import { useContext, useEffect, useMemo, useRef } from 'preact/hooks';
 import type { ToolbarContext, ToolbarPlugin } from '@/plugin';
 import { useSRPCBridge } from './use-srpc-bridge';
 import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
-import { useSession } from './use-session';
+import { useVSCode } from './use-vscode';
 
 export interface PluginContextType {
   plugins: ToolbarPlugin[];
@@ -42,7 +42,7 @@ export function PluginProvider({
   plugins: ToolbarPlugin[];
 }) {
   const { bridge } = useSRPCBridge();
-  const sessionId = useSession();
+  const { selectedSession } = useVSCode();
 
   const toolbarContext = useMemo(() => {
     return {
@@ -51,14 +51,21 @@ export function PluginProvider({
 
         const result = await bridge.call.triggerAgentPrompt(
           typeof prompt === 'string'
-            ? { prompt, ...(sessionId && { sessionId }) }
+            ? {
+                prompt,
+                ...(selectedSession && {
+                  sessionId: selectedSession.sessionId,
+                }),
+              }
             : {
                 prompt: prompt.prompt,
                 model: prompt.model,
                 files: prompt.files,
                 images: prompt.images,
                 mode: prompt.mode,
-                ...(sessionId && { sessionId }),
+                ...(selectedSession && {
+                  sessionId: selectedSession.sessionId,
+                }),
               },
           {
             onUpdate: (update) => {},
@@ -66,7 +73,7 @@ export function PluginProvider({
         );
       },
     };
-  }, [bridge, sessionId]);
+  }, [bridge, selectedSession]);
 
   // call plugins once on initial load
   const pluginsLoadedRef = useRef(false);
