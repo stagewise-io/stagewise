@@ -22,6 +22,7 @@ import {
 } from '@stagewise/extension-toolbar-srpc-contract';
 import { createSRPCClientBridge } from '@stagewise/srpc/client';
 import { contract } from '@stagewise/extension-toolbar-srpc-contract';
+import type { z } from 'zod';
 
 export async function findPort(
   maxAttempts = 10,
@@ -63,16 +64,9 @@ export async function findPort(
   return null;
 }
 
-export interface VSCodeWindow {
-  sessionId: string;
-  displayName: string;
-  port: number;
-  workspaceName: string | null;
-  activeFile: string | null;
-  appName: string;
-  windowFocused: boolean;
-  workspaceFolders: string[];
-}
+export type VSCodeContext = z.infer<
+  typeof contract.server.getSessionInfo.response
+>;
 
 /**
  * Discover all available VS Code windows by scanning ports and getting session info
@@ -80,8 +74,8 @@ export interface VSCodeWindow {
 export async function discoverVSCodeWindows(
   maxAttempts = 10,
   timeout = 300,
-): Promise<VSCodeWindow[]> {
-  const windows: VSCodeWindow[] = [];
+): Promise<VSCodeContext[]> {
+  const windows: VSCodeContext[] = [];
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const port = DEFAULT_PORT + attempt;
@@ -112,7 +106,7 @@ export async function discoverVSCodeWindows(
               onUpdate: () => {},
             },
           );
-          windows.push(sessionInfo as VSCodeWindow);
+          windows.push(sessionInfo);
 
           await bridge.close();
         } catch (error) {

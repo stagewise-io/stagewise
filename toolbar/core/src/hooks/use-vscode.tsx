@@ -1,21 +1,27 @@
 import { createContext } from 'preact';
 import { useContext, useState, useEffect } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { discoverVSCodeWindows, type VSCodeWindow } from '../srpc';
+import {
+  discoverVSCodeWindows,
+  type VSCodeContext as SRPCVSCodeContext,
+} from '../srpc';
 
 interface VSCodeContextType {
   // Window discovery
-  windows: VSCodeWindow[];
+  windows: SRPCVSCodeContext[];
   isDiscovering: boolean;
   discoveryError: string | null;
 
   // Session management
-  selectedSession: VSCodeWindow | undefined;
+  selectedSession: SRPCVSCodeContext | undefined;
 
   // Actions
   discover: () => Promise<void>;
   selectSession: (sessionId: string | undefined) => void;
   refreshSession: () => Promise<void>;
+
+  // App name
+  appName: string | undefined;
 }
 
 const VSCodeContext = createContext<VSCodeContextType>({
@@ -26,10 +32,11 @@ const VSCodeContext = createContext<VSCodeContextType>({
   discover: async () => {},
   selectSession: () => {},
   refreshSession: async () => {},
+  appName: undefined,
 });
 
 export function VSCodeProvider({ children }: { children: ComponentChildren }) {
-  const [windows, setWindows] = useState<VSCodeWindow[]>([]);
+  const [windows, setWindows] = useState<SRPCVSCodeContext[]>([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<
@@ -88,6 +95,7 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
     discover,
     selectSession,
     refreshSession,
+    appName: selectedSession?.appName,
   };
 
   return (

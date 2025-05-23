@@ -45,6 +45,8 @@ const ConnectionSettings = () => {
     selectSession(selectedSessionId);
   };
 
+  const { appName } = useVSCode();
+
   const handleRefresh = () => {
     discover();
   };
@@ -56,7 +58,7 @@ const ConnectionSettings = () => {
           htmlFor="session-select"
           className="mb-2 block font-medium text-gray-700 text-sm"
         >
-          VS Code Window
+          VS Code Window {appName && `(${appName})`}
         </label>
         <div className="flex items-center space-x-2">
           <select
