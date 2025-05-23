@@ -38,6 +38,7 @@ import { cn } from '@/utils';
 import { useAppState } from '@/hooks/use-app-state';
 import { Logo } from '@/components/ui/logo';
 import type { VNode } from 'preact';
+import { SettingsButton, SettingsPanel } from '../settings';
 
 export function ToolbarDraggableBox() {
   const provider = useContext(DraggableContext) as DraggableContextType | null;
@@ -75,6 +76,9 @@ export function ToolbarDraggableBox() {
     component: VNode;
     pluginName: string;
   }>(null);
+  const [openPanel, setOpenPanel] = useState<
+    null | 'settings' | { pluginName: string; component: VNode }
+  >(null);
 
   const chatState = useChatState();
 
@@ -87,6 +91,10 @@ export function ToolbarDraggableBox() {
       setPluginBox(null);
     }
   }, [minimized]);
+
+  // Handler for settings button
+  const handleOpenSettings = () =>
+    setOpenPanel(openPanel === 'settings' ? null : 'settings');
 
   return (
     <div ref={draggable.draggableRef} className="absolute p-0.5">
@@ -104,7 +112,7 @@ export function ToolbarDraggableBox() {
         <div
           className={cn(
             'flex min-h-0 flex-1 origin-bottom-right flex-col items-stretch px-2 transition-all duration-300 ease-out',
-            pluginBox
+            pluginBox || openPanel === 'settings'
               ? 'pointer-events-auto scale-100 opacity-100 blur-none'
               : 'pointer-events-none h-0 scale-50 opacity-0 blur-md',
             draggable.position.isTopHalf ? 'justify-start' : 'justify-end',
@@ -117,7 +125,11 @@ export function ToolbarDraggableBox() {
                 : 'origin-bottom-right',
           )}
         >
-          {pluginBox?.component}
+          {openPanel === 'settings' ? (
+            <SettingsPanel onClose={() => setOpenPanel(null)} />
+          ) : (
+            pluginBox?.component
+          )}
         </div>
         {/* This is the chat area. It is only visible when the prompt creation is active. */}
         <div
@@ -170,6 +182,10 @@ export function ToolbarDraggableBox() {
             minimized && 'pointer-events-none h-0 scale-50 opacity-0 blur-md',
           )}
         >
+          <SettingsButton
+            onOpenPanel={handleOpenSettings}
+            isActive={openPanel === 'settings'}
+          />
           {pluginsWithActions.length > 0 && (
             <ToolbarSection>
               {pluginsWithActions.map((plugin) => (
