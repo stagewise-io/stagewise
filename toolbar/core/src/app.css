@@ -18,6 +18,19 @@
 
 @import "tailwindcss" important;
 
+/* Custom animations for chat box states */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+@keyframes gradient-animation {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 stagewise-companion-anchor {
   all: initial;
   @apply text-zinc-950;
@@ -37,6 +50,68 @@ stagewise-companion-anchor {
     min-height: 0;
     min-width: 0;
     position: relative;
+  }
+}
+
+@layer utilities {
+  .animate-shake {
+    animation: shake 0.5s ease-in-out 2;
+  }
+}
+
+@layer components {
+  /* Chat box loading gradient border */
+  .chat-loading-gradient {
+    position: relative;
+    /* Ensure we have a stacking context */
+    z-index: 0;
+  }
+
+  .chat-loading-gradient::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(45deg, #8b5cf6, #06b6d4, #8b5cf6);
+    background-size: 200% 200%;
+    animation: gradient-animation 2s ease infinite;
+    z-index: -2;
+    border-radius: inherit;
+  }
+
+  .chat-loading-gradient::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgb(248 250 252 / 0.8); /* zinc-50/80 */
+    border-radius: inherit;
+    z-index: -1;
+  }
+
+  /* Success and error animations */
+  .chat-success-border {
+    animation: blink-green-fade 2s ease-out;
+  }
+
+  .chat-error-border {
+    animation: blink-red-fade 1s ease-out;
+  }
+
+  @keyframes blink-green-fade {
+    0%, 50% {
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.7);
+    }
+    100% {
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0);
+    }
+  }
+
+  @keyframes blink-red-fade {
+    0%, 50% {
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 1);
+    }
+    100% {
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0);
+    }
   }
 }
 
