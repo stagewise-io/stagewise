@@ -1,18 +1,13 @@
 import * as vscode from 'vscode';
-
+import type { VSCodeContext } from '@stagewise/extension-toolbar-srpc-contract';
 /**
  * Get detailed information about the current VS Code window
  * This is used by the getSessionInfo RPC method
  */
-export function getCurrentWindowInfo(port: number) {
+export function getCurrentWindowInfo(port: number): VSCodeContext {
   return {
     sessionId: vscode.env.sessionId,
-    workspaceName: vscode.workspace.name ?? null,
-    workspaceFolders:
-      vscode.workspace.workspaceFolders?.map((f) => f.name) ?? [],
-    activeFile: vscode.window.activeTextEditor?.document.fileName ?? null,
     appName: vscode.env.appName,
-    windowFocused: vscode.window.state.focused,
     displayName: vscode.env.appName,
     port,
   };

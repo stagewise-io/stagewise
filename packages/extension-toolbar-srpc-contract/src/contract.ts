@@ -30,11 +30,9 @@ export const contract = createBridgeContract({
       request: z.object({}),
       response: z.object({
         sessionId: z.string().optional(),
-        workspaceName: z.string().nullable(),
-        workspaceFolders: z.array(z.string()),
-        activeFile: z.string().nullable(),
-        appName: z.string(),
-        windowFocused: z.boolean(),
+        appName: z
+          .string()
+          .describe('The name of the application, e.g. "VS Code" or "Cursor"'),
         displayName: z
           .string()
           .describe('Human-readable window identifier for UI display'),
@@ -83,4 +81,8 @@ export const contract = createBridgeContract({
 
 export type PromptRequest = z.infer<
   typeof contract.server.triggerAgentPrompt.request
+>;
+
+export type VSCodeContext = z.infer<
+  typeof contract.server.getSessionInfo.response
 >;
