@@ -29,7 +29,7 @@ export const contract = createBridgeContract({
     getSessionInfo: {
       request: z.object({}),
       response: z.object({
-        sessionId: z.string(),
+        sessionId: z.string().optional(),
         workspaceName: z.string().nullable(),
         workspaceFolders: z.array(z.string()),
         activeFile: z.string().nullable(),
@@ -66,7 +66,7 @@ export const contract = createBridgeContract({
           .describe('Upload files like images, videos, etc.'),
       }),
       response: z.object({
-        sessionId: z.string(),
+        sessionId: z.string().optional(),
         result: z.object({
           success: z.boolean(),
           error: z.string().optional(),
@@ -74,7 +74,7 @@ export const contract = createBridgeContract({
         }),
       }),
       update: z.object({
-        sessionId: z.string(),
+        sessionId: z.string().optional(),
         updateText: z.string(),
       }),
     },
