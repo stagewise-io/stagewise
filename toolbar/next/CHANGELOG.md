@@ -1,5 +1,16 @@
 # @stagewise/toolbar-next
 
+## 0.2.0-alpha.4
+
+### Minor Changes
+
+- 9f36e3f: No changes, aligning versions.
+
+### Patch Changes
+
+- Updated dependencies [9f36e3f]
+  - @stagewise/toolbar-react@0.2.0-alpha.4
+
 ## 0.2.0-alpha.3
 
 ### Minor Changes
