@@ -112,7 +112,7 @@ export async function discoverVSCodeWindows(
               onUpdate: () => {},
             },
           );
-          windows.push(sessionInfo);
+          windows.push(sessionInfo as VSCodeWindow);
 
           await bridge.close();
         } catch (error) {
