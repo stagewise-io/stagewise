@@ -18,6 +18,73 @@ import type { ContextSnippet } from './plugin';
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 /**
+ * Instructions for the agent about using Stagewise MCP tools
+ */
+const STAGEWISE_MCP_INSTRUCTIONS = `
+
+## Stagewise MCP Tools
+
+You have access to Stagewise MCP tools that help provide feedback to the user throughout the development workflow:
+
+### stagewise_notify_start
+Call this tool when you begin working on a user's request to let them know work has started.
+
+Usage:
+\`\`\`
+stagewise_notify_start({
+  "task": "Implementing login form component",
+  "estimatedSteps": 3  // optional
+})
+\`\`\`
+
+### stagewise_notify_progress
+Call this tool during your work to provide progress updates.
+
+Usage:
+\`\`\`
+stagewise_notify_progress({
+  "step": "Adding form validation logic",
+  "currentStep": 2,    // optional
+  "totalSteps": 3,     // optional
+  "details": "Implementing email and password validation rules"  // optional
+})
+\`\`\`
+
+### stagewise_notify_completion
+**IMPORTANT**: After successfully implementing changes requested by the user, you MUST call this tool to notify completion.
+
+Usage:
+\`\`\`
+stagewise_notify_completion({
+  "success": true,
+  "message": "Successfully implemented the requested login form component with validation",
+  "filesModified": ["src/components/LoginForm.tsx", "src/styles/auth.css"]  // optional
+})
+\`\`\`
+
+### stagewise_notify_error
+Call this tool if you encounter errors during your work.
+
+Usage:
+\`\`\`
+stagewise_notify_error({
+  "error": "Cannot write to file: permission denied",
+  "context": "While trying to create new component file",  // optional
+  "recoverable": false  // optional
+})
+\`\`\`
+
+## Recommended Workflow
+
+1. **Start**: Call \`stagewise_notify_start\` when beginning work
+2. **Progress**: Call \`stagewise_notify_progress\` for major steps or milestones  
+3. **Completion**: Always call \`stagewise_notify_completion\` when finished
+4. **Errors**: Call \`stagewise_notify_error\` if issues occur
+
+This provides real-time feedback to users about your progress and helps them understand what's happening.
+`;
+
+/**
  * Extracts relevant attributes from an HTMLElement.
  * Filters out potentially noisy attributes like 'style' if computed styles are handled separately.
  * Prioritizes identifying attributes.
@@ -171,8 +238,9 @@ ${snippet.contextSnippets.map((snippet) => `    <${snippet.promptContextName}>${
     <request>
       <user_goal>${userPrompt}</user_goal>
       <url>${url}</url>
-  <context>No specific element was selected on the page. Please analyze the page code in general or ask for clarification.</context>
-  ${pluginContext}
+      <context>No specific element was selected on the page. Please analyze the page code in general or ask for clarification.</context>
+      ${pluginContext}
+      ${STAGEWISE_MCP_INSTRUCTIONS}
 </request>`.trim();
   }
 
@@ -189,5 +257,6 @@ ${snippet.contextSnippets.map((snippet) => `    <${snippet.promptContextName}>${
     ${detailedContext.trim()}
   </selected_elements>
   ${pluginContext}
+  ${STAGEWISE_MCP_INSTRUCTIONS}
 </request>`.trim();
 }
