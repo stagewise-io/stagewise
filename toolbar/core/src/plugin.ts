@@ -11,132 +11,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-export type MCPPrompt = {
+/**
+ * MCP Server configuration that follows the official MCP client configuration format
+ * This aligns with Claude Desktop and other MCP clients
+ */
+export interface McpServerConfig {
+  /** Command to run (for stdio transport) */
+  command?: string;
+  /** Arguments for the command (for stdio transport) */
+  args?: string[];
+  /** Environment variables */
+  env?: Record<string, string>;
+  /** Path to environment file */
+  envFile?: string;
+  /** URL for SSE/HTTP transport */
+  url?: string;
+  /** Headers for HTTP requests */
+  headers?: Record<string, string>;
+  /** Additional server-specific settings */
+  [key: string]: any;
+}
+
+interface NamedMcpServer {
   name: string;
-  description: string;
-  arguments: {
-    name: string;
-    description: string;
-    required: boolean;
-  }[];
-  generator: () => MCPPromptMessage | Promise<MCPPromptMessage>;
-};
-
-export type MCPPromptList = {
-  prompts: MCPPrompt[];
-  nextCursor?: string;
-};
-
-export type MCPPromptMessage = {
-  role: 'user' | 'assistant';
-  content:
-    | {
-        type: 'text';
-        text: string;
-      }
-    | {
-        type: 'image' | 'audio';
-        data: string;
-        mimeType: string;
-      }
-    | {
-        type: 'resource';
-        resource: {
-          uri: string;
-          mimeType: string;
-          text: string;
-        };
-      };
-};
-
-export type MCPResource = {
-  uri: string;
-  name: string;
-  description: string;
-  mimeType: string;
-  size: number;
-};
-
-export type MCPResourceList = {
-  resources: MCPResource[];
-  nextCursor?: string;
-};
-
-export type MCPResourceContent = {
-  uri: string;
-  mimeType: string;
-} & (
-  | {
-      text: string;
-    }
-  | {
-      data: string;
-    }
-);
-
-export type MCPTool = {
-  /** Unique identifier for the tool */
-  name: string;
-  /** Human-readable description */
-  description?: string;
-  /** JSON Schema for the tool's parameters */
-  inputSchema: object;
-  /** Optional hints about tool behavior */
-  annotations?: {
-    /** Human-readable title for the tool */
-    title?: string;
-    /** If true, the tool does not modify its environment */
-    readOnlyHint?: boolean;
-    /** If true, the tool may perform destructive updates */
-    destructiveHint?: boolean;
-    /** If true, repeated calls with same args have no additional effect */
-    idempotentHint?: boolean;
-    /** If true, tool interacts with external entities */
-    openWorldHint?: boolean;
-  };
-};
-
-export type MCPToolList = {
-  tools: MCPTool[];
-  nextCursor?: string;
-};
-
-export type MCPToolResponse = {
-  content: (
-    | {
-        type: 'text';
-        text: string;
-      }
-    | {
-        type: 'image' | 'audio';
-        data: string;
-        mimeType: string;
-      }
-    | {
-        type: 'resource';
-        resource: {
-          uri: string;
-          mimeType: string;
-          text: string;
-        };
-      }
-  )[];
-  isError: boolean;
-};
-
-export interface MCP {
-  prompts: {
-    list: (cursor?: string) => MCPPromptList | Promise<MCPPromptList>;
-    get: (name: string) => MCPPromptMessage | Promise<MCPPromptMessage>;
-  };
-  resources: {
-    list: (cursor?: string) => MCPResourceList | Promise<MCPResourceList>;
-    read: (uri: string) => MCPResourceContent | Promise<MCPResourceContent>;
-  };
-  tools: {
-    list: (cursor?: string) => MCPToolList | Promise<MCPToolList>;
-    call: (name: string) => MCPToolResponse | Promise<MCPToolResponse>;
-  };
+  config: McpServerConfig;
 }
 
 export interface UserMessage {
@@ -201,8 +99,8 @@ export interface ToolbarPlugin {
 
   onActionClick?: () => undefined | VNode;
 
-  /** Not yet implemented. Add a MCP server to the plugin that will be accessible to the agent. */
-  mcp?: MCP | null;
+  /** MCP server configuration that will be registered with the IDE when the plugin loads. */
+  mcp?: McpServerConfig | null;
 
   /** Called when the toolbar and the plugin is loaded. */
   onLoad?: ((toolbar: ToolbarContext) => void) | null;
@@ -230,4 +128,21 @@ export interface ToolbarPlugin {
   onContextElementSelect?:
     | ((element: HTMLElement) => ContextElementContext)
     | null;
+}
+
+/**
+ * Utility function to collect MCP servers from loaded plugins
+ */
+export function collectMcpServersFromPlugins(
+  plugins: ToolbarPlugin[],
+): NamedMcpServer[] {
+  return plugins
+    .filter(
+      (plugin): plugin is ToolbarPlugin & { mcp: McpServerConfig } =>
+        plugin.mcp !== null && plugin.mcp !== undefined,
+    )
+    .map((plugin) => ({
+      name: plugin.pluginName,
+      config: plugin.mcp,
+    }));
 }
