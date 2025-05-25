@@ -8,7 +8,7 @@ export function getCurrentWindowInfo(port: number): VSCodeContext {
   return {
     sessionId: vscode.env.sessionId,
     appName: vscode.env.appName,
-    displayName: vscode.workspace.name || vscode.env.appName,
+    displayName: `${vscode.workspace.name} (${vscode.env.appName})`,
     port,
   };
 }
