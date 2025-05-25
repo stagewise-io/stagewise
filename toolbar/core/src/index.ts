@@ -20,15 +20,171 @@ import appStyle from './app.css?inline';
 import { App } from './app.tsx';
 
 import { companionAnchorTagName } from './utils.tsx';
+import { findPort, getToolbarBridge } from './srpc';
 
 import type { ToolbarConfig } from './config.ts';
+import type { McpServerConfig, ToolbarPlugin } from './plugin.ts';
+import { collectMcpServersFromPlugins } from './plugin.ts';
 
 export * from './plugin.ts';
 export type { ToolbarConfig } from './config.ts';
 
-export function initToolbar(config?: ToolbarConfig) {
-  if (!document.body)
+/**
+ * Core MCP server that provides completion notification tools
+ * Configuration is sent to extension regardless of environment
+ */
+function createCoreMcpServer(): {
+  name: string;
+  config: McpServerConfig;
+} {
+  // Always provide the MCP server configuration - the extension will handle execution
+  // In browser environments, we can't resolve paths, so use the published package approach
+
+  const isBrowser =
+    typeof window !== 'undefined' || typeof require === 'undefined';
+
+  if (isBrowser) {
+    // For development from examples directory, use relative path to toolbar
+    // examples/ and toolbar/ are at the same level in the workspace
+    return {
+      name: 'stagewise-core',
+      config: {
+        command: 'node',
+        args: ['../toolbar/core/dist/mcp-server.js'],
+        env: {
+          STAGEWISE_CORE: 'true',
+          DEBUG: 'stagewise:*',
+          MCP_SERVER_NAME: 'stagewise-core',
+        },
+      },
+    };
+  }
+
+  try {
+    // In Node.js environment, try to resolve the development path
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+
+    if (isDevelopment) {
+      // Use direct path to the built MCP server for development
+      const mcpServerPath = require.resolve('@stagewise/toolbar/mcp-server');
+
+      return {
+        name: 'stagewise-core',
+        config: {
+          command: 'node',
+          args: [mcpServerPath],
+          env: {
+            STAGEWISE_CORE: 'true',
+            DEBUG: 'stagewise:*',
+            MCP_SERVER_NAME: 'stagewise-core',
+          },
+        },
+      };
+    } else {
+      // In production, use npx with the published package
+      return {
+        name: 'stagewise-core',
+        config: {
+          command: 'npx',
+          args: ['@stagewise/toolbar/mcp-server'],
+          env: {
+            STAGEWISE_CORE: 'true',
+            DEBUG: 'stagewise:*',
+            MCP_SERVER_NAME: 'stagewise-core',
+          },
+        },
+      };
+    }
+  } catch (error) {
+    console.warn(
+      'Failed to resolve MCP server path, falling back to npx:',
+      error,
+    );
+    // Fallback to npx approach if path resolution fails
+    return {
+      name: 'stagewise-core',
+      config: {
+        command: 'npx',
+        args: ['@stagewise/toolbar/mcp-server'],
+        env: {
+          STAGEWISE_CORE: 'true',
+          DEBUG: 'stagewise:*',
+          MCP_SERVER_NAME: 'stagewise-core',
+        },
+      },
+    };
+  }
+}
+
+/**
+ * Registers MCP servers with the extension via SRPC
+ */
+async function registerMcpServersWithExtension(
+  servers: Array<{ name: string; config: McpServerConfig }>,
+): Promise<void> {
+  if (servers.length === 0) {
+    console.log('No MCP servers to register');
+    return;
+  }
+
+  try {
+    // Use existing port finding logic
+    const port = await findPort();
+
+    if (!port) {
+      console.warn(
+        'Could not find Stagewise extension to register MCP servers. Extension may not be running.',
+      );
+      return;
+    }
+
+    console.log(`Found Stagewise extension on port ${port}`);
+
+    // Use the proper SRPC bridge and connect it
+    const bridge = getToolbarBridge(port);
+    await bridge.connect();
+
+    try {
+      // Register MCP servers using the SRPC contract
+      await bridge.call.registerMCP(
+        {
+          servers: servers,
+          source: 'toolbar-initialization',
+        },
+        {
+          onUpdate: (update) => {
+            console.log('MCP registration update:', update.updateText);
+          },
+        },
+      );
+
+      console.log(
+        `Successfully registered ${servers.length} MCP servers with extension`,
+      );
+    } finally {
+      // Always close the bridge when done
+      await bridge.close();
+    }
+  } catch (error) {
+    console.error('Failed to register MCP servers with extension:', error);
+  }
+}
+
+/**
+ * Initialize the toolbar UI components with full DOM manipulation
+ */
+function initializeToolbarUI(config?: ToolbarConfig): void {
+  // Check if we're in a browser environment
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    console.warn(
+      'Stagewise toolbar: Not in browser environment, skipping UI initialization',
+    );
+    return;
+  }
+
+  if (!document.body) {
     throw new Error('stagewise companion cannot find document.body');
+  }
 
   // If a stagewise companion anchor already exists, we abort this instance.
   if (document.body.querySelector(companionAnchorTagName)) {
@@ -74,5 +230,56 @@ export function initToolbar(config?: ToolbarConfig) {
   const styleNode = document.createElement('style');
   styleNode.append(document.createTextNode(appStyle));
   document.head.appendChild(styleNode);
+
   render(createElement(App, config), shadowDomAnchor);
+
+  console.log('Stagewise toolbar UI initialized');
 }
+
+/**
+ * Initialize the Stagewise toolbar with plugins and MCP server support
+ */
+export async function initToolbar(
+  config: ToolbarConfig = { plugins: [] },
+): Promise<void> {
+  try {
+    console.log('Initializing Stagewise toolbar...');
+
+    // Collect MCP servers from plugins
+    const pluginMcpServers = collectMcpServersFromPlugins(config.plugins);
+
+    // Add core MCP server (always included)
+    const coreMcpServer = createCoreMcpServer();
+
+    // Combine core MCP server with plugin MCP servers
+    const allMcpServers = [coreMcpServer, ...pluginMcpServers];
+
+    console.log(
+      `Found ${allMcpServers.length} MCP servers to register:`,
+      allMcpServers.map((s) => s.name).join(', '),
+    );
+
+    // Register MCP servers with the extension
+    await registerMcpServersWithExtension(allMcpServers);
+
+    // Initialize the UI with full DOM manipulation
+    initializeToolbarUI(config);
+
+    console.log('Stagewise toolbar initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize Stagewise toolbar:', error);
+    throw error;
+  }
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use initToolbar instead
+ */
+export function setupToolbar(config: ToolbarConfig = { plugins: [] }): void {
+  console.warn('setupToolbar is deprecated. Use initToolbar instead.');
+  initializeToolbarUI(config);
+}
+
+// Export types and utilities
+export type { ToolbarPlugin, McpServerConfig };
