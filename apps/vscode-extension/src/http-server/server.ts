@@ -9,6 +9,12 @@ import {
   PING_ENDPOINT,
   PING_RESPONSE,
 } from '@stagewise/extension-toolbar-srpc-contract';
+import {
+  handleCompletionNotification,
+  handleErrorNotification,
+  handleProgressNotification,
+  handleStartNotification,
+} from './handlers/mcp-notifications';
 
 const createServer = (port: number) => {
   const app = express();
@@ -31,6 +37,12 @@ const createServer = (port: number) => {
   app.all('/mcp', handleStreamableHttp);
   app.get('/sse', handleSse);
   app.post('/sse-messages', handleSsePost);
+
+  // MCP notification endpoints
+  app.post('/start', handleStartNotification);
+  app.post('/progress', handleProgressNotification);
+  app.post('/completion', handleCompletionNotification);
+  app.post('/error', handleErrorNotification);
 
   // Error handling
   app.use(errorHandler);
