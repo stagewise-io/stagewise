@@ -379,7 +379,9 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
             // Handle response based on success/error
             if (result.result.success) {
-              // On success, stay in loading state (will be handled by reload)
+              // On success, show agent-reached state in MCP UI
+              const appState = useAppState.getState();
+              appState.setAgentReached();
               setPromptState('loading');
             } else {
               // On error, go to error state
