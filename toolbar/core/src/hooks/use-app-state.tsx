@@ -30,6 +30,7 @@ export type CompletionState = 'idle' | 'loading' | 'success' | 'error';
 // Enhanced MCP tool call state
 export type McpToolCallStatus =
   | 'idle'
+  | 'agent-reached'
   | 'starting'
   | 'in-progress'
   | 'completed'
@@ -96,6 +97,7 @@ export interface AppState {
   mcpToolCall: McpToolCallState;
 
   // Enhanced MCP tool call actions
+  setAgentReached: () => void;
   startMcpTask: (
     task: string,
     estimatedSteps?: number,
@@ -295,6 +297,45 @@ const createAppStore: StateCreator<AppState> = (s) => {
     },
 
     // Enhanced MCP tool call actions
+    setAgentReached: () => {
+      set((state) => {
+        // Clear any existing timeout
+        if (state.mcpToolCall.timeoutId) {
+          clearTimeout(state.mcpToolCall.timeoutId);
+        }
+
+        // Set 30-second timeout for showing "waiting for agent..." message
+        const timeoutId = window.setTimeout(() => {
+          set((state) => ({
+            mcpToolCall: {
+              ...state.mcpToolCall,
+              status: 'error',
+              error: {
+                error: 'Agent did not start working within 30 seconds',
+                recoverable: true,
+              },
+              timeoutId: undefined,
+            },
+          }));
+        }, 30000);
+
+        return {
+          mcpToolCall: {
+            status: 'agent-reached',
+            timeoutId,
+            currentTask: undefined,
+            estimatedSteps: undefined,
+            toolName: undefined,
+            inputSchema: undefined,
+            inputArguments: undefined,
+            progress: undefined,
+            result: undefined,
+            error: undefined,
+          },
+        };
+      });
+    },
+
     startMcpTask: (
       task: string,
       estimatedSteps?: number,
