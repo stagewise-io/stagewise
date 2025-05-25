@@ -18,61 +18,70 @@
   "publishConfig": {
     "access": "public"
   },
+  "main": "./dist/index.cjs.js",
+  "module": "./dist/index.es.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "module": "./dist/index.es.js",
-      "main": "./dist/index.umd.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.cjs.js"
     },
     "./plugin-ui": {
-      "module": "./dist/plugin-ui.es.js",
-      "main": "./dist/plugin-ui.umd.js",
-      "types": "./dist/plugin-ui.d.ts"
+      "types": "./dist/plugin-ui.d.ts",
+      "import": "./dist/plugin-ui.es.js",
+      "require": "./dist/plugin-ui.cjs.js"
     },
     "./plugin-ui/jsx-runtime": {
-      "module": "./dist/plugin-ui/jsx-runtime.es.js",
-      "main": "./dist/plugin-ui/jsx-runtime.umd.js",
-      "types": "./dist/plugin-ui/jsx-runtime.d.ts"
+      "types": "./dist/plugin-ui/jsx-runtime.d.ts",
+      "import": "./dist/plugin-ui/jsx-runtime.es.js",
+      "require": "./dist/plugin-ui/jsx-runtime.cjs.js"
+    },
+    "./mcp-server": {
+      "import": "./dist/mcp-server.js"
     }
   },
   "files": ["dist"],
   "license": "AGPL-3.0-only",
   "scripts": {
     "clean": "rm -rf .turbo node_modules",
-    "dev": "tsc -b && vite build --mode development",
-    "dev:examples": "tsc -b && vite build --mode development",
-    "build:toolbar": "tsc -b && vite build --mode production",
-    "build": "tsc -b && vite build --mode production"
+    "build": "tsc -b && vite build --mode production && chmod +x dist/mcp-server.js",
+    "build:dev": "tsc -b && vite build --mode development && chmod +x dist/mcp-server.js",
+    "dev": "vite build --watch --mode development"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@stagewise/extension-toolbar-srpc-contract": "workspace:*",
+    "@stagewise/srpc": "workspace:*",
+    "preact": "^10.25.4"
+  },
   "devDependencies": {
     "@headlessui/react": "2.2.2",
+    "@preact/compat": "18.3.1",
+    "@preact/preset-vite": "^2.10.1",
+    "@tailwindcss/postcss": "^4.1.5",
+    "@types/node": "^22.10.1",
+    "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "javascript-time-ago": "^2.5.11",
     "lucide-react": "^0.503.0",
+    "postcss": "^8.5.3",
     "postcss-prefix-selector": "^2.1.1",
-    "preact": "^10.26.6",
-    "react-remove-scroll": "^2.6.3",
     "superjson": "^2.2.2",
     "tailwind-merge": "^3.2.0",
     "tailwindcss": "^4.1.5",
-    "tsup": "^8.4.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.8.2",
     "ua-parser-js": "^2.0.3",
-    "vite-plugin-css-injected-by-js": "^3.5.2",
+    "vite": "^6.0.3",
+    "vite-bundle-analyzer": "^0.19.0",
+    "vite-plugin-dts": "^4.3.0",
     "zod": "^3.24.4",
     "zustand": "^5.0.4",
-    "@preact/compat": "18.3.1",
-    "@preact/preset-vite": "^2.10.1",
-    "@stagewise/extension-toolbar-srpc-contract": "workspace:*",
-    "@stagewise/srpc": "workspace:*",
-    "@tailwindcss/postcss": "^4.1.5",
-    "@types/node": "22.15.2",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.3",
-    "typescript": "^5.8.3",
-    "vite": "^6.3.5",
-    "vite-bundle-analyzer": "^0.19.0",
-    "vite-plugin-dts": "^4.5.3"
+    "@stagewise/typescript-config": "workspace:*"
+  },
+  "peerDependencies": {
+    "preact": "^10.25.4"
   }
 }

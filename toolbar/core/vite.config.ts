@@ -56,23 +56,49 @@ export default defineConfig({
           __dirname,
           'src/plugin-ui/jsx-runtime.ts',
         ),
+        'mcp-server': resolve(__dirname, 'src/mcp-server.ts'),
       },
       name: 'StagewiseToolbar',
-      fileName: (format, entryName) => `${entryName}.${format}.js`,
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      output: {
-        manualChunks: undefined,
-        preserveModules: false,
-        globals: {
-          preact: 'Preact',
+      output: [
+        // ES modules for main library
+        {
+          format: 'es',
+          entryFileNames: (chunkInfo) => {
+            if (chunkInfo.name === 'mcp-server') {
+              return 'mcp-server.js';
+            }
+            return '[name].es.js';
+          },
+          // Add shebang to MCP server
+          banner: (chunk) => {
+            if (chunk.name === 'mcp-server') {
+              return '#!/usr/bin/env node';
+            }
+            return '';
+          },
         },
+        // CommonJS for compatibility (exclude mcp-server)
+        {
+          format: 'cjs',
+          entryFileNames: '[name].cjs.js',
+          exports: 'named',
+        },
+      ],
+      // External dependencies for MCP server
+      external: (id) => {
+        if (id.startsWith('@modelcontextprotocol/sdk')) {
+          return true;
+        }
+        return false;
       },
       treeshake: true,
     },
     minify: false,
     cssMinify: false,
+    cssCodeSplit: false,
   },
   optimizeDeps: {
     include: ['@stagewise/extension-toolbar-srpc-contract'],
