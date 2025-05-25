@@ -121,3 +121,80 @@ export async function discoverVSCodeWindows(
 
   return windows;
 }
+
+/**
+ * Get the toolbar bridge for a specific port with completion notification handlers
+ */
+export function getToolbarBridge(port: number) {
+  const bridge = createSRPCClientBridge(`ws://localhost:${port}`, contract);
+
+  // Register completion notification handlers
+  bridge.register({
+    notifyCompletionSuccess: async (request) => {
+      // Get app state and call completeSuccess
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.completeSuccess(request.message);
+
+      return { success: true };
+    },
+    notifyCompletionError: async (request) => {
+      // Get app state and call completeError
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.completeError(request.message);
+
+      return { success: true };
+    },
+    // Enhanced MCP tool call notification handlers
+    notifyMcpStart: async (request) => {
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.startMcpTask(
+        request.task,
+        request.estimatedSteps,
+        request.toolName,
+        request.inputSchema,
+        request.inputArguments,
+      );
+
+      return { success: true };
+    },
+    notifyMcpProgress: async (request) => {
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.updateMcpProgress(
+        request.step,
+        request.currentStep,
+        request.totalSteps,
+        request.details,
+      );
+
+      return { success: true };
+    },
+    notifyMcpCompletion: async (request) => {
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.completeMcpTask(
+        request.success,
+        request.message,
+        request.filesModified,
+      );
+
+      return { success: true };
+    },
+    notifyMcpError: async (request) => {
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.errorMcpTask(
+        request.error,
+        request.context,
+        request.recoverable,
+      );
+
+      return { success: true };
+    },
+  });
+
+  return bridge;
+}
