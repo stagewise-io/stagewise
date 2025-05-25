@@ -17,9 +17,9 @@
 
 import { createContext, useContext, useEffect, useState } from 'preact/compat';
 import type { ComponentChildren } from 'preact';
-import { createSRPCClientBridge, type ZodClient } from '@stagewise/srpc/client';
-import { contract } from '@stagewise/extension-toolbar-srpc-contract';
-import { findPort } from '../srpc';
+import type { ZodClient } from '@stagewise/srpc/client';
+import type { contract } from '@stagewise/extension-toolbar-srpc-contract';
+import { findPort, getToolbarBridge } from '../srpc';
 
 interface SRPCBridgeContextValue {
   bridge: ZodClient<typeof contract> | null;
@@ -46,10 +46,7 @@ export function SRPCBridgeProvider({
     async function initializeBridge() {
       try {
         const port = await findPort();
-        const bridge = createSRPCClientBridge(
-          `ws://localhost:${port}`,
-          contract,
-        );
+        const bridge = getToolbarBridge(port);
         await bridge.connect();
         setState({
           bridge,
