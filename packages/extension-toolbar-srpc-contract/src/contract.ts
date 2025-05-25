@@ -24,8 +24,52 @@ export const DEFAULT_PORT = 5746; // This is the default port for the extension'
 export const PING_ENDPOINT = '/ping/stagewise'; // Will be used by the toolbar to check if the extension is running and find the correct port
 export const PING_RESPONSE = 'stagewise'; // The response to the ping request
 
+/**
+ * MCP Server configuration schema that follows official MCP client configuration format
+ * Transport type is inferred from the presence of command (stdio) or url (sse/http)
+ */
+const McpServerSchema = z
+  .object({
+    // stdio transport
+    command: z.string().optional(),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string()).optional(),
+    envFile: z.string().optional(),
+    // sse/http transport
+    url: z.string().optional(),
+    headers: z.record(z.string()).optional(),
+    // Additional server-specific settings
+  })
+  .passthrough(); // Allow additional properties
+
+const NamedMcpServerSchema = z.object({
+  name: z.string(),
+  config: McpServerSchema,
+});
+
 export const contract = createBridgeContract({
   server: {
+    registerMCP: {
+      request: z.object({
+        servers: z.array(NamedMcpServerSchema),
+        source: z
+          .string()
+          .optional()
+          .describe(
+            "Source of the registration (e.g., 'toolbar-init', 'plugin-load')",
+          ),
+      }),
+      response: z.object({
+        result: z.object({
+          success: z.boolean(),
+          error: z.string().optional(),
+          output: z.string().optional(),
+        }),
+      }),
+      update: z.object({
+        updateText: z.string(),
+      }),
+    },
     getSessionInfo: {
       request: z.object({}),
       response: z.object({
@@ -75,6 +119,74 @@ export const contract = createBridgeContract({
         sessionId: z.string().optional(),
         updateText: z.string(),
       }),
+    },
+  },
+  client: {
+    notifyCompletionSuccess: {
+      request: z.object({
+        message: z.string(),
+      }),
+      response: z.object({
+        success: z.boolean(),
+      }),
+      update: z.object({}),
+    },
+    notifyCompletionError: {
+      request: z.object({
+        message: z.string(),
+      }),
+      response: z.object({
+        success: z.boolean(),
+      }),
+      update: z.object({}),
+    },
+    // Enhanced MCP tool call notifications
+    notifyMcpStart: {
+      request: z.object({
+        task: z.string(),
+        estimatedSteps: z.number().optional(),
+        toolName: z.string().optional(),
+        inputSchema: z.record(z.any()).optional(),
+        inputArguments: z.record(z.any()).optional(),
+      }),
+      response: z.object({
+        success: z.boolean(),
+      }),
+      update: z.object({}),
+    },
+    notifyMcpProgress: {
+      request: z.object({
+        step: z.string(),
+        currentStep: z.number().optional(),
+        totalSteps: z.number().optional(),
+        details: z.string().optional(),
+      }),
+      response: z.object({
+        success: z.boolean(),
+      }),
+      update: z.object({}),
+    },
+    notifyMcpCompletion: {
+      request: z.object({
+        success: z.boolean(),
+        message: z.string(),
+        filesModified: z.array(z.string()).optional(),
+      }),
+      response: z.object({
+        success: z.boolean(),
+      }),
+      update: z.object({}),
+    },
+    notifyMcpError: {
+      request: z.object({
+        error: z.string(),
+        context: z.string().optional(),
+        recoverable: z.boolean().optional(),
+      }),
+      response: z.object({
+        success: z.boolean(),
+      }),
+      update: z.object({}),
     },
   },
 });
