@@ -44,13 +44,12 @@ function createCoreMcpServer(): {
     typeof window !== 'undefined' || typeof require === 'undefined';
 
   if (isBrowser) {
-    // For development from examples directory, use relative path to toolbar
-    // examples/ and toolbar/ are at the same level in the workspace
+    // Use pnpm exec with the linked package for browser/development environments
     return {
       name: 'stagewise-core',
       config: {
-        command: 'node',
-        args: ['../toolbar/core/dist/mcp-server.js'],
+        command: 'pnpm',
+        args: ['exec', 'stagewise-mcp-server'],
         env: {
           STAGEWISE_CORE: 'true',
           DEBUG: 'stagewise:*',
@@ -65,14 +64,12 @@ function createCoreMcpServer(): {
     const isDevelopment = process.env.NODE_ENV !== 'production';
 
     if (isDevelopment) {
-      // Use direct path to the built MCP server for development
-      const mcpServerPath = require.resolve('@stagewise/toolbar/mcp-server');
-
+      // Use pnpm exec with the linked package for development
       return {
         name: 'stagewise-core',
         config: {
-          command: 'node',
-          args: [mcpServerPath],
+          command: 'pnpm',
+          args: ['exec', 'stagewise-mcp-server'],
           env: {
             STAGEWISE_CORE: 'true',
             DEBUG: 'stagewise:*',
@@ -81,12 +78,12 @@ function createCoreMcpServer(): {
         },
       };
     } else {
-      // In production, use npx with the published package
+      // In production, use npx with the binary
       return {
         name: 'stagewise-core',
         config: {
           command: 'npx',
-          args: ['@stagewise/toolbar/mcp-server'],
+          args: ['stagewise-mcp-server'],
           env: {
             STAGEWISE_CORE: 'true',
             DEBUG: 'stagewise:*',
@@ -105,7 +102,7 @@ function createCoreMcpServer(): {
       name: 'stagewise-core',
       config: {
         command: 'npx',
-        args: ['@stagewise/toolbar/mcp-server'],
+        args: ['stagewise-mcp-server'],
         env: {
           STAGEWISE_CORE: 'true',
           DEBUG: 'stagewise:*',
