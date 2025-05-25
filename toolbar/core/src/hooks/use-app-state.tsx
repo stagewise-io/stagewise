@@ -25,6 +25,43 @@ import { create, type StateCreator } from 'zustand';
 import SuperJSON from 'superjson';
 import { persist, type PersistStorage } from 'zustand/middleware';
 
+export type CompletionState = 'idle' | 'loading' | 'success' | 'error';
+
+// Enhanced MCP tool call state
+export type McpToolCallStatus =
+  | 'idle'
+  | 'starting'
+  | 'in-progress'
+  | 'completed'
+  | 'error';
+
+export interface McpToolCallState {
+  status: McpToolCallStatus;
+  currentTask?: string;
+  estimatedSteps?: number;
+  // Agent input schema properties
+  toolName?: string;
+  inputSchema?: Record<string, any>;
+  inputArguments?: Record<string, any>;
+  progress?: {
+    step: string;
+    currentStep?: number;
+    totalSteps?: number;
+    details?: string;
+  };
+  result?: {
+    success: boolean;
+    message: string;
+    filesModified?: string[];
+  };
+  error?: {
+    error: string;
+    context?: string;
+    recoverable?: boolean;
+  };
+  timeoutId?: number;
+}
+
 export interface AppState {
   requestMainAppBlock: () => number;
   requestMainAppUnblock: () => number;
@@ -43,6 +80,46 @@ export interface AppState {
 
   promotedOnStartup: boolean; // This will be false initially, but will be set to true for the next re-hydration fo the store. If allows components to read and create an additional promoting animation.
   promotionFinished: () => void;
+
+  // Legacy completion flow state (for backward compatibility)
+  completionState: CompletionState;
+  completionMessage: string | null;
+  completionTimeoutId: number | null;
+
+  // Legacy completion flow actions
+  startCompletion: () => void;
+  completeSuccess: (message: string) => void;
+  completeError: (message: string) => void;
+  resetCompletion: () => void;
+
+  // Enhanced MCP tool call state
+  mcpToolCall: McpToolCallState;
+
+  // Enhanced MCP tool call actions
+  startMcpTask: (
+    task: string,
+    estimatedSteps?: number,
+    toolName?: string,
+    inputSchema?: Record<string, any>,
+    inputArguments?: Record<string, any>,
+  ) => void;
+  updateMcpProgress: (
+    step: string,
+    currentStep?: number,
+    totalSteps?: number,
+    details?: string,
+  ) => void;
+  completeMcpTask: (
+    success: boolean,
+    message: string,
+    filesModified?: string[],
+  ) => void;
+  errorMcpTask: (
+    error: string,
+    context?: string,
+    recoverable?: boolean,
+  ) => void;
+  resetMcpTask: () => void;
 }
 
 export interface InternalAppState extends AppState {
@@ -136,6 +213,228 @@ const createAppStore: StateCreator<AppState> = (s) => {
 
     promotedOnStartup: false,
     promotionFinished: () => set(() => ({ promotedOnStartup: true })),
+
+    // Legacy completion flow state
+    completionState: 'idle',
+    completionMessage: null,
+    completionTimeoutId: null,
+
+    // Legacy completion flow actions
+    startCompletion: () => {
+      set((state) => {
+        // Clear any existing timeout
+        if (state.completionTimeoutId) {
+          clearTimeout(state.completionTimeoutId);
+        }
+
+        // Set 30-second timeout for error state
+        const timeoutId = window.setTimeout(() => {
+          set({
+            completionState: 'error',
+            completionMessage: 'Agent completion timed out after 30 seconds',
+            completionTimeoutId: null,
+          });
+        }, 30000);
+
+        return {
+          completionState: 'loading',
+          completionMessage: null,
+          completionTimeoutId: timeoutId,
+        };
+      });
+    },
+
+    completeSuccess: (message: string) => {
+      set((state) => {
+        // Clear timeout
+        if (state.completionTimeoutId) {
+          clearTimeout(state.completionTimeoutId);
+        }
+
+        return {
+          completionState: 'success',
+          completionMessage: message,
+          completionTimeoutId: null,
+        };
+      });
+    },
+
+    completeError: (message: string) => {
+      set((state) => {
+        // Clear timeout
+        if (state.completionTimeoutId) {
+          clearTimeout(state.completionTimeoutId);
+        }
+
+        return {
+          completionState: 'error',
+          completionMessage: message,
+          completionTimeoutId: null,
+        };
+      });
+    },
+
+    resetCompletion: () => {
+      set((state) => {
+        // Clear timeout
+        if (state.completionTimeoutId) {
+          clearTimeout(state.completionTimeoutId);
+        }
+
+        return {
+          completionState: 'idle',
+          completionMessage: null,
+          completionTimeoutId: null,
+        };
+      });
+    },
+
+    // Enhanced MCP tool call state
+    mcpToolCall: {
+      status: 'idle',
+    },
+
+    // Enhanced MCP tool call actions
+    startMcpTask: (
+      task: string,
+      estimatedSteps?: number,
+      toolName?: string,
+      inputSchema?: Record<string, any>,
+      inputArguments?: Record<string, any>,
+    ) => {
+      set((state) => {
+        // Clear any existing timeout
+        if (state.mcpToolCall.timeoutId) {
+          clearTimeout(state.mcpToolCall.timeoutId);
+        }
+
+        // Set 60-second timeout for error state (longer than legacy)
+        const timeoutId = window.setTimeout(() => {
+          set((state) => ({
+            mcpToolCall: {
+              ...state.mcpToolCall,
+              status: 'error',
+              error: {
+                error: 'Agent task timed out after 60 seconds',
+                recoverable: false,
+              },
+              timeoutId: undefined,
+            },
+          }));
+        }, 60000);
+
+        return {
+          mcpToolCall: {
+            status: 'starting',
+            currentTask: task,
+            estimatedSteps,
+            toolName,
+            inputSchema,
+            inputArguments,
+            timeoutId,
+            progress: undefined,
+            result: undefined,
+            error: undefined,
+          },
+        };
+      });
+    },
+
+    updateMcpProgress: (
+      step: string,
+      currentStep?: number,
+      totalSteps?: number,
+      details?: string,
+    ) => {
+      set((state) => ({
+        mcpToolCall: {
+          ...state.mcpToolCall,
+          status: 'in-progress',
+          progress: {
+            step,
+            currentStep,
+            totalSteps,
+            details,
+          },
+        },
+      }));
+    },
+
+    completeMcpTask: (
+      success: boolean,
+      message: string,
+      filesModified?: string[],
+    ) => {
+      set((state) => {
+        // Clear timeout
+        if (state.mcpToolCall.timeoutId) {
+          clearTimeout(state.mcpToolCall.timeoutId);
+        }
+
+        const newState = {
+          mcpToolCall: {
+            ...state.mcpToolCall,
+            status: 'completed' as McpToolCallStatus,
+            result: {
+              success,
+              message,
+              filesModified,
+            },
+            timeoutId: undefined,
+          },
+        };
+
+        // Auto-reset after 5 seconds on success
+        if (success) {
+          setTimeout(() => {
+            set((state) => ({
+              mcpToolCall: {
+                status: 'idle',
+              },
+            }));
+          }, 5000);
+        }
+
+        return newState;
+      });
+    },
+
+    errorMcpTask: (error: string, context?: string, recoverable?: boolean) => {
+      set((state) => {
+        // Clear timeout
+        if (state.mcpToolCall.timeoutId) {
+          clearTimeout(state.mcpToolCall.timeoutId);
+        }
+
+        return {
+          mcpToolCall: {
+            ...state.mcpToolCall,
+            status: 'error',
+            error: {
+              error,
+              context,
+              recoverable,
+            },
+            timeoutId: undefined,
+          },
+        };
+      });
+    },
+
+    resetMcpTask: () => {
+      set((state) => {
+        // Clear timeout
+        if (state.mcpToolCall.timeoutId) {
+          clearTimeout(state.mcpToolCall.timeoutId);
+        }
+
+        return {
+          mcpToolCall: {
+            status: 'idle',
+          },
+        };
+      });
+    },
   };
 };
 
