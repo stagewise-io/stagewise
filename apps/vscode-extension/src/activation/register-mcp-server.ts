@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { getCurrentIDE } from 'src/utils/get-current-ide';
 
 /**
  * MCP Server configuration that follows the official MCP client configuration format
@@ -146,18 +147,16 @@ async function registerMcpServersCursor(
 function getIdeMcpRegistrationFunction(): (
   servers: Record<string, any>,
 ) => Promise<void> {
-  const appName = vscode.env.appName.toLowerCase();
-
-  if (appName.includes('visual studio code')) {
-    return registerMcpServersVSCode;
-  } else if (appName.includes('windsurf')) {
-    return registerMcpServersWindsurf;
-  } else if (appName.includes('cursor')) {
-    return registerMcpServersCursor;
-  } else {
-    throw new Error(
-      `Unrecognized IDE "${vscode.env.appName}", MCP registration not supported.`,
-    );
+  const ide = getCurrentIDE();
+  switch (ide) {
+    case 'CURSOR':
+      return registerMcpServersCursor;
+    case 'WINDSURF':
+      return registerMcpServersWindsurf;
+    case 'VSCODE':
+      return registerMcpServersVSCode;
+    default:
+      throw new Error(`Unsupported IDE: ${ide}`);
   }
 }
 
