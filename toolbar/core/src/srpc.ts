@@ -20,6 +20,9 @@ import {
   PING_ENDPOINT,
   PING_RESPONSE,
 } from '@stagewise/extension-toolbar-srpc-contract';
+import { createSRPCClientBridge } from '@stagewise/srpc/client';
+import { contract } from '@stagewise/extension-toolbar-srpc-contract';
+import type { z } from 'zod';
 
 export async function findPort(
   maxAttempts = 10,
@@ -59,4 +62,139 @@ export async function findPort(
   }
 
   return null;
+}
+
+export type VSCodeContext = z.infer<
+  typeof contract.server.getSessionInfo.response
+>;
+
+/**
+ * Discover all available VS Code windows by scanning ports and getting session info
+ */
+export async function discoverVSCodeWindows(
+  maxAttempts = 10,
+  timeout = 300,
+): Promise<VSCodeContext[]> {
+  const windows: VSCodeContext[] = [];
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const port = DEFAULT_PORT + attempt;
+
+    try {
+      // First check if the port responds to ping
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const response = await fetch(`http://localhost:${port}${PING_ENDPOINT}`, {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok && (await response.text()) === PING_RESPONSE) {
+        // Port is active, now get session info
+        try {
+          const bridge = createSRPCClientBridge(
+            `ws://localhost:${port}`,
+            contract,
+          );
+          await bridge.connect();
+
+          const sessionInfo = await bridge.call.getSessionInfo(
+            {},
+            {
+              onUpdate: () => {},
+            },
+          );
+          windows.push(sessionInfo);
+
+          await bridge.close();
+        } catch (error) {
+          console.warn(`Failed to get session info from port ${port}:`, error);
+        }
+      }
+    } catch (error) {
+      // Port not available, continue to next
+      continue;
+    }
+  }
+
+  return windows;
+}
+
+/**
+ * Get the toolbar bridge for a specific port with completion notification handlers
+ */
+export function getToolbarBridge(port: number) {
+  const bridge = createSRPCClientBridge(`ws://localhost:${port}`, contract);
+
+  // Register completion notification handlers
+  bridge.register({
+    notifyCompletionSuccess: async (request) => {
+      // Get app state and call completeSuccess
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.completeSuccess(request.message);
+
+      return { success: true };
+    },
+    notifyCompletionError: async (request) => {
+      // Get app state and call completeError
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.completeError(request.message);
+
+      return { success: true };
+    },
+    // Enhanced MCP tool call notification handlers
+    notifyMcpStart: async (request) => {
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.startMcpTask(
+        request.task,
+        request.estimatedSteps,
+        request.toolName,
+        request.inputSchema,
+        request.inputArguments,
+      );
+
+      return { success: true };
+    },
+    notifyMcpProgress: async (request) => {
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.updateMcpProgress(
+        request.step,
+        request.currentStep,
+        request.totalSteps,
+        request.details,
+      );
+
+      return { success: true };
+    },
+    notifyMcpCompletion: async (request) => {
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.completeMcpTask(
+        request.success,
+        request.message,
+        request.filesModified,
+      );
+
+      return { success: true };
+    },
+    notifyMcpError: async (request) => {
+      const { useAppState } = await import('./hooks/use-app-state');
+      const appState = useAppState.getState();
+      appState.errorMcpTask(
+        request.error,
+        request.context,
+        request.recoverable,
+      );
+
+      return { success: true };
+    },
+  });
+
+  return bridge;
 }

@@ -22,6 +22,7 @@ import { createPrompt, type PluginContextSnippets } from '@/prompts';
 import { useAppState } from './use-app-state';
 import { usePlugins } from './use-plugins';
 import type { ContextElementContext } from '@/plugin';
+import { useVSCode } from './use-vscode';
 
 interface Message {
   id: string;
@@ -49,6 +50,9 @@ interface Chat {
 
 type ChatAreaState = 'hidden' | 'compact' | 'expanded';
 
+// Add new prompt state type
+type PromptState = 'idle' | 'loading' | 'success' | 'error';
+
 interface ChatContext {
   // Chat list management
   chats: Chat[];
@@ -71,6 +75,10 @@ interface ChatContext {
   isPromptCreationActive: boolean;
   startPromptCreation: () => void;
   stopPromptCreation: () => void;
+
+  // Prompt state
+  promptState: PromptState;
+  resetPromptState: () => void;
 }
 
 const ChatContext = createContext<ChatContext>({
@@ -88,6 +96,8 @@ const ChatContext = createContext<ChatContext>({
   isPromptCreationActive: false,
   startPromptCreation: () => {},
   stopPromptCreation: () => {},
+  promptState: 'idle',
+  resetPromptState: () => {},
 });
 
 interface ChatStateProviderProps {
@@ -110,7 +120,17 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const [isPromptCreationMode, setIsPromptCreationMode] =
     useState<boolean>(false);
 
+  // Add prompt state management
+  const [promptState, setPromptState] = useState<PromptState>('idle');
+
+  // Reset prompt state function
+  const resetPromptState = useCallback(() => {
+    setPromptState('idle');
+  }, []);
+
   const isMinimized = useAppState((state) => state.minimized);
+
+  const { selectedSession } = useVSCode();
 
   useEffect(() => {
     if (isMinimized) {
@@ -189,6 +209,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const stopPromptCreation = useCallback(() => {
     setIsPromptCreationMode(false);
+    // Reset prompt state when stopping prompt creation
+    setPromptState('idle');
     // clear dom context for this chat so that it doesn't get too weird when re-starting prompt creation mode
     setChats((prev) =>
       prev.map((chat) =>
@@ -265,7 +287,18 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     async (chatId: ChatId, content: string, pluginTriggered = false) => {
       if (!content.trim()) return;
 
+      // Prevent sending new messages while one is already loading
+      if (promptState === 'loading') return;
+
       const chat = chats.find((chat) => chat.id === chatId);
+
+      // Set loading state at the start
+      setPromptState('loading');
+
+      // NOTE: We no longer start the legacy completion flow here.
+      // Instead, we rely entirely on the enhanced MCP notification system.
+      // When the agent starts working, it will send MCP notifications that will
+      // display the enhanced UI with tool details, input schema, and arguments.
 
       const pluginContextSnippets: PluginContextSnippets[] = [];
 
@@ -338,18 +371,77 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       async function triggerAgentPrompt() {
         if (bridge) {
-          const result = await bridge.call.triggerAgentPrompt(
-            { prompt },
-            {
-              onUpdate: (update) => {},
-            },
-          );
+          try {
+            const result = await bridge.call.triggerAgentPrompt(
+              { prompt, sessionId: selectedSession?.sessionId },
+              { onUpdate: (update) => {} },
+            );
+
+            // Handle response based on success/error
+            if (result.result.success) {
+              // On success, show agent-reached state in MCP UI
+              const appState = useAppState.getState();
+              appState.setAgentReached();
+              setPromptState('loading');
+            } else {
+              // On error, go to error state
+              setPromptState('error');
+              // NOTE: We no longer call the legacy completeError here.
+              // If the agent sends MCP error notifications, they will be handled
+              // by the MCP notification system.
+
+              // Auto-reset to idle and close prompt creation after error animation
+              setTimeout(() => {
+                setPromptState('idle');
+                setIsPromptCreationMode(false);
+                // Clear input after error completion
+                setChats((prev) =>
+                  prev.map((chat) =>
+                    chat.id === chatId ? { ...chat, inputValue: '' } : chat,
+                  ),
+                );
+              }, 3000);
+            }
+          } catch (error) {
+            // On exception, go to error state
+            setPromptState('error');
+            // NOTE: We no longer call the legacy completeError here.
+            // Connection errors will be handled by the MCP notification system.
+
+            // Auto-reset to idle and close prompt creation after error animation
+            setTimeout(() => {
+              setPromptState('idle');
+              setIsPromptCreationMode(false);
+              // Clear input after error completion
+              setChats((prev) =>
+                prev.map((chat) =>
+                  chat.id === chatId ? { ...chat, inputValue: '' } : chat,
+                ),
+              );
+            }, 3000);
+          }
+        } else {
+          // No bridge available, go to error state
+          setPromptState('error');
+          // NOTE: We no longer call the legacy completeError here.
+          // No connection scenarios don't use MCP notifications anyway.
+
+          setTimeout(() => {
+            setPromptState('idle');
+            setIsPromptCreationMode(false);
+            // Clear input after error completion
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === chatId ? { ...chat, inputValue: '' } : chat,
+              ),
+            );
+          }, 3000);
         }
       }
 
       triggerAgentPrompt();
 
-      setIsPromptCreationMode(false);
+      // Don't close prompt creation mode immediately - keep it open to show loading state
 
       if (chatAreaState === 'hidden') {
         internalSetChatAreaState('compact');
@@ -361,7 +453,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
             ? {
                 ...chat,
                 messages: [...chat.messages, newMessage],
-                inputValue: '',
+                inputValue: content.trim(), // Keep the original prompt instead of clearing
                 domContextElements: [],
               }
             : chat,
@@ -374,6 +466,10 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       chats,
       setIsPromptCreationMode,
       internalSetChatAreaState,
+      selectedSession,
+      promptState,
+      setPromptState,
+      plugins,
     ],
   );
 
@@ -392,6 +488,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     stopPromptCreation,
     addChatDomContext,
     removeChatDomContext,
+    promptState,
+    resetPromptState,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

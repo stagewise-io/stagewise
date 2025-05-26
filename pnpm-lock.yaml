@@ -651,6 +651,19 @@ importers:
         version: 4.5.3(@types/node@22.15.17)(rollup@4.40.2)(typescript@5.8.3)(vite@6.3.5(@types/node@22.15.17)(jiti@2.4.2)(lightningcss@1.29.2)(terser@5.39.0)(tsx@4.19.4)(yaml@2.7.1))
 
   toolbar/core:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.0.0
+        version: 1.10.2
+      '@stagewise/extension-toolbar-srpc-contract':
+        specifier: workspace:*
+        version: link:../../packages/extension-toolbar-srpc-contract
+      '@stagewise/srpc':
+        specifier: workspace:*
+        version: link:../../packages/srpc
+      preact:
+        specifier: ^10.25.4
+        version: 10.26.6
     devDependencies:
       '@headlessui/react':
         specifier: 2.2.2
@@ -661,17 +674,14 @@ importers:
       '@preact/preset-vite':
         specifier: ^2.10.1
         version: 2.10.1(@babel/core@7.27.1)(preact@10.26.6)(vite@6.3.5(@types/node@22.15.2)(jiti@2.4.2)(lightningcss@1.29.2)(terser@5.39.0)(tsx@4.19.4)(yaml@2.7.1))
-      '@stagewise/extension-toolbar-srpc-contract':
+      '@stagewise/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/extension-toolbar-srpc-contract
-      '@stagewise/srpc':
-        specifier: workspace:*
-        version: link:../../packages/srpc
+        version: link:../../packages/typescript-config
       '@tailwindcss/postcss':
         specifier: ^4.1.5
         version: 4.1.5
       '@types/node':
-        specifier: 22.15.2
+        specifier: ^22.10.1
         version: 22.15.2
       autoprefixer:
         specifier: ^10.4.21
@@ -694,12 +704,6 @@ importers:
       postcss-prefix-selector:
         specifier: ^2.1.1
         version: 2.1.1(postcss@8.5.3)
-      preact:
-        specifier: ^10.26.6
-        version: 10.26.6
-      react-remove-scroll:
-        specifier: ^2.6.3
-        version: 2.6.3(@types/react@19.1.3)(react@19.1.0)
       superjson:
         specifier: ^2.2.2
         version: 2.2.2
@@ -710,25 +714,22 @@ importers:
         specifier: ^4.1.5
         version: 4.1.5
       tsup:
-        specifier: ^8.4.0
+        specifier: ^8.3.5
         version: 8.4.0(@microsoft/api-extractor@7.52.7(@types/node@22.15.2))(@swc/core@1.11.24(@swc/helpers@0.5.17))(jiti@2.4.2)(postcss@8.5.3)(tsx@4.19.4)(typescript@5.8.3)(yaml@2.7.1)
       typescript:
-        specifier: ^5.8.3
+        specifier: ^5.8.2
         version: 5.8.3
       ua-parser-js:
         specifier: ^2.0.3
         version: 2.0.3
       vite:
-        specifier: ^6.3.5
+        specifier: ^6.0.3
         version: 6.3.5(@types/node@22.15.2)(jiti@2.4.2)(lightningcss@1.29.2)(terser@5.39.0)(tsx@4.19.4)(yaml@2.7.1)
       vite-bundle-analyzer:
         specifier: ^0.19.0
         version: 0.19.0
-      vite-plugin-css-injected-by-js:
-        specifier: ^3.5.2
-        version: 3.5.2(vite@6.3.5(@types/node@22.15.2)(jiti@2.4.2)(lightningcss@1.29.2)(terser@5.39.0)(tsx@4.19.4)(yaml@2.7.1))
       vite-plugin-dts:
-        specifier: ^4.5.3
+        specifier: ^4.3.0
         version: 4.5.3(@types/node@22.15.2)(rollup@4.40.2)(typescript@5.8.3)(vite@6.3.5(@types/node@22.15.2)(jiti@2.4.2)(lightningcss@1.29.2)(terser@5.39.0)(tsx@4.19.4)(yaml@2.7.1))
       zod:
         specifier: ^3.24.4
@@ -9138,11 +9139,6 @@ packages:
         optional: true
       vue-tsc:
         optional: true
-
-  vite-plugin-css-injected-by-js@3.5.2:
-    resolution: {integrity: sha512-2MpU/Y+SCZyWUB6ua3HbJCrgnF0KACAsmzOQt1UvRVJCGF6S8xdA3ZUhWcWdM9ivG4I5az8PnQmwwrkC2CAQrQ==}
-    peerDependencies:
-      vite: '>2.0.0-0'
 
   vite-plugin-dts@4.5.3:
     resolution: {integrity: sha512-P64VnD00dR+e8S26ESoFELqc17+w7pKkwlBpgXteOljFyT0zDwD8hH4zXp49M/kciy//7ZbVXIwQCekBJjfWzA==}
@@ -19291,10 +19287,6 @@ snapshots:
       optionator: 0.9.4
       typescript: 5.8.3
       vue-tsc: 2.2.10(typescript@5.8.3)
-
-  vite-plugin-css-injected-by-js@3.5.2(vite@6.3.5(@types/node@22.15.2)(jiti@2.4.2)(lightningcss@1.29.2)(terser@5.39.0)(tsx@4.19.4)(yaml@2.7.1)):
-    dependencies:
-      vite: 6.3.5(@types/node@22.15.2)(jiti@2.4.2)(lightningcss@1.29.2)(terser@5.39.0)(tsx@4.19.4)(yaml@2.7.1)
 
   vite-plugin-dts@4.5.3(@types/node@22.15.17)(rollup@4.40.2)(typescript@5.8.3)(vite@6.3.5(@types/node@22.15.17)(jiti@2.4.2)(lightningcss@1.29.2)(terser@5.39.0)(tsx@4.19.4)(yaml@2.7.1)):
     dependencies:
