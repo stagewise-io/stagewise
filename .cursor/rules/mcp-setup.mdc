@@ -1,0 +1,118 @@
+---
+description: Explains how MCP servers work in stagewise
+globs: 
+alwaysApply: false
+---
+# Stagewise MCP (Model Context Protocol) Setup
+
+## Overview
+
+Stagewise uses MCP (Model Context Protocol) to provide AI agents with tools for progress tracking and task notifications. This setup allows AI assistants like Cursor to communicate with the Stagewise toolbar through standardized tools.
+
+## Architecture
+
+### MCP Server
+The MCP server is built in [toolbar/core/src/mcp-server.ts](mdc:toolbar/core/src/mcp-server.ts) and provides the following tools:
+
+1. **`stagewise_notify_start`** - Notify that work on a task has started
+   - Parameters: `task` (required), `estimatedSteps` (optional)
+
+2. **`stagewise_notify_progress`** - Notify of progress during task execution  
+   - Parameters: `step` (required), `currentStep`, `totalSteps`, `details`
+
+3. **`stagewise_notify_completion`** - Notify that a task has been completed
+   - Parameters: `success` (required), `message` (required), `filesModified` (optional)
+
+4. **`stagewise_notify_error`** - Notify that an error occurred during task execution
+   - Parameters: `error` (required), `context`, `recoverable`
+
+### Binary Setup
+The MCP server is exposed as a binary `stagewise-mcp-server` defined in [toolbar/core/package.json](mdc:toolbar/core/package.json):
+
+```json
+"bin": {
+  "stagewise-mcp-server": "./dist/mcp-server.js"
+}
+```
+
+## Development Setup
+
+### 1. Package Linking
+For local development, the package is linked globally:
+```bash
+cd toolbar/core
+pnpm link --global
+```
+
+This makes the `stagewise-mcp-server` binary available system-wide for development.
+
+### 2. Automatic Registration
+The toolbar automatically registers MCP servers through [toolbar/core/src/index.ts](mdc:toolbar/core/src/index.ts) in the `createCoreMcpServer()` function:
+
+- **Browser/Development**: Uses `pnpm exec stagewise-mcp-server` (works with linked packages)
+- **Production**: Uses `npx stagewise-mcp-server` (works with published packages)
+- **Fallback**: Falls back to `npx` if path resolution fails
+
+### 3. MCP Configuration
+MCP configurations are automatically generated when `initToolbar()` is called. For manual testing, configurations use:
+
+```json
+{
+  "mcpServers": {
+    "stagewise-core": {
+      "command": "pnpm",
+      "args": ["exec", "stagewise-mcp-server"],
+      "env": {
+        "STAGEWISE_CORE": "true",
+        "DEBUG": "stagewise:*",
+        "MCP_SERVER_NAME": "stagewise-core"
+      }
+    }
+  }
+}
+```
+
+## Usage in Examples
+
+### Example Projects
+All example projects in [examples/](mdc:examples) have the toolbar initialized, which automatically registers the MCP server. Examples include:
+
+- [examples/next-example/](mdc:mcp:examples/next-example)
+- [examples/react-example/](mdc:mcp:examples/react-example)
+- [examples/vue-example/](mdc:mcp:examples/vue-example)
+- [examples/svelte-kit-example/](mdc:mcp:examples/svelte-kit-example)
+- [examples/nuxt-example/](mdc:mcp:examples/nuxt-example)
+
+### Testing MCP Tools
+When working in any example workspace, you can request the Stagewise MCP tools:
+
+1. **Start a task**: Use `stagewise_notify_start` to signal beginning of work
+2. **Update progress**: Use `stagewise_notify_progress` for ongoing updates  
+3. **Complete task**: Use `stagewise_notify_completion` when finished
+4. **Report errors**: Use `stagewise_notify_error` for error handling
+
+## Extension Integration
+
+The MCP server communicates with the VS Code extension through SRPC (Simple RPC) as defined in [packages/extension-toolbar-srpc-contract/](mdc:mcp:packages/extension-toolbar-srpc-contract). The extension receives MCP notifications and updates the toolbar UI accordingly.
+
+## Troubleshooting
+
+### MCP Server Not Found
+If the MCP server cannot be found:
+1. Ensure the toolbar package is built: `cd toolbar/core && pnpm build`
+2. Verify the package is linked: `pnpm link --global` in `toolbar/core`
+3. Check if the binary is available: `which stagewise-mcp-server`
+
+### MCP Tools Not Available
+If MCP tools aren't available in Cursor:
+1. Ensure you're working in an example workspace where `initToolbar()` is called
+2. Check that the VS Code extension is running
+3. Verify the MCP configuration exists (it should be auto-generated)
+
+## Files Reference
+
+Key files for MCP setup:
+- [toolbar/core/src/mcp-server.ts](mdc:mcp:toolbar/core/src/mcp-server.ts) - MCP server implementation
+- [toolbar/core/src/index.ts](mdc:mcp:toolbar/core/src/index.ts) - Auto-registration logic
+- [toolbar/core/package.json](mdc:mcp:toolbar/core/package.json) - Binary definition
+- [apps/vscode-extension/src/activation/register-mcp-server.ts](mdc:mcp:apps/vscode-extension/src/activation/register-mcp-server.ts) - Extension MCP registration
