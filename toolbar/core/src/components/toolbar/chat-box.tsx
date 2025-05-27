@@ -49,10 +49,12 @@ export function ToolbarChatArea() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         handleSubmit();
       }
+      // Allow Shift+Enter for newlines, do nothing for Enter alone (for IME)
+      // The original condition for Enter alone submitting the form is now removed.
     },
     [handleSubmit],
   );
