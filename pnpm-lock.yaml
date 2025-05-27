@@ -68,6 +68,9 @@ importers:
       express:
         specifier: ^5.1.0
         version: 5.1.0
+      posthog-node:
+        specifier: ^4.17.1
+        version: 4.17.1
       ws:
         specifier: ^8.18.2
         version: 8.18.2
