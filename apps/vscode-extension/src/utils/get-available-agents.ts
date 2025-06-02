@@ -5,9 +5,9 @@
 import { AGENTS } from 'src/constants';
 import * as vscode from 'vscode';
 
-const agents: string[] = [];
+const agents: (keyof typeof AGENTS)[] = [];
 
-export function getAgents() {
+export function getAvailableAgents(): (keyof typeof AGENTS)[] {
   const appName = vscode.env.appName.toLowerCase();
   if (appName.includes('cursor')) {
     agents.push(AGENTS.CURSOR);
@@ -18,4 +18,5 @@ export function getAgents() {
   if (vscode.extensions.getExtension('gitHub.copilot-chat')) {
     agents.push(AGENTS.GITHUB_COPILOT);
   }
+  return agents;
 }
