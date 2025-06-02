@@ -19,9 +19,15 @@ interface VSCodeContextType {
   discover: () => Promise<void>;
   selectSession: (sessionId: string | undefined) => void;
   refreshSession: () => Promise<void>;
+  selectAgent: (agent: string | undefined) => void;
 
   // App name
   appName: string | undefined;
+  displayName?: string; // Optional display name for the current window
+
+  // Available agents
+  availableAgents?: string[];
+  selectedAgent?: string;
 }
 
 const VSCodeContext = createContext<VSCodeContextType>({
@@ -33,6 +39,10 @@ const VSCodeContext = createContext<VSCodeContextType>({
   selectSession: () => {},
   refreshSession: async () => {},
   appName: undefined,
+  displayName: undefined,
+  availableAgents: [],
+  selectAgent: () => {},
+  selectedAgent: undefined,
 });
 
 export function VSCodeProvider({ children }: { children: ComponentChildren }) {
@@ -42,6 +52,9 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
   const [selectedSessionId, setSelectedSessionId] = useState<
     string | undefined
   >(undefined);
+  const [selectedAgent, setSelectedAgent] = useState<string | undefined>(
+    undefined,
+  );
 
   const discover = async () => {
     setIsDiscovering(true);
@@ -71,6 +84,10 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
     setSelectedSessionId(sessionId);
   };
 
+  const selectAgent = (agent: string | undefined) => {
+    setSelectedAgent(agent);
+  };
+
   const refreshSession = async () => {
     if (selectedSessionId) {
       // Re-discover to get fresh session info
@@ -96,6 +113,10 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
     selectSession,
     refreshSession,
     appName: selectedSession?.appName,
+    displayName: selectedSession?.displayName,
+    availableAgents: selectedSession?.availableAgents,
+    selectAgent,
+    selectedAgent,
   };
 
   return (

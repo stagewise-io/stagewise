@@ -37,6 +37,10 @@ const ConnectionSettings = () => {
     discover,
     selectedSession,
     selectSession,
+    availableAgents = [],
+    selectedAgent,
+    selectAgent,
+    appName,
   } = useVSCode();
 
   const handleSessionChange = (e: Event) => {
@@ -45,7 +49,13 @@ const ConnectionSettings = () => {
     selectSession(selectedSessionId);
   };
 
-  const { appName } = useVSCode();
+  console.log('Available agents:', availableAgents);
+
+  const handleAgentChange = (e: Event) => {
+    const target = e.target as HTMLSelectElement;
+    const agent = target.value || undefined;
+    selectAgent(agent);
+  };
 
   const handleRefresh = () => {
     discover();
@@ -99,6 +109,30 @@ const ConnectionSettings = () => {
           </p>
         )}
       </div>
+
+      {/* Agent selector */}
+      {availableAgents.length > 1 && (
+        <div>
+          <label
+            htmlFor="agent-select"
+            className="mb-2 block font-medium text-gray-700 text-sm"
+          >
+            Agent
+          </label>
+          <select
+            id="agent-select"
+            value={selectedAgent || ''}
+            onChange={handleAgentChange}
+            className="h-8 w-full rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
+          >
+            {availableAgents.map((agent) => (
+              <option key={agent} value={agent}>
+                {agent}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {selectedSession && (
         <div className="rounded-lg bg-blue-50 p-3">
