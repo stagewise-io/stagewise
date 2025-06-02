@@ -5,22 +5,29 @@
 import { AGENTS } from 'src/constants';
 import * as vscode from 'vscode';
 
-const agents: (keyof typeof AGENTS)[] = [];
+// Agent display names mapping
+const AGENT_DISPLAY_NAMES = {
+  [AGENTS.CURSOR]: 'Cursor Agent',
+  [AGENTS.WINDSURF]: 'Windsurf Agent',
+  [AGENTS.GITHUB_COPILOT]: 'GitHub Copilot',
+} as const;
 
-export function getAvailableAgents(): (keyof typeof AGENTS)[] {
-  agents.pop(); // Clear previous agents
+export function getAvailableAgents(): string[] {
+  const agents: string[] = [];
+
   const appName = vscode.env.appName.toLowerCase();
   if (appName.includes('cursor')) {
-    agents.push(AGENTS.CURSOR);
+    agents.push(AGENT_DISPLAY_NAMES[AGENTS.CURSOR]);
     console.log('[Stagewise] Detected Cursor IDE');
   } else if (appName.includes('windsurf')) {
-    agents.push(AGENTS.WINDSURF);
+    agents.push(AGENT_DISPLAY_NAMES[AGENTS.WINDSURF]);
     console.log('[Stagewise] Detected WindSurf IDE');
   }
 
   if (vscode.extensions.getExtension('gitHub.copilot-chat')) {
-    agents.push(AGENTS.GITHUB_COPILOT);
+    agents.push(AGENT_DISPLAY_NAMES[AGENTS.GITHUB_COPILOT]);
     console.log('[Stagewise] Detected GitHub Copilot');
   }
+
   return agents;
 }
