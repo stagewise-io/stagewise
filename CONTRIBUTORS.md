@@ -1,6 +1,6 @@
 # Contributors
 
-## These are the day-ones
+## Day-One Contributors
 
 Without these guys, stagewise wouldn't be here. Huge props to:
 
