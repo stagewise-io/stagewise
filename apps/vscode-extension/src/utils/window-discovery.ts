@@ -6,6 +6,10 @@ import { getAvailableAgents } from './get-available-agents';
  * This is used by the getSessionInfo RPC method
  */
 export function getCurrentWindowInfo(port: number): VSCodeContext {
+  const availableAgents = getAvailableAgents();
+  console.log(
+    `[Stagewise] getCurrentWindowInfo: sessionId=${vscode.env.sessionId}, appName=${vscode.env.appName}, availableAgents=${availableAgents.join(', ')}`,
+  );
   return {
     sessionId: vscode.env.sessionId,
     appName: vscode.env.appName,
