@@ -25,8 +25,8 @@ interface VSCodeContextType {
   appName: string | undefined;
   displayName?: string; // Optional display name for the current window
 
-  // Available agents
-  availableAgents?: string[];
+  // Available agents - properly typed from the contract
+  availableAgents: string[];
   selectedAgent?: string;
 }
 
@@ -70,6 +70,20 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
         !discoveredWindows.some((w) => w.sessionId === selectedSessionId)
       ) {
         setSelectedSessionId(undefined);
+        setSelectedAgent(undefined);
+      }
+
+      // If selected agent is no longer available in the session, clear it
+      const currentSession = selectedSessionId
+        ? discoveredWindows.find((w) => w.sessionId === selectedSessionId)
+        : discoveredWindows[0]; // Use first available if no specific session selected
+
+      if (
+        currentSession &&
+        selectedAgent &&
+        !currentSession.availableAgents?.includes(selectedAgent)
+      ) {
+        setSelectedAgent(undefined);
       }
     } catch (err) {
       setDiscoveryError(
@@ -82,6 +96,8 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
 
   const selectSession = (sessionId: string | undefined) => {
     setSelectedSessionId(sessionId);
+    // Reset agent selection to auto mode when changing sessions
+    setSelectedAgent(undefined);
   };
 
   const selectAgent = (agent: string | undefined) => {
@@ -104,6 +120,11 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
     ? windows.find((w) => w.sessionId === selectedSessionId)
     : undefined;
 
+  // Get available agents from the selected session, or from any session if none selected
+  const availableAgents =
+    selectedSession?.availableAgents ||
+    (windows.length > 0 ? windows[0]?.availableAgents || [] : []);
+
   const value: VSCodeContextType = {
     windows,
     isDiscovering,
@@ -114,7 +135,7 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
     refreshSession,
     appName: selectedSession?.appName,
     displayName: selectedSession?.displayName,
-    availableAgents: selectedSession?.availableAgents,
+    availableAgents,
     selectAgent,
     selectedAgent,
   };
@@ -137,4 +158,10 @@ export function useVSCodeWindows() {
 export function useVSCodeSession() {
   const { selectedSession, selectSession, refreshSession } = useVSCode();
   return { selectedSession, selectSession, refreshSession };
+}
+
+// New convenience hook for agent management
+export function useVSCodeAgents() {
+  const { availableAgents, selectedAgent, selectAgent } = useVSCode();
+  return { availableAgents, selectedAgent, selectAgent };
 }

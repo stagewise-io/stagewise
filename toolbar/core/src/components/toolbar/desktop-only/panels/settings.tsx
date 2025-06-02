@@ -37,7 +37,7 @@ const ConnectionSettings = () => {
     discover,
     selectedSession,
     selectSession,
-    availableAgents = [],
+    availableAgents,
     selectedAgent,
     selectAgent,
     appName,
@@ -49,11 +49,10 @@ const ConnectionSettings = () => {
     selectSession(selectedSessionId);
   };
 
-  console.log('Available agents:', availableAgents);
-
   const handleAgentChange = (e: Event) => {
     const target = e.target as HTMLSelectElement;
-    const agent = target.value || undefined;
+    const agent =
+      target.value === 'auto' ? undefined : target.value || undefined;
     selectAgent(agent);
   };
 
@@ -110,27 +109,41 @@ const ConnectionSettings = () => {
         )}
       </div>
 
-      {/* Agent selector */}
+      {/* Agent selector - show if we have agents available */}
       {availableAgents.length > 1 && (
         <div>
           <label
             htmlFor="agent-select"
             className="mb-2 block font-medium text-gray-700 text-sm"
           >
-            Agent
+            Agent{' '}
+            {availableAgents.length > 1
+              ? `(${availableAgents.length} available)`
+              : ''}
           </label>
           <select
             id="agent-select"
-            value={selectedAgent || ''}
+            value={selectedAgent || 'auto'}
             onChange={handleAgentChange}
             className="h-8 w-full rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
           >
+            <option value="auto">Auto (IDE detection)</option>
             {availableAgents.map((agent) => (
               <option key={agent} value={agent}>
                 {agent}
               </option>
             ))}
           </select>
+          {!selectedAgent && (
+            <p className="mt-1 text-gray-500 text-xs">
+              Auto mode will select the appropriate agent based on your IDE
+            </p>
+          )}
+          {selectedAgent && availableAgents.length === 1 && (
+            <p className="mt-1 text-gray-500 text-xs">
+              Only one agent available in this session
+            </p>
+          )}
         </div>
       )}
 
@@ -140,8 +153,15 @@ const ConnectionSettings = () => {
             <strong>Selected:</strong> {selectedSession.displayName}
           </p>
           <p className="mt-1 text-blue-600 text-xs">
-            Session ID: {selectedSession.sessionId.substring(0, 8)}...
+            Session ID: {selectedSession.sessionId?.substring(0, 8)}...
           </p>
+          {selectedAgent ? (
+            <p className="mt-1 text-blue-600 text-xs">Agent: {selectedAgent}</p>
+          ) : (
+            <p className="mt-1 text-blue-600 text-xs">
+              Agent: Auto (IDE detection)
+            </p>
+          )}
         </div>
       )}
 
@@ -151,6 +171,15 @@ const ConnectionSettings = () => {
             <strong>Auto-detect mode:</strong> Commands will be sent to any
             available VS Code window.
           </p>
+          {selectedAgent ? (
+            <p className="mt-1 text-gray-500 text-xs">
+              Using agent: {selectedAgent}
+            </p>
+          ) : (
+            <p className="mt-1 text-gray-500 text-xs">
+              Using agent: Auto (IDE detection)
+            </p>
+          )}
         </div>
       )}
     </div>
