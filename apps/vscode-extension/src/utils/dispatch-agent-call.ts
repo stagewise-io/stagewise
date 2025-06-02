@@ -14,7 +14,7 @@ export async function dispatchAgentCall(request: PromptRequest) {
     case 'WINDSURF':
       return await callWindsurfAgent(request);
     case 'VSCODE':
-      if (isCopilotChatInstalled()) return await callCopilotAgent(prompt);
+      if (isCopilotChatInstalled()) return await callCopilotAgent(request);
       else {
         vscode.window.showErrorMessage(
           'Currently, only Copilot Chat is supported for VSCode. Please install it from the marketplace to use stagewise with VSCode.',
