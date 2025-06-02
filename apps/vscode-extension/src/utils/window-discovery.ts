@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { VSCodeContext } from '@stagewise/extension-toolbar-srpc-contract';
+import { getAvailableAgents } from './get-available-agents';
 /**
  * Get detailed information about the current VS Code window
  * This is used by the getSessionInfo RPC method
@@ -9,6 +10,7 @@ export function getCurrentWindowInfo(port: number): VSCodeContext {
     sessionId: vscode.env.sessionId,
     appName: vscode.env.appName,
     displayName: `${vscode.workspace.name} (${vscode.env.appName})`,
+    availableAgents: getAvailableAgents(), // Placeholder, can be extended to include other agents
     port,
   };
 }
