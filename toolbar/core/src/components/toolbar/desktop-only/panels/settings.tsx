@@ -1,6 +1,6 @@
 import { Panel } from '@/plugin-ui/components/panel';
-import { ToolbarButton } from './button';
-import { ToolbarSection } from './section';
+import { ToolbarButton } from '../../button';
+import { ToolbarSection } from '../../section';
 import { SettingsIcon, RefreshCwIcon } from 'lucide-react';
 import { useVSCode } from '@/hooks/use-vscode';
 
