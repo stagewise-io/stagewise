@@ -465,7 +465,7 @@ export default function Home() {
               <ExternalLink className="ml-1 h-3 w-3 opacity-100 transition-opacity" />
             </Link>
             <Link
-              href="https://discord.gg/vsDjhubRbh"
+              href="https://discord.gg/gkdGsDYaKA"
               className="group flex items-center text-slate-900 transition-colors dark:text-white"
               target="_blank"
               onClick={() =>
