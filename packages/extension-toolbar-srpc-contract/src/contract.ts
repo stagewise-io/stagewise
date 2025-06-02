@@ -54,6 +54,7 @@ export const contract = createBridgeContract({
           .array(z.string())
           .optional()
           .describe('Upload files like images, videos, etc.'),
+        agent: z.string().optional(),
       }),
       response: z.object({
         sessionId: z.string().optional(),
