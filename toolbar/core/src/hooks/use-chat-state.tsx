@@ -295,6 +295,11 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       // Set loading state at the start
       setPromptState('loading');
 
+      // NOTE: We no longer start the legacy completion flow here.
+      // Instead, we rely entirely on the enhanced MCP notification system.
+      // When the agent starts working, it will send MCP notifications that will
+      // display the enhanced UI with tool details, input schema, and arguments.
+
       const pluginContextSnippets: PluginContextSnippets[] = [];
 
       const pluginProcessingPromises = plugins.map(async (plugin) => {
@@ -374,11 +379,17 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
             // Handle response based on success/error
             if (result.result.success) {
-              // On success, stay in loading state (will be handled by reload)
+              // On success, show agent-reached state in MCP UI
+              const appState = useAppState.getState();
+              appState.setAgentReached();
               setPromptState('loading');
             } else {
               // On error, go to error state
               setPromptState('error');
+              // NOTE: We no longer call the legacy completeError here.
+              // If the agent sends MCP error notifications, they will be handled
+              // by the MCP notification system.
+
               // Auto-reset to idle and close prompt creation after error animation
               setTimeout(() => {
                 setPromptState('idle');
@@ -394,6 +405,9 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
           } catch (error) {
             // On exception, go to error state
             setPromptState('error');
+            // NOTE: We no longer call the legacy completeError here.
+            // Connection errors will be handled by the MCP notification system.
+
             // Auto-reset to idle and close prompt creation after error animation
             setTimeout(() => {
               setPromptState('idle');
@@ -409,6 +423,9 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         } else {
           // No bridge available, go to error state
           setPromptState('error');
+          // NOTE: We no longer call the legacy completeError here.
+          // No connection scenarios don't use MCP notifications anyway.
+
           setTimeout(() => {
             setPromptState('idle');
             setIsPromptCreationMode(false);
