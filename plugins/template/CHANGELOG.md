@@ -1,5 +1,11 @@
 # @stagewise/plugin-example
 
+## 0.3.1
+
+### Patch Changes
+
+- efa687b: Add missing "preact" package to peer dependencies
+
 ## 0.3.0
 
 ### Minor Changes
