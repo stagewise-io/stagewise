@@ -4,6 +4,7 @@ import type { ToolbarContext, ToolbarPlugin } from '@/plugin';
 import { useSRPCBridge } from './use-srpc-bridge';
 import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 import { useVSCode } from './use-vscode';
+import { useConfig } from './use-config';
 
 export interface PluginContextType {
   plugins: ToolbarPlugin[];
@@ -19,13 +20,14 @@ const PluginContext = createContext<PluginContextType>({
 
 export function PluginProvider({
   children,
-  plugins,
 }: {
   children: ComponentChildren;
-  plugins: ToolbarPlugin[];
 }) {
   const { bridge } = useSRPCBridge();
   const { selectedSession } = useVSCode();
+  const { config } = useConfig();
+
+  const plugins = config?.plugins || [];
 
   const toolbarContext = useMemo(() => {
     return {
