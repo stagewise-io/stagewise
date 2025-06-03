@@ -5,6 +5,7 @@ import { LocationProvider } from '../hooks/use-location';
 import type { ComponentChildren } from 'preact';
 import { SRPCBridgeProvider } from '@/hooks/use-srpc-bridge';
 import { VSCodeProvider } from '@/hooks/use-vscode';
+import { ConfigProvider } from '@/hooks/use-config';
 
 export function ContextProviders({
   children,
@@ -14,14 +15,16 @@ export function ContextProviders({
   config?: ToolbarConfig;
 }) {
   return (
-    <LocationProvider>
-      <SRPCBridgeProvider>
-        <VSCodeProvider>
-          <PluginProvider plugins={config?.plugins || []}>
-            <ChatStateProvider>{children}</ChatStateProvider>
-          </PluginProvider>
-        </VSCodeProvider>
-      </SRPCBridgeProvider>
-    </LocationProvider>
+    <ConfigProvider config={config}>
+      <LocationProvider>
+        <SRPCBridgeProvider>
+          <VSCodeProvider>
+            <PluginProvider>
+              <ChatStateProvider>{children}</ChatStateProvider>
+            </PluginProvider>
+          </VSCodeProvider>
+        </SRPCBridgeProvider>
+      </LocationProvider>
+    </ConfigProvider>
   );
 }
