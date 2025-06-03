@@ -69,5 +69,6 @@
     "./lib/*": "./src/lib/*.ts",
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts"
-  }
+  },
+  "version": "0.0.0"
 }

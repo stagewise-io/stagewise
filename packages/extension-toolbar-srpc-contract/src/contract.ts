@@ -1,20 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// SRPC contract implementation for VS Code extension and toolbar communication
-// Copyright (C) 2025 Goetze, Scharpff & Toews GbR
-
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
-
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 import { createBridgeContract } from '@stagewise/srpc';
 import { z } from 'zod';
 
@@ -26,8 +9,25 @@ export const PING_RESPONSE = 'stagewise'; // The response to the ping request
 
 export const contract = createBridgeContract({
   server: {
+    getSessionInfo: {
+      request: z.object({}),
+      response: z.object({
+        sessionId: z.string().optional(),
+        appName: z
+          .string()
+          .describe('The name of the application, e.g. "VS Code" or "Cursor"'),
+        displayName: z
+          .string()
+          .describe('Human-readable window identifier for UI display'),
+        port: z
+          .number()
+          .describe('Port number this VS Code instance is running on'),
+      }),
+      update: z.object({}),
+    },
     triggerAgentPrompt: {
       request: z.object({
+        sessionId: z.string().optional(),
         prompt: z.string(),
         model: z
           .string()
@@ -47,6 +47,7 @@ export const contract = createBridgeContract({
           .describe('Upload files like images, videos, etc.'),
       }),
       response: z.object({
+        sessionId: z.string().optional(),
         result: z.object({
           success: z.boolean(),
           error: z.string().optional(),
@@ -54,6 +55,7 @@ export const contract = createBridgeContract({
         }),
       }),
       update: z.object({
+        sessionId: z.string().optional(),
         updateText: z.string(),
       }),
     },
@@ -62,4 +64,8 @@ export const contract = createBridgeContract({
 
 export type PromptRequest = z.infer<
   typeof contract.server.triggerAgentPrompt.request
+>;
+
+export type VSCodeContext = z.infer<
+  typeof contract.server.getSessionInfo.response
 >;

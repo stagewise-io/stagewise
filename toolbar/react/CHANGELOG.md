@@ -1,5 +1,44 @@
 # @stagewise/toolbar-react
 
+## 0.2.0
+
+### Minor Changes
+
+- 79e11fa: Align versions to match 0.3
+- 8de8414: No changes: Aligning package versions
+- 9f36e3f: No changes, aligning versions.
+
+### Patch Changes
+
+- 938d2b9: enable toolbar only in development environment
+- 0092794: Update license and copyright notices
+- 3b637e8: Update README.md to include multiple-window-caveat
+- 92407bd: Update license field in readme.
+- Updated dependencies [da84c16]
+- Updated dependencies [bca204b]
+- Updated dependencies [0092794]
+- Updated dependencies [f4b085d]
+- Updated dependencies [3b637e8]
+- Updated dependencies [ddc9c9b]
+- Updated dependencies [0897284]
+- Updated dependencies [e148009]
+- Updated dependencies [4abc02e]
+- Updated dependencies [16fe652]
+- Updated dependencies [ce71a0d]
+- Updated dependencies [058d70b]
+- Updated dependencies [79e11fa]
+- Updated dependencies [92407bd]
+- Updated dependencies [a5c1d5b]
+- Updated dependencies [319e0e1]
+  - @stagewise/toolbar@0.3.0
+
+## 0.2.0-alpha.6
+
+### Patch Changes
+
+- Updated dependencies [f4b085d]
+  - @stagewise/toolbar@0.3.0-alpha.6
+
 ## 0.2.0-alpha.5
 
 ### Patch Changes

@@ -309,18 +309,11 @@ Check out our [project roadmap](./.github/ROADMAP.md) for upcoming features, bug
 
 ## 📜 License
 
-stagewise is developed by Goetze, Scharpff & Toews GbR under an **Open Core** model:
+stagewise is developed by tiq UG (haftungsbeschränkt) and offerend under the AGPLv3 license.
 
-* 🧩 99% is open-source under AGPLv3
-* 🏢 1% (enterprise features) is commercial
+For more information on the license model, visit the [FAQ about the GNU Licenses](https://www.gnu.org/licenses/gpl-faq.html).
 
-This allows us to:
-
-* Keep core tech open and transparent
-* Ensure sustainability and quality
-* Prevent misuse by closed-source platforms
-
-We believe this model creates a fair, open ecosystem that benefits both individuals and companies.
+For use cases that fall outside the scope permitted by the AGPLv3 license, feel free to [📬 Contact Us](#contact-us-section).
 
 ## 🤝 Contributing
 
@@ -332,7 +325,7 @@ We're just getting started and love contributions! Check out our [CONTRIBUTING.m
 * 📖 Open an [issue on GitHub](https://github.com/stagewise-io/stagewise/issues) for dev support.
 
 
-## 📬 Contact Us
+## <a id="contact-us-section"></a> 📬 Contact Us
 
 Got questions or want to license stagewise for commercial or enterprise use?
 

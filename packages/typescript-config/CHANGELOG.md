@@ -1,0 +1,3 @@
+# @stagewise/typescript-config
+
+## null

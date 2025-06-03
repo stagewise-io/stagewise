@@ -1,25 +1,9 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Toolbar plugins hook
-// Copyright (C) 2025 Goetze, Scharpff & Toews GbR
-
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
-
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 import { type ComponentChildren, createContext } from 'preact';
 import { useContext, useEffect, useMemo, useRef } from 'preact/hooks';
 import type { ToolbarContext, ToolbarPlugin } from '@/plugin';
 import { useSRPCBridge } from './use-srpc-bridge';
 import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
+import { useVSCode } from './use-vscode';
 
 export interface PluginContextType {
   plugins: ToolbarPlugin[];
@@ -41,20 +25,30 @@ export function PluginProvider({
   plugins: ToolbarPlugin[];
 }) {
   const { bridge } = useSRPCBridge();
+  const { selectedSession } = useVSCode();
 
   const toolbarContext = useMemo(() => {
     return {
       sendPrompt: async (prompt: string | PromptRequest) => {
         if (!bridge) throw new Error('No connection to the agent');
+
         const result = await bridge.call.triggerAgentPrompt(
           typeof prompt === 'string'
-            ? { prompt }
+            ? {
+                prompt,
+                ...(selectedSession && {
+                  sessionId: selectedSession.sessionId,
+                }),
+              }
             : {
                 prompt: prompt.prompt,
                 model: prompt.model,
                 files: prompt.files,
                 images: prompt.images,
                 mode: prompt.mode,
+                ...(selectedSession && {
+                  sessionId: selectedSession.sessionId,
+                }),
               },
           {
             onUpdate: (update) => {},
@@ -62,7 +56,7 @@ export function PluginProvider({
         );
       },
     };
-  }, [bridge]);
+  }, [bridge, selectedSession]);
 
   // call plugins once on initial load
   const pluginsLoadedRef = useRef(false);

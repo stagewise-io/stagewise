@@ -1,20 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Toolbar chat state hook
-// Copyright (C) 2025 Goetze, Scharpff & Toews GbR
-
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
-
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 import { type ComponentChildren, createContext } from 'preact';
 import { useContext, useState, useCallback, useEffect } from 'preact/hooks';
 import { useSRPCBridge } from './use-srpc-bridge';
@@ -22,6 +5,7 @@ import { createPrompt, type PluginContextSnippets } from '@/prompts';
 import { useAppState } from './use-app-state';
 import { usePlugins } from './use-plugins';
 import type { ContextElementContext } from '@/plugin';
+import { useVSCode } from './use-vscode';
 
 interface Message {
   id: string;
@@ -49,6 +33,9 @@ interface Chat {
 
 type ChatAreaState = 'hidden' | 'compact' | 'expanded';
 
+// Add new prompt state type
+type PromptState = 'idle' | 'loading' | 'success' | 'error';
+
 interface ChatContext {
   // Chat list management
   chats: Chat[];
@@ -71,6 +58,10 @@ interface ChatContext {
   isPromptCreationActive: boolean;
   startPromptCreation: () => void;
   stopPromptCreation: () => void;
+
+  // Prompt state
+  promptState: PromptState;
+  resetPromptState: () => void;
 }
 
 const ChatContext = createContext<ChatContext>({
@@ -88,6 +79,8 @@ const ChatContext = createContext<ChatContext>({
   isPromptCreationActive: false,
   startPromptCreation: () => {},
   stopPromptCreation: () => {},
+  promptState: 'idle',
+  resetPromptState: () => {},
 });
 
 interface ChatStateProviderProps {
@@ -110,7 +103,17 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const [isPromptCreationMode, setIsPromptCreationMode] =
     useState<boolean>(false);
 
+  // Add prompt state management
+  const [promptState, setPromptState] = useState<PromptState>('idle');
+
+  // Reset prompt state function
+  const resetPromptState = useCallback(() => {
+    setPromptState('idle');
+  }, []);
+
   const isMinimized = useAppState((state) => state.minimized);
+
+  const { selectedSession } = useVSCode();
 
   useEffect(() => {
     if (isMinimized) {
@@ -189,6 +192,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const stopPromptCreation = useCallback(() => {
     setIsPromptCreationMode(false);
+    // Reset prompt state when stopping prompt creation
+    setPromptState('idle');
     // clear dom context for this chat so that it doesn't get too weird when re-starting prompt creation mode
     setChats((prev) =>
       prev.map((chat) =>
@@ -265,7 +270,13 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     async (chatId: ChatId, content: string, pluginTriggered = false) => {
       if (!content.trim()) return;
 
+      // Prevent sending new messages while one is already loading
+      if (promptState === 'loading') return;
+
       const chat = chats.find((chat) => chat.id === chatId);
+
+      // Set loading state at the start
+      setPromptState('loading');
 
       const pluginContextSnippets: PluginContextSnippets[] = [];
 
@@ -338,18 +349,72 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       async function triggerAgentPrompt() {
         if (bridge) {
-          const result = await bridge.call.triggerAgentPrompt(
-            { prompt },
-            {
-              onUpdate: (update) => {},
-            },
-          );
+          try {
+            const result = await bridge.call.triggerAgentPrompt(
+              { prompt, sessionId: selectedSession?.sessionId },
+              { onUpdate: (update) => {} },
+            );
+
+            // Handle response based on success/error
+            if (result.result.success) {
+              // On success, show success state briefly then reset
+              setTimeout(() => {
+                setPromptState('success');
+              }, 1000);
+              setChats((prev) =>
+                prev.map((chat) =>
+                  chat.id === chatId ? { ...chat, inputValue: '' } : chat,
+                ),
+              );
+            } else {
+              // On error, go to error state
+              setPromptState('error');
+              // Auto-reset to idle and close prompt creation after error animation
+              setTimeout(() => {
+                setPromptState('idle');
+                setIsPromptCreationMode(false);
+                // Clear input after error completion
+                setChats((prev) =>
+                  prev.map((chat) =>
+                    chat.id === chatId ? { ...chat, inputValue: '' } : chat,
+                  ),
+                );
+              }, 1000);
+            }
+          } catch (error) {
+            // On exception, go to error state
+            setPromptState('error');
+            // Auto-reset to idle and close prompt creation after error animation
+            setTimeout(() => {
+              setPromptState('idle');
+              setIsPromptCreationMode(false);
+              // Clear input after error completion
+              setChats((prev) =>
+                prev.map((chat) =>
+                  chat.id === chatId ? { ...chat, inputValue: '' } : chat,
+                ),
+              );
+            }, 1000);
+          }
+        } else {
+          // No bridge available, go to error state
+          setPromptState('error');
+          setTimeout(() => {
+            setPromptState('idle');
+            setIsPromptCreationMode(false);
+            // Clear input after error completion
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === chatId ? { ...chat, inputValue: '' } : chat,
+              ),
+            );
+          }, 1000);
         }
       }
 
       triggerAgentPrompt();
 
-      setIsPromptCreationMode(false);
+      // Don't close prompt creation mode immediately - keep it open to show loading state
 
       if (chatAreaState === 'hidden') {
         internalSetChatAreaState('compact');
@@ -361,7 +426,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
             ? {
                 ...chat,
                 messages: [...chat.messages, newMessage],
-                inputValue: '',
+                inputValue: content.trim(), // Keep the original prompt instead of clearing
                 domContextElements: [],
               }
             : chat,
@@ -374,6 +439,10 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       chats,
       setIsPromptCreationMode,
       internalSetChatAreaState,
+      selectedSession,
+      promptState,
+      setPromptState,
+      plugins,
     ],
   );
 
@@ -392,6 +461,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     stopPromptCreation,
     addChatDomContext,
     removeChatDomContext,
+    promptState,
+    resetPromptState,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

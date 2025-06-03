@@ -1,9 +1,9 @@
 {
   "name": "@stagewise-plugins/react",
-  "version": "0.3.1-alpha.1",
+  "version": "0.3.0",
   "type": "module",
   "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
-  "author": "Goetze, Scharpff & Toews GbR",
+  "author": "tiq UG (haftungsbeschränkt)",
   "homepage": "https://stagewise.io",
   "bugs": {
     "url": "https://github.com/stagewise-io/stagewise/issues"

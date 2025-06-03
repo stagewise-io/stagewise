@@ -1,13 +1,11 @@
 {
   "name": "angular-example",
-  "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "dev": "ng serve --configuration development",
+    "dev": "ng serve --configuration development --port 3001",
     "start": "ng serve",
     "build": "ng build",
-    "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "watch": "ng build --watch --configuration development"
   },
   "private": true,
   "dependencies": {

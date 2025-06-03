@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --port 3005",
+    "dev": "vite --port 3008",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview"
   },

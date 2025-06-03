@@ -4,5 +4,6 @@
   "license": "MIT",
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "version": "0.0.0"
 }

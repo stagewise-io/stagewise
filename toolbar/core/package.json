@@ -1,11 +1,11 @@
 {
   "name": "@stagewise/toolbar",
   "private": false,
-  "version": "0.3.0-alpha.5",
+  "version": "0.3.0",
   "type": "module",
   "description": "stagewise toolbar SDK for AI Agent interaction.",
   "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
-  "author": "Goetze, Scharpff & Toews GbR",
+  "author": "tiq UG (haftungsbeschränkt)",
   "homepage": "https://stagewise.io",
   "bugs": {
     "url": "https://github.com/stagewise-io/stagewise/issues"
