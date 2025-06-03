@@ -2,7 +2,7 @@ import type { ToolbarPlugin } from './plugin.ts';
 
 export interface ToolbarConfig {
   plugins: ToolbarPlugin[];
-  experimental: {
+  experimental?: {
     /**
      * If true, the toolbar will use the stagewise MCP server.
      */
