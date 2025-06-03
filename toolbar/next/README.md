@@ -291,13 +291,14 @@ You would then use `StagewiseToolbarLoader` in your `src/routes/+layout.svelte`.
 
 | **Agent**      | **Supported**  |
 | -------------- | -------------- |
-| Cursor         | ✅              |
+| Cursor         | ✅             |
 | Windsurf       | ✅              |
 | GitHub Copilot | 🚧 In Progress |
 | Cline          | ❌              |
 | BLACKBOXAI     | ❌              |
 | Console Ninja  | ❌              |
 | Continue.dev   | ❌              |
+| Claude Code    | ❌              |
 | Amazon Q       | ❌              |
 | Cody           | ❌              |
 | Qodo           | ❌              |
@@ -325,7 +326,7 @@ We're just getting started and love contributions! Check out our [CONTRIBUTING.m
 * 📖 Open an [issue on GitHub](https://github.com/stagewise-io/stagewise/issues) for dev support.
 
 
-## <a id="contact-us-section"></a> 📬 Contact Us
+## 📬 Contact Us
 
 Got questions or want to license stagewise for commercial or enterprise use?
 
