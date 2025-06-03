@@ -40,6 +40,7 @@ const ConnectionSettings = () => {
     availableAgents,
     selectedAgent,
     selectAgent,
+    discoverAgents,
     appName,
   } = useVSCode();
 
@@ -60,6 +61,14 @@ const ConnectionSettings = () => {
     discover();
   };
 
+  const handleRefreshAgents = () => {
+    if (selectedSession) {
+      discoverAgents(selectedSession.sessionId);
+    } else {
+      discoverAgents();
+    }
+  };
+
   return (
     <div className="space-y-4 pb-4">
       <div>
@@ -74,7 +83,7 @@ const ConnectionSettings = () => {
             id="session-select"
             value={selectedSession?.sessionId || ''}
             onChange={handleSessionChange}
-            className="h-8 flex-1 rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
+            className="h-8 w-fit flex-1 rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
             disabled={isDiscovering}
           >
             <option value="">Auto-detect (any window)</option>
@@ -121,19 +130,32 @@ const ConnectionSettings = () => {
               ? `(${availableAgents.length} available)`
               : ''}
           </label>
-          <select
-            id="agent-select"
-            value={selectedAgent || 'auto'}
-            onChange={handleAgentChange}
-            className="h-8 w-full rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
-          >
-            <option value="auto">Auto (IDE detection)</option>
-            {availableAgents.map((agent) => (
-              <option key={agent} value={agent}>
-                {agent}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center space-x-2">
+            <select
+              id="agent-select"
+              value={selectedAgent || 'auto'}
+              onChange={handleAgentChange}
+              className="h-8 flex-1 rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
+            >
+              <option value="auto">Auto (IDE detection)</option>
+              {availableAgents.map((agent) => (
+                <option key={agent} value={agent}>
+                  {agent}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleRefreshAgents}
+              disabled={isDiscovering}
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-500/10 backdrop-saturate-150 transition-colors hover:bg-zinc-500/20 disabled:opacity-50"
+              title="Refresh available agents"
+            >
+              <RefreshCwIcon
+                className={`size-4 ${isDiscovering ? 'animate-spin' : ''}`}
+              />
+            </button>
+          </div>
           {!selectedAgent && (
             <p className="mt-1 text-gray-500 text-xs">
               Auto mode will select the appropriate agent based on your IDE
