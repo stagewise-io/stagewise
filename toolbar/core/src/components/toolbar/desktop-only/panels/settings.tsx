@@ -4,6 +4,88 @@ import { ToolbarSection } from '../../section';
 import { SettingsIcon, RefreshCwIcon } from 'lucide-react';
 import { useVSCode } from '@/hooks/use-vscode';
 
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+interface SelectWithRefreshProps {
+  label: string;
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+  onRefresh: () => void;
+  disabled?: boolean;
+  isLoading?: boolean;
+  refreshTitle: string;
+  errorMessage?: string;
+  helpText?: string;
+  className?: string;
+}
+
+const SelectWithRefresh = ({
+  label,
+  value,
+  options,
+  onChange,
+  onRefresh,
+  disabled = false,
+  isLoading = false,
+  refreshTitle,
+  errorMessage,
+  helpText,
+  className = '',
+}: SelectWithRefreshProps) => {
+  const handleChange = (e: Event) => {
+    const target = e.target as HTMLSelectElement;
+    onChange(target.value);
+  };
+
+  // Generate a unique ID for accessibility
+  const selectId = `select-${label.toLowerCase().replace(/\s+/g, '-')}`;
+
+  return (
+    <div className={`space-y-2 ${className}`}>
+      <label
+        htmlFor={selectId}
+        className="mb-2 block font-medium text-gray-700 text-sm"
+      >
+        {label}
+      </label>
+      <div className="flex items-center space-x-2">
+        <select
+          id={selectId}
+          value={value}
+          onChange={handleChange}
+          className="h-8 w-fit flex-1 rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
+          disabled={disabled}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={disabled || isLoading}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-500/10 backdrop-saturate-150 transition-colors hover:bg-zinc-500/20 disabled:opacity-50"
+          title={refreshTitle}
+        >
+          <RefreshCwIcon
+            className={`size-4 ${isLoading ? 'animate-spin' : ''}`}
+          />
+        </button>
+      </div>
+      {errorMessage && (
+        <p className="mt-1 text-red-600 text-sm">{errorMessage}</p>
+      )}
+      {helpText && <p className="mt-1 text-gray-500 text-xs">{helpText}</p>}
+    </div>
+  );
+};
+
 export const SettingsButton = ({
   onOpenPanel,
   isActive = false,
@@ -44,16 +126,13 @@ const ConnectionSettings = () => {
     appName,
   } = useVSCode();
 
-  const handleSessionChange = (e: Event) => {
-    const target = e.target as HTMLSelectElement;
-    const selectedSessionId = target.value || undefined;
+  const handleSessionChange = (value: string) => {
+    const selectedSessionId = value || undefined;
     selectSession(selectedSessionId);
   };
 
-  const handleAgentChange = (e: Event) => {
-    const target = e.target as HTMLSelectElement;
-    const agent =
-      target.value === 'auto' ? undefined : target.value || undefined;
+  const handleAgentChange = (value: string) => {
+    const agent = value === 'auto' ? undefined : value || undefined;
     selectAgent(agent);
   };
 
@@ -69,104 +148,75 @@ const ConnectionSettings = () => {
     }
   };
 
+  // Prepare session options
+  const sessionOptions: SelectOption[] = [
+    { value: '', label: 'Auto-detect (any window)' },
+    ...windows.map((window) => ({
+      value: window.sessionId || '',
+      label: `${window.displayName} - Port ${window.port}`,
+    })),
+  ];
+
+  // Prepare agent options
+  const agentOptions: SelectOption[] = [
+    { value: 'auto', label: 'Auto (IDE detection)' },
+    ...availableAgents.map((agent) => ({
+      value: agent,
+      label: agent,
+    })),
+  ];
+
+  // Session selector help text
+  const getSessionHelpText = () => {
+    if (!isDiscovering && windows.length === 0 && !discoveryError) {
+      return 'No VS Code windows found. Make sure the Stagewise extension is installed and running.';
+    }
+    return undefined;
+  };
+
+  // Agent selector help text
+  const getAgentHelpText = () => {
+    if (!selectedAgent) {
+      return 'Auto mode will select the appropriate agent based on your IDE';
+    }
+    if (selectedAgent && availableAgents.length === 1) {
+      return 'Only one agent available in this session';
+    }
+    return undefined;
+  };
+
   return (
     <div className="space-y-4 pb-4">
-      <div>
-        <label
-          htmlFor="session-select"
-          className="mb-2 block font-medium text-gray-700 text-sm"
-        >
-          VS Code Window {appName && `(${appName})`}
-        </label>
-        <div className="flex items-center space-x-2">
-          <select
-            id="session-select"
-            value={selectedSession?.sessionId || ''}
-            onChange={handleSessionChange}
-            className="h-8 w-fit flex-1 rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
-            disabled={isDiscovering}
-          >
-            <option value="">Auto-detect (any window)</option>
-            {windows.map((window) => (
-              <option key={window.sessionId} value={window.sessionId}>
-                {window.displayName} - Port {window.port}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={isDiscovering}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-500/10 backdrop-saturate-150 transition-colors hover:bg-zinc-500/20 disabled:opacity-50"
-            title="Refresh window list"
-          >
-            <RefreshCwIcon
-              className={`size-4 ${isDiscovering ? 'animate-spin' : ''}`}
-            />
-          </button>
-        </div>
-        {discoveryError && (
-          <p className="mt-1 text-red-600 text-sm">
-            Error discovering windows: {discoveryError}
-          </p>
-        )}
-        {!isDiscovering && windows.length === 0 && !discoveryError && (
-          <p className="mt-1 text-gray-500 text-sm">
-            No VS Code windows found. Make sure the Stagewise extension is
-            installed and running.
-          </p>
-        )}
-      </div>
+      <SelectWithRefresh
+        label={`VS Code Window${appName ? ` (${appName})` : ''}`}
+        value={selectedSession?.sessionId || ''}
+        options={sessionOptions}
+        onChange={handleSessionChange}
+        onRefresh={handleRefresh}
+        disabled={isDiscovering}
+        isLoading={isDiscovering}
+        refreshTitle="Refresh window list"
+        errorMessage={discoveryError || undefined}
+        helpText={getSessionHelpText()}
+      />
 
       {/* Agent selector - show if we have agents available */}
       {availableAgents.length > 1 && (
-        <div>
-          <label
-            htmlFor="agent-select"
-            className="mb-2 block font-medium text-gray-700 text-sm"
-          >
-            Agent{' '}
-            {availableAgents.length > 1
-              ? `(${availableAgents.length} available)`
-              : ''}
-          </label>
-          <div className="flex items-center space-x-2">
-            <select
-              id="agent-select"
-              value={selectedAgent || 'auto'}
-              onChange={handleAgentChange}
-              className="h-8 flex-1 rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
-            >
-              <option value="auto">Auto (IDE detection)</option>
-              {availableAgents.map((agent) => (
-                <option key={agent} value={agent}>
-                  {agent}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleRefreshAgents}
-              disabled={isDiscovering}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-500/10 backdrop-saturate-150 transition-colors hover:bg-zinc-500/20 disabled:opacity-50"
-              title="Refresh available agents"
-            >
-              <RefreshCwIcon
-                className={`size-4 ${isDiscovering ? 'animate-spin' : ''}`}
-              />
-            </button>
-          </div>
-          {!selectedAgent && (
-            <p className="mt-1 text-gray-500 text-xs">
-              Auto mode will select the appropriate agent based on your IDE
-            </p>
-          )}
-          {selectedAgent && availableAgents.length === 1 && (
-            <p className="mt-1 text-gray-500 text-xs">
-              Only one agent available in this session
-            </p>
-          )}
-        </div>
+        <SelectWithRefresh
+          label={`Agent${
+            availableAgents.length > 1
+              ? ` (${availableAgents.length} available)`
+              : ''
+          }`}
+          value={selectedAgent || 'auto'}
+          options={agentOptions}
+          onChange={handleAgentChange}
+          onRefresh={handleRefreshAgents}
+          disabled={isDiscovering}
+          isLoading={isDiscovering}
+          refreshTitle="Refresh available agents"
+          helpText={getAgentHelpText()}
+        />
       )}
 
       {selectedSession && (
