@@ -298,6 +298,7 @@ You would then use `StagewiseToolbarLoader` in your `src/routes/+layout.svelte`.
 | BLACKBOXAI     | ❌              |
 | Console Ninja  | ❌              |
 | Continue.dev   | ❌              |
+| Claude Code    | ❌              |
 | Amazon Q       | ❌              |
 | Cody           | ❌              |
 | Qodo           | ❌              |

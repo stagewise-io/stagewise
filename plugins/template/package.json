@@ -1,6 +1,6 @@
 {
   "name": "@stagewise/plugin-example",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
@@ -33,11 +33,13 @@
     "build": "tsc -b && vite build --mode production"
   },
   "peerDependencies": {
-    "@stagewise/toolbar": "workspace:*"
+    "@stagewise/toolbar": "workspace:*",
+    "preact": "^10.20.0"
   },
   "dependencies": {},
   "devDependencies": {
     "@stagewise/toolbar": "workspace:*",
+    "preact": "^10.20.0",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
     "vite-plugin-dts": "^4.5.3",

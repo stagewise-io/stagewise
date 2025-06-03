@@ -1,5 +1,11 @@
 # create-stagewise-plugin
 
+## 0.1.1
+
+### Patch Changes
+
+- efa687b: Add missing "preact" package to peer dependencies
+
 ## 0.1.0
 
 ### Minor Changes

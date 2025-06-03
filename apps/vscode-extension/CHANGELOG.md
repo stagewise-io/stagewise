@@ -1,5 +1,11 @@
 # stagewise-vscode-extension
 
+## 0.4.1
+
+### Patch Changes
+
+- c9cafe7: Include pseudonymized telemetry collection
+
 ## 0.4.0
 
 ### Minor Changes

@@ -93,6 +93,7 @@ export default defineBuildConfig({
       options.plugins = [options.plugins];
     },
     'build:done'() {
+      // Copy the template plugin to the dist folder
       const src = path.resolve(__dirname, '../../plugins/template');
       const dest = path.resolve(__dirname, './dist/template');
       copyRecursiveSync(src, dest);

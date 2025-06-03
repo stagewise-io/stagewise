@@ -4,8 +4,12 @@ name: VSCode Extension Release
 on:
   push:
     tags:
-      - stagewise-vscode-extension**
+      - stagewise-vscode-extension@**
   workflow_dispatch:
+
+env:
+  POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+  POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
 
 jobs:
   release-vscode-extension:
