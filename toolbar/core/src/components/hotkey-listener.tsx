@@ -5,18 +5,30 @@ import { useChatState } from '@/hooks/use-chat-state';
 
 // This listener is responsible for listening to hotkeys and triggering the appropriate actions in the global app state.
 export function HotkeyListener() {
-  const { startPromptCreation, stopPromptCreation } = useChatState();
+  const { startPromptCreation, stopPromptCreation, isPromptCreationActive } =
+    useChatState();
 
-  const hotKeyHandlerMap: Record<HotkeyActions, () => void> = useMemo(
+  const hotKeyHandlerMap: Record<HotkeyActions, () => boolean> = useMemo(
     () => ({
+      // Function that return true will prevent further propagation of the event.
       [HotkeyActions.CTRL_ALT_C]: () => {
-        startPromptCreation();
+        if (!isPromptCreationActive) {
+          startPromptCreation();
+          return true;
+        }
+        return false;
       },
       [HotkeyActions.ESC]: () => {
-        stopPromptCreation();
+        if (isPromptCreationActive) {
+          console.log('stopPromptCreation');
+          stopPromptCreation();
+          return true;
+        }
+        console.log('stopPromptCreation failed');
+        return false;
       },
     }),
-    [startPromptCreation, stopPromptCreation],
+    [startPromptCreation, stopPromptCreation, isPromptCreationActive],
   );
 
   const hotKeyListener = useCallback(
@@ -26,9 +38,12 @@ export function HotkeyListener() {
         hotkeyActionDefinitions,
       )) {
         if (definition.isEventMatching(ev)) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          hotKeyHandlerMap[action as unknown as HotkeyActions]();
+          const matched =
+            hotKeyHandlerMap[action as unknown as HotkeyActions]();
+          if (matched) {
+            ev.preventDefault();
+            ev.stopPropagation();
+          }
           break;
         }
       }
