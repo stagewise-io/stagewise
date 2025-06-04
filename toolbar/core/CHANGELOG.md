@@ -1,5 +1,11 @@
 # @stagewise/toolbar
 
+## 0.3.1
+
+### Patch Changes
+
+- 3d8613e: Update the README agent list
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,5 +1,13 @@
 # @stagewise/toolbar-next
 
+## 0.2.1
+
+### Patch Changes
+
+- 3d8613e: Update the README agent list
+- Updated dependencies [3d8613e]
+  - @stagewise/toolbar-react@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@stagewise-plugins/react",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
   "author": "tiq UG (haftungsbeschränkt)",

@@ -1,5 +1,12 @@
 # stagewise-vscode-extension
 
+## 0.4.2
+
+### Patch Changes
+
+- 56e2bea: Don't crash when analytics can't be configured
+- 3d8613e: Update the README agent list
+
 ## 0.4.1
 
 ### Patch Changes
