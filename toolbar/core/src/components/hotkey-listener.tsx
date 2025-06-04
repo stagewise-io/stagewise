@@ -3,33 +3,34 @@ import { useCallback, useMemo } from 'preact/hooks';
 import { hotkeyActionDefinitions, HotkeyActions } from '../utils';
 import { useChatState } from '@/hooks/use-chat-state';
 
+type StopPreventPropagation = boolean;
+
 // This listener is responsible for listening to hotkeys and triggering the appropriate actions in the global app state.
 export function HotkeyListener() {
   const { startPromptCreation, stopPromptCreation, isPromptCreationActive } =
     useChatState();
 
-  const hotKeyHandlerMap: Record<HotkeyActions, () => boolean> = useMemo(
-    () => ({
-      // Function that return true will prevent further propagation of the event.
-      [HotkeyActions.CTRL_ALT_C]: () => {
-        if (!isPromptCreationActive) {
-          startPromptCreation();
-          return true;
-        }
-        return false;
-      },
-      [HotkeyActions.ESC]: () => {
-        if (isPromptCreationActive) {
-          console.log('stopPromptCreation');
-          stopPromptCreation();
-          return true;
-        }
-        console.log('stopPromptCreation failed');
-        return false;
-      },
-    }),
-    [startPromptCreation, stopPromptCreation, isPromptCreationActive],
-  );
+  const hotKeyHandlerMap: Record<HotkeyActions, () => StopPreventPropagation> =
+    useMemo(
+      () => ({
+        // Functions that return true will prevent further propagation of the event.
+        [HotkeyActions.CTRL_ALT_C]: () => {
+          if (!isPromptCreationActive) {
+            startPromptCreation();
+            return true;
+          }
+          return false;
+        },
+        [HotkeyActions.ESC]: () => {
+          if (isPromptCreationActive) {
+            stopPromptCreation();
+            return true;
+          }
+          return false;
+        },
+      }),
+      [startPromptCreation, stopPromptCreation, isPromptCreationActive],
+    );
 
   const hotKeyListener = useCallback(
     (ev: KeyboardEvent) => {
