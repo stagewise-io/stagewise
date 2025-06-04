@@ -10,6 +10,6 @@ export function useEventListener(
     if (typeof window === 'undefined') return;
     if (!element) return;
     element.addEventListener(eventName, handler, options);
-    return () => element.removeEventListener(eventName, handler);
+    return () => element.removeEventListener(eventName, handler, options);
   }, [eventName, handler, element, options]);
 }
