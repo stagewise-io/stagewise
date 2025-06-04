@@ -4,14 +4,16 @@ import { createHash } from 'node:crypto';
 
 // Initialize PostHog client
 // Note: The API key should be your actual PostHog API key
-const POSTHOG_API_KEY = process.env.POSTHOG_API_KEY || '';
+const POSTHOG_API_KEY = process.env.POSTHOG_API_KEY;
 const POSTHOG_HOST = process.env.POSTHOG_HOST || 'https://eu.i.posthog.com';
 const SALT = 'stagewise';
 
-export const client = new PostHog(POSTHOG_API_KEY, {
-  host: POSTHOG_HOST,
-  disableGeoip: true,
-});
+export const client = POSTHOG_API_KEY
+  ? new PostHog(POSTHOG_API_KEY, {
+      host: POSTHOG_HOST,
+      disableGeoip: true,
+    })
+  : null;
 
 function hashId(id: string): string {
   return createHash('sha256')
@@ -46,7 +48,7 @@ export async function trackEvent(
     // Using a machine-specific ID that's anonymized
     const machineId = vscode.env.machineId;
 
-    await client.capture({
+    await client?.capture({
       distinctId: hashId(machineId),
       event: eventName,
       properties: {
@@ -79,7 +81,7 @@ export async function trackEvent(
  * Should be called when the extension is deactivated
  */
 export async function shutdownAnalytics(): Promise<void> {
-  await client.shutdown();
+  await client?.shutdown();
 }
 
 /**
@@ -94,7 +96,7 @@ export async function trackTelemetryStateChange(
     const machineId = vscode.env.machineId;
     const eventName = enabled ? 'telemetry_enabled' : 'telemetry_disabled';
 
-    await client.capture({
+    await client?.capture({
       distinctId: hashId(machineId),
       event: eventName,
       properties: {
