@@ -19,6 +19,7 @@
 > Perfect for devs tired of pasting folder paths into prompts. stagewise gives your AI real-time, browser-powered context.
 
 
+
 ## ✨ Features
 
 The stagewise Toolbar makes it incredibly easy to edit your frontend code with AI agents:
