@@ -22,6 +22,15 @@ export const contract = createBridgeContract({
         port: z
           .number()
           .describe('Port number this VS Code instance is running on'),
+        availableAgents: z
+          .array(
+            z
+              .string()
+              .describe(
+                'The name of the agent, e.g. "Cursor Agent" or "GitHub Copilot"',
+              ),
+          )
+          .describe('List of available agents in this VS Code instance'),
       }),
       update: z.object({}),
     },
@@ -45,6 +54,7 @@ export const contract = createBridgeContract({
           .array(z.string())
           .optional()
           .describe('Upload files like images, videos, etc.'),
+        agent: z.string().optional(),
       }),
       response: z.object({
         sessionId: z.string().optional(),

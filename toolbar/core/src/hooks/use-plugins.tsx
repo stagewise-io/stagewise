@@ -25,7 +25,7 @@ export function PluginProvider({
   plugins: ToolbarPlugin[];
 }) {
   const { bridge } = useSRPCBridge();
-  const { selectedSession } = useVSCode();
+  const { selectedSession, selectedAgent } = useVSCode();
 
   const toolbarContext = useMemo(() => {
     return {
@@ -36,6 +36,7 @@ export function PluginProvider({
           typeof prompt === 'string'
             ? {
                 prompt,
+                agent: selectedAgent,
                 ...(selectedSession && {
                   sessionId: selectedSession.sessionId,
                 }),
@@ -46,6 +47,7 @@ export function PluginProvider({
                 files: prompt.files,
                 images: prompt.images,
                 mode: prompt.mode,
+                agent: prompt.agent || selectedAgent,
                 ...(selectedSession && {
                   sessionId: selectedSession.sessionId,
                 }),
@@ -56,7 +58,7 @@ export function PluginProvider({
         );
       },
     };
-  }, [bridge, selectedSession]);
+  }, [bridge, selectedSession, selectedAgent]);
 
   // call plugins once on initial load
   const pluginsLoadedRef = useRef(false);

@@ -113,7 +113,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const isMinimized = useAppState((state) => state.minimized);
 
-  const { selectedSession } = useVSCode();
+  const { selectedSession, selectedAgent } = useVSCode();
 
   useEffect(() => {
     if (isMinimized) {
@@ -351,7 +351,11 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         if (bridge) {
           try {
             const result = await bridge.call.triggerAgentPrompt(
-              { prompt, sessionId: selectedSession?.sessionId },
+              {
+                prompt,
+                sessionId: selectedSession?.sessionId,
+                agent: selectedAgent,
+              },
               { onUpdate: (update) => {} },
             );
 
@@ -440,6 +444,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       setIsPromptCreationMode,
       internalSetChatAreaState,
       selectedSession,
+      selectedAgent,
       promptState,
       setPromptState,
       plugins,

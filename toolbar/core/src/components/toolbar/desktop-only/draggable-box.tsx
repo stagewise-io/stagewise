@@ -23,7 +23,7 @@ import { cn } from '@/utils';
 import { useAppState } from '@/hooks/use-app-state';
 import { Logo } from '@/components/ui/logo';
 import type { VNode } from 'preact';
-import { SettingsButton, SettingsPanel } from '../settings';
+import { SettingsButton, SettingsPanel } from './panels/settings';
 import { useVSCode } from '@/hooks/use-vscode';
 import { DisconnectedStatePanel } from './panels/disconnected';
 
