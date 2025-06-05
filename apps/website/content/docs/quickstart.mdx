@@ -169,4 +169,33 @@ import { StagewiseToolbar } from '@stagewise/toolbar-vue';
 
 </details>
 
-For more, check out our [examples repo](https://github.com/stagewise-io/stagewise/tree/main/examples) for Next.js, Nuxt, and SvelteKit. 
+<details>
+<summary>Angular</summary>
+
+Use the `@stagewise/toolbar` package for Angular projects. Conditionally call the `initToolbar()` function in `main.ts` whenever you want the toolbar to be active.
+
+***We recommend installing the Angular plugin (`@stagewise-plugins/angular`) for improved agent behavior and additional support 🚀***
+
+```ts
+// src/main.ts
+import { bootstrapApplication } from '@angular/platform-browser';
+import { appConfig } from './app/app.config';
+import { AppComponent } from './app/app.component';
+import { initToolbar } from '@stagewise/toolbar';
+import { AngularPlugin } from '@stagewise-plugins/angular';
+
+// Only initialize in development mode (customize as needed)
+if (!('production' in window) || !window.production) {
+  initToolbar({
+    plugins: [AngularPlugin]
+  });
+}
+
+bootstrapApplication(AppComponent, appConfig).catch((err) =>
+  console.error(err),
+);
+```
+
+</details>
+
+For more, check out our [examples repo](https://github.com/stagewise-io/stagewise/tree/main/examples) for Next.js, Nuxt, Angular and SvelteKit. 
