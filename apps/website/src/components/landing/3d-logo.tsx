@@ -60,7 +60,7 @@ export function Logo3D() {
         />
       </div>
       <div
-        className="absolute inset-0 rounded-full bg-purple-500/10 blur-md dark:bg-purple-500/20"
+        className="absolute inset-0 rounded-full bg-indigo-500/10 blur-md dark:bg-indigo-500/20"
         style={{ transform: 'translateZ(10px)' }}
       />
     </div>

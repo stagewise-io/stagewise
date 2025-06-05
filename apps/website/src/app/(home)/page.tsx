@@ -25,7 +25,7 @@ function GradientStarIcon({ className = '' }: { className?: string }) {
       style={{
         width: '16px',
         height: '16px',
-        background: 'linear-gradient(to right, #a21caf, #ec4899)', // from-purple-500 to-pink-500
+        background: 'var(--color-yellow-500)', // from-indigo-500 to-pink-500
         WebkitMaskImage:
           "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z' fill='black'/></svg>\")",
         maskImage:
@@ -55,7 +55,7 @@ export default function Home() {
             <div className="mb-12 text-center">
               <h1 className="mb-6 font-bold text-4xl tracking-tight md:text-6xl">
                 Eyesight for your
-                <span className="bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-indigo-500 to-pink-500 bg-clip-text text-transparent">
                   {' '}
                   AI-powered{' '}
                 </span>
@@ -80,7 +80,7 @@ export default function Home() {
                   onClick={() => posthog?.capture('hero_github_star_click')}
                 >
                   <GradientButton variant="outline" size="lg">
-                    <GradientStarIcon className="mr-2 h-4 w-4" />
+                    <GradientStarIcon className="mr-2 h-4 w-4 text-yellow-500" />
                     Star on GitHub
                   </GradientButton>
                 </Link>
@@ -125,7 +125,7 @@ export default function Home() {
         </ScrollReveal>
 
         <ScrollReveal delay={200}>
-          <div className="mx-auto max-w-4xl scale-[1.02] transform overflow-hidden rounded-xl border border-purple-900/50 shadow-[0_0_40px_rgba(128,90,213,0.25)] transition-transform duration-500">
+          <div className="mx-auto max-w-4xl scale-[1.02] transform overflow-hidden rounded-xl border border-indigo-900/50 shadow-[0_0_40px_rgba(128,90,213,0.25)] transition-transform duration-500">
             <video
               src="https://github.com/stagewise-io/assets/raw/refs/heads/main/media/demo-video-v1.mp4"
               width={1200}
@@ -199,8 +199,8 @@ export default function Home() {
             },
           ].map((feature, i) => (
             <ScrollReveal key={feature.title} delay={feature.delay}>
-              <div className="group -translate-y-1 rounded-lg border border-purple-600 bg-gray-100 p-6 shadow-[0_0_30px_rgba(128,90,213,0.15)] transition-all duration-300 dark:border-purple-800 dark:bg-gray-900">
-                <div className="mb-4 inline-flex rounded-lg bg-purple-100 p-3 transition-colors dark:bg-purple-900/20">
+              <div className="group -translate-y-1 rounded-lg border border-indigo-600 bg-gray-100 p-6 shadow-[0_0_30px_rgba(128,90,213,0.15)] transition-all duration-300 dark:border-indigo-800 dark:bg-gray-900">
+                <div className="mb-4 inline-flex rounded-lg bg-indigo-100 p-3 transition-colors dark:bg-indigo-900/20">
                   {feature.icon}
                 </div>
                 <h3 className="mb-2 font-semibold text-xl">{feature.title}</h3>
@@ -230,13 +230,18 @@ export default function Home() {
           {[
             {
               name: 'React',
-              color: 'bg-blue-500',
+              color: 'bg-cyan-400',
               href: 'https://github.com/stagewise-io/stagewise/tree/main/examples/react-example',
             },
             {
               name: 'Vue',
-              color: 'bg-green-500',
+              color: 'bg-emerald-500',
               href: 'https://github.com/stagewise-io/stagewise/tree/main/examples/vue-example',
+            },
+            {
+              name: 'Angular',
+              color: 'bg-red-500',
+              href: 'https://github.com/stagewise-io/stagewise/tree/main/examples/angular-example',
             },
             {
               name: 'Svelte',
@@ -245,7 +250,7 @@ export default function Home() {
             },
             {
               name: 'Next.js',
-              color: 'bg-gray-500',
+              color: 'bg-zinc-900',
               href: 'https://github.com/stagewise-io/stagewise/tree/main/examples/next-example',
             },
             {
@@ -257,7 +262,7 @@ export default function Home() {
             <ScrollReveal key={framework.name} delay={i * 100} direction="up">
               <Link
                 href={framework.href}
-                className="group flex cursor-pointer items-center gap-2 rounded-full border border-purple-600 bg-gray-100 px-6 py-3 shadow-[0_0_20px_rgba(128,90,213,0.15)] transition-all duration-300 dark:border-purple-800 dark:bg-gray-900"
+                className="group flex cursor-pointer items-center gap-2 rounded-full border border-indigo-600/50 bg-gray-50 px-6 py-2 shadow-[0_0_20px_rgba(128,90,213,0.15)] transition-all duration-300 dark:border-indigo-800 dark:bg-gray-900"
                 target="_blank"
                 onClick={() =>
                   posthog?.capture('framework_link_click', {
@@ -370,7 +375,7 @@ export default function Home() {
         </ScrollReveal>
 
         <ScrollReveal delay={200}>
-          <div className="mx-auto max-w-4xl rounded-lg bg-gradient-to-br from-gray-100 to-purple-200/30 p-12 shadow-[0_0_50px_rgba(128,90,213,0.2)] transition-all duration-500 dark:from-gray-900 dark:to-purple-900/30">
+          <div className="mx-auto max-w-4xl rounded-lg bg-gradient-to-br from-gray-100 to-indigo-200/30 p-12 shadow-[0_0_50px_rgba(128,90,213,0.2)] transition-all duration-500 dark:from-gray-900 dark:to-indigo-900/30">
             <table className="w-full">
               <thead>
                 <tr className="border-gray-300 border-b dark:border-gray-800">
@@ -408,7 +413,7 @@ export default function Home() {
       {/* CTA Section */}
       <section className="container relative z-10 mx-auto border-gray-200 border-t px-4 py-16 md:py-24 dark:border-gray-800">
         <ScrollReveal>
-          <div className="mx-auto max-w-4xl rounded-lg bg-gradient-to-br from-gray-100 to-purple-200/30 p-12 shadow-[0_0_50px_rgba(128,90,213,0.2)] transition-all duration-500 dark:from-gray-900 dark:to-purple-900/30">
+          <div className="mx-auto max-w-4xl rounded-lg bg-gradient-to-br from-gray-100 to-indigo-200/30 p-12 shadow-[0_0_50px_rgba(128,90,213,0.2)] transition-all duration-500 dark:from-gray-900 dark:to-indigo-900/30">
             <h2 className="mb-6 text-center font-bold text-3xl md:text-4xl">
               Ready to enhance your AI coding experience?
             </h2>
