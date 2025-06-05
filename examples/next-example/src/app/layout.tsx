@@ -32,6 +32,9 @@ export default function RootLayout({
         <StagewiseToolbar
           config={{
             plugins: [ReactPlugin],
+            server: {
+              protocol: 'auto', // or 'https' for HTTPS-only
+            },
           }}
         />
         {children}

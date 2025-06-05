@@ -17,8 +17,8 @@ export function ContextProviders({
   return (
     <ConfigProvider config={config}>
       <LocationProvider>
-        <SRPCBridgeProvider>
-          <VSCodeProvider>
+        <SRPCBridgeProvider config={config}>
+          <VSCodeProvider config={config}>
             <PluginProvider>
               <ChatStateProvider>{children}</ChatStateProvider>
             </PluginProvider>

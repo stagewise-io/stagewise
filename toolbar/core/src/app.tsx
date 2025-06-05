@@ -9,7 +9,7 @@ import { VisibilityManager } from './components/visibility-manager';
 import { useAppState } from './hooks/use-app-state';
 import type { ToolbarConfig } from './config';
 
-export function App(config?: ToolbarConfig) {
+export function App({ config }: { config?: ToolbarConfig }) {
   const isMainAppBlocked = useAppState((state) => state.isMainAppBlocked);
 
   return (

@@ -7,7 +7,14 @@ import { StagewiseToolbar } from '@stagewise/toolbar-react';
 // Render the main app
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <StagewiseToolbar />
+    <StagewiseToolbar
+      config={{
+        plugins: [],
+        server: {
+          protocol: 'auto', // or 'https' for HTTPS-only
+        },
+      }}
+    />
     <App />
   </StrictMode>,
 );
