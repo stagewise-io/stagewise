@@ -56,7 +56,7 @@ const ConnectionSettings = () => {
       <div>
         <label
           htmlFor="session-select"
-          className="mb-2 block font-medium text-gray-700 text-sm"
+          className="mb-2 block font-medium text-sm text-zinc-700"
         >
           VS Code Window {appName && `(${appName})`}
         </label>
@@ -93,7 +93,7 @@ const ConnectionSettings = () => {
           </p>
         )}
         {!isDiscovering && windows.length === 0 && !discoveryError && (
-          <p className="mt-1 text-gray-500 text-sm">
+          <p className="mt-1 text-sm text-zinc-500">
             No VS Code windows found. Make sure the Stagewise extension is
             installed and running.
           </p>
@@ -113,7 +113,7 @@ const ConnectionSettings = () => {
 
       {!selectedSession && (
         <div>
-          <p className="text-gray-600 text-sm">
+          <p className="text-sm text-zinc-600">
             <strong>Auto-detect mode:</strong> Commands will be sent to any
             available VS Code window.
           </p>

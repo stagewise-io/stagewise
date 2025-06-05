@@ -26,7 +26,7 @@ export function Clipboard({
   return (
     <button
       type="button"
-      className="mb-4 flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-100 p-4 dark:border-gray-800 dark:bg-gray-900"
+      className="mb-4 flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-100 p-4 dark:border-zinc-800 dark:bg-zinc-900"
       onClick={handleCopy}
       aria-label="Copy to clipboard"
     >

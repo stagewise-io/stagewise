@@ -106,7 +106,7 @@ export function AnimatedBackground() {
             if (!ctx) return;
             ctx.strokeStyle = isDarkMode
               ? `rgba(150, 100, 220, ${opacity})`
-              : `rgba(200, 200, 200, ${opacity * 2})`; // Lighter gray for light mode, slightly more visible
+              : `rgba(200, 200, 200, ${opacity * 2})`; // Lighter zinc for light mode, slightly more visible
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(particlesArray[a].x, particlesArray[a].y);

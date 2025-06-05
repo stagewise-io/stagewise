@@ -4,7 +4,7 @@ export type LogoColor =
   | 'default'
   | 'black'
   | 'white'
-  | 'gray'
+  | 'zinc'
   | 'current'
   | 'gradient';
 
@@ -26,7 +26,7 @@ export const Logo: FC<LogoProps> = ({
     default: 'fill-stagewise-700 stroke-none',
     black: 'fill-zinc-950 stroke-none',
     white: 'fill-white stroke-none',
-    gray: 'fill-zinc-500/50 stroke-none',
+    zinc: 'fill-zinc-500/50 stroke-none',
     current: 'fill-current stroke-none',
     gradient: 'fill-white stroke-black/30 stroke-1',
   };
