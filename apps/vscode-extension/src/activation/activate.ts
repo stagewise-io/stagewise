@@ -20,8 +20,7 @@ import {
 } from '../utils/analytics';
 import { CertificateManager } from '../utils/certificate-manager';
 import {
-  registerCertificateCommands,
-  showHttpsSetupGuidance,
+  registerCertificateCommands
 } from '../commands/certificate-commands';
 
 // Diagnostic collection specifically for our fake prompt
@@ -83,7 +82,6 @@ export async function activate(context: vscode.ExtensionContext) {
         const certificates = await certManager.ensureValidCertificates();
         console.log('[Stagewise] Certificates obtained successfully');
         serverOptions = { useHttps: true, certificates };
-        await showHttpsSetupGuidance();
         console.log('[Stagewise] HTTPS setup completed');
       } catch (error) {
         console.error('[Stagewise] Certificate setup failed:', error);
