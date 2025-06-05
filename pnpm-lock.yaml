@@ -395,6 +395,9 @@ importers:
       '@eslint/js':
         specifier: ^9.26.0
         version: 9.26.0
+      '@stagewise-plugins/react':
+        specifier: workspace:*
+        version: link:../../plugins/react
       '@stagewise/toolbar-react':
         specifier: workspace:*
         version: link:../../toolbar/react
