@@ -130,7 +130,7 @@ export default function Home() {
         <ScrollReveal delay={200}>
           <div className="mx-auto max-w-4xl scale-[1.02] transform overflow-hidden rounded-xl border border-indigo-900/50 shadow-[0_0_40px_rgba(128,90,213,0.25)] transition-transform duration-500">
             <video
-              src="https://github.com/stagewise-io/assets/raw/refs/heads/main/media/demo-video-v1.mp4"
+              src="https://github.com/stagewise-io/assets/raw/refs/heads/main/edited/0-3-0-plugin-release/standard-demo.mp4"
               width={1200}
               height={675}
               className="w-full"
