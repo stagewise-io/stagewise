@@ -65,14 +65,19 @@ export function ContextItem({ refElement, ...props }: ContextItemProps) {
         <div className="flex flex-row items-center justify-center gap-0.5 overflow-hidden rounded-md bg-zinc-700/80 px-1 py-0 font-medium text-white text-xs">
           <span className="truncate">{refElement.tagName.toLowerCase()}</span>
         </div>
-        {props.pluginContext.map((plugin) => (
-          <div className="flex flex-row items-center justify-center gap-0.5 overflow-hidden rounded-md bg-zinc-700/80 px-1 py-0 font-medium text-white text-xs">
-            <span className="size-3 shrink-0 stroke-white text-white *:size-full">
-              {plugins.find((p) => p.pluginName === plugin.pluginName)?.iconSvg}
-            </span>
-            <span className="truncate">{plugin.context.annotation}</span>
-          </div>
-        ))}
+        {props.pluginContext
+          .filter((plugin) => plugin.context.annotation)
+          .map((plugin) => (
+            <div className="flex flex-row items-center justify-center gap-0.5 overflow-hidden rounded-md bg-zinc-700/80 px-1 py-0 font-medium text-white text-xs">
+              <span className="size-3 shrink-0 stroke-white text-white *:size-full">
+                {
+                  plugins.find((p) => p.pluginName === plugin.pluginName)
+                    ?.iconSvg
+                }
+              </span>
+              <span className="truncate">{plugin.context.annotation}</span>
+            </div>
+          ))}
       </div>
       <Trash2 className="size-6 drop-shadow-black drop-shadow-md" />
     </div>

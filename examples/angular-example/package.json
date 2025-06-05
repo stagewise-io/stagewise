@@ -25,6 +25,7 @@
     "@angular/cli": "^19.2.13",
     "@angular/compiler-cli": "^19.2.0",
     "@stagewise/toolbar": "workspace:*",
+    "@stagewise-plugins/angular": "workspace:*",
     "@types/jasmine": "~5.1.0",
     "jasmine-core": "~5.6.0",
     "karma": "~6.4.0",
