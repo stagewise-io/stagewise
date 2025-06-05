@@ -1,5 +1,17 @@
 # @stagewise/toolbar-vue
 
+## 0.3.0
+
+### Minor Changes
+
+- e8b0fd4: No-op: Aligning versions with toolbar/core
+
+### Patch Changes
+
+- Updated dependencies [aa11e20]
+- Updated dependencies [3ab9b64]
+  - @stagewise/toolbar@0.4.0
+
 ## 0.2.1
 
 ### Patch Changes

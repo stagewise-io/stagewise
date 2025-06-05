@@ -1,5 +1,15 @@
 # @stagewise/toolbar
 
+## 0.4.0
+
+### Minor Changes
+
+- 3ab9b64: Add useConfig hook to access config properties throughout the toolbar. Adds an experimental object property to set feature flags for experimental feature usage
+
+### Patch Changes
+
+- aa11e20: Don't capture key events when hotkey don't result in any change
+
 ## 0.3.1
 
 ### Patch Changes

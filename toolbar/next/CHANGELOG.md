@@ -1,5 +1,16 @@
 # @stagewise/toolbar-next
 
+## 0.3.0
+
+### Minor Changes
+
+- e8b0fd4: No-op: Aligning versions with toolbar/core
+
+### Patch Changes
+
+- Updated dependencies [e8b0fd4]
+  - @stagewise/toolbar-react@0.3.0
+
 ## 0.2.1
 
 ### Patch Changes
