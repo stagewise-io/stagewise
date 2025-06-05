@@ -82,6 +82,9 @@ export default function Home() {
                   <GradientButton variant="outline" size="lg">
                     <GradientStarIcon className="mr-2 h-4 w-4 text-yellow-500" />
                     Star on GitHub
+                    <div className="ml-1 rounded-full bg-zinc-500/10 px-1.5 py-0.5 font-medium text-xs text-zinc-500">
+                      3K+
+                    </div>
                   </GradientButton>
                 </Link>
               </div>
