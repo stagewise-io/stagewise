@@ -63,25 +63,7 @@ import { initToolbar } from '@stagewise/toolbar';
 
 // 2. Define your toolbar configuration
 const stagewiseConfig = {
-  plugins: [
-    {
-      name: 'example-plugin',
-      description: 'Adds additional context for your components',
-      shortInfoForPrompt: () => {
-        return "Context information about the selected element";
-      },
-      mcp: null,
-      actions: [
-        {
-          name: 'Example Action',
-          description: 'Demonstrates a custom action',
-          execute: () => {
-            window.alert('This is a custom action!');
-          },
-        },
-      ],
-    },
-  ],
+  plugins: [],
 };
 
 // 3. Initialize the toolbar when your app starts
@@ -292,7 +274,7 @@ You would then use `StagewiseToolbarLoader` in your `src/routes/+layout.svelte`.
 
 | **Agent**      | **Supported**  |
 | -------------- | -------------- |
-| Cursor         | ✅             |
+| Cursor         | ✅              |
 | Windsurf       | ✅              |
 | GitHub Copilot | 🚧 In Progress |
 | Cline          | ❌              |
