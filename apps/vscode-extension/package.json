@@ -3,21 +3,38 @@
   "displayName": "stagewise",
   "private": true,
   "description": "Eyesight for your AI-powered Code Editor.",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "publisher": "stagewise",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
   "license": "AGPL-3.0-only",
-  "categories": ["AI", "Debuggers", "Machine Learning", "Other"],
-  "activationEvents": ["onStartupFinished"],
+  "categories": [
+    "AI",
+    "Debuggers",
+    "Machine Learning",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "stagewise.setupToolbar",
         "title": "Auto-setup the stagewise toolbar (AI-Assisted)",
+        "category": "stagewise"
+      },
+      {
+        "command": "stagewise.regenerateCertificates",
+        "title": "Regenerate HTTPS Certificates",
+        "category": "stagewise"
+      },
+      {
+        "command": "stagewise.showCertificateInstructions",
+        "title": "Show HTTPS Certificate Trust Instructions",
         "category": "stagewise"
       }
     ],
@@ -29,8 +46,22 @@
           "type": "boolean",
           "default": true,
           "description": "Enable anonymous usage data collection to help improve the product. No personal data is collected.",
-          "tags": ["telemetry", "usesOnlineServices"],
+          "tags": [
+            "telemetry",
+            "usesOnlineServices"
+          ],
           "markdownDescription": "Enable anonymous usage data collection to help improve the product. No personal data is collected.\n\nRead more about our [telemetry data collection](https://github.com/stagewise-io/stagewise/blob/main/apps/vscode-extension/TELEMETRY.md)."
+        },
+        "stagewise.server.enableHttps": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable HTTPS server to support connections from HTTPS websites (requires certificate trust setup)",
+          "markdownDescription": "Enable HTTPS server to support connections from HTTPS websites. When enabled, you'll need to trust the self-signed certificate in your browser. [Learn more](https://github.com/stagewise-io/stagewise/blob/main/docs/https-setup.md)"
+        },
+        "stagewise.server.regenerateCertificates": {
+          "type": "boolean",
+          "default": false,
+          "description": "Regenerate HTTPS certificates on next startup"
         }
       }
     }
@@ -60,6 +91,7 @@
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "22.15.2",
+    "@types/node-forge": "^1.3.11",
     "@types/vscode": "^1.85.0",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.32.0",
@@ -84,6 +116,8 @@
     "@types/express": "^5.0.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "mkcert": "^3.2.0",
+    "node-forge": "^1.3.1",
     "posthog-node": "^4.17.1",
     "ws": "^8.18.2",
     "zod": "^3.24.4"
@@ -91,8 +125,12 @@
   "turbo": {
     "tasks": {
       "build": {
-        "dependsOn": ["^build"],
-        "outputs": ["out/**"]
+        "dependsOn": [
+          "^build"
+        ],
+        "outputs": [
+          "out/**"
+        ]
       }
     }
   }

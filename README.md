@@ -63,6 +63,9 @@ import { initToolbar } from '@stagewise/toolbar';
 // 2. Define your toolbar configuration
 const stagewiseConfig = {
   plugins: [],
+  server: {
+    protocol: 'auto', // 'auto', 'https', or 'http'
+  },
 };
 
 // 3. Initialize the toolbar when your app starts
@@ -114,6 +117,9 @@ createRoot(document.getElementById('root')!).render(
 // Initialize toolbar separately
 const toolbarConfig = {
   plugins: [], // Add your custom plugins here
+  server: {
+    protocol: 'auto', // 'auto', 'https', or 'http'
+  },
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -150,6 +156,9 @@ export default function RootLayout({
         <StagewiseToolbar
           config={{
             plugins: [], // Add your custom plugins here
+            server: {
+              protocol: 'auto', // 'auto', 'https', or 'http'
+            },
           }}
         />
         {children}
@@ -173,6 +182,9 @@ import { StagewiseToolbar, type ToolbarConfig } from '@stagewise/toolbar-vue';
 
 const config: ToolbarConfig = {
   plugins: [], // Add your custom plugins here
+  server: {
+    protocol: 'auto', // 'auto', 'https', or 'http'
+  },
 };
 </script>
 
@@ -201,6 +213,9 @@ import { StagewiseToolbar, type ToolbarConfig } from '@stagewise/toolbar-vue';
 
 const config: ToolbarConfig = {
   plugins: [], // Add your custom plugins here
+  server: {
+    protocol: 'auto', // 'auto', 'https', or 'http'
+  },
 };
 </script>
 
@@ -233,6 +248,9 @@ For SvelteKit, you can integrate the toolbar using `@stagewise/toolbar` and Svel
         plugins: [
           // Add your Svelte-specific plugins or configurations here
         ],
+        server: {
+          protocol: 'auto', // 'auto', 'https', or 'http'
+        },
       };
       initToolbar(stagewiseConfig);
     }
@@ -257,6 +275,9 @@ const stagewiseConfig: ToolbarConfig = {
   plugins: [
     // ... your svelte plugin config
   ],
+  server: {
+    protocol: 'auto', // 'auto', 'https', or 'http'
+  },
 };
 </script>
 
@@ -268,6 +289,46 @@ You would then use `StagewiseToolbarLoader` in your `src/routes/+layout.svelte`.
 
 </details>
 
+
+## 🔒 HTTPS Support
+
+If your development server runs on HTTPS (e.g., `https://localhost:3000`), you'll need to enable HTTPS support in stagewise to avoid mixed content errors.
+
+> [!NOTE]
+> For detailed setup instructions and troubleshooting, see our comprehensive [HTTPS Setup Guide](./HTTPS_SETUP.md).
+
+### 1. Enable HTTPS in the VSCode Extension
+
+1. Open VSCode/Cursor settings (`Cmd + ,` on macOS, `Ctrl + ,` on Windows/Linux)
+2. Search for "stagewise"
+3. Enable "**Stagewise › Server: Enable Https**"
+4. Restart the extension by running the command "**Developer: Reload Window**" (`Cmd + Shift + P` then type "reload window")
+
+### 2. Configure Toolbar for HTTPS (Optional)
+
+By default, the toolbar will auto-detect the protocol. You can also explicitly configure it:
+
+```tsx
+// Next.js example
+<StagewiseToolbar
+  config={{
+    plugins: [],
+    server: {
+      protocol: 'https', // or 'http', 'auto' (default)
+    },
+  }}
+/>
+```
+
+```ts
+// Framework-agnostic example
+const stagewiseConfig = {
+  plugins: [],
+  server: {
+    protocol: 'https', // or 'http', 'auto' (default)
+  },
+};
+```
 
 ## 🤖 Agent support 
 

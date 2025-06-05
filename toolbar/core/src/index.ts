@@ -57,5 +57,5 @@ export function initToolbar(config?: ToolbarConfig) {
   const styleNode = document.createElement('style');
   styleNode.append(document.createTextNode(appStyle));
   document.head.appendChild(styleNode);
-  render(createElement(App, config), shadowDomAnchor);
+  render(createElement(App, { config }), shadowDomAnchor);
 }

@@ -1,16 +1,24 @@
 import express from 'express';
 import type { Server } from 'node:http';
+import type { Server as HttpsServer } from 'node:https';
 import cors from 'cors';
 import { handleStreamableHttp } from './handlers/mcp';
 import { handleSse, handleSsePost } from './handlers/sse';
 import { errorHandler } from './middleware/error';
+import { startHttpsServer } from './https-server';
+import type { CertificateData } from '../utils/certificate-manager';
 import {
   DEFAULT_PORT,
   PING_ENDPOINT,
   PING_RESPONSE,
 } from '@stagewise/extension-toolbar-srpc-contract';
 
-const createServer = (port: number) => {
+export interface ServerOptions {
+  useHttps: boolean;
+  certificates?: CertificateData;
+}
+
+const createApp = () => {
   const app = express();
 
   // Middleware
@@ -49,13 +57,23 @@ const createServer = (port: number) => {
   return app;
 };
 
-let server: ReturnType<typeof express.application.listen> | null = null;
+let server: Server | HttpsServer | null = null;
 
 export const startServer = async (
   port: number = DEFAULT_PORT,
-): Promise<Server> => {
-  const app = createServer(port);
-  return await app.listen(port, () => {});
+  options: ServerOptions = { useHttps: false },
+): Promise<Server | HttpsServer> => {
+  const app = createApp();
+
+  if (options.useHttps && options.certificates) {
+    const httpsServer = await startHttpsServer(app, port, options.certificates);
+    server = httpsServer;
+    return httpsServer;
+  } else {
+    const httpServer = await app.listen(port, () => {});
+    server = httpServer;
+    return httpServer;
+  }
 };
 
 export const stopServer = (): Promise<void> => {

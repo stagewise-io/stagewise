@@ -6,6 +6,7 @@ import type { ComponentChildren } from 'preact';
 import { createSRPCClientBridge, type ZodClient } from '@stagewise/srpc/client';
 import { contract } from '@stagewise/extension-toolbar-srpc-contract';
 import { findPort } from '../srpc';
+import type { ToolbarConfig } from '../config';
 
 interface SRPCBridgeContextValue {
   bridge: ZodClient<typeof contract> | null;
@@ -21,7 +22,11 @@ const SRPCBridgeContext = createContext<SRPCBridgeContextValue>({
 
 export function SRPCBridgeProvider({
   children,
-}: { children: ComponentChildren }) {
+  config,
+}: {
+  children: ComponentChildren;
+  config?: ToolbarConfig;
+}) {
   const [state, setState] = useState<SRPCBridgeContextValue>({
     bridge: null,
     isConnecting: true,
@@ -31,11 +36,19 @@ export function SRPCBridgeProvider({
   useEffect(() => {
     async function initializeBridge() {
       try {
-        const port = await findPort();
+        const protocol = config?.server?.protocol || 'auto';
+        const result = await findPort(protocol);
+
+        if (!result) {
+          throw new Error('No available Stagewise server found');
+        }
+
+        const wsProtocol = result.protocol === 'https' ? 'wss' : 'ws';
         const bridge = createSRPCClientBridge(
-          `ws://localhost:${port}`,
+          `${wsProtocol}://localhost:${result.port}`,
           contract,
         );
+
         await bridge.connect();
         setState({
           bridge,
@@ -52,7 +65,7 @@ export function SRPCBridgeProvider({
     }
 
     initializeBridge();
-  }, []);
+  }, [config]);
 
   return (
     <SRPCBridgeContext.Provider value={state}>

@@ -5,6 +5,7 @@ import {
   discoverVSCodeWindows,
   type VSCodeContext as SRPCVSCodeContext,
 } from '../srpc';
+import type { ToolbarConfig } from '../config';
 
 interface VSCodeContextType {
   // Window discovery
@@ -35,7 +36,13 @@ const VSCodeContext = createContext<VSCodeContextType>({
   appName: undefined,
 });
 
-export function VSCodeProvider({ children }: { children: ComponentChildren }) {
+export function VSCodeProvider({
+  children,
+  config,
+}: {
+  children: ComponentChildren;
+  config?: ToolbarConfig;
+}) {
   const [windows, setWindows] = useState<SRPCVSCodeContext[]>([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
@@ -48,7 +55,8 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
     setDiscoveryError(null);
 
     try {
-      const discoveredWindows = await discoverVSCodeWindows();
+      const protocol = config?.server?.protocol || 'auto';
+      const discoveredWindows = await discoverVSCodeWindows(protocol);
       setWindows(discoveredWindows);
 
       // If selected session is no longer available, clear it
@@ -78,10 +86,10 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
     }
   };
 
-  // Auto-discover on mount
+  // Auto-discover on mount, and re-discover when config changes
   useEffect(() => {
     discover();
-  }, []);
+  }, [config?.server?.protocol]);
 
   const selectedSession = selectedSessionId
     ? windows.find((w) => w.sessionId === selectedSessionId)
