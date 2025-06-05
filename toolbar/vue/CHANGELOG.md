@@ -1,5 +1,15 @@
 # @stagewise/toolbar-vue
 
+## 0.4.1
+
+### Patch Changes
+
+- 8f6f8ec: Update README.md to include GitHub Copilot
+- f44c5f2: Update README (removing example-plugin)
+- Updated dependencies [8f6f8ec]
+- Updated dependencies [f44c5f2]
+  - @stagewise/toolbar@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes

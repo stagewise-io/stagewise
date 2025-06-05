@@ -1,5 +1,12 @@
 # @stagewise/toolbar
 
+## 0.4.1
+
+### Patch Changes
+
+- 8f6f8ec: Update README.md to include GitHub Copilot
+- f44c5f2: Update README (removing example-plugin)
+
 ## 0.4.0
 
 ### Minor Changes
