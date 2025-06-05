@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ExternalLink } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
+import StagewiseLogo from '../../logo.svg';
 
 export function Footer() {
   const posthog = usePostHog();
@@ -11,15 +12,8 @@ export function Footer() {
     <footer className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-12 dark:border-zinc-800">
       <div className="flex flex-col items-center justify-between md:flex-row">
         <div className="mb-4 flex items-center gap-2 md:mb-0">
-          <Image
-            src="/logo.png"
-            alt="stagewise Logo"
-            width={24}
-            height={24}
-            className="rounded-full"
-          />
-          <span className="font-semibold">stagewise</span>
-          <span className="ml-2 text-sm text-zinc-600 dark:text-zinc-500">
+          <Image src={StagewiseLogo} alt="stagewise Logo" height={32} />
+          <span className="ml-8 text-sm text-zinc-600 dark:text-zinc-500">
             © 2025 tiq UG (haftungsbeschränkt)
           </span>
         </div>

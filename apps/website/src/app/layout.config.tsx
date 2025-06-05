@@ -1,6 +1,6 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { siteConfig } from '@/lib/site-config';
 import Image from 'next/image';
+import StagewiseLogo from './logo.svg';
 /**
  * Shared layout configurations
  *
@@ -12,8 +12,7 @@ export const baseOptions: BaseLayoutProps = {
   nav: {
     title: (
       <>
-        <Image src="/logo.png" alt="Logo" width={24} height={24} />
-        {siteConfig.title}
+        <Image src={StagewiseLogo} alt="Logo" height={32} />
       </>
     ),
   },

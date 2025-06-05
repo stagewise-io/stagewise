@@ -26,7 +26,7 @@ import SamsungLogo from './_components/company_logos/samsung.png';
 import ZendeskLogo from './_components/company_logos/zendesk.png';
 
 // GradientStarIcon: Star with gradient fill using mask
-function GradientStarIcon({ className = '' }: { className?: string }) {
+function StarIcon({ className = '' }: { className?: string }) {
   return (
     <span
       className={`inline-block ${className}`}
@@ -62,12 +62,11 @@ export default function Home() {
           <ScrollReveal>
             <div className="mb-12 text-center">
               <h1 className="mb-6 font-bold text-4xl tracking-tight md:text-6xl">
-                Eyesight for your
-                <span className="bg-gradient-to-r from-indigo-500 to-pink-500 bg-clip-text text-transparent">
-                  {' '}
-                  AI-powered{' '}
+                <span className="bg-gradient-to-tr from-blue-700 via-violet-500 to-indigo-800 bg-clip-text text-transparent">
+                  Visual vibe coding.
                 </span>
-                Code Editor
+                <br />
+                Right in your codebase.
               </h1>
               <p className="mx-auto mb-8 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
                 Connect your frontend UI to your code AI agents. Select
@@ -88,7 +87,7 @@ export default function Home() {
                   onClick={() => posthog?.capture('hero_github_star_click')}
                 >
                   <GradientButton variant="outline" size="lg">
-                    <GradientStarIcon className="mr-2 h-4 w-4 text-yellow-500" />
+                    <StarIcon className="mr-2 h-4 w-4 text-yellow-500" />
                     Star on GitHub
                     <div className="ml-1 rounded-full bg-zinc-500/10 px-1.5 py-0.5 font-medium text-xs text-zinc-500">
                       3K+
