@@ -1,0 +1,140 @@
+---
+title: Removal
+---
+
+export const metadata = {
+  title: "Removal",
+  description: "Learn how to remove the Stagewise toolbar from your project.",
+};
+
+# How to Remove Stagewise Toolbar
+
+If you need to remove the Stagewise toolbar from your project, follow these simple steps based on your integration method:
+
+## Method 1: Conditional Rendering (Recommended)
+
+The toolbar is automatically excluded from production builds when using the development environment check. If you want to temporarily disable it in development:
+
+```ts
+// Disable by commenting out or removing the setup call
+// setupStagewise();
+
+// Or set NODE_ENV to production
+process.env.NODE_ENV = 'production';
+```
+
+## Method 2: Complete Removal
+
+### Framework-agnostic Integration
+
+If you used the manual `initToolbar` approach, simply remove the initialization code:
+
+```diff
+- import { initToolbar } from '@stagewise/toolbar';
+- 
+- const stagewiseConfig = { /* ... */ };
+- 
+- function setupStagewise() {
+-   if (process.env.NODE_ENV === 'development') {
+-     initToolbar(stagewiseConfig);
+-   }
+- }
+- 
+- setupStagewise();
+```
+
+### React.js
+
+Remove the toolbar component from your render tree:
+
+```diff
+// src/main.tsx
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+- import { StagewiseToolbar } from '@stagewise/toolbar-react';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+-   <StagewiseToolbar />
+  </StrictMode>,
+);
+```
+
+### Next.js
+
+Remove the component from your layout:
+
+```diff
+// src/app/layout.tsx
+- import { StagewiseToolbar } from '@stagewise/toolbar-next';
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+-       <StagewiseToolbar />
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+### Vue.js & Nuxt.js
+
+Remove the component from your template:
+
+```diff
+<template>
+  <div>
+    <NuxtRouteAnnouncer />
+-   <ClientOnly>
+-     <StagewiseToolbar />
+-   </ClientOnly>
+    <NuxtWelcome />
+  </div>
+</template>
+
+<script setup>
+- import { StagewiseToolbar } from '@stagewise/toolbar-vue';
+</script>
+```
+
+### SvelteKit
+
+Remove the component from your layout or page:
+
+```diff
+<script lang="ts">
+- import StagewiseToolbar from '$lib/components/stagewise/ToolbarLoader.svelte';
+</script>
+
+- <StagewiseToolbar />
+
+<main>
+  <!-- Your page content -->
+</main>
+```
+
+## Uninstall Package Dependencies
+
+After removing the code, uninstall the packages you no longer need:
+
+```bash
+# Remove the core toolbar package
+pnpm remove @stagewise/toolbar
+
+# Remove framework-specific packages if used
+pnpm remove @stagewise/toolbar-react    # For React
+pnpm remove @stagewise/toolbar-next     # For Next.js  
+pnpm remove @stagewise/toolbar-vue      # For Vue/Nuxt
+```
+
+## Clean Up Extension
+
+1. **Disable the VS Code Extension**: Go to VS Code Extensions panel and disable the Stagewise extension
+2. **Uninstall the Extension** (optional): Right-click the extension and select "Uninstall"
+
+> **Note**: The toolbar only renders in development mode by default, so it won't appear in your production builds even if you leave the code in place.
