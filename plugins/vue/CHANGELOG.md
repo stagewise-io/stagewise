@@ -1,0 +1,1 @@
+# @stagewise-plugins/vue
