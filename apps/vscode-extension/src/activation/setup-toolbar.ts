@@ -38,10 +38,13 @@ export async function setupToolbar() {
   </step_2>
 
   <step_3>
-    Create a basic toolbar configuration object with empty plugins array:
+    Create a basic toolbar configuration object with empty plugins array. Use the protocol 'auto' to automatically detect the protocol. When the project is running on HTTPS in development, use 'https':
     \`\`\`typescript
     const stagewiseConfig = {
-      plugins: []
+      plugins: [],
+      server: {
+        protocol: 'auto', // or 'https' when running on HTTPS in development
+      },
     };
     \`\`\`
   </step_3>
