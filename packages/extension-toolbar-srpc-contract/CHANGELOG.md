@@ -1,5 +1,12 @@
 # @stagewise/extension-toolbar-srpc-contract
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [9e7610d]
+  - @stagewise/srpc@0.2.1
+
 ## 0.1.0
 
 ### Minor Changes

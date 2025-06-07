@@ -1,5 +1,15 @@
 # @stagewise-plugins/angular
 
+## 0.4.3
+
+### Patch Changes
+
+- bef562d: Changed branding slogan
+- 96bd3fd: Remove unnecessary logs
+- Updated dependencies [bef562d]
+- Updated dependencies [9e7610d]
+  - @stagewise/toolbar@0.4.5
+
 ## 0.4.2
 
 ### Patch Changes
