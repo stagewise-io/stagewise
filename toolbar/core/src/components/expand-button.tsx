@@ -2,7 +2,7 @@ import { useAppState } from '@/hooks/use-app-state';
 import { Logo } from './ui/logo';
 
 export function ExpandButton() {
-  const expand = useAppState((state) => state.expand);
+  const { expand } = useAppState();
 
   return (
     <button

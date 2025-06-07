@@ -1,11 +1,11 @@
 import { PluginProvider } from '@/hooks/use-plugins';
 import type { ToolbarConfig } from '../config';
 import { ChatStateProvider } from '@/hooks/use-chat-state';
-import { LocationProvider } from '../hooks/use-location';
 import type { ComponentChildren } from 'preact';
 import { SRPCBridgeProvider } from '@/hooks/use-srpc-bridge';
 import { VSCodeProvider } from '@/hooks/use-vscode';
 import { ConfigProvider } from '@/hooks/use-config';
+import { AppStateProvider } from '@/hooks/use-app-state';
 
 export function ContextProviders({
   children,
@@ -16,15 +16,15 @@ export function ContextProviders({
 }) {
   return (
     <ConfigProvider config={config}>
-      <LocationProvider>
-        <SRPCBridgeProvider>
-          <VSCodeProvider>
-            <PluginProvider>
+      <SRPCBridgeProvider>
+        <VSCodeProvider>
+          <PluginProvider>
+            <AppStateProvider>
               <ChatStateProvider>{children}</ChatStateProvider>
-            </PluginProvider>
-          </VSCodeProvider>
-        </SRPCBridgeProvider>
-      </LocationProvider>
+            </AppStateProvider>
+          </PluginProvider>
+        </VSCodeProvider>
+      </SRPCBridgeProvider>
     </ConfigProvider>
   );
 }

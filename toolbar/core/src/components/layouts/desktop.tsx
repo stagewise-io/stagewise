@@ -1,6 +1,6 @@
 // This component manages the main layout of the companion UI. It is responsible for rendering the toolbar, the main content area, and the sidebar.
 
-import { ToolbarArea } from '@/components/toolbar/desktop-only/area';
+import { ToolbarArea } from '@/components/toolbar/canvas';
 import { cn } from '@/utils';
 import { SelectorCanvas } from '../dom-context/selector-canvas';
 

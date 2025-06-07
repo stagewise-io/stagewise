@@ -10,7 +10,7 @@ import { useAppState } from '@/hooks/use-app-state';
 import { ToolbarSection } from './section';
 
 export function ToolbarMoreActionsButton() {
-  const minimizeCompanion = useAppState((state) => state.minimize);
+  const { minimize } = useAppState();
 
   return (
     <ToolbarSection>
@@ -21,7 +21,7 @@ export function ToolbarMoreActionsButton() {
           </ToolbarButton>
         </DropdownMenuButton>
         <DropdownMenuContent>
-          <DropdownMenuButttonItem onClick={minimizeCompanion}>
+          <DropdownMenuButttonItem onClick={minimize}>
             <Minimize2 className="size-4" />
             Minimize companion
           </DropdownMenuButttonItem>

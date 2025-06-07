@@ -22,7 +22,7 @@ export default defineConfig({
     extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
   },
   esbuild: {
-    minifyIdentifiers: false,
+    minifyIdentifiers: true,
     treeShaking: true,
   },
   build: {
@@ -54,8 +54,8 @@ export default defineConfig({
       },
       treeshake: true,
     },
-    minify: false,
-    cssMinify: false,
+    minify: true,
+    cssMinify: true,
   },
   optimizeDeps: {
     include: ['@stagewise/extension-toolbar-srpc-contract'],

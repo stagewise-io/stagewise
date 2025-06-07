@@ -5,126 +5,27 @@ import { Button } from '@headlessui/react';
 import {
   ChevronDownIcon,
   ChevronUpIcon,
-  MessageCircleIcon,
-  PuzzleIcon,
   RefreshCwIcon,
   WifiOffIcon,
 } from 'lucide-react';
-import { ToolbarChatArea } from '../chat-box';
+import { ToolbarChatArea } from './panels/chat-box';
 import { useDraggable } from '@/hooks/use-draggable';
 import { useContext, useEffect, useState } from 'preact/hooks';
 import { DraggableContext } from '@/hooks/use-draggable';
 import type { DraggableContextType } from '@/hooks/use-draggable';
-import { usePlugins } from '@/hooks/use-plugins';
-import { ToolbarSection } from '../section';
-import { ToolbarButton } from '../button';
+import { ToolbarSection } from './section';
+import { ToolbarButton } from './button';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
 import { useAppState } from '@/hooks/use-app-state';
 import { Logo } from '@/components/ui/logo';
 import type { VNode } from 'preact';
-import { SettingsButton, SettingsPanel } from '../settings';
+import { SettingsPanel } from './settings';
 import { useVSCode } from '@/hooks/use-vscode';
-import { DisconnectedStatePanel } from './panels/disconnected';
-
-// Subcomponent for loading state content
-function LoadingStateContent() {
-  return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50/90 p-4 shadow-lg backdrop-blur">
-      <div className="mb-3 flex items-center gap-3">
-        <RefreshCwIcon className="size-5 animate-spin text-blue-600" />
-        <h3 className="font-semibold text-blue-800">Connecting...</h3>
-      </div>
-
-      <div className="text-blue-700 text-sm">
-        <p>Looking for VS Code windows...</p>
-      </div>
-    </div>
-  );
-}
-
-// Subcomponent for connected state toolbar buttons
-function ConnectedStateButtons({
-  handleButtonClick,
-  pluginBox,
-  setPluginBox,
-  openPanel,
-  setOpenPanel,
-  chatState,
-}: {
-  handleButtonClick: (handler: () => void) => (e: MouseEvent) => void;
-  pluginBox: null | {
-    component: VNode;
-    pluginName: string;
-  };
-  setPluginBox: (value: typeof pluginBox) => void;
-  openPanel: null | 'settings' | { pluginName: string; component: VNode };
-  setOpenPanel: (value: typeof openPanel) => void;
-  chatState: ReturnType<typeof useChatState>;
-}) {
-  const plugins = usePlugins();
-
-  const pluginsWithActions = plugins.plugins.filter(
-    (plugin) => plugin.onActionClick,
-  );
-
-  // Handler for settings button
-  const handleOpenSettings = () =>
-    setOpenPanel(openPanel === 'settings' ? null : 'settings');
-
-  return (
-    <>
-      <SettingsButton
-        onOpenPanel={handleOpenSettings}
-        isActive={openPanel === 'settings'}
-      />
-      {pluginsWithActions.length > 0 && (
-        <ToolbarSection>
-          {pluginsWithActions.map((plugin) => (
-            <ToolbarButton
-              key={plugin.pluginName}
-              onClick={handleButtonClick(() => {
-                if (pluginBox?.pluginName !== plugin.pluginName) {
-                  const component = plugin.onActionClick();
-
-                  if (component) {
-                    setPluginBox({
-                      component: plugin.onActionClick(),
-                      pluginName: plugin.pluginName,
-                    });
-                  }
-                } else {
-                  setPluginBox(null);
-                }
-              })}
-              active={pluginBox?.pluginName === plugin.pluginName}
-            >
-              {plugin.iconSvg ? (
-                <span className="size-4 stroke-zinc-950 text-zinc-950 *:size-full">
-                  {plugin.iconSvg}
-                </span>
-              ) : (
-                <PuzzleIcon className="size-4" />
-              )}
-            </ToolbarButton>
-          ))}
-        </ToolbarSection>
-      )}
-      <ToolbarSection>
-        <ToolbarButton
-          onClick={handleButtonClick(() =>
-            chatState.isPromptCreationActive
-              ? chatState.stopPromptCreation()
-              : chatState.startPromptCreation(),
-          )}
-          active={chatState.isPromptCreationActive}
-        >
-          <MessageCircleIcon className="size-4 stroke-zinc-950" />
-        </ToolbarButton>
-      </ToolbarSection>
-    </>
-  );
-}
+import { DisconnectedStatePanel } from './panels/disconnected-state';
+import { ConnectingStatePanel } from './panels/connecting-state';
+import { NormalStateButtons } from './contents/normal';
+import { DisconnectedStateButtons } from './contents/disconnected';
 
 export function ToolbarDraggableBox() {
   const provider = useContext(DraggableContext) as DraggableContextType | null;
@@ -152,9 +53,7 @@ export function ToolbarDraggableBox() {
 
   const chatState = useChatState();
 
-  const minimized = useAppState((state) => state.minimized);
-  const minimize = useAppState((state) => state.minimize);
-  const expand = useAppState((state) => state.expand);
+  const { minimized, minimize, expand } = useAppState();
 
   useEffect(() => {
     if (minimized) {
@@ -255,7 +154,7 @@ export function ToolbarDraggableBox() {
           )}
         >
           {/* Render content based on state */}
-          {isLoadingState && <LoadingStateContent />}
+          {true && <ConnectingStatePanel />}
           {isDisconnectedState && (
             <DisconnectedStatePanel
               discover={discover}
@@ -331,8 +230,8 @@ export function ToolbarDraggableBox() {
           )}
         >
           {/* Show different buttons based on state */}
-          {isConnectedState && (
-            <ConnectedStateButtons
+          {isConnectedState ? (
+            <NormalStateButtons
               handleButtonClick={handleButtonClick}
               pluginBox={pluginBox}
               setPluginBox={setPluginBox}
@@ -340,23 +239,8 @@ export function ToolbarDraggableBox() {
               setOpenPanel={setOpenPanel}
               chatState={chatState}
             />
-          )}
-
-          {(isLoadingState || isDisconnectedState) && (
-            <ToolbarSection>
-              <ToolbarButton
-                onClick={isDisconnectedState ? () => discover() : undefined}
-                className={cn(
-                  theme.buttonColor,
-                  isDisconnectedState && 'hover:bg-orange-200',
-                )}
-              >
-                {isLoadingState && (
-                  <RefreshCwIcon className="size-4 animate-spin" />
-                )}
-                {isDisconnectedState && <RefreshCwIcon className="size-4" />}
-              </ToolbarButton>
-            </ToolbarSection>
+          ) : (
+            <DisconnectedStateButtons />
           )}
 
           {/* Minimize button - always present */}

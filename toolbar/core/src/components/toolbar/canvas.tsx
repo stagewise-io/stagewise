@@ -1,4 +1,4 @@
-import { ToolbarDraggableBox } from './draggable-box';
+import { ToolbarDraggableBox } from './toolbar';
 import { useRef } from 'preact/hooks';
 import { DraggableProvider } from '@/hooks/use-draggable';
 

@@ -112,16 +112,16 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     setPromptState('idle');
   }, []);
 
-  const isMinimized = useAppState((state) => state.minimized);
+  const { minimized } = useAppState();
 
   const { selectedSession } = useVSCode();
 
   useEffect(() => {
-    if (isMinimized) {
+    if (minimized) {
       setIsPromptCreationMode(false);
       internalSetChatAreaState('hidden');
     }
-  }, [isMinimized]);
+  }, [minimized]);
 
   const { bridge } = useSRPCBridge();
 
