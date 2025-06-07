@@ -1,5 +1,15 @@
 # @stagewise-plugins/react
 
+## 0.4.5
+
+### Patch Changes
+
+- bef562d: Changed branding slogan
+- 96bd3fd: Fix potential crash in element selection annotation generation
+- Updated dependencies [bef562d]
+- Updated dependencies [9e7610d]
+  - @stagewise/toolbar@0.4.5
+
 ## 0.4.4
 
 ### Patch Changes

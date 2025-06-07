@@ -1,6 +1,6 @@
 {
   "name": "@stagewise-plugins/angular",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "type": "module",
   "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
   "author": "tiq UG (haftungsbeschränkt)",

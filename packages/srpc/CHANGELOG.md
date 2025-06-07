@@ -1,5 +1,11 @@
 # @stagewise/srpc
 
+## 0.2.1
+
+### Patch Changes
+
+- 9e7610d: Replace randomUUID calls with (unsafer, but universally working) Math.random generated IDs
+
 ## 0.2.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # @stagewise/toolbar
 
+## 0.4.5
+
+### Patch Changes
+
+- bef562d: Changed branding slogan
+- 9e7610d: Replace randomUUID calls with (unsafer, but universally working) Math.random generated IDs
+
 ## 0.4.4
 
 ### Patch Changes
