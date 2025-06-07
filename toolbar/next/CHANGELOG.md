@@ -1,5 +1,13 @@
 # @stagewise/toolbar-next
 
+## 0.4.5
+
+### Patch Changes
+
+- bef562d: Changed branding slogan
+- Updated dependencies [bef562d]
+  - @stagewise/toolbar-react@0.4.5
+
 ## 0.4.4
 
 ### Patch Changes

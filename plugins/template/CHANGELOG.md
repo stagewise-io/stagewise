@@ -1,5 +1,14 @@
 # @stagewise/plugin-example
 
+## 0.4.5
+
+### Patch Changes
+
+- bef562d: Changed branding slogan
+- Updated dependencies [bef562d]
+- Updated dependencies [9e7610d]
+  - @stagewise/toolbar@0.4.5
+
 ## 0.4.4
 
 ### Patch Changes

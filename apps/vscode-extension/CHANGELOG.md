@@ -1,5 +1,13 @@
 # stagewise-vscode-extension
 
+## 0.4.4
+
+### Patch Changes
+
+- 0c81ec9: Improved toolbar setup prompt
+- bef562d: Changed branding slogan
+  - @stagewise/extension-toolbar-srpc-contract@0.1.1
+
 ## 0.4.3
 
 ### Patch Changes
