@@ -3,7 +3,13 @@ import { useHotkeyListenerComboText } from '@/hooks/use-hotkey-listener-combo-te
 import { cn, HotkeyActions } from '@/utils';
 import { Button, Textarea } from '@headlessui/react';
 import { SendIcon } from 'lucide-react';
-import { useEffect, useMemo, useRef, useCallback, useState } from 'preact/hooks';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+  useState,
+} from 'preact/hooks';
 
 export function ToolbarChatArea() {
   const chatState = useChatState();
