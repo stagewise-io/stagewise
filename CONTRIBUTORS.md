@@ -11,7 +11,7 @@ Without these guys, stagewise wouldn't be here. Huge props to:
 | <center>[See on LinkedIn](https://www.linkedin.com/in/juliangoetze/)</center> | <center>[See on LinkedIn](https://www.linkedin.com/in/nicklas-scharpff/)</center> | <center>[See on LinkedIn](https://www.linkedin.com/in/glenntws/)</center> |
 
 
-## Special thanks for all contributors
+## Special thanks to all the contributors
 
 - [denwaya34](https://github.com/denwaya34)
 
