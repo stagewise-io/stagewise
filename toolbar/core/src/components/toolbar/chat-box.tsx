@@ -3,10 +3,11 @@ import { useHotkeyListenerComboText } from '@/hooks/use-hotkey-listener-combo-te
 import { cn, HotkeyActions } from '@/utils';
 import { Button, Textarea } from '@headlessui/react';
 import { SendIcon } from 'lucide-react';
-import { useEffect, useMemo, useRef, useCallback } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useCallback, useState } from 'preact/hooks';
 
 export function ToolbarChatArea() {
   const chatState = useChatState();
+  const [isComposing, setIsComposing] = useState(false);
 
   const currentChat = useMemo(
     () => chatState.chats.find((c) => c.id === chatState.currentChatId),
@@ -32,13 +33,21 @@ export function ToolbarChatArea() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
         e.preventDefault();
         handleSubmit();
       }
     },
-    [handleSubmit],
+    [handleSubmit, isComposing],
   );
+
+  const handleCompositionStart = useCallback(() => {
+    setIsComposing(true);
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    setIsComposing(false);
+  }, []);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -122,6 +131,8 @@ export function ToolbarChatArea() {
         value={currentInput}
         onChange={(e) => handleInputChange(e.currentTarget.value)}
         onKeyDown={handleKeyDown}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         placeholder={
           chatState.isPromptCreationActive
             ? chatState.promptState === 'loading'
