@@ -35,7 +35,7 @@ export function SRPCBridgeProvider({
     error: null,
   });
 
-  const { selectedSession } = useVSCode();
+  const { selectedSession, windows } = useVSCode();
   const bridgeRef = useRef<ZodClient<typeof contract> | null>(null);
 
   const initializeBridge = useCallback(async (port: number) => {
@@ -62,8 +62,12 @@ export function SRPCBridgeProvider({
   }, []);
 
   useEffect(() => {
-    if (selectedSession) initializeBridge(selectedSession.port);
-  }, [selectedSession, initializeBridge]);
+    if (selectedSession) {
+      initializeBridge(selectedSession.port);
+    } else if (windows.length > 0) {
+      initializeBridge(windows[0].port);
+    }
+  }, [selectedSession, initializeBridge, windows]);
 
   return (
     <SRPCBridgeContext.Provider value={state}>

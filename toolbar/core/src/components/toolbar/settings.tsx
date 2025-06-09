@@ -41,7 +41,7 @@ const ConnectionSettings = () => {
 
   const handleSessionChange = (e: Event) => {
     const target = e.target as HTMLSelectElement;
-    const selectedSessionId = target.value || undefined;
+    const selectedSessionId = target.value === '' ? undefined : target.value;
     selectSession(selectedSessionId);
   };
 

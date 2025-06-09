@@ -114,7 +114,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const { minimized } = useAppState();
 
-  const { selectedSession, setShouldPromptWindowSelection } = useVSCode();
+  const { selectedSession, setShouldPromptWindowSelection, windows } =
+    useVSCode();
 
   useEffect(() => {
     if (minimized) {
@@ -352,7 +353,10 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         if (bridge) {
           try {
             const result = await bridge.call.triggerAgentPrompt(
-              { prompt, sessionId: selectedSession?.sessionId },
+              {
+                prompt,
+                sessionId: selectedSession?.sessionId || windows[0]?.sessionId,
+              },
               { onUpdate: (update) => {} },
             );
 

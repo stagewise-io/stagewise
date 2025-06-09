@@ -165,10 +165,16 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
   };
 
   const selectSession = (sessionId: string | undefined) => {
+    if (!sessionId || sessionId === '') {
+      setStoredSessionId(undefined);
+      setSelectedSessionId(undefined);
+      return;
+    }
+
     setSelectedSessionId(sessionId);
     setStoredSessionId(sessionId);
 
-    // When user selects a session, clear the prompt
+    // When user selects a session, clear the window selection prompt
     if (sessionId) {
       setShouldPromptWindowSelection(false);
     }
@@ -186,9 +192,9 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
     discover();
   }, []);
 
-  const selectedSession = selectedSessionId
-    ? windows.find((w) => w.sessionId === selectedSessionId)
-    : undefined;
+  const selectedSession = windows.find(
+    (w) => w.sessionId === selectedSessionId,
+  );
 
   const value: VSCodeContextType = {
     windows,
