@@ -60,12 +60,12 @@ const ConnectionSettings = () => {
         >
           VS Code Window {appName && `(${appName})`}
         </label>
-        <div className="flex items-center space-x-2">
+        <div className="flex w-full items-center space-x-2">
           <select
             id="session-select"
             value={selectedSession?.sessionId || ''}
             onChange={handleSessionChange}
-            className="h-8 flex-1 rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
+            className="h-8 min-w-0 flex-1 rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
             disabled={isDiscovering}
           >
             <option value="">Auto-detect (any window)</option>
@@ -79,7 +79,7 @@ const ConnectionSettings = () => {
             type="button"
             onClick={handleRefresh}
             disabled={isDiscovering}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-500/10 backdrop-saturate-150 transition-colors hover:bg-zinc-500/20 disabled:opacity-50"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-500/10 backdrop-saturate-150 transition-colors hover:bg-zinc-500/20 disabled:opacity-50"
             title="Refresh window list"
           >
             <RefreshCwIcon

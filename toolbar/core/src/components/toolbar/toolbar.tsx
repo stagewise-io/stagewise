@@ -24,6 +24,7 @@ import { SettingsPanel } from './settings';
 import { useVSCode } from '@/hooks/use-vscode';
 import { DisconnectedStatePanel } from './panels/disconnected-state';
 import { ConnectingStatePanel } from './panels/connecting-state';
+import { WindowSelectionPanel } from './panels/window-selection';
 import { NormalStateButtons } from './contents/normal';
 import { DisconnectedStateButtons } from './contents/disconnected';
 
@@ -40,7 +41,13 @@ export function ToolbarDraggableBox() {
     initialSnapArea: 'bottomRight',
   });
 
-  const { windows, isDiscovering, discoveryError, discover } = useVSCode();
+  const {
+    windows,
+    isDiscovering,
+    discoveryError,
+    discover,
+    shouldPromptWindowSelection,
+  } = useVSCode();
   const isConnected = windows.length > 0;
 
   const [pluginBox, setPluginBox] = useState<null | {
@@ -50,6 +57,8 @@ export function ToolbarDraggableBox() {
   const [openPanel, setOpenPanel] = useState<
     null | 'settings' | { pluginName: string; component: VNode }
   >(null);
+  const [windowSelectionDismissed, setWindowSelectionDismissed] =
+    useState(false);
 
   const chatState = useChatState();
 
@@ -61,6 +70,13 @@ export function ToolbarDraggableBox() {
       setOpenPanel(null);
     }
   }, [minimized]);
+
+  // Reset window selection dismissal when shouldPromptWindowSelection changes
+  useEffect(() => {
+    if (shouldPromptWindowSelection) {
+      setWindowSelectionDismissed(false);
+    }
+  }, [shouldPromptWindowSelection]);
 
   // Create a wrapper function to handle button clicks
   const handleButtonClick = (handler: () => void) => (e: MouseEvent) => {
@@ -79,6 +95,10 @@ export function ToolbarDraggableBox() {
   const isLoadingState = isDiscovering;
   const isDisconnectedState = !isConnected && !isDiscovering;
   const isConnectedState = isConnected;
+  const shouldShowWindowSelection =
+    shouldPromptWindowSelection &&
+    !windowSelectionDismissed &&
+    isConnectedState;
 
   // Theme classes based on state
   const getThemeClasses = () => {
@@ -139,7 +159,10 @@ export function ToolbarDraggableBox() {
         <div
           className={cn(
             'flex min-h-0 flex-1 origin-bottom-right flex-col items-stretch px-2 transition-all duration-300 ease-out',
-            (pluginBox || openPanel === 'settings' || !isConnectedState) &&
+            (pluginBox ||
+              openPanel === 'settings' ||
+              !isConnectedState ||
+              shouldShowWindowSelection) &&
               !minimized
               ? 'pointer-events-auto scale-100 opacity-100 blur-none'
               : 'pointer-events-none h-0 scale-50 opacity-0 blur-md',
@@ -161,10 +184,19 @@ export function ToolbarDraggableBox() {
               discoveryError={discoveryError}
             />
           )}
-          {isConnectedState && openPanel === 'settings' && (
-            <SettingsPanel onClose={() => setOpenPanel(null)} />
+          {shouldShowWindowSelection && (
+            <WindowSelectionPanel
+              onDismiss={() => setWindowSelectionDismissed(true)}
+            />
           )}
-          {isConnectedState && pluginBox?.component}
+          {isConnectedState &&
+            openPanel === 'settings' &&
+            !shouldShowWindowSelection && (
+              <SettingsPanel onClose={() => setOpenPanel(null)} />
+            )}
+          {isConnectedState &&
+            pluginBox?.component &&
+            !shouldShowWindowSelection}
         </div>
 
         {/* This is the chat area. Only visible when connected and prompt creation is active. */}
