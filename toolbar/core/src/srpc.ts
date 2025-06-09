@@ -9,7 +9,7 @@ import type { z } from 'zod';
 
 /**
  * Maximum number of consecutive connection errors before stopping the discovery process.
- * This prevents unnecessary network requests when no VS Code instances are running.
+ * This prevents unnecessary network requests when no IDE instances are running.
  */
 const MAX_CONSECUTIVE_ERRORS = 2;
 
@@ -18,7 +18,7 @@ export type VSCodeContext = z.infer<
 >;
 
 /**
- * Discover all available VS Code windows by scanning ports and getting session info
+ * Discover all available IDE windows by scanning ports and getting session info
  */
 export async function discoverVSCodeWindows(
   maxAttempts = 10,
@@ -87,7 +87,7 @@ export async function discoverVSCodeWindows(
 
   if (windows.length === 0) {
     console.warn(
-      `No VS Code windows found, please start an IDE with the stagewise extension installed! ❌`,
+      `No IDE windows found, please start an IDE with the stagewise extension installed! ❌`,
     );
   }
 

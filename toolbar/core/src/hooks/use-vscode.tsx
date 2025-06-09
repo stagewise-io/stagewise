@@ -42,12 +42,12 @@ const setStoredSessionId = (sessionId: string | undefined): void => {
 };
 
 /**
- * Context type for VS Code integration functionality.
+ * Context type for IDE integration functionality.
  * Provides access to window discovery, session management, and selection prompts.
  */
 interface VSCodeContextType {
   // Window discovery
-  /** Array of discovered VS Code windows/instances */
+  /** Array of discovered IDE windows/instances */
   windows: SRPCVSCodeContext[];
   /** Whether window discovery is currently in progress */
   isDiscovering: boolean;
@@ -55,7 +55,7 @@ interface VSCodeContextType {
   discoveryError: string | null;
 
   // Session management
-  /** Currently selected VS Code session, undefined if none selected */
+  /** Currently selected IDE session, undefined if none selected */
   selectedSession: SRPCVSCodeContext | undefined;
 
   // Window selection prompt
@@ -70,7 +70,7 @@ interface VSCodeContextType {
   setShouldPromptWindowSelection: (show: boolean) => void;
 
   // Actions
-  /** Discover available VS Code windows */
+  /** Discover available IDE windows */
   discover: () => Promise<void>;
   /** Select a specific session by ID, or undefined to clear selection */
   selectSession: (sessionId: string | undefined) => void;
@@ -78,7 +78,7 @@ interface VSCodeContextType {
   refreshSession: () => Promise<void>;
 
   // App name
-  /** Name of the currently selected VS Code application */
+  /** Name of the currently selected IDE application */
   appName: string | undefined;
 }
 
@@ -96,16 +96,16 @@ const VSCodeContext = createContext<VSCodeContextType>({
 });
 
 /**
- * Provider component for VS Code integration functionality.
+ * Provider component for IDE integration functionality.
  * Manages window discovery, session selection, and persistent storage.
  *
  * Features:
- * - Automatically discovers VS Code windows on mount
+ * - Automatically discovers IDE windows on mount
  * - Persists selected session per browser port across refreshes
  * - Intelligently prompts for window selection when needed
  * - Uses port-specific storage keys for different development environments
  *
- * @param children - Child components that will have access to VS Code context
+ * @param children - Child components that will have access to IDE context
  *
  * @example
  * ```tsx
@@ -209,11 +209,11 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
 }
 
 /**
- * Main hook for accessing VS Code integration functionality.
- * Provides complete access to all VS Code context including window discovery,
+ * Main hook for accessing IDE integration functionality.
+ * Provides complete access to all IDE context including window discovery,
  * session management, and selection prompts.
  *
- * @returns VSCodeContextType - Complete VS Code context
+ * @returns VSCodeContextType - Complete IDE context
  *
  * @example
  * ```tsx
@@ -239,7 +239,7 @@ export function useVSCode() {
 }
 
 /**
- * Convenience hook for VS Code window discovery functionality.
+ * Convenience hook for IDE window discovery functionality.
  * Use this when you only need access to window discovery features.
  *
  * @returns Object containing windows array, discovery state, and discover function
@@ -249,7 +249,7 @@ export function useVSCode() {
  * function WindowList() {
  *   const { windows, isDiscovering, discoveryError, discover } = useVSCodeWindows();
  *
- *   if (isDiscovering) return <div>Discovering VS Code windows...</div>;
+ *   if (isDiscovering) return <div>Discovering IDE windows...</div>;
  *   if (discoveryError) return <div>Error: {discoveryError}</div>;
  *
  *   return (
@@ -271,7 +271,7 @@ export function useVSCodeWindows() {
 }
 
 /**
- * Convenience hook for VS Code session management.
+ * Convenience hook for IDE session management.
  * Use this when you only need access to the selected session and session controls.
  *
  * @returns Object containing selected session and session management functions
@@ -282,7 +282,7 @@ export function useVSCodeWindows() {
  *   const { selectedSession, selectSession, refreshSession } = useVSCodeSession();
  *
  *   if (!selectedSession) {
- *     return <div>No VS Code session selected</div>;
+ *     return <div>No IDE session selected</div>;
  *   }
  *
  *   return (
@@ -301,7 +301,7 @@ export function useVSCodeSession() {
 }
 
 /**
- * Convenience hook for VS Code window selection prompts.
+ * Convenience hook for IDE window selection prompts.
  * Use this when you need to implement a window selection UI.
  *
  * The shouldPromptWindowSelection flag is true when:
@@ -319,7 +319,7 @@ export function useVSCodeSession() {
  *
  *   return (
  *     <div className="modal">
- *       <h3>Multiple VS Code windows detected</h3>
+ *       <h3>Multiple IDE windows detected</h3>
  *       <p>Please select which window to connect to:</p>
  *       {windows.map(window => (
  *         <button

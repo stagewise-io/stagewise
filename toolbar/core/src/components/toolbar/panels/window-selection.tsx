@@ -29,7 +29,7 @@ export function WindowSelectionPanel({ onDismiss }: WindowSelectionPanelProps) {
   return (
     <div className="rounded-lg border border-blue-200 bg-blue-50/90 p-4 shadow-lg backdrop-blur">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-semibold text-blue-800">Select VS Code Window</h3>
+        <h3 className="font-semibold text-blue-800">Select IDE Window</h3>
         <button
           type="button"
           onClick={onDismiss}
@@ -46,7 +46,7 @@ export function WindowSelectionPanel({ onDismiss }: WindowSelectionPanelProps) {
             htmlFor="window-selection-select"
             className="mb-2 block font-medium text-blue-700 text-sm"
           >
-            VS Code Window {appName && `(${appName})`}
+            IDE Window {appName && `(${appName})`}
           </label>
           <div className="flex w-full items-center space-x-2">
             <select
@@ -84,7 +84,7 @@ export function WindowSelectionPanel({ onDismiss }: WindowSelectionPanelProps) {
 
           {!isDiscovering && windows.length === 0 && !discoveryError && (
             <p className="mt-1 text-blue-600 text-sm">
-              No VS Code windows found. Make sure the Stagewise extension is
+              No IDE windows found. Make sure the Stagewise extension is
               installed and running.
             </p>
           )}
@@ -105,7 +105,7 @@ export function WindowSelectionPanel({ onDismiss }: WindowSelectionPanelProps) {
           <div className="rounded-lg bg-blue-100/80 p-3">
             <p className="text-blue-700 text-sm">
               <strong>Auto-detect mode:</strong> Commands will be sent to any
-              available VS Code window.
+              available IDE window.
             </p>
           </div>
         )}
