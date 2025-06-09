@@ -51,6 +51,7 @@ export const contract = createBridgeContract({
         result: z.object({
           success: z.boolean(),
           error: z.string().optional(),
+          errorCode: z.enum(['session_mismatch']).optional(),
           output: z.string().optional(),
         }),
       }),

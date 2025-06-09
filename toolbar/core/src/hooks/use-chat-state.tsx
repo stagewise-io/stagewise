@@ -114,7 +114,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const { minimized } = useAppState();
 
-  const { selectedSession } = useVSCode();
+  const { selectedSession, setShouldPromptWindowSelection } = useVSCode();
 
   useEffect(() => {
     if (minimized) {
@@ -368,6 +368,12 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
                 ),
               );
             } else {
+              if (
+                result.result.errorCode &&
+                result.result.errorCode === 'session_mismatch'
+              ) {
+                setShouldPromptWindowSelection(true);
+              }
               // On error, go to error state
               setPromptState('error');
               // Auto-reset to idle and close prompt creation after error animation
@@ -380,11 +386,12 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
                     chat.id === chatId ? { ...chat, inputValue: '' } : chat,
                   ),
                 );
-              }, 1000);
+              }, 300);
             }
           } catch (error) {
             // On exception, go to error state
             setPromptState('error');
+            // TODO: show the error message
             // Auto-reset to idle and close prompt creation after error animation
             setTimeout(() => {
               setPromptState('idle');
@@ -395,10 +402,11 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
                   chat.id === chatId ? { ...chat, inputValue: '' } : chat,
                 ),
               );
-            }, 1000);
+            }, 300);
           }
         } else {
           // No bridge available, go to error state
+          setShouldPromptWindowSelection(true);
           setPromptState('error');
           setTimeout(() => {
             setPromptState('idle');
@@ -409,7 +417,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
                 chat.id === chatId ? { ...chat, inputValue: '' } : chat,
               ),
             );
-          }, 1000);
+          }, 300);
         }
       }
 

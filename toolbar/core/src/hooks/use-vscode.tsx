@@ -6,14 +6,24 @@ import {
   type VSCodeContext as SRPCVSCodeContext,
 } from '../srpc';
 
-// Constants for localStorage keys
-const SELECTED_SESSION_STORAGE_KEY = 'vscode-selected-session-id';
-const LAST_WINDOWS_HASH_STORAGE_KEY = 'vscode-last-windows-hash';
+// Utility function to get current port from browser location
+const getCurrentPort = (): string => {
+  if (typeof window !== 'undefined' && window.location) {
+    return window.location.port || '80'; // Default to 80 if no port specified
+  }
+  return '80'; // Fallback for SSR or testing
+};
+
+// Generate port-specific storage key
+const getStorageKey = (): string => {
+  const port = getCurrentPort();
+  return `vscode-selected-session-id-on-browser-port-${port}`;
+};
 
 // Utility functions for localStorage
 const getStoredSessionId = (): string | undefined => {
   try {
-    return localStorage.getItem(SELECTED_SESSION_STORAGE_KEY) || undefined;
+    return localStorage.getItem(getStorageKey()) || undefined;
   } catch {
     return undefined;
   }
@@ -22,40 +32,13 @@ const getStoredSessionId = (): string | undefined => {
 const setStoredSessionId = (sessionId: string | undefined): void => {
   try {
     if (sessionId) {
-      localStorage.setItem(SELECTED_SESSION_STORAGE_KEY, sessionId);
+      localStorage.setItem(getStorageKey(), sessionId);
     } else {
-      localStorage.removeItem(SELECTED_SESSION_STORAGE_KEY);
+      localStorage.removeItem(getStorageKey());
     }
   } catch {
     // Ignore localStorage errors (e.g., in incognito mode)
   }
-};
-
-const getLastWindowsHash = (): string | undefined => {
-  try {
-    return localStorage.getItem(LAST_WINDOWS_HASH_STORAGE_KEY) || undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-const setLastWindowsHash = (hash: string): void => {
-  try {
-    localStorage.setItem(LAST_WINDOWS_HASH_STORAGE_KEY, hash);
-  } catch {
-    // Ignore localStorage errors
-  }
-};
-
-/**
- * Creates a hash of windows to detect changes in available VS Code instances.
- * Used to determine when to prompt users for window selection.
- */
-const createWindowsHash = (windows: SRPCVSCodeContext[]): string => {
-  return windows
-    .map((w) => `${w.sessionId}-${w.appName}`)
-    .sort()
-    .join('|');
 };
 
 /**
@@ -79,10 +62,12 @@ interface VSCodeContextType {
   /**
    * True when user should be prompted to select a window.
    * Becomes true when multiple windows are available and either:
-   * - User has never selected a window before, OR
-   * - Available windows have changed since last selection
+   * - No sessionId is saved for the current browser port, OR
+   * - The saved sessionId for the current port is no longer available in discovered windows
    */
   shouldPromptWindowSelection: boolean;
+  /** Set whether the window selection prompt should be shown */
+  setShouldPromptWindowSelection: (show: boolean) => void;
 
   // Actions
   /** Discover available VS Code windows */
@@ -103,6 +88,7 @@ const VSCodeContext = createContext<VSCodeContextType>({
   discoveryError: null,
   selectedSession: undefined,
   shouldPromptWindowSelection: false,
+  setShouldPromptWindowSelection: () => {},
   discover: async () => {},
   selectSession: () => {},
   refreshSession: async () => {},
@@ -115,9 +101,9 @@ const VSCodeContext = createContext<VSCodeContextType>({
  *
  * Features:
  * - Automatically discovers VS Code windows on mount
- * - Persists selected session across browser refreshes
+ * - Persists selected session per browser port across refreshes
  * - Intelligently prompts for window selection when needed
- * - Detects when available windows change
+ * - Uses port-specific storage keys for different development environments
  *
  * @param children - Child components that will have access to VS Code context
  *
@@ -150,15 +136,14 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
       const discoveredWindows = await discoverVSCodeWindows();
       setWindows(discoveredWindows);
 
-      // Check if we should prompt for window selection
-      const currentWindowsHash = createWindowsHash(discoveredWindows);
-      const lastWindowsHash = getLastWindowsHash();
+      // Get stored session ID for current port
+      const storedSessionId = getStoredSessionId();
 
       // Determine if we should prompt for selection
       const shouldPrompt =
-        discoveredWindows.length > 1 &&
-        (!lastWindowsHash || // Never selected before
-          lastWindowsHash !== currentWindowsHash); // Windows changed
+        (discoveredWindows.length > 1 && !storedSessionId) || // No saved sessionId for current port
+        (storedSessionId &&
+          !discoveredWindows.some((w) => w.sessionId === storedSessionId)); // Saved sessionId not in discovered windows
 
       setShouldPromptWindowSelection(shouldPrompt);
 
@@ -183,10 +168,8 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
     setSelectedSessionId(sessionId);
     setStoredSessionId(sessionId);
 
-    // When user selects a session, store the current windows hash and clear prompt
-    if (sessionId && windows.length > 0) {
-      const currentWindowsHash = createWindowsHash(windows);
-      setLastWindowsHash(currentWindowsHash);
+    // When user selects a session, clear the prompt
+    if (sessionId) {
       setShouldPromptWindowSelection(false);
     }
   };
@@ -213,6 +196,7 @@ export function VSCodeProvider({ children }: { children: ComponentChildren }) {
     discoveryError,
     selectedSession,
     shouldPromptWindowSelection,
+    setShouldPromptWindowSelection,
     discover,
     selectSession,
     refreshSession,
@@ -322,14 +306,14 @@ export function useVSCodeSession() {
  *
  * The shouldPromptWindowSelection flag is true when:
  * - Multiple windows are available AND
- * - Either user has never selected a window OR available windows have changed
+ * - Either no sessionId is saved for the current browser port OR the saved sessionId is no longer available
  *
  * @returns Object containing windows, prompt flag, and selection function
  *
  * @example
  * ```tsx
  * function WindowSelectionPrompt() {
- *   const { windows, shouldPromptWindowSelection, selectSession } = useVSCodeWindowSelection();
+ *   const { windows, shouldPromptWindowSelection, setShouldPromptWindowSelection, selectSession } = useVSCodeWindowSelection();
  *
  *   if (!shouldPromptWindowSelection) return null;
  *
@@ -351,6 +335,16 @@ export function useVSCodeSession() {
  * ```
  */
 export function useVSCodeWindowSelection() {
-  const { windows, shouldPromptWindowSelection, selectSession } = useVSCode();
-  return { windows, shouldPromptWindowSelection, selectSession };
+  const {
+    windows,
+    shouldPromptWindowSelection,
+    setShouldPromptWindowSelection,
+    selectSession,
+  } = useVSCode();
+  return {
+    windows,
+    shouldPromptWindowSelection,
+    setShouldPromptWindowSelection,
+    selectSession,
+  };
 }

@@ -56,6 +56,7 @@ export function PluginProvider({
             onUpdate: (update) => {},
           },
         );
+        return result;
       },
     };
   }, [bridge, selectedSession]);

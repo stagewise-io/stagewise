@@ -76,6 +76,7 @@ export async function activate(context: vscode.ExtensionContext) {
             result: {
               success: false,
               error: error,
+              errorCode: 'session_mismatch',
             },
           };
         }
