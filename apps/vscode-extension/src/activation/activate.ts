@@ -5,7 +5,7 @@ import {
   getExtensionBridge,
   DEFAULT_PORT,
 } from '@stagewise/extension-toolbar-srpc-contract';
-import { setupToolbar } from './setup-toolbar';
+import { setupToolbar } from '../auto-prompts/setup-toolbar';
 import { getCurrentIDE } from 'src/utils/get-current-ide';
 import { dispatchAgentCall } from 'src/utils/dispatch-agent-call';
 import { getCurrentWindowInfo } from '../utils/window-discovery';
@@ -21,6 +21,7 @@ import {
 import { ExtensionStorage } from '../data-storage';
 import { VScodeContext } from '../utils/vscode-context';
 import { EnvironmentInfo } from 'src/utils/environment-info';
+import { ToolbarUpdateNotificator } from 'src/utils/toolbar-update-notificator';
 
 // Diagnostic collection specifically for our fake prompt
 const fakeDiagCollection =
@@ -32,6 +33,10 @@ const outputChannel = vscode.window.createOutputChannel('stagewise');
 // Dummy handler for the setupToolbar command
 async function setupToolbarHandler() {
   await setupToolbar();
+  await vscode.window.showInformationMessage(
+    "The agent has been started to integrate stagewise into this project. Please follow the agent's instructions in the chat panel.",
+    'OK',
+  );
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -51,6 +56,9 @@ export async function activate(context: vscode.ExtensionContext) {
   const storage = new ExtensionStorage(context);
 
   await EnvironmentInfo.getInstance();
+  // Initialize the toolbar update notificator
+  const updateNotificator = new ToolbarUpdateNotificator(storage);
+  context.subscriptions.push(updateNotificator); // This will call dispose() when the extension is deactivated
 
   // Add configuration change listener to track telemetry setting changes
   const configChangeListener = vscode.workspace.onDidChangeConfiguration(

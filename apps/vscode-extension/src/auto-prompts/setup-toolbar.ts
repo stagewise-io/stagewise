@@ -14,6 +14,7 @@ export async function setupToolbar() {
 <requirements>
   1. Install the required stagewise package(s) for the project's framework
   2. Integrate the stagewise toolbar into the project structure (ensure it only runs in development mode)
+  3. Add the stagewise extension to the active repositories recommended extensions list. If the list does not yet exist, cretae a new one.
 </requirements>
 
 <implementation_steps>
@@ -101,6 +102,27 @@ export async function setupToolbar() {
     \`\`\`
   </svelte>
 </framework_specific_integrations>
+
+<workspace_extensions_list>
+  The recommended extensions lsit for a workspace is located in the root fo the workspace and has the filename "extensions.json".
+
+  <example_list>
+    {
+      "recommendations": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  </example_list>
+
+  <requirement>
+    Make sure, that the stagewise extension is added to the recommended extensions list if it is not already present. The name of the extension is "stagewise.stagewise-vscode-extension".
+
+    If the list does not yet exist, create a new one with the following content:
+    <new_list_content>
+      {
+        "recommendations": ["stagewise.stagewise-vscode-extension"]
+      }
+    </new_list_content>
+  </requirement>
+</workspace_extensions_list>
 
 <expected_outcome>
   A properly integrated stagewise toolbar that:
