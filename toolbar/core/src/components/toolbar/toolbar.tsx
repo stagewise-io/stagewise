@@ -180,8 +180,8 @@ export function ToolbarDraggableBox() {
               <SettingsPanel onClose={() => setOpenPanel(null)} />
             )}
           {isConnectedState &&
-            pluginBox?.component &&
-            !shouldShowWindowSelection}
+            !shouldShowWindowSelection &&
+            pluginBox?.component}
         </div>
 
         {/* This is the chat area. Only visible when connected and prompt creation is active. */}
