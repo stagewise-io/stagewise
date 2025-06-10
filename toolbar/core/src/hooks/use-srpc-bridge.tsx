@@ -35,7 +35,7 @@ export function SRPCBridgeProvider({
     error: null,
   });
 
-  const { selectedSession, windows } = useVSCode();
+  const { selectedSession } = useVSCode();
   const bridgeRef = useRef<ZodClient<typeof contract> | null>(null);
 
   const initializeBridge = useCallback(async (port: number) => {
