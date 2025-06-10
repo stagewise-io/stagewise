@@ -17,7 +17,7 @@ const getCurrentPort = (): string => {
 // Generate port-specific storage key
 const getStorageKey = (): string => {
   const port = getCurrentPort();
-  return `vscode-selected-session-id-on-browser-port-${port}`;
+  return `ide-selected-session-id-on-browser-port-${port}`;
 };
 
 // Utility functions for localStorage
