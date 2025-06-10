@@ -79,32 +79,38 @@ function getWebviewContent(
       ? 'http://localhost:3000/vscode-extension/welcome'
       : 'https://stagewise.io/vscode-extension/welcome';
 
+  const cspDomain =
+    context.extensionMode === vscode.ExtensionMode.Development
+      ? 'http://localhost:3000'
+      : 'https://stagewise.io';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src ${webview.cspSource} https://stagewise.io http://localhost:3000; style-src ${webview.cspSource} 'unsafe-inline' https://stagewise.io http://localhost:3000; script-src ${webview.cspSource} 'unsafe-inline' https://stagewise.io http://localhost:3000;">
+    <meta http-equiv="Content-Security-Policy" content="default-src ${webview.cspSource} ${cspDomain}; style-src ${webview.cspSource} 'unsafe-inline' ${cspDomain}; script-src ${webview.cspSource} 'unsafe-inline' ${cspDomain};">
     <title>Getting Started with stagewise</title>
     <style>
-        body {
-            padding: 0px;
+        html, body {
+            padding: 0;
             margin: 0;
             width: 100%;
             height: 100%;
             border: none;
-            border-color: transparent;
+            overflow: hidden;
+            box-sizing: border-box;
         }
         #maincontent_iframe {
-            position:absolute;
-            inset:0;
-            top:0px;
-            left:0px;
-            bottom:0px;
-            right:0px;
-            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            z-index: 100;    
+            height: 100%;
+            border: 0;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
     </style>
 </head>
