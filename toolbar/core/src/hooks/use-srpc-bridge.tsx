@@ -62,12 +62,8 @@ export function SRPCBridgeProvider({
   }, []);
 
   useEffect(() => {
-    if (selectedSession) {
-      initializeBridge(selectedSession.port);
-    } else if (windows.length > 0) {
-      initializeBridge(windows[0].port);
-    }
-  }, [selectedSession, initializeBridge, windows]);
+    if (selectedSession) initializeBridge(selectedSession.port);
+  }, [selectedSession, initializeBridge]);
 
   return (
     <SRPCBridgeContext.Provider value={state}>

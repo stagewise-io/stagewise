@@ -1,11 +1,7 @@
-import { RefreshCwIcon, XIcon } from 'lucide-react';
+import { RefreshCwIcon } from 'lucide-react';
 import { useVSCode } from '@/hooks/use-vscode';
 
-interface WindowSelectionPanelProps {
-  onDismiss: () => void;
-}
-
-export function WindowSelectionPanel({ onDismiss }: WindowSelectionPanelProps) {
+export function WindowSelectionPanel() {
   const {
     windows,
     isDiscovering,
@@ -28,16 +24,8 @@ export function WindowSelectionPanel({ onDismiss }: WindowSelectionPanelProps) {
 
   return (
     <div className="rounded-lg border border-blue-200 bg-blue-50/90 p-4 shadow-lg backdrop-blur">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3">
         <h3 className="font-semibold text-blue-800">Select IDE Window</h3>
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-blue-600 hover:bg-blue-100 hover:text-blue-800"
-          title="Dismiss"
-        >
-          <XIcon className="size-4" />
-        </button>
       </div>
 
       <div className="space-y-3">
@@ -56,7 +44,11 @@ export function WindowSelectionPanel({ onDismiss }: WindowSelectionPanelProps) {
               className="h-8 min-w-0 flex-1 rounded-lg border border-blue-300 bg-white/80 px-3 text-sm backdrop-saturate-150 focus:border-blue-500 focus:outline-none"
               disabled={isDiscovering}
             >
-              <option value="">Auto-detect (any window)</option>
+              <option value="" disabled>
+                {windows.length > 0
+                  ? 'Select an IDE window...'
+                  : 'No windows available'}
+              </option>
               {windows.map((window) => (
                 <option key={window.sessionId} value={window.sessionId}>
                   {window.displayName} - Port {window.port}
@@ -102,10 +94,10 @@ export function WindowSelectionPanel({ onDismiss }: WindowSelectionPanelProps) {
         )}
 
         {!selectedSession && (
-          <div className="rounded-lg bg-blue-100/80 p-3">
-            <p className="text-blue-700 text-sm">
-              <strong>Auto-detect mode:</strong> Commands will be sent to any
-              available IDE window.
+          <div className="rounded-lg border border-blue-200 bg-white/90 p-3">
+            <p className="text-blue-800 text-sm">
+              <strong>No window selected:</strong> Please select an IDE window
+              above to connect.
             </p>
           </div>
         )}

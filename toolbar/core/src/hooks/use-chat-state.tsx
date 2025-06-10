@@ -355,7 +355,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
             const result = await bridge.call.triggerAgentPrompt(
               {
                 prompt,
-                sessionId: selectedSession?.sessionId || windows[0]?.sessionId,
+                sessionId: selectedSession?.sessionId,
               },
               { onUpdate: (update) => {} },
             );

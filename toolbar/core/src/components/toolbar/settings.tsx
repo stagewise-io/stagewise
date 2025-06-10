@@ -68,7 +68,11 @@ const ConnectionSettings = () => {
             className="h-8 min-w-0 flex-1 rounded-lg border border-zinc-300 bg-zinc-500/10 px-3 text-sm backdrop-saturate-150 focus:border-zinc-500 focus:outline-none"
             disabled={isDiscovering}
           >
-            <option value="">Auto-detect (any window)</option>
+            <option value="" disabled>
+              {windows.length > 0
+                ? 'Select an IDE window...'
+                : 'No windows available'}
+            </option>
             {windows.map((window) => (
               <option key={window.sessionId} value={window.sessionId}>
                 {window.displayName} - Port {window.port}
@@ -111,11 +115,11 @@ const ConnectionSettings = () => {
         </div>
       )}
 
-      {!selectedSession && (
-        <div>
-          <p className="text-sm text-zinc-600">
-            <strong>Auto-detect mode:</strong> Commands will be sent to any
-            available IDE window.
+      {!selectedSession && windows.length > 0 && (
+        <div className="rounded-lg bg-amber-50 p-3">
+          <p className="text-amber-800 text-sm">
+            <strong>No window selected:</strong> Please select an IDE window
+            above to connect.
           </p>
         </div>
       )}

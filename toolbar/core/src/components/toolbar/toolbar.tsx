@@ -57,8 +57,6 @@ export function ToolbarDraggableBox() {
   const [openPanel, setOpenPanel] = useState<
     null | 'settings' | { pluginName: string; component: VNode }
   >(null);
-  const [windowSelectionDismissed, setWindowSelectionDismissed] =
-    useState(false);
 
   const chatState = useChatState();
 
@@ -70,13 +68,6 @@ export function ToolbarDraggableBox() {
       setOpenPanel(null);
     }
   }, [minimized]);
-
-  // Reset window selection dismissal when shouldPromptWindowSelection changes
-  useEffect(() => {
-    if (shouldPromptWindowSelection) {
-      setWindowSelectionDismissed(false);
-    }
-  }, [shouldPromptWindowSelection]);
 
   // Create a wrapper function to handle button clicks
   const handleButtonClick = (handler: () => void) => (e: MouseEvent) => {
@@ -96,9 +87,7 @@ export function ToolbarDraggableBox() {
   const isDisconnectedState = !isConnected && !isDiscovering;
   const isConnectedState = isConnected;
   const shouldShowWindowSelection =
-    shouldPromptWindowSelection &&
-    !windowSelectionDismissed &&
-    isConnectedState;
+    shouldPromptWindowSelection && isConnectedState;
 
   // Theme classes based on state
   const getThemeClasses = () => {
@@ -184,11 +173,7 @@ export function ToolbarDraggableBox() {
               discoveryError={discoveryError}
             />
           )}
-          {shouldShowWindowSelection && (
-            <WindowSelectionPanel
-              onDismiss={() => setWindowSelectionDismissed(true)}
-            />
-          )}
+          {shouldShowWindowSelection && <WindowSelectionPanel />}
           {isConnectedState &&
             openPanel === 'settings' &&
             !shouldShowWindowSelection && (
