@@ -1,5 +1,11 @@
 # @stagewise/extension-toolbar-srpc-contract
 
+## 0.1.3
+
+### Patch Changes
+
+- 2e121ac: Updated the README to clarify how framework-specific packages are named
+
 ## 0.1.2
 
 ### Patch Changes

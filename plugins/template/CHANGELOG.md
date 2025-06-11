@@ -1,5 +1,14 @@
 # @stagewise/plugin-example
 
+## 0.4.7
+
+### Patch Changes
+
+- 2e121ac: Updated the README to clarify how framework-specific packages are named
+- Updated dependencies [263c871]
+- Updated dependencies [2e121ac]
+  - @stagewise/toolbar@0.4.7
+
 ## 0.4.6
 
 ### Patch Changes

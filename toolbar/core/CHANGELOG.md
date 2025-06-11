@@ -1,5 +1,12 @@
 # @stagewise/toolbar
 
+## 0.4.7
+
+### Patch Changes
+
+- 263c871: Update README.md to include roocode and cline support
+- 2e121ac: Updated the README to clarify how framework-specific packages are named
+
 ## 0.4.6
 
 ### Patch Changes

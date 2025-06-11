@@ -1,5 +1,14 @@
 # @stagewise-plugins/angular
 
+## 0.4.5
+
+### Patch Changes
+
+- 2e121ac: Updated the README to clarify how framework-specific packages are named
+- Updated dependencies [263c871]
+- Updated dependencies [2e121ac]
+  - @stagewise/toolbar@0.4.7
+
 ## 0.4.4
 
 ### Patch Changes

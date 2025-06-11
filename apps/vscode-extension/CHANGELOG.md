@@ -1,5 +1,15 @@
 # stagewise-vscode-extension
 
+## 0.5.1
+
+### Patch Changes
+
+- 263c871: Add roo-code and cline support
+- 2e121ac: Updated the README to clarify how framework-specific packages are named
+- 1b6e4a2: Fix package dependency parser in order to report correct toolbar version
+- Updated dependencies [2e121ac]
+  - @stagewise/extension-toolbar-srpc-contract@0.1.3
+
 ## 0.5.0
 
 ### Minor Changes
