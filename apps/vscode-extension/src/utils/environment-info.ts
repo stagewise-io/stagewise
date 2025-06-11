@@ -2,6 +2,23 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import axios from 'axios';
+import * as yaml from 'js-yaml';
+
+interface PnpmLockFileContent {
+  importers?: Record<
+    string,
+    {
+      dependencies?: Record<string, { version?: string }>;
+      devDependencies?: Record<string, { version?: string }>;
+    }
+  >;
+  dependencies?: Record<string, { version?: string }>;
+  devDependencies?: Record<string, { version?: string }>;
+}
+
+interface BunLockFileContent {
+  packages?: Record<string, [string, string, object, string]>;
+}
 
 export class EnvironmentInfo {
   private static instance: EnvironmentInfo;
@@ -18,9 +35,21 @@ export class EnvironmentInfo {
   private constructor() {
     // Set up workspace change listeners
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      this.checkToolbarInstallation().catch((error) => {
-        console.error('Error checking toolbar installation:', error);
-      });
+      this.checkToolbarInstallation()
+        .then(() => {
+          // Output all collected information to the console logs
+          console.log('[EnvironmentInfo] Workspace changed:', {
+            toolbarInstalled: this.toolbarInstalled,
+            toolbarInstalledVersion: this.toolbarInstalledVersion,
+            latestToolbarVersion: this.latestToolbarVersion,
+            latestExtensionVersion: this.latestExtensionVersion,
+            workspaceLoaded: this.workspaceLoaded,
+            toolbarInstallations: this.toolbarInstallations,
+          });
+        })
+        .catch((error) => {
+          console.error('Error checking toolbar installation:', error);
+        });
     });
   }
 
@@ -47,6 +76,14 @@ export class EnvironmentInfo {
       await this.checkToolbarInstallation();
       await this.fetchLatestToolbarVersion();
       await this.fetchLatestExtensionVersion();
+
+      // Output all collected information to the console logs
+      console.log('[EnvironmentInfo] Initialized:', {
+        toolbarInstalled: this.toolbarInstalled,
+        toolbarInstalledVersion: this.toolbarInstalledVersion,
+        latestToolbarVersion: this.latestToolbarVersion,
+        latestExtensionVersion: this.latestExtensionVersion,
+      });
     } catch (error) {
       console.error('Error initializing EnvironmentInfo:', error);
     }
@@ -100,18 +137,140 @@ export class EnvironmentInfo {
   }
 
   private isFixedVersion(version: string): boolean {
-    // Check if version is a fixed version (e.g., "1.2.3")
+    // Check if version is a fixed version (e.g., "1.2.3", "0.4.5-alpha.1")
     // Not a range (e.g., "^1.2.3", "~1.2.3", ">=1.2.3")
     // Not a workspace/link (e.g., "workspace:*", "file:../path", "link:../path")
-    return /^\d+\.\d+\.\d+$/.test(version);
+    return /^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$/.test(version);
   }
 
-  private isWorkspaceOrLink(version: string): boolean {
-    return (
-      version.startsWith('workspace:') ||
-      version.startsWith('file:') ||
-      version.startsWith('link:')
-    );
+  private parsePackageLock(content: string): string[] {
+    try {
+      const data = JSON.parse(content);
+      const versions: string[] = [];
+
+      // package-lock.json has a packages object with all dependencies
+      if (data.packages) {
+        for (const [pkgPath, pkgData] of Object.entries(data.packages)) {
+          if (
+            pkgPath.includes('@stagewise/toolbar') &&
+            typeof pkgData === 'object' &&
+            pkgData !== null
+          ) {
+            const version = (pkgData as any).version;
+            if (version && this.isFixedVersion(version)) {
+              versions.push(version);
+            }
+          }
+        }
+      }
+
+      // Also check dependencies for older package-lock.json versions
+      if (data.dependencies) {
+        const checkDeps = (deps: Record<string, any>) => {
+          for (const [name, dep] of Object.entries(deps)) {
+            if (
+              name.startsWith('@stagewise/toolbar') &&
+              dep.version &&
+              this.isFixedVersion(dep.version)
+            ) {
+              versions.push(dep.version);
+            }
+            if (dep.dependencies) {
+              checkDeps(dep.dependencies);
+            }
+          }
+        };
+        checkDeps(data.dependencies);
+      }
+
+      return versions;
+    } catch (error) {
+      console.error('Error parsing package-lock.json:', error);
+      return [];
+    }
+  }
+
+  private parseYarnLock(content: string): string[] {
+    try {
+      const versions: string[] = [];
+      const lines = content.split('\n');
+      let currentPackage = '';
+      let currentVersion = '';
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        // Check for package name
+        if (line.startsWith('"@stagewise/toolbar')) {
+          currentPackage = line.split('"')[1];
+          continue;
+        }
+
+        // Check for version
+        if (line.trim().startsWith('version ')) {
+          currentVersion = line.split('"')[1];
+          if (currentPackage.startsWith('@stagewise/toolbar')) {
+            versions.push(currentVersion);
+          }
+          currentPackage = '';
+          currentVersion = '';
+        }
+      }
+
+      return versions;
+    } catch (error) {
+      console.error('Error parsing yarn.lock:', error);
+      return [];
+    }
+  }
+
+  private parsePnpmLock(content: string): string[] {
+    try {
+      const versions: string[] = [];
+      const data = yaml.load(content) as PnpmLockFileContent;
+
+      if (data.importers) {
+        for (const [_, pkgData] of Object.entries(data.importers)) {
+          for (const [depName, depVersion] of Object.entries(
+            pkgData.dependencies || {},
+          ).concat(Object.entries(pkgData.devDependencies || {}))) {
+            if (depName.includes('@stagewise/toolbar') && depVersion.version) {
+              versions.push(depVersion.version.split('(')[0]);
+            }
+          }
+        }
+      }
+
+      // Return unique versions
+      return [...new Set(versions)];
+    } catch (error) {
+      console.error('Error parsing pnpm-lock.yaml:', error);
+      return [];
+    }
+  }
+
+  private parseBunLock(content: string): string[] {
+    try {
+      const data = JSON.parse(content) as BunLockFileContent;
+      const versions: string[] = [];
+
+      // bun.lock has a packages object with all dependencies
+      if (data.packages) {
+        for (const [pkgName, pkgDetails] of Object.entries(data.packages)) {
+          if (pkgDetails[0].startsWith('@stagewise/toolbar')) {
+            const version = pkgDetails[0].split('@').pop();
+            if (version) {
+              versions.push(version);
+            }
+          }
+        }
+      }
+
+      return versions;
+    } catch (error) {
+      console.error('Error parsing bun.lock:', error);
+      return [];
+    }
   }
 
   private async checkToolbarInstallation() {
@@ -123,6 +282,7 @@ export class EnvironmentInfo {
         this.toolbarInstalled = false;
         this.toolbarInstalledVersion = null;
         this.toolbarInstallations = [];
+        console.log('[EnvironmentInfo] No workspace loaded');
         return;
       }
 
@@ -130,84 +290,35 @@ export class EnvironmentInfo {
       let oldestVersion: string | null = null;
 
       for (const folder of workspaceFolders) {
-        // Check package.json files
-        const packageJsonPath = path.join(folder.uri.fsPath, 'package.json');
-        if (fs.existsSync(packageJsonPath)) {
-          try {
-            const packageJsonContent = fs.readFileSync(
-              packageJsonPath,
-              'utf-8',
-            );
-            const packageJson = JSON.parse(packageJsonContent);
-            const dependencies = {
-              ...(packageJson.dependencies || {}),
-              ...(packageJson.devDependencies || {}),
-            };
-
-            for (const [dep, version] of Object.entries(dependencies)) {
-              if (dep.startsWith('@stagewise/toolbar')) {
-                const versionStr = version as string;
-
-                // Skip if it's a version range
-                if (
-                  !this.isFixedVersion(versionStr) &&
-                  !this.isWorkspaceOrLink(versionStr)
-                ) {
-                  continue;
-                }
-
-                const finalVersion = this.isWorkspaceOrLink(versionStr)
-                  ? EnvironmentInfo.WORKSPACE_VERSION
-                  : versionStr;
-
-                this.toolbarInstallations.push({
-                  version: finalVersion,
-                  path: packageJsonPath,
-                });
-
-                if (
-                  !oldestVersion ||
-                  this.compareVersions(finalVersion, oldestVersion) < 0
-                ) {
-                  oldestVersion = finalVersion;
-                }
-              }
-            }
-          } catch (error) {
-            console.error(
-              `Error processing package.json at ${packageJsonPath}:`,
-              error,
-            );
-          }
-        }
-
         // Check lock files
-        const lockFiles = ['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'];
-        for (const lockFile of lockFiles) {
-          const lockFilePath = path.join(folder.uri.fsPath, lockFile);
+        const lockFiles = [
+          {
+            name: 'package-lock.json',
+            parser: this.parsePackageLock.bind(this),
+          },
+          { name: 'yarn.lock', parser: this.parseYarnLock.bind(this) },
+          { name: 'pnpm-lock.yaml', parser: this.parsePnpmLock.bind(this) },
+          { name: 'bun.lock', parser: this.parseBunLock.bind(this) },
+        ];
+
+        for (const { name, parser } of lockFiles) {
+          const lockFilePath = path.join(folder.uri.fsPath, name);
           if (fs.existsSync(lockFilePath)) {
             try {
               const content = fs.readFileSync(lockFilePath, 'utf-8');
-              const toolbarRegex =
-                /@stagewise\/toolbar(?:-[^"'\s]*)?@([^"'\s]+)/g;
-              let match: RegExpExecArray | null = toolbarRegex.exec(content);
+              const versions = parser(content);
 
-              while (match !== null) {
-                const version = match[1];
-                // For lock files, we only care about fixed versions
-                if (this.isFixedVersion(version)) {
-                  this.toolbarInstallations.push({
-                    version,
-                    path: lockFilePath,
-                  });
-                  if (
-                    !oldestVersion ||
-                    this.compareVersions(version, oldestVersion) < 0
-                  ) {
-                    oldestVersion = version;
-                  }
+              for (const version of versions) {
+                this.toolbarInstallations.push({
+                  version,
+                  path: lockFilePath,
+                });
+                if (
+                  !oldestVersion ||
+                  this.compareVersions(version, oldestVersion) < 0
+                ) {
+                  oldestVersion = version;
                 }
-                match = toolbarRegex.exec(content);
               }
             } catch (error) {
               console.error(

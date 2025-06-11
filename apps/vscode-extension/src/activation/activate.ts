@@ -20,6 +20,7 @@ import {
 } from '../webviews/getting-started';
 import { ExtensionStorage } from '../data-storage';
 import { VScodeContext } from '../utils/vscode-context';
+import { EnvironmentInfo } from 'src/utils/environment-info';
 
 // Diagnostic collection specifically for our fake prompt
 const fakeDiagCollection =
@@ -48,6 +49,8 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(outputChannel); // Dispose output channel on deactivation
 
   const storage = new ExtensionStorage(context);
+
+  await EnvironmentInfo.getInstance();
 
   // Add configuration change listener to track telemetry setting changes
   const configChangeListener = vscode.workspace.onDidChangeConfiguration(
