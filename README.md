@@ -89,7 +89,7 @@ setupStagewise();
 
 ### Framework-specific integration examples
 
-For easier integration, we provide framework-specific NPM packages that come with dedicated toolbar components (e.g., `<StagewiseToolbar>`). You can usually import these from `@stagewise/[framework-name]`.
+For easier integration, we provide framework-specific NPM packages that come with dedicated toolbar components (e.g., `<StagewiseToolbar>`). You can usually import these from `@stagewise/toolbar-[framework-name]`.
 
 <details>
 <summary>React.js</summary>
