@@ -14,6 +14,7 @@ Without these guys, stagewise wouldn't be here. Huge props to:
 ## Special thanks to all the contributors
 
 - [denwaya34](https://github.com/denwaya34)
+- [hwanyoungChoi](https://github.com/hwanyoungChoi)
 
 ## I would like to join this list. How can I help the project?
 
