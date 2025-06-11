@@ -39,8 +39,8 @@ export async function injectPromptDiagnosticWithCallback(params: {
       );
       return;
     }
-    // Sleep 200ms to ensure editor is ready
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Sleep 150ms to ensure editor is ready
+    await new Promise((resolve) => setTimeout(resolve, 150));
   }
 
   const document = editor.document; // Get document early
@@ -72,6 +72,8 @@ export async function injectPromptDiagnosticWithCallback(params: {
       selectionOrCurrentLine.start,
       selectionOrCurrentLine.start,
     );
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     // 5. Execute the callback command
     await params.callback();
