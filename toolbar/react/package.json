@@ -8,6 +8,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "types": "./dist/index.d.ts",
+  "import": "./dist/index.js",
+  "require": "./dist/index.umd.cjs",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
