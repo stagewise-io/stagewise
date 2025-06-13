@@ -28,6 +28,19 @@ import ReactLogo from './_components/plugin_logos/react.svg';
 import VueLogo from './_components/plugin_logos/vue.svg';
 import AngularLogo from './_components/plugin_logos/angular.svg';
 
+import CursorLogo from './_components/ide_logos/cursor.png';
+import WindsurfLogo from './_components/ide_logos/windsurf.png';
+import GitHubCopilotLogo from './_components/ide_logos/github_copilot.png';
+import ClineLogo from './_components/ide_logos/cline.png';
+import RooCodeLogo from './_components/ide_logos/roo_code.png';
+
+import ReactFrameworkLogo from './_components/framework_logos/react.png';
+import VueFrameworkLogo from './_components/framework_logos/vue.png';
+import AngularFrameworkLogo from './_components/framework_logos/angular.png';
+import SvelteFrameworkLogo from './_components/framework_logos/svelte.png';
+import NextFrameworkLogo from './_components/framework_logos/next.png';
+import NuxtFrameworkLogo from './_components/framework_logos/nuxt.png';
+
 // GradientStarIcon: Star with gradient fill using mask
 function StarIcon({ className = '' }: { className?: string }) {
   return (
@@ -279,48 +292,48 @@ export default function Home() {
               Works With Your Stack
             </h2>
             <p className="mx-auto max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
-              stagewise integrates seamlessly with popular frontend frameworks
+              stagewise integrates seamlessly with popular frontend frameworks.
             </p>
           </div>
         </ScrollReveal>
 
-        <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-8">
+        <div className="mx-auto flex max-w-3xl flex-wrap justify-center gap-8">
           {[
             {
               name: 'React',
-              color: 'bg-cyan-400',
+              logo: ReactFrameworkLogo,
               href: 'https://github.com/stagewise-io/stagewise/tree/main/examples/react-example',
             },
             {
               name: 'Vue',
-              color: 'bg-emerald-500',
+              logo: VueFrameworkLogo,
               href: 'https://github.com/stagewise-io/stagewise/tree/main/examples/vue-example',
             },
             {
               name: 'Angular',
-              color: 'bg-red-500',
+              logo: AngularFrameworkLogo,
               href: 'https://github.com/stagewise-io/stagewise/tree/main/examples/angular-example',
             },
             {
               name: 'Svelte',
-              color: 'bg-orange-500',
+              logo: SvelteFrameworkLogo,
               href: 'https://github.com/stagewise-io/stagewise/tree/main/examples/svelte-kit-example',
             },
             {
               name: 'Next.js',
-              color: 'bg-zinc-900',
+              logo: NextFrameworkLogo,
               href: 'https://github.com/stagewise-io/stagewise/tree/main/examples/next-example',
             },
             {
               name: 'Nuxt',
-              color: 'bg-green-600',
+              logo: NuxtFrameworkLogo,
               href: 'https://github.com/stagewise-io/stagewise/tree/main/examples/nuxt-example',
             },
           ].map((framework, i) => (
             <ScrollReveal key={framework.name} delay={i * 100} direction="up">
               <Link
                 href={framework.href}
-                className="group flex cursor-pointer items-center gap-2 rounded-full border border-indigo-600/50 bg-zinc-50 px-6 py-2 shadow-[0_0_20px_rgba(128,90,213,0.15)] transition-all duration-300 dark:border-indigo-800 dark:bg-zinc-900"
+                className="group hover:-translate-y-0.5 flex cursor-pointer items-center gap-2 rounded-full border border-zinc-500/30 bg-zinc-50 px-6 py-2 shadow-[0_0_20px_rgba(128,90,213,0.15)] transition-all duration-300 ease-out hover:bg-white dark:border-indigo-800 dark:bg-zinc-900"
                 target="_blank"
                 onClick={() =>
                   posthog?.capture('framework_link_click', {
@@ -328,12 +341,19 @@ export default function Home() {
                   })
                 }
               >
-                <div className={`h-3 w-3 rounded-full ${framework.color}`} />
+                <Image
+                  src={framework.logo}
+                  alt={framework.name}
+                  className="size-6"
+                />
                 <span className="font-medium">{framework.name}</span>
               </Link>
             </ScrollReveal>
           ))}
         </div>
+        <p className="mx-auto mt-12 w-full text-center text-sm text-zinc-500 dark:text-zinc-500">
+          Click on a framework to see an example project.
+        </p>
       </section>
 
       {/* Plugin Section */}
@@ -392,23 +412,24 @@ export default function Home() {
       {/* Quickstart Section */}
       <section
         id="quickstart"
-        className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800"
+        className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 text-center md:py-32 dark:border-zinc-800"
       >
         <ScrollReveal>
           <div className="mx-auto max-w-4xl">
             <h2 className="mb-10 font-bold text-3xl md:text-4xl">Quickstart</h2>
-            <div className="space-y-12">
+            <div className="space-y-20">
               {/* Step 1: Install VS Code Extension */}
-              <div className="flex flex-col items-start gap-8 md:flex-row">
+              <div className="flex flex-col items-center justify-center gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-200 font-bold text-slate-900 text-xl dark:bg-zinc-800 dark:text-white">
                   1
                 </div>
                 <div>
                   <h3 className="mb-4 font-semibold text-2xl">
-                    Install the VS Code extension
+                    Install the code editor extension
                   </h3>
                   <p className="mb-4 text-zinc-600 dark:text-zinc-400">
-                    Install the extension from the Visual Studio Marketplace.
+                    Install the extension from the extension store of your
+                    favorite code editor.
                   </p>
                   <Link
                     href="https://marketplace.visualstudio.com/items?itemName=stagewise.stagewise-vscode-extension"
@@ -416,12 +437,16 @@ export default function Home() {
                       posthog?.capture('quickstart_get_extension_click')
                     }
                   >
-                    <GradientButton>Get Extension</GradientButton>
+                    <GradientButton>
+                      Get from VS Code Marketplace
+                      <ArrowRight className="ml-2 size-4" />
+                    </GradientButton>
                   </Link>
                 </div>
               </div>
+
               {/* Step 2: Install and inject the toolbar */}
-              <div className="flex flex-col items-start gap-8 md:flex-row">
+              <div className="flex flex-col items-center justify-center gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-200 font-bold text-slate-900 text-xl dark:bg-zinc-800 dark:text-white">
                   2
                 </div>
@@ -452,10 +477,13 @@ export default function Home() {
                       </li>
                     </ol>
                   </div>
-                  <p className="mb-4 text-zinc-600 dark:text-zinc-400">
+                  <p className="mb-4 text-center text-zinc-600 dark:text-zinc-400">
                     Or follow the manual way:
                   </p>
-                  <Clipboard text="pnpm i -D @stagewise/toolbar" />
+                  <Clipboard
+                    className="mx-auto"
+                    text="pnpm i -D @stagewise/toolbar"
+                  />
                   ⚡️ The toolbar will <strong>automatically connect</strong> to
                   the extension!
                   <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
@@ -467,6 +495,22 @@ export default function Home() {
                   </p>
                 </div>
               </div>
+
+              {/* Step 3: tart vibe coding */}
+              <div className="flex flex-col items-center justify-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-200 font-bold text-slate-900 text-xl dark:bg-zinc-800 dark:text-white">
+                  3
+                </div>
+                <div>
+                  <h3 className="mb-4 font-semibold text-2xl">
+                    Start your visual vibe coding journey! 🎉
+                  </h3>
+                  <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+                    Click on the chat icon in the bottom right corner of your
+                    app to get started.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </ScrollReveal>
@@ -475,50 +519,51 @@ export default function Home() {
       {/* Agent Support Section */}
       <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800">
         <ScrollReveal>
-          <div className="mx-auto mb-16 max-w-4xl">
+          <div className="mx-auto mb-16 max-w-4xl text-center">
             <h2 className="mb-6 font-bold text-3xl md:text-4xl">
               Agent Support
             </h2>
             <p className="text-lg text-zinc-600 dark:text-zinc-400">
-              Compatible with popular AI coding assistants
+              Compatible with all popular AI coding assistants
             </p>
           </div>
         </ScrollReveal>
 
-        <ScrollReveal delay={200}>
-          <div className="mx-auto max-w-4xl rounded-lg bg-gradient-to-br from-zinc-100 to-indigo-200/30 p-12 shadow-[0_0_50px_rgba(128,90,213,0.2)] transition-all duration-500 dark:from-zinc-900 dark:to-indigo-900/30">
-            <table className="w-full">
-              <thead>
-                <tr className="border-zinc-300 border-b dark:border-zinc-800">
-                  <th className="px-4 py-3 text-left font-semibold">Agent</th>
-                  <th className="px-4 py-3 text-left font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-zinc-300 border-b dark:border-zinc-700">
-                  <td className="px-4 py-3">Cursor</td>
-                  <td className="px-4 py-3 text-green-500">Supported</td>
-                </tr>
-                <tr className="border-zinc-300 border-b dark:border-zinc-700">
-                  <td className="px-4 py-3">GitHub Copilot</td>
-                  <td className="px-4 py-3 text-green-500">Supported</td>
-                </tr>
-                <tr className="border-zinc-300 border-b dark:border-zinc-700">
-                  <td className="px-4 py-3">Windsurf</td>
-                  <td className="px-4 py-3 text-green-500">Supported</td>
-                </tr>
-                <tr className="border-zinc-300 border-b dark:border-zinc-700">
-                  <td className="px-4 py-3">Cline</td>
-                  <td className="px-4 py-3 text-red-500">Not Supported</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-3">Zed</td>
-                  <td className="px-4 py-3 text-red-500">Not Supported</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </ScrollReveal>
+        <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-8">
+          {[
+            {
+              name: 'Cursor',
+              logo: CursorLogo,
+            },
+            {
+              name: 'Windsurf',
+              logo: WindsurfLogo,
+            },
+            {
+              name: 'GitHub Copilot',
+              logo: GitHubCopilotLogo,
+            },
+            {
+              name: 'Cline',
+              logo: ClineLogo,
+            },
+            {
+              name: 'Roo Code',
+              logo: RooCodeLogo,
+            },
+          ].map((framework, i) => (
+            <ScrollReveal key={framework.name} delay={i * 100} direction="up">
+              <div className="group flex items-center gap-2 rounded-full border border-zinc-500/30 bg-zinc-50 px-6 py-2 shadow-[0_0_20px_rgba(128,90,213,0.15)] transition-all duration-300 dark:border-indigo-800 dark:bg-zinc-900">
+                <Image
+                  src={framework.logo}
+                  alt={framework.name}
+                  className="h-6 w-6"
+                />
+                <span className="font-medium">{framework.name}</span>
+              </div>
+            </ScrollReveal>
+          ))}
+        </div>
       </section>
 
       {/* CTA Section */}

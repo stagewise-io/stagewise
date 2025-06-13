@@ -3,11 +3,14 @@
 import { useState } from 'react';
 import { CopyIcon, CheckIcon } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
+import { cn } from '@stagewise/ui/lib/utils';
 
 export function Clipboard({
   text,
+  className,
 }: {
   text: string;
+  className?: string;
 }) {
   const [copied, setCopied] = useState(false);
   const posthog = usePostHog();
@@ -26,7 +29,10 @@ export function Clipboard({
   return (
     <button
       type="button"
-      className="mb-4 flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-100 p-4 dark:border-zinc-800 dark:bg-zinc-900"
+      className={cn(
+        'mb-4 flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-100 p-4 dark:border-zinc-800 dark:bg-zinc-900',
+        className,
+      )}
       onClick={handleCopy}
       aria-label="Copy to clipboard"
     >
