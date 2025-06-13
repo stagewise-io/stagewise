@@ -1,7 +1,8 @@
 import { cn } from '@/utils';
 import type { ComponentChildren } from 'preact';
+import type { ButtonHTMLAttributes } from 'preact/compat';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ComponentChildren;
   style?: 'primary' | 'secondary' | 'outline' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
