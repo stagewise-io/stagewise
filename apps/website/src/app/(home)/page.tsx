@@ -335,6 +335,7 @@ export default function Home() {
                 href={framework.href}
                 className="group hover:-translate-y-0.5 flex cursor-pointer items-center gap-2 rounded-full border border-zinc-500/30 bg-zinc-50 px-6 py-2 shadow-[0_0_20px_rgba(128,90,213,0.15)] transition-all duration-300 ease-out hover:bg-white dark:border-indigo-800 dark:bg-zinc-900"
                 target="_blank"
+                rel="noopener noreferrer"
                 onClick={() =>
                   posthog?.capture('framework_link_click', {
                     framework: framework.name,
