@@ -2,6 +2,7 @@
   "pages": [
     "index",
     "quickstart",
+    "removal",
     "plugins",
     "debug",
     "community",
