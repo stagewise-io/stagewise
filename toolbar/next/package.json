@@ -1,7 +1,7 @@
 {
   "name": "@stagewise/toolbar-next",
   "private": false,
-  "version": "0.4.7",
+  "version": "0.4.8",
   "type": "module",
   "files": ["dist"],
   "license": "AGPL-3.0-only",

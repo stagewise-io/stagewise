@@ -1,5 +1,12 @@
 # @stagewise/toolbar
 
+## 0.4.8
+
+### Patch Changes
+
+- 02b58d8: Fix type issues in plugin-sdk Button component
+- 33be114: add legacy module resolution support for older bundlers
+
 ## 0.4.7
 
 ### Patch Changes

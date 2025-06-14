@@ -1,5 +1,13 @@
 # @stagewise/toolbar-next
 
+## 0.4.8
+
+### Patch Changes
+
+- 33be114: add legacy module resolution support for older bundlers
+- Updated dependencies [33be114]
+  - @stagewise/toolbar-react@0.4.8
+
 ## 0.4.7
 
 ### Patch Changes

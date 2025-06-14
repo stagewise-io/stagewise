@@ -1,5 +1,11 @@
 # stagewise-vscode-extension
 
+## 0.6.0
+
+### Minor Changes
+
+- a1e0027: Add update recommendations for outdated toolbar packages
+
 ## 0.5.1
 
 ### Patch Changes

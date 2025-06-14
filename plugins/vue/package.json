@@ -1,6 +1,6 @@
 {
   "name": "@stagewise-plugins/vue",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "type": "module",
   "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
   "author": "tiq UG (haftungsbeschränkt)",

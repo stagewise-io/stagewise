@@ -1,6 +1,6 @@
 {
   "name": "@stagewise/plugin-example",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "private": true,
   "type": "module",
   "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
