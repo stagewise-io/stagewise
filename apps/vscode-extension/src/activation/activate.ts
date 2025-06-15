@@ -23,6 +23,7 @@ import { ExtensionStorage } from '../data-storage';
 import { VScodeContext } from '../utils/vscode-context';
 import { EnvironmentInfo } from 'src/utils/environment-info';
 import { ToolbarUpdateNotificator } from 'src/utils/toolbar-update-notificator';
+import { ToolbarIntegrationNotificator } from 'src/utils/toolbar-integration-notificator';
 
 // Diagnostic collection specifically for our fake prompt
 const fakeDiagCollection =
@@ -60,6 +61,10 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize the toolbar update notificator
   const updateNotificator = new ToolbarUpdateNotificator(storage);
   context.subscriptions.push(updateNotificator); // This will call dispose() when the extension is deactivated
+
+  // Initialize the toolbar integration notificator
+  const integrationNotificator = new ToolbarIntegrationNotificator(storage);
+  context.subscriptions.push(integrationNotificator); // This will call dispose() when the extension is deactivated
 
   // Add configuration change listener to track telemetry setting changes
   const configChangeListener = vscode.workspace.onDidChangeConfiguration(

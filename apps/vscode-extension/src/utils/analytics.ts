@@ -70,6 +70,10 @@ export enum EventName {
   TOOLBAR_UPDATE_NOTIFICATION_IGNORED = 'toolbar_update_notification_ignored',
   TOOLBAR_UPDATE_NOTIFICATION_DISMISSED = 'toolbar_update_notification_dismissed',
 
+  SHOW_TOOLBAR_INTEGRATION_NOTIFICATION = 'show_toolbar_integration_notification',
+  TOOLBAR_INTEGRATION_NOTIFICATION_IGNORE = 'toolbar_integration_notification_ignore',
+  TOOLBAR_INTEGRATION_NOTIFICATION_DISMISSED = 'toolbar_integration_notification_dismissed',
+
   TOOLBAR_AUTO_UPDATE_PROMPT_SENT = 'toolbar_auto_update_prompt_sent',
 }
 
