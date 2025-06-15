@@ -44,13 +44,42 @@ export function isAnalyticsEnabled(): boolean {
   return config.get<boolean>('telemetry.enabled', true);
 }
 
+export enum EventName {
+  EXTENSION_ACTIVATED = 'extension_activated',
+  ACTIVATION_ERROR = 'activation_error',
+
+  OPENED_WEB_APP_WORKSPACE = 'opened_web_app_workspace',
+
+  GETTING_STARTED_PANEL_SHOWN = 'getting_started_panel_shown',
+  GETTING_STARTED_PANEL_MANUAL_SHOW = 'getting_started_panel_manual_show',
+  INTERACTED_WITH_GETTING_STARTED_PANEL = 'interacted_with_getting_started_panel',
+  DISMISSED_GETTING_STARTED_PANEL = 'dismissed_getting_started_panel',
+  CLICKED_SETUP_TOOLBAR_IN_GETTING_STARTED_PANEL = 'clicked_setup_toolbar_in_getting_started_panel',
+  CLICKED_OPEN_DOCS_IN_GETTING_STARTED_PANEL = 'clicked_open_docs_in_getting_started_panel',
+
+  POST_SETUP_FEEDBACK = 'post_setup_feedback',
+
+  TOOLBAR_AUTO_SETUP_STARTED = 'toolbar_auto_setup_started',
+
+  TOOLBAR_CONNECTED = 'toolbar_connected',
+
+  AGENT_PROMPT_TRIGGERED = 'agent_prompt_triggered',
+
+  SHOW_TOOLBAR_UPDATE_NOTIFICATION = 'show_toolbar_update_notification',
+  TOOLBAR_UPDATE_NOTIFICATION_AUTO_UPDATE = 'toolbar_update_notification_auto_update',
+  TOOLBAR_UPDATE_NOTIFICATION_IGNORED = 'toolbar_update_notification_ignored',
+  TOOLBAR_UPDATE_NOTIFICATION_DISMISSED = 'toolbar_update_notification_dismissed',
+
+  TOOLBAR_AUTO_UPDATE_PROMPT_SENT = 'toolbar_auto_update_prompt_sent',
+}
+
 /**
  * Tracks an event using PostHog if analytics is enabled
  * @param eventName The name of the event to track
  * @param properties Optional properties to include with the event
  */
 export async function trackEvent(
-  eventName: string,
+  eventName: EventName,
   properties?: Record<string, any>,
 ): Promise<void> {
   if (!isAnalyticsEnabled()) {
