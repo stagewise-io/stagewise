@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { ExtensionStorage } from '../data-storage';
-import { trackEvent } from 'src/utils/analytics';
+import { trackEvent, EventName } from 'src/utils/analytics';
 
 export function createGettingStartedPanel(
   context: vscode.ExtensionContext,
@@ -18,12 +18,18 @@ export function createGettingStartedPanel(
   );
   panel.webview.html = getWebviewContent(panel.webview, context);
 
+  // Immediately mark as seen
+  storage.set('stagewise.hasSeenGettingStarted', true);
+
   // Handle messages from the webview
   panel.webview.onDidReceiveMessage(
     async (message) => {
       switch (message.command) {
         case 'setupToolbar':
           try {
+            await trackEvent(
+              EventName.CLICKED_SETUP_TOOLBAR_IN_GETTING_STARTED_PANEL,
+            );
             await onSetupToolbar();
           } catch (error) {
             // Show error message in webview
@@ -36,6 +42,9 @@ export function createGettingStartedPanel(
           }
           break;
         case 'openDocs':
+          await trackEvent(
+            EventName.CLICKED_OPEN_DOCS_IN_GETTING_STARTED_PANEL,
+          );
           vscode.env.openExternal(
             vscode.Uri.parse(
               'https://stagewise.io/docs/quickstart#2-install-and-inject-the-toolbar',
@@ -45,7 +54,7 @@ export function createGettingStartedPanel(
           break;
         case 'captureFeedback':
           // Create posthog event
-          await trackEvent('post_setup_feedback', {
+          await trackEvent(EventName.POST_SETUP_FEEDBACK, {
             type: message.data.type,
             text: message.data.text,
           });
@@ -56,10 +65,11 @@ export function createGettingStartedPanel(
           );
           break;
         case 'dismissPanel':
+          await trackEvent(EventName.DISMISSED_GETTING_STARTED_PANEL);
           panel.dispose();
           break;
         case 'markGettingStartAsSeen':
-          await storage.set('stagewise.hasSeenGettingStarted', true);
+          await trackEvent(EventName.INTERACTED_WITH_GETTING_STARTED_PANEL);
           break;
       }
     },
