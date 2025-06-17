@@ -7,7 +7,15 @@ import { AngularPlugin } from '@stagewise-plugins/angular';
 // Only initialize in development mode (customize as needed)
 if (!('production' in window) || !window.production) {
   initToolbar({
-    plugins: [AngularPlugin],
+    plugins: [
+      {
+        ...AngularPlugin,
+        onPromptTransmit: (prompt) => {
+          // copy to clipboard
+          void navigator.clipboard.writeText(`prompt: ${prompt}`);
+        },
+      } satisfies typeof AngularPlugin,
+    ],
   });
 }
 
