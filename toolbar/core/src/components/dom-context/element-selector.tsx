@@ -39,9 +39,13 @@ export function ElementSelector(props: ElementSelectorProps) {
 
   const handleMouseClick = useCallback<
     MouseEventHandler<HTMLDivElement>
-  >(() => {
+  >((event) => {
     if (!lastHoveredElement.current) return;
     if (props.ignoreList.includes(lastHoveredElement.current)) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
     props.onElementSelected(lastHoveredElement.current);
   }, [props]);
 
