@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { TextEncoder, TextDecoder } from 'node:util'; // Node.js built-in
+import { VScodeContext } from './vscode-context';
 
 /**
  * A reusable class to manage key-value storage within an extension's globalStorageUri.
@@ -8,18 +9,31 @@ import { TextEncoder, TextDecoder } from 'node:util'; // Node.js built-in
  * It stores each key-value pair as a separate file in the extension's storage directory,
  * using JSON for serialization.
  */
-export class ExtensionStorage {
-  private storageUri: vscode.Uri;
+export class StorageService {
+  private static instance: StorageService;
+  private context = VScodeContext.getInstance();
+  private storageUri!: vscode.Uri;
   private textEncoder = new TextEncoder(); // For converting string to Uint8Array (UTF-8)
   private textDecoder = new TextDecoder(); // For converting Uint8Array to string (UTF-8)
 
-  /**
-   * @param context The extension context, used to access the global storage path.
-   */
-  constructor(context: vscode.ExtensionContext) {
-    // The globalStorageUri is a directory specific to this extension.
-    // It's the perfect place for data that should be removed upon uninstall.
-    this.storageUri = context.globalStorageUri;
+  private constructor() {}
+
+  public static getInstance() {
+    if (!StorageService.instance) {
+      StorageService.instance = new StorageService();
+    }
+    return StorageService.instance;
+  }
+
+  public initialize() {
+    if (!this.context.isInitialized()) {
+      throw new Error(
+        'VScodeContext has not been initialized. Call VScodeContext.getInstance().initialize(context) first.',
+      );
+    }
+    this.storageUri = this.context.getContext()!.globalStorageUri;
+    // ensure storage directory exists
+    vscode.workspace.fs.createDirectory(this.storageUri);
   }
 
   /**

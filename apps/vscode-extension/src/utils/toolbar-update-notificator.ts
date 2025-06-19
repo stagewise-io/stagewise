@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import type { ExtensionStorage } from '../data-storage';
+import { StorageService } from './storage-service';
 import { EnvironmentInfo } from './environment-info';
 import { updateToolbar } from 'src/auto-prompts/update-toolbar';
 import { compareVersions } from './lock-file-parsers/version-comparator';
-import { trackEvent, EventName } from './analytics';
+import { AnalyticsService, EventName } from './analytics-service';
 import { getWorkspaceId } from './get-workspace-id';
 
 interface ToolbarVersionInfo {
@@ -12,14 +12,24 @@ interface ToolbarVersionInfo {
   workspaceId: string;
 }
 
-export class ToolbarUpdateNotificator {
+export class ToolbarUpdateNotificator implements vscode.Disposable {
+  private static instance: ToolbarUpdateNotificator;
   private static readonly STORAGE_KEY_PREFIX = 'toolbar_version_';
-  private storage: ExtensionStorage;
+  private storage: StorageService = StorageService.getInstance();
   private disposables: vscode.Disposable[] = [];
+  private analyticsService = AnalyticsService.getInstance();
 
-  constructor(storage: ExtensionStorage) {
-    console.log('[ToolbarUpdateNotificator]: Constructor');
-    this.storage = storage;
+  private constructor() {}
+
+  public static getInstance(): ToolbarUpdateNotificator {
+    if (!ToolbarUpdateNotificator.instance) {
+      ToolbarUpdateNotificator.instance = new ToolbarUpdateNotificator();
+    }
+    return ToolbarUpdateNotificator.instance;
+  }
+
+  public initialize() {
+    console.log('[ToolbarUpdateNotificator]: Initializing');
     void this.setupWorkspaceListener().catch((err) =>
       console.error('[ToolbarUpdateNotificator] Failed to initialise', err),
     );
@@ -62,7 +72,7 @@ export class ToolbarUpdateNotificator {
    * @param workspaceId The unique identifier of the current workspace
    */
   public async checkForUpdates(workspaceId: string): Promise<void> {
-    const envInfo = await EnvironmentInfo.getInstance();
+    const envInfo = EnvironmentInfo.getInstance();
 
     const installedVersion = envInfo.getToolbarInstalledVersion();
     const latestVersion = envInfo.getLatestAvailableToolbarVersion();
@@ -109,11 +119,15 @@ export class ToolbarUpdateNotificator {
       .showInformationMessage(message, 'Auto-update', 'Ignore')
       .then(async (result) => {
         if (result === 'Auto-update') {
-          trackEvent(EventName.TOOLBAR_UPDATE_NOTIFICATION_AUTO_UPDATE);
+          this.analyticsService.trackEvent(
+            EventName.TOOLBAR_UPDATE_NOTIFICATION_AUTO_UPDATE,
+          );
           await this.sendToolbarAutoUpdatePrompt(workspaceId, latestVersion);
           return 'Auto-update';
         } else if (result === 'Ignore') {
-          trackEvent(EventName.TOOLBAR_UPDATE_NOTIFICATION_IGNORED);
+          this.analyticsService.trackEvent(
+            EventName.TOOLBAR_UPDATE_NOTIFICATION_IGNORED,
+          );
           await this.storage.set<ToolbarVersionInfo>(storageKey, {
             installedVersion,
             latestVersion,
@@ -121,11 +135,15 @@ export class ToolbarUpdateNotificator {
           });
           return 'Ignore';
         } else {
-          trackEvent(EventName.TOOLBAR_UPDATE_NOTIFICATION_DISMISSED);
+          this.analyticsService.trackEvent(
+            EventName.TOOLBAR_UPDATE_NOTIFICATION_DISMISSED,
+          );
           return 'Dismissed';
         }
       });
-    trackEvent(EventName.SHOW_TOOLBAR_UPDATE_NOTIFICATION);
+    this.analyticsService.trackEvent(
+      EventName.SHOW_TOOLBAR_UPDATE_NOTIFICATION,
+    );
   }
 
   private async sendToolbarAutoUpdatePrompt(
