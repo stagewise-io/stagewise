@@ -1,17 +1,29 @@
 import * as vscode from 'vscode';
-import type { ExtensionStorage } from '../data-storage';
 import { EnvironmentInfo } from './environment-info';
-import { trackEvent, EventName } from './analytics';
+import { AnalyticsService, EventName } from './analytics-service';
 import { getWorkspaceId } from './get-workspace-id';
 import { setupToolbar } from 'src/auto-prompts/setup-toolbar';
+import { StorageService } from './storage-service';
 
-export class ToolbarIntegrationNotificator {
-  private storage: ExtensionStorage;
+export class ToolbarIntegrationNotificator implements vscode.Disposable {
+  private static instance: ToolbarIntegrationNotificator;
+  private storage!: StorageService;
   private disposables: vscode.Disposable[] = [];
+  private analyticsService = AnalyticsService.getInstance();
 
-  constructor(storage: ExtensionStorage) {
-    console.log('[ToolbarIntegrationNotificator]: Constructor');
-    this.storage = storage;
+  private constructor() {}
+
+  public static getInstance() {
+    if (!ToolbarIntegrationNotificator.instance) {
+      ToolbarIntegrationNotificator.instance =
+        new ToolbarIntegrationNotificator();
+    }
+    return ToolbarIntegrationNotificator.instance;
+  }
+
+  public initialize() {
+    console.log('[ToolbarIntegrationNotificator]: Initializing');
+    this.storage = StorageService.getInstance();
     void this.setupWorkspaceListener();
   }
 
@@ -54,7 +66,7 @@ export class ToolbarIntegrationNotificator {
    * @param workspaceId The unique identifier of the current workspace
    */
   public async checkForIntegration(workspaceId: string): Promise<void> {
-    const envInfo = await EnvironmentInfo.getInstance();
+    const envInfo = EnvironmentInfo.getInstance();
 
     const isWebAppWorkspace = envInfo.isWebAppWorkspace;
     const isToolbarInstalled = envInfo.getToolbarInstalled();
@@ -108,18 +120,26 @@ export class ToolbarIntegrationNotificator {
       .showInformationMessage(message, 'Enable stagewise', 'Ignore')
       .then(async (result) => {
         if (result === 'Enable stagewise') {
-          trackEvent(EventName.TOOLBAR_AUTO_SETUP_STARTED);
+          this.analyticsService.trackEvent(
+            EventName.TOOLBAR_AUTO_SETUP_STARTED,
+          );
           await setupToolbar();
           return 'Enable stagewise';
         } else if (result === 'Ignore') {
-          trackEvent(EventName.TOOLBAR_UPDATE_NOTIFICATION_IGNORED);
+          this.analyticsService.trackEvent(
+            EventName.TOOLBAR_UPDATE_NOTIFICATION_IGNORED,
+          );
           await this.storage.set<boolean>(storageKey, true);
           return 'Ignore';
         } else {
-          trackEvent(EventName.TOOLBAR_INTEGRATION_NOTIFICATION_DISMISSED);
+          this.analyticsService.trackEvent(
+            EventName.TOOLBAR_INTEGRATION_NOTIFICATION_DISMISSED,
+          );
           return 'Dismissed';
         }
       });
-    trackEvent(EventName.SHOW_TOOLBAR_UPDATE_NOTIFICATION);
+    this.analyticsService.trackEvent(
+      EventName.SHOW_TOOLBAR_UPDATE_NOTIFICATION,
+    );
   }
 }

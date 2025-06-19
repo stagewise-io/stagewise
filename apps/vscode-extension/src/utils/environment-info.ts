@@ -2,11 +2,10 @@ import * as vscode from 'vscode';
 import { compareVersions as compareVersionsUtil } from './lock-file-parsers/version-comparator';
 import { RegistryService } from './registry-service';
 import { WorkspaceService } from './workspace-service';
-import { trackEvent, EventName } from './analytics';
+import { AnalyticsService, EventName } from './analytics-service';
 
 export class EnvironmentInfo {
   private static instance: EnvironmentInfo;
-  private static initializationPromise: Promise<void> | null = null;
   private toolbarInstalled = false;
   private toolbarInstalledVersion: string | null = null;
   private latestToolbarVersion: string | null = null;
@@ -14,46 +13,36 @@ export class EnvironmentInfo {
   private workspaceLoaded = false;
   private toolbarInstallations: Array<{ version: string; path: string }> = [];
   private webAppWorkspace = false;
-  private readonly workspaceService: WorkspaceService;
-  private readonly registryService: RegistryService;
+  private readonly workspaceService = WorkspaceService.getInstance();
+  private readonly registryService = RegistryService.getInstance();
+  private analyticsService: AnalyticsService = AnalyticsService.getInstance();
 
-  private constructor() {
-    this.workspaceService = new WorkspaceService();
-    this.registryService = new RegistryService();
-    // Set up workspace change listeners
-    vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      this.refreshState()
-        .then(() => {
-          if (this.webAppWorkspace) {
-            trackEvent(EventName.OPENED_WEB_APP_WORKSPACE);
-          }
-        })
-        .catch((error) => {
-          console.error('Error refreshing environment state:', error);
-        });
-    });
-  }
+  private constructor() {}
 
-  public static async getInstance(): Promise<EnvironmentInfo> {
-    try {
-      if (!EnvironmentInfo.instance) {
-        EnvironmentInfo.instance = new EnvironmentInfo();
-        EnvironmentInfo.initializationPromise =
-          EnvironmentInfo.instance.initialize();
-      }
-
-      // Wait for initialization to complete before returning the instance
-      await EnvironmentInfo.initializationPromise;
-      return EnvironmentInfo.instance;
-    } catch (error) {
-      console.error('Error getting EnvironmentInfo instance:', error);
-      // Return a new instance even if initialization failed
-      return EnvironmentInfo.instance || new EnvironmentInfo();
+  public static getInstance() {
+    if (!EnvironmentInfo.instance) {
+      EnvironmentInfo.instance = new EnvironmentInfo();
     }
+    return EnvironmentInfo.instance;
   }
 
-  private async initialize() {
+  public async initialize() {
     try {
+      // Set up workspace change listeners
+      vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        this.refreshState()
+          .then(() => {
+            if (this.webAppWorkspace) {
+              this.analyticsService.trackEvent(
+                EventName.OPENED_WEB_APP_WORKSPACE,
+              );
+            }
+          })
+          .catch((error) => {
+            console.error('Error refreshing environment state:', error);
+          });
+      });
+
       await this.refreshState();
       // Output all collected information to the console logs
       console.log('[EnvironmentInfo] Initialized:', {
@@ -65,7 +54,7 @@ export class EnvironmentInfo {
       });
 
       if (this.webAppWorkspace) {
-        trackEvent(EventName.OPENED_WEB_APP_WORKSPACE);
+        this.analyticsService.trackEvent(EventName.OPENED_WEB_APP_WORKSPACE);
       }
     } catch (error) {
       console.error('Error initializing EnvironmentInfo:', error);

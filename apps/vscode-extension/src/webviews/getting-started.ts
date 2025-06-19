@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import type { ExtensionStorage } from '../data-storage';
-import { trackEvent, EventName } from '../utils/analytics';
+import type { StorageService } from '../utils/storage-service';
+import { AnalyticsService, EventName } from '../utils/analytics-service';
 
 export function createGettingStartedPanel(
   context: vscode.ExtensionContext,
-  storage: ExtensionStorage,
+  storage: StorageService,
   onSetupToolbar: () => Promise<void>,
 ): vscode.WebviewPanel {
   const panel = vscode.window.createWebviewPanel(
@@ -27,7 +27,7 @@ export function createGettingStartedPanel(
       switch (message.command) {
         case 'setupToolbar':
           try {
-            await trackEvent(
+            AnalyticsService.getInstance().trackEvent(
               EventName.CLICKED_SETUP_TOOLBAR_IN_GETTING_STARTED_PANEL,
             );
             await onSetupToolbar();
@@ -42,7 +42,7 @@ export function createGettingStartedPanel(
           }
           break;
         case 'openDocs':
-          await trackEvent(
+          AnalyticsService.getInstance().trackEvent(
             EventName.CLICKED_OPEN_DOCS_IN_GETTING_STARTED_PANEL,
           );
           vscode.env.openExternal(
@@ -54,10 +54,13 @@ export function createGettingStartedPanel(
           break;
         case 'captureFeedback':
           // Create posthog event
-          await trackEvent(EventName.POST_SETUP_FEEDBACK, {
-            type: message.data.type,
-            text: message.data.text,
-          });
+          AnalyticsService.getInstance().trackEvent(
+            EventName.POST_SETUP_FEEDBACK,
+            {
+              type: message.data.type,
+              text: message.data.text,
+            },
+          );
           break;
         case 'showRepo':
           vscode.env.openExternal(
@@ -65,11 +68,15 @@ export function createGettingStartedPanel(
           );
           break;
         case 'dismissPanel':
-          await trackEvent(EventName.DISMISSED_GETTING_STARTED_PANEL);
+          AnalyticsService.getInstance().trackEvent(
+            EventName.DISMISSED_GETTING_STARTED_PANEL,
+          );
           panel.dispose();
           break;
         case 'markGettingStartAsSeen':
-          await trackEvent(EventName.INTERACTED_WITH_GETTING_STARTED_PANEL);
+          AnalyticsService.getInstance().trackEvent(
+            EventName.INTERACTED_WITH_GETTING_STARTED_PANEL,
+          );
           break;
       }
     },
@@ -151,7 +158,7 @@ function getWebviewContent(
 }
 
 export async function shouldShowGettingStarted(
-  storage: ExtensionStorage,
+  storage: StorageService,
 ): Promise<boolean> {
   // Show getting started panel if the user hasn't seen it before
   return !(await storage.get('stagewise.hasSeenGettingStarted', false));

@@ -2,6 +2,17 @@ import axios from 'axios';
 import { compareVersions as compareVersionsUtil } from './lock-file-parsers/version-comparator';
 
 export class RegistryService {
+  private static instance: RegistryService;
+
+  private constructor() {}
+
+  public static getInstance() {
+    if (!RegistryService.instance) {
+      RegistryService.instance = new RegistryService();
+    }
+    return RegistryService.instance;
+  }
+
   public async getLatestToolbarVersion(): Promise<string | null> {
     try {
       const response = await axios.get(

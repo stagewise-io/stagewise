@@ -28,6 +28,17 @@ const WEB_APP_DEPS = [
 ];
 
 export class WorkspaceService {
+  private static instance: WorkspaceService;
+
+  private constructor() {}
+
+  public static getInstance() {
+    if (!WorkspaceService.instance) {
+      WorkspaceService.instance = new WorkspaceService();
+    }
+    return WorkspaceService.instance;
+  }
+
   public getToolbarInstallations(): Array<{
     version: string;
     path: string;
@@ -57,9 +68,13 @@ export class WorkspaceService {
   }
 
   public isWebAppWorkspace(): boolean {
+    console.log(
+      '[WorkspaceService] Checking if workspace is a web app workspace',
+    );
     let foundWebAppDep = false;
     this.forEachWorkspaceFolderWithLockFile((dependencies) => {
       if (this.hasWebAppDeps(dependencies)) {
+        console.log('[WorkspaceService] Found web app dependencies');
         foundWebAppDep = true;
         return true; // stop iterating
       }
