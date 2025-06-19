@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { compareVersions as compareVersionsUtil } from './lock-file-parsers/version-comparator';
+import { compareVersions as compareVersionsUtil } from 'src/utils/lock-file-parsers/version-comparator';
 
 export class RegistryService {
   private static instance: RegistryService;

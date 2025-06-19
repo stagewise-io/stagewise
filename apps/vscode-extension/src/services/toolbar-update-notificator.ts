@@ -2,9 +2,9 @@ import * as vscode from 'vscode';
 import { StorageService } from './storage-service';
 import { EnvironmentInfo } from './environment-info';
 import { updateToolbar } from 'src/auto-prompts/update-toolbar';
-import { compareVersions } from './lock-file-parsers/version-comparator';
+import { compareVersions } from 'src/utils/lock-file-parsers/version-comparator';
 import { AnalyticsService, EventName } from './analytics-service';
-import { getWorkspaceId } from './get-workspace-id';
+import { getWorkspaceId } from 'src/utils/get-workspace-id';
 
 interface ToolbarVersionInfo {
   installedVersion: string;

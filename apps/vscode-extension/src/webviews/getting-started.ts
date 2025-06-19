@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import type { StorageService } from '../utils/storage-service';
-import { AnalyticsService, EventName } from '../utils/analytics-service';
+import type { StorageService } from 'src/services/storage-service';
+import { AnalyticsService, EventName } from 'src/services/analytics-service';
 
 export function createGettingStartedPanel(
   context: vscode.ExtensionContext,

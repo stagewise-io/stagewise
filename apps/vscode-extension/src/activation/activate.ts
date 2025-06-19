@@ -9,18 +9,18 @@ import { setupToolbar } from '../auto-prompts/setup-toolbar';
 import { getCurrentIDE } from 'src/utils/get-current-ide';
 import { dispatchAgentCall } from 'src/utils/dispatch-agent-call';
 import { getCurrentWindowInfo } from '../utils/window-discovery';
-import { AnalyticsService, EventName } from '../utils/analytics-service';
+import { AnalyticsService, EventName } from 'src/services/analytics-service';
 import {
   createGettingStartedPanel,
   shouldShowGettingStarted,
 } from '../webviews/getting-started';
-import { StorageService } from '../utils/storage-service';
-import { VScodeContext } from '../utils/vscode-context';
-import { EnvironmentInfo } from 'src/utils/environment-info';
-import { ToolbarUpdateNotificator } from 'src/utils/toolbar-update-notificator';
-import { ToolbarIntegrationNotificator } from 'src/utils/toolbar-integration-notificator';
-import { WorkspaceService } from 'src/utils/workspace-service';
-import { RegistryService } from 'src/utils/registry-service';
+import { StorageService } from 'src/services/storage-service';
+import { VScodeContext } from 'src/services/vscode-context';
+import { EnvironmentInfo } from 'src/services/environment-info';
+import { ToolbarUpdateNotificator } from 'src/services/toolbar-update-notificator';
+import { ToolbarIntegrationNotificator } from 'src/services/toolbar-integration-notificator';
+import { WorkspaceService } from 'src/services/workspace-service';
+import { RegistryService } from 'src/services/registry-service';
 
 // Diagnostic collection specifically for our fake prompt
 const fakeDiagCollection =

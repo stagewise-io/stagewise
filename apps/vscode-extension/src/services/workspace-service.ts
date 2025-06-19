@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { getInstalledDependencies as getInstalledDependenciesFromBun } from './lock-file-parsers/bun';
-import { getInstalledDependencies as getInstalledDependenciesFromNpm } from './lock-file-parsers/npm';
-import { getInstalledDependencies as getInstalledDependenciesFromPnpm } from './lock-file-parsers/pnpm';
-import { getInstalledDependencies as getInstalledDependenciesFromYarn } from './lock-file-parsers/yarn';
-import type { Dependencies } from './lock-file-parsers/types';
-import { compareVersions as compareVersionsUtil } from './lock-file-parsers/version-comparator';
+import { getInstalledDependencies as getInstalledDependenciesFromBun } from 'src/utils/lock-file-parsers/bun';
+import { getInstalledDependencies as getInstalledDependenciesFromNpm } from 'src/utils/lock-file-parsers/npm';
+import { getInstalledDependencies as getInstalledDependenciesFromPnpm } from 'src/utils/lock-file-parsers/pnpm';
+import { getInstalledDependencies as getInstalledDependenciesFromYarn } from 'src/utils/lock-file-parsers/yarn';
+import type { Dependencies } from 'src/utils/lock-file-parsers/types';
+import { compareVersions as compareVersionsUtil } from 'src/utils/lock-file-parsers/version-comparator';
 
 const LOCK_FILES = [
   { name: 'package-lock.json', parser: getInstalledDependenciesFromNpm },
