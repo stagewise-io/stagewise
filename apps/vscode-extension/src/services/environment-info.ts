@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { compareVersions as compareVersionsUtil } from './lock-file-parsers/version-comparator';
+import { compareVersions as compareVersionsUtil } from 'src/utils/lock-file-parsers/version-comparator';
 import { RegistryService } from './registry-service';
 import { WorkspaceService } from './workspace-service';
 import { AnalyticsService, EventName } from './analytics-service';

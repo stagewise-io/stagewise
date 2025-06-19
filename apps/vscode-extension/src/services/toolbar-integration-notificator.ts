@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { EnvironmentInfo } from './environment-info';
 import { AnalyticsService, EventName } from './analytics-service';
-import { getWorkspaceId } from './get-workspace-id';
+import { getWorkspaceId } from 'src/utils/get-workspace-id';
 import { setupToolbar } from 'src/auto-prompts/setup-toolbar';
 import { StorageService } from './storage-service';
 
