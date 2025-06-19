@@ -55,7 +55,9 @@ function saveStateToStorage(state: Partial<InternalAppState>) {
 
 export function AppStateProvider({
   children,
-}: { children: preact.ComponentChildren }) {
+}: {
+  children: preact.ComponentChildren;
+}) {
   const [state, setState] = useState<InternalAppState>(() => {
     const storedState = loadStateFromStorage();
     return {

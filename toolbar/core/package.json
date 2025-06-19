@@ -4,7 +4,14 @@
   "version": "0.4.8",
   "type": "module",
   "description": "stagewise toolbar SDK for AI Agent interaction.",
-  "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
+  "keywords": [
+    "stagewise",
+    "toolbar",
+    "ai",
+    "devtool",
+    "agent",
+    "interaction"
+  ],
   "author": "tiq UG (haftungsbeschränkt)",
   "homepage": "https://stagewise.io",
   "bugs": {
@@ -38,7 +45,9 @@
       "require": "./dist/plugin-ui/jsx-runtime.umd.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "license": "AGPL-3.0-only",
   "scripts": {
     "clean": "rm -rf .turbo node_modules",

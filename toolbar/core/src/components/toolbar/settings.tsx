@@ -7,7 +7,10 @@ import { useVSCode } from '@/hooks/use-vscode';
 export const SettingsButton = ({
   onOpenPanel,
   isActive = false,
-}: { onOpenPanel: () => void; isActive?: boolean }) => (
+}: {
+  onOpenPanel: () => void;
+  isActive?: boolean;
+}) => (
   <ToolbarSection>
     <ToolbarButton onClick={onOpenPanel} active={isActive}>
       <SettingsIcon className="size-4" />

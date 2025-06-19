@@ -3,7 +3,9 @@
   "private": false,
   "version": "0.4.8",
   "type": "module",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"

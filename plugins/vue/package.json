@@ -2,7 +2,14 @@
   "name": "@stagewise-plugins/vue",
   "version": "0.4.6",
   "type": "module",
-  "keywords": ["stagewise", "toolbar", "ai", "devtool", "agent", "interaction"],
+  "keywords": [
+    "stagewise",
+    "toolbar",
+    "ai",
+    "devtool",
+    "agent",
+    "interaction"
+  ],
   "author": "tiq UG (haftungsbeschränkt)",
   "homepage": "https://stagewise.io",
   "bugs": {
@@ -27,7 +34,9 @@
   "main": "dist/index.umd.cjs",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "license": "AGPL-3.0-only",
   "scripts": {
     "clean": "rm -rf .turbo node_modules",

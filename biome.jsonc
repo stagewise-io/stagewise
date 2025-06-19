@@ -1,20 +1,21 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
   "files": {
     "ignoreUnknown": false,
-    "ignore": [
-      "**/pnpm-lock.yaml",
-      "lib/db/migrations",
-      "lib/editor/react-renderer.tsx",
-      "node_modules",
-      ".next",
-      "public",
-      ".vercel",
-      "**/src/types/db.ts",
-      "**/.nuxt/**",
-      "**/.svelte-kit/**",
-      "**/.output/**",
-      "**/.source/**"
+    "includes": [
+      "**",
+      "!**/pnpm-lock.yaml",
+      "!**/lib/db/migrations",
+      "!**/lib/editor/react-renderer.tsx",
+      "!**/node_modules",
+      "!**/.next",
+      "!**/public",
+      "!**/.vercel",
+      "!**/src/types/db.ts",
+      "!**/.nuxt/**",
+      "!**/.svelte-kit/**",
+      "!**/.output/**",
+      "!**/.source/**"
     ]
   },
   "vcs": {
@@ -51,27 +52,29 @@
         "noSvgWithoutTitle": "off", // We do not intend to adhere to this rule
         "useMediaCaption": "off", // We would need a cultural change to turn this on
         "noAutofocus": "off", // We're highly intentional about when we use autofocus
-        "noBlankTarget": "off", // Covered by Conformance
         "useFocusableInteractive": "off", // Disable focusable interactive element requirement
         "useAriaPropsForRole": "off", // Disable required ARIA attributes check
-        "useKeyWithClickEvents": "off" // Disable keyboard event requirement with click events
+        "useKeyWithClickEvents": "off", // Disable keyboard event requirement with click events,
+        "noStaticElementInteractions": "warn",
+        "useValidAutocomplete": "warn"
       },
       "complexity": {
         "noUselessStringConcat": "warn", // Not in recommended ruleset, turning on manually
         "noForEach": "off", // forEach is too familiar to ban
         "noUselessSwitchCase": "off", // Turned off due to developer preferences
-        "noUselessThisAlias": "off" // Turned off due to developer preferences
+        "noUselessThisAlias": "off", // Turned off due to developer preferences,
+        "noUselessContinue": "off" // Turned off due to developer preferences
       },
       "correctness": {
         "noUnusedImports": "warn", // Not in recommended ruleset, turning on manually
-        "useArrayLiterals": "warn", // Not in recommended ruleset, turning on manually
-        "noNewSymbol": "warn", // Not in recommended ruleset, turning on manually
         "useJsxKeyInIterable": "off", // Rule is buggy, revisit later
         "useExhaustiveDependencies": "off", // Community feedback on this rule has been poor, we will continue with ESLint
-        "noUnnecessaryContinue": "off" // Turned off due to developer preferences
+        "noInvalidBuiltinInstantiation": "warn",
+        "noUnusedVariables": "warn"
       },
       "security": {
-        "noDangerouslySetInnerHtml": "off" // Covered by Conformance
+        "noDangerouslySetInnerHtml": "off", // Covered by Conformance,
+        "noBlankTarget": "off"
       },
       "style": {
         "useFragmentSyntax": "warn", // Not in recommended ruleset, turning on manually
@@ -80,18 +83,24 @@
         "useExponentiationOperator": "off", // Obscure and arguably not easily readable
         "noUnusedTemplateLiteral": "off", // Stylistic opinion
         "noUselessElse": "off", // Stylistic opinion
-        "noNonNullAssertion": "off" // Dude I wish I could turn this on
+        "noNonNullAssertion": "off", // Dude I wish I could turn this on,
+        "noParameterAssign": "error",
+        "useAsConstAssertion": "error",
+        "useEnumInitializers": "error",
+        "useSelfClosingElements": "error",
+        "useSingleVarDeclarator": "error",
+        "useNumberNamespace": "error",
+        "noInferrableTypes": "error",
+        "useArrayLiterals": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "off" // We trust Vercelians to use any only when necessary
-      },
-      "nursery": {
-        "noStaticElementInteractions": "warn",
+        "noExplicitAny": "off", // We trust Vercelians to use any only when necessary,
         "noHeadImportInDocument": "warn",
         "noDocumentImportInPage": "warn",
         "noDuplicateElseIf": "warn",
-        "noIrregularWhitespace": "warn",
-        "useValidAutocomplete": "warn",
+        "noIrregularWhitespace": "warn"
+      },
+      "nursery": {
         "useSortedClasses": {
           "level": "warn",
           "fix": "safe",
@@ -99,7 +108,9 @@
             "attributes": ["className"],
             "functions": ["cn", "clsx", "cva", "tw", "tw.*"]
           }
-        }
+        },
+        "useUniqueElementIds": "warn",
+        "noNestedComponentDefinitions": "warn"
       }
     }
   },
@@ -135,14 +146,12 @@
       "enabled": false
     }
   },
-  "organizeImports": {
-    "enabled": false
-  },
+  "assist": { "actions": { "source": { "organizeImports": "off" } } },
   "overrides": [
     // Playwright requires an object destructure, even if empty
     // https://github.com/microsoft/playwright/issues/30007
     {
-      "include": ["playwright/**"],
+      "includes": ["**/playwright/**"],
       "linter": {
         "rules": {
           "correctness": {
@@ -152,7 +161,7 @@
       }
     },
     {
-      "include": ["*.svelte", "*.astro", "*.vue"],
+      "includes": ["**/*.svelte", "**/*.astro", "**/*.vue"],
       "linter": {
         "rules": {
           "style": {

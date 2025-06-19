@@ -10,8 +10,15 @@
     "vscode": "^1.85.0"
   },
   "license": "AGPL-3.0-only",
-  "categories": ["AI", "Debuggers", "Machine Learning", "Other"],
-  "activationEvents": ["onStartupFinished"],
+  "categories": [
+    "AI",
+    "Debuggers",
+    "Machine Learning",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -34,7 +41,10 @@
           "type": "boolean",
           "default": true,
           "description": "Enable anonymous usage data collection to help improve the product. No personal data is collected.",
-          "tags": ["telemetry", "usesOnlineServices"],
+          "tags": [
+            "telemetry",
+            "usesOnlineServices"
+          ],
           "markdownDescription": "Enable anonymous usage data collection to help improve the product. No personal data is collected.\n\nRead more about our [telemetry data collection](https://github.com/stagewise-io/stagewise/blob/main/apps/vscode-extension/TELEMETRY.md)."
         }
       }
@@ -102,8 +112,12 @@
   "turbo": {
     "tasks": {
       "build": {
-        "dependsOn": ["^build"],
-        "outputs": ["out/**"]
+        "dependsOn": [
+          "^build"
+        ],
+        "outputs": [
+          "out/**"
+        ]
       }
     }
   }

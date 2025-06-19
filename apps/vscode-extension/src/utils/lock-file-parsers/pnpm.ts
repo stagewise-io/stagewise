@@ -19,10 +19,10 @@ export function getInstalledDependencies(
   // 1. Collect all package versions from the 'packages' section
   //    The key is like '/package-name/1.2.3' or '/@scope/name/1.2.3'
   if (data.packages) {
-    for (const [pkgPath, pkgData] of Object.entries<any>(data.packages)) {
+    for (const [pkgPath, _pkgData] of Object.entries<any>(data.packages)) {
       // Extract the package name and version from the path
       // e.g. '/react/18.2.0' => name: 'react', version: '18.2.0'
-      const match = pkgPath.match(/^((?:@)?(?:[^@]+))@([a-zA-Z\d\.\-]+).*$/);
+      const match = pkgPath.match(/^((?:@)?(?:[^@]+))@([a-zA-Z\d.-]+).*$/);
       if (!match) continue;
       const name = match[1];
       const version = match[2];

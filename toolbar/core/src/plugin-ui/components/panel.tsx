@@ -4,7 +4,10 @@ import type { ComponentChildren } from 'preact';
 function Panel({
   children,
   alwaysFullHeight = false,
-}: { children: ComponentChildren; alwaysFullHeight?: boolean }) {
+}: {
+  children: ComponentChildren;
+  alwaysFullHeight?: boolean;
+}) {
   return (
     <section
       className={cn(
@@ -36,7 +39,9 @@ Panel.Header = function PanelHeader({
 
 Panel.Content = function PanelContent({
   children,
-}: { children: ComponentChildren }) {
+}: {
+  children: ComponentChildren;
+}) {
   return (
     <div className="-mx-4 flex flex-col gap-2 overflow-y-auto border-border/30 border-t px-4 pt-4 text-zinc-950">
       {children}
@@ -46,7 +51,9 @@ Panel.Content = function PanelContent({
 
 Panel.Footer = function PanelFooter({
   children,
-}: { children: ComponentChildren }) {
+}: {
+  children: ComponentChildren;
+}) {
   return (
     <footer className="flex flex-row items-end justify-end gap-2 text-sm text-zinc-600">
       {children}

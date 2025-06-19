@@ -28,7 +28,7 @@ export default defineConfig({
   build: {
     commonjsOptions: {
       transformMixedEsModules: true,
-      include: [/node_modules/, /\@stagewise\/extension-toolbar-srpc-contract/],
+      include: [/node_modules/, /@stagewise\/extension-toolbar-srpc-contract/],
       requireReturnsDefault: 'auto',
     },
     lib: {

@@ -18,11 +18,7 @@ const PluginContext = createContext<PluginContextType>({
   },
 });
 
-export function PluginProvider({
-  children,
-}: {
-  children: ComponentChildren;
-}) {
+export function PluginProvider({ children }: { children: ComponentChildren }) {
   const { bridge } = useSRPCBridge();
   const { selectedSession } = useVSCode();
   const { config } = useConfig();
@@ -53,7 +49,7 @@ export function PluginProvider({
                 }),
               },
           {
-            onUpdate: (update) => {},
+            onUpdate: (_update) => {},
           },
         );
         return result;

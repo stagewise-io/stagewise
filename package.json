@@ -24,7 +24,7 @@
     "version-and-format": "pnpm changeset version && pnpm biome format --write ."
   },
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
+    "@biomejs/biome": "2.0.0",
     "@changesets/cli": "^2.29.3",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
@@ -43,7 +43,9 @@
     "patchedDependencies": {
       "@headlessui/react@2.2.2": "patches/@headlessui__react.patch"
     },
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "dependencies": {
     "create-stagewise-plugin": "link:packages/create-stagewise-plugin"

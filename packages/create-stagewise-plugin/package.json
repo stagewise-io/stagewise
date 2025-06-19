@@ -11,7 +11,9 @@
     "create-stagewise-plugin": "dist/index.mjs",
     "cva": "dist/index.mjs"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "unbuild --stub",
     "build": "unbuild",

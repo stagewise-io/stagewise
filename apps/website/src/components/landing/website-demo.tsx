@@ -35,8 +35,6 @@ export function WebsiteDemo() {
 
   const typingInterval = useRef<NodeJS.Timeout | null>(null);
 
-  const isLoading = status === 'loading';
-
   useEffect(() => {
     if (status !== 'typing') return;
 

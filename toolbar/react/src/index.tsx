@@ -6,17 +6,16 @@ export type { ToolbarConfig } from '@stagewise/toolbar';
 export function StagewiseToolbar({
   config,
   enabled = process.env.NODE_ENV === 'development',
-}: { config?: ToolbarConfig; enabled?: boolean }) {
-  if (!enabled) {
-    return null;
-  }
-
+}: {
+  config?: ToolbarConfig;
+  enabled?: boolean;
+}) {
   const isLoaded = useRef(false);
   useEffect(() => {
-    if (isLoaded.current) return;
+    if (isLoaded.current || !enabled) return;
     isLoaded.current = true;
     initToolbar(config);
-  }, [config]);
+  }, [config, enabled]);
 
   return null;
 }

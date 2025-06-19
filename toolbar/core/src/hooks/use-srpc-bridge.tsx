@@ -28,7 +28,9 @@ const SRPCBridgeContext = createContext<SRPCBridgeContextValue>({
 
 export function SRPCBridgeProvider({
   children,
-}: { children: ComponentChildren }) {
+}: {
+  children: ComponentChildren;
+}) {
   const [state, setState] = useState<SRPCBridgeContextValue>({
     bridge: null,
     isConnecting: true,
