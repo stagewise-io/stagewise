@@ -14,12 +14,20 @@ export const ReactPlugin: ToolbarPlugin = {
   pluginName: 'react',
   onContextElementHover: getSelectedElementAnnotation,
   onContextElementSelect: getSelectedElementAnnotation,
-  onPromptSend: (prompt) => ({
-    contextSnippets: [
-      {
-        promptContextName: 'elements-react-component-info',
-        content: getSelectedElementsPrompt(prompt.contextElements),
-      },
-    ],
-  }),
+  onPromptSend: (prompt) => {
+    const content = getSelectedElementsPrompt(prompt.contextElements);
+
+    if (!content) {
+      return { contextSnippets: [] };
+    }
+
+    return {
+      contextSnippets: [
+        {
+          promptContextName: 'elements-react-component-info',
+          content: content,
+        },
+      ],
+    };
+  },
 };

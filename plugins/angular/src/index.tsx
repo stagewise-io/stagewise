@@ -13,12 +13,20 @@ export const AngularPlugin: ToolbarPlugin = {
   pluginName: 'angular',
   onContextElementHover: getSelectedElementAnnotation,
   onContextElementSelect: getSelectedElementAnnotation,
-  onPromptSend: (prompt) => ({
-    contextSnippets: [
-      {
-        promptContextName: 'elements-angular-component-info',
-        content: getSelectedElementsPrompt(prompt.contextElements),
-      },
-    ],
-  }),
+  onPromptSend: (prompt) => {
+    const content = getSelectedElementsPrompt(prompt.contextElements);
+
+    if (!content) {
+      return { contextSnippets: [] };
+    }
+
+    return {
+      contextSnippets: [
+        {
+          promptContextName: 'elements-angular-component-info',
+          content: content,
+        },
+      ],
+    };
+  },
 };

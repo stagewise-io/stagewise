@@ -13,12 +13,21 @@ export const VuePlugin: ToolbarPlugin = {
   pluginName: 'vue',
   onContextElementHover: getSelectedElementAnnotation,
   onContextElementSelect: getSelectedElementAnnotation,
-  onPromptSend: (prompt) => ({
-    contextSnippets: [
-      {
-        promptContextName: 'elements-vue-component-info',
-        content: getSelectedElementsPrompt(prompt.contextElements),
-      },
-    ],
-  }),
+  onPromptSend: (prompt) => {
+    const content = getSelectedElementsPrompt(prompt.contextElements);
+
+    // contentがnullの場合は空配列を返す
+    if (!content) {
+      return { contextSnippets: [] };
+    }
+
+    return {
+      contextSnippets: [
+        {
+          promptContextName: 'elements-vue-component-info',
+          content: content,
+        },
+      ],
+    };
+  },
 };
