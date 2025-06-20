@@ -9,6 +9,7 @@ import {
   Feather,
   Layers,
   MessageSquare,
+  User,
 } from 'lucide-react';
 import { WebsiteDemo } from '@/components/landing/website-demo';
 import { AnimatedBackground } from '@/components/landing/animated-background';
@@ -79,10 +80,10 @@ export default function Home() {
             <div className="mb-12 text-center">
               <h1 className="mb-6 font-bold text-4xl tracking-tight md:text-6xl">
                 <span className="bg-gradient-to-tr from-blue-700 via-violet-500 to-indigo-800 bg-clip-text text-transparent dark:from-cyan-400 dark:via-violet-500 dark:to-indigo-400">
-                  Visual vibe coding.
+                  Visually prompt any dev agent.
                 </span>
                 <br />
-                Right in your codebase.
+                Right on your localhost
               </h1>
               <p className="mx-auto mb-8 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
                 Our toolbar connects your app frontend to your favorite code
@@ -114,7 +115,7 @@ export default function Home() {
               <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-zinc-600 dark:text-zinc-400">
                 <div className="flex items-center">
                   <div className="mr-2 h-2 w-2 rounded-full bg-green-500" />
-                  Cursor, Windsurf & VS Code Support
+                  Wide dev agent support.
                 </div>
                 <div className="flex items-center">
                   <div className="mr-2 h-2 w-2 rounded-full bg-green-500" />
@@ -268,7 +269,7 @@ export default function Home() {
               description: 'Comment directly on live elements in the browser',
               delay: 600,
             },
-          ].map((feature, i) => (
+          ].map((feature, _i) => (
             <ScrollReveal key={feature.title} delay={feature.delay}>
               <div className="group -translate-y-1 rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-2xl shadow-[rgba(128,90,213,0.15)] transition-all duration-300 dark:border-indigo-800 dark:bg-zinc-900">
                 <div className="mb-4 inline-flex rounded-lg bg-indigo-100 p-3 transition-colors dark:bg-indigo-900/20">
@@ -357,6 +358,123 @@ export default function Home() {
         </p>
       </section>
 
+      {/* Testimonials Section */}
+      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800">
+        <ScrollReveal>
+          <div className="mx-auto mb-16 max-w-4xl text-center">
+            <h2 className="mb-6 font-bold text-3xl md:text-4xl">
+              Loved by Developers Worldwide
+            </h2>
+            <p className="text-lg text-zinc-600 dark:text-zinc-400">
+              Don't just take our word for it. Here's what developers are saying
+              about their experience.
+            </p>
+          </div>
+        </ScrollReveal>
+
+        <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-3">
+          {[
+            {
+              quote:
+                'This Cursor Extension is awesome. Accurate tweaking of UI was always a struggle, but @stagewise_io allows you to bring full context to Cursor, just point and command.',
+              name: 'Jason Zhou',
+              role: 'Product engineer @ TaskMaster AI',
+              avatar:
+                'https://pbs.twimg.com/profile_images/1613651966663749632/AuQiWkVc_400x400.jpg',
+            },
+            {
+              quote:
+                'How did I even use Cursor before this?! Amazing extension.',
+              name: 'Dennis Cutraro',
+              role: 'Founder @ unfuture',
+              avatar: null,
+            },
+            {
+              quote:
+                "This is an amazing extension. The setup is quite simple, and it impresses from the very beginning. I was surprised how well it worked right away, even in a poorly designed brownfield project. This is only the beginning, I'm excited to see how it develops.",
+              name: 'Egor Koldasov',
+              role: '',
+              avatar: null,
+            },
+            {
+              quote:
+                'Just tried Stagewise plugin for Cursor - point and tell what to change. Way easier than describing UI elements in prompts.',
+              name: 'Renat Abbiazov',
+              role: '',
+              avatar:
+                'https://pbs.twimg.com/profile_images/1641815076477837313/1IfZhFZM_400x400.jpg',
+            },
+            {
+              quote:
+                "Our team's productivity has skyrocketed since we adopted Stagewise. Collaboration between designers and developers has never been smoother.",
+              name: 'David Garcia',
+              role: 'Engineering Manager @ FutureWorks',
+              avatar: null,
+            },
+            {
+              quote:
+                "stagewise in cursor is different gravy. UI changes for code you didn't write has never been easier",
+              name: 'Kareem',
+              role: '',
+              avatar:
+                'https://pbs.twimg.com/profile_images/1923032215954305024/6Y7NyOBy_400x400.jpg',
+            },
+            {
+              quote:
+                'stagewise is what a good interface for AI should look like',
+              name: 'chocologist',
+              role: '',
+              avatar:
+                'https://pbs.twimg.com/profile_images/1866724361857798154/Ujx2G3m0_400x400.jpg',
+            },
+            {
+              quote:
+                "🚨 VIBE CODERS: If you are using @cursor and working on a frontend, install stagewise immediately. Go in to debt if you have to. ps - it's free :)",
+              name: 'John Schoenith',
+              role: '',
+              avatar:
+                'https://pbs.twimg.com/profile_images/1905304449016627200/2GQ72XW5_400x400.jpg',
+            },
+            {
+              quote:
+                'A must-have tool for any modern development workflow. It simplifies complex tasks and makes coding enjoyable again.',
+              name: 'Kevin Harris',
+              role: 'Staff Engineer @ DevHouse',
+              avatar: null,
+            },
+          ].map((testimonial, i) => (
+            <ScrollReveal key={testimonial.name} delay={i * 100}>
+              <div className="flex h-full flex-col justify-between rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-[rgba(128,90,213,0.1)] shadow-lg transition-all duration-300 dark:border-indigo-800 dark:bg-zinc-900">
+                <div className="mb-4">
+                  <p className="text-zinc-600 dark:text-zinc-400">
+                    "{testimonial.quote}"
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  {testimonial.avatar ? (
+                    <Image
+                      src={testimonial.avatar}
+                      alt={testimonial.name}
+                      width={48}
+                      height={48}
+                      className="h-12 w-12 rounded-full border border-zinc-200 dark:border-zinc-800"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-200 bg-indigo-100 dark:border-zinc-800 dark:bg-indigo-900/20">
+                      <User className="h-6 w-6" />{' '}
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-semibold">{testimonial.name}</p>
+                    <p className="text-sm text-zinc-500">{testimonial.role}</p>
+                  </div>
+                </div>
+              </div>
+            </ScrollReveal>
+          ))}
+        </div>
+      </section>
+
       {/* Plugin Section */}
       <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-16 md:py-24 dark:border-zinc-800">
         <ScrollReveal>
@@ -394,7 +512,7 @@ export default function Home() {
               description: 'First-class support for Angular apps.',
               delay: 500,
             },
-          ].map((feature, i) => (
+          ].map((feature, _i) => (
             <ScrollReveal key={feature.title} delay={feature.delay}>
               <div className="group -translate-y-1 h-full rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-2xl shadow-[rgba(128,90,213,0.15)] transition-all duration-300 dark:border-indigo-800 dark:bg-zinc-900">
                 <div className="mb-4 inline-flex rounded-lg bg-zinc-50 p-3 transition-colors dark:bg-zinc-900/10">
