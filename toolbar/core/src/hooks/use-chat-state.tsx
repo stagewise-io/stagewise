@@ -341,6 +341,12 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         pluginContextSnippets,
       );
 
+      for (const plugin of plugins) {
+        if (plugin.onPromptTransmit) {
+          await plugin.onPromptTransmit(prompt);
+        }
+      }
+
       const newMessage: Message = {
         id: generateId(),
         content: content.trim(),
