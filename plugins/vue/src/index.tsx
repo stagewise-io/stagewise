@@ -16,7 +16,6 @@ export const VuePlugin: ToolbarPlugin = {
   onPromptSend: (prompt) => {
     const content = getSelectedElementsPrompt(prompt.contextElements);
 
-    // contentがnullの場合は空配列を返す
     if (!content) {
       return { contextSnippets: [] };
     }
