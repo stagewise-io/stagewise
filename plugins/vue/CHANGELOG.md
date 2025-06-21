@@ -1,5 +1,11 @@
 # @stagewise-plugins/vue
 
+## 0.4.7
+
+### Patch Changes
+
+- 642efa8: Fix plugin hang when no elements are selected
+
 ## 0.4.6
 
 ### Patch Changes
