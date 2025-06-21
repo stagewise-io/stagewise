@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    allow:
+      - update-types: ["minor"]
+    reviewers:
+      - "juliangoetze"
+    ignore:
+      # Ignore updates to @headlessui/react since we patched it to 2.2.2
+      - dependency-name: "@headlessui/react"
