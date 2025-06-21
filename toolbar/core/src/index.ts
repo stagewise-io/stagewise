@@ -46,16 +46,30 @@ export function initToolbar(config?: ToolbarConfig) {
   shadowDomAnchor.onfocus = eventBlocker;
   shadowDomAnchor.onblur = eventBlocker;
 
+  const shadowRoot = shadowDomAnchor.attachShadow({ mode: 'closed' });
+
   document.body.appendChild(shadowDomAnchor);
+
+  const portalRoot = document.getElementById('headlessui-portal-root');
+  if (portalRoot) {
+    portalRoot.style.position = 'fixed';
+    portalRoot.style.height = '100vh';
+    portalRoot.style.width = '100vw';
+    portalRoot.style.zIndex = '50';
+    Array.from(portalRoot.children).forEach((child) => {
+      (child as HTMLElement).style.pointerEvents = 'auto';
+    });
+  }
 
   const fontLinkNode = document.createElement('link');
   fontLinkNode.rel = 'stylesheet';
   fontLinkNode.href = `https://rsms.me/inter/inter.css`;
-  document.head.appendChild(fontLinkNode);
+  shadowRoot.appendChild(fontLinkNode);
 
   /** Insert generated css into shadow dom */
   const styleNode = document.createElement('style');
   styleNode.append(document.createTextNode(appStyle));
-  document.head.appendChild(styleNode);
-  render(createElement(App, config), shadowDomAnchor);
+  shadowRoot.appendChild(styleNode);
+
+  render(createElement(App, config), shadowRoot);
 }
