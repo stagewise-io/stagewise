@@ -70,7 +70,6 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.503.0",
     "postcss": "^8.5.3",
-    "postcss-prefix-selector": "^2.1.1",
     "preact": "^10.26.6",
     "tailwind-merge": "^3.2.0",
     "tailwindcss": "^4.1.5",
