@@ -1,0 +1,55 @@
+{
+  "name": "@stagewise/agent-interface",
+  "author": "tiq UG (haftungsbeschränkt)",
+  "version": "0.0.1",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "private": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup --config build.config.ts",
+    "clean": "rm -rf dist",
+    "dev": "tsup --config build.config.ts --watch",
+    "test": "vitest run",
+    "prebuild": "pnpm clean"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    "./toolbar": {
+      "types": "./dist/toolbar.d.ts",
+      "import": "./dist/toolbar.js",
+      "require": "./dist/toolbar.cjs"
+    },
+    "./agent": {
+      "types": "./dist/agent.d.ts",
+      "import": "./dist/agent.js",
+      "require": "./dist/agent.cjs"
+    }
+  },
+  "devDependencies": {
+    "@trpc/server": "11.4.2",
+    "superjson": "2.2.2",
+    "ws": "^8.18.2",
+    "zod": "3.25.67",
+    "@types/node": "22.15.2",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.25.5",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3"
+  },
+  "turbo": {
+    "tasks": {
+      "build": {
+        "dependsOn": [
+          "^build"
+        ],
+        "outputs": [
+          "dist/**"
+        ]
+      }
+    }
+  }
+}
