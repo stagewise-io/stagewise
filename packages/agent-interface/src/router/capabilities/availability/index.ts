@@ -1,28 +1,6 @@
-import { z } from 'zod';
-import { procedure, router } from '../trpc';
-import { zAsyncIterable } from '../../utils';
-
-// 1. DEFINE ALL TYPES AND SCHEMAS
-
-export enum AgentAvailabilityError {
-  NO_CONNECTION = 'no_connection',
-  NO_AUTHENTICATION = 'no_authentication',
-  INCOMPATIBLE_VERSION = 'incompatible_version',
-  OTHER = 'other',
-}
-
-const agentAvailabilitySchema = z.discriminatedUnion('isAvailable', [
-  z.object({
-    isAvailable: z.literal(true),
-  }),
-  z.object({
-    isAvailable: z.literal(false),
-    error: z.nativeEnum(AgentAvailabilityError),
-    errorMessage: z.string().optional(),
-  }),
-]);
-
-export type AgentAvailability = z.infer<typeof agentAvailabilitySchema>;
+import { procedure, router } from '../../trpc';
+import { zAsyncIterable } from '../../../utils';
+import { type AgentAvailability, agentAvailabilitySchema } from './types';
 
 // 2. DEFINE THE IMPLEMENTATION INTERFACE
 export interface AvailabilityImplementation {

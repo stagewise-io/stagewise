@@ -1,27 +1,33 @@
-export type { InterfaceRouter } from '../router';
+import type { InterfaceRouter } from '../router';
 
-export type {
-  AgentAvailability,
+export type { InterfaceRouter };
+
+export {
+  type AgentAvailability,
   AgentAvailabilityError,
-} from '../router/capabilities/availability';
+} from '../router/capabilities/availability/types';
 
-export type { AgentState, AgentStateType } from '../router/capabilities/state';
+export {
+  type AgentState,
+  AgentStateType,
+} from '../router/capabilities/state/types';
 
-export type {
-  SelectedElement,
-  UserMessage,
-  UserMessageMetadata,
-  UserMessageContentItem,
-  AgentMessageUpdate,
-  AgentMessageContentItemPart,
-} from '../router/capabilities/messaging';
+export {
+  type UserMessage,
+  userMessageSchema,
+  type UserMessageContentItem,
+  type UserMessageMetadata,
+  type SelectedElement,
+  type AgentMessageContentItemPart,
+  type AgentMessageUpdate,
+} from '../router/capabilities/messaging/types';
 
 export type {
   PendingToolCall,
   ToolCallResult,
   Tool,
   ToolList,
-} from '../router/capabilities/tool-calling';
+} from '../router/capabilities/tool-calling/types';
 
 export type { StagewiseInfo } from '../info';
 

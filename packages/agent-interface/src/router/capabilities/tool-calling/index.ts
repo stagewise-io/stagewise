@@ -1,31 +1,13 @@
-import { z } from 'zod';
-import { procedure, router } from '../trpc';
-import { zAsyncIterable } from '../../utils';
-
-// 1. DEFINE ALL TYPES AND SCHEMAS
-const pendingToolCallSchema = z.object({
-  toolName: z.string(),
-});
-
-export type PendingToolCall = z.infer<typeof pendingToolCallSchema>;
-
-const toolCallResultSchema = z.object({
-  toolName: z.string(),
-});
-
-export type ToolCallResult = z.infer<typeof toolCallResultSchema>;
-
-const toolSchema = z.object({
-  toolName: z.string().min(4).max(32),
-  description: z.string().min(4).max(64),
-  parameters: z.object({}), // This is a JSON Schema, because we cant send Zod schemas
-});
-
-export type Tool = z.infer<typeof toolSchema>;
-
-const toolListSchema = z.array(toolSchema);
-
-export type ToolList = z.infer<typeof toolListSchema>;
+import { procedure, router } from '../../trpc';
+import { zAsyncIterable } from '../../../utils';
+import {
+  type PendingToolCall,
+  pendingToolCallSchema,
+  type ToolCallResult,
+  toolCallResultSchema,
+  type ToolList,
+  toolListSchema,
+} from './types';
 
 // 2. DEFINE THE IMPLEMENTATION INTERFACE
 export interface ToolCallingImplementation {

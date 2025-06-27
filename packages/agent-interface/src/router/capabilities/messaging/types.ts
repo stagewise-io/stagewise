@@ -1,11 +1,7 @@
 import { z } from 'zod';
-import { procedure, router } from '../trpc';
-import { zAsyncIterable } from '../../utils';
-
-// 1. DEFINE ALL TYPES AND SCHEMAS
 
 /** Information about a selected element */
-const baseSelectedElementSchema = z.object({
+export const baseSelectedElementSchema = z.object({
   nodeType: z.string().min(1).max(96).describe('The node type of the element.'),
   xpath: z.string().min(1).max(1024).describe('The XPath of the element.'),
   attributes: z
@@ -154,33 +150,3 @@ export const agentMessageUpdateSchema = z
   );
 
 export type AgentMessageUpdate = z.infer<typeof agentMessageUpdateSchema>;
-
-// 2. DEFINE THE IMPLEMENTATION INTERFACE
-export interface MessagingImplementation {
-  /** Returns the currently active message to the toolbar.
-   *
-   * ***Always send over the last known state over to the toolbar immediately after connection.***
-   *
-   * *In order to clear the agent message, simply send an empty message with a new message ID. Agent's should do so only once they added the message to the chat history (not implemented yet), or after setting the state to "idle".*
-   *
-   * ***You should not return in this function, as this closes the subscription and will prompt the toolbar to subscribe again.***
-   */
-  getMessage: () => AsyncIterable<AgentMessageUpdate>;
-
-  onUserMessage: (message: UserMessage) => void;
-}
-
-// 3. DEFINE THE SUB-ROUTER
-export const messagingRouter = (impl: MessagingImplementation) =>
-  router({
-    getMessage: procedure
-      .output(
-        zAsyncIterable({
-          yield: agentMessageUpdateSchema,
-        }),
-      )
-      .subscription(impl.getMessage),
-    sendUserMessage: procedure
-      .input(userMessageSchema)
-      .mutation(({ input }) => impl.onUserMessage(input)),
-  });
