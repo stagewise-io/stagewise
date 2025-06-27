@@ -53,6 +53,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.12.1
         version: 1.12.1
+      '@stagewise/agent-interface':
+        specifier: workspace:*
+        version: link:../../packages/agent-interface
       '@stagewise/extension-toolbar-srpc-contract':
         specifier: workspace:*
         version: link:../../packages/extension-toolbar-srpc-contract
@@ -534,6 +537,10 @@ importers:
         version: 2.2.10(typescript@5.8.3)
 
   packages/agent-interface:
+    dependencies:
+      express:
+        specifier: ^4.21.2
+        version: 4.21.2
     devDependencies:
       '@trpc/server':
         specifier: 11.4.2
@@ -550,9 +557,6 @@ importers:
       esbuild:
         specifier: ^0.25.5
         version: 0.25.5
-      express:
-        specifier: ^4.21.2
-        version: 4.21.2
       superjson:
         specifier: 2.2.2
         version: 2.2.2

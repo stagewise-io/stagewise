@@ -129,7 +129,7 @@ export async function activate(context: vscode.ExtensionContext) {
       });
 
       bridge.register({
-        getSessionInfo: async (request, sendUpdate) => {
+        getSessionInfo: async (_request, _sendUpdate) => {
           return getCurrentWindowInfo(port);
         },
         triggerAgentPrompt: async (request, sendUpdate) => {

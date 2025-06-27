@@ -1,20 +1,16 @@
 {
-  "include": ["build.config.ts", "src", "__tests__"],
   "compilerOptions": {
-    "outDir": "dist",
-    "target": "ES2022",
-    "module": "ES2020",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "skipLibCheck": true,
+    "target": "ES2020",
+    "module": "ESNext",
     "declaration": true,
-    "declarationMap": false,
-    "sourceMap": false,
-    "noUnusedLocals": true,
+    "outDir": "./dist",
+    "strict": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": false
-  }
+    "types": ["node"],
+    "moduleResolution": "bundler"
+  },
+  "include": ["src/**/*", "index.ts"],
+  "exclude": ["node_modules", "dist"]
 }

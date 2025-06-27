@@ -97,6 +97,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.12.1",
     "@stagewise/extension-toolbar-srpc-contract": "workspace:*",
+    "@stagewise/agent-interface": "workspace:*",
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.1",
     "@types/js-yaml": "^4.0.9",

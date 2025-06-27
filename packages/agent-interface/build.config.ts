@@ -4,7 +4,7 @@ import { defineConfig } from 'tsup';
  * Build configuration for @stagewise/agent-interface package
  *
  * This configuration creates:
- * - Two separate entry points: `toolbar` and `agent`
+ * - Two separate entry points: `toolbar` and `agent` in subfolders
  * - Both ESModule (.js) and CommonJS (.cjs) bundles for each entry point
  * - Single TypeScript declaration files (.d.ts) shared between both formats
  * - Bundled code without minification for better debugging
@@ -16,12 +16,12 @@ export default defineConfig([
     entry: {
       toolbar: 'src/toolbar/index.ts',
     },
-    format: ['esm', 'cjs'],
-    dts: false, // Skip duplicate .d.cts generation
+    format: ['cjs', 'esm'],
+    dts: true,
     sourcemap: false,
     minify: false,
     bundle: true,
-    clean: false,
+    clean: true,
     outDir: 'dist',
     external: [],
     splitting: false,
@@ -32,53 +32,20 @@ export default defineConfig([
     entry: {
       agent: 'src/agent/index.ts',
     },
-    format: ['esm', 'cjs'],
-    dts: false, // Skip duplicate .d.cts generation
+    format: ['cjs', 'esm'],
+    dts: true,
     sourcemap: false,
     minify: false,
     bundle: true,
-    clean: false,
+    clean: false, // Don't clean since toolbar already cleaned
     outDir: 'dist',
     external: [
       // Node.js built-in modules that should not be bundled
-      'node:net',
-      'node:http',
-      'node:url',
-      'node:path',
-      'node:fs',
-      'node:stream',
-      'node:crypto',
-      'node:events',
-      'node:util',
-      'node:buffer',
-      'node:querystring',
-      'node:zlib',
+      'express',
       // WebSocket library is external since it's in devDependencies
       'ws',
     ],
     splitting: false,
     treeshake: true,
-  },
-  // TypeScript declarations for toolbar
-  {
-    entry: {
-      toolbar: 'src/toolbar/index.ts',
-    },
-    format: ['esm'], // Only need one format for types
-    dts: {
-      only: true, // Only generate .d.ts files
-    },
-    outDir: 'dist',
-  },
-  // TypeScript declarations for agent
-  {
-    entry: {
-      agent: 'src/agent/index.ts',
-    },
-    format: ['esm'], // Only need one format for types
-    dts: {
-      only: true, // Only generate .d.ts files
-    },
-    outDir: 'dist',
   },
 ]);
