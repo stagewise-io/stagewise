@@ -272,23 +272,113 @@ export const generateId = (length = 16): string => {
     .substring(2, length + 2);
 };
 
+export const copyObject = (obj: unknown, depth = 0, maxDepth = 3): unknown => {
+  // Stop recursion if we've reached max depth
+  if (depth >= maxDepth) {
+    return null;
+  }
+
+  // Handle primitive values
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  // Handle non-object types
+  if (typeof obj !== 'object') {
+    return typeof obj === 'function' ? undefined : obj;
+  }
+
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    return obj
+      .map((item) => copyObject(item, depth + 1, maxDepth))
+      .filter((item) => item !== undefined);
+  }
+
+  // Handle objects
+  const result: Record<string, unknown> = {};
+
+  for (const key of Object.getOwnPropertyNames(obj)) {
+    // Skip excluded properties
+    if (excludedProperties.has(key)) {
+      continue;
+    }
+
+    try {
+      const value = (obj as Record<string, unknown>)[key];
+
+      // Skip functions
+      if (typeof value === 'function') {
+        continue;
+      }
+
+      // Recursively copy the value
+      const copiedValue = copyObject(value, depth + 1, maxDepth);
+
+      // Only include the property if it's not undefined
+      if (copiedValue !== undefined) {
+        result[key] = copiedValue;
+      }
+    } catch {
+      // Skip properties that throw errors when accessed
+      continue;
+    }
+  }
+
+  return result;
+};
+
+// Properties that should be excluded to prevent prototype pollution and reduce noise
+const excludedProperties = new Set([
+  'constructor',
+  '__proto__',
+  'prototype',
+  '__defineGetter__',
+  '__defineSetter__',
+  '__lookupGetter__',
+  '__lookupSetter__',
+  'hasOwnProperty',
+  'isPrototypeOf',
+  'propertyIsEnumerable',
+  'toString',
+  'valueOf',
+  'toLocaleString',
+]);
+
 export const getSelectedElementInfo = (
   element: HTMLElement,
   callDepth?: number,
 ): SelectedElement => {
+  const boundingRect = element.getBoundingClientRect();
+
   return {
     nodeType: element.nodeName,
     xpath: getXPathForElement(element, false),
     attributes: {},
     textContent: element.textContent || '',
-    ownProperties: Object.getOwnPropertyNames(element).reduce(
-      (acc, prop) => {
-        acc[prop] = element[prop as keyof HTMLElement];
-        return acc;
-      },
-      {} as Record<string, unknown>,
-    ),
-    boundingClientRect: element.getBoundingClientRect(),
+    ownProperties: Object.getOwnPropertyNames(element)
+      .filter((prop) => !excludedProperties.has(prop))
+      .reduce(
+        (acc, prop) => {
+          try {
+            const value = element[prop as keyof HTMLElement];
+            // Only include serializable values
+            if (typeof value !== 'function') {
+              acc[prop] = copyObject(value, 0, 2);
+            }
+          } catch {
+            // Skip properties that throw errors when accessed
+          }
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      ),
+    boundingClientRect: {
+      top: boundingRect.top,
+      left: boundingRect.left,
+      height: boundingRect.height,
+      width: boundingRect.width,
+    },
     parent:
       element.parentElement && (callDepth ?? 0) < 10
         ? getSelectedElementInfo(element.parentElement, (callDepth ?? 0) + 1)

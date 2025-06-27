@@ -42,7 +42,10 @@ interface AgentProviderInterface {
   /**
    * The agent that the toolbar is currently connected to.
    */
-  connected: ReturnType<typeof createTRPCClient<InterfaceRouter>> | null;
+  connected: null | {
+    agent: ReturnType<typeof createTRPCClient<InterfaceRouter>>;
+    port: number;
+  };
 
   /**
    * Connect to an agent.
@@ -63,11 +66,6 @@ interface AgentProviderInterface {
    * Whether the agent list is currently being refreshed.
    */
   isRefreshing: boolean;
-
-  /**
-   * The port of the currently connected agent.
-   */
-  connectedPort: number | null;
 }
 
 const agentContext = createContext<AgentProviderInterface>({
@@ -77,7 +75,6 @@ const agentContext = createContext<AgentProviderInterface>({
   disconnectAgent: () => {},
   refreshAgentList: () => {},
   isRefreshing: false,
-  connectedPort: null,
 });
 
 /**
@@ -256,7 +253,6 @@ function setupConnectionHealthCheck(
           console.log(
             `[AgentProvider] ✅ Health check completed for port ${port}`,
           );
-          onConnectionLost();
         },
       },
     );
@@ -284,12 +280,12 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
 
   // ===== STATE MANAGEMENT =====
   const [availableAgents, setAvailableAgents] = useState<AgentInfo[]>([]);
-  const [connected, setConnected] = useState<ReturnType<
+  const connected = useRef<ReturnType<
     typeof createTRPCClient<InterfaceRouter>
   > | null>(null);
   const [connectedPort, setConnectedPort] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [hasInitialScan, setHasInitialScan] = useState(false);
+  const [finishedInitialScan, setFinishedInitialScan] = useState(false);
 
   // ===== REFS FOR CONNECTION MANAGEMENT =====
   const previouslySelectedPortRef = useRef<number | null>(null);
@@ -322,10 +318,9 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
           `[AgentProvider] ⏰ Setting up retry interval (every 2s) for port ${port}...`,
         );
         retryIntervalRef.current = setInterval(() => {
-          // Check if we should still retry (user hasn't manually selected another port)
           if (
             previouslySelectedPortRef.current === port &&
-            !connected &&
+            !connected.current &&
             !isManualSelectionRef.current
           ) {
             console.log(
@@ -371,7 +366,7 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
    */
   const scanAgents = useCallback(async () => {
     console.log(
-      `[AgentProvider] 🔍 Starting agent scan... (hasInitialScan: ${hasInitialScan}, connected: ${!!connected})`,
+      `[AgentProvider] 🔍 Starting agent scan... (finishedInitialScan: ${finishedInitialScan}, connected: ${!!connected.current})`,
     );
     setIsRefreshing(true);
     try {
@@ -388,17 +383,19 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
 
       setAvailableAgents(agents);
 
-      // Auto-connect if exactly one agent is found and no agent is currently connected
-      if (!hasInitialScan && agents.length === 1 && !connected) {
+      console.log(
+        `[AgentProvider] 👀 Scanned: ${agents.length} agents found, connected: ${!!connected.current}`,
+      );
+      console.log(
+        `[AgentProvider] 🔍 finishedInitialScan: ${finishedInitialScan}, connected: ${!!connected.current}`,
+      );
+
+      if (!finishedInitialScan && agents.length === 1 && !connected.current) {
         // Auto-connect if exactly one agent is found and no agent is currently connected
         console.log(
           `[AgentProvider] 🤖 Auto-connecting to single available agent: ${agents[0].name} (port ${agents[0].port})`,
         );
         connectAgentInternal(agents[0].port, false); // false = not manual selection
-      } else if (!hasInitialScan) {
-        console.log(
-          `[AgentProvider] 🤔 Not auto-connecting: ${agents.length} agents found, connected: ${!!connected}`,
-        );
       }
 
       // Try to reconnect to previously selected agent if connection was lost
@@ -425,10 +422,10 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
       console.error('[AgentProvider] ❌ Failed to scan for agents:', error);
     } finally {
       setIsRefreshing(false);
-      setHasInitialScan(true);
+      setFinishedInitialScan(true);
       console.log(`[AgentProvider] ✅ Agent scan complete. Refreshing: false`);
     }
-  }, [connected, hasInitialScan, availableAgents.length]);
+  }, [connected, finishedInitialScan, availableAgents.length]);
 
   // ===== CONNECTION MANAGEMENT =====
 
@@ -450,7 +447,7 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
           console.log(
             `[AgentProvider] 🧹 Cleaning up existing connection (port ${connectedPort})...`,
           );
-          setConnected(null);
+          connected.current = null;
           setConnectedPort(null);
         }
         if (connectionTimeoutRef.current) {
@@ -461,7 +458,8 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
         }
 
         const client = createWebSocketClient(port);
-        setConnected(client);
+        connected.current = client;
+        console.log('Connected to agent', client);
         setConnectedPort(port);
         previouslySelectedPortRef.current = port;
         isManualSelectionRef.current = isManual;
@@ -479,7 +477,7 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
             console.log(
               `[AgentProvider] 💔 Connection lost to agent on port ${port}`,
             );
-            setConnected(null);
+            connected.current = null;
             setConnectedPort(null);
 
             // Start retry attempts if this wasn't a manual disconnection
@@ -504,7 +502,7 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
           `[AgentProvider] ❌ Failed to connect to agent on port ${port}:`,
           error,
         );
-        setConnected(null);
+        connected.current = null;
         setConnectedPort(null);
 
         // Start retry attempts if this wasn't a manual selection and connection failed
@@ -537,7 +535,7 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
       connectionTimeoutRef.current();
     }
 
-    setConnected(null);
+    connected.current = null;
     setConnectedPort(null);
     previouslySelectedPortRef.current = null;
     isManualSelectionRef.current = true; // Mark as manual action
@@ -616,27 +614,36 @@ export function AgentProvider({ children }: { children?: ComponentChildren }) {
 
   // ===== PROVIDER INTERFACE =====
 
+  const agentGetter = useMemo(() => {
+    return {
+      agent: connected.current,
+    };
+  }, [connectedPort]);
+
   /**
    * Memoized provider value to prevent unnecessary re-renders.
    */
   const providerInterface = useMemo(
     (): AgentProviderInterface => ({
       availableAgents,
-      connected,
+      connected: connected.current
+        ? {
+            agent: connected.current,
+            port: connectedPort,
+          }
+        : null,
       connectAgent,
       disconnectAgent,
       refreshAgentList,
       isRefreshing,
-      connectedPort,
     }),
     [
       availableAgents,
-      connected,
+      agentGetter,
       connectAgent,
       disconnectAgent,
       refreshAgentList,
       isRefreshing,
-      connectedPort,
     ],
   );
 

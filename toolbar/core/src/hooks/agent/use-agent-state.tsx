@@ -23,7 +23,7 @@ export function AgentStateProvider({
 
   useEffect(() => {
     if (agent !== null) {
-      agent.state.getState.subscribe(undefined, {
+      agent.agent.state.getState.subscribe(undefined, {
         onData: (value) => {
           setState(value);
         },

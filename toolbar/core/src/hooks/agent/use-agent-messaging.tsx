@@ -90,7 +90,7 @@ export const AgentMessagingProvider = ({
 
   useEffect(() => {
     if (agent !== null) {
-      agent.messaging.getMessage.subscribe(undefined, {
+      agent.agent.messaging.getMessage.subscribe(undefined, {
         onData: (value) => {
           handleMessageUpdate(value);
         },
@@ -102,7 +102,9 @@ export const AgentMessagingProvider = ({
   }, [agent]);
 
   const handleUserMessage = (message: UserMessage) => {
-    agent?.messaging.sendUserMessage.mutate(message);
+    console.log('Sending user message', message);
+    console.log(agent);
+    agent?.agent.messaging.sendUserMessage.mutate(message);
   };
 
   return (

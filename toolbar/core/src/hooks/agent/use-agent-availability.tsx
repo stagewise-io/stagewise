@@ -24,7 +24,7 @@ export function AgentAvailabilityProvider({
 
   useEffect(() => {
     if (agent !== null) {
-      agent.availability.getAvailability.subscribe(undefined, {
+      agent.agent.availability.getAvailability.subscribe(undefined, {
         onData: (value) => {
           setAvailability(value);
         },
