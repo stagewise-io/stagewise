@@ -274,6 +274,7 @@ You would then use `StagewiseToolbarLoader` in your `src/routes/+layout.svelte`.
 | Windsurf       | ✅             |
 | Cline          | ✅             |
 | Roo Code       | ✅             |
+| Kilo Code      | ✅             |
 
 
 ## 🛣️ Roadmap
