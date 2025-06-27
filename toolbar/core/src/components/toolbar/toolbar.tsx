@@ -21,7 +21,6 @@ import { useAppState } from '@/hooks/use-app-state';
 import { Logo } from '@/components/ui/logo';
 import type { VNode } from 'preact';
 import { SettingsPanel } from './settings';
-import { useVSCode } from '@/hooks/use-vscode';
 import { DisconnectedStatePanel } from './panels/disconnected-state';
 import { ConnectingStatePanel } from './panels/connecting-state';
 import { WindowSelectionPanel } from './panels/window-selection';
@@ -41,14 +40,13 @@ export function ToolbarDraggableBox() {
     initialSnapArea: 'bottomRight',
   });
 
-  const {
-    windows,
-    isDiscovering,
-    discoveryError,
-    discover,
-    shouldPromptWindowSelection,
-  } = useVSCode();
-  const isConnected = windows.length > 0;
+  const _windows = [];
+  const isDiscovering = false;
+  const discoveryError = null;
+  const discover: () => Promise<void> = async () => {};
+  const shouldPromptWindowSelection = false;
+
+  const isConnected = true; //windows.length > 0;
 
   const [pluginBox, setPluginBox] = useState<null | {
     component: VNode;

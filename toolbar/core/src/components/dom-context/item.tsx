@@ -45,7 +45,7 @@ export function ContextItem({ refElement, ...props }: ContextItemProps) {
   const chatState = useChatState();
 
   const handleDeleteClick = useCallback(() => {
-    chatState.removeChatDomContext(chatState.currentChatId, refElement);
+    chatState.removeChatDomContext(refElement);
   }, [chatState, refElement]);
 
   const { plugins } = usePlugins();

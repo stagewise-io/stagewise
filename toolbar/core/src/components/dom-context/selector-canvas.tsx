@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import { ElementSelector } from './element-selector';
 import { useChatState } from '@/hooks/use-chat-state';
 import { ContextItemProposal } from './item-proposal';
@@ -6,23 +6,13 @@ import { ContextItem } from './item';
 
 export function SelectorCanvas() {
   const {
-    chats,
-    currentChatId,
+    domContextElements,
     addChatDomContext,
     isPromptCreationActive,
     promptState,
   } = useChatState();
 
-  const currentChat = useMemo(
-    () => chats.find((chat) => chat.id === currentChatId),
-    [currentChatId, chats],
-  );
-
   const shouldShow = isPromptCreationActive && promptState !== 'loading';
-
-  const contextElements = useMemo(() => {
-    return currentChat?.domContextElements || [];
-  }, [currentChat]);
 
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(
     null,
@@ -30,9 +20,9 @@ export function SelectorCanvas() {
 
   const addElementToContext = useCallback(
     (el: HTMLElement) => {
-      addChatDomContext(currentChatId, el);
+      addChatDomContext(el);
     },
-    [addChatDomContext, currentChatId],
+    [addChatDomContext],
   );
 
   if (!shouldShow) return null;
@@ -40,12 +30,12 @@ export function SelectorCanvas() {
     <>
       {hoveredElement && <ContextItemProposal refElement={hoveredElement} />}
       <ElementSelector
-        ignoreList={contextElements.map((el) => el.element)}
+        ignoreList={domContextElements.map((el) => el.element)}
         onElementHovered={setHoveredElement}
         onElementSelected={addElementToContext}
         onElementUnhovered={() => setHoveredElement(null)}
       />
-      {contextElements.map((el) => (
+      {domContextElements.map((el) => (
         <ContextItem refElement={el.element} pluginContext={el.pluginContext} />
       ))}
     </>

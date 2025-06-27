@@ -80,6 +80,8 @@
     "vite-bundle-analyzer": "^0.19.0",
     "vite-plugin-css-injected-by-js": "^3.5.2",
     "vite-plugin-dts": "^4.5.3",
-    "zod": "^3.24.4"
+    "zod": "^3.24.4",
+    "@trpc/client": "11.4.2",
+    "@stagewise/agent-interface": "workspace:*"
   }
 }

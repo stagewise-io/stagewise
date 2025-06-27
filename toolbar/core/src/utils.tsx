@@ -1,3 +1,8 @@
+import type {
+  SelectedElement,
+  UserMessageMetadata,
+} from '@stagewise/agent-interface/toolbar';
+
 export const companionAnchorTagName = 'stagewise-companion-anchor';
 
 export function getElementAtPoint(x: number, y: number) {
@@ -265,4 +270,47 @@ export const generateId = (length = 16): string => {
   return Math.random()
     .toString(36)
     .substring(2, length + 2);
+};
+
+export const getSelectedElementInfo = (
+  element: HTMLElement,
+  callDepth?: number,
+): SelectedElement => {
+  return {
+    nodeType: element.nodeName,
+    xpath: getXPathForElement(element, false),
+    attributes: {},
+    textContent: element.textContent || '',
+    ownProperties: Object.getOwnPropertyNames(element).reduce(
+      (acc, prop) => {
+        acc[prop] = element[prop as keyof HTMLElement];
+        return acc;
+      },
+      {} as Record<string, unknown>,
+    ),
+    boundingClientRect: element.getBoundingClientRect(),
+    parent:
+      element.parentElement && (callDepth ?? 0) < 10
+        ? getSelectedElementInfo(element.parentElement, (callDepth ?? 0) + 1)
+        : null,
+    pluginInfo: [], // TODO: Implement plugin info
+  };
+};
+
+export const collectUserMessageMetadata = (
+  selectedElements: SelectedElement[],
+): UserMessageMetadata => {
+  return {
+    currentUrl: window.location.href,
+    currentTitle: document.title,
+    currentZoomLevel: 0,
+    devicePixelRatio: window.devicePixelRatio,
+    userAgent: navigator.userAgent,
+    locale: navigator.language,
+    selectedElements,
+    viewportResolution: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    },
+  };
 };

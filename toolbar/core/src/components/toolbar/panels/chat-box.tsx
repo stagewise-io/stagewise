@@ -15,27 +15,9 @@ export function ToolbarChatArea() {
   const chatState = useChatState();
   const [isComposing, setIsComposing] = useState(false);
 
-  const currentChat = useMemo(
-    () => chatState.chats.find((c) => c.id === chatState.currentChatId),
-    [chatState.chats, chatState.currentChatId],
-  );
-
-  const currentInput = useMemo(
-    () => currentChat?.inputValue || '',
-    [currentChat?.inputValue],
-  );
-
-  const handleInputChange = useCallback(
-    (value: string) => {
-      chatState.setChatInput(chatState.currentChatId, value);
-    },
-    [chatState.setChatInput, chatState.currentChatId],
-  );
-
   const handleSubmit = useCallback(() => {
-    if (!currentChat || !currentInput.trim()) return;
-    chatState.addMessage(currentChat.id, currentInput);
-  }, [currentChat, currentInput, chatState.addMessage]);
+    chatState.sendMessage();
+  }, [chatState]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -76,11 +58,11 @@ export function ToolbarChatArea() {
     () =>
       cn(
         'flex size-8 items-center justify-center rounded-full bg-transparent p-1 text-zinc-950 opacity-20 transition-all duration-150',
-        currentInput.length > 0 && 'bg-blue-600 text-white opacity-100',
+        chatState.chatInput.length > 0 && 'bg-blue-600 text-white opacity-100',
         chatState.promptState === 'loading' &&
           'cursor-not-allowed bg-zinc-300 text-zinc-500 opacity-30',
       ),
-    [currentInput.length, chatState.promptState],
+    [chatState.promptState],
   );
 
   const textareaClassName = useMemo(
@@ -134,8 +116,8 @@ export function ToolbarChatArea() {
       <Textarea
         ref={inputRef}
         className={textareaClassName}
-        value={currentInput}
-        onChange={(e) => handleInputChange(e.currentTarget.value)}
+        value={chatState.chatInput}
+        onChange={(e) => chatState.setChatInput(e.currentTarget.value)}
         onKeyDown={handleKeyDown}
         onCompositionStart={handleCompositionStart}
         onCompositionEnd={handleCompositionEnd}
@@ -151,7 +133,8 @@ export function ToolbarChatArea() {
       <Button
         className={buttonClassName}
         disabled={
-          currentInput.length === 0 || chatState.promptState === 'loading'
+          chatState.chatInput.length === 0 ||
+          chatState.promptState === 'loading'
         }
         onClick={handleSubmit}
       >
