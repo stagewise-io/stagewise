@@ -31,6 +31,7 @@
     }
   },
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^4.21.2"
   },
   "devDependencies": {
@@ -38,6 +39,7 @@
     "superjson": "2.2.2",
     "ws": "^8.18.2",
     "zod": "3.25.67",
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
     "@types/node": "22.15.2",
     "@types/ws": "^8.18.1",

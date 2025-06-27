@@ -5,6 +5,7 @@ import { WebSocketServer } from 'ws';
 import { type AgentInterfaceImplementation, interfaceRouter } from '../router';
 import net from 'node:net';
 import express, { type Request, type Response } from 'express';
+import cors from 'cors';
 import { createServer } from 'node:http';
 import type { StagewiseInfo } from '../info';
 import { DEFAULT_STARTING_PORT } from '../constants';
@@ -70,6 +71,15 @@ export const createAgentServer = async (
   // Add JSON middleware for parsing request bodies
   app.use(express.json());
 
+  // Add CORS middleware with the same configuration as the extension http-server
+  app.use(
+    cors({
+      origin: '*',
+      methods: ['GET', 'POST'],
+      allowedHeaders: ['Content-Type'],
+    }),
+  );
+
   // Create the info object that will be returned by the /stagewise/info endpoint
   const info: StagewiseInfo = {
     name: 'Stagewise Agent',
@@ -94,6 +104,13 @@ export const createAgentServer = async (
     path: '/stagewise/ws',
   });
 
+  wss.on('connection', () => {
+    console.log('New connection to toolbar.');
+  });
+  wss.on('close', () => {
+    console.log('Connection to toolbar closed.');
+  });
+
   // Step 6: Register the tRPC implementation with the WebSocket server
   const handler = applyWSSHandler({
     wss,
@@ -105,6 +122,9 @@ export const createAgentServer = async (
       pingMs: 30000,
       // connection is terminated if pong message is not received in this many milliseconds
       pongWaitMs: 5000,
+    },
+    onError: (error) => {
+      console.error('Error in tRPC handler:', error);
     },
   });
 
