@@ -24,7 +24,7 @@
     "version-and-format": "pnpm changeset version && pnpm biome format --write ."
   },
   "devDependencies": {
-    "@biomejs/biome": "2.0.0",
+    "@biomejs/biome": "2.0.6",
     "@changesets/cli": "^2.29.3",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
