@@ -17,7 +17,7 @@ export interface AgentInterfaceImplementation {
   availability: AvailabilityImplementation;
   messaging: MessagingImplementation;
   state: StateImplementation;
-  toolCalling: ToolCallingImplementation;
+  toolCalling?: ToolCallingImplementation;
 }
 
 export const interfaceRouter = (implementation: AgentInterfaceImplementation) =>

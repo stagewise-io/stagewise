@@ -59,7 +59,7 @@ export interface ToolCallingImplementation {
 }
 
 // 3. DEFINE THE SUB-ROUTER
-export const toolCallingRouter = (impl: ToolCallingImplementation) =>
+export const toolCallingRouter = (impl?: ToolCallingImplementation) =>
   router({
     getPendingToolCalls: procedure
       .output(
@@ -67,11 +67,17 @@ export const toolCallingRouter = (impl: ToolCallingImplementation) =>
           yield: pendingToolCallSchema,
         }),
       )
-      .subscription(impl.getPendingToolCalls),
+      .subscription(
+        impl?.getPendingToolCalls ??
+          async function* () {
+            yield* [];
+            return;
+          },
+      ),
     sendToolCallResult: procedure
       .input(toolCallResultSchema)
-      .mutation(({ input }) => impl.onToolCallResult(input)),
+      .mutation(({ input }) => impl?.onToolCallResult(input)),
     sendToolListUpdate: procedure
       .input(toolListSchema)
-      .mutation(({ input }) => impl.onToolListUpdate(input)),
+      .mutation(({ input }) => impl?.onToolListUpdate(input)),
   });

@@ -1,8 +1,11 @@
 export type { InterfaceRouter } from '../router';
 
-export type { AgentAvailability } from '../router/capabilities/availability';
+export type {
+  AgentAvailability,
+  AgentAvailabilityError,
+} from '../router/capabilities/availability';
 
-export type { AgentState } from '../router/capabilities/state';
+export type { AgentState, AgentStateType } from '../router/capabilities/state';
 
 export type {
   SelectedElement,
@@ -19,3 +22,9 @@ export type {
   Tool,
   ToolList,
 } from '../router/capabilities/tool-calling';
+
+export type { StagewiseInfo } from '../info';
+
+export { DEFAULT_STARTING_PORT } from '../constants';
+
+export { transformer } from '../transformer';

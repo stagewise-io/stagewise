@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsup --config build.config.ts",
     "clean": "rm -rf dist",
-    "dev": "tsup --config build.config.ts --watch",
+    "dev": "tsup --config build.config.ts",
     "test": "vitest run",
     "prebuild": "pnpm clean"
   },
@@ -31,9 +31,11 @@
   },
   "devDependencies": {
     "@trpc/server": "11.4.2",
+    "express": "^4.21.2",
     "superjson": "2.2.2",
     "ws": "^8.18.2",
     "zod": "3.25.67",
+    "@types/express": "^5.0.3",
     "@types/node": "22.15.2",
     "@types/ws": "^8.18.1",
     "esbuild": "^0.25.5",

@@ -9,8 +9,11 @@ const baseSelectedElementSchema = z.object({
   nodeType: z.string().min(1).max(96).describe('The node type of the element.'),
   xpath: z.string().min(1).max(1024).describe('The XPath of the element.'),
   attributes: z
-    .set(z.string().max(512))
-    .max(100)
+    .record(z.string().max(512))
+    .refine((value) => Object.keys(value).length <= 100, {
+      message: 'Attributes must be less than 100 entries.',
+    })
+    // TODO: Add proper truncation logic
     .describe(
       'A list of attributes of the element. Will be truncated after 100 entries.',
     ),
@@ -21,7 +24,11 @@ const baseSelectedElementSchema = z.object({
       'Text content of the element. Will be truncated after 512 characters.',
     ),
   ownProperties: z
-    .set(z.any())
+    .record(z.any())
+    .refine((value) => Object.keys(value).length <= 500, {
+      message: 'Own properties must be less than 500 entries.',
+    })
+    // TODO: Add proper truncation logic
     .describe(
       'Custom properties that the underlying object may have. Will be truncated after 500 entries. Object are only copied up to 3 levels deep, all children and levels will be truncated equally. Only elements that are serializable will be sent over',
     ),
@@ -90,6 +97,8 @@ export const userMessageSchema = z.object({
   contentItems: z.array(userMessageContentItemSchema),
   createdAt: z.date(),
   metadata: userMessageMetadataSchema,
+  pluginContent: z.record(z.array(userMessageContentItemSchema)),
+  sentByPlugin: z.boolean(),
 });
 
 export type UserMessage = z.infer<typeof userMessageSchema>;
@@ -139,6 +148,7 @@ export const agentMessageUpdateSchema = z
         'If true, the update will be handled like a full resync of the complete message. It will thus replace the complete previous message.',
       ),
   })
+  .strict()
   .describe(
     'Update for the existing message with the user. To clear a message, just send a empty message with a new ID.',
   );

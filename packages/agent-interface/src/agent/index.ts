@@ -4,11 +4,13 @@
 import { WebSocketServer } from 'ws';
 import { type AgentInterfaceImplementation, interfaceRouter } from '../router';
 import net from 'node:net';
+import express, { type Request, type Response } from 'express';
+import { createServer } from 'node:http';
+import type { StagewiseInfo } from '../info';
+import { DEFAULT_STARTING_PORT } from '../constants';
 
 export type { AgentInterfaceImplementation } from '../router';
 import { applyWSSHandler } from '@trpc/server/adapters/ws';
-
-const DEFAULT_STARTING_PORT = 5746;
 
 /**
  * Find the first available port starting from the given port
@@ -62,14 +64,39 @@ export const createAgentServer = async (
   // Step 1: Find the first open port based on the initial port we have available (starting with 5746)
   const port = await findAvailablePort(DEFAULT_STARTING_PORT);
 
-  // Step 2: Start the server on the lowest available port
-  const server = new WebSocketServer({
-    port,
+  // Step 2: Create Express app
+  const app = express();
+
+  // Add JSON middleware for parsing request bodies
+  app.use(express.json());
+
+  // Create the info object that will be returned by the /stagewise/info endpoint
+  const info: StagewiseInfo = {
+    name: 'Stagewise Agent',
+    description: 'A example stagewise agent',
+    capabilities: {
+      toolCalling: implementation.toolCalling !== undefined,
+      chatHistory: false,
+    },
+  };
+
+  // Step 3: Add the /stagewise/info endpoint
+  app.get('/stagewise/info', (_req: Request, res: Response) => {
+    res.json(info);
   });
 
-  // Step 3: Register the implementation with the server
+  // Step 4: Create HTTP server from Express app
+  const httpServer = createServer(app);
+
+  // Step 5: Create WebSocket server that uses the same HTTP server
+  const wss = new WebSocketServer({
+    server: httpServer,
+    path: '/stagewise/ws',
+  });
+
+  // Step 6: Register the tRPC implementation with the WebSocket server
   const handler = applyWSSHandler({
-    wss: server,
+    wss,
     router: interfaceRouter(implementation),
     // Enable heartbeat messages to keep connection open (disabled by default)
     keepAlive: {
@@ -81,9 +108,19 @@ export const createAgentServer = async (
     },
   });
 
+  // Step 7: Start the HTTP server (which also handles WebSocket upgrades)
+  httpServer.listen(port);
+
   return {
-    server,
+    server: httpServer,
+    wss,
     handler,
     port, // Return the port so consumers know which port was used
+    setAgentName: (name: string) => {
+      info.name = name;
+    },
+    setAgentDescription: (description: string) => {
+      info.description = description;
+    },
   };
 };
