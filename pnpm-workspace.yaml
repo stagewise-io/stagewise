@@ -5,3 +5,4 @@ packages:
 - examples/*
 - toolbar/*
 - plugins/*
+- agent-adapters/*

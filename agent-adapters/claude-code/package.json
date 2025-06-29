@@ -1,0 +1,50 @@
+{
+  "name": "@stagewise/agent-adapters-claude-code",
+  "version": "0.0.1",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test-cli": "tsx src/test.index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^1.0.35",
+    "ws": "^8.18.2",
+    "zod": "^3.24.4",
+    "@stagewise/toolbar": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "devDependencies": {
+    "@stagewise/agent-interface": "workspace:*",
+    "@types/node": "22.15.2",
+    "@types/ws": "^8.18.1",
+    "tsup": "^8.4.0",
+    "tsx": "^4.16.2",
+    "typescript": "^5.8.3",
+    "vitest": "3.1.2"
+  },
+  "turbo": {
+    "tasks": {
+      "build": {
+        "dependsOn": [
+          "^build"
+        ],
+        "outputs": [
+          "dist/**"
+        ]
+      }
+    }
+  }
+}
