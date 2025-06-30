@@ -1,5 +1,5 @@
-import { type ComponentChildren, createContext } from 'preact';
-import { useContext, useState, useCallback, useEffect } from 'preact/hooks';
+import { type ReactNode, createContext } from 'react';
+import { useContext, useState, useCallback, useEffect } from 'react';
 import { useSRPCBridge } from './use-srpc-bridge';
 import { createPrompt, type PluginContextSnippets } from '@/prompts';
 import { useAppState } from './use-app-state';
@@ -85,7 +85,7 @@ const ChatContext = createContext<ChatContext>({
 });
 
 interface ChatStateProviderProps {
-  children: ComponentChildren;
+  children: ReactNode;
 }
 
 export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
@@ -357,7 +357,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
                 prompt,
                 sessionId: selectedSession?.sessionId,
               },
-              { onUpdate: (update) => {} },
+              { onUpdate: (_update) => {} },
             );
 
             // Handle response based on success/error
@@ -392,7 +392,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
                 );
               }, 300);
             }
-          } catch (error) {
+          } catch (_error) {
             // On exception, go to error state
             setPromptState('error');
             // TODO: show the error message

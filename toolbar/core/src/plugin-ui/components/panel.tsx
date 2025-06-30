@@ -1,11 +1,11 @@
 import { cn } from '@/utils';
-import type { ComponentChildren } from 'preact';
+import type { ReactNode } from 'react';
 
 function Panel({
   children,
   alwaysFullHeight = false,
 }: {
-  children: ComponentChildren;
+  children?: ReactNode;
   alwaysFullHeight?: boolean;
 }) {
   return (
@@ -20,7 +20,7 @@ function Panel({
   );
 }
 
-Panel.Header = function PanelHeader({
+function PanelHeader({
   title,
   description,
 }: {
@@ -35,30 +35,22 @@ Panel.Header = function PanelHeader({
       )}
     </header>
   );
-};
+}
 
-Panel.Content = function PanelContent({
-  children,
-}: {
-  children: ComponentChildren;
-}) {
+function PanelContent({ children }: { children?: ReactNode }) {
   return (
     <div className="-mx-4 flex flex-col gap-2 overflow-y-auto border-border/30 border-t px-4 pt-4 text-zinc-950">
       {children}
     </div>
   );
-};
+}
 
-Panel.Footer = function PanelFooter({
-  children,
-}: {
-  children: ComponentChildren;
-}) {
+function PanelFooter({ children }: { children?: ReactNode }) {
   return (
     <footer className="flex flex-row items-end justify-end gap-2 text-sm text-zinc-600">
       {children}
     </footer>
   );
-};
+}
 
-export { Panel };
+export { Panel, PanelHeader, PanelContent, PanelFooter };

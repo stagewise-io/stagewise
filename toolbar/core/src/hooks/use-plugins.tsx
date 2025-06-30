@@ -1,5 +1,5 @@
-import { type ComponentChildren, createContext } from 'preact';
-import { useContext, useEffect, useMemo, useRef } from 'preact/hooks';
+import { createContext, type ReactNode } from 'react';
+import { useContext, useEffect, useMemo, useRef } from 'react';
 import type { ToolbarContext, ToolbarPlugin } from '@/plugin';
 import { useSRPCBridge } from './use-srpc-bridge';
 import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
@@ -15,10 +15,11 @@ const PluginContext = createContext<PluginContextType>({
   plugins: [],
   toolbarContext: {
     sendPrompt: () => {},
+    mainAppWindow: window.parent,
   },
 });
 
-export function PluginProvider({ children }: { children: ComponentChildren }) {
+export function PluginProvider({ children }: { children?: ReactNode }) {
   const { bridge } = useSRPCBridge();
   const { selectedSession } = useVSCode();
   const { config } = useConfig();
@@ -54,6 +55,7 @@ export function PluginProvider({ children }: { children: ComponentChildren }) {
         );
         return result;
       },
+      mainAppWindow: window.parent,
     };
   }, [bridge, selectedSession]);
 

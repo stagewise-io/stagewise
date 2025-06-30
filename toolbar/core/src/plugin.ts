@@ -151,9 +151,10 @@ export interface UIHandle {
 }
 
 import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
-import type { VNode } from 'preact';
+import type { ReactNode } from 'react';
 export interface ToolbarContext {
   sendPrompt: (prompt: string | PromptRequest) => void;
+  mainAppWindow: Window;
 }
 
 /** A context snippet that get's added into the prompt. */
@@ -197,9 +198,9 @@ export interface ToolbarPlugin {
   description: string;
 
   /** A monochrome svg icon that will be rendered in places where the plugin is shown */
-  iconSvg: VNode | null;
+  iconSvg: ReactNode | null;
 
-  onActionClick?: () => undefined | VNode;
+  onActionClick?: () => undefined | ReactNode;
 
   /** Not yet implemented. Add a MCP server to the plugin that will be accessible to the agent. */
   mcp?: MCP | null;

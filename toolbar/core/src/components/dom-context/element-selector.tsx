@@ -3,8 +3,8 @@
 // It ignores the companion itself.
 
 import { getElementAtPoint } from '@/utils';
-import { useCallback, useRef } from 'preact/hooks';
-import type { MouseEventHandler } from 'preact/compat';
+import { useCallback, useRef } from 'react';
+import type { MouseEventHandler } from 'react';
 
 export interface ElementSelectorProps {
   onElementHovered: (element: HTMLElement) => void;

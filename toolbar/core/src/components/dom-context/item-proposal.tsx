@@ -1,7 +1,7 @@
 import { useWindowSize } from '@/hooks/use-window-size';
 import { useCyclicUpdate } from '@/hooks/use-cyclic-update';
-import { useCallback, useMemo, useRef } from 'preact/hooks';
-import type { HTMLAttributes } from 'preact/compat';
+import { useCallback, useMemo, useRef } from 'react';
+import type { HTMLAttributes } from 'react';
 import { PlusIcon } from 'lucide-react';
 import { usePlugins } from '@/hooks/use-plugins';
 

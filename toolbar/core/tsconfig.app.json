@@ -9,7 +9,6 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "basePath": ".",
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -18,7 +17,7 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "preact",
+    "jsxImportSource": "react",
 
     /* Linting */
     "strict": true,

@@ -1,7 +1,7 @@
 import { useWindowSize } from '@/hooks/use-window-size';
 import { useCyclicUpdate } from '@/hooks/use-cyclic-update';
-import { useCallback, useRef } from 'preact/hooks';
-import type { HTMLAttributes } from 'preact/compat';
+import { useCallback, useRef } from 'react';
+import type { HTMLAttributes } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useChatState } from '@/hooks/use-chat-state';
 import type { ContextElementContext } from '@/plugin';

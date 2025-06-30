@@ -12,7 +12,7 @@ export function WindowSelectionPanel() {
     appName,
   } = useVSCode();
 
-  const handleSessionChange = (e: Event) => {
+  const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const target = e.target as HTMLSelectElement;
     const selectedSessionId = target.value === '' ? undefined : target.value;
     selectSession(selectedSessionId);

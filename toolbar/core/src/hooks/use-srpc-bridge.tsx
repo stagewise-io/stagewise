@@ -8,8 +8,8 @@ import {
   useEffect,
   useRef,
   useState,
-} from 'preact/compat';
-import type { ComponentChildren } from 'preact';
+} from 'react';
+import type { ReactNode } from 'react';
 import { createSRPCClientBridge, type ZodClient } from '@stagewise/srpc/client';
 import { contract } from '@stagewise/extension-toolbar-srpc-contract';
 import { useVSCode } from './use-vscode';
@@ -26,11 +26,7 @@ const SRPCBridgeContext = createContext<SRPCBridgeContextValue>({
   error: null,
 });
 
-export function SRPCBridgeProvider({
-  children,
-}: {
-  children: ComponentChildren;
-}) {
+export function SRPCBridgeProvider({ children }: { children?: ReactNode }) {
   const [state, setState] = useState<SRPCBridgeContextValue>({
     bridge: null,
     isConnecting: true,

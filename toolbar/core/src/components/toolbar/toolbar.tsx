@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { ToolbarChatArea } from './panels/chat-box';
 import { useDraggable } from '@/hooks/use-draggable';
-import { useContext, useEffect, useState } from 'preact/hooks';
+import { useContext, useEffect, useState } from 'react';
 import { DraggableContext } from '@/hooks/use-draggable';
 import type { DraggableContextType } from '@/hooks/use-draggable';
 import { ToolbarSection } from './section';
@@ -19,7 +19,7 @@ import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
 import { useAppState } from '@/hooks/use-app-state';
 import { Logo } from '@/components/ui/logo';
-import type { VNode } from 'preact';
+import type { ReactNode } from 'react';
 import { SettingsPanel } from './settings';
 import { useVSCode } from '@/hooks/use-vscode';
 import { DisconnectedStatePanel } from './panels/disconnected-state';
@@ -51,11 +51,11 @@ export function ToolbarDraggableBox() {
   const isConnected = windows.length > 0;
 
   const [pluginBox, setPluginBox] = useState<null | {
-    component: VNode;
+    component: ReactNode;
     pluginName: string;
   }>(null);
   const [openPanel, setOpenPanel] = useState<
-    null | 'settings' | { pluginName: string; component: VNode }
+    null | 'settings' | { pluginName: string; component: ReactNode }
   >(null);
 
   const chatState = useChatState();
@@ -70,15 +70,17 @@ export function ToolbarDraggableBox() {
   }, [minimized]);
 
   // Create a wrapper function to handle button clicks
-  const handleButtonClick = (handler: () => void) => (e: MouseEvent) => {
-    // If we just finished dragging, prevent the click
-    if (draggable.wasDragged) {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-    handler();
-  };
+  const handleButtonClick =
+    (handler: () => void) =>
+    (e): React.MouseEventHandler<HTMLButtonElement> => {
+      // If we just finished dragging, prevent the click
+      if (draggable.wasDragged) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      handler();
+    };
 
   if (!isReady) return null; // Wait until borderLocation is valid
 

@@ -1,12 +1,12 @@
 import { cn } from '@/utils';
-import type { VNode } from 'preact';
+import type { ReactNode } from 'react';
 
 export interface ToolbarItemProps {
-  badgeContent?: VNode;
+  badgeContent?: ReactNode;
   badgeClassName?: string;
   statusDot?: boolean;
   statusDotClassName?: string;
-  children?: VNode;
+  children?: ReactNode;
 }
 
 export function ToolbarItem(props: ToolbarItemProps) {

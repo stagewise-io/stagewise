@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'preact/hooks';
+import { useCallback, useMemo, useState } from 'react';
 import { ElementSelector } from './element-selector';
 import { useChatState } from '@/hooks/use-chat-state';
 import { ContextItemProposal } from './item-proposal';

@@ -1,5 +1,5 @@
 import { ToolbarDraggableBox } from './toolbar';
-import { useRef } from 'preact/hooks';
+import { useRef } from 'react';
 import { DraggableProvider } from '@/hooks/use-draggable';
 
 export function ToolbarArea() {

@@ -20,8 +20,8 @@
       "dependsOn": ["^lint"]
     },
     "dev": {
-      "cache": false,
-      "persistent": true
+      "dependsOn": ["^dev"],
+      "cache": false
     },
     "typecheck": {
       "dependsOn": ["^typecheck"]

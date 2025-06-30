@@ -8,19 +8,23 @@ import {
   MenuItem,
   type MenuItemProps,
   Button,
+  type ButtonProps,
 } from '@headlessui/react';
-import { forwardRef, Fragment, type Ref } from 'preact/compat';
+import { forwardRef, Fragment, type Ref } from 'react';
 
 export const DropdownMenu = Menu;
 
 export const DropdownMenuButton = forwardRef(
-  (props: MenuButtonProps, ref: Ref<typeof MenuButton>) => {
+  (
+    props: MenuButtonProps & { className?: string },
+    ref: Ref<HTMLButtonElement>,
+  ) => {
     return <MenuButton as={Fragment} ref={ref} {...props} />;
   },
 );
 
 export const DropdownMenuContent = forwardRef(
-  (props: MenuItemsProps, ref: Ref<typeof MenuItems>) => {
+  (props: MenuItemsProps, ref: Ref<HTMLElement>) => {
     return (
       <MenuItems
         ref={ref}
@@ -41,12 +45,17 @@ const DropdownMenuItemStyles =
   'w-full flex flex-row select-none items-center justify-start gap-2 p-2 pr-6 truncate overflow-hidden rounded-md hover:bg-zinc-950/10 focus:text-zinc-900 cursor-pointer transition-color duration-150 text-sm font-normal text-foreground';
 
 export const DropdownMenuButttonItem = forwardRef(
-  (props: MenuItemProps, ref: Ref<typeof MenuItem>) => {
+  (
+    props: MenuItemProps & ButtonProps & { className?: string },
+    ref: Ref<HTMLButtonElement | HTMLElement>,
+  ) => {
+    const { className, ...buttonProps } = props;
     return (
       <MenuItem ref={ref}>
         <Button
-          {...props}
-          className={cn(DropdownMenuItemStyles, props.className)}
+          as="button"
+          {...buttonProps}
+          className={cn(DropdownMenuItemStyles, className)}
         />
       </MenuItem>
     );
@@ -54,7 +63,10 @@ export const DropdownMenuButttonItem = forwardRef(
 );
 
 export const DropdownMenuLinkItem = forwardRef(
-  (props: MenuItemProps, ref: Ref<typeof MenuItem>) => {
+  (
+    props: React.AnchorHTMLAttributes<HTMLAnchorElement>,
+    ref: Ref<HTMLElement>,
+  ) => {
     return (
       <MenuItem ref={ref}>
         <a {...props} className={cn(DropdownMenuItemStyles, props.className)} />

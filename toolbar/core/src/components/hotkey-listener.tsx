@@ -1,5 +1,5 @@
 import { useEventListener } from '@/hooks/use-event-listener';
-import { useCallback, useMemo } from 'preact/hooks';
+import { useCallback, useMemo } from 'react';
 import { hotkeyActionDefinitions, HotkeyActions } from '../utils';
 import { useChatState } from '@/hooks/use-chat-state';
 

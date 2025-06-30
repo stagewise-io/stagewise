@@ -32,7 +32,7 @@
     "@types/node": "22.15.2",
     "lefthook": "^1.11.12",
     "ts-node": "10.9.2",
-    "turbo": "^2.5.3",
+    "turbo": "^2.5.4",
     "typescript": "^5.8.3"
   },
   "packageManager": "pnpm@10.10.0",

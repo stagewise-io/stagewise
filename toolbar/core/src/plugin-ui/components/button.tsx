@@ -1,17 +1,17 @@
 import { cn } from '@/utils';
-import type { ComponentChildren } from 'preact';
-import type { ButtonHTMLAttributes } from 'preact/compat';
+import type { ReactNode } from 'react';
+import type { ButtonHTMLAttributes } from 'react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  children: ComponentChildren;
-  style?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  children: ReactNode;
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   asChild?: boolean;
 }
 
 export function Button({
   children,
-  style = 'primary',
+  variant = 'primary',
   size = 'md',
   asChild,
   ...props
@@ -31,10 +31,11 @@ export function Button({
         size === 'sm' && 'h-8',
         size === 'md' && 'h-12',
         size === 'lg' && 'h-16',
-        style === 'primary' && 'bg-blue-600',
-        style === 'secondary' && 'bg-zinc-500/40',
-        style === 'outline' && 'border border-zinc-500 bg-white text-blue-500',
-        style === 'ghost' && 'bg-transparent text-blue-500',
+        variant === 'primary' && 'bg-blue-600',
+        variant === 'secondary' && 'bg-zinc-500/40',
+        variant === 'outline' &&
+          'border border-zinc-500 bg-white text-blue-500',
+        variant === 'ghost' && 'bg-transparent text-blue-500',
       )}
       type="submit"
     >

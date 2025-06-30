@@ -50,7 +50,10 @@
     "vite": "^6.3.5",
     "vite-plugin-dts": "^4.5.3",
     "@vitejs/plugin-react-swc": "^3.7.0",
-    "rollup-preserve-directives": "^1.0.0"
+    "rollup-preserve-directives": "^1.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@types/react": "^19.1.8"
   },
   "peerDependencies": {
     "@stagewise/toolbar": "workspace:*"

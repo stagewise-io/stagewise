@@ -1,11 +1,11 @@
 import { Button, type ButtonProps } from '@headlessui/react';
-import { forwardRef } from 'preact/compat';
-import type { VNode } from 'preact';
+import { forwardRef } from 'react';
+import type { ReactNode } from 'react';
 import { ToolbarItem } from './item';
 import { cn } from '@/utils';
 
 export interface ToolbarButtonProps extends ButtonProps {
-  badgeContent?: VNode;
+  badgeContent?: ReactNode;
   badgeClassName?: string;
   statusDot?: boolean;
   statusDotClassName?: string;

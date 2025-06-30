@@ -3,8 +3,14 @@
 // This hook provides information to all components about whether certain parts of the companion layout should be rendered or not.
 // Components can use this information to hide themselves or show additional information.
 
-import { createRef, type RefObject, createContext } from 'preact';
-import { useContext, useState, useCallback, useEffect } from 'preact/hooks';
+import { createRef, type RefObject, createContext } from 'react';
+import {
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  type ReactNode,
+} from 'react';
 
 export interface AppState {
   requestMainAppBlock: () => number;
@@ -53,11 +59,7 @@ function saveStateToStorage(state: Partial<InternalAppState>) {
   }
 }
 
-export function AppStateProvider({
-  children,
-}: {
-  children: preact.ComponentChildren;
-}) {
+export function AppStateProvider({ children }: { children?: ReactNode }) {
   const [state, setState] = useState<InternalAppState>(() => {
     const storedState = loadStateFromStorage();
     return {

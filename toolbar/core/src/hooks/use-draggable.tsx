@@ -1,11 +1,5 @@
-import { type ComponentChildren, createContext, type RefObject } from 'preact';
-import {
-  useState,
-  useEffect,
-  useContext,
-  useRef,
-  useCallback,
-} from 'preact/hooks';
+import { type ReactNode, createContext, type RefObject } from 'react';
+import { useState, useEffect, useContext, useRef, useCallback } from 'react';
 
 export interface DraggableContextType {
   borderLocation: {
@@ -40,7 +34,7 @@ export const DraggableProvider = ({
   onDragEnd,
 }: {
   containerRef: RefObject<HTMLElement>;
-  children: ComponentChildren;
+  children: ReactNode;
   snapAreas: DraggableContextType['snapAreas'];
   onDragStart?: () => void;
   onDragEnd?: () => void;
@@ -590,7 +584,7 @@ export function useDraggable(config: DraggableConfig) {
 
   // This will be listened to globally if the mouse was pressed down on the draggable element
   const mouseUpHandler = useCallback(
-    (e: MouseEvent) => {
+    (_e: MouseEvent) => {
       if (isDraggingRef.current) {
         if (onDragEnd) onDragEnd();
         if (latestProviderDataRef.current?.emitDragEnd) {

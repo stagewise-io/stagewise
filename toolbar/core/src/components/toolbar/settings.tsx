@@ -1,4 +1,4 @@
-import { Panel } from '@/plugin-ui/components/panel';
+import { Panel, PanelContent, PanelHeader } from '@/plugin-ui/components/panel';
 import { ToolbarButton } from './button';
 import { ToolbarSection } from './section';
 import { SettingsIcon, RefreshCwIcon } from 'lucide-react';
@@ -21,13 +21,13 @@ export const SettingsButton = ({
 export const SettingsPanel = ({ onClose }: { onClose?: () => void }) => {
   return (
     <Panel>
-      <Panel.Header title="Settings" />
-      <Panel.Content>
+      <PanelHeader title="Settings" />
+      <PanelContent>
         <ConnectionSettings />
-      </Panel.Content>
-      <Panel.Content>
+      </PanelContent>
+      <PanelContent>
         <ProjectInfoSection />
-      </Panel.Content>
+      </PanelContent>
     </Panel>
   );
 };
@@ -42,7 +42,7 @@ const ConnectionSettings = () => {
     selectSession,
   } = useVSCode();
 
-  const handleSessionChange = (e: Event) => {
+  const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const target = e.target as HTMLSelectElement;
     const selectedSessionId = target.value === '' ? undefined : target.value;
     selectSession(selectedSessionId);

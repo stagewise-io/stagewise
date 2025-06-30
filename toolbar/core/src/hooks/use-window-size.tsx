@@ -1,7 +1,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-import { useCallback, useState } from 'preact/hooks';
+import { useCallback, useState } from 'react';
 import { useEventListener } from './use-event-listener';
 
 export interface WindowSize {

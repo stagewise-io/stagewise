@@ -1,5 +1,5 @@
 import { cn } from '@/utils';
-import type { ComponentChildren } from 'preact';
+import type { ReactNode } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const badgeVariants = cva('rounded-md p-2', {
@@ -97,7 +97,7 @@ const badgeVariants = cva('rounded-md p-2', {
 });
 
 interface BadgeProps extends VariantProps<typeof badgeVariants> {
-  children: ComponentChildren;
+  children: ReactNode;
   className?: string;
 }
 

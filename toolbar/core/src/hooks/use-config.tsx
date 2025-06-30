@@ -1,5 +1,5 @@
-import { type ComponentChildren, createContext } from 'preact';
-import { useContext, useMemo } from 'preact/hooks';
+import { createContext, type ReactNode } from 'react';
+import { useContext, useMemo } from 'react';
 import type { ToolbarConfig } from '@/config';
 
 export interface ConfigContextType {
@@ -21,7 +21,7 @@ export function ConfigProvider({
   children,
   config,
 }: {
-  children: ComponentChildren;
+  children?: ReactNode;
   config?: ToolbarConfig;
 }) {
   const value = useMemo(() => {

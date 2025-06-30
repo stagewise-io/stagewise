@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsup",
     "clean": "rimraf dist",
-    "dev": "tsup --watch",
+    "dev": "tsup",
     "format": "biome format --write \"**/*.{ts,tsx,md}\""
   },
   "dependencies": {

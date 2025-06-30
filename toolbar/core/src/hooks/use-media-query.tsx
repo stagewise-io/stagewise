@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'react';
 import { useEventListener } from './use-event-listener';
 
 export const useMediaQuery = (query: string) => {

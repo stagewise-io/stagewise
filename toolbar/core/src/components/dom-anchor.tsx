@@ -9,8 +9,8 @@ import {
   useMemo,
   useRef,
   useState,
-} from 'preact/hooks';
-import { createContext, type VNode } from 'preact';
+} from 'react';
+import { createContext, type ReactNode } from 'react';
 
 export interface DOMAnchorProps {
   referencePath: string; // The XPath of the reference element
@@ -19,7 +19,7 @@ export interface DOMAnchorProps {
   updateRate?: number; // How often the anchor position should be updated per second
   verticalSafeDistance?: number; // The distance from the viewport border where the anchor should be rendered
   horizontalSafeDistance?: number; // The distance from the viewport border where the anchor should be rendered
-  children?: VNode; // Stuff that should be rendered in the anchor
+  children?: ReactNode; // Stuff that should be rendered in the anchor
   keepInViewport?: boolean; // Applies reglar scrollIntoView to the reference Element
   disableUpdating?: boolean; //  Disables the anchor updating
 }

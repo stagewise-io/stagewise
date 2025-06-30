@@ -1,4 +1,4 @@
-import type { VNode } from 'preact';
+import type { ReactNode } from 'react';
 import type { useChatState } from '@/hooks/use-chat-state';
 import { usePlugins } from '@/hooks/use-plugins';
 import { SettingsButton } from '../settings';
@@ -15,13 +15,13 @@ export function NormalStateButtons({
   setOpenPanel,
   chatState,
 }: {
-  handleButtonClick: (handler: () => void) => (e: MouseEvent) => void;
+  handleButtonClick: (handler: () => void) => (e: React.MouseEvent) => void;
   pluginBox: null | {
-    component: VNode;
+    component: ReactNode;
     pluginName: string;
   };
   setPluginBox: (value: typeof pluginBox) => void;
-  openPanel: null | 'settings' | { pluginName: string; component: VNode };
+  openPanel: null | 'settings' | { pluginName: string; component: ReactNode };
   setOpenPanel: (value: typeof openPanel) => void;
   chatState: ReturnType<typeof useChatState>;
 }) {

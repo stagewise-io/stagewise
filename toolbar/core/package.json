@@ -32,17 +32,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.es.js",
-      "require": "./dist/index.umd.js"
+      "require": "./dist/index.cjs.js"
     },
     "./plugin-ui": {
-      "types": "./dist/plugin-ui.d.ts",
-      "import": "./dist/plugin-ui.es.js",
-      "require": "./dist/plugin-ui.umd.js"
-    },
-    "./plugin-ui/jsx-runtime": {
-      "types": "./dist/plugin-ui/jsx-runtime.d.ts",
-      "import": "./dist/plugin-ui/jsx-runtime.es.js",
-      "require": "./dist/plugin-ui/jsx-runtime.umd.js"
+      "types": "./dist/plugin-ui/index.d.ts",
+      "import": "./dist/plugin-ui/index.es.js",
+      "require": "./dist/plugin-ui/index.cjs.js"
     }
   },
   "files": [
@@ -51,19 +46,20 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "clean": "rm -rf .turbo node_modules",
-    "dev": "tsc -b && vite build --mode development",
-    "dev:examples": "tsc -b && vite build --mode development",
-    "build:toolbar": "tsc -b && vite build --mode production",
-    "build": "tsc -b && vite build --mode production"
+    "dev": "tsc -b && tsx build.vite.ts development",
+    "dev:examples": "tsc -b && tsx build.vite.ts development",
+    "build:toolbar": "tsc -b && tsx build.vite.ts production",
+    "build": "tsc -b && tsx build.vite.ts production"
   },
   "devDependencies": {
     "@headlessui/react": "2.2.2",
-    "@preact/compat": "18.3.1",
-    "@preact/preset-vite": "^2.10.1",
+    "@microsoft/api-extractor": "^7.52.8",
     "@stagewise/extension-toolbar-srpc-contract": "workspace:*",
     "@stagewise/srpc": "workspace:*",
     "@tailwindcss/postcss": "^4.1.5",
     "@types/node": "22.15.2",
+    "@types/react": "^19.1.8",
+    "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.4.21",
     "bowser": "^2.11.0",
     "class-variance-authority": "^0.7.1",
@@ -71,7 +67,10 @@
     "lucide-react": "^0.523.0",
     "postcss": "^8.5.3",
     "postcss-prefix-selector": "^2.1.1",
-    "preact": "^10.26.6",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "rollup": "^4.44.1",
+    "rollup-plugin-dts": "^6.2.1",
     "tailwind-merge": "^3.2.0",
     "tailwindcss": "^4.1.5",
     "tsup": "^8.4.0",

@@ -2,7 +2,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import { useCyclicUpdate } from './use-cyclic-update';
-import { useCallback, useEffect, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useRef } from 'react';
 
 export function useReferenceElement(referencePath: string, updateRate = 0) {
   // Fetch the reference element using the provided path and return the reference to it.

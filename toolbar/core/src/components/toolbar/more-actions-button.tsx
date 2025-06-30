@@ -21,7 +21,7 @@ export function ToolbarMoreActionsButton() {
           </ToolbarButton>
         </DropdownMenuButton>
         <DropdownMenuContent>
-          <DropdownMenuButttonItem onClick={minimize}>
+          <DropdownMenuButttonItem onClick={() => minimize()}>
             <Minimize2 className="size-4" />
             Minimize companion
           </DropdownMenuButttonItem>

@@ -1,16 +1,16 @@
-export const companionAnchorTagName = 'stagewise-companion-anchor';
-
 export function getElementAtPoint(x: number, y: number) {
-  const elementsBelowAnnotation = document.elementsFromPoint(x, y);
+  const elementsBelowAnnotation = window.parent.document.elementsFromPoint(
+    x,
+    y,
+  );
 
   const refElement =
     (elementsBelowAnnotation.find(
       (element) =>
-        element.nodeName !== 'STAGEWISE-COMPANION-ANCHOR' &&
-        !element.closest(companionAnchorTagName) &&
         !element.closest('svg') &&
+        !element.closest('STAGEWISE-TOOLBAR') &&
         isElementAtPoint(element as HTMLElement, x, y),
-    ) as HTMLElement) || document.body;
+    ) as HTMLElement) || window.parent.document.body;
 
   return refElement;
 }
@@ -154,92 +154,6 @@ export const hotkeyActionDefinitions: Record<
       ev.code === 'KeyC' && (ev.ctrlKey || ev.metaKey) && ev.altKey,
   },
 };
-
-export function dataURItoBlob(dataURI: string) {
-  const byteString = atob(dataURI.split(',')[1]);
-
-  // separate out the mime component
-  const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
-
-  // write the bytes of the string to an ArrayBuffer
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-
-  // set the bytes of the buffer to the correct values
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-
-  const blob = new Blob([ab], { type: mimeString });
-  return blob;
-}
-
-export async function promoteAreaInImage(
-  image: Blob,
-  area: {
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-  },
-): Promise<Blob> {
-  const img = await createImageBitmap(image);
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-
-  if (!ctx) {
-    throw new Error('Could not get 2d context for canvas');
-  }
-
-  canvas.width = img.width;
-  canvas.height = img.height;
-
-  // Create a darkened and blurred version of the image
-  ctx.drawImage(img, 0, 0);
-
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(canvas, 0, 0);
-
-  ctx.filter = 'blur(1px)';
-  ctx.drawImage(canvas, 0, 0);
-  ctx.filter = 'none';
-
-  // Draw the promoted area with a blue border and a light white glow.
-  ctx.roundRect(area.left, area.top, area.width, area.height, 6);
-  ctx.clip();
-  ctx.drawImage(
-    img,
-    area.left,
-    area.top,
-    area.width,
-    area.height,
-    area.left,
-    area.top,
-    area.width,
-    area.height,
-  );
-  ctx.restore();
-
-  // Create a rounded rectangle path for the promoted area
-  ctx.strokeStyle = '#2563eb';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // Convert the canvas back to a Blob
-  return new Promise<Blob>((resolve) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          throw new Error('Could not convert canvas to blob');
-        }
-        resolve(blob);
-      },
-      'image/png',
-      1,
-    );
-  });
-}
 
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';

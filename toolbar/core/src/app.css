@@ -1,4 +1,15 @@
-@import "tailwindcss" important;
+@import "tailwindcss";
+
+:root {
+  background-color: transparent;
+  color-scheme: normal;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+body {
+  background-color: transparent;
+}
+
 
 /* Custom animations for chat box states */
 @keyframes shake {
@@ -13,25 +24,32 @@
   100% { background-position: 0% 50%; }
 }
 
-stagewise-companion-anchor {
-  all: initial;
-  @apply text-zinc-950;
-  font-family: "Inter", "Noto Color Emoji", -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, "SF Compact", "SF Pro", "Helvetica Neue", sans-serif !important;
-  font-weight: normal !important;
-  letter-spacing: normal !important;
-  line-height: normal !important;
-  text-rendering: auto !important;
-  -webkit-transform: translate3d(0, 0, 0);
-  transform: translate3d(0, 0, 0);
-  interpolate-size: allow-keywords;
-}
-
 @layer base {
-  stagewise-companion-anchor * {
+  * {
     min-height: 0;
     min-width: 0;
     position: relative;
+  }
+  body {
+    width: 100vh;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    all: initial;
+    @apply text-zinc-950;
+    font-family: "Inter", "Noto Color Emoji", -apple-system, BlinkMacSystemFont,
+      "Segoe UI", Roboto, "SF Compact", "SF Pro", "Helvetica Neue", sans-serif !important;
+    font-weight: normal !important;
+    letter-spacing: normal !important;
+    line-height: normal !important;
+  }
+  @supports (font-variation-settings: normal) {
+    body {
+      font-family: "InterVariable", "Noto Color Emoji", -apple-system,
+        BlinkMacSystemFont, "Segoe UI", Roboto, "SF Compact", "SF Pro",
+        "Helvetica Neue", sans-serif !important;
+      font-optical-sizing: auto !important;
+    }
   }
 }
 
@@ -76,15 +94,6 @@ stagewise-companion-anchor {
     100% {
       box-shadow: 0 0 0 2px rgba(239, 68, 68, 0);
     }
-  }
-}
-
-@supports (font-variation-settings: normal) {
-  stagewise-companion-anchor {
-    font-family: "InterVariable", "Noto Color Emoji", -apple-system,
-      BlinkMacSystemFont, "Segoe UI", Roboto, "SF Compact", "SF Pro",
-      "Helvetica Neue", sans-serif !important;
-    font-optical-sizing: auto !important;
   }
 }
 

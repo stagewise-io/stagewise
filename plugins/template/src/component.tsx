@@ -1,16 +1,22 @@
-import { Panel, Button, useToolbar } from '@stagewise/toolbar/plugin-ui';
+import {
+  Panel,
+  PanelHeader,
+  PanelContent,
+  Button,
+  useToolbar,
+} from '@stagewise/toolbar/plugin-ui';
 
 export const ExampleComponent = () => {
   const toolbar = useToolbar();
 
   return (
     <Panel>
-      <Panel.Header title="Example Plugin" />
-      <Panel.Content>
+      <PanelHeader title="Example Plugin" />
+      <PanelContent>
         <Button onClick={() => toolbar.sendPrompt('Hello world!')}>
           Send "Hello world!" to Cursor!
         </Button>
-      </Panel.Content>
+      </PanelContent>
     </Panel>
   );
 };

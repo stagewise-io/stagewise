@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsup",
     "clean": "rm -rf dist",
-    "dev": "tsup --watch",
+    "dev": "tsup",
     "test": "vitest run"
   },
   "publishConfig": {
