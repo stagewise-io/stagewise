@@ -17,7 +17,9 @@ export function ToolbarChatArea() {
   const chatState = useChatState();
   const [isComposing, setIsComposing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const { plugins } = usePlugins();
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentChat = useMemo(
     () => chatState.chats.find((c) => c.id === chatState.currentChatId),
@@ -111,13 +113,31 @@ export function ToolbarChatArea() {
       // Copy to clipboard
       await navigator.clipboard.writeText(prompt);
       setIsCopied(true);
+      setCopyError(false);
+
+      // Clear any existing timeout
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
 
       // Reset after 1.5 seconds
-      setTimeout(() => {
+      copyTimeoutRef.current = setTimeout(() => {
         setIsCopied(false);
       }, 1500);
     } catch (error) {
       console.error('Failed to copy prompt:', error);
+      setCopyError(true);
+      setIsCopied(false);
+
+      // Clear any existing timeout
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+
+      // Reset error state after 2 seconds
+      copyTimeoutRef.current = setTimeout(() => {
+        setCopyError(false);
+      }, 2000);
     }
   }, [currentInput, currentChat, plugins]);
 
@@ -156,13 +176,27 @@ export function ToolbarChatArea() {
     };
   }, [chatState.isPromptCreationActive]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const baseButtonClassName =
+    'flex size-8 items-center justify-center rounded-full bg-transparent p-1 text-zinc-950 opacity-20 transition-all duration-150';
+
+  const disabledButtonClassName =
+    'cursor-not-allowed bg-zinc-300 text-zinc-500 opacity-30';
+
   const buttonClassName = useMemo(
     () =>
       cn(
-        'flex size-8 items-center justify-center rounded-full bg-transparent p-1 text-zinc-950 opacity-20 transition-all duration-150',
+        baseButtonClassName,
         currentInput.length > 0 && 'bg-blue-600 text-white opacity-100',
-        chatState.promptState === 'loading' &&
-          'cursor-not-allowed bg-zinc-300 text-zinc-500 opacity-30',
+        chatState.promptState === 'loading' && disabledButtonClassName,
       ),
     [currentInput.length, chatState.promptState],
   );
@@ -170,14 +204,14 @@ export function ToolbarChatArea() {
   const copyButtonClassName = useMemo(
     () =>
       cn(
-        'flex size-8 items-center justify-center rounded-full bg-transparent p-1 text-zinc-950 opacity-20 transition-all duration-150',
+        baseButtonClassName,
         currentInput.length > 0 &&
           'bg-zinc-600 text-white opacity-100 hover:bg-zinc-700',
         isCopied && 'bg-green-600 text-white opacity-100',
-        chatState.promptState === 'loading' &&
-          'cursor-not-allowed bg-zinc-300 text-zinc-500 opacity-30',
+        copyError && 'bg-red-600 text-white opacity-100',
+        chatState.promptState === 'loading' && disabledButtonClassName,
       ),
-    [currentInput.length, chatState.promptState, isCopied],
+    [currentInput.length, chatState.promptState, isCopied, copyError],
   );
 
   const textareaClassName = useMemo(
@@ -252,6 +286,13 @@ export function ToolbarChatArea() {
         }
         onClick={handleCopy}
         title="Copy prompt to clipboard"
+        aria-label={
+          copyError
+            ? 'Failed to copy prompt'
+            : isCopied
+              ? 'Prompt copied'
+              : 'Copy prompt to clipboard'
+        }
       >
         {isCopied ? (
           <CheckIcon className="size-4" />
