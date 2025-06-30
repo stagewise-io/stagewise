@@ -2,7 +2,9 @@ import { useChatState } from '@/hooks/use-chat-state';
 import { useHotkeyListenerComboText } from '@/hooks/use-hotkey-listener-combo-text';
 import { cn, HotkeyActions } from '@/utils';
 import { Button, Textarea } from '@headlessui/react';
-import { SendIcon } from 'lucide-react';
+import { SendIcon, CopyIcon, CheckIcon } from 'lucide-react';
+import { createPrompt, type PluginContextSnippets } from '@/prompts';
+import { usePlugins } from '@/hooks/use-plugins';
 import {
   useEffect,
   useMemo,
@@ -14,6 +16,10 @@ import {
 export function ToolbarChatArea() {
   const chatState = useChatState();
   const [isComposing, setIsComposing] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  const { plugins } = usePlugins();
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentChat = useMemo(
     () => chatState.chats.find((c) => c.id === chatState.currentChatId),
@@ -36,6 +42,104 @@ export function ToolbarChatArea() {
     if (!currentChat || !currentInput.trim()) return;
     chatState.addMessage(currentChat.id, currentInput);
   }, [currentChat, currentInput, chatState.addMessage]);
+
+  const handleCopy = useCallback(async () => {
+    if (!currentInput.trim()) return;
+
+    try {
+      // Collect plugin context snippets
+      const pluginContextSnippets: PluginContextSnippets[] = [];
+
+      const pluginProcessingPromises = plugins.map(async (plugin) => {
+        const userMessagePayload = {
+          id: 'copy-action',
+          text: currentInput,
+          contextElements:
+            currentChat?.domContextElements.map((el) => el.element) || [],
+          sentByPlugin: false,
+        };
+
+        const handlerResult = await plugin.onPromptSend?.(userMessagePayload);
+
+        if (
+          !handlerResult ||
+          !handlerResult.contextSnippets ||
+          handlerResult.contextSnippets.length === 0
+        ) {
+          return null;
+        }
+
+        const snippetPromises = handlerResult.contextSnippets.map(
+          async (snippet) => {
+            const resolvedContent =
+              typeof snippet.content === 'string'
+                ? snippet.content
+                : await snippet.content();
+            return {
+              promptContextName: snippet.promptContextName,
+              content: resolvedContent,
+            };
+          },
+        );
+
+        const resolvedSnippets = await Promise.all(snippetPromises);
+
+        if (resolvedSnippets.length > 0) {
+          const pluginSnippets: PluginContextSnippets = {
+            pluginName: plugin.pluginName,
+            contextSnippets: resolvedSnippets,
+          };
+          return pluginSnippets;
+        }
+        return null;
+      });
+
+      const allPluginContexts = await Promise.all(pluginProcessingPromises);
+
+      allPluginContexts.forEach((pluginCtx) => {
+        if (pluginCtx) {
+          pluginContextSnippets.push(pluginCtx);
+        }
+      });
+
+      // Create the formatted prompt
+      const prompt = createPrompt(
+        currentChat?.domContextElements.map((e) => e.element) || [],
+        currentInput,
+        window.location.href,
+        pluginContextSnippets,
+      );
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(prompt);
+      setIsCopied(true);
+      setCopyError(false);
+
+      // Clear any existing timeout
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+
+      // Reset after 1.5 seconds
+      copyTimeoutRef.current = setTimeout(() => {
+        setIsCopied(false);
+      }, 1500);
+    } catch (error) {
+      console.error('Failed to copy prompt:', error);
+      setCopyError(true);
+      setIsCopied(false);
+
+      // Clear any existing timeout
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+
+      // Reset error state after 2 seconds
+      copyTimeoutRef.current = setTimeout(() => {
+        setCopyError(false);
+      }, 2000);
+    }
+  }, [currentInput, currentChat, plugins]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -72,15 +176,42 @@ export function ToolbarChatArea() {
     };
   }, [chatState.isPromptCreationActive]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const baseButtonClassName =
+    'flex size-8 items-center justify-center rounded-full bg-transparent p-1 text-zinc-950 opacity-20 transition-all duration-150';
+
+  const disabledButtonClassName =
+    'cursor-not-allowed bg-zinc-300 text-zinc-500 opacity-30';
+
   const buttonClassName = useMemo(
     () =>
       cn(
-        'flex size-8 items-center justify-center rounded-full bg-transparent p-1 text-zinc-950 opacity-20 transition-all duration-150',
+        baseButtonClassName,
         currentInput.length > 0 && 'bg-blue-600 text-white opacity-100',
-        chatState.promptState === 'loading' &&
-          'cursor-not-allowed bg-zinc-300 text-zinc-500 opacity-30',
+        chatState.promptState === 'loading' && disabledButtonClassName,
       ),
     [currentInput.length, chatState.promptState],
+  );
+
+  const copyButtonClassName = useMemo(
+    () =>
+      cn(
+        baseButtonClassName,
+        currentInput.length > 0 &&
+          'bg-zinc-600 text-white opacity-100 hover:bg-zinc-700',
+        isCopied && 'bg-green-600 text-white opacity-100',
+        copyError && 'bg-red-600 text-white opacity-100',
+        chatState.promptState === 'loading' && disabledButtonClassName,
+      ),
+    [currentInput.length, chatState.promptState, isCopied, copyError],
   );
 
   const textareaClassName = useMemo(
@@ -148,6 +279,27 @@ export function ToolbarChatArea() {
         }
         disabled={chatState.promptState === 'loading'}
       />
+      <Button
+        className={copyButtonClassName}
+        disabled={
+          currentInput.length === 0 || chatState.promptState === 'loading'
+        }
+        onClick={handleCopy}
+        title="Copy prompt to clipboard"
+        aria-label={
+          copyError
+            ? 'Failed to copy prompt'
+            : isCopied
+              ? 'Prompt copied'
+              : 'Copy prompt to clipboard'
+        }
+      >
+        {isCopied ? (
+          <CheckIcon className="size-4" />
+        ) : (
+          <CopyIcon className="size-4" />
+        )}
+      </Button>
       <Button
         className={buttonClassName}
         disabled={
