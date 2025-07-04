@@ -4,15 +4,37 @@ import { z } from 'zod';
 export const baseSelectedElementSchema = z.object({
   nodeType: z.string().min(1).max(96).describe('The node type of the element.'),
   xpath: z.string().min(1).max(1024).describe('The XPath of the element.'),
-  attributes: z
-    .record(z.string().max(512))
-    .refine((value) => Object.keys(value).length <= 100, {
-      message: 'Attributes must be less than 100 entries.',
-    })
-    // TODO: Add proper truncation logic
-    .describe(
-      'A list of attributes of the element. Will be truncated after 100 entries.',
-    ),
+  attributes: z.intersection(
+    // We only send the most important attributes
+    z.object({
+      class: z.string().max(4096).optional(),
+      id: z.string().max(4096).optional(),
+      name: z.string().max(4096).optional(),
+      role: z.string().max(4096).optional(),
+      href: z.string().max(4096).optional(),
+      for: z.string().max(4096).optional(),
+      placeholder: z.string().max(4096).optional(),
+      alt: z.string().max(4096).optional(),
+      title: z.string().max(4096).optional(),
+      ariaLabel: z.string().max(4096).optional(),
+      ariaRole: z.string().max(4096).optional(),
+      ariaDescription: z.string().max(4096).optional(),
+      ariaHidden: z.boolean().optional(),
+      ariaDisabled: z.boolean().optional(),
+      ariaExpanded: z.boolean().optional(),
+      ariaSelected: z.boolean().optional(),
+    }),
+    // Custom attributes could also help massively
+    z
+      .record(z.string().max(256))
+      .refine((value) => Object.keys(value).length <= 100, {
+        message: 'Attributes must be less than 100 entries.',
+      })
+      // TODO: Add proper truncation logic
+      .describe(
+        'A list of attributes of the element. Will be truncated after 100 entries.',
+      ),
+  ),
   textContent: z
     .string()
     .max(512)
