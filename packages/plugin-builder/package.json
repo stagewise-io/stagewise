@@ -54,7 +54,7 @@
     "typescript": "^5.8.3"
   },
   "devDependencies": {
-    "esbuild": "^0.24.2",
+    "esbuild": "^0.25.5",
     "typescript": "^5.8.3"
   },
   "packageManager": "pnpm@10.10.0",
