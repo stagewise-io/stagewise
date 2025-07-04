@@ -87,6 +87,10 @@ export default async function buildPlugin(
     'utf8',
   );
 
+  if (!fs.existsSync(resolve(__dirname, 'dist'))) {
+    fs.mkdirSync(resolve(__dirname, 'dist'), { recursive: true });
+  }
+
   // create .js and .d.ts files in the output directory
   // Write CJS file
   fs.writeFileSync(
