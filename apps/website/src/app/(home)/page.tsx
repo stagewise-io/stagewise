@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { WaitlistBanner } from './_components/waitlist-banner';
 import {
   ArrowRight,
   Github,
@@ -74,7 +75,7 @@ export default function Home() {
       <AnimatedBackground />
 
       {/* Early Access Banner */}
-      {/* <WaitlistBanner copy={copyA} /> */}
+      <WaitlistBanner />
 
       {/* Hero Section */}
       <section className="container relative z-10 mx-auto px-4 pt-28 pb-24 sm:pt-32 md:pb-32">

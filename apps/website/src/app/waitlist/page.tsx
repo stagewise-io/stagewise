@@ -26,9 +26,9 @@ export default function WaitlistPage() {
                   </span>
                 </h1>
                 {/* Video Preview Placeholder */}
-                <div className="hidden aspect-video w-full overflow-hidden rounded-xl border border-indigo-900/20 shadow-[0_0_40px_rgba(128,90,213,0.25)] md:block">
+                <div className="hidden aspect-video w-full rounded-xl border border-indigo-900/20 shadow-[0_0_40px_rgba(128,90,213,0.25)] md:block">
                   <CustomVideoPlayer
-                    videoSrc="https://github.com/stagewise-io/assets/raw/refs/heads/main/edited/0-3-0-plugin-release/standard-demo.mp4"
+                    videoSrc="https://github.com/stagewise-io/assets/raw/24f1bbf1f75eb41be8076b40e2c1ada8676a97c7/edited/0-5-0-custom-agent/stagewise-custom-agent-demo.mp4"
                     thumbnailSrc="/agent-thumbnail.png"
                     alt="stagewise demo video"
                     width={1200}
@@ -55,9 +55,9 @@ export default function WaitlistPage() {
               </div>
             </ScrollReveal>
             <ScrollReveal>
-              <div className="aspect-video w-full overflow-hidden rounded-xl border border-indigo-900/20 shadow-[0_0_40px_rgba(128,90,213,0.25)] md:hidden">
+              <div className="aspect-video w-full rounded-xl border border-indigo-900/20 shadow-[0_0_40px_rgba(128,90,213,0.25)] md:hidden">
                 <CustomVideoPlayer
-                  videoSrc="https://github.com/stagewise-io/assets/raw/refs/heads/main/edited/0-3-0-plugin-release/standard-demo.mp4"
+                  videoSrc="https://github.com/stagewise-io/assets/raw/24f1bbf1f75eb41be8076b40e2c1ada8676a97c7/edited/0-5-0-custom-agent/stagewise-custom-agent-demo.mp4"
                   thumbnailSrc="/agent-thumbnail.png"
                   alt="stagewise demo video"
                   width={1200}

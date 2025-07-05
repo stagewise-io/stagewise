@@ -90,7 +90,7 @@ export function CustomVideoPlayer({
         src={videoSrc}
         width={width}
         height={height}
-        className="h-auto w-full"
+        className="aspect-video w-full rounded-xl object-cover"
         muted={muted}
         loop={loop}
         controls={controls}
@@ -100,22 +100,22 @@ export function CustomVideoPlayer({
 
       {/* Thumbnail overlay - shown by default, hidden after play */}
       {showThumbnail && (
-        // biome-ignore lint/a11y/noStaticElementInteractions: The video is not static
         <div
           className="absolute inset-0 cursor-pointer"
           onClick={handlePlayClick}
         >
+          {/* Thumbnail image */}
           <Image
             src={thumbnailSrc}
             alt={alt}
             width={width}
             height={height}
-            className="h-auto w-full"
+            className="aspect-video w-full rounded-xl object-cover"
             priority
           />
 
           {/* Play button overlay */}
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-all duration-300 group-hover:bg-black/30">
+          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20 transition-all duration-300 group-hover:bg-black/30">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/90 shadow-lg transition-transform duration-300 hover:scale-110 group-hover:bg-white">
               {isLoading ? (
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent" />
@@ -132,7 +132,7 @@ export function CustomVideoPlayer({
           </div>
 
           {/* Optional: Add a "Play Video" text below the button */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <div className="mt-28 text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100">
               <span className="font-medium text-sm">
                 {isLoading ? 'Loading...' : 'Click to play'}
