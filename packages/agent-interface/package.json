@@ -9,7 +9,8 @@
     "build": "tsup --config build.config.ts",
     "clean": "rm -rf dist",
     "dev": "tsup --config build.config.ts",
-    "prebuild": "pnpm clean"
+    "prebuild": "pnpm clean",
+    "test": "vitest --run"
   },
   "publishConfig": {
     "access": "public"
@@ -36,14 +37,15 @@
   },
   "devDependencies": {
     "@trpc/server": "11.4.2",
-    "superjson": "2.2.2",
-    "zod": "3.25.67",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
     "@types/node": "22.15.2",
     "@types/ws": "^8.18.1",
     "esbuild": "^0.25.5",
+    "superjson": "2.2.2",
     "tsup": "^8.4.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4",
+    "zod": "3.25.67"
   }
 }

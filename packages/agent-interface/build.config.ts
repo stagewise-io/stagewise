@@ -16,7 +16,7 @@ export default defineConfig([
     entry: {
       toolbar: 'src/toolbar/index.ts',
     },
-    format: ['cjs', 'esm'],
+    format: ['esm', 'cjs'],
     dts: true,
     sourcemap: false,
     minify: false,
@@ -32,7 +32,7 @@ export default defineConfig([
     entry: {
       agent: 'src/agent/index.ts',
     },
-    format: ['cjs', 'esm'],
+    format: ['esm', 'cjs'],
     dts: true,
     sourcemap: false,
     minify: false,

@@ -1,6 +1,5 @@
 import type { RequestHandler } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { mcpServer } from '../../mcp/server';
 import { addTransport, removeTransport, getTransport } from '../transport';
 
 export const handleStreamableHttp: RequestHandler = async (req, res) => {
@@ -34,6 +33,5 @@ export const handleStreamableHttp: RequestHandler = async (req, res) => {
 
   res.on('close', () => removeTransport('streamable', newSessionId));
 
-  await mcpServer.connect(transport);
   await transport.handleRequest(req, res);
 };

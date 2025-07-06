@@ -13,14 +13,14 @@ import {
   messagingRouter,
 } from './capabilities/messaging';
 
-export interface AgentInterfaceImplementation {
+export interface TransportInterface {
   availability: AvailabilityImplementation;
   messaging: MessagingImplementation;
   state: StateImplementation;
   toolCalling?: ToolCallingImplementation;
 }
 
-export const interfaceRouter = (implementation: AgentInterfaceImplementation) =>
+export const interfaceRouter = (implementation: TransportInterface) =>
   router({
     availability: availabilityRouter(implementation.availability),
     messaging: messagingRouter(implementation.messaging),

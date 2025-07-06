@@ -1,14 +1,6 @@
 import * as vscode from 'vscode';
-import { startServer, stopServer } from '../http-server/server';
-import { findAvailablePort } from '../utils/find-available-port';
-import {
-  getExtensionBridge,
-  DEFAULT_PORT,
-} from '@stagewise/extension-toolbar-srpc-contract';
 import { setupToolbar } from '../auto-prompts/setup-toolbar';
 import { getCurrentIDE } from 'src/utils/get-current-ide';
-import { dispatchAgentCall } from 'src/utils/dispatch-agent-call';
-import { getCurrentWindowInfo } from '../utils/window-discovery';
 import { AnalyticsService, EventName } from 'src/services/analytics-service';
 import {
   createGettingStartedPanel,
@@ -21,6 +13,8 @@ import { ToolbarUpdateNotificator } from 'src/services/toolbar-update-notificato
 import { ToolbarIntegrationNotificator } from 'src/services/toolbar-integration-notificator';
 import { WorkspaceService } from 'src/services/workspace-service';
 import { RegistryService } from 'src/services/registry-service';
+import { RetroAgentService } from 'src/services/agent-service/retro';
+import { AgentService } from 'src/services/agent-service';
 
 // Diagnostic collection specifically for our fake prompt
 const fakeDiagCollection =
@@ -90,6 +84,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(configChangeListener);
 
+    // Start agent services
+    const retroAgentService = RetroAgentService.getInstance();
+    await retroAgentService.initialize();
+
+    const agentService = AgentService.getInstance();
+    await agentService.initialize();
+
     // Function to show getting started panel if needed
     const showGettingStartedIfNeeded = async () => {
       if (await shouldShowGettingStarted(storage)) {
@@ -111,64 +112,6 @@ export async function activate(context: vscode.ExtensionContext) {
         }
       });
     context.subscriptions.push(workspaceFolderListener);
-
-    try {
-      // Track extension activation
-      analyticsService.trackEvent(EventName.EXTENSION_ACTIVATED, { ide });
-
-      // Find an available port
-      const port = await findAvailablePort(DEFAULT_PORT);
-
-      // Start the HTTP server with the same port
-      const server = await startServer(port);
-      const bridge = getExtensionBridge(server);
-
-      server.on('connect', () => {
-        console.log('Toolbar connected');
-        analyticsService.trackEvent(EventName.TOOLBAR_CONNECTED);
-      });
-
-      bridge.register({
-        getSessionInfo: async (_request, _sendUpdate) => {
-          return getCurrentWindowInfo(port);
-        },
-        triggerAgentPrompt: async (request, sendUpdate) => {
-          // If sessionId is provided, validate it matches this window
-          // If no sessionId provided, accept the request (backward compatibility)
-          if (request.sessionId && request.sessionId !== vscode.env.sessionId) {
-            const error = `Session mismatch: Request for ${request.sessionId} but this window is ${vscode.env.sessionId}`;
-            console.warn(`[Stagewise] ${error}`);
-            return {
-              sessionId: vscode.env.sessionId,
-              result: {
-                success: false,
-                error: error,
-                errorCode: 'session_mismatch',
-              },
-            };
-          }
-          analyticsService.trackEvent(EventName.AGENT_PROMPT_TRIGGERED);
-
-          await dispatchAgentCall(request);
-          sendUpdate.sendUpdate({
-            sessionId: vscode.env.sessionId,
-            updateText: 'Called the agent',
-          });
-
-          return {
-            sessionId: vscode.env.sessionId,
-            result: { success: true },
-          };
-        },
-      });
-    } catch (error) {
-      // Track activation error
-      analyticsService.trackEvent(EventName.ACTIVATION_ERROR, {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      vscode.window.showErrorMessage(`Failed to start server: ${error}`);
-      throw error;
-    }
 
     // Register the setupToolbar command
     const setupToolbarCommand = vscode.commands.registerCommand(
@@ -215,7 +158,10 @@ export async function activate(context: vscode.ExtensionContext) {
 export async function deactivate() {
   try {
     // Track extension deactivation before shutting down analytics
-    await stopServer();
+    const retroAgentService = RetroAgentService.getInstance();
+    await retroAgentService.shutdown();
+    const agentService = AgentService.getInstance();
+    await agentService.shutdown();
     AnalyticsService.getInstance().shutdown();
   } catch (error) {
     // Log error but don't throw during deactivation

@@ -9,6 +9,7 @@ export const baseSelectedElementSchema = z.object({
     z.object({
       class: z.string().max(4096).optional(),
       id: z.string().max(4096).optional(),
+      style: z.string().max(4096).optional(),
       name: z.string().max(4096).optional(),
       role: z.string().max(4096).optional(),
       href: z.string().max(4096).optional(),
@@ -115,7 +116,7 @@ export const userMessageSchema = z.object({
   contentItems: z.array(userMessageContentItemSchema),
   createdAt: z.date(),
   metadata: userMessageMetadataSchema,
-  pluginContent: z.record(z.array(userMessageContentItemSchema)),
+  pluginContent: z.record(z.record(userMessageContentItemSchema)),
   sentByPlugin: z.boolean(),
 });
 

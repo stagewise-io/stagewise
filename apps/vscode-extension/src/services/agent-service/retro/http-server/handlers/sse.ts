@@ -1,6 +1,5 @@
 import type { RequestHandler } from 'express';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { mcpServer } from '../../mcp/server';
 import { addTransport, removeTransport, getTransport } from '../transport';
 
 export const handleSse: RequestHandler = async (_req, res) => {
@@ -8,8 +7,6 @@ export const handleSse: RequestHandler = async (_req, res) => {
   addTransport('sse', transport.sessionId, transport);
 
   res.on('close', () => removeTransport('sse', transport.sessionId));
-
-  await mcpServer.connect(transport);
 };
 
 export const handleSsePost: RequestHandler = async (req, res) => {

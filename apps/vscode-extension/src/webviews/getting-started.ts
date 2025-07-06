@@ -19,7 +19,7 @@ export function createGettingStartedPanel(
   panel.webview.html = getWebviewContent(panel.webview, context);
 
   // Immediately mark as seen
-  storage.set('stagewise.hasSeenGettingStarted', true);
+  void storage.set('stagewise.hasSeenGettingStarted', true);
 
   // Handle messages from the webview
   panel.webview.onDidReceiveMessage(

@@ -2,7 +2,7 @@
 // They should receive a pre-defined server instance with the options to register all the procedures in a nice and simple way
 
 import { WebSocketServer } from 'ws';
-import { type AgentInterfaceImplementation, interfaceRouter } from '../router';
+import { type TransportInterface, interfaceRouter } from '../router';
 import net from 'node:net';
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';
@@ -10,13 +10,21 @@ import { createServer } from 'node:http';
 import type { StagewiseInfo } from '../info';
 import { DEFAULT_STARTING_PORT } from '../constants';
 
-export type { AgentInterfaceImplementation } from '../router';
+export type { TransportInterface } from '../router';
 import { applyWSSHandler } from '@trpc/server/adapters/ws';
+import type { AgentInterface } from './interface';
+import { AgentTransportAdapter } from './adapter';
 
 export type AgentServer = Awaited<ReturnType<typeof createAgentServer>>;
 export type { StagewiseInfo } from '../info';
-export type * from '../router/capabilities/availability/types';
-export type * from '../router/capabilities/state/types';
+export {
+  AgentAvailabilityError,
+  type AgentAvailability,
+} from '../router/capabilities/availability/types';
+export {
+  AgentStateType,
+  type AgentState,
+} from '../router/capabilities/state/types';
 export type * from '../router/capabilities/messaging/types';
 export type * from '../router/capabilities/tool-calling/types';
 
@@ -66,9 +74,7 @@ async function findAvailablePort(
  * @param implementation - The implementation of the agent interface.
  * @returns The server instance, the handler and the port it is running on.
  */
-export const createAgentServer = async (
-  implementation: AgentInterfaceImplementation,
-) => {
+export const createAgentServer = async () => {
   // Step 1: Find the first open port based on the initial port we have available (starting with 5746)
   const port = await findAvailablePort(DEFAULT_STARTING_PORT);
 
@@ -87,12 +93,14 @@ export const createAgentServer = async (
     }),
   );
 
+  const impl: TransportInterface = new AgentTransportAdapter();
+
   // Create the info object that will be returned by the /stagewise/info endpoint
   const info: StagewiseInfo = {
     name: 'Stagewise Agent',
     description: 'A example stagewise agent',
     capabilities: {
-      toolCalling: implementation.toolCalling !== undefined,
+      toolCalling: impl.toolCalling !== undefined,
       chatHistory: false,
     },
   };
@@ -121,7 +129,7 @@ export const createAgentServer = async (
   // Step 6: Register the tRPC implementation with the WebSocket server
   const handler = applyWSSHandler({
     wss,
-    router: interfaceRouter(implementation),
+    router: interfaceRouter(impl),
     // Enable heartbeat messages to keep connection open (disabled by default)
     keepAlive: {
       enabled: true,
@@ -158,11 +166,16 @@ export const createAgentServer = async (
     httpServer.listen(port);
   });
 
+  const agentInterface: AgentInterface = (
+    impl as AgentTransportAdapter
+  ).getAgent();
+
   return {
     server: httpServer,
     wss,
     handler,
     port, // Return the port so consumers know which port was used
+    interface: agentInterface,
     setAgentName: (name: string) => {
       info.name = name;
     },
