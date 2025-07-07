@@ -25,7 +25,7 @@ export const baseSelectedElementSchema = z.object({
       ariaExpanded: z.boolean().optional(),
       ariaSelected: z.boolean().optional(),
     }),
-    // Custom attributes could also help massively
+    // Custom attributes could also help massively (excluding known properties)
     z
       .record(
         z.string().transform((val) => {
@@ -36,8 +36,33 @@ export const baseSelectedElementSchema = z.object({
         }),
       )
       .transform((obj) => {
+        // Remove known properties to avoid conflicts with the intersection
+        const knownProperties = new Set([
+          'class',
+          'id',
+          'style',
+          'name',
+          'role',
+          'href',
+          'for',
+          'placeholder',
+          'alt',
+          'title',
+          'ariaLabel',
+          'ariaRole',
+          'ariaDescription',
+          'ariaHidden',
+          'ariaDisabled',
+          'ariaExpanded',
+          'ariaSelected',
+        ]);
+
+        const filteredObj = Object.fromEntries(
+          Object.entries(obj).filter(([key]) => !knownProperties.has(key)),
+        );
+
         // Truncate to first 100 entries
-        const entries = Object.entries(obj);
+        const entries = Object.entries(filteredObj);
         const truncatedEntries = entries.slice(0, 100);
         const result = Object.fromEntries(truncatedEntries);
 
@@ -49,7 +74,7 @@ export const baseSelectedElementSchema = z.object({
         return result;
       })
       .describe(
-        'A list of attributes of the element. Will be truncated after 100 entries.',
+        'A list of custom attributes of the element (excluding known properties). Will be truncated after 100 entries.',
       ),
   ),
   textContent: z
