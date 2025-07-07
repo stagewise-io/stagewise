@@ -51,7 +51,7 @@
     "tailwind-merge": "^3.2.0",
     "tw-animate-css": "^1.2.9",
     "vaul": "^1.1.2",
-    "zod": "^3.24.4"
+    "zod": "^3.25.75"
   },
   "devDependencies": {
     "@stagewise/typescript-config": "workspace:*",

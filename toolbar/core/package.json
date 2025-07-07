@@ -77,6 +77,6 @@
     "vite": "^6.3.5",
     "vite-plugin-css-injected-by-js": "^3.5.2",
     "vite-plugin-dts": "^4.5.3",
-    "zod": "^3.24.4"
+    "zod": "^3.25.75"
   }
 }
