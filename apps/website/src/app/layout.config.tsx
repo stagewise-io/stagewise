@@ -3,6 +3,9 @@ import Image from 'next/image';
 import StagewiseLogo from './logo.svg';
 import StagewiseLogoWhite from './logo-white.svg';
 import { SiDiscord, SiGithub, SiX } from 'react-icons/si';
+import { HeaderAuth } from '@/components/layout/header-auth';
+import { Button } from '@stagewise/ui/components/button';
+
 /**
  * Shared layout configurations
  *
@@ -42,25 +45,74 @@ export const baseOptions: BaseLayoutProps = {
     //   active: 'nested-url',
     // },
     {
-      type: 'icon',
-      label: 'Discord', // `aria-label`
-      icon: <SiDiscord className="m-1 size-4" />,
-      text: 'Discord',
-      url: 'https://discord.gg/9dy3YSE8',
+      type: 'custom',
+      children: (
+        <a
+          href="https://discord.gg/9dy3YSE8"
+          target="_blank"
+          className="ml-8"
+          rel="noreferrer noopener"
+          aria-label="Discord"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full hover:bg-fd-accent hover:text-fd-accent-foreground"
+          >
+            <SiDiscord className="h-5 w-5" />
+            <span className="sr-only">Discord</span>
+          </Button>
+        </a>
+      ),
+      secondary: true,
     },
     {
-      type: 'icon',
-      label: 'X', // `aria-label`
-      icon: <SiX className="m-1 size-4" />,
-      text: 'X',
-      url: 'https://x.com/stagewise_io',
+      type: 'custom',
+      children: (
+        <a
+          href="https://x.com/stagewise_io"
+          target="_blank"
+          rel="noreferrer noopener"
+          aria-label="X"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full hover:bg-fd-accent hover:text-fd-accent-foreground"
+          >
+            <SiX className="h-5 w-5" />
+            <span className="sr-only">X</span>
+          </Button>
+        </a>
+      ),
+      secondary: true,
     },
     {
-      type: 'icon',
-      label: 'GitHub', // `aria-label`
-      icon: <SiGithub className="m-1 size-4" />,
-      text: 'itHub',
-      url: 'https://github.com/stagewise-io/stagewise',
+      type: 'custom',
+      children: (
+        <a
+          href="https://github.com/stagewise-io/stagewise"
+          target="_blank"
+          className="mr-8"
+          rel="noreferrer noopener"
+          aria-label="GitHub"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full hover:bg-fd-accent hover:text-fd-accent-foreground"
+          >
+            <SiGithub className="h-5 w-5" />
+            <span className="sr-only">GitHub</span>
+          </Button>
+        </a>
+      ),
+      secondary: true,
+    },
+    {
+      type: 'custom',
+      children: <HeaderAuth />,
+      secondary: true,
     },
   ],
 };

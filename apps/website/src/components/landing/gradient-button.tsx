@@ -4,7 +4,7 @@ import { Button } from '@stagewise/ui/components/button';
 import { cn } from '@stagewise/ui/lib/utils';
 import type React from 'react';
 
-interface GradientButtonProps {
+interface GradientButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;
@@ -18,6 +18,7 @@ export function GradientButton({
   onClick,
   variant = 'default',
   size = 'default',
+  ...props
 }: GradientButtonProps) {
   return (
     <Button
@@ -31,6 +32,7 @@ export function GradientButton({
       )}
       size={size}
       onClick={onClick}
+      {...props}
     >
       <span className="relative z-10 flex items-center">{children}</span>
     </Button>
