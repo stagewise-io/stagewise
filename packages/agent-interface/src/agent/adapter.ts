@@ -365,6 +365,13 @@ export class AgentTransportAdapter implements TransportInterface {
 
           if (type === 'replace') {
             self._messageContent[index] = contentPart;
+            const update: AgentMessageUpdate = {
+              messageId: self._currentMessageId!,
+              updateParts: [{ contentIndex: index, part: contentPart }],
+              createdAt: new Date(),
+              resync: false,
+            };
+            self._messageController.push(update);
           } else if (type === 'append') {
             const existingPart = self._messageContent[index];
             if (existingPart.type !== 'text' || contentPart.type !== 'text') {
@@ -373,17 +380,14 @@ export class AgentTransportAdapter implements TransportInterface {
               );
             }
             existingPart.text += contentPart.text;
+            const update: AgentMessageUpdate = {
+              messageId: self._currentMessageId!,
+              updateParts: [{ contentIndex: index, part: contentPart }],
+              createdAt: new Date(),
+              resync: false,
+            };
+            self._messageController.push(update);
           }
-
-          const update: AgentMessageUpdate = {
-            messageId: self._currentMessageId!,
-            updateParts: [
-              { contentIndex: index, part: self._messageContent[index] },
-            ],
-            createdAt: new Date(),
-            resync: false,
-          };
-          self._messageController.push(update);
         },
       },
       toolCalling: {

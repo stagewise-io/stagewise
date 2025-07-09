@@ -76,7 +76,9 @@ export type AgentInterface = {
      * @param content - The content to update with
      * @param index - The index of the part to update. If index equals the current
      *                message length (highest index + 1), a new part will be added.
-     * @param type - 'replace' to replace the part, 'append' to append text (text parts only)
+     * @param type - 'replace' to replace the part, 'append' to append text (text parts only).
+     *               When using 'append', only the delta (new text) is sent in the update,
+     *               not the entire content.
      */
     updatePart: (
       content: AgentMessageContentItemPart | AgentMessageContentItemPart[],

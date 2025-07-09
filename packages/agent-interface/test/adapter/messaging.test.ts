@@ -643,6 +643,131 @@ describe('AgentTransportAdapterMessaging', () => {
         expect(secondClearUpdate.messageId).not.toBe(firstClearId);
       });
 
+      it('should send only delta text when using updatePart with append mode', async () => {
+        const messageIterator = adapter.messaging
+          .getMessage()
+          [Symbol.asyncIterator]();
+        await getNext(messageIterator); // consume initial resync
+
+        // Add initial part with some text
+        agentInterface.messaging.addPart({ type: 'text', text: 'Hello' });
+        await getNext(messageIterator); // consume the add update
+
+        // Use updatePart to append text
+        agentInterface.messaging.updatePart(
+          { type: 'text', text: ' World' },
+          0,
+          'append',
+        );
+
+        const appendUpdate = (await getNext(
+          messageIterator,
+        )) as AgentMessageUpdate;
+
+        // The update should only contain the delta text, not the full text
+        expect(appendUpdate.resync).toBe(false);
+        expect(appendUpdate.updateParts).toHaveLength(1);
+        expect(appendUpdate.updateParts[0].contentIndex).toBe(0);
+        expect(appendUpdate.updateParts[0].part).toEqual({
+          type: 'text',
+          text: ' World', // Only the appended text, not 'Hello World'
+        });
+
+        // Verify the internal state has the full text
+        const currentMessage = agentInterface.messaging.get();
+        expect(currentMessage).toHaveLength(1);
+        expect(currentMessage[0]).toEqual({
+          type: 'text',
+          text: 'Hello World', // Full text in internal state
+        });
+      });
+
+      it('should send full content when using updatePart with replace mode', async () => {
+        const messageIterator = adapter.messaging
+          .getMessage()
+          [Symbol.asyncIterator]();
+        await getNext(messageIterator); // consume initial resync
+
+        // Add initial part
+        agentInterface.messaging.addPart({
+          type: 'text',
+          text: 'Original text',
+        });
+        await getNext(messageIterator); // consume the add update
+
+        // Use updatePart to replace text
+        agentInterface.messaging.updatePart(
+          { type: 'text', text: 'Replacement text' },
+          0,
+          'replace',
+        );
+
+        const replaceUpdate = (await getNext(
+          messageIterator,
+        )) as AgentMessageUpdate;
+
+        // The update should contain the full replacement text
+        expect(replaceUpdate.resync).toBe(false);
+        expect(replaceUpdate.updateParts).toHaveLength(1);
+        expect(replaceUpdate.updateParts[0].contentIndex).toBe(0);
+        expect(replaceUpdate.updateParts[0].part).toEqual({
+          type: 'text',
+          text: 'Replacement text', // Full replacement text
+        });
+
+        // Verify the internal state
+        const currentMessage = agentInterface.messaging.get();
+        expect(currentMessage[0]).toEqual({
+          type: 'text',
+          text: 'Replacement text',
+        });
+      });
+
+      it('should handle multiple append operations sending only deltas', async () => {
+        const messageIterator = adapter.messaging
+          .getMessage()
+          [Symbol.asyncIterator]();
+        await getNext(messageIterator); // consume initial resync
+
+        // Add initial part
+        agentInterface.messaging.addPart({ type: 'text', text: 'Start' });
+        await getNext(messageIterator); // consume the add update
+
+        // Append multiple times
+        const appends = [' Middle', ' End', '!'];
+        for (const appendText of appends) {
+          agentInterface.messaging.updatePart(
+            { type: 'text', text: appendText },
+            0,
+            'append',
+          );
+        }
+
+        // Get all append updates
+        const updates = await collectNext(messageIterator, 3);
+
+        // Each update should only contain its delta
+        expect(updates[0].updateParts[0].part).toEqual({
+          type: 'text',
+          text: ' Middle',
+        });
+        expect(updates[1].updateParts[0].part).toEqual({
+          type: 'text',
+          text: ' End',
+        });
+        expect(updates[2].updateParts[0].part).toEqual({
+          type: 'text',
+          text: '!',
+        });
+
+        // Verify final state
+        const currentMessage = agentInterface.messaging.get();
+        expect(currentMessage[0]).toEqual({
+          type: 'text',
+          text: 'Start Middle End!',
+        });
+      });
+
       it('should allow updatePart to add a new part at the highest index + 1', async () => {
         const messageIterator = adapter.messaging
           .getMessage()
@@ -740,11 +865,13 @@ describe('AgentTransportAdapterMessaging', () => {
         });
 
         // Verify it returns by value (modifications don't affect internal state)
+        // @ts-expect-error - text does exist, because we checked it above
         currentMessage.parts[0].text = 'Modified';
         currentMessage.id = 'modified-id';
 
         const newMessage = agentInterface.messaging.getCurrentMessage();
         expect(newMessage.id).toBe(messageId);
+        // @ts-expect-error - text does exist, because we checked it above
         expect(newMessage.parts[0].text).toBe('Part 1');
       });
 
