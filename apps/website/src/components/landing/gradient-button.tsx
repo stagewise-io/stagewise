@@ -4,7 +4,8 @@ import { Button } from '@stagewise/ui/components/button';
 import { cn } from '@stagewise/ui/lib/utils';
 import type React from 'react';
 
-interface GradientButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface GradientButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;

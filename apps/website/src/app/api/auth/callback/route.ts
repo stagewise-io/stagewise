@@ -20,12 +20,12 @@ export async function GET(request: Request) {
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
+                cookieStore.set(name, value, options),
               );
             } catch {}
           },
         },
-      }
+      },
     );
 
     await supabase.auth.exchangeCodeForSession(code);

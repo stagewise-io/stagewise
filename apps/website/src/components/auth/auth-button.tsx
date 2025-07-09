@@ -15,11 +15,7 @@ export function AuthButton({ user }: AuthButtonProps) {
 
   return (
     <Link href="/signin">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-9 cursor-pointer px-3"
-      >
+      <Button variant="ghost" size="sm" className="h-9 cursor-pointer px-3">
         Sign in
       </Button>
     </Link>
