@@ -1,0 +1,32 @@
+{
+  "name": "@stagewise/db",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "dev": "tsup"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.3",
+    "build": "^0.1.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "turbo": {
+    "tasks": {
+      "build": {
+        "dependsOn": [
+          "^build"
+        ],
+        "outputs": [
+          "dist/**"
+        ]
+      }
+    }
+  }
+}
