@@ -3,26 +3,28 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get('code');
+  const tokenHash = requestUrl.searchParams.get('token_hash');
   const origin = requestUrl.origin;
 
-  if (!code) {
-    return NextResponse.json(
-      { error: 'Missing authorization code' },
-      { status: 400 },
-    );
+  if (!tokenHash) {
+    return NextResponse.json({ error: 'Missing token hash' }, { status: 400 });
   }
 
   try {
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: 'email',
+    });
 
     if (error) {
-      console.error('Auth callback error:', error);
-      return NextResponse.redirect(`${origin}/signin?error=auth_failed`);
+      console.error('OTP verification error:', error);
+      return NextResponse.redirect(
+        `${origin}/signin?error=verification_failed`,
+      );
     }
   } catch (err) {
-    console.error('Unexpected auth error:', err);
+    console.error('Unexpected verification error:', err);
     return NextResponse.redirect(`${origin}/signin?error=server_error`);
   }
 
