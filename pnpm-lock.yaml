@@ -102,7 +102,7 @@ importers:
         version: 22.15.2
       '@types/vscode':
         specifier: ^1.85.0
-        version: 1.101.0
+        version: 1.102.0
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
@@ -630,8 +630,8 @@ importers:
         specifier: 6.3.5
         version: 6.3.5(@types/node@24.0.3)(jiti@2.4.2)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
       vite-plugin-dts:
-        specifier: 4.5.3
-        version: 4.5.3(@types/node@24.0.3)(rollup@4.44.2)(typescript@5.8.3)(vite@6.3.5(@types/node@24.0.3)(jiti@2.4.2)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0))
+        specifier: 4.5.4
+        version: 4.5.4(@types/node@24.0.3)(rollup@4.44.2)(typescript@5.8.3)(vite@6.3.5(@types/node@24.0.3)(jiti@2.4.2)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0))
     devDependencies:
       esbuild:
         specifier: ^0.25.6
@@ -5669,8 +5669,8 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
-  '@types/vscode@1.101.0':
-    resolution: {integrity: sha512-ZWf0IWa+NGegdW3iU42AcDTFHWW7fApLdkdnBqwYEtHVIBGbTu0ZNQKP/kX3Ds/uMJXIMQNAojHR4vexCEEz5Q==}
+  '@types/vscode@1.102.0':
+    resolution: {integrity: sha512-V9sFXmcXz03FtYTSUsYsu5K0Q9wH9w9V25slddcxrh5JgORD14LpnOA7ov0L9ALi+6HrTjskLJ/tY5zeRF3TFA==}
 
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
@@ -5862,23 +5862,23 @@ packages:
   '@vitest/utils@3.2.4':
     resolution: {integrity: sha512-fB2V0JFrQSMsCo9HiSq3Ezpdv4iYaXRG1Sx8edX3MwxfyNn83mKiGzOcH+Fkxt4MHxr3y42fQi1oeAInqgX2QA==}
 
-  '@volar/language-core@2.4.13':
-    resolution: {integrity: sha512-MnQJ7eKchJx5Oz+YdbqyFUk8BN6jasdJv31n/7r6/WwlOOv7qzvot6B66887l2ST3bUW4Mewml54euzpJWA6bg==}
-
   '@volar/language-core@2.4.15':
     resolution: {integrity: sha512-3VHw+QZU0ZG9IuQmzT68IyN4hZNd9GchGPhbD9+pa8CVv7rnoOZwo7T8weIbrRmihqy3ATpdfXFnqRrfPVK6CA==}
 
-  '@volar/source-map@2.4.13':
-    resolution: {integrity: sha512-l/EBcc2FkvHgz2ZxV+OZK3kMSroMr7nN3sZLF2/f6kWW66q8+tEL4giiYyFjt0BcubqJhBt6soYIrAPhg/Yr+Q==}
+  '@volar/language-core@2.4.18':
+    resolution: {integrity: sha512-G3yYV85ekH4TV0EDS6DsS/dUJWrz675H9UgsxFz5pQbmas51a0Q2fF6Lb2q4RKgytuLZ4E0MBdT5PlVsJXNalw==}
 
   '@volar/source-map@2.4.15':
     resolution: {integrity: sha512-CPbMWlUN6hVZJYGcU/GSoHu4EnCHiLaXI9n8c9la6RaI9W5JHX+NqG+GSQcB0JdC2FIBLdZJwGsfKyBB71VlTg==}
 
-  '@volar/typescript@2.4.13':
-    resolution: {integrity: sha512-Ukz4xv84swJPupZeoFsQoeJEOm7U9pqsEnaGGgt5ni3SCTa22m8oJP5Nng3Wed7Uw5RBELdLxxORX8YhJPyOgQ==}
+  '@volar/source-map@2.4.18':
+    resolution: {integrity: sha512-zaj2V/zo/CHQ/xA75h60jBPgrz+Ou9s6aPl7dX0rT46/uill9aB/ZaDk92ROpJsa/9e2xftCeNAU9ZwVyB/egQ==}
 
   '@volar/typescript@2.4.15':
     resolution: {integrity: sha512-2aZ8i0cqPGjXb4BhkMsPYDkkuc2ZQ6yOpqwAuNwUoncELqoy5fRgOQtLR9gB0g902iS0NAkvpIzs27geVyVdPg==}
+
+  '@volar/typescript@2.4.18':
+    resolution: {integrity: sha512-xcbsMG8m/yhvO1VIKnTtc+llZxw3YtWkZiV7/F1qNpTORdPExkZRcBxJ5d19MXLpkeiQ+DG5JURHh1SV0bcWRA==}
 
   '@vscode/test-cli@0.0.10':
     resolution: {integrity: sha512-B0mMH4ia+MOOtwNiLi79XhA+MLmUItIC8FckEuKrVAVriIuSWjt7vv4+bF8qVFiNFe4QRfzPaIZk39FZGWEwHA==}
@@ -12980,15 +12980,6 @@ packages:
     peerDependencies:
       vite: '>2.0.0-0'
 
-  vite-plugin-dts@4.5.3:
-    resolution: {integrity: sha512-P64VnD00dR+e8S26ESoFELqc17+w7pKkwlBpgXteOljFyT0zDwD8hH4zXp49M/kciy//7ZbVXIwQCekBJjfWzA==}
-    peerDependencies:
-      typescript: '*'
-      vite: '*'
-    peerDependenciesMeta:
-      vite:
-        optional: true
-
   vite-plugin-dts@4.5.4:
     resolution: {integrity: sha512-d4sOM8M/8z7vRXHHq/ebbblfaxENjogAAekcfcDCCwAyvGqnPrc7f4NZbvItS+g4WTgerW0xDwSz5qz11JT3vg==}
     peerDependencies:
@@ -17599,14 +17590,6 @@ snapshots:
     optionalDependencies:
       rollup: 4.44.0
 
-  '@rollup/pluginutils@5.1.4(rollup@4.44.2)':
-    dependencies:
-      '@types/estree': 1.0.8
-      estree-walker: 2.0.2
-      picomatch: 4.0.2
-    optionalDependencies:
-      rollup: 4.44.2
-
   '@rollup/pluginutils@5.2.0(rollup@4.44.0)':
     dependencies:
       '@types/estree': 1.0.8
@@ -18764,7 +18747,7 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
-  '@types/vscode@1.101.0': {}
+  '@types/vscode@1.102.0': {}
 
   '@types/ws@8.18.1':
     dependencies:
@@ -19096,27 +19079,27 @@ snapshots:
       loupe: 3.1.4
       tinyrainbow: 2.0.0
 
-  '@volar/language-core@2.4.13':
-    dependencies:
-      '@volar/source-map': 2.4.13
-
   '@volar/language-core@2.4.15':
     dependencies:
       '@volar/source-map': 2.4.15
 
-  '@volar/source-map@2.4.13': {}
+  '@volar/language-core@2.4.18':
+    dependencies:
+      '@volar/source-map': 2.4.18
 
   '@volar/source-map@2.4.15': {}
 
-  '@volar/typescript@2.4.13':
-    dependencies:
-      '@volar/language-core': 2.4.13
-      path-browserify: 1.0.1
-      vscode-uri: 3.1.0
+  '@volar/source-map@2.4.18': {}
 
   '@volar/typescript@2.4.15':
     dependencies:
       '@volar/language-core': 2.4.15
+      path-browserify: 1.0.1
+      vscode-uri: 3.1.0
+
+  '@volar/typescript@2.4.18':
+    dependencies:
+      '@volar/language-core': 2.4.18
       path-browserify: 1.0.1
       vscode-uri: 3.1.0
 
@@ -19321,7 +19304,7 @@ snapshots:
 
   '@vue/language-core@2.2.0(typescript@5.8.3)':
     dependencies:
-      '@volar/language-core': 2.4.13
+      '@volar/language-core': 2.4.18
       '@vue/compiler-dom': 3.5.17
       '@vue/compiler-vue2': 2.7.16
       '@vue/shared': 3.5.17
@@ -23175,7 +23158,7 @@ snapshots:
   local-pkg@1.1.1:
     dependencies:
       mlly: 1.7.4
-      pkg-types: 2.1.0
+      pkg-types: 2.2.0
       quansync: 0.2.10
 
   locate-character@3.0.0: {}
@@ -27859,33 +27842,14 @@ snapshots:
     dependencies:
       vite: 6.3.5(@types/node@22.15.2)(jiti@2.4.2)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
 
-  vite-plugin-dts@4.5.3(@types/node@24.0.3)(rollup@4.44.2)(typescript@5.8.3)(vite@6.3.5(@types/node@24.0.3)(jiti@2.4.2)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)):
-    dependencies:
-      '@microsoft/api-extractor': 7.52.8(@types/node@24.0.3)
-      '@rollup/pluginutils': 5.1.4(rollup@4.44.2)
-      '@volar/typescript': 2.4.13
-      '@vue/language-core': 2.2.0(typescript@5.8.3)
-      compare-versions: 6.1.1
-      debug: 4.4.0
-      kolorist: 1.8.0
-      local-pkg: 1.1.1
-      magic-string: 0.30.17
-      typescript: 5.8.3
-    optionalDependencies:
-      vite: 6.3.5(@types/node@24.0.3)(jiti@2.4.2)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
-    transitivePeerDependencies:
-      - '@types/node'
-      - rollup
-      - supports-color
-
   vite-plugin-dts@4.5.4(@types/node@22.15.2)(rollup@4.44.2)(typescript@5.8.3)(vite@6.3.5(@types/node@22.15.2)(jiti@2.4.2)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)):
     dependencies:
       '@microsoft/api-extractor': 7.52.8(@types/node@22.15.2)
-      '@rollup/pluginutils': 5.1.4(rollup@4.44.2)
-      '@volar/typescript': 2.4.13
+      '@rollup/pluginutils': 5.2.0(rollup@4.44.2)
+      '@volar/typescript': 2.4.18
       '@vue/language-core': 2.2.0(typescript@5.8.3)
       compare-versions: 6.1.1
-      debug: 4.4.0
+      debug: 4.4.1(supports-color@8.1.1)
       kolorist: 1.8.0
       local-pkg: 1.1.1
       magic-string: 0.30.17
@@ -27900,11 +27864,11 @@ snapshots:
   vite-plugin-dts@4.5.4(@types/node@24.0.3)(rollup@4.44.2)(typescript@5.8.3)(vite@6.3.5(@types/node@24.0.3)(jiti@2.4.2)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)):
     dependencies:
       '@microsoft/api-extractor': 7.52.8(@types/node@24.0.3)
-      '@rollup/pluginutils': 5.1.4(rollup@4.44.2)
-      '@volar/typescript': 2.4.13
+      '@rollup/pluginutils': 5.2.0(rollup@4.44.2)
+      '@volar/typescript': 2.4.18
       '@vue/language-core': 2.2.0(typescript@5.8.3)
       compare-versions: 6.1.1
-      debug: 4.4.0
+      debug: 4.4.1(supports-color@8.1.1)
       kolorist: 1.8.0
       local-pkg: 1.1.1
       magic-string: 0.30.17
