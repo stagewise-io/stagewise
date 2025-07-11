@@ -345,7 +345,7 @@ export class AgentTransportAdapter implements TransportInterface {
               messageId: self._currentMessageId!,
               updateParts: [{ contentIndex: index, part: contentPart }],
               createdAt: new Date(),
-              resync: false,
+              resync: type === 'replace',
             };
             self._messageController.push(update);
             return;
@@ -369,7 +369,7 @@ export class AgentTransportAdapter implements TransportInterface {
               messageId: self._currentMessageId!,
               updateParts: [{ contentIndex: index, part: contentPart }],
               createdAt: new Date(),
-              resync: false,
+              resync: true,
             };
             self._messageController.push(update);
           } else if (type === 'append') {

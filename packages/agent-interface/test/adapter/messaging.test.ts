@@ -707,7 +707,7 @@ describe('AgentTransportAdapterMessaging', () => {
         )) as AgentMessageUpdate;
 
         // The update should contain the full replacement text
-        expect(replaceUpdate.resync).toBe(false);
+        expect(replaceUpdate.resync).toBe(true);
         expect(replaceUpdate.updateParts).toHaveLength(1);
         expect(replaceUpdate.updateParts[0].contentIndex).toBe(0);
         expect(replaceUpdate.updateParts[0].part).toEqual({
@@ -787,7 +787,7 @@ describe('AgentTransportAdapterMessaging', () => {
         );
 
         const update = (await getNext(messageIterator)) as AgentMessageUpdate;
-        expect(update.resync).toBe(false);
+        expect(update.resync).toBe(true);
         expect(update.updateParts).toHaveLength(1);
         expect(update.updateParts[0].contentIndex).toBe(2);
         expect(update.updateParts[0].part).toEqual({
@@ -832,7 +832,7 @@ describe('AgentTransportAdapterMessaging', () => {
         );
 
         const update = (await getNext(messageIterator)) as AgentMessageUpdate;
-        expect(update.resync).toBe(false);
+        expect(update.resync).toBe(true);
         expect(update.updateParts).toHaveLength(1);
         expect(update.updateParts[0].contentIndex).toBe(0);
         expect(update.updateParts[0].part).toEqual({
@@ -842,6 +842,49 @@ describe('AgentTransportAdapterMessaging', () => {
 
         // Verify message ID was created
         expect(agentInterface.messaging.getCurrentId()).not.toBeNull();
+      });
+
+      it('should send resync: true for replace operations to prevent content appending', async () => {
+        const messageIterator = adapter.messaging
+          .getMessage()
+          [Symbol.asyncIterator]();
+        await getNext(messageIterator); // consume initial resync
+
+        // Add initial content
+        agentInterface.messaging.addPart({
+          type: 'text',
+          text: 'Original content',
+        });
+        await getNext(messageIterator); // consume the add update
+
+        // Replace the content - this should send resync: true
+        agentInterface.messaging.updatePart(
+          { type: 'text', text: 'Replaced content' },
+          0,
+          'replace',
+        );
+
+        const replaceUpdate = (await getNext(
+          messageIterator,
+        )) as AgentMessageUpdate;
+
+        // The key fix: replace operations should send resync: true
+        // This signals to the consumer that this should replace the existing content
+        // at the specified index, not append to it
+        expect(replaceUpdate.resync).toBe(true);
+        expect(replaceUpdate.updateParts).toHaveLength(1);
+        expect(replaceUpdate.updateParts[0].contentIndex).toBe(0);
+        expect(replaceUpdate.updateParts[0].part).toEqual({
+          type: 'text',
+          text: 'Replaced content',
+        });
+
+        // Verify internal state is updated correctly
+        const currentMessage = agentInterface.messaging.get();
+        expect(currentMessage[0]).toEqual({
+          type: 'text',
+          text: 'Replaced content',
+        });
       });
 
       it('should return current message state by value with getCurrentMessage', () => {
