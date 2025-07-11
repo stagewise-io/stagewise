@@ -161,7 +161,9 @@ function findPersistedAgent(availableAgents: AgentInfo[]): AgentInfo | null {
 async function checkAgentOnPort(port: number): Promise<AgentInfo | null> {
   console.debug(`[AgentProvider] Checking for agent on port ${port}...`);
   try {
-    const response = await fetch(`http://localhost:${port}/stagewise/info`, {
+    // We use the hostname of the open page to connec tto the agent
+    const hostname = window.parent.location.hostname;
+    const response = await fetch(`http://${hostname}:${port}/stagewise/info`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -289,8 +291,9 @@ function createWebSocketClient(
   let isConnectionStable = false;
   let connectionFailedCalled = false;
 
+  const hostname = window.parent.location.hostname;
   const wsClient = createWSClient({
-    url: `ws://localhost:${port}/stagewise/ws`,
+    url: `ws://${hostname}:${port}/stagewise/ws`,
     onClose(cause) {
       console.debug(
         `[AgentProvider] WebSocket closed for port ${port}: ${cause}`,
