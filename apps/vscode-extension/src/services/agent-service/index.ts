@@ -42,6 +42,7 @@ export class AgentService {
     this.server.setAgentDescription(
       vscode.workspace.name ?? 'No open workspace',
     );
+    this.server.interface.availability.set(true);
 
     let timeoutHandler: NodeJS.Timeout | null = null;
     this.server.interface.messaging.addUserMessageListener((message) => {
@@ -61,7 +62,7 @@ export class AgentService {
     return setTimeout(() => {
       this.server?.interface.state.set(
         AgentStateType.COMPLETED,
-        'Prompt was added to the agents chatbox!',
+        'Prompt was added to the agents chatbox',
       );
       this.scheduleIdleTransition();
     }, AGENT_COMPLETION_DELAY_MS);
