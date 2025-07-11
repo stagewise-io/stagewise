@@ -211,7 +211,6 @@ export function ChatPanel() {
         <div
           className={cn(
             'mask-alpha mask-[linear-gradient(to_bottom,transparent_0%,black_5%,black_95%,transparent_100%)] absolute inset-0 size-full overflow-hidden',
-            agentState.state === AgentStateType.IDLE && '-mt-2',
           )}
         >
           <AgentMessageDisplay />
@@ -219,7 +218,7 @@ export function ChatPanel() {
       </PanelContent>
       <PanelFooter
         className={cn(
-          'mt-0 flex origin-top flex-col items-stretch gap-0 px-2 pb-2 duration-150 ease-out',
+          'mt-0 flex origin-top flex-col items-stretch gap-0 px-2 pt-1 pb-2 duration-150 ease-out',
           !enableInputField && 'pointer-events-none opacity-80 brightness-75',
           chatState.isPromptCreationActive && 'bg-blue-400/10',
           anyMessageInChat ? 'h-24' : 'h-36',
@@ -242,16 +241,18 @@ export function ChatPanel() {
               onKeyDown={handleKeyDown}
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
-              className="my-1 ml-1 h-full w-full resize-none placeholder:text-foreground/70 focus:outline-none"
-              placeholder="Type your message here..."
+              className="my-1 ml-1 h-full w-full resize-none focus:outline-none"
             />
-            <div className="pointer-events-none absolute inset-0 z-10 p-2">
+            <div className="pointer-events-none absolute inset-0 z-10 p-1">
               <TextSlideshow
-                className="text-foreground/80 text-sm italic"
+                className={cn(
+                  'text-foreground/40 text-sm',
+                  chatState.chatInput.length !== 0 && 'opacity-0',
+                )}
                 texts={[
-                  'Add a new button into the top right corner',
-                  'Convert these card into accordions',
-                  'Add a gradient to the background',
+                  'Try: Add a new button into the top right corner',
+                  'Try: Convert these cards into accordions',
+                  'Try: Add a gradient to the background',
                 ]}
               />
             </div>

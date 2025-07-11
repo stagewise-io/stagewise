@@ -4,7 +4,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/utils';
 
 const textSlideshowVariants = cva(
-  'relative inline-block h-[1.2em] overflow-hidden',
+  'relative block h-[1.2em] h-full overflow-hidden',
 );
 
 interface TextSlideshowProps
@@ -52,7 +52,7 @@ function TextSlideshow({
         className={cn(
           'absolute inset-0 transition-all duration-300 ease-in-out',
           isAnimating
-            ? '-translate-y-full transform opacity-0'
+            ? '-translate-y-2 transform opacity-0 blur-sm'
             : 'translate-y-0 transform opacity-100',
         )}
         key={`current-${currentIndex}`}
@@ -64,7 +64,7 @@ function TextSlideshow({
           'absolute inset-0 transition-all duration-300 ease-in-out',
           isAnimating
             ? 'translate-y-0 opacity-100'
-            : 'translate-y-full opacity-0',
+            : 'translate-y-2 opacity-0 blur-sm',
         )}
         key={`next-${(currentIndex + 1) % texts.length}`}
       >
