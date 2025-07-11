@@ -76,7 +76,7 @@
     "@types/axios": "^0.14.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.15.2",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.102.0",
     "@types/ws": "^8.18.1",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.5.2",
