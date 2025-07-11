@@ -512,7 +512,7 @@ export class AuthService {
 
           const response = await axios(authenticatedConfig);
           return response.data;
-        } catch (refreshError) {
+        } catch (_refreshError) {
           // Refresh failed, user needs to re-authenticate
           await this.logout();
           throw new Error('Authentication expired. Please login again.');
