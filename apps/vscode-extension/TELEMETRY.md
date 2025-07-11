@@ -28,6 +28,8 @@ We collect the following types of telemetry data:
   - When users trigger an auto-update sequence for the toolbar packages
 - Telemetry setting changes (`telemetry_disabled`, `telemetry_enabled`)
   - When users opt-out or opt-in to telemetry collection
+- Authentication events (`authenticate_command_triggered`, `logout_command_triggered`, `check_auth_status_command_triggered`)
+  - When users trigger authentication-related commands
 
 ### Event Details
 
@@ -65,6 +67,14 @@ We collect the following types of telemetry data:
 - `toolbar_integration_notification_ignore`: Triggered when the user decides to explicitly ignore the integration recommendation
   - No additional properties collected
 - `toolbar_integration_notification_dismissed`: Triggered when the user dismisses the toolbar integration notification
+  - No additional properties collected
+
+#### Authentication Events
+- `authenticate_command_triggered`: Triggered when a user initiates the authentication process
+  - No additional properties collected
+- `logout_command_triggered`: Triggered when a user logs out of their account
+  - No additional properties collected
+- `check_auth_status_command_triggered`: Triggered when a user checks their authentication status
   - No additional properties collected
 
 #### Privacy Events

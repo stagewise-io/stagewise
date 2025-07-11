@@ -17,7 +17,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onUri"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -30,6 +31,21 @@
       {
         "command": "stagewise.showGettingStarted",
         "title": "Show Getting Started Guide",
+        "category": "stagewise"
+      },
+      {
+        "command": "stagewise.authenticate",
+        "title": "Authenticate with Stagewise",
+        "category": "stagewise"
+      },
+      {
+        "command": "stagewise.logout",
+        "title": "Logout from Stagewise",
+        "category": "stagewise"
+      },
+      {
+        "command": "stagewise.checkAuthStatus",
+        "title": "Check Authentication Status",
         "category": "stagewise"
       }
     ],

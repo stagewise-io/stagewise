@@ -38,6 +38,10 @@ export enum EventName {
   TOOLBAR_INTEGRATION_NOTIFICATION_DISMISSED = 'toolbar_integration_notification_dismissed',
 
   TOOLBAR_AUTO_UPDATE_PROMPT_SENT = 'toolbar_auto_update_prompt_sent',
+  
+  AUTHENTICATE_COMMAND_TRIGGERED = 'authenticate_command_triggered',
+  LOGOUT_COMMAND_TRIGGERED = 'logout_command_triggered',
+  CHECK_AUTH_STATUS_COMMAND_TRIGGERED = 'check_auth_status_command_triggered',
 }
 
 export class AnalyticsService {

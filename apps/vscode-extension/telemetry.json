@@ -167,6 +167,21 @@
       "classification": "SystemMetaData",
       "purpose": "FeatureInsight",
       "comment": "Tracks when a user dismisses the toolbar integration notification"
+    },
+    "authenticate_command_triggered": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Tracks when a user initiates the authentication process"
+    },
+    "logout_command_triggered": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Tracks when a user logs out of their account"
+    },
+    "check_auth_status_command_triggered": {
+      "classification": "SystemMetaData",
+      "purpose": "FeatureInsight",
+      "comment": "Tracks when a user checks their authentication status"
     }
   }
 }
