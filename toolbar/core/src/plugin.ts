@@ -139,21 +139,19 @@ export interface MCP {
   };
 }
 
-export interface UserMessage {
-  id: string;
-  text: string;
-  contextElements: HTMLElement[];
-  sentByPlugin: boolean;
-}
-
 export interface UIHandle {
   remove: () => void;
 }
 
-import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 import type { ReactNode } from 'react';
+import type { UserMessage } from '@stagewise/agent-interface/toolbar';
+
+export type PluginUserMessage = Omit<
+  UserMessage,
+  'id' | 'createdAt' | 'sentByPlugin' | 'metadata' | 'pluginContent'
+>;
 export interface ToolbarContext {
-  sendPrompt: (prompt: string | PromptRequest) => void;
+  sendPrompt: (prompt: PluginUserMessage) => void;
   mainAppWindow: Window;
 }
 
@@ -187,6 +185,8 @@ export interface ContextElementContext {
   annotation: string | null;
 }
 
+export type { SelectedElement } from '@stagewise/agent-interface/toolbar';
+
 export interface ToolbarPlugin {
   /** The name of the plugin shown to the user. */
   displayName: string;
@@ -219,7 +219,9 @@ export interface ToolbarPlugin {
 
   /** Called just before a prompt is sent. Plugins can use this to automatically provide additional context for the prompt or simply listen to some change. */
   onPromptSend?:
-    | ((prompt: UserMessage) => PromptContext | Promise<PromptContext> | null)
+    | ((
+        prompt: Omit<UserMessage, 'id'>,
+      ) => PromptContext | Promise<PromptContext> | null)
     | null;
 
   /** Called when a context element is hovered in the context menu. This only happens in prompting mode. */

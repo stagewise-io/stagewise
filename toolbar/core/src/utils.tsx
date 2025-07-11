@@ -1,3 +1,10 @@
+import type {
+  SelectedElement,
+  UserMessageMetadata,
+} from '@stagewise/agent-interface/toolbar';
+
+export const companionAnchorTagName = 'stagewise-companion-anchor';
+
 export function getElementAtPoint(x: number, y: number) {
   const elementsBelowAnnotation = window.parent.document.elementsFromPoint(
     x,
@@ -179,4 +186,270 @@ export const generateId = (length = 16): string => {
   return Math.random()
     .toString(36)
     .substring(2, length + 2);
+};
+
+export const copyObject = (obj: unknown, depth = 0, maxDepth = 3): unknown => {
+  // Handle primitive values first
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  // Handle non-object types
+  if (typeof obj !== 'object') {
+    return typeof obj === 'function' ? undefined : obj;
+  }
+
+  // Stop recursion if we've reached max depth
+  if (depth >= maxDepth) {
+    // Return empty containers for complex types, primitives as-is
+    if (Array.isArray(obj)) {
+      return [];
+    }
+    return {};
+  }
+
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    return obj
+      .map((item) => copyObject(item, depth + 1, maxDepth))
+      .filter((item) => item !== undefined);
+  }
+
+  // Handle objects
+  const result: Record<string, unknown> = {};
+
+  for (const key of Object.getOwnPropertyNames(obj)) {
+    // Skip excluded properties
+    if (excludedProperties.has(key)) {
+      continue;
+    }
+
+    try {
+      const value = (obj as Record<string, unknown>)[key];
+
+      // Skip functions
+      if (typeof value === 'function') {
+        continue;
+      }
+
+      // Recursively copy the value
+      const copiedValue = copyObject(value, depth + 1, maxDepth);
+
+      // Only include the property if it's not undefined
+      if (copiedValue !== undefined) {
+        result[key] = copiedValue;
+      }
+    } catch {
+      // Skip properties that throw errors when accessed
+      continue;
+    }
+  }
+
+  return result;
+};
+
+// Properties that should be excluded to prevent prototype pollution and reduce noise
+const excludedProperties = new Set([
+  'constructor',
+  '__proto__',
+  'prototype',
+  '__defineGetter__',
+  '__defineSetter__',
+  '__lookupGetter__',
+  '__lookupSetter__',
+  'hasOwnProperty',
+  'isPrototypeOf',
+  'propertyIsEnumerable',
+  'toString',
+  'valueOf',
+  'toLocaleString',
+]);
+
+// Truncation utilities to ensure data conforms to schema limits
+const truncateString = (str: string, maxLength: number): string => {
+  if (str.length <= maxLength) return str;
+  return `${str.substring(0, maxLength - 3)}...`;
+};
+
+const truncateAttributes = (
+  attributes: Record<string, string>,
+): Record<string, string> => {
+  const result: Record<string, string> = {};
+  const entries = Object.entries(attributes);
+
+  // Limit to 100 entries max
+  const limitedEntries = entries.slice(0, 100);
+
+  for (const [key, value] of limitedEntries) {
+    if (value === null || value === undefined) continue;
+
+    // Special handling for important attributes with 4096 char limit
+    const importantAttributes = new Set([
+      'class',
+      'id',
+      'style',
+      'name',
+      'role',
+      'href',
+      'for',
+      'placeholder',
+      'alt',
+      'title',
+      'ariaLabel',
+      'ariaRole',
+      'ariaDescription',
+    ]);
+
+    if (importantAttributes.has(key)) {
+      result[key] = truncateString(value, 4096);
+    } else {
+      // Custom attributes have 256 char limit
+      result[key] = truncateString(value, 256);
+    }
+  }
+
+  return result;
+};
+
+const truncateOwnProperties = (
+  properties: Record<string, unknown>,
+): Record<string, unknown> => {
+  const result: Record<string, unknown> = {};
+  const entries = Object.entries(properties);
+
+  // Limit to 500 entries max
+  const limitedEntries = entries.slice(0, 500);
+
+  for (const [key, value] of limitedEntries) {
+    // Apply deep truncation to nested objects/arrays
+    result[key] = truncateValue(value, 0, 2); // Keep original depth limits
+  }
+
+  return result;
+};
+
+const truncateValue = (
+  value: unknown,
+  currentDepth: number,
+  maxDepth: number,
+): unknown => {
+  if (value === null || value === undefined) return value;
+
+  if (currentDepth >= maxDepth) {
+    if (Array.isArray(value)) return [];
+    if (typeof value === 'object') return {};
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    // Apply reasonable string truncation for nested values
+    return truncateString(value, 1024);
+  }
+
+  if (Array.isArray(value)) {
+    // Limit array size to prevent excessive data
+    return value
+      .slice(0, 50)
+      .map((item) => truncateValue(item, currentDepth + 1, maxDepth));
+  }
+
+  if (typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    const entries = Object.entries(value);
+
+    // Limit object entries to prevent excessive data
+    const limitedEntries = entries.slice(0, 50);
+
+    for (const [key, val] of limitedEntries) {
+      result[key] = truncateValue(val, currentDepth + 1, maxDepth);
+    }
+
+    return result;
+  }
+
+  return value;
+};
+
+const truncatePluginInfo = (
+  pluginInfo: Array<{ pluginName: string; content: string }>,
+): Array<{ pluginName: string; content: string }> => {
+  return pluginInfo.map((plugin) => ({
+    pluginName: truncateString(plugin.pluginName, 128),
+    content: truncateString(plugin.content, 4096),
+  }));
+};
+
+export const getSelectedElementInfo = (
+  element: HTMLElement,
+  callDepth?: number,
+): SelectedElement => {
+  const boundingRect = element.getBoundingClientRect();
+
+  // Collect raw attributes
+  const rawAttributes = element.getAttributeNames().reduce(
+    (acc, name) => {
+      const value = element.getAttribute(name);
+      if (value !== null) {
+        acc[name] = value;
+      }
+      return acc;
+    },
+    {} as Record<string, string>,
+  );
+
+  // Collect raw own properties
+  const rawOwnProperties = Object.getOwnPropertyNames(element)
+    .filter((prop) => !excludedProperties.has(prop))
+    .reduce(
+      (acc, prop) => {
+        try {
+          const value = element[prop as keyof HTMLElement];
+          // Only include serializable values
+          if (typeof value !== 'function') {
+            acc[prop] = copyObject(value, 0, 2);
+          }
+        } catch {
+          // Skip properties that throw errors when accessed
+        }
+        return acc;
+      },
+      {} as Record<string, unknown>,
+    );
+
+  return {
+    nodeType: truncateString(element.nodeName, 96),
+    xpath: truncateString(getXPathForElement(element, false), 1024),
+    attributes: truncateAttributes(rawAttributes),
+    textContent: truncateString(element.textContent || '', 512),
+    ownProperties: truncateOwnProperties(rawOwnProperties),
+    boundingClientRect: {
+      top: boundingRect.top,
+      left: boundingRect.left,
+      height: boundingRect.height,
+      width: boundingRect.width,
+    },
+    parent:
+      element.parentElement && (callDepth ?? 0) < 10
+        ? getSelectedElementInfo(element.parentElement, (callDepth ?? 0) + 1)
+        : null,
+    pluginInfo: truncatePluginInfo([]), // TODO: Implement plugin info with proper truncation
+  };
+};
+
+export const collectUserMessageMetadata = (
+  selectedElements: SelectedElement[],
+): UserMessageMetadata => {
+  return {
+    currentUrl: truncateString(window.parent.location.href, 1024),
+    currentTitle: truncateString(window.parent.document.title, 256),
+    currentZoomLevel: 0,
+    devicePixelRatio: window.parent.devicePixelRatio,
+    userAgent: truncateString(window.parent.navigator.userAgent, 1024),
+    locale: truncateString(window.parent.navigator.language, 64),
+    selectedElements,
+    viewportResolution: {
+      width: window.parent.innerWidth,
+      height: window.parent.innerHeight,
+    },
+  };
 };

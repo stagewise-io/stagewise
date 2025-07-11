@@ -57,6 +57,7 @@ export function initToolbar(config: ToolbarConfig = {}) {
   iframe.sandbox.add('allow-scripts');
   iframe.sandbox.add('allow-presentation');
   iframe.sandbox.add('allow-pointer-lock');
+  iframe.sandbox.add('allow-popups');
   iframe.setAttribute('allowtransparency', 'true');
 
   iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="preconnect" href="https://rsms.me/"><link rel="stylesheet" href="https://rsms.me/inter/inter.css"></head><body style="pointer-events: none;"></body></html>`;

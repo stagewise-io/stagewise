@@ -2,8 +2,8 @@ import {
   Panel,
   PanelHeader,
   PanelContent,
-  Button,
   useToolbar,
+  Button,
 } from '@stagewise/toolbar/plugin-ui';
 
 export const ExampleComponent = () => {
@@ -13,8 +13,20 @@ export const ExampleComponent = () => {
     <Panel>
       <PanelHeader title="Example Plugin" />
       <PanelContent>
-        <Button onClick={() => toolbar.sendPrompt('Hello world!')}>
-          Send "Hello world!" to Cursor!
+        Welcome to the template plugin!
+        <Button
+          onClick={() => {
+            toolbar.sendPrompt({
+              contentItems: [
+                {
+                  type: 'text',
+                  text: "Hello Agent! This is just a test prompt. Could you please repsond with 'Hello toolbar plugin!'",
+                },
+              ],
+            });
+          }}
+        >
+          Send "Hello world!" to the agent!
         </Button>
       </PanelContent>
     </Panel>

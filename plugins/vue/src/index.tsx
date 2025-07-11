@@ -8,13 +8,13 @@ import {
 const VuePlugin: ToolbarPlugin = {
   displayName: 'Vue',
   description:
-    'This toolbar adds additional information and metadata for apps using Vue as an UI framework',
+    'This plugin adds additional information and metadata for apps using Vue as an UI framework',
   iconSvg: <VueLogo />,
   pluginName: 'vue',
   onContextElementHover: getSelectedElementAnnotation,
   onContextElementSelect: getSelectedElementAnnotation,
   onPromptSend: (prompt) => {
-    const content = getSelectedElementsPrompt(prompt.contextElements);
+    const content = getSelectedElementsPrompt(prompt.metadata.selectedElements);
 
     if (!content) {
       return { contextSnippets: [] };

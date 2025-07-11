@@ -5,7 +5,13 @@
       "label": "Build Extension: vscode-extension",
       "type": "shell",
       "command": "pnpm",
-      "args": ["run", "build", "--filter", "stagewise-vscode-extension"],
+      "args": [
+        "run",
+        "build",
+        "--filter",
+        "stagewise-vscode-extension",
+        "--force"
+      ],
       "group": "build",
       "problemMatcher": ["$tsc"],
       "presentation": {

@@ -6,7 +6,7 @@ export function ReactLogo() {
     >
       <title>React Logo</title>
       <circle cx="0" cy="0" r="2.05" fill="currentColor" />
-      <g stroke="currentColor" stroke-width="1" fill="none">
+      <g stroke="currentColor" strokeWidth="1" fill="none">
         <ellipse rx="11" ry="4.2" />
         <ellipse rx="11" ry="4.2" transform="rotate(60)" />
         <ellipse rx="11" ry="4.2" transform="rotate(120)" />

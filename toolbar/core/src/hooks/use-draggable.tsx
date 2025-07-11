@@ -115,7 +115,11 @@ export const DraggableProvider = ({
 
   return (
     <DraggableContext.Provider value={contextValue}>
-      {children}
+      {contextValue.borderLocation.right - contextValue.borderLocation.left >
+        0 &&
+        contextValue.borderLocation.bottom - contextValue.borderLocation.top >
+          0 &&
+        children}
     </DraggableContext.Provider>
   );
 };
@@ -124,7 +128,9 @@ export interface DraggableConfig {
   startThreshold?: number;
   areaSnapThreshold?: number;
   onDragStart?: () => void;
-  onDragEnd?: () => void;
+  onDragEnd?: (
+    snapArea: keyof DraggableContextType['snapAreas'] | null,
+  ) => void;
   initialSnapArea?: keyof DraggableContextType['snapAreas'];
   initialRelativeCenter?: { x: number; y: number };
   springStiffness?: number;
@@ -158,6 +164,7 @@ export function useDraggable(config: DraggableConfig) {
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const currentMousePosRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // This ref will store the latest relative center, initialized with the config's
   // initialRelativeCenter, and updated during/after drag operations.
@@ -585,15 +592,13 @@ export function useDraggable(config: DraggableConfig) {
   // This will be listened to globally if the mouse was pressed down on the draggable element
   const mouseUpHandler = useCallback(
     (_e: MouseEvent) => {
+      let finalSnapArea: keyof DraggableContextType['snapAreas'] | null = null;
+
       if (isDraggingRef.current) {
-        if (onDragEnd) onDragEnd();
-        if (latestProviderDataRef.current?.emitDragEnd) {
-          latestProviderDataRef.current.emitDragEnd();
-        }
         // Set wasDragged to true when a drag operation ends
         setWasDragged(true);
         // Reset wasDragged after a short delay to allow click handlers to check it
-        setTimeout(() => setWasDragged(false), 0);
+        setTimeout(() => setWasDragged(false), 20);
         // --- Persist the new position on drag end ---
         const draggableEl = movingElementRef.current;
         const provider = latestProviderDataRef.current;
@@ -664,6 +669,7 @@ export function useDraggable(config: DraggableConfig) {
           }
           // Snap to the closest area, but only if within threshold
           if (closestArea && closestCenter) {
+            finalSnapArea = closestArea;
             setCurrentSnapArea(closestArea);
             // Convert to relative
             const relX = (closestCenter.x - parentViewportLeft) / parentWidth;
@@ -673,15 +679,23 @@ export function useDraggable(config: DraggableConfig) {
             // Fallback: use released position
             // This else branch should ideally not be reached if a closestArea and closestCenter are always found.
             // However, keeping it as a fallback or for cases where no snap areas are defined/valid.
+            finalSnapArea = null;
             setCurrentSnapArea(null);
             const relX = (releasedCenterX - parentViewportLeft) / parentWidth;
             const relY = (releasedCenterY - parentViewportTop) / parentHeight;
             persistedRelativeCenterRef.current = { x: relX, y: relY };
           }
         }
+
+        // Call onDragEnd with the determined snap area
+        if (onDragEnd) onDragEnd(finalSnapArea);
+        if (latestProviderDataRef.current?.emitDragEnd) {
+          latestProviderDataRef.current.emitDragEnd();
+        }
       }
       mouseDownPosRef.current = null;
       isDraggingRef.current = false;
+      setIsDragging(false);
       window.removeEventListener('mousemove', mouseMoveHandler, {
         capture: true,
       });
@@ -708,6 +722,7 @@ export function useDraggable(config: DraggableConfig) {
       );
       if (distance > startThreshold && !isDraggingRef.current) {
         isDraggingRef.current = true;
+        setIsDragging(true);
         if (movingElementRef.current) {
           movingElementRef.current.style.userSelect = 'none';
         }
@@ -793,9 +808,10 @@ export function useDraggable(config: DraggableConfig) {
       // Cleanup if hook unmounts or elementToListenOn changes mid-drag
       if (isDraggingRef.current) {
         if (onDragEnd) {
-          onDragEnd();
+          onDragEnd(currentSnapArea); // Pass current snap area on cleanup
         }
         isDraggingRef.current = false;
+        setIsDragging(false);
         if (movingElementNode) {
           // Reset styles on the MOVED element
           movingElementNode.style.userSelect = '';
@@ -818,6 +834,7 @@ export function useDraggable(config: DraggableConfig) {
     onDragEnd,
     mouseMoveHandler,
     mouseUpHandler,
+    currentSnapArea,
   ]);
 
   // Effect to set initial position
@@ -872,5 +889,6 @@ export function useDraggable(config: DraggableConfig) {
         : true,
     },
     wasDragged,
+    isDragging,
   };
 }

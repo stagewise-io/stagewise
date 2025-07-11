@@ -1,102 +1,62 @@
-import Image from 'next/image';
-
 export default function Home() {
   return (
     <div className="grid min-h-screen grid-rows-[20px_1fr_20px] items-center justify-items-center gap-16 p-8 pb-20 font-[family-name:var(--font-geist-sans)] sm:p-20">
       <main className="row-start-2 flex flex-col items-center gap-[32px] sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-center font-[family-name:var(--font-geist-mono)] text-sm/6 sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{' '}
-            <code className="rounded bg-black/[.05] px-1 py-0.5 font-[family-name:var(--font-geist-mono)] font-semibold dark:bg-white/[.06]">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+        <h1 className="mb-4 text-center font-bold text-4xl">bye, bye!</h1>
 
-        <div className="flex flex-col items-center gap-4 sm:flex-row">
+        <div className="prose max-w-2xl text-center sm:text-left">
+          <p className="mb-4">
+            Once upon a time, in a digital realm far beyond our screens, there
+            lived a young line of code named Pixel. Pixel was different from
+            other code snippets - while they were content being static and
+            predictable, Pixel dreamed of creating beautiful animations and
+            delightful user experiences.
+          </p>
+
+          <p className="mb-4">
+            One day, Pixel met a wise old JavaScript function who taught them
+            about the magic of transforms and transitions. Excited by these new
+            possibilities, Pixel began practicing day and night, learning to
+            dance across the screen in elegant animations.
+          </p>
+
+          <p className="mb-4">
+            Soon, other elements noticed Pixel's talents. Buttons asked for
+            hover effects, menus requested smooth transitions, and even the
+            rigid grid layouts wanted to learn how to flow more naturally. Pixel
+            happily shared their knowledge, and gradually, the entire website
+            became more alive and engaging.
+          </p>
+
+          <p>
+            And so, Pixel's dream came true - they had transformed their corner
+            of the web into a more beautiful and interactive place, proving that
+            even the smallest line of code can make a big difference in the
+            digital world.
+          </p>
+        </div>
+
+        <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row">
           <a
-            className="flex h-10 items-center justify-center gap-2 rounded-full border border-transparent border-solid bg-foreground px-4 font-medium text-background text-sm transition-colors hover:bg-[#383838] sm:h-12 sm:w-auto sm:px-5 sm:text-base dark:hover:bg-[#ccc]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            className="flex h-10 items-center justify-center gap-2 rounded-full border border-transparent border-solid bg-blue-600 px-4 font-medium text-sm text-white transition-colors hover:bg-blue-700 sm:h-12 sm:w-auto sm:px-5 sm:text-base dark:hover:bg-blue-500"
+            href="https://nextjs.org/docs"
             target="_blank"
             rel="noopener noreferrer"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
+            Read More Stories
           </a>
           <a
-            className="flex h-10 w-full items-center justify-center rounded-full border border-black/[.08] border-solid px-4 font-medium text-sm transition-colors hover:border-transparent hover:bg-[#f2f2f2] sm:h-12 sm:w-auto sm:px-5 sm:text-base md:w-[158px] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            className="flex h-10 w-full items-center justify-center rounded-full border-2 border-black px-4 font-medium text-black text-sm transition-colors hover:bg-gray-50 sm:h-12 sm:w-auto sm:px-5 sm:text-base md:w-[158px] dark:border-white dark:text-white dark:hover:bg-gray-900"
+            href="https://nextjs.org/learn"
             target="_blank"
             rel="noopener noreferrer"
           >
-            Read our docs
+            Let's go!
           </a>
         </div>
       </main>
-      <footer className="row-start-3 flex flex-wrap items-center justify-center gap-[24px]">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+      <footer className="row-start-3 flex flex-wrap items-center justify-center gap-[24px] text-gray-600 text-sm dark:text-gray-400">
+        <p>A tale of code and creativity</p>
       </footer>
     </div>
   );

@@ -11,6 +11,7 @@ import {
   type ButtonProps,
 } from '@headlessui/react';
 import { forwardRef, Fragment, type Ref } from 'react';
+import { glassyBoxClassName } from './glassy';
 
 export const DropdownMenu = Menu;
 
@@ -33,7 +34,8 @@ export const DropdownMenuContent = forwardRef(
         portal
         {...props}
         className={cn(
-          'z-50 flex w-fit min-w-24 max-w-90 flex-col items-stretch justify-start gap-1 rounded-lg border border-border/30 border-solid bg-background/60 p-1 shadow-black/50 shadow-lg outline-none backdrop-blur-md data-focus:outline-none',
+          glassyBoxClassName,
+          'z-50 flex w-fit min-w-24 max-w-90 flex-col items-stretch justify-start gap-1 rounded-xl p-1 shadow-black/50 shadow-lg outline-none data-focus:outline-none',
           props.className,
         )}
       />
@@ -42,7 +44,7 @@ export const DropdownMenuContent = forwardRef(
 );
 
 const DropdownMenuItemStyles =
-  'w-full flex flex-row select-none items-center justify-start gap-2 p-2 pr-6 truncate overflow-hidden rounded-md hover:bg-zinc-950/10 focus:text-zinc-900 cursor-pointer transition-color duration-150 text-sm font-normal text-foreground';
+  'w-full flex flex-row select-none items-center justify-start gap-2 py-1.5 pl-2 pr-6 truncate overflow-hidden rounded-lg hover:bg-zinc-950/10 focus:text-zinc-900 cursor-pointer transition-color duration-150 text-sm font-normal text-foreground';
 
 export const DropdownMenuButtonItem = forwardRef(
   (

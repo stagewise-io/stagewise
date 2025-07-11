@@ -8,11 +8,11 @@ export {
   PanelContent,
   PanelHeader,
   PanelFooter,
-} from '@/plugin-ui/components/panel';
+} from '@/components/ui/panel';
 
-export { Badge } from '@/plugin-ui/components/badge';
+export { Badge } from '@/components/ui/badge';
 
-export { Button } from '@/plugin-ui/components/button';
+export { Button } from '@/components/ui/button';
 
 // Create proxies that always delegate to the current value from globalThis
 export const useToolbar = () => {
