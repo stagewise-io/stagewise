@@ -1,5 +1,11 @@
 # @stagewise/agent-interface
 
+## 0.2.2
+
+### Patch Changes
+
+- 69d29b2: Fix message repition in update-parts (update-parts now contain only the update, as expected)
+
 ## 0.2.1
 
 ### Patch Changes
