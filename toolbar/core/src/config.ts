@@ -1,7 +1,10 @@
 import type { ToolbarPlugin } from './plugin.ts';
 
 export interface InternalToolbarConfig {
+  /** A list of plugins that the toolbar should use. */
   plugins: ToolbarPlugin[];
+
+  /** Experimental features that are not yet stable and might change in the future. */
   experimental?: {
     /**
      * If true, the toolbar will use the stagewise MCP server.

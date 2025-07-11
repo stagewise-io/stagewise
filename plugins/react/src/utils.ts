@@ -1,3 +1,5 @@
+import type { SelectedElement } from '@stagewise/toolbar';
+
 interface FiberNode {
   displayName?: string;
   name?: string;
@@ -22,6 +24,31 @@ export interface ComponentInfo {
   type: 'regular' | 'rsc';
 }
 
+function getOwnProperties(element: HTMLElement) {
+  // get all non-standard properties from the element
+  const ownProperties = {};
+  for (const key of Object.getOwnPropertyNames(element)) {
+    if (
+      !key.startsWith('__reactFiber$') &&
+      !key.startsWith('__reactInternalInstance$')
+    ) {
+      ownProperties[key] = (element as any)[key];
+    }
+  }
+  return ownProperties;
+}
+
+export function getReactComponentHierarchyFromElement(element: HTMLElement) {
+  const ownProperties = getOwnProperties(element);
+  return getReactComponentHierarchy(ownProperties);
+}
+
+export function getReactComponentHierarchyFromSelectedElement(
+  element: SelectedElement,
+) {
+  return getReactComponentHierarchy(element.ownProperties);
+}
+
 /**
  * Attempts to find the hierarchy of React components (up to 3) that an HTMLElement belongs to.
  * It returns an array of objects, each containing the component's name, type ('client' or 'server'),
@@ -35,9 +62,9 @@ export interface ComponentInfo {
  * @returns An array of ComponentInfo objects, or null if no components are found or the element is not React-managed.
  */
 export function getReactComponentHierarchy(
-  element: HTMLElement | null,
+  ownProperties: Record<string, any>,
 ): ComponentInfo[] | null {
-  if (!element) {
+  if (!ownProperties) {
     return null;
   }
 
@@ -47,7 +74,7 @@ export function getReactComponentHierarchy(
   // 1. Find the internal React Fiber node key.
   // React attaches a Fiber node reference to the DOM element.
   // The key usually starts with '__reactFiber$' or '__reactInternalInstance$'.
-  const fiberKey = Object.keys(element).find(
+  const fiberKey = Object.keys(ownProperties).find(
     (key) =>
       key.startsWith('__reactFiber$') ||
       key.startsWith('__reactInternalInstance$'),
@@ -57,7 +84,7 @@ export function getReactComponentHierarchy(
     return null;
   }
 
-  let currentFiber: FiberNode | null = (element as any)[fiberKey];
+  let currentFiber: FiberNode | null = ownProperties[fiberKey];
 
   if (!currentFiber) {
     return null;
@@ -108,29 +135,6 @@ export function getReactComponentHierarchy(
   return components.length > 0 ? components : null;
 }
 
-/**
- * Formats the React component hierarchy information into a human-readable string.
- *
- * @param hierarchy An array of ComponentInfo objects, or null.
- * @returns A string describing the component hierarchy, or a message if no components are found.
- */
-export function formatReactComponentHierarchy(
-  hierarchy: ComponentInfo[] | null,
-): string {
-  if (!hierarchy || hierarchy.length === 0) {
-    return 'No React components found for this element.';
-  }
-
-  const parts = hierarchy.map(
-    (info) => `{name: ${info.name}, type: ${info.type}}`,
-  );
-
-  let description = `React component tree (from closest to farthest, ${hierarchy.length} closest element${hierarchy.length > 1 ? 's' : ''}): `;
-  description += parts.join(' child of ');
-
-  return description;
-}
-
 export function getSelectedElementAnnotation(element: HTMLElement) {
   const hierarchy = getReactComponentHierarchy(element);
   if (hierarchy?.[0]) {
@@ -141,12 +145,12 @@ export function getSelectedElementAnnotation(element: HTMLElement) {
   return { annotation: null };
 }
 
-export function getSelectedElementsPrompt(elements: HTMLElement[]) {
+export function getSelectedElementsPrompt(elements: SelectedElement[]) {
   const selectedComponentHierarchies = elements.map((e) =>
-    getReactComponentHierarchy(e),
+    getReactComponentHierarchyFromSelectedElement(e),
   );
 
-  if (selectedComponentHierarchies.some((h) => h.length > 0)) {
+  if (selectedComponentHierarchies.some((h) => h && h.length > 0)) {
     const content = `This is additional information on the elements that the user selected. Use this information to find the correct element in the codebase.
 
   ${selectedComponentHierarchies.map((h, index) => {

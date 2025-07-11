@@ -2,7 +2,7 @@ import './app.css';
 
 import { ContextProviders } from './components/context-providers';
 import { HotkeyListener } from './components/hotkey-listener';
-import { DesktopLayout } from './components/layouts/desktop';
+import { DefaultLayout } from './layouts/default';
 import { AppStateProvider } from './hooks/use-app-state';
 import type { InternalToolbarConfig } from './config';
 import { MainAppBlocker } from './components/main-app-blocker';
@@ -15,7 +15,7 @@ export function App(config?: InternalToolbarConfig) {
         <HotkeyListener />
         {/* Depending on the screen size, load either the mobile or the desktop companion layout */}
         {/* Until the mobile layout is ready, we will always load the desktop layout */}
-        <DesktopLayout />
+        <DefaultLayout />
       </ContextProviders>
     </AppStateProvider>
   );

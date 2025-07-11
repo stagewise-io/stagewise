@@ -8,13 +8,13 @@ import {
 const AngularPlugin: ToolbarPlugin = {
   displayName: 'Angular',
   description:
-    'This toolbar adds additional information and metadata for apps using Angular as a UI framework',
+    'This plugin adds additional information and metadata for apps using Angular as a UI framework',
   iconSvg: <AngularLogo />,
   pluginName: 'angular',
   onContextElementHover: getSelectedElementAnnotation,
   onContextElementSelect: getSelectedElementAnnotation,
   onPromptSend: (prompt) => {
-    const content = getSelectedElementsPrompt(prompt.contextElements);
+    const content = getSelectedElementsPrompt(prompt.metadata.selectedElements);
 
     if (!content) {
       return { contextSnippets: [] };

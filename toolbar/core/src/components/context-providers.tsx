@@ -2,9 +2,12 @@ import { PluginProvider } from '@/hooks/use-plugins';
 import type { InternalToolbarConfig } from '../config';
 import { ChatStateProvider } from '@/hooks/use-chat-state';
 import type { ReactNode } from 'react';
-import { SRPCBridgeProvider } from '@/hooks/use-srpc-bridge';
-import { VSCodeProvider } from '@/hooks/use-vscode';
 import { ConfigProvider } from '@/hooks/use-config';
+import { AgentProvider } from '@/hooks/agent/use-agent-provider';
+import { AgentAvailabilityProvider } from '@/hooks/agent/use-agent-availability';
+import { AgentStateProvider } from '@/hooks/agent/use-agent-state';
+import { AgentMessagingProvider } from '@/hooks/agent/use-agent-messaging';
+import { PanelsProvider } from '@/hooks/use-panels';
 
 export function ContextProviders({
   children,
@@ -15,13 +18,19 @@ export function ContextProviders({
 }) {
   return (
     <ConfigProvider config={config}>
-      <VSCodeProvider>
-        <SRPCBridgeProvider>
-          <PluginProvider>
-            <ChatStateProvider>{children}</ChatStateProvider>
-          </PluginProvider>
-        </SRPCBridgeProvider>
-      </VSCodeProvider>
+      <AgentProvider>
+        <AgentAvailabilityProvider>
+          <AgentStateProvider>
+            <AgentMessagingProvider>
+              <PanelsProvider>
+                <PluginProvider>
+                  <ChatStateProvider>{children}</ChatStateProvider>
+                </PluginProvider>
+              </PanelsProvider>
+            </AgentMessagingProvider>
+          </AgentStateProvider>
+        </AgentAvailabilityProvider>
+      </AgentProvider>
     </ConfigProvider>
   );
 }
