@@ -1,5 +1,16 @@
 # @stagewise/toolbar-next
 
+## 0.6.0
+
+### Minor Changes
+
+- 20d6671: Refactor the toolbar to new UI and new agent interface
+
+### Patch Changes
+
+- Updated dependencies [20d6671]
+  - @stagewise/toolbar-react@0.6.0
+
 ## 0.5.2
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @stagewise/toolbar
 
+## 0.6.0
+
+### Minor Changes
+
+- 2c7432e: Allow cross-network access of dev mode! Toolbar now looks for agents on hostname of hosted page.
+- 20d6671: Refactor the toolbar to new UI and new agent interface
+
 ## 0.5.2
 
 ### Patch Changes

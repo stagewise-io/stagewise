@@ -1,5 +1,18 @@
 # @stagewise-plugins/angular
 
+## 1.0.0
+
+### Minor Changes
+
+- 20d6671: Refactor the toolbar to new UI and new agent interface
+- 20d6671: Update plugin API to new interface
+
+### Patch Changes
+
+- Updated dependencies [2c7432e]
+- Updated dependencies [20d6671]
+  - @stagewise/toolbar@0.6.0
+
 ## 0.5.2
 
 ### Patch Changes
