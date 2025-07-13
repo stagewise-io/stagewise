@@ -25,12 +25,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.0.6",
-    "@changesets/cli": "^2.29.3",
+    "@changesets/cli": "^2.29.5",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@stagewise/typescript-config": "workspace:*",
     "@types/node": "22.15.2",
-    "lefthook": "^1.12.1",
+    "lefthook": "^1.12.2",
     "ts-node": "10.9.2",
     "turbo": "^2.5.4",
     "typescript": "^5.8.3"
