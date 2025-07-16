@@ -1,5 +1,11 @@
 # @stagewise/toolbar
 
+## 0.6.1
+
+### Patch Changes
+
+- f581a39: Make the context element selection experience a bit smoother
+
 ## 0.6.0
 
 ### Minor Changes
