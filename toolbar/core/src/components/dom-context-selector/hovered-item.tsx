@@ -2,8 +2,8 @@ import { useWindowSize } from '@/hooks/use-window-size';
 import { useCyclicUpdate } from '@/hooks/use-cyclic-update';
 import { useCallback, useMemo, useRef } from 'react';
 import type { HTMLAttributes } from 'react';
-import { PlusIcon } from 'lucide-react';
 import { usePlugins } from '@/hooks/use-plugins';
+import { cn } from '@/utils';
 
 export interface HoveredItemProps extends HTMLAttributes<HTMLDivElement> {
   refElement: HTMLElement;
@@ -29,22 +29,20 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
   }, [refElement]);
 
   const updateBoxPosition = useCallback(() => {
-    if (boxRef.current) {
-      if (refElement) {
-        const referenceRect = refElement.getBoundingClientRect();
+    if (boxRef.current && refElement) {
+      const referenceRect = refElement.getBoundingClientRect();
 
-        boxRef.current.style.top = `${referenceRect.top - 2}px`;
-        boxRef.current.style.left = `${referenceRect.left - 2}px`;
-        boxRef.current.style.width = `${referenceRect.width + 4}px`;
-        boxRef.current.style.height = `${referenceRect.height + 4}px`;
-        boxRef.current.style.display = undefined;
-      } else {
-        boxRef.current.style.height = '0px';
-        boxRef.current.style.width = '0px';
-        boxRef.current.style.top = `${windowSize.height / 2}px`;
-        boxRef.current.style.left = `${windowSize.width / 2}px`;
-        boxRef.current.style.display = 'none';
-      }
+      boxRef.current.style.top = `${referenceRect.top - 2}px`;
+      boxRef.current.style.left = `${referenceRect.left - 2}px`;
+      boxRef.current.style.width = `${referenceRect.width + 4}px`;
+      boxRef.current.style.height = `${referenceRect.height + 4}px`;
+      boxRef.current.style.display = undefined;
+    } else {
+      boxRef.current.style.height = '0px';
+      boxRef.current.style.width = '0px';
+      boxRef.current.style.top = `${windowSize.height / 2}px`;
+      boxRef.current.style.left = `${windowSize.width / 2}px`;
+      boxRef.current.style.display = 'none';
     }
   }, [refElement, windowSize.height, windowSize.width]);
 
@@ -53,9 +51,9 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
   return (
     <div
       {...props}
-      className={
-        'fixed z-10 flex items-center justify-center rounded-lg border-2 border-blue-600/80 bg-blue-600/20 text-white transition-all duration-100'
-      }
+      className={cn(
+        'fixed z-10 flex items-center justify-center rounded-sm border-2 border-blue-600/70 border-dotted bg-blue-600/5 text-white transition-all duration-100',
+      )}
       ref={boxRef}
     >
       <div className="absolute top-0.5 left-0.5 flex w-full flex-row items-start justify-start gap-1">
@@ -79,7 +77,6 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
             </div>
           ))}
       </div>
-      <PlusIcon className="size-6 drop-shadow-black drop-shadow-md" />
     </div>
   );
 }

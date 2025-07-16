@@ -3,7 +3,6 @@
 import { cn } from '@/utils';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
 import { ContextChipHoverProvider } from '@/hooks/use-context-chip-hover';
-import { ContextChipHoverOverlay } from '@/components/context-chip-hover-overlay';
 import {
   type DraggableContextType,
   DraggableProvider,
@@ -57,7 +56,6 @@ export function DefaultLayout() {
     <ContextChipHoverProvider>
       <div className={cn('fixed inset-0 h-screen w-screen')}>
         <DOMContextSelector />
-        <ContextChipHoverOverlay />
         <DraggingArea />
       </div>
     </ContextChipHoverProvider>

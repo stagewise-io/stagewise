@@ -1,16 +1,20 @@
 import { useWindowSize } from '@/hooks/use-window-size';
 import { useCyclicUpdate } from '@/hooks/use-cyclic-update';
 import { useCallback, useRef, type HTMLAttributes } from 'react';
+import { cn } from '@/utils';
 
-export interface ChipHoveredItemProps extends HTMLAttributes<HTMLDivElement> {
+export interface SelectedItemProps extends HTMLAttributes<HTMLButtonElement> {
   refElement: HTMLElement;
+  isChipHovered: boolean;
+  onRemoveClick: () => void;
 }
 
-export function ChipHoveredItem({
+export function SelectedItem({
   refElement,
+  isChipHovered,
   ...props
-}: ChipHoveredItemProps) {
-  const boxRef = useRef<HTMLDivElement>(null);
+}: SelectedItemProps) {
+  const boxRef = useRef<HTMLButtonElement>(null);
 
   const windowSize = useWindowSize();
 
@@ -29,7 +33,7 @@ export function ChipHoveredItem({
         boxRef.current.style.width = '0px';
         boxRef.current.style.top = `${windowSize.height / 2}px`;
         boxRef.current.style.left = `${windowSize.width / 2}px`;
-        boxRef.current.style.display = 'none';
+        boxRef.current.style.opacity = 'none';
       }
     }
   }, [refElement, windowSize.height, windowSize.width]);
@@ -37,11 +41,13 @@ export function ChipHoveredItem({
   useCyclicUpdate(updateBoxPosition, 30);
 
   return (
-    <div
+    <button
       {...props}
-      className={
-        'fixed z-10 flex items-center justify-center rounded-lg border-2 border-blue-600/80 bg-blue-600/20 text-white transition-all duration-100'
-      }
+      className={cn(
+        'pointer-events-auto fixed flex cursor-not-allowed items-center justify-center rounded-sm border-2 border-zinc-600/70 border-dotted transition-all duration-100 hover:border-rose-600/70 hover:bg-rose-600/5',
+        isChipHovered && 'border-blue-600/70 bg-blue-600/5',
+      )}
+      onClick={props.onRemoveClick}
       ref={boxRef}
     />
   );
