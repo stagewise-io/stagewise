@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rails Example - Stagewise</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body>
+    <%= yield %>
+    
+    <% if Rails.env.development? %>
+      <script type="module">
+        import { initToolbar } from '@stagewise/toolbar';
+        
+        // Initialize Stagewise toolbar in development mode
+        document.addEventListener('DOMContentLoaded', () => {
+          const stagewiseConfig = {
+            plugins: [] // No Rails-specific plugin yet
+          };
+          
+          initToolbar(stagewiseConfig);
+        });
+      </script>
+    <% end %>
+  </body>
+</html>
