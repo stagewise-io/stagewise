@@ -1,8 +1,8 @@
-export default function ImprintPage() {
+export default function LegalNoticePage() {
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="prose prose-zinc">
-        <h1>Imprint</h1>
+        <h1>Legal Notice</h1>
         <p>According to § 5 TMG (German law)</p>
         <h2>tiq UG (haftungsbeschränkt)</h2>
         <br />

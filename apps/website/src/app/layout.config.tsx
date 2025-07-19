@@ -1,7 +1,7 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 import Image from 'next/image';
-import StagewiseLogo from './logo.svg';
-import StagewiseLogoWhite from './logo-white.svg';
+import StagewiseLogo from 'public/logo.svg';
+import StagewiseLogoWhite from 'public/logo-white.svg';
 import { SiDiscord, SiGithub, SiX } from 'react-icons/si';
 /**
  * Shared layout configurations
