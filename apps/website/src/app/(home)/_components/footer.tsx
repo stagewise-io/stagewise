@@ -4,8 +4,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ExternalLink } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
-import StagewiseLogo from '../../logo.svg';
-import StagewiseLogoWhite from '../../logo-white.svg';
+import StagewiseLogo from 'public/logo.svg';
+import StagewiseLogoWhite from 'public/logo-white.svg';
 
 export function Footer() {
   const posthog = usePostHog();
@@ -79,10 +79,10 @@ export function Footer() {
         </p>
         <div className="mt-4 flex gap-4 md:mt-0">
           <Link
-            href="/imprint"
+            href="/legal-notice"
             className="text-xs text-zinc-500 hover:underline dark:text-zinc-400"
           >
-            Impressum
+            Legal Notice
           </Link>
           <Link
             href="/docs/trademark-policy"
