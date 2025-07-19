@@ -19,7 +19,7 @@ export function ShowcaseCard({
   delay,
 }: ShowcaseCardProps) {
   return (
-    <ScrollReveal key={id} delay={delay ? delay : id * DELAY_INCREMENT}>
+    <ScrollReveal key={id} delay={delay ?? id * DELAY_INCREMENT}>
       <div className="group relative h-full overflow-hidden rounded-3xl border border-transparent bg-gradient-to-br from-white via-white to-zinc-50/50 p-8 shadow-[0_8px_32px_rgba(128,90,213,0.12)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(128,90,213,0.25)] dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-800/50">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-violet-500/5 to-indigo-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
