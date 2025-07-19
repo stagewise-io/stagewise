@@ -14,7 +14,7 @@
     "@radix-ui/react-navigation-menu": "^1.2.12",
     "@stagewise/ui": "workspace:*",
     "framer-motion": "^12.23.3",
-    "fumadocs-core": "15.5.5",
+    "fumadocs-core": "15.6.4",
     "fumadocs-mdx": "11.6.1",
     "fumadocs-ui": "15.6.3",
     "lucide-react": "^0.523.0",

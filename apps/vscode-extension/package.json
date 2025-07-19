@@ -109,7 +109,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.12.1",
+    "@modelcontextprotocol/sdk": "1.15.1",
     "@stagewise/agent-interface": "workspace:*",
     "@stagewise-agent/client-sdk": "0.0.4",
     "@stagewise-agent/implementation-client-runtime-vscode": "0.0.2",

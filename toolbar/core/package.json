@@ -58,7 +58,7 @@
     "@stagewise/extension-toolbar-srpc-contract": "workspace:*",
     "@stagewise/srpc": "workspace:*",
     "@tailwindcss/postcss": "^4.1.5",
-    "@trpc/client": "11.4.2",
+    "@trpc/client": "11.4.3",
     "@types/node": "22.15.2",
     "@types/react": "^19.1.8",
     "@vitejs/plugin-react": "^4.6.0",

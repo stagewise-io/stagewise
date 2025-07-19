@@ -36,7 +36,7 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@trpc/server": "11.4.2",
+    "@trpc/server": "11.4.3",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
     "@types/node": "22.15.2",
