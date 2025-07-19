@@ -1,5 +1,11 @@
 # stagewise-vscode-extension
 
+## 0.8.12
+
+### Patch Changes
+
+- cb9c248: Improving token-refresh robustness
+
 ## 0.8.11
 
 ### Patch Changes
