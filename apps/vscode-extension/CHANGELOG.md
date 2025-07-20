@@ -1,5 +1,11 @@
 # stagewise-vscode-extension
 
+## 0.8.15
+
+### Patch Changes
+
+- 9986196: Clarifying early access commands.
+
 ## 0.8.14
 
 ### Patch Changes
