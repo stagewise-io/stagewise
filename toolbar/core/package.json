@@ -66,7 +66,7 @@
     "bowser": "^2.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.523.0",
+    "lucide-react": "^0.525.0",
     "postcss": "^8.5.3",
     "postcss-prefix-selector": "^2.1.1",
     "react": "^19.1.0",
