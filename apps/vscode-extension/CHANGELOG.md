@@ -1,5 +1,11 @@
 # stagewise-vscode-extension
 
+## 0.8.14
+
+### Patch Changes
+
+- 5cb6c8f: Updating client-sdk to log request errors
+
 ## 0.8.13
 
 ### Patch Changes

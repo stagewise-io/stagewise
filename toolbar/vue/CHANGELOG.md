@@ -1,5 +1,12 @@
 # @stagewise/toolbar-vue
 
+## 0.6.2
+
+### Patch Changes
+
+- Updated dependencies [41d9a9b]
+  - @stagewise/toolbar@0.6.2
+
 ## 0.6.1
 
 ### Patch Changes
