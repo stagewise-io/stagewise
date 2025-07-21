@@ -40,7 +40,7 @@ export async function setupToolbar() {
     Also, install and use the \`@stagewise-plugins/react\` package for react specific functionality.
 
     Include the StagewiseToolbar component (exported by the \`\@stagewise/toolbar-react\` package) inside the top-most component of the app.
-    Set the \`config\` prop to an object with the plugins array containing the \`ReactPlugin\` (exported by the \`\@stagewise-plugins/react\` package).
+    Set the \`config\` prop to an object with the plugins array containing the \`ReactPlugin\` (default exported by the \`\@stagewise-plugins/react\` package).
 
     Note: The \`@stagewise/toolbar-react\` package already handles rendering the toolbar only in development mode. The "enabled" prop can be overriden with custom logic to conditionally load the toolbar.
   </react>
@@ -50,7 +50,7 @@ export async function setupToolbar() {
     Also, install and use the \`@stagewise-plugins/react\` package for react specific functionality.
 
     Include the StagewiseToolbar component in the root layout file (layout.tsx).
-    Set the \`config\` prop to an object with the plugins array containing the \`ReactPlugin\` (exported by the \`\@stagewise-plugins/react\` package).
+    Set the \`config\` prop to an object with the plugins array containing the \`ReactPlugin\` (default exported by the \`\@stagewise-plugins/react\` package).
 
     Note: The \`@stagewise/toolbar-next\` package already handles opt-out of SSR so that a simple integration of the component is enough.
     Note: The \`@stagewise/toolbar-next\` package already handles rendering the toolbar only in development mode. The "enabled" prop can be overriden with custom logic to conditionally load the toolbar.
@@ -61,7 +61,7 @@ export async function setupToolbar() {
     Also, install and use the \`@stagewise-plugins/vue\` package for vue specific functionality.
 
     Add the StagewiseToolbar component to the main App component.
-    Set the \`config\` prop to an object with the plugins array containing the \`VuePlugin\` (exported by the \`\@stagewise-plugins/vue\` package).
+    Set the \`config\` prop to an object with the plugins array containing the \`VuePlugin\` (default exported by the \`\@stagewise-plugins/vue\` package).
   </vue>
   
   <nuxt>
@@ -69,7 +69,7 @@ export async function setupToolbar() {
     Also, install and use the \`@stagewise-plugins/vue\` package for vue specific functionality.
 
     Wrap the StagewiseToolbar component in a ClientOnly component to ensure it only renders on the client side.
-    Set the \`config\` prop to an object with the plugins array containing the \`VuePlugin\` (exported by the \`\@stagewise-plugins/vue\` package).
+    Set the \`config\` prop to an object with the plugins array containing the \`VuePlugin\` (default exported by the \`\@stagewise-plugins/vue\` package).
   </nuxt>
   
   <svelte>
@@ -101,6 +101,38 @@ export async function setupToolbar() {
     });
     \`\`\`
   </svelte>
+
+  <other_frameworks>
+    Use the plain \`@stagewise/toolbar\` package for integration.
+    
+    Import the { initToolbar } function from the \`@stagewise/toolbar\` package.
+    Call the initToolbar function without any arguments in the entry point of the app (e.g. main.ts, app.ts, etc.).
+
+    Note: The \`@stagewise/toolbar\` package does NOT handle rendering the toolbar only in development mode. You need to implement this:
+    \`\`\`ts
+    import { initToolbar } from '@stagewise/toolbar';
+
+    if (import.meta.env.DEV) { // or any other way to check for dev mode
+      initToolbar();
+    }
+    \`\`\`
+  </other_frameworks>
+
+  <plain_javascript>
+    Use the plain \`@stagewise/toolbar\` package for integration.
+
+    Import the { initToolbar } function from the \`@stagewise/toolbar\` package and call it without any arguments in the entry point of the app (e.g. main.ts, app.ts, etc.).
+
+    Note: The \`@stagewise/toolbar\` package does NOT handle rendering the toolbar only in development mode. You need to implement this:
+    \`\`\`ts
+    import { initToolbar } from '@stagewise/toolbar';
+
+    if (import.meta.env.DEV) { // or any other way to check for dev mode
+      initToolbar();
+    }
+    \`\`\`
+  </plain_javascript>
+
 </framework_specific_integrations>
 
 <workspace_extensions_list>
