@@ -90,7 +90,7 @@ export function CustomVideoPlayer({
         src={videoSrc}
         width={width}
         height={height}
-        className="aspect-video w-full rounded-xl object-cover"
+        className="aspect-video w-full rounded-xl border border-indigo-900/50 object-cover"
         muted={muted}
         loop={loop}
         controls={controls}
@@ -110,12 +110,15 @@ export function CustomVideoPlayer({
             alt={alt}
             width={width}
             height={height}
-            className="aspect-video w-full rounded-xl object-cover"
+            className="aspect-video w-full rounded-xl border border-indigo-900/50 object-cover"
             priority
           />
 
           {/* Play button overlay */}
-          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20 transition-all duration-300 group-hover:bg-black/30">
+          <div
+            className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20 transition-all duration-300 group-hover:bg-black/30"
+            style={{ borderRadius: '0.75rem' }}
+          >
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/90 shadow-lg transition-transform duration-300 hover:scale-110 group-hover:bg-white">
               {isLoading ? (
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent" />

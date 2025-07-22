@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { WaitlistBanner } from './_components/waitlist-banner';
+
 import {
   ArrowRight,
   Github,
@@ -12,10 +12,10 @@ import {
   MessageSquare,
   User,
 } from 'lucide-react';
-import { WebsiteDemo } from '@/components/landing/website-demo';
 import { AnimatedBackground } from '@/components/landing/animated-background';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { GradientButton } from '@/components/landing/gradient-button';
+import { CustomVideoPlayer } from '@/components/landing/custom-video-player';
 import { usePostHog } from 'posthog-js/react';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
@@ -137,24 +137,33 @@ export default function Home() {
     <div className="relative min-h-screen overflow-hidden bg-white text-slate-900 dark:bg-black dark:text-white">
       <AnimatedBackground />
 
-      {/* Early Access Banner */}
-      <WaitlistBanner />
-
       {/* Hero Section */}
-      <section className="container relative z-10 mx-auto px-4 pt-28 pb-24 sm:pt-32 md:pb-32">
+      <section className="container relative z-10 mx-auto px-4 pt-16 pb-12 sm:pt-20 md:pb-16">
         <div className="mx-auto max-w-4xl">
           <ScrollReveal>
             <div className="mb-12 text-center">
+              {/* YC Banner */}
+              <div className="mb-6 flex flex-col items-center justify-center gap-1 px-6 py-3 text-base text-zinc-600 dark:text-zinc-400">
+                <span className="text-sm">Backed by</span>
+                <img
+                  src="https://cdn.prod.website-files.com/646640ee59ccbb4e0a574e55/6472b3d55908e6f00aad0210_Y_Combinator_logo_text_wordmark.png"
+                  alt="Y Combinator"
+                  className="h-12 w-auto"
+                />
+              </div>
               <h1 className="mb-6 font-bold text-4xl tracking-tight md:text-6xl">
                 <span className="bg-gradient-to-tr from-blue-700 via-violet-500 to-indigo-800 bg-clip-text text-transparent dark:from-cyan-400 dark:via-violet-500 dark:to-indigo-400">
-                  Visually prompt any dev agent.
+                  A frontend coding agent.
                 </span>
                 <br />
-                Right on your localhost
+                <span className="text-3xl md:text-5xl">
+                  Right on your localhost
+                </span>
               </h1>
               <p className="mx-auto mb-8 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
-                Our toolbar connects your app frontend to your favorite code
-                agent and lets you edit your web app UI with prompts.
+                The stagewise coding agent lives inside your browser and lets
+                you visually edit your frontend by selecting elements and
+                prompting changes.
               </p>
               <div className="mb-8 flex flex-col justify-center gap-4 sm:flex-row">
                 <Link
@@ -197,8 +206,18 @@ export default function Home() {
           </ScrollReveal>
 
           <ScrollReveal delay={300}>
-            <div className="mx-auto max-w-3xl scale-[1.01] transform shadow-[0_0_50px_rgba(128,90,213,0.3)] transition-transform duration-300">
-              <WebsiteDemo />
+            <div className="mx-auto max-w-4xl scale-[1.02] transform overflow-hidden rounded-xl border border-indigo-900/50 shadow-[0_0_40px_rgba(128,90,213,0.25)] transition-transform duration-500">
+              <video
+                src="https://github.com/stagewise-io/assets/raw/1aeae6c24e0aedc959ae3fb730ea569c984e3a13/edited/0-5-0-custom-agent/github-projects-demo.mp4"
+                width={1200}
+                height={675}
+                className="w-full"
+                autoPlay
+                muted
+                loop
+                preload="auto"
+                playsInline
+              />
             </div>
           </ScrollReveal>
 
@@ -249,33 +268,111 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Demo Section */}
-      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-16 md:py-24 dark:border-zinc-800">
+      {/* Quickstart Section */}
+      <section
+        id="quickstart"
+        className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800"
+      >
         <ScrollReveal>
-          <div className="mx-auto mb-12 max-w-4xl text-center">
-            <h2 className="mb-6 font-bold text-3xl md:text-4xl">
-              See It In Action
+          <div className="mx-auto max-w-6xl">
+            <h2 className="mb-10 text-center font-bold text-3xl md:text-4xl">
+              Quickstart
             </h2>
-            <p className="mx-auto max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
-              Watch how stagewise connects your browser UI to your code editor,
-              providing real-time context for your AI agents.
-            </p>
-          </div>
-        </ScrollReveal>
+            <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
+              {/* Step 1: Install VS Code Extension */}
+              <div className="flex flex-col items-center justify-center gap-4 text-center">
+                <div>
+                  <h3 className="mb-4 font-semibold text-2xl">
+                    Install the extension
+                  </h3>
+                  <p className="mb-6 text-zinc-600 dark:text-zinc-400">
+                    You need the code editor extension to use the stagewise
+                    agent.
+                  </p>
+                  <div className="w-full">
+                    <Accordion
+                      type="single"
+                      collapsible
+                      className="-space-y-px w-full"
+                      defaultValue="cursor"
+                    >
+                      {ideOptions.map((option) => (
+                        <AccordionItem
+                          key={option.id}
+                          value={option.id}
+                          className="overflow-hidden border border-zinc-500/30 bg-white shadow-sm first:rounded-t-lg last:rounded-b-lg dark:border-indigo-800 dark:bg-zinc-900"
+                        >
+                          <AccordionTrigger className="px-4 py-3 text-left hover:bg-zinc-50 hover:no-underline dark:hover:bg-zinc-800">
+                            <div className="flex items-center gap-3">
+                              <Image
+                                src={option.logo}
+                                alt={option.name}
+                                className="h-6 w-6 dark:invert"
+                              />
+                              <span className="font-medium text-lg">
+                                {option.name}
+                              </span>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-4 py-4">
+                            <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+                              Get the stagewise extension for {option.name} to
+                              begin.
+                            </p>
+                            <Link
+                              href={option.url}
+                              onClick={() =>
+                                posthog?.capture(
+                                  'quickstart_get_extension_click',
+                                  {
+                                    ide: option.name,
+                                  },
+                                )
+                              }
+                            >
+                              <GradientButton>
+                                Get from {option.name} Marketplace
+                                <ArrowRight className="ml-2 size-4" />
+                              </GradientButton>
+                            </Link>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </div>
+                  <p className="mt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">
+                    For further toolbar instructions,{' '}
+                    <Link
+                      href="/docs/quickstart"
+                      className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      check the setup guide
+                    </Link>
+                  </p>
+                </div>
+              </div>
 
-        <ScrollReveal delay={200}>
-          <div className="mx-auto max-w-4xl scale-[1.02] transform overflow-hidden rounded-xl border border-indigo-900/50 shadow-[0_0_40px_rgba(128,90,213,0.25)] transition-transform duration-500">
-            <video
-              src="https://github.com/stagewise-io/assets/raw/refs/heads/main/edited/0-3-0-plugin-release/standard-demo.mp4"
-              width={1200}
-              height={675}
-              className="w-full"
-              autoPlay
-              muted
-              loop
-              preload="auto"
-              playsInline
-            />
+              {/* Getting Started Video */}
+              <div className="flex flex-col items-center justify-center">
+                <h3 className="mb-4 text-center font-semibold text-2xl lg:text-left">
+                  Getting Started Guide
+                </h3>
+                <p className="mb-6 text-center text-zinc-600 lg:text-left dark:text-zinc-400">
+                  Watch this to see how to set up stagewise.
+                </p>
+                <CustomVideoPlayer
+                  videoSrc="https://github.com/stagewise-io/assets/raw/1aeae6c24e0aedc959ae3fb730ea569c984e3a13/edited/0-5-0-custom-agent/github-projects-demo.mp4"
+                  thumbnailSrc="/agent-thumbnail.png"
+                  alt="Getting Started Guide Video"
+                  width={600}
+                  height={338}
+                  muted={true}
+                  loop={true}
+                  preload="auto"
+                  playsInline={true}
+                />
+              </div>
+            </div>
           </div>
         </ScrollReveal>
       </section>
@@ -593,161 +690,6 @@ export default function Home() {
             </ScrollReveal>
           ))}
         </div>
-      </section>
-
-      {/* Quickstart Section */}
-      <section
-        id="quickstart"
-        className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 text-center md:py-32 dark:border-zinc-800"
-      >
-        <ScrollReveal>
-          <div className="mx-auto max-w-4xl">
-            <h2 className="mb-10 font-bold text-3xl md:text-4xl">Quickstart</h2>
-            <div className="space-y-20">
-              {/* Step 1: Install VS Code Extension */}
-              <div className="flex flex-col items-center justify-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-200 font-bold text-slate-900 text-xl dark:bg-zinc-800 dark:text-white">
-                  1
-                </div>
-                <div>
-                  <h3 className="mb-4 font-semibold text-2xl">
-                    Install the extension
-                  </h3>
-                  <p className="mb-6 text-zinc-600 dark:text-zinc-400">
-                    Install the extension from the extension store of your code
-                    editor.
-                  </p>
-                  <div className="w-full">
-                    <Accordion
-                      type="single"
-                      collapsible
-                      className="-space-y-px w-full"
-                      defaultValue="cursor"
-                    >
-                      {ideOptions.map((option) => (
-                        <AccordionItem
-                          key={option.id}
-                          value={option.id}
-                          className="overflow-hidden border border-zinc-500/30 bg-white shadow-sm first:rounded-t-lg last:rounded-b-lg dark:border-indigo-800 dark:bg-zinc-900"
-                        >
-                          <AccordionTrigger className="px-4 py-3 text-left hover:bg-zinc-50 hover:no-underline dark:hover:bg-zinc-800">
-                            <div className="flex items-center gap-3">
-                              <Image
-                                src={option.logo}
-                                alt={option.name}
-                                className="h-6 w-6 dark:invert"
-                              />
-                              <span className="font-medium text-lg">
-                                {option.name}
-                              </span>
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="px-4 py-4">
-                            <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-                              Get the stagewise extension for {option.name} to
-                              begin.
-                            </p>
-                            <Link
-                              href={option.url}
-                              onClick={() =>
-                                posthog?.capture(
-                                  'quickstart_get_extension_click',
-                                  {
-                                    ide: option.name,
-                                  },
-                                )
-                              }
-                            >
-                              <GradientButton>
-                                Get from {option.name} Marketplace
-                                <ArrowRight className="ml-2 size-4" />
-                              </GradientButton>
-                            </Link>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 2: Install and inject the toolbar */}
-              <div className="flex flex-col items-center justify-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-200 font-bold text-slate-900 text-xl dark:bg-zinc-800 dark:text-white">
-                  2
-                </div>
-                <div>
-                  <h3 className="mb-4 font-semibold text-2xl">
-                    Install and inject the toolbar (the extension will guide
-                    you)
-                  </h3>
-                  <div className="mb-4 rounded-lg border border-zinc-500/30 bg-white p-4 shadow-[0_0_20px_rgba(128,90,213,0.15)] dark:border-indigo-800 dark:bg-zinc-900">
-                    <h4 className="font-medium text-zinc-700 dark:text-zinc-300">
-                      🪄 AI-Assisted Setup (recommended):
-                    </h4>
-                    <ol className="mt-2 list-decimal pl-5 text-start text-zinc-600 dark:text-zinc-400">
-                      <li>
-                        In Cursor, Press{' '}
-                        <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">
-                          CMD + Shift + P
-                        </code>
-                      </li>
-                      <li>
-                        Enter{' '}
-                        <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">
-                          setupToolbar
-                        </code>
-                      </li>
-                      <li>
-                        Execute the command and the toolbar will init
-                        automatically 🦄
-                      </li>
-                    </ol>
-                  </div>
-                  <p className="mb-4 text-center text-zinc-600 dark:text-zinc-400">
-                    Or
-                  </p>
-                  <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-100 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                    <h4 className="pb-2 font-medium text-zinc-700 dark:text-zinc-300">
-                      Manual Setup:
-                    </h4>
-                    <Link
-                      href="/docs/quickstart"
-                      className="text-indigo-600 underline hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
-                    >
-                      Follow the manual setup guide
-                    </Link>
-                  </div>
-                  ⚡️ The toolbar will <strong>automatically connect</strong> to
-                  the extension!
-                </div>
-              </div>
-
-              {/* Step 3: tart vibe coding */}
-              <div className="flex flex-col items-center justify-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-200 font-bold text-slate-900 text-xl dark:bg-zinc-800 dark:text-white">
-                  3
-                </div>
-                <div>
-                  <h3 className="mb-4 font-semibold text-2xl">
-                    Start dev mode and begin coding! 🎉
-                  </h3>
-                  <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
-                    The toolbar should appear in the bottom right corner of your
-                    web app. If not, please reach out via{' '}
-                    <Link
-                      href="https://discord.gg/gkdGsDYaKA"
-                      className="underline"
-                    >
-                      Discord
-                    </Link>
-                    .
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ScrollReveal>
       </section>
 
       {/* Agent Support Section */}

@@ -14,11 +14,11 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://stagewise.io'),
   title: 'stagewise | Visually prompt your dev agent - right on localhost.',
   description:
-    'Our toolbar connects your app frontend to your favorite code agent and lets you edit your web app UI with prompts.',
+    'The stagewise coding agent lives inside your browser and lets you visually edit your frontend by selecting elements and prompting changes.',
   openGraph: {
     title: 'stagewise | Visually prompt your dev agent - right on localhost.',
     description:
-      'Our toolbar connects your app frontend to your favorite code agent and lets you edit your web app UI with prompts.',
+      'The stagewise coding agent lives inside your browser and lets you visually edit your frontend by selecting elements and prompting changes.',
     type: 'website',
     images: [
       {
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'stagewise | Visually prompt your dev agent - right on localhost.',
     description:
-      'Our toolbar connects your app frontend to your favorite code agent and lets you edit your web app UI with prompts.',
+      'The stagewise coding agent lives inside your browser and lets you visually edit your frontend by selecting elements and prompting changes.',
     images: ['/agent-thumbnail.png'],
   },
 };

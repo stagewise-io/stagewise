@@ -18,9 +18,7 @@ If your problem is not listed here, please open an issue on [GitHub](https://git
 ### Table of Contents
 
 - [Prompt Not Appearing in IDE](#prompt-not-appearing-in-ide)
-- [Dialogs and Modals Close Unexpectedly](#dialogs-and-modals-close-unexpectedly)
 - [Does Not Work in SSH Remote Session on WSL](#does-not-work-in-ssh-remote-session-on-wsl)
-- [Toolbar Only Works on Localhost](#toolbar-only-works-on-localhost)
 
 
 ## Prompt Not Appearing in IDE
@@ -44,22 +42,6 @@ Your prompt was sent to a different running instance (window) of the IDE.
 
 ---
 
-## Dialogs and Modals Close Unexpectedly
-
-**Symptom:**
-Starting the select mode or sending a prompt closes dialogs and modals.
-
-**Resolution:**
-
-* *This is a known bug.* No local workaround exists at this time.
-
-**Next Steps:**
-
-* Tracked under issue [#87](https://github.com/stagewise-io/stagewise/issues/87).
-* A fix is actively being developed and will arrive in an upcoming release.
-
----
-
 ## Does Not Work in SSH Remote Session on WSL
 
 **Symptom:**
@@ -74,27 +56,4 @@ stagewise toolbar fails to initialize or send prompts when connecting via SSH re
 * Tracked under issue [#172](https://github.com/stagewise-io/stagewise/issues/172).
 * We are working on compatibility support for SSH‑remote workflows.
 
----
 
-## Toolbar Only Works on Localhost
-
-**Symptom:**
-The stagewise toolbar fails to load or function properly when accessing your development environment through:
-- Local network addresses (e.g., `192.168.1.100:3000`)
-- Tunneled environments (e.g., ngrok, Cloudflare Tunnel)
-- Remote development servers
-- Docker containers accessed via non-localhost URLs
-
-**Probable Cause:**
-The stagewise toolbar is designed to work exclusively with `localhost` or `127.0.0.1` addresses for security and architectural reasons.
-
-**Workaround:**
-
-* Access your development environment using `localhost` or `127.0.0.1` instead of other network addresses
-* If using Docker, ensure port mapping allows access via localhost (e.g., `-p 3000:3000`)
-* For remote development, consider using SSH tunneling to forward ports to localhost
-
-**Next Steps:**
-
-* This is a current architectural limitation
-* Support for hosted development environments may be considered for future releases based on user demand
