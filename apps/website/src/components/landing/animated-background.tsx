@@ -58,14 +58,13 @@ export function AnimatedBackground() {
         this.speedX = (Math.random() - 0.5) * 0.5;
         this.speedY = (Math.random() - 0.5) * 0.5;
         if (isDarkMode) {
-          this.color = `rgba(${Math.floor(Math.random() * 100 + 150)}, ${Math.floor(
-            Math.random() * 50 + 100,
-          )}, ${Math.floor(Math.random() * 150 + 150)}, ${Math.random() * 0.3 + 0.2})`;
+          // Use grayscale colors for dark mode
+          const gray = Math.floor(Math.random() * 100 + 150);
+          this.color = `rgba(${gray}, ${gray}, ${gray}, ${Math.random() * 0.3 + 0.2})`;
         } else {
-          // Lighter colors for light mode
-          this.color = `rgba(${Math.floor(Math.random() * 50 + 200)}, ${Math.floor(
-            Math.random() * 50 + 200,
-          )}, ${Math.floor(Math.random() * 50 + 200)}, ${Math.random() * 0.1 + 0.05})`;
+          // Use grayscale colors for light mode
+          const gray = Math.floor(Math.random() * 50 + 150);
+          this.color = `rgba(${gray}, ${gray}, ${gray}, ${Math.random() * 0.1 + 0.05})`;
         }
       }
 
@@ -105,8 +104,8 @@ export function AnimatedBackground() {
             const opacity = 0.1 - distance / 2000;
             if (!ctx) return;
             ctx.strokeStyle = isDarkMode
-              ? `rgba(150, 100, 220, ${opacity})`
-              : `rgba(200, 200, 200, ${opacity * 2})`; // Lighter zinc for light mode, slightly more visible
+              ? `rgba(150, 150, 150, ${opacity})`
+              : `rgba(100, 100, 100, ${opacity * 2})`; // Grayscale for both modes
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(particlesArray[a].x, particlesArray[a].y);

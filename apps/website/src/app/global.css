@@ -10,9 +10,9 @@
 }
 
 :root {
-  --color-fd-background: #fff;
-  --color-fd-foreground: #09090b;
-  --color-fd-primary: #9810fa;
+  --color-fd-background: var(--color-zinc-50);
+  --color-fd-foreground: #var(--color-zinc-950);
+  --color-fd-primary: var(--color-zinc-950);
   /* --color-fd-secondary: #ec4899; */
   /* Add more as needed */
 }
@@ -54,4 +54,9 @@
   100% {
     transform: translateX(200%);
   }
+}
+
+
+#nd-nav nav {
+  @apply max-w-7xl mx-auto;
 }

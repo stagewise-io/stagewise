@@ -3,16 +3,12 @@ import Link from 'next/link';
 
 import {
   ArrowRight,
-  Github,
   Zap,
   Settings,
-  Link2,
-  Feather,
   Layers,
   MessageSquare,
   User,
 } from 'lucide-react';
-import { AnimatedBackground } from '@/components/landing/animated-background';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { GradientButton } from '@/components/landing/gradient-button';
 import { CustomVideoPlayer } from '@/components/landing/custom-video-player';
@@ -39,8 +35,6 @@ import AngularLogo from './_components/plugin_logos/angular.svg';
 import CursorLogo from './_components/ide_logos/cursor.png';
 import WindsurfLogo from './_components/ide_logos/windsurf.png';
 import GitHubCopilotLogo from './_components/ide_logos/github_copilot.png';
-import ClineLogo from './_components/ide_logos/cline.png';
-import RooCodeLogo from './_components/ide_logos/roo_code.png';
 import TraeLogo from './_components/ide_logos/trae.png';
 import ReactFrameworkLogo from './_components/framework_logos/react.png';
 import VueFrameworkLogo from './_components/framework_logos/vue.png';
@@ -134,36 +128,41 @@ export default function Home() {
   ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-white text-slate-900 dark:bg-black dark:text-white">
-      <AnimatedBackground />
-
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-black dark:text-white">
       {/* Hero Section */}
-      <section className="container relative z-10 mx-auto px-4 pt-16 pb-12 sm:pt-20 md:pb-16">
-        <div className="mx-auto max-w-4xl">
+      <section className="container relative z-10 mx-auto px-4 pt-32 pb-12 sm:pt-28 md:pb-16">
+        <div className="mx-auto max-w-7xl">
           <ScrollReveal>
             <div className="mb-12 text-center">
               {/* YC Banner */}
-              <div className="mb-6 flex flex-col items-center justify-center gap-1 px-6 py-3 text-base text-zinc-600 dark:text-zinc-400">
-                <span className="text-sm">Backed by</span>
-                <img
-                  src="https://cdn.prod.website-files.com/646640ee59ccbb4e0a574e55/6472b3d55908e6f00aad0210_Y_Combinator_logo_text_wordmark.png"
-                  alt="Y Combinator"
-                  className="h-12 w-auto"
-                />
+              <div className="mb-6 flex justify-center">
+                <a
+                  href="https://www.ycombinator.com/companies/stagewise"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-3 py-1.5 font-medium text-gray-700 text-sm transition-colors hover:border-gray-400 dark:border-gray-600 dark:text-gray-300 dark:hover:border-gray-500"
+                >
+                  <span>Backed by</span>
+                  <div className="inline-flex items-center gap-1.5">
+                    <div
+                      className="flex h-4 w-4 items-center justify-center"
+                      style={{ backgroundColor: '#f26622' }}
+                    >
+                      <span className="font-normal text-white text-xs">Y</span>
+                    </div>
+                    <span>YCombinator</span>
+                  </div>
+                </a>
               </div>
-              <h1 className="mb-6 font-bold text-4xl tracking-tight md:text-6xl">
-                <span className="bg-gradient-to-tr from-blue-700 via-violet-500 to-indigo-800 bg-clip-text text-transparent dark:from-cyan-400 dark:via-violet-500 dark:to-indigo-400">
-                  A frontend coding agent.
-                </span>
-                <br />
-                <span className="text-3xl md:text-5xl">
-                  Right on your localhost
+              <h1 className="mb-6 font-bold text-3xl tracking-tight md:text-5xl">
+                <span className="bg-gradient-to-tr from-gray-900 via-gray-700 to-black bg-clip-text text-transparent dark:from-gray-100 dark:via-gray-300 dark:to-white">
+                  The frontend coding agent for local codebases
                 </span>
               </h1>
-              <p className="mx-auto mb-8 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
-                The stagewise coding agent lives inside your browser and lets
-                you visually edit your frontend by selecting elements and
-                prompting changes.
+              <p className="mx-auto mb-8 max-w-3xl text-center text-lg text-zinc-600 dark:text-zinc-400">
+                stagewise runs locally, lives inside your browser and let's you
+                build app frontends simply by selecting elements and prompting
+                changes.
               </p>
               <div className="mb-8 flex flex-col justify-center gap-4 sm:flex-row">
                 <Link
@@ -188,25 +187,25 @@ export default function Home() {
                   </GradientButton>
                 </Link>
               </div>
-              <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-zinc-600 dark:text-zinc-400">
+              <div className="flex items-center justify-center gap-2 text-sm text-zinc-600 md:flex-row md:gap-8 dark:text-zinc-400">
                 <div className="flex items-center">
                   <div className="mr-2 h-2 w-2 rounded-full bg-green-500" />
-                  Wide dev agent support.
-                </div>
-                <div className="flex items-center">
-                  <div className="mr-2 h-2 w-2 rounded-full bg-green-500" />
-                  Works with all frameworks
+                  Supports all frameworks
                 </div>
                 <div className="flex items-center">
                   <div className="mr-2 h-2 w-2 rounded-full bg-green-500" />
                   Open Source
+                </div>
+                <div className="flex items-center">
+                  <div className="mr-2 h-2 w-2 rounded-full bg-green-500" />
+                  Connects to plugins & custom agents
                 </div>
               </div>
             </div>
           </ScrollReveal>
 
           <ScrollReveal delay={300}>
-            <div className="mx-auto max-w-4xl scale-[1.02] transform overflow-hidden rounded-xl border border-indigo-900/50 shadow-[0_0_40px_rgba(128,90,213,0.25)] transition-transform duration-500">
+            <div className="mx-auto mt-8 max-w-3xl scale-[1.02] transform overflow-hidden rounded-xl border border-gray-900/50 shadow-[0_0_40px_rgba(0,0,0,0.25)] transition-transform duration-500 dark:border-gray-100/50 dark:shadow-[0_0_40px_rgba(255,255,255,0.1)]">
               <video
                 src="https://github.com/stagewise-io/assets/raw/1aeae6c24e0aedc959ae3fb730ea569c984e3a13/edited/0-5-0-custom-agent/github-projects-demo.mp4"
                 width={1200}
@@ -274,7 +273,7 @@ export default function Home() {
         className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800"
       >
         <ScrollReveal>
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-7xl">
             <h2 className="mb-10 text-center font-bold text-3xl md:text-4xl">
               Quickstart
             </h2>
@@ -392,51 +391,54 @@ export default function Home() {
           </div>
         </ScrollReveal>
 
-        <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-3">
+        <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2 lg:grid-rows-2">
           {[
             {
-              icon: <Zap className="h-6 w-6" />,
-              title: 'Works out of the box',
-              description: 'Simple setup with minimal configuration required',
+              icon: <Layers className="size-6 text-violet-600" />,
+              title: 'Understands Your Website',
+              description:
+                'Analyzes DOM structure, styles, and components to provide contextually aware suggestions and modifications',
               delay: 100,
+              size: 'large', // spans 2 columns on lg
+              iconBg: 'bg-violet-50 dark:bg-violet-950/20',
             },
             {
-              icon: <Settings className="h-6 w-6" />,
-              title: 'Customizable',
+              icon: <Zap className="size-6 text-yellow-500" />,
+              title: 'Smart Styling Choices',
               description:
-                'Use your own configuration file to tailor the experience',
+                'Makes intelligent design decisions based on your existing design system and patterns',
               delay: 200,
+              size: 'normal',
+              iconBg: 'bg-yellow-50 dark:bg-yellow-950/20',
             },
             {
-              icon: <Link2 className="h-6 w-6" />,
-              title: 'Connect to MCP',
+              icon: <Settings className="size-6 text-green-600" />,
+              title: 'Framework Agnostic',
               description:
-                'Connect to your own MCP server for enhanced capabilities',
+                'Works seamlessly with React, Vue, Angular, Next.js, and any web framework',
               delay: 300,
+              size: 'normal',
+              iconBg: 'bg-green-50 dark:bg-green-950/20',
             },
             {
-              icon: <Feather className="h-6 w-6" />,
-              title: 'Zero impact',
-              description: 'Does not impact bundle size of your production app',
-              delay: 400,
-            },
-            {
-              icon: <Layers className="h-6 w-6" />,
-              title: 'Rich context',
+              icon: <MessageSquare className="size-6 text-blue-600" />,
+              title: 'Visual Development',
               description:
-                'Sends DOM elements, screenshots & metadata to your AI agent',
-              delay: 500,
-            },
-            {
-              icon: <MessageSquare className="h-6 w-6" />,
-              title: 'Live comments',
-              description: 'Comment directly on live elements in the browser',
-              delay: 600,
+                'Comment directly on live elements, see changes instantly, and iterate faster than ever',
+              delay: 400,
+              size: 'large', // spans 2 columns on lg
+              iconBg: 'bg-blue-50 dark:bg-blue-950/20',
             },
           ].map((feature, _i) => (
             <ScrollReveal key={feature.title} delay={feature.delay}>
-              <div className="group -translate-y-1 rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-2xl shadow-[rgba(128,90,213,0.15)] transition-all duration-300 dark:border-indigo-800 dark:bg-zinc-900">
-                <div className="mb-4 inline-flex rounded-lg bg-indigo-100 p-3 transition-colors dark:bg-indigo-900/20">
+              <div
+                className={`group -translate-y-1 h-full rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-2xl shadow-[rgba(0,0,0,0.15)] transition-all duration-300 dark:border-gray-800 dark:bg-white ${
+                  feature.size === 'large' ? 'lg:col-span-2' : ''
+                }`}
+              >
+                <div
+                  className={`mb-4 inline-flex rounded-lg p-3 transition-colors ${feature.iconBg}`}
+                >
                   {feature.icon}
                 </div>
                 <h3 className="mb-2 font-semibold text-xl">{feature.title}</h3>
@@ -498,7 +500,7 @@ export default function Home() {
             <ScrollReveal key={framework.name} delay={i * 100} direction="up">
               <Link
                 href={framework.href}
-                className="group hover:-translate-y-0.5 flex cursor-pointer items-center gap-2 rounded-full border border-zinc-500/30 bg-zinc-50 px-6 py-2 shadow-[0_0_20px_rgba(128,90,213,0.15)] transition-all duration-300 ease-out hover:bg-white hover:text-zinc-900 dark:border-indigo-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white"
+                className="group hover:-translate-y-0.5 flex cursor-pointer items-center gap-2 rounded-full border border-zinc-500/30 bg-white px-6 py-2 shadow-[0_0_20px_rgba(0,0,0,0.15)] transition-all duration-300 ease-out hover:bg-white hover:text-zinc-900 dark:border-white dark:bg-white dark:hover:bg-white dark:hover:text-zinc-900"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() =>
@@ -512,7 +514,9 @@ export default function Home() {
                   alt={framework.name}
                   className={`size-6 ${framework.name === 'Next.js' ? 'dark:invert' : ''}`}
                 />
-                <span className="font-medium">{framework.name}</span>
+                <span className="font-medium text-zinc-900">
+                  {framework.name}
+                </span>
               </Link>
             </ScrollReveal>
           ))}
@@ -608,7 +612,7 @@ export default function Home() {
             },
           ].map((testimonial, i) => (
             <ScrollReveal key={testimonial.name} delay={i * 100}>
-              <div className="flex h-full flex-col justify-between rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-[rgba(128,90,213,0.1)] shadow-lg transition-all duration-300 dark:border-indigo-800 dark:bg-zinc-900">
+              <div className="flex h-full flex-col justify-between rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-[rgba(0,0,0,0.1)] shadow-lg transition-all duration-300 dark:border-gray-800 dark:bg-zinc-900">
                 <div className="mb-4">
                   <p className="text-zinc-600 dark:text-zinc-400">
                     "{testimonial.quote}"
@@ -624,7 +628,7 @@ export default function Home() {
                       className="h-12 w-12 rounded-full border border-zinc-200 dark:border-zinc-800"
                     />
                   ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-200 bg-indigo-100 dark:border-zinc-800 dark:bg-indigo-900/20">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-200 bg-gray-100 dark:border-zinc-800 dark:bg-gray-900/20">
                       <User className="h-6 w-6" />{' '}
                     </div>
                   )}
@@ -678,7 +682,7 @@ export default function Home() {
             },
           ].map((feature, _i) => (
             <ScrollReveal key={feature.title} delay={feature.delay}>
-              <div className="group -translate-y-1 h-full rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-2xl shadow-[rgba(128,90,213,0.15)] transition-all duration-300 dark:border-indigo-800 dark:bg-zinc-900">
+              <div className="group -translate-y-1 h-full rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-2xl shadow-[rgba(0,0,0,0.15)] transition-all duration-300 dark:border-gray-800 dark:bg-zinc-900">
                 <div className="mb-4 inline-flex rounded-lg bg-zinc-50 p-3 transition-colors dark:bg-zinc-900/10">
                   {feature.icon}
                 </div>
@@ -690,88 +694,6 @@ export default function Home() {
             </ScrollReveal>
           ))}
         </div>
-      </section>
-
-      {/* Agent Support Section */}
-      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800">
-        <ScrollReveal>
-          <div className="mx-auto mb-16 max-w-4xl text-center">
-            <h2 className="mb-6 font-bold text-3xl md:text-4xl">
-              Agent Support
-            </h2>
-            <p className="text-lg text-zinc-600 dark:text-zinc-400">
-              Compatible with all popular AI coding assistants
-            </p>
-          </div>
-        </ScrollReveal>
-
-        <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-8">
-          {[
-            {
-              name: 'Cursor',
-              logo: CursorLogo,
-            },
-            {
-              name: 'Windsurf',
-              logo: WindsurfLogo,
-            },
-            {
-              name: 'GitHub Copilot',
-              logo: GitHubCopilotLogo,
-            },
-            {
-              name: 'Cline',
-              logo: ClineLogo,
-            },
-            {
-              name: 'Roo Code',
-              logo: RooCodeLogo,
-            },
-            {
-              name: 'Trae',
-              logo: TraeLogo,
-            },
-          ].map((framework, i) => (
-            <ScrollReveal key={framework.name} delay={i * 100} direction="up">
-              <div className="group flex items-center gap-2 rounded-full border border-zinc-500/30 bg-zinc-50 px-6 py-2 shadow-[0_0_20px_rgba(128,90,213,0.15)] transition-all duration-300 dark:border-indigo-800 dark:bg-zinc-900">
-                <Image
-                  src={framework.logo}
-                  alt={framework.name}
-                  className="h-6 w-6 dark:invert"
-                />
-                <span className="font-medium">{framework.name}</span>
-              </div>
-            </ScrollReveal>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-16 md:py-24 dark:border-zinc-800">
-        <ScrollReveal>
-          <div className="mx-auto max-w-4xl rounded-lg bg-gradient-to-br from-zinc-100 to-indigo-200/30 p-12 shadow-[0_0_50px_rgba(128,90,213,0.2)] transition-all duration-500 dark:from-zinc-900 dark:to-indigo-900/30">
-            <h2 className="mb-6 text-center font-bold text-3xl md:text-4xl">
-              Ready to enhance your AI coding experience?
-            </h2>
-            <p className="mx-auto mb-8 max-w-2xl text-center text-xl text-zinc-700 dark:text-zinc-300">
-              Join our growing community of developers using stagewise to
-              supercharge their AI-powered coding workflow.
-            </p>
-            <div className="flex flex-col justify-center gap-4 sm:flex-row">
-              <Link href="https://marketplace.visualstudio.com/items?itemName=stagewise.stagewise-vscode-extension">
-                <GradientButton size="lg">
-                  Install VS Code Extension
-                </GradientButton>
-              </Link>
-              <Link href="https://github.com/stagewise-io/stagewise">
-                <GradientButton variant="outline" size="lg">
-                  <Github className="mr-2 h-4 w-4" />
-                  View on GitHub
-                </GradientButton>
-              </Link>
-            </div>
-          </div>
-        </ScrollReveal>
       </section>
     </div>
   );

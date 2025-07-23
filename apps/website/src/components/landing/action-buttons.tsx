@@ -88,7 +88,7 @@ export default function CopyNPMInstallCommandButton() {
             </div>
           </Button>
         </TooltipTrigger>
-        <TooltipContent className="border border-slate-200 bg-white px-2 py-1 text-slate-900 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+        <TooltipContent className="border border-slate-200 bg-slate-50 px-2 py-1 text-slate-900 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
           Click to copy
         </TooltipContent>
       </Tooltip>

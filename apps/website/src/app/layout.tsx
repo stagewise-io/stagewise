@@ -1,14 +1,10 @@
 import './global.css';
 import { RootProvider } from 'fumadocs-ui/provider';
-import { Inter } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { StagewiseToolbar } from '@stagewise/toolbar-next';
 import { PostHogProvider } from '@/components/posthog-provider';
 import type { Metadata } from 'next';
-
-const inter = Inter({
-  subsets: ['latin'],
-});
+import { GeistSans } from 'geist/font/sans';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://stagewise.io'),
@@ -40,7 +36,11 @@ export const metadata: Metadata = {
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={inter.className} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${GeistSans.className}`}
+      suppressHydrationWarning
+    >
       <body className="flex min-h-screen flex-col">
         <PostHogProvider>
           <StagewiseToolbar config={{ plugins: [] }} />

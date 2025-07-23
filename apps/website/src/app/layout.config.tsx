@@ -1,8 +1,8 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import Image from 'next/image';
-import StagewiseLogo from './logo.svg';
-import StagewiseLogoWhite from './logo-white.svg';
 import { SiDiscord, SiGithub, SiX } from 'react-icons/si';
+import { AnimatedGradientBackground } from '@/components/landing/animated-gradient-background';
+import { Logo } from '@/components/landing/logo';
+
 /**
  * Shared layout configurations
  *
@@ -11,28 +11,35 @@ import { SiDiscord, SiGithub, SiX } from 'react-icons/si';
  * Docs Layout: app/docs/layout.tsx
  */
 export const baseOptions: BaseLayoutProps = {
+  searchToggle: {
+    enabled: false,
+  },
+  themeSwitch: {
+    enabled: false,
+  },
   nav: {
     title: (
       <>
-        <Image
-          src={StagewiseLogo}
-          alt="Logo"
-          height={32}
-          className="dark:hidden"
-        />
-        <Image
-          src={StagewiseLogoWhite}
-          alt="Logo"
-          height={32}
-          className="hidden dark:block"
-        />
+        <div className="relative size-10 scale-95 overflow-hidden rounded-full shadow-lg ring-1 ring-black/20 ring-inset">
+          <AnimatedGradientBackground className="absolute inset-0 size-full" />
+          <Logo
+            className="absolute top-[24%] left-[24%] z-10 size-1/2 drop-shadow-xs"
+            color="white"
+          />
+        </div>
       </>
     ),
+    transparentMode: 'top',
   },
   links: [
     {
-      text: 'Documentation',
+      text: 'Docs',
       url: '/docs',
+      active: 'nested-url',
+    },
+    {
+      text: 'Team',
+      url: '/team',
       active: 'nested-url',
     },
     // TODO: Uncomment this when we officially launch the waitlist
