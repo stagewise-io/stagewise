@@ -1,0 +1,53 @@
+---
+title: Install Plugins
+---
+
+export const metadata = {
+  title: "Install Plugins",
+  description: "Learn how to create and use stagewise plugins.",
+};
+
+Plugins enhance your experiecne with stagewise by giving you an easy way to add additional capabilities to your toolbar and more information for the agent.
+
+## How to integrate plugins
+
+Plugins are integrated by adding them to the config entry of your project's stagewise integration.
+
+For component-based frameworks like React, an integration typically looks like this;
+
+```tsx
+// app/layout.tsx
+import type { Metadata } from 'next';
+import { StagewiseToolbar } from '@stagewise/toolbar-react';
+import ExamplePlugin from '@stagewise/plugin-example'; // <-- This is ann imported plugin
+
+
+export default function App() {
+  return (
+    <html lang="en">
+      <body>
+        <StagewiseToolbar config={{ plugins: [ExamplePlugin] }} /> // <-- Add them to the toolbar like this
+        {/* ... */}
+      </body>
+    </html>
+  );
+}
+```
+
+
+## Recommended plugins for your project
+
+We highly recommend adding a framework-dedicated plugin to your project in order to get even better results and a nicer experience.
+
+- We support and distribute support of the following frameworks:
+  - React & Next (`@stagewise-plugins/react`)
+  - Angular (`@stagewise-plugins/angular`)
+  - Vue & Nuxt (`@stagewise-plugins/vue`)
+- If your framework is not listed, don't worry! stagewise will work just fine.
+  - If you want to add improved support for an additional framework, feel free to create a plugin and tell us about it!
+
+
+## Community-created plugins
+
+Feel free to build plugins using the guidelines found in our [Plugin Developer Guide](/docs/developer-guides/build-plugins)
+and add them to this page by making a contribution to [our project's repository](https://github.com/stagewise-io/stagewise)!

@@ -1,0 +1,10 @@
+{
+  "title": "Developer guides",
+  "pages": [
+    "test-stagewise-locally",
+    "build-plugins",
+    "build-custom-agent-integrations",
+    "contribution-guidelines"
+  ],
+  "defaultOpen": false
+}

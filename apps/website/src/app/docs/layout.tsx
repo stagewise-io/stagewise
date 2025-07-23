@@ -13,7 +13,11 @@ export const metadata = {
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <DocsLayout tree={source.pageTree} {...baseOptions}>
+    <DocsLayout
+      tree={source.pageTree}
+      {...baseOptions}
+      searchToggle={{ enabled: true }}
+    >
       {children}
     </DocsLayout>
   );

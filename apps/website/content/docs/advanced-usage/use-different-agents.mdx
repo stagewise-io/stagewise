@@ -1,0 +1,42 @@
+---
+title: Use different agents
+---
+
+export const metadata = {
+  title: "Use different agents",
+  description: "Learn how to use stagewise with other coding agents",
+};
+
+If you want to use stagewise with an IDE-provided chat agent or some other CLI application, here's how to do so.
+
+> We don't actively support custom integrations with agents other than the stagewise agent. But: We encourage our community to build custom integrations! [Here's a guide on how to do so](/docs/developer-guides/build-custom-agent-integrations).
+
+## Agents supported through the stagewise code editor extension
+
+The stagewise code editor extension allows you to connect the toolbar to a wide variety of IDE-integrate coding agents.
+
+Please note, that the support of the below mentioned IDEs and IDE Extensions is fairly rudimentary.
+
+| Agent           | Supported      |
+| --------------- | -------------- |
+| Cursor          | ✅             |
+| GitHub Copilot  | ✅             |
+| Windsurf        | ✅             |
+| Cline           | ✅             |
+| Roo Code        | ✅             |
+| Trae            | ✅             |
+
+IDE chat integrations work like this:
+
+  - You send a message through the toolbar
+  - The stagewise code editor extension forwards the message along all necessary information to the best available agent chat window
+  - In most cases, you will be required to switch over to the IDE to send the message to the agent.
+    - This is due to a limitation in the IDE provided APIs.
+
+## Community-driven agent integrations
+
+The following list contains noteworthy community-driven agent integrations:
+
+  - none - feel free to build one!
+
+*stagewise is not affiliated with any of the community-driven integrations and does not support the given integrations.*

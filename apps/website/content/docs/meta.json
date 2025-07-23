@@ -1,13 +1,9 @@
 {
   "pages": [
     "index",
-    "quickstart",
-    "plugins",
-    "agent-interface",
-    "debug",
     "community",
-    "contributing",
-    "test-locally",
-    "contact"
+    "advanced-usage",
+    "troubleshooting",
+    "developer-guides"
   ]
 }

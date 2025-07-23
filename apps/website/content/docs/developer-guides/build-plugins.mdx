@@ -7,8 +7,6 @@ export const metadata = {
   description: "Learn how to create and use stagewise plugins.",
 };
 
-# stagewise Plugins
-
 stagewise plugins let you extend the browser toolbar with custom UI, actions, and context for your AI-powered code workflows. Plugins can provide new buttons, panels, and even custom tools that your AI agent can call via MCP (Multi-Context Protocol).
 
 ## 1. Getting Started
@@ -177,13 +175,15 @@ The plugin:
 import type { ToolbarPlugin } from '@stagewise/toolbar';
 import { ExampleComponent } from './component';
 
-export const ExamplePlugin: ToolbarPlugin = {
+const ExamplePlugin: ToolbarPlugin = {
   displayName: 'Example',
   description: 'Example Plugin',
   iconSvg: null,
   pluginName: 'example',
   onActionClick: () => <ExampleComponent />,
 };
+
+export default ExamplePlugin;
 
 // src/component.tsx
 import { Panel, PanelHeader, PanelContent, Button, useToolbar } from '@stagewise/toolbar/plugin-ui';
@@ -209,7 +209,7 @@ Using the plugin in your next-app:
 // app/layout.tsx
 import type { Metadata } from 'next';
 import { StagewiseToolbar } from '@stagewise/toolbar-next';
-import { ExamplePlugin } from '@stagewise/plugin-example'; // <-- replace this with your plugin-name
+import ExamplePlugin from '@stagewise/plugin-example'; // <-- replace this with your plugin-name
 
 export const metadata: Metadata = {
   title: 'My Next.js App',
