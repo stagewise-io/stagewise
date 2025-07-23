@@ -32,7 +32,7 @@ export function Footer() {
         <div className="flex gap-8">
           <Link
             href="https://github.com/stagewise-io/stagewise"
-            className="group flex items-center text-slate-900 transition-colors dark:text-white"
+            className="group flex items-center text-zinc-900 transition-colors dark:text-white"
             target="_blank"
             onClick={() =>
               posthog?.capture('footer_link_click', { destination: 'github' })
@@ -43,7 +43,7 @@ export function Footer() {
           </Link>
           <Link
             href="https://discord.gg/gkdGsDYaKA"
-            className="group flex items-center text-slate-900 transition-colors dark:text-white"
+            className="group flex items-center text-zinc-900 transition-colors dark:text-white"
             target="_blank"
             onClick={() =>
               posthog?.capture('footer_link_click', {
@@ -56,7 +56,7 @@ export function Footer() {
           </Link>
           <Link
             href="mailto:sales@stagewise.io"
-            className="group flex items-center text-slate-900 transition-colors dark:text-white"
+            className="group flex items-center text-zinc-900 transition-colors dark:text-white"
             target="_blank"
             onClick={() =>
               posthog?.capture('footer_link_click', {
@@ -97,7 +97,7 @@ export function Footer() {
             Legal notice
           </Link>
           <Link
-            href="/docs/trademark-policy"
+            href="/trademark-policy"
             className="text-xs text-zinc-500 hover:underline dark:text-zinc-400"
           >
             Trademark Policy

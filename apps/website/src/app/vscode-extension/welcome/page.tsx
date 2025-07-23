@@ -45,7 +45,7 @@ export default function WelcomePage() {
       <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-2">
         {/* Automated Setup Card */}
         <div
-          className={`flex min-h-[320px] animate-pulse-border flex-col rounded-lg border-2 border-blue-500 bg-slate-800/50 p-8 shadow-lg transition-colors hover:bg-slate-800 ${
+          className={`flex min-h-[320px] animate-pulse-border flex-col rounded-lg border-2 border-blue-500 bg-zinc-800/50 p-8 shadow-lg transition-colors hover:bg-zinc-800 ${
             isAnyButtonLoading ? 'pointer-events-none' : ''
           }`}
         >

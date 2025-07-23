@@ -119,7 +119,7 @@ export function CustomVideoPlayer({
             className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20 transition-all duration-300 group-hover:bg-black/30"
             style={{ borderRadius: '0.75rem' }}
           >
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-50/90 shadow-lg transition-transform duration-300 hover:scale-110 group-hover:bg-slate-50">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-zinc-50/90 shadow-lg transition-transform duration-300 hover:scale-110 group-hover:bg-zinc-50">
               {isLoading ? (
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-black border-t-transparent" />
               ) : (

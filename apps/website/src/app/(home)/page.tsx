@@ -128,9 +128,9 @@ export default function Home() {
   ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-black dark:text-white">
+    <div className="relative min-h-screen overflow-hidden bg-zinc-50 text-zinc-900 dark:bg-black dark:text-white">
       {/* Hero Section */}
-      <section className="container relative z-10 mx-auto px-4 pt-32 pb-12 sm:pt-28 md:pb-16">
+      <section className="container relative z-10 mx-auto px-4 pt-40 pb-12 sm:pt-28 md:pb-16">
         <div className="mx-auto max-w-7xl">
           <ScrollReveal>
             <div className="mb-12 text-center">
@@ -140,18 +140,17 @@ export default function Home() {
                   href="https://www.ycombinator.com/companies/stagewise"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-3 py-1.5 font-medium text-gray-700 text-sm transition-colors hover:border-gray-400 dark:border-gray-600 dark:text-gray-300 dark:hover:border-gray-500"
+                  className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-3 py-1.5 font-medium text-gray-700 text-sm transition-colors hover:border-gray-400 hover:bg-orange-500/5 dark:border-gray-600 dark:text-gray-300 dark:hover:border-gray-500"
                 >
-                  <span>Backed by</span>
-                  <div className="inline-flex items-center gap-1.5">
-                    <div
-                      className="flex h-4 w-4 items-center justify-center"
-                      style={{ backgroundColor: '#f26622' }}
-                    >
-                      <span className="font-normal text-white text-xs">Y</span>
-                    </div>
-                    <span>YCombinator</span>
-                  </div>
+                  <span>
+                    Backed by{' '}
+                    <span className="ml-2 inline-flex size-4 items-center justify-center bg-[#f26622] align-text-bottom font-normal text-white text-xs">
+                      Y
+                    </span>
+                    <span className="ml-1 font-normal text-[#f26622]">
+                      Combinator
+                    </span>
+                  </span>
                 </a>
               </div>
               <h1 className="mb-6 font-bold text-3xl tracking-tight md:text-5xl">

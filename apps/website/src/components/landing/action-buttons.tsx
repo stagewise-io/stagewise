@@ -56,7 +56,7 @@ export default function CopyNPMInstallCommandButton() {
         <TooltipTrigger asChild>
           <Button
             variant="outline"
-            className="flex border-slate-300 text-slate-900 hover:bg-slate-100 disabled:opacity-100 dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
+            className="flex border-zinc-300 text-zinc-900 hover:bg-zinc-100 disabled:opacity-100 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800"
             onClick={handleCopy}
             aria-label={copied ? 'Copied' : 'Copy to clipboard'}
             disabled={copied}
@@ -88,7 +88,7 @@ export default function CopyNPMInstallCommandButton() {
             </div>
           </Button>
         </TooltipTrigger>
-        <TooltipContent className="border border-slate-200 bg-slate-50 px-2 py-1 text-slate-900 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+        <TooltipContent className="border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white">
           Click to copy
         </TooltipContent>
       </Tooltip>

@@ -70,7 +70,7 @@ export function WebsiteDemo() {
   }, [messageIndex, status]);
 
   return (
-    <div className="w-full max-w-4xl rounded-lg border border-indigo-300/40 bg-slate-50 shadow-lg transition-transform duration-500 dark:border-indigo-800/40 dark:bg-zinc-900 dark:shadow-[0_0_30px_rgba(128,90,213,0.2)]">
+    <div className="w-full max-w-4xl rounded-lg border border-indigo-300/40 bg-zinc-50 shadow-lg transition-transform duration-500 dark:border-indigo-800/40 dark:bg-zinc-900 dark:shadow-[0_0_30px_rgba(128,90,213,0.2)]">
       {/* Browser Top Bar */}
       <div className="flex items-center justify-between border-zinc-200 border-b px-6 py-4 dark:border-zinc-800">
         <div className="flex items-center gap-2">
@@ -103,7 +103,7 @@ export function WebsiteDemo() {
             <ToggleButton isActive={isActive} />
             {status !== 'hidden' && (
               <div className="-translate-x-1/2 sm:-translate-y-1/2 sm:-translate-x-0 absolute top-full left-1/2 z-10 mt-4 w-xs sm:top-1/2 sm:left-full sm:mt-0 sm:ml-4">
-                <div className="h-20 rounded-lg border border-indigo-300/40 bg-slate-50 p-4 shadow-lg dark:border-indigo-800/30 dark:bg-zinc-800">
+                <div className="h-20 rounded-lg border border-indigo-300/40 bg-zinc-50 p-4 shadow-lg dark:border-indigo-800/30 dark:bg-zinc-800">
                   <div className="flex items-start justify-between gap-2">
                     <div className="w-full font-mono text-sm text-zinc-700 dark:text-zinc-300">
                       {text}
@@ -142,12 +142,12 @@ export function WebsiteDemo() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border border-zinc-200 bg-slate-50 p-4 transition-colors hover:border-indigo-300/40 dark:border-zinc-800 dark:bg-zinc-900 hover:dark:border-indigo-800/30">
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 transition-colors hover:border-indigo-300/40 dark:border-zinc-800 dark:bg-zinc-900 hover:dark:border-indigo-800/30">
             <div className="mb-2 h-4 w-24 rounded bg-zinc-200 dark:bg-zinc-800" />
             <div className="mb-2 h-4 w-full rounded bg-zinc-200 dark:bg-zinc-800" />
             <div className="h-4 w-3/4 rounded bg-zinc-200 dark:bg-zinc-800" />
           </div>
-          <div className="rounded-lg border border-zinc-200 bg-slate-50 p-4 transition-colors hover:border-indigo-300/40 dark:border-zinc-800 dark:bg-zinc-900 hover:dark:border-indigo-800/30">
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 transition-colors hover:border-indigo-300/40 dark:border-zinc-800 dark:bg-zinc-900 hover:dark:border-indigo-800/30">
             <div className="mb-2 h-4 w-24 rounded bg-zinc-200 dark:bg-zinc-800" />
             <div className="mb-2 h-4 w-full rounded bg-zinc-200 dark:bg-zinc-800" />
             <div className="h-4 w-3/4 rounded bg-zinc-200 dark:bg-zinc-800" />
