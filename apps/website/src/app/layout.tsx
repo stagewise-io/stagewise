@@ -1,8 +1,6 @@
 import './global.css';
 import { RootProvider } from 'fumadocs-ui/provider';
 import type { ReactNode } from 'react';
-import { StagewiseToolbar } from '@stagewise/toolbar-next';
-import { PostHogProvider } from '@/components/posthog-provider';
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
 

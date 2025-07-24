@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { GradientButton } from '@/components/landing/gradient-button';
-import { CustomVideoPlayer } from '@/components/landing/custom-video-player';
 import { usePostHog } from 'posthog-js/react';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
