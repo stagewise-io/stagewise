@@ -358,16 +358,13 @@ export default function Home() {
                 <p className="mb-6 text-center text-zinc-600 lg:text-left dark:text-zinc-400">
                   Watch this to see how to set up stagewise.
                 </p>
-                <CustomVideoPlayer
-                  videoSrc="https://github.com/stagewise-io/assets/raw/1aeae6c24e0aedc959ae3fb730ea569c984e3a13/edited/0-5-0-custom-agent/github-projects-demo.mp4"
-                  thumbnailSrc="/agent-thumbnail.png"
-                  alt="Getting Started Guide Video"
-                  width={600}
-                  height={338}
-                  muted={true}
-                  loop={true}
-                  preload="auto"
-                  playsInline={true}
+                <iframe
+                  className="aspect-video w-full rounded-lg shadow-md"
+                  src="https://www.youtube-nocookie.com/embed/bZGpeGD9WEk?si=pEyJV8vHhBb0HAs5"
+                  title="stagewise Quickstart Guide"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
                 />
               </div>
             </div>

@@ -42,10 +42,10 @@ export default function Layout({ children }: { children: ReactNode }) {
       suppressHydrationWarning
     >
       <body className="flex min-h-screen flex-col">
-        <PostHogProvider>
-          <StagewiseToolbar config={{ plugins: [] }} />
-          <RootProvider>{children}</RootProvider>
-        </PostHogProvider>
+        {/* <PostHogProvider> */}
+        {/* <StagewiseToolbar config={{ plugins: [] }} /> */}
+        <RootProvider>{children}</RootProvider>
+        {/* </PostHogProvider> */}
       </body>
     </html>
   );
