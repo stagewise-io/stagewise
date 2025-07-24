@@ -1,5 +1,11 @@
 # stagewise-vscode-extension
 
+## 0.9.0
+
+### Minor Changes
+
+- 3bead9e: Only start one agent per window at once. Automatically select the best option.
+
 ## 0.8.18
 
 ### Patch Changes
