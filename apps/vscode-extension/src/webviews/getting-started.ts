@@ -47,7 +47,7 @@ export function createGettingStartedPanel(
           );
           vscode.env.openExternal(
             vscode.Uri.parse(
-              'https://stagewise.io/docs/quickstart#2-install-and-inject-the-toolbar',
+              'https://stagewise.io/docs#2-install-and-inject-the-toolbar',
             ),
           );
           panel.reveal();

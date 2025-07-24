@@ -11,7 +11,7 @@
 
 :root {
   --color-fd-background: var(--color-zinc-50);
-  --color-fd-foreground: #var(--color-zinc-950);
+  --color-fd-foreground: var(--color-zinc-950);
   --color-fd-primary: var(--color-zinc-950);
   /* --color-fd-secondary: #ec4899; */
   /* Add more as needed */

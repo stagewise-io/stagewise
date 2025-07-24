@@ -340,7 +340,7 @@ export default function Home() {
                   <p className="mt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">
                     For further toolbar instructions,{' '}
                     <Link
-                      href="/docs/quickstart"
+                      href="/docs"
                       className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
                     >
                       check the setup guide
