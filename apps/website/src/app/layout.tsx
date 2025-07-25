@@ -3,31 +3,34 @@ import { RootProvider } from 'fumadocs-ui/provider';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
+import { PostHogProvider } from '@/components/posthog-provider';
+import { StagewiseToolbar } from '@stagewise/toolbar-next';
+import ReactPlugin from '@stagewise-plugins/react';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://stagewise.io'),
-  title: 'stagewise | Visually prompt your dev agent - right on localhost.',
+  title: 'stagewise | The frontend coding agent for production codebases',
   description:
-    'The stagewise coding agent lives inside your browser and lets you visually edit your frontend by selecting elements and prompting changes.',
+    'Visually build your apps frontend right inside your browser on localhost. Compatible with any frontend framework.',
   openGraph: {
-    title: 'stagewise | Visually prompt your dev agent - right on localhost.',
+    title: 'stagewise | The frontend coding agent for production codebases',
     description:
-      'The stagewise coding agent lives inside your browser and lets you visually edit your frontend by selecting elements and prompting changes.',
+      'Visually build your apps frontend right inside your browser on localhost. Compatible with any frontend framework.',
     type: 'website',
     images: [
       {
         url: '/agent-thumbnail.png',
         width: 1200,
         height: 630,
-        alt: 'stagewise - Visually prompt your dev agent',
+        alt: 'stagewise: The frontend coding agent for production codebases',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'stagewise | Visually prompt your dev agent - right on localhost.',
+    title: 'stagewise | The frontend coding agent for production codebases',
     description:
-      'The stagewise coding agent lives inside your browser and lets you visually edit your frontend by selecting elements and prompting changes.',
+      'Visually build your apps frontend right inside your browser on localhost. Compatible with any frontend framework.',
     images: ['/agent-thumbnail.png'],
   },
 };
@@ -40,10 +43,10 @@ export default function Layout({ children }: { children: ReactNode }) {
       suppressHydrationWarning
     >
       <body className="flex min-h-screen flex-col">
-        {/* <PostHogProvider> */}
-        {/* <StagewiseToolbar config={{ plugins: [] }} /> */}
-        <RootProvider>{children}</RootProvider>
-        {/* </PostHogProvider> */}
+        <PostHogProvider>
+          <StagewiseToolbar config={{ plugins: [ReactPlugin] }} />
+          <RootProvider>{children}</RootProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

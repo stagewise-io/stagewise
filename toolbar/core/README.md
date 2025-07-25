@@ -1,6 +1,6 @@
 # <img src="https://github.com/stagewise-io/assets/blob/main/media/logo.png?raw=true" alt="stagewise logo" width="48" height="48" style="border-radius: 50%; vertical-align: middle; margin-right: 8px;" /> stagewise
 
-# Visual vibe coding. Right in your codebase.
+# The frontend coding agent for production codebases
 
 [![VS Code Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/stagewise.stagewise-vscode-extension?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=stagewise.stagewise-vscode-extension) [![GitHub Repo stars](https://img.shields.io/github/stars/stagewise-io/stagewise)](https://github.com/stagewise-io/stagewise) [![Join us on Discord](https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white)](https://discord.gg/gkdGsDYaKA) <!-- [![Build Status](https://img.shields.io/github/actions/workflow/status/stagewise-io/stagewise/ci.yml?branch=main)](https://github.com/stagewise-io/stagewise/actions) -->
 
@@ -16,23 +16,21 @@
 
 ## About the project
 
-**stagewise is a browser toolbar that connects your frontend UI to your code ai agents in your code editor.**
+Welcome to **stagewise** —  The frontend coding agent for production codebases
 
-* 🧠 Select any element(s) in your web app
-* 💬 Leave a comment on it
-* 💡 Let your AI-Agent do the magic
+- 💬 Tell the agent what you want to change
+- 🧠 Click on element(s) to let the agent know where a change should happen
+- 💡 Let stagewise do the magic!
 
-> Perfect for devs tired of pasting folder paths into prompts. stagewise gives your AI real-time, browser-powered context.
+> Perfect for devs tired of pasting element information and folder paths into prompts. stagewise uses real-time, browser-powered context.
 
+## Features
 
-## ✨ Features
-
-The stagewise Toolbar makes it incredibly easy to edit your frontend code with AI agents:
-
-* ⚡ Works out of the box
-* 🧩 Customise and extend functionality with Plugins
-* 🧠 Sends DOM elements & more metadata to your AI agent
-* 🧪 Comes with examples for React, Vue, Svelte and more
+- ⚡ Works out of the box
+- 🧩 Customize and extend functionality with Plugins
+- 📖 Open source
+- ⛓️ Compatible with all kinds of frameworks
+- 🧠 Use our dedicated frontend agent - or any other compatible through our open agent interface!
 
 
 ## 📖 Quickstart 
@@ -86,7 +84,17 @@ setupStagewise();
 ```
 > ⚡️ The toolbar will **automatically connect** to the extension!
 
-### 3. 🎉 **Start dev mode and begin coding!**
+### 3. **Setup your stagewise account**
+
+> 🪄 **Auto-Install the toolbar (AI-guided):**
+> 1. In your IDE, Press `⌘ + Shift + P`
+> 2. Enter `Login to stagewise`
+> 3. Execute the command and follow the guide
+> 4. You're good to go!
+
+> ⚡️ The toolbar will **automatically connect** to the extension when opening up the dev mode of your app
+
+### 4. 🎉 **Start dev mode and begin coding!**
 
 The toolbar should appear in the bottom right corner of your web app. If not, please reach out via [Discord](https://discord.gg/gkdGsDYaKA).
 
@@ -276,6 +284,7 @@ You would then use `StagewiseToolbarLoader` in your `src/routes/+layout.svelte`.
 
 | **Agent**      | **Supported**  |
 | -------------- | -------------- |
+| stagewise agent| ✅⭐️           |
 | Cursor         | ✅             |
 | GitHub Copilot | ✅             |
 | Windsurf       | ✅             |

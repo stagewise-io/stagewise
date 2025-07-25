@@ -154,7 +154,9 @@ export default function Home() {
               </div>
               <h1 className="mb-6 font-bold text-3xl tracking-tight md:text-5xl">
                 <span className="bg-gradient-to-tr from-gray-900 via-gray-700 to-black bg-clip-text text-transparent dark:from-gray-100 dark:via-gray-300 dark:to-white">
-                  The frontend coding agent for local codebases
+                  The frontend coding agent for
+                  <br />
+                  production codebases
                 </span>
               </h1>
               <p className="mx-auto mb-8 max-w-3xl text-center text-lg text-zinc-600 dark:text-zinc-400">
