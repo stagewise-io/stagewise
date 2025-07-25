@@ -169,7 +169,10 @@ export default function Home() {
                 <Link
                   href="#quickstart"
                   onClick={() => posthog?.capture('hero_get_started_click')}
-                  className={buttonVariants({ size: 'lg', variant: 'default' })}
+                  className={buttonVariants({
+                    size: 'lg',
+                    variant: 'default',
+                  })}
                 >
                   Get Started
                   <ArrowRight className="size-4" />
