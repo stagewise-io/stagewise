@@ -2,7 +2,8 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 /* Additional watch source for tailwind */
-@source "../../../../packages/ui/src";
+@source "../../node_modules/@stagewise/ui";
+
 
 @theme {
   --animate-shine: shine 3s ease-in-out infinite;
@@ -10,13 +11,34 @@
 }
 
 :root {
+  --foreground: var(--color-zinc-950);
+  --background: var(--color-zinc-50);
+  --primary: var(--color-zinc-950);
+  --primary-foreground: var(--color-zinc-50);
+  --secondary: var(--color-zinc-200);
+  --accent: var(--color-zinc-950);
+  --muted: var(--color-zinc-100);
+  --border: var(--color-zinc-500);
+  --input: var(--color-zinc-200);
+  --card: var(--color-zinc-50);
   --color-fd-background: var(--color-zinc-50);
   --color-fd-foreground: var(--color-zinc-950);
   --color-fd-primary: var(--color-zinc-950);
   /* --color-fd-secondary: #ec4899; */
   /* Add more as needed */
 }
-.dark {
+
+:root.dark {
+  --foreground: var(--color-zinc-50);
+  --background: var(--color-zinc-950);
+  --primary: var(--color-zinc-50);
+  --primary-foreground: var(--color-zinc-950);
+  --secondary: var(--color-zinc-800);
+  --accent: var(--color-zinc-50);
+  --muted: var(--color-zinc-900);
+  --border: var(--color-zinc-700);
+  --input: var(--color-zinc-800);
+  --card: var(--color-zinc-900);
   --color-fd-background: #09090b;
   --color-fd-foreground: #fff;
   /* ... */

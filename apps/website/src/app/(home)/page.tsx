@@ -41,6 +41,7 @@ import AngularFrameworkLogo from './_components/framework_logos/angular.png';
 import SvelteFrameworkLogo from './_components/framework_logos/svelte.png';
 import NextFrameworkLogo from './_components/framework_logos/next.png';
 import NuxtFrameworkLogo from './_components/framework_logos/nuxt.png';
+import { buttonVariants } from '@stagewise/ui/components/button';
 
 // GradientStarIcon: Star with gradient fill using mask
 function StarIcon({ className = '' }: { className?: string }) {
@@ -139,7 +140,7 @@ export default function Home() {
                   href="https://www.ycombinator.com/companies/stagewise"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-3 py-1.5 font-medium text-gray-700 text-sm transition-colors hover:border-gray-400 hover:bg-orange-500/5 dark:border-gray-600 dark:text-gray-300 dark:hover:border-gray-500"
+                  className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-3 py-1.5 font-medium text-sm text-zinc-700 transition-colors hover:border-zinc-400 hover:bg-orange-500/5 dark:border-zinc-600 dark:text-zinc-300 dark:hover:border-zinc-500"
                 >
                   <span>
                     Backed by{' '}
@@ -153,7 +154,7 @@ export default function Home() {
                 </a>
               </div>
               <h1 className="mb-6 font-bold text-3xl tracking-tight md:text-5xl">
-                <span className="bg-gradient-to-tr from-gray-900 via-gray-700 to-black bg-clip-text text-transparent dark:from-gray-100 dark:via-gray-300 dark:to-white">
+                <span className="bg-gradient-to-tr from-zinc-900 via-zinc-700 to-black bg-clip-text text-transparent dark:from-zinc-100 dark:via-zinc-300 dark:to-white">
                   The frontend coding agent for
                   <br />
                   production codebases
@@ -168,23 +169,21 @@ export default function Home() {
                 <Link
                   href="#quickstart"
                   onClick={() => posthog?.capture('hero_get_started_click')}
+                  className={buttonVariants({ size: 'lg', variant: 'default' })}
                 >
-                  <GradientButton size="lg">
-                    Get Started
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </GradientButton>
+                  Get Started
+                  <ArrowRight className="size-4" />
                 </Link>
                 <Link
                   href="https://github.com/stagewise-io/stagewise"
                   onClick={() => posthog?.capture('hero_github_star_click')}
+                  className={buttonVariants({ size: 'lg', variant: 'outline' })}
                 >
-                  <GradientButton variant="outline" size="lg">
-                    <StarIcon className="mr-2 h-4 w-4 text-yellow-500" />
-                    Star on GitHub
-                    <div className="ml-1 rounded-full bg-zinc-500/10 px-1.5 py-0.5 font-medium text-xs text-zinc-500">
-                      {formatStarCount(starCount)}
-                    </div>
-                  </GradientButton>
+                  <StarIcon className="mr-2 h-4 w-4 text-yellow-500" />
+                  Star on GitHub
+                  <div className="ml-1 rounded-full bg-zinc-500/10 px-1.5 py-0.5 font-medium text-xs text-zinc-500">
+                    {formatStarCount(starCount)}
+                  </div>
                 </Link>
               </div>
               <div className="flex items-center justify-center gap-2 text-sm text-zinc-600 md:flex-row md:gap-8 dark:text-zinc-400">
@@ -205,7 +204,7 @@ export default function Home() {
           </ScrollReveal>
 
           <ScrollReveal delay={300}>
-            <div className="mx-auto mt-8 max-w-3xl scale-[1.02] transform overflow-hidden rounded-xl border border-gray-900/50 shadow-[0_0_40px_rgba(0,0,0,0.25)] transition-transform duration-500 dark:border-gray-100/50 dark:shadow-[0_0_40px_rgba(255,255,255,0.1)]">
+            <div className="mx-auto mt-8 max-w-3xl scale-[1.02] transform overflow-hidden rounded-xl border border-zinc-900/50 shadow-[0_0_40px_rgba(0,0,0,0.25)] transition-transform duration-500 dark:border-zinc-100/50 dark:shadow-[0_0_40px_rgba(255,255,255,0.1)]">
               <video
                 src="https://github.com/stagewise-io/assets/raw/1aeae6c24e0aedc959ae3fb730ea569c984e3a13/edited/0-5-0-custom-agent/github-projects-demo.mp4"
                 width={1200}
@@ -299,7 +298,7 @@ export default function Home() {
                         <AccordionItem
                           key={option.id}
                           value={option.id}
-                          className="overflow-hidden border border-zinc-500/30 bg-white shadow-sm first:rounded-t-lg last:rounded-b-lg dark:border-indigo-800 dark:bg-zinc-900"
+                          className="overflow-hidden border border-zinc-500/30 bg-white shadow-sm first:rounded-t-lg last:rounded-b-lg dark:border-zinc-800 dark:bg-zinc-900"
                         >
                           <AccordionTrigger className="px-4 py-3 text-left hover:bg-zinc-50 hover:no-underline dark:hover:bg-zinc-800">
                             <div className="flex items-center gap-3">
@@ -429,7 +428,7 @@ export default function Home() {
           ].map((feature, _i) => (
             <ScrollReveal key={feature.title} delay={feature.delay}>
               <div
-                className={`group -translate-y-1 h-full rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-2xl shadow-[rgba(0,0,0,0.15)] transition-all duration-300 dark:border-gray-800 dark:bg-white ${
+                className={`group -translate-y-1 h-full rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-2xl shadow-[rgba(0,0,0,0.15)] transition-all duration-300 dark:border-zinc-800 dark:bg-zinc-900 ${
                   feature.size === 'large' ? 'lg:col-span-2' : ''
                 }`}
               >
@@ -497,7 +496,7 @@ export default function Home() {
             <ScrollReveal key={framework.name} delay={i * 100} direction="up">
               <Link
                 href={framework.href}
-                className="group hover:-translate-y-0.5 flex cursor-pointer items-center gap-2 rounded-full border border-zinc-500/30 bg-white px-6 py-2 shadow-[0_0_20px_rgba(0,0,0,0.15)] transition-all duration-300 ease-out hover:bg-white hover:text-zinc-900 dark:border-white dark:bg-white dark:hover:bg-white dark:hover:text-zinc-900"
+                className="group hover:-translate-y-0.5 flex cursor-pointer items-center gap-2 rounded-full border border-zinc-500/30 bg-white px-6 py-2 font-medium shadow-[0_0_20px_rgba(0,0,0,0.15)] transition-all duration-300 ease-out hover:bg-white hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800 dark:hover:text-white"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() =>
@@ -511,9 +510,7 @@ export default function Home() {
                   alt={framework.name}
                   className={`size-6 ${framework.name === 'Next.js' ? 'dark:invert' : ''}`}
                 />
-                <span className="font-medium text-zinc-900">
-                  {framework.name}
-                </span>
+                <span>{framework.name}</span>
               </Link>
             </ScrollReveal>
           ))}
@@ -609,7 +606,7 @@ export default function Home() {
             },
           ].map((testimonial, i) => (
             <ScrollReveal key={testimonial.name} delay={i * 100}>
-              <div className="flex h-full flex-col justify-between rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-[rgba(0,0,0,0.1)] shadow-lg transition-all duration-300 dark:border-gray-800 dark:bg-zinc-900">
+              <div className="flex h-full flex-col justify-between rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-[rgba(0,0,0,0.1)] shadow-lg transition-all duration-300 dark:border-zinc-800 dark:bg-zinc-900">
                 <div className="mb-4">
                   <p className="text-zinc-600 dark:text-zinc-400">
                     "{testimonial.quote}"
@@ -625,7 +622,7 @@ export default function Home() {
                       className="h-12 w-12 rounded-full border border-zinc-200 dark:border-zinc-800"
                     />
                   ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-200 bg-gray-100 dark:border-zinc-800 dark:bg-gray-900/20">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900/20">
                       <User className="h-6 w-6" />{' '}
                     </div>
                   )}
@@ -679,7 +676,7 @@ export default function Home() {
             },
           ].map((feature, _i) => (
             <ScrollReveal key={feature.title} delay={feature.delay}>
-              <div className="group -translate-y-1 h-full rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-2xl shadow-[rgba(0,0,0,0.15)] transition-all duration-300 dark:border-gray-800 dark:bg-zinc-900">
+              <div className="group -translate-y-1 h-full rounded-2xl border border-zinc-500/20 bg-white p-6 shadow-2xl shadow-[rgba(0,0,0,0.15)] transition-all duration-300 dark:border-zinc-800 dark:bg-zinc-900">
                 <div className="mb-4 inline-flex rounded-lg bg-zinc-50 p-3 transition-colors dark:bg-zinc-900/10">
                   {feature.icon}
                 </div>
