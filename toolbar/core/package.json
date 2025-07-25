@@ -61,7 +61,7 @@
     "@trpc/client": "11.4.3",
     "@types/node": "22.15.2",
     "@types/react": "^19.1.8",
-    "@vitejs/plugin-react": "^4.6.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.21",
     "bowser": "^2.11.0",
     "class-variance-authority": "^0.7.1",
