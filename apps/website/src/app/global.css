@@ -41,6 +41,7 @@
   --card: var(--color-zinc-900);
   --color-fd-background: #09090b;
   --color-fd-foreground: #fff;
+  --color-fd-primary: #fff;
   /* ... */
 }
 
