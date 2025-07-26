@@ -117,7 +117,7 @@
     "tsconfig-paths-webpack-plugin": "^4.2.0",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
-    "vitest": "3.1.2",
+    "vitest": "3.2.4",
     "webpack": "^5.100.0",
     "webpack-cli": "^6.0.1"
   },
