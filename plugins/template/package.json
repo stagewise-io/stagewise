@@ -50,7 +50,7 @@
     "@stagewise/plugin-builder": "workspace:*",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "@vitejs/plugin-react-swc": "^3.7.0",
+    "@vitejs/plugin-react-swc": "^3.11.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "@types/react": "^19.1.8",
