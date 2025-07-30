@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { AuthService } from './auth-service';
 import { PostHog } from 'posthog-node';
 import { createHash } from 'node:crypto';
 import { EnvironmentInfo } from './environment-info';
@@ -65,7 +66,9 @@ export class AnalyticsService {
     return AnalyticsService.instance;
   }
 
-  public initialize(): void {
+  public async initialize(): Promise<void> {
+    const authService = AuthService.getInstance();
+    const authState = await authService.getAuthState();
     const POSTHOG_API_KEY = process.env.POSTHOG_API_KEY;
     const POSTHOG_HOST = process.env.POSTHOG_HOST || 'https://eu.i.posthog.com';
 
@@ -75,9 +78,32 @@ export class AnalyticsService {
         host: POSTHOG_HOST,
         disableGeoip: true,
       });
+      if (
+        authState?.isAuthenticated &&
+        authState.userId &&
+        this.isAnalyticsEnabled()
+      ) {
+        await this.identify(authState.userId, authState.userEmail);
+      }
     } else {
       console.log('[AnalyticsService] No API key found');
     }
+  }
+
+  public async identify(userId: string, userEmail?: string): Promise<void> {
+    if (!this.client || !this.isAnalyticsEnabled()) return;
+
+    this.client.identify({
+      distinctId: userId,
+      properties: {
+        email: userEmail,
+      },
+    });
+
+    this.client.alias({
+      distinctId: userId,
+      alias: this.hashId(vscode.env.machineId),
+    });
   }
 
   private hashId(id: string): string {
