@@ -61,11 +61,6 @@
         }
       }
     },
-    "extension_deactivated": {
-      "classification": "SystemMetaData",
-      "purpose": "FeatureInsight",
-      "comment": "Tracks when the extension is deactivated"
-    },
     "telemetry_disabled": {
       "classification": "SystemMetaData",
       "purpose": "FeatureInsight",
