@@ -13,6 +13,7 @@ import { Toolbar } from '@/toolbar';
 import { usePanels } from '@/hooks/use-panels';
 import { SettingsPanel } from '@/panels/settings';
 import { ChatPanel } from '@/panels/chat';
+import { ChatWithHistoryPanel } from '@/panels/chat-with-history';
 import { AgentConnectivityPanel } from '@/panels/agent-connectivity';
 import { usePlugins } from '@/hooks/use-plugins';
 
@@ -199,6 +200,8 @@ function PanelsArea({
     return null;
   }, [openPluginName, plugins]);
 
+  const showChatPanelWithHistory = true;
+
   return (
     <div
       className={cn(
@@ -211,7 +214,7 @@ function PanelsArea({
       )}
     >
       <PanelWrapper position={position} isOpen={isChatOpen}>
-        <ChatPanel />
+        {showChatPanelWithHistory ? <ChatWithHistoryPanel /> : <ChatPanel />}
       </PanelWrapper>
 
       <PanelWrapper position={position} isOpen={isSettingsOpen}>
