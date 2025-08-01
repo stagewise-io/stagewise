@@ -68,6 +68,7 @@
     "postcss-prefix-selector": "^2.1.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-timeago": "^8.3.0",
     "rollup": "^4.44.2",
     "rollup-plugin-dts": "^6.2.1",
     "serialize-javascript": "^6.0.2",
