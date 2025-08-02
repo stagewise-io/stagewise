@@ -1,9 +1,6 @@
 {
   "name": "@stagewise/agent-runtime-vscode",
-  "private": false,
-  "publishConfig": {
-    "access": "public"
-  },
+  "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
