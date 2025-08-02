@@ -1,7 +1,7 @@
 {
   "name": "stagewise-vscode-extension",
   "displayName": "stagewise",
-  "private": true,
+  "private": false,
   "description": "Visual vibe coding. Right in your codebase.",
   "version": "0.9.1",
   "publisher": "stagewise",
