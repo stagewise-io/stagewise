@@ -1,7 +1,6 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
   "bundledPackages": [
-    "@stagewise/extension-toolbar-srpc-contract",
     "class-variance-authority",
     "class-variance-authority/*",
     "zod",

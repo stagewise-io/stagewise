@@ -13,7 +13,7 @@
     "interaction"
   ],
   "author": "tiq UG (haftungsbeschränkt)",
-  "license": "AGPL-3.0-only",
+  "license": "MIT",
   "scripts": {
     "dev": "tsx build.ts",
     "build": "tsx build.ts"

@@ -3,6 +3,7 @@
   "version": "0.6.2",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "keywords": [
     "stagewise",
     "toolbar",
@@ -35,7 +36,6 @@
   "files": [
     "dist"
   ],
-  "license": "AGPL-3.0-only",
   "scripts": {
     "clean": "rm -rf .turbo node_modules",
     "dev": "NODE_ENV=development tsc -b && vite build --mode development",

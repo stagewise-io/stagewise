@@ -16,7 +16,6 @@ import { WorkspaceService } from 'src/services/workspace-service';
 import { RegistryService } from 'src/services/registry-service';
 import { AuthService } from 'src/services/auth-service';
 import { AgentService as IDEChatAgentService } from 'src/services/agent-service';
-import { RetroAgentService } from 'src/services/agent-service/retro';
 import { ClientRuntimeVSCode } from '@stagewise/agent-runtime-vscode';
 import { AgentSelectorService } from 'src/services/agent-selector';
 
@@ -283,10 +282,6 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(uriHandler);
 
-    // Always initialize RetroAgent
-    const retroAgentService = RetroAgentService.getInstance();
-    await retroAgentService.initialize();
-
     const ide = getCurrentIDE();
     if (ide === 'UNKNOWN') {
       vscode.window.showInformationMessage(
@@ -462,10 +457,6 @@ export async function deactivate(_context: vscode.ExtensionContext) {
     if (ideAgentInitialized) {
       await shutdownIDEAgent();
     }
-
-    // Always shutdown RetroAgent
-    const retroAgentService = RetroAgentService.getInstance();
-    await retroAgentService.shutdown();
   } catch (error) {
     // Log error but don't throw during deactivation
     console.error(

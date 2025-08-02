@@ -5,7 +5,7 @@
   "version": "0.1.4",
   "description": "Stagewise CLI",
   "author": "stagewise GmbH",
-  "license": "AGPL-3.0",
+  "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "https://github.com/stagewise-io/stagewise.git"

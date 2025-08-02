@@ -2,7 +2,7 @@
   "name": "create-stagewise-plugin",
   "version": "0.1.1",
   "type": "module",
-  "license": "AGPL-3.0-only",
+  "license": "MIT",
   "author": "tiq UG (haftungsbeschränkt)",
   "private": false,
   "publishConfig": {
