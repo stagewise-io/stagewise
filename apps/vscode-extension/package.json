@@ -126,7 +126,6 @@
     "@stagewise/agent-runtime-vscode": "workspace:*",
     "@stagewise/agent-interface": "workspace:*",
     "@stagewise/agent-client": "workspace:*",
-    "@stagewise/extension-toolbar-srpc-contract": "workspace:*",
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.1",
     "@types/js-yaml": "^4.0.9",

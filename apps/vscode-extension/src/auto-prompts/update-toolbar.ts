@@ -1,5 +1,4 @@
 import { dispatchAgentCall } from 'src/utils/dispatch-agent-call';
-import * as vscode from 'vscode';
 
 export async function updateToolbar() {
   const prompt = `
@@ -27,6 +26,5 @@ export async function updateToolbar() {
 
   await dispatchAgentCall({
     prompt,
-    sessionId: vscode.env.sessionId,
   });
 }
