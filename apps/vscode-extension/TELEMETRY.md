@@ -99,15 +99,26 @@ We collect the following types of telemetry data:
 ### Data Collection Method
 
 We use pseudonymization to protect user privacy while maintaining data quality:
-- Each user is assigned a consistent but non-identifying hash
+- Each user is assigned a consistent but non-identifying hash based on their machine ID
 - This allows us to understand usage patterns without identifying individuals
 - The hash is generated from system information and cannot be reversed
 - No direct connection between the hash and user identity is maintained
 
+### User Identification (for Authenticated Users)
+
+For users who authenticate with stagewise:
+- We create a connection between the pseudonymized machine ID and the authenticated user ID
+- This allows us to correlate usage across sessions and provide better user support
+- The user ID and email (when available) are stored alongside analytics events
+- Users can opt out of telemetry at any time, which will stop all data collection
+- Authentication is optional - the extension works without signing in
+
 ## What We Don't Collect
 
 We do NOT collect:
-- Personal identifiable information (PII) except for optionally provided email addresses during feedback
+- Personal identifiable information (PII) except for:
+  - User ID and email address for authenticated users (to provide user support)
+  - Optionally provided email addresses during feedback
 - File contents or file names
 - User names
 - Project-specific information
@@ -154,8 +165,8 @@ The collected pseudonymized data helps us:
 
 We are committed to GDPR compliance:
 - All data collection is opt-out
-- Data is pseudonymized, not anonymized
-- No personal data is collected
+- Data is pseudonymized for anonymous users
+- For authenticated users, user ID and email are collected with explicit consent through authentication
 - Clear documentation of all collected data
 - Easy opt-out mechanisms
 - Transparent data handling practices

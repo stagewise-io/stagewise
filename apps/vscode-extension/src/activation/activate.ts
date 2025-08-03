@@ -96,7 +96,7 @@ export async function activate(context: vscode.ExtensionContext) {
     await StorageService.getInstance().initialize();
 
     const analyticsService = AnalyticsService.getInstance();
-    analyticsService.initialize();
+    await analyticsService.initialize();
 
     WorkspaceService.getInstance();
     RegistryService.getInstance();
@@ -208,6 +208,10 @@ export async function activate(context: vscode.ExtensionContext) {
         );
       }
 
+      if (authState.userId) {
+        await analyticsService.identify(authState.userId, authState.userEmail);
+      }
+
       // Handle stagewise agent based on auth state (IDE agent always runs)
       if (authState.isAuthenticated) {
         // User is authenticated - initialize stagewise agent
@@ -254,6 +258,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize stagewise agent if authenticated
     const authState = await authService.getAuthState();
+
+    if (authState?.isAuthenticated && authState.userId) {
+      await analyticsService.identify(authState.userId, authState.userEmail);
+    }
+
     if (
       authState?.isAuthenticated &&
       authState?.accessToken &&
