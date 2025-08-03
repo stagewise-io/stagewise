@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "ignore": "^7.0.5",
-    "minimatch": "^9.0.3"
+    "minimatch": "^10.0.0"
   },
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",
