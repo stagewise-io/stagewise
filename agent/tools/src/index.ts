@@ -2,6 +2,11 @@ import type { Tools } from '@stagewise/agent-types';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { z } from 'zod';
 import {
+  DESCRIPTION as SINGLE_LINE_EDIT_DESCRIPTION,
+  singleLineEditParamsSchema,
+  singleLineEditTool,
+} from './edit-single-line-tool.js';
+import {
   DESCRIPTION as OVERWRITE_FILE_DESCRIPTION,
   overwriteFileParamsSchema,
   overwriteFileTool,
@@ -27,10 +32,10 @@ import {
   globTool,
 } from './glob-tool.js';
 import {
-  DESCRIPTION as MULTI_EDIT_DESCRIPTION,
-  multiEditParamsSchema,
-  multiEditTool,
-} from './multi-edit-tool.js';
+  DESCRIPTION as EDIT_FILE_DESCRIPTION,
+  editFileParamsSchema,
+  editFileTool,
+} from './edit-file-tool.js';
 import {
   DESCRIPTION as DELETE_FILE_DESCRIPTION,
   deleteFileParamsSchema,
@@ -86,8 +91,8 @@ export const syntheticToolParamsSchema = z
   .or(
     z.object({
       toolCallId: z.string(),
-      toolName: z.literal('multiEditTool'),
-      args: multiEditParamsSchema,
+      toolName: z.literal('editFileTool'),
+      args: editFileParamsSchema,
     }),
   )
   .or(
@@ -100,6 +105,16 @@ export const syntheticToolParamsSchema = z
 
 export function tools(clientRuntime: ClientRuntime) {
   return {
+    singleLineEditTool: {
+      description: SINGLE_LINE_EDIT_DESCRIPTION,
+      parameters: singleLineEditParamsSchema,
+      stagewiseMetadata: {
+        runtime: 'client',
+      },
+      execute: async (args) => {
+        return await singleLineEditTool(args, clientRuntime);
+      },
+    },
     overwriteFileTool: {
       description: OVERWRITE_FILE_DESCRIPTION,
       parameters: overwriteFileParamsSchema,
@@ -170,14 +185,14 @@ export function tools(clientRuntime: ClientRuntime) {
         return await globTool(args, clientRuntime);
       },
     },
-    multiEditTool: {
-      description: MULTI_EDIT_DESCRIPTION,
-      parameters: multiEditParamsSchema,
+    editFileTool: {
+      description: EDIT_FILE_DESCRIPTION,
+      parameters: editFileParamsSchema,
       stagewiseMetadata: {
         runtime: 'client',
       },
       execute: async (args) => {
-        return await multiEditTool(args, clientRuntime);
+        return await editFileTool(args, clientRuntime);
       },
     },
     deleteFileTool: {
