@@ -19,22 +19,15 @@ body:
       required: true
   - type: textarea
     attributes:
-      label: Describe the solution you'd like to see
-      description: Please describe the solution you would like to see. Adding example usage is a good way to provide context.
-    validations:
-      required: true
-  - type: textarea
-    attributes:
-      label: Describe alternate solutions
+      label: What is the use case for this feature?
       description: |
-        Please describe alternate solutions you have considered. What makes your suggested feature better?
-        If you currently have a workaround to get a similar experience, add that here.
+        Please describe the use case for this feature. What are you trying to achieve?
     validations:
-      required: true
+      required: false
   - type: textarea
     attributes:
       label: Additional information
-      description: Add any other information related to the feature here. If your feature request is related to any issues or discussions, link them here.
+      description: Add any other information related to the feature here.
   - type: checkboxes
     attributes:
       label: 👨‍👧‍👦 Contributing

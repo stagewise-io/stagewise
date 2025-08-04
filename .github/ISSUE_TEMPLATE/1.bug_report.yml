@@ -23,43 +23,6 @@ body:
     validations:
       required: true
 
-  - type: textarea
-    attributes:
-      label: Provide environment information (envinfo & npm list)
-      description: |
-        Run these commands in your project root and paste the results:
-
-        To get the envinfo result, run:
-
-          ```terminal
-          npx envinfo \
-            --system \
-            --binaries \
-            --browsers \
-            --npmPackages "typescript,next,react,vue,@angular/core,@angular/cli,svelte,@sveltejs/kit,ember-source,preact,gatsby,nuxt,astro,@stagewise/toolbar,@stagewise/toolbar-next,@stagewise/toolbar-react,@stagewise/toolbar-vue,@stagewise/toolbar-angular,@stagewise/toolbar-svelte,@stagewise/toolbar-preact,@stagewise/toolbar-ember,@stagewise/toolbar-gatsby,@stagewise/toolbar-nuxt,@stagewise/toolbar-astro"
-          ```
-
-        To get the npm list result, run:
-
-          ```bash
-          npm list --depth=0
-          ```
-      placeholder: '<Paste envinfo & npm list results here>'
-    validations:
-      required: true
-
-  - type: textarea
-    attributes:
-      label: Provide VS Code extension version
-      description: |
-        Run this command to list installed extensions and versions:
-
-          ```terminal
-          code --list-extensions --show-versions | grep stagewise
-          ```
-      placeholder: '<Paste VS Code extension version here>'
-    validations:
-      required: true
 
   - type: textarea
     attributes:
@@ -69,22 +32,11 @@ body:
     validations:
       required: true
 
-  - type: input
-    attributes:
-      label: Link to reproduction
-      description: >
-        Please provide a link to a reproduction of the bug (repo, StackBlitz, CodeSandbox, etc.).
-      placeholder: Link to reproduction
-    validations:
-      required: true
-
   - type: textarea
     attributes:
       label: To reproduce
       description: |
         Describe how to reproduce your bug. Can be code or a link to a reproduction.
-    validations:
-      required: true
 
   - type: textarea
     attributes:

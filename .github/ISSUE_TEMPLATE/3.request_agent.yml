@@ -21,22 +21,6 @@ body:
       required: true
   - type: textarea
     attributes:
-      label: Brief description
-      description: |
-        What does this agent do?  
-        Summarize its core capabilities and intended workflows.
-    validations:
-      required: true
-  - type: textarea
-    attributes:
-      label: Key features & integrations (optional)
-      description: |
-        Which languages, frameworks, or services does it support out-of-the-box?  
-        Does it integrate with specific APIs, SDKs, or tools?
-    validations:
-      required: false
-  - type: textarea
-    attributes:
       label: Additional notes for maintainers
       description: |
         Anything else we should know at a glance?  
