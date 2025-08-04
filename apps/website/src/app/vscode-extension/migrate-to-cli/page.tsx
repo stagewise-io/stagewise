@@ -91,6 +91,18 @@ export default function MigrateToCLI() {
                 </div>
               </div>
 
+              <div className="mx-auto mb-8 max-w-xl">
+                <div className="relative aspect-video overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900" style={{width: '66.67%', margin: '0 auto'}}>
+                  <iframe
+                    src="https://www.youtube.com/embed/A7a78tfo8wg"
+                    title="stagewise CLI Migration Guide"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    className="h-full w-full"
+                  />
+                </div>
+              </div>
+
               <div className="flex flex-col items-center gap-8">
                 <p className="mb-1 text-center font-medium text-md text-zinc-600 dark:text-zinc-400">
                   Here's what you need to do to upgrade:
