@@ -92,7 +92,10 @@ export default function MigrateToCLI() {
               </div>
 
               <div className="mx-auto mb-8 max-w-xl">
-                <div className="relative aspect-video overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900" style={{width: '66.67%', margin: '0 auto'}}>
+                <div
+                  className="relative aspect-video overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                  style={{ width: '66.67%', margin: '0 auto' }}
+                >
                   <iframe
                     src="https://www.youtube.com/embed/A7a78tfo8wg"
                     title="stagewise CLI Migration Guide"
