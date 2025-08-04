@@ -113,10 +113,24 @@ program.action(() => {
 
 // Parse arguments but store raw values for validation
 const rawArgs = process.argv.slice(2);
+
+// Check for wrapped commands (double-dash delimiter)
+const doubleDashIndex = rawArgs.indexOf('--');
+let stagewiseArgs = rawArgs;
+let wrappedCommand: string[] = [];
+let hasWrappedCommand = false;
+
+if (doubleDashIndex !== -1) {
+  hasWrappedCommand = true;
+  stagewiseArgs = rawArgs.slice(0, doubleDashIndex);
+  wrappedCommand = rawArgs.slice(doubleDashIndex + 1);
+}
+
 const _hasWorkspaceArg =
-  rawArgs.includes('-w') || rawArgs.includes('--workspace');
-const hasTokenArg = rawArgs.includes('-t') || rawArgs.includes('--token');
-const hasBridgeMode = rawArgs.includes('-b');
+  stagewiseArgs.includes('-w') || stagewiseArgs.includes('--workspace');
+const hasTokenArg =
+  stagewiseArgs.includes('-t') || stagewiseArgs.includes('--token');
+const hasBridgeMode = stagewiseArgs.includes('-b');
 
 // Validate bridge mode conflicts before parsing (to avoid path validation)
 if (hasBridgeMode && hasTokenArg) {
@@ -126,8 +140,8 @@ if (hasBridgeMode && hasTokenArg) {
   process.exit(1);
 }
 
-// Parse with Commander
-program.parse(process.argv);
+// Parse with Commander using only stagewise args
+program.parse([...process.argv.slice(0, 2), ...stagewiseArgs]);
 
 // Initialize variables
 let port: number | undefined;
@@ -196,6 +210,8 @@ export {
   commandExecuted,
   authSubcommand,
   telemetrySubcommand,
+  wrappedCommand,
+  hasWrappedCommand,
 };
 
 // Export telemetry level if set command was used

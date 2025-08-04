@@ -289,4 +289,134 @@ describe('argparse', () => {
       expect(args.appPort).toBe(3000);
     });
   });
+
+  describe('command wrapping with double-dash', () => {
+    it('should detect wrapped command when double-dash is present', async () => {
+      process.argv = ['node', 'test.js', '-p', '3100', '--', 'npm', 'run', 'build'];
+      const mockOpts = {
+        port: 3100,
+        workspace: process.cwd(),
+        silent: false,
+        verbose: false,
+        b: false,
+      };
+
+      vi.mocked(Command).mockImplementation(() => createMockCommand(mockOpts));
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      const args = await import('../../../src/config/argparse');
+      expect(args.hasWrappedCommand).toBe(true);
+      expect(args.wrappedCommand).toEqual(['npm', 'run', 'build']);
+      expect(args.port).toBe(3100);
+    });
+
+    it('should extract wrapped command correctly with complex arguments', async () => {
+      process.argv = ['node', 'test.js', '-v', '--', 'tsx', 'build.ts', '--watch', '--config', 'custom.config.js'];
+      const mockOpts = {
+        verbose: true,
+        workspace: process.cwd(),
+        silent: false,
+        b: false,
+      };
+
+      vi.mocked(Command).mockImplementation(() => createMockCommand(mockOpts));
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      const args = await import('../../../src/config/argparse');
+      expect(args.hasWrappedCommand).toBe(true);
+      expect(args.wrappedCommand).toEqual(['tsx', 'build.ts', '--watch', '--config', 'custom.config.js']);
+      expect(args.verbose).toBe(true);
+    });
+
+    it('should handle empty wrapped command after double-dash', async () => {
+      process.argv = ['node', 'test.js', '-p', '3100', '--'];
+      const mockOpts = {
+        port: 3100,
+        workspace: process.cwd(),
+        silent: false,
+        verbose: false,
+        b: false,
+      };
+
+      vi.mocked(Command).mockImplementation(() => createMockCommand(mockOpts));
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      const args = await import('../../../src/config/argparse');
+      expect(args.hasWrappedCommand).toBe(true);
+      expect(args.wrappedCommand).toEqual([]);
+    });
+
+    it('should not have wrapped command when no double-dash present', async () => {
+      process.argv = ['node', 'test.js', '-p', '3100', 'npm', 'run', 'build'];
+      const mockOpts = {
+        port: 3100,
+        workspace: process.cwd(),
+        silent: false,
+        verbose: false,
+        b: false,
+      };
+
+      vi.mocked(Command).mockImplementation(() => createMockCommand(mockOpts));
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      const args = await import('../../../src/config/argparse');
+      expect(args.hasWrappedCommand).toBe(false);
+      expect(args.wrappedCommand).toEqual([]);
+    });
+
+    it('should handle double-dash at the beginning', async () => {
+      process.argv = ['node', 'test.js', '--', 'echo', 'hello'];
+      const mockOpts = {
+        workspace: process.cwd(),
+        silent: false,
+        verbose: false,
+        b: false,
+      };
+
+      vi.mocked(Command).mockImplementation(() => createMockCommand(mockOpts));
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      const args = await import('../../../src/config/argparse');
+      expect(args.hasWrappedCommand).toBe(true);
+      expect(args.wrappedCommand).toEqual(['echo', 'hello']);
+    });
+
+    it('should handle wrapped command with bridge mode flag before double-dash', async () => {
+      process.argv = ['node', 'test.js', '-b', '--', 'npm', 'test'];
+      const mockOpts = {
+        b: true,
+        workspace: process.cwd(),
+        silent: false,
+        verbose: false,
+      };
+
+      vi.mocked(Command).mockImplementation(() => createMockCommand(mockOpts));
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      const args = await import('../../../src/config/argparse');
+      expect(args.hasWrappedCommand).toBe(true);
+      expect(args.wrappedCommand).toEqual(['npm', 'test']);
+      expect(args.bridgeMode).toBe(true);
+    });
+
+    it('should correctly parse stagewise flags before double-dash and ignore command args after', async () => {
+      process.argv = ['node', 'test.js', '-p', '4000', '-v', '--', 'node', 'script.js', '-p', '5000'];
+      const mockOpts = {
+        port: 4000,
+        verbose: true,
+        workspace: process.cwd(),
+        silent: false,
+        b: false,
+      };
+
+      vi.mocked(Command).mockImplementation(() => createMockCommand(mockOpts));
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      const args = await import('../../../src/config/argparse');
+      expect(args.hasWrappedCommand).toBe(true);
+      expect(args.wrappedCommand).toEqual(['node', 'script.js', '-p', '5000']);
+      expect(args.port).toBe(4000); // Stagewise port, not the one in wrapped command
+      expect(args.verbose).toBe(true);
+    });
+  });
 });

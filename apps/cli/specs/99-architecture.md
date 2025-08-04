@@ -31,6 +31,7 @@ src/
 │   └── proxy.ts            # HTTP proxy middleware
 ├── utils/                   # Utility functions
 │   ├── banner.ts           # CLI banner display
+│   ├── command-executor.ts # Command execution for proxy mode
 │   ├── config-path.ts      # Configuration path management
 │   ├── identifier.ts       # Machine identifier management
 │   ├── logger.ts           # Logging utilities
@@ -101,9 +102,10 @@ src/
 
 ### 1. Entry Point (`index.ts`)
 - Initializes the application
-- Handles command execution (auth and telemetry commands)
+- Handles command execution (auth, telemetry, and proxy commands)
 - Sets up the HTTP server
 - Manages graceful shutdown
+- **Proxy Mode**: Executes external commands while running Stagewise server in background
 
 ### 2. Authentication (`auth/`)
 - **OAuth Manager**: Handles OAuth2 flow with PKCE
@@ -127,6 +129,8 @@ src/
   3. Configuration file (stagewise.config.json)
   4. Default values
 - Handles authentication flow initialization
+- **Proxy Mode Support**: Provides minimal configuration for command proxying
+- **Argument Parser**: Detects double-dash delimiter for command separation
 
 ### 5. Server (`server/`)
 - **Express Server**: Main HTTP server
@@ -163,12 +167,17 @@ src/
 - **Config Path**: Platform-specific configuration directory management using env-paths
 - **Identifier Manager**: Creates and manages persistent machine ID
 - **Telemetry Utils**: Helper functions for telemetry status checks
+- **Command Executor**: Manages child process execution for proxy mode
+  - Cross-platform command spawning
+  - Signal forwarding (SIGINT, SIGTERM)
+  - Graceful shutdown with timeout
+  - Real-time output streaming
 
 ## CLI Commands
 
 ### Main Command
 ```
-stagewise [options]
+stagewise [options] [-- <command>]
 ```
 
 Starts the Stagewise development proxy server.
@@ -181,6 +190,25 @@ Starts the Stagewise development proxy server.
 - `-v, --verbose`: Output debug information to the CLI
 - `-t, --token <token>`: If set, will use the given auth token instead of using or asked for a stored one
 - `-b`: Bridge mode - will not start the coding agent server
+
+### Proxy Mode
+```
+stagewise [options] -- <command> [args...]
+```
+
+Runs a command while starting Stagewise server in the background. Similar to dotenv-cli pattern.
+
+**Examples:**
+- `stagewise -- npm run build`
+- `stagewise -p 3100 -- tsx src/build.ts --watch`
+- `stagewise -- node script.js --flag value`
+
+**Features:**
+- Executes command with real-time output
+- Forwards exit codes from proxied command
+- Handles signal forwarding (Ctrl+C, etc.)
+- Runs Stagewise server concurrently
+- Minimal configuration required
 
 ### Auth Command
 ```
@@ -207,6 +235,33 @@ Manage telemetry settings for Stagewise CLI. Telemetry tracks usage metrics and 
   - `off`: Disable telemetry completely
   - `anonymous`: Enable telemetry with pseudonymized ID (default)
   - `full`: Enable telemetry with actual user ID
+
+## Execution Modes
+
+The CLI supports three distinct execution modes:
+
+### 1. Standard Mode
+Default mode when no special flags or commands are provided.
+- Starts Stagewise server
+- Requires app-port configuration
+- Requires authentication (unless in bridge mode)
+- Interactive setup if configuration is missing
+
+### 2. Bridge Mode (`-b` flag)
+Lightweight mode that disables the agent server.
+- Starts proxy server only
+- No authentication required
+- Still requires app-port for proxying
+- Suitable for environments where agent features aren't needed
+
+### 3. Proxy Mode (`-- command`)
+Executes external commands while running Stagewise in background.
+- Detects double-dash delimiter in arguments
+- Runs Stagewise server concurrently with user command
+- Forwards stdio streams from proxied command
+- Returns exit code of proxied command
+- Minimal configuration (uses defaults when possible)
+- Silent mode enabled by default
 
 ## Key Features
 

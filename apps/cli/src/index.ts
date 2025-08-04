@@ -11,6 +11,8 @@ import {
   authSubcommand,
   telemetrySubcommand,
   telemetryLevel,
+  wrappedCommand,
+  hasWrappedCommand,
 } from './config/argparse';
 import { printBanner } from './utils/banner';
 import { oauthManager } from './auth/oauth';
@@ -19,6 +21,7 @@ import {
   getDependencyList,
 } from './dependency-parser/index.js';
 import open from 'open';
+import { commandExecutor } from './utils/command-executor';
 
 // Suppress util._extend deprecation warnings
 // Set NODE_NO_DEPRECATION to suppress all deprecation warnings, then restore other warnings
@@ -296,6 +299,12 @@ async function main() {
       log.error(`Unhandled rejection at: ${promise}, reason: ${reason}`);
       process.exit(1);
     });
+
+    if (hasWrappedCommand && wrappedCommand.length > 0) {
+      // Execute the wrapped command
+      const result = await commandExecutor.executeCommand(wrappedCommand);
+      process.exit(result.exitCode);
+    }
   } catch (error) {
     if (error instanceof Error) {
       // Only log once using the logger if available
