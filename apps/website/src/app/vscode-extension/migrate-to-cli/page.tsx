@@ -97,10 +97,11 @@ export default function MigrateToCLI() {
                   style={{ width: '66.67%', margin: '0 auto' }}
                 >
                   <iframe
-                    src="https://www.youtube.com/embed/A7a78tfo8wg"
+                    src="https://www.youtube-nocookie.com/embed/A7a78tfo8wg"
                     title="stagewise CLI Migration Guide"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
+                    loading="lazy"
                     className="h-full w-full"
                   />
                 </div>
