@@ -182,6 +182,28 @@ export default function MigrateToCLI() {
                     </div>
                   </div>
                 </div>
+
+                <div className="w-full max-w-md">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/20">
+                    <div className="text-center">
+                      <p className="mb-2 font-medium text-sm text-zinc-900 dark:text-white">
+                        Thanks for your support!
+                      </p>
+                      <p className="mb-3 text-xs text-zinc-700 dark:text-zinc-300">
+                        Because you were super early with stagewise, we want to
+                        give you free credits to play around with the stagewise
+                        agent.
+                      </p>
+                      <div className="rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono font-semibold text-sm text-zinc-800 dark:border-zinc-600 dark:bg-zinc-800/40 dark:text-zinc-200">
+                        {process.env.NEXT_PUBLIC_AGENT_COUPON}
+                      </div>
+                      <p className="mt-2 text-xs text-zinc-700 dark:text-zinc-300">
+                        Use this on console.stagewise.io!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <p className="mb-3 max-w-2xl text-center text-zinc-600 dark:text-zinc-400">
                   By default, the CLI will automatically connect you to the new
                   stagewise agent.
