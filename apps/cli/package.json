@@ -38,6 +38,7 @@
     "@stagewise-plugins/vue": "workspace:*",
     "@stagewise/agent-client": "workspace:*",
     "@stagewise/agent-runtime-node": "workspace:*",
+    "@stagewise/api-client": "0.2.0",
     "@stagewise/toolbar": "workspace:*",
     "@types/express": "^4.17.21",
     "@vitest/coverage-v8": "^2.0.0",
@@ -57,6 +58,7 @@
     "typescript": "^5",
     "vitest": "^2.0.0",
     "winston": "^3.17.0",
-    "zod": "^3.24.0"
+    "zod": "^3.24.0",
+    "cli-table3": "^0.6.5"
   }
 }

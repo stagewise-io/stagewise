@@ -248,6 +248,9 @@ importers:
       '@stagewise/agent-runtime-node':
         specifier: workspace:*
         version: link:../../agent/runtime-node
+      '@stagewise/api-client':
+        specifier: 0.2.0
+        version: 0.2.0(react@19.1.0)(typescript@5.8.3)
       '@stagewise/toolbar':
         specifier: workspace:*
         version: link:../../toolbar/core
@@ -266,6 +269,9 @@ importers:
       chalk:
         specifier: ^5.3.0
         version: 5.4.1
+      cli-table3:
+        specifier: ^0.6.5
+        version: 0.6.5
       commander:
         specifier: ^14.0.0
         version: 14.0.0
@@ -5751,6 +5757,9 @@ packages:
   '@stagewise/api-client@0.1.0':
     resolution: {integrity: sha512-rLCJ0q42gZd5lC1/Zs4dwlJvj6dyf5hTO3ULkg3INKKJUPO+M1HtVTZtzRNiXiuydMH/AOQzAJ724BmIEZDrVQ==}
 
+  '@stagewise/api-client@0.2.0':
+    resolution: {integrity: sha512-HF50JQnb/kz6r0ogy1kC4vH5Qn6uARVn7hOC6JCWpUipWyydpcSNhP/qtYhQlG40TGxiPOL/H8wxibsizA2zYg==}
+
   '@standard-schema/spec@1.0.0':
     resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
 
@@ -7484,6 +7493,10 @@ packages:
   cli-spinners@2.9.2:
     resolution: {integrity: sha512-ywqV+5MmyL4E7ybXgKys4DugZbX0FC6LnwrhjuykIjnK9k8OQacQ7axGKnjDXWNhns0xot3bZI5h55H8yo9cJg==}
     engines: {node: '>=6'}
+
+  cli-table3@0.6.5:
+    resolution: {integrity: sha512-+W/5efTR7y5HRD7gACw9yQjqMVvEMLBHmboM/kPWam+H+Hmyrgjh6YncVKK122YZkXrLudzTuAukUw9FnMf7IQ==}
+    engines: {node: 10.* || >= 12.*}
 
   cli-truncate@4.0.0:
     resolution: {integrity: sha512-nPdaFdQ0h/GEigbPClz11D0v/ZJEwxmeVZGeMo3Z5StPtUTkA9o1lD6QwoirYiSDzbcwn2XcjwmCp68W1IS4TA==}
@@ -19482,6 +19495,17 @@ snapshots:
       - react
       - typescript
 
+  '@stagewise/api-client@0.2.0(react@19.1.0)(typescript@5.8.3)':
+    dependencies:
+      '@trpc/client': 11.4.3(@trpc/server@11.4.3(typescript@5.8.3))(typescript@5.8.3)
+      '@trpc/server': 11.4.3(typescript@5.8.3)
+      ai: 4.3.19(react@19.1.0)(zod@3.25.76)
+      superjson: 2.2.2
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - react
+      - typescript
+
   '@standard-schema/spec@1.0.0': {}
 
   '@standard-schema/utils@0.3.0': {}
@@ -21682,6 +21706,12 @@ snapshots:
       restore-cursor: 5.1.0
 
   cli-spinners@2.9.2: {}
+
+  cli-table3@0.6.5:
+    dependencies:
+      string-width: 4.2.3
+    optionalDependencies:
+      '@colors/colors': 1.5.0
 
   cli-truncate@4.0.0:
     dependencies:

@@ -22,6 +22,7 @@ import {
 } from './dependency-parser/index.js';
 import open from 'open';
 import { commandExecutor } from './utils/command-executor';
+import { startupBanner } from './utils/startup-banner.js';
 
 // Suppress util._extend deprecation warnings
 // Set NODE_NO_DEPRECATION to suppress all deprecation warnings, then restore other warnings
@@ -223,8 +224,19 @@ async function main() {
       );
     }
 
-    const { server } = await getServer();
+    const { server, plugins } = await getServer();
 
+    if (!config.bridgeMode && authState?.isAuthenticated) {
+      const subscription = await oauthManager.getSubscription();
+
+      startupBanner({
+        subscription,
+        loadedPlugins: plugins,
+        email: authState?.userEmail || '',
+        appPort: config.port,
+        proxyPort: config.appPort,
+      });
+    }
     // Start the server listening
     server.listen(config.port);
 
@@ -233,14 +245,6 @@ async function main() {
       const port =
         typeof address === 'object' && address ? address.port : config.port;
       const serverUrl = `http://localhost:${port}`;
-
-      log.info(`✓ Stagewise is running on ${serverUrl}`);
-      if (config.appPort) {
-        log.info(`✓ Proxying app from port ${config.appPort}`);
-      }
-      if (config.bridgeMode) {
-        log.info('✓ Running in bridge mode (agent server disabled)');
-      }
 
       // Open browser automatically unless in test environment or auth flow was initiated
       // (auth flow will redirect the existing browser window)
@@ -259,11 +263,9 @@ async function main() {
 
     // Handle graceful shutdown
     const gracefulShutdown = async () => {
-      log.info('\nShutting down...');
-
       // Prevent multiple shutdown attempts
       if ((global as any).isShuttingDown) {
-        console.log('Already shutting down');
+        log.debug('Already shutting down');
         return;
       }
       (global as any).isShuttingDown = true;

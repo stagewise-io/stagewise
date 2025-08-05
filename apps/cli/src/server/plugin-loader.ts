@@ -229,15 +229,12 @@ export async function loadPlugins(config: Config): Promise<Plugin[]> {
   }
 
   const pluginList = Array.from(plugins.values());
-  const availableCount = pluginList.filter((p) => p.available !== false).length;
   const unavailableCount = pluginList.filter(
     (p) => p.available === false,
   ).length;
 
   if (unavailableCount > 0) {
     log.warn(`Couldn't load ${unavailableCount} plugins`);
-  } else {
-    log.info(`Loaded ${availableCount} plugins`);
   }
 
   return pluginList;

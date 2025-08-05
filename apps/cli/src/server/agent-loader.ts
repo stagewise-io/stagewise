@@ -62,7 +62,6 @@ export async function loadAndInitializeAgent(
       '/stagewise-toolbar-app/server',
     );
 
-    log.info('✓ Agent server initialized successfully');
     log.debug('Agent endpoints available at /stagewise-toolbar-app/server/*');
 
     // Return the WebSocket server instance if available

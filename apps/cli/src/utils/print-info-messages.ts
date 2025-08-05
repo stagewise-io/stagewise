@@ -1,4 +1,5 @@
 import type { AgentEvent } from '@stagewise/agent-client';
+import chalk from 'chalk';
 
 function createCreditStatusBar(available: number, total: number): string {
   const barWidth = 30;
@@ -59,7 +60,9 @@ export function printInfoMessages(event: AgentEvent) {
           : 0;
       if (percentage < 0.2 || creditInEuros.available <= 1.5) {
         console.log(
-          '💡 Running low on credits? Get more at https://console.stagewise.io',
+          chalk.grey(
+            'Running low on credits? Get more at https://console.stagewise.io',
+          ),
         );
       }
 

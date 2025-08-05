@@ -11,7 +11,6 @@ import { loadAndInitializeAgent, getAgentInstance } from './agent-loader.js';
 import {
   loadPlugins,
   generatePluginImportMapEntries,
-  getPluginNames,
   type Plugin,
 } from './plugin-loader.js';
 
@@ -159,7 +158,6 @@ export const getServer = async () => {
 
     // Load plugins based on configuration and dependencies
     const plugins = await loadPlugins(config);
-    const availablePlugins = plugins.filter((p) => p.available !== false);
     const unavailablePlugins = plugins.filter((p) => p.available === false);
 
     if (unavailablePlugins.length > 0) {
@@ -168,9 +166,6 @@ export const getServer = async () => {
         log.warn(`  - ${p.name}: ${p.error || 'Unknown error'}`);
       });
     }
-
-    const pluginNames = getPluginNames(availablePlugins);
-    log.info(`Available plugins: ${pluginNames.join(', ') || 'none'}`);
 
     // Set up proxy middleware first
     app.use(proxy);
@@ -270,7 +265,7 @@ export const getServer = async () => {
       }
     });
 
-    return { app, server, agent: getAgentInstance(), agentWss };
+    return { app, server, agent: getAgentInstance(), agentWss, plugins };
   } catch (error) {
     console.error(error);
     process.exit(1);

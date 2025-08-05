@@ -5,10 +5,13 @@ import { log } from '../utils/logger';
 import { tokenManager, type TokenData } from './token-manager';
 import open from 'open';
 import { analyticsEvents } from '../utils/telemetry';
+import { createNodeApiClient } from '@stagewise/api-client';
 
 // Configuration
 const STAGEWISE_CONSOLE_URL =
   process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
+
+const API_URL = process.env.API_URL || 'https://api.stagewise.io';
 
 interface TokenPair {
   accessToken: string;
@@ -822,6 +825,25 @@ export class OAuthManager {
   async hasEarlyAgentAccess(): Promise<boolean> {
     const authState = await this.getAuthState();
     return authState?.hasEarlyAgentAccess ?? false;
+  }
+
+  /**
+   * Check if the authenticated user has a subscription
+   */
+  async getSubscription() {
+    const authState = await this.getAuthState();
+    if (!authState?.accessToken) {
+      throw new Error('No access token found');
+    }
+
+    const client = createNodeApiClient({
+      baseUrl: API_URL,
+      headers: {
+        Authorization: `Bearer ${authState?.accessToken}`,
+      },
+    });
+    const subscription = await client.subscription.getSubscription.query();
+    return subscription;
   }
 
   /**

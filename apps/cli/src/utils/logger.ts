@@ -8,7 +8,7 @@ const colorizeFormat = winston.format.printf(
 
     switch (level) {
       case 'info':
-        return chalk.blue(`${prefix}${message}`);
+        return chalk.cyan(`${prefix}${message}`);
       case 'warn':
         return chalk.yellow(`${prefix}${message}`);
       case 'error':

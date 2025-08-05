@@ -9,20 +9,26 @@ interface PromptOptions {
 }
 
 export const promptNumber = async (options: PromptOptions): Promise<number> => {
-  const { message, hint, default: defaultValue } = options;
+  const { message, default: defaultValue } = options;
 
-  let promptMessage = `${message}\n`;
-  if (hint) {
-    promptMessage += `\n${chalk.gray(`Hint: ${hint}`)}\n`;
-  }
-  promptMessage += `Answer: `;
+  const promptMessage = `${message}`;
 
   const result = await input({
-    message: promptMessage,
-    default: defaultValue?.toString(),
+    message: chalk.cyan(promptMessage),
+    default: chalk.gray(defaultValue?.toString()),
+    theme: {
+      prefix: { idle: chalk.cyan('› '), done: chalk.green('✓ ') },
+      style: {
+        answer: (text: string) => chalk.green(text),
+        message: (text: string) => chalk.gray(text),
+        defaultAnswer: (text: string) => chalk.gray(text),
+      },
+    },
   });
 
-  const parsed = Number.parseInt(result, 10);
+  const parsed =
+    Number.parseInt(result, 10) ||
+    Number.parseInt(defaultValue?.toString() || '', 10);
 
   if (Number.isNaN(parsed)) {
     throw new Error('Invalid number provided');
@@ -34,15 +40,20 @@ export const promptNumber = async (options: PromptOptions): Promise<number> => {
 export const promptConfirm = async (
   options: PromptOptions,
 ): Promise<boolean> => {
-  const { message, hint, default: defaultValue } = options;
+  const { message, default: defaultValue } = options;
 
-  let promptMessage = message;
-  if (hint) {
-    promptMessage += `\n${chalk.gray(`Hint: ${hint}`)}\n`;
-  }
+  const promptMessage = `${message}`;
 
   return await confirm({
-    message: promptMessage,
+    message: chalk.cyan(promptMessage),
+    theme: {
+      prefix: { idle: chalk.cyan('› '), done: chalk.green('✓ ') },
+      style: {
+        answer: (text: string) => chalk.green(text),
+        message: (text: string) => chalk.cyan(text),
+        defaultAnswer: (text: string) => chalk.gray(text),
+      },
+    },
     default: defaultValue as boolean | undefined,
   });
 };

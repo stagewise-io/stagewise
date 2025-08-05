@@ -53,8 +53,7 @@ export class ConfigResolver {
 
         appPort = await promptNumber({
           message: 'What port is your development app running on?',
-          hint: 'This is the port where your app is currently accessible (e.g. 3000 or 8080)',
-          placeholder: '',
+          default: '3000',
         });
       } else if (!appPort) {
         throw new Error(
@@ -66,7 +65,6 @@ export class ConfigResolver {
       if (!configFile && !args.silent) {
         const shouldSave = await promptConfirm({
           message: `Would you like to save this configuration to ${CONFIG_FILE_NAME}?`,
-          hint: "This will save your settings so you don't have to enter them again",
           default: true,
         });
 
@@ -126,12 +124,9 @@ export class ConfigResolver {
 
     // Check if we need to prompt for missing values
     if (!appPort && !args.silent) {
-      log.info('Missing required configuration. Starting interactive setup...');
-
       appPort = await promptNumber({
-        message: 'What port is your development app running on? (e.g. 3000)',
-        hint: '',
-        placeholder: '',
+        message: 'What port is your development app running on?',
+        default: '3000',
       });
     } else if (!appPort) {
       throw new Error(
@@ -148,7 +143,6 @@ export class ConfigResolver {
     if (!args.silent && !(await configFileExists(args.workspace))) {
       const shouldSave = await promptConfirm({
         message: `Would you like to save this configuration to ${CONFIG_FILE_NAME}?`,
-        hint: "This will save your settings so you don't have to enter them again",
         default: true,
       });
 
