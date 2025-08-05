@@ -129,7 +129,29 @@
 - ✓ Test cleanup functionality
 - ✓ All 114 tests passing
 
-### Phase 6: Update exports and documentation
-- Update package exports
-- Add usage examples
-- Document migration from messaging to chat
+### Phase 6: Update exports and documentation - COMPLETED
+- ✓ Update package exports to include chat types
+- ✓ Add comprehensive usage example (examples/chat-usage.ts)
+- ✓ Update README with chat capability documentation
+- ✓ Document message types aligned with Vercel AI SDK
+- ✓ Provide clear migration path from messaging
+
+## Summary
+
+Successfully implemented the chat capability for the stagewise agent interface:
+
+1. **Removed toolCalling capability** - Cleaned up old implementation
+2. **Created comprehensive types** - Aligned with Vercel AI SDK standards
+3. **Implemented chat router** - Full TRPC-based chat management
+4. **Updated adapter** - Complete chat state management with streaming
+5. **Added thorough tests** - 24 new tests, all passing
+6. **Updated documentation** - Clear examples and migration guidance
+
+The new chat capability provides:
+- Multi-chat management (one active at a time)
+- Full message history with user/assistant/tool messages
+- Parallel streaming of message parts
+- Integrated tool calling within messages
+- Placeholder persistence methods for future implementation
+
+All existing functionality remains intact with full backward compatibility.
