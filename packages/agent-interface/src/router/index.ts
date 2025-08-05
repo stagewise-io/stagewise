@@ -8,18 +8,30 @@ import {
   type MessagingImplementation,
   messagingRouter,
 } from './capabilities/messaging';
+import {
+  type ChatImplementation,
+  chatRouter,
+} from './capabilities/chat';
 
 export interface TransportInterface {
   availability: AvailabilityImplementation;
   messaging: MessagingImplementation;
   state: StateImplementation;
+  chat?: ChatImplementation;
 }
 
-export const interfaceRouter = (implementation: TransportInterface) =>
-  router({
+export const interfaceRouter = (implementation: TransportInterface) => {
+  const routes: any = {
     availability: availabilityRouter(implementation.availability),
     messaging: messagingRouter(implementation.messaging),
     state: stateRouter(implementation.state),
-  });
+  };
+  
+  if (implementation.chat) {
+    routes.chat = chatRouter(implementation.chat);
+  }
+  
+  return router(routes);
+};
 
 export type InterfaceRouter = ReturnType<typeof interfaceRouter>;
