@@ -48,14 +48,20 @@ async function main() {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Continue streaming
+    const firstContentItem = userMessage.contentItems[0];
+    const textContent = firstContentItem && firstContentItem.type === 'text' 
+      ? firstContentItem.text 
+      : '[non-text content]';
+    
     agent.chat.streamMessagePart(assistantMessageId, 0, {
-      content: { type: 'text', text: userMessage.contentItems[0].text },
+      content: { type: 'text', text: textContent },
       updateType: 'append',
     });
 
     // If the message contains a question about tools, demonstrate tool calling
-    if (userMessage.contentItems[0].type === 'text' && 
-        userMessage.contentItems[0].text.includes('tool')) {
+    const firstItem = userMessage.contentItems[0];
+    if (firstItem && firstItem.type === 'text' && 
+        firstItem.text.includes('tool')) {
       
       // Add a tool call part
       agent.chat.streamMessagePart(assistantMessageId, 1, {
@@ -107,9 +113,7 @@ async function main() {
   ]);
 
   // Handle tool results from toolbar
-  agent.chat.onToolResult = (toolCallId, result, isError) => {
-    console.log(`Tool ${toolCallId} result:`, result, isError ? '(error)' : '');
-  };
+  agent.chat.reportToolResult('example-call-id', { exampleResult: true }, false);
 
   console.log('Chat agent is running on http://localhost:3000');
   console.log('Connect with the toolbar to start chatting!');
