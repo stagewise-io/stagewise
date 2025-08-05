@@ -9,6 +9,7 @@ export interface CommandExecutionResult {
 export class CommandExecutor {
   private childProcess: ChildProcess | null = null;
   private isShuttingDown = false;
+  private signalHandlers: Map<NodeJS.Signals, () => void> = new Map();
 
   async executeCommand(
     commandParts: string[],
@@ -41,6 +42,7 @@ export class CommandExecutor {
             `Proxy command exited with code: ${code}, signal: ${signal || 'none'}`,
           );
           this.childProcess = null;
+          this.cleanupSignalHandlers();
 
           if (signal) {
             resolve({ exitCode: code || 1, signal });
@@ -53,6 +55,7 @@ export class CommandExecutor {
         childProcess.on('error', (error) => {
           log.error(`Failed to execute proxy command: ${error.message}`);
           this.childProcess = null;
+          this.cleanupSignalHandlers();
           reject(error);
         });
 
@@ -67,6 +70,9 @@ export class CommandExecutor {
   private setupSignalHandling(): void {
     if (!this.childProcess) return;
 
+    // Clean up any existing handlers first
+    this.cleanupSignalHandlers();
+
     const forwardSignal = (signal: NodeJS.Signals) => {
       return () => {
         if (
@@ -80,13 +86,29 @@ export class CommandExecutor {
       };
     };
 
-    process.on('SIGINT', forwardSignal('SIGINT'));
-    process.on('SIGTERM', forwardSignal('SIGTERM'));
+    // Register handlers and store references
+    const sigintHandler = forwardSignal('SIGINT');
+    const sigtermHandler = forwardSignal('SIGTERM');
+
+    process.on('SIGINT', sigintHandler);
+    process.on('SIGTERM', sigtermHandler);
+
+    this.signalHandlers.set('SIGINT', sigintHandler);
+    this.signalHandlers.set('SIGTERM', sigtermHandler);
 
     // Handle Windows signals
     if (process.platform === 'win32') {
-      process.on('SIGBREAK', forwardSignal('SIGTERM'));
+      const sigbreakHandler = forwardSignal('SIGTERM');
+      process.on('SIGBREAK', sigbreakHandler);
+      this.signalHandlers.set('SIGBREAK', sigbreakHandler);
     }
+  }
+
+  private cleanupSignalHandlers(): void {
+    for (const [signal, handler] of this.signalHandlers) {
+      process.off(signal, handler);
+    }
+    this.signalHandlers.clear();
   }
 
   async shutdown(): Promise<void> {
@@ -99,6 +121,7 @@ export class CommandExecutor {
 
     return new Promise((resolve) => {
       if (!this.childProcess) {
+        this.cleanupSignalHandlers();
         resolve();
         return;
       }
@@ -115,6 +138,7 @@ export class CommandExecutor {
       this.childProcess.on('exit', () => {
         clearTimeout(timeout);
         this.childProcess = null;
+        this.cleanupSignalHandlers();
         resolve();
       });
 

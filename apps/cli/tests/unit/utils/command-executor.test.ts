@@ -212,17 +212,161 @@ describe('CommandExecutor Unit Tests', () => {
   });
 
   describe('signal forwarding', () => {
+    let originalListeners: { [key: string]: ((...args: any[]) => void)[] };
+
+    beforeEach(() => {
+      // Store original listeners
+      originalListeners = {
+        SIGINT: process.listeners('SIGINT').slice() as ((...args: any[]) => void)[],
+        SIGTERM: process.listeners('SIGTERM').slice() as ((...args: any[]) => void)[],
+        SIGBREAK: process.listeners('SIGBREAK').slice() as ((...args: any[]) => void)[],
+      };
+    });
+
+    afterEach(() => {
+      // Clean up any remaining listeners added during tests
+      process.removeAllListeners('SIGINT');
+      process.removeAllListeners('SIGTERM');
+      process.removeAllListeners('SIGBREAK');
+      
+      // Restore original listeners
+      originalListeners.SIGINT?.forEach(listener => process.on('SIGINT', listener));
+      originalListeners.SIGTERM?.forEach(listener => process.on('SIGTERM', listener));
+      originalListeners.SIGBREAK?.forEach(listener => process.on('SIGBREAK', listener));
+    });
+
     it('should set up signal handlers when command is running', async () => {
+      const initialSigintCount = process.listenerCount('SIGINT');
+      const initialSigtermCount = process.listenerCount('SIGTERM');
+      
       const resultPromise = commandExecutor.executeCommand(['test']);
       
       // Wait for spawn to be called and signal handlers to be set up
       await new Promise(resolve => setImmediate(resolve));
       
-      // Check that the setup method was called (indirectly by checking for child process)
-      expect(commandExecutor.isRunning()).toBe(true);
+      // Check that signal handlers were added
+      expect(process.listenerCount('SIGINT')).toBe(initialSigintCount + 1);
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount + 1);
 
       // Complete the mock command
       mockChildProcess.emit('exit', 0, null);
+      await resultPromise;
+    });
+
+    it('should clean up signal handlers when command exits', async () => {
+      const initialSigintCount = process.listenerCount('SIGINT');
+      const initialSigtermCount = process.listenerCount('SIGTERM');
+      
+      const resultPromise = commandExecutor.executeCommand(['test']);
+      
+      // Wait for setup
+      await new Promise(resolve => setImmediate(resolve));
+      
+      // Verify handlers were added
+      expect(process.listenerCount('SIGINT')).toBe(initialSigintCount + 1);
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount + 1);
+
+      // Complete the command
+      mockChildProcess.emit('exit', 0, null);
+      await resultPromise;
+      
+      // Verify handlers were cleaned up
+      expect(process.listenerCount('SIGINT')).toBe(initialSigintCount);
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount);
+    });
+
+    it('should clean up signal handlers when command errors', async () => {
+      const initialSigintCount = process.listenerCount('SIGINT');
+      const initialSigtermCount = process.listenerCount('SIGTERM');
+      
+      const resultPromise = commandExecutor.executeCommand(['test']);
+      
+      // Wait for setup
+      await new Promise(resolve => setImmediate(resolve));
+      
+      // Verify handlers were added
+      expect(process.listenerCount('SIGINT')).toBe(initialSigintCount + 1);
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount + 1);
+
+      // Simulate error
+      mockChildProcess.emit('error', new Error('Test error'));
+      
+      try {
+        await resultPromise;
+      } catch (error) {
+        // Expected to throw
+      }
+      
+      // Verify handlers were cleaned up
+      expect(process.listenerCount('SIGINT')).toBe(initialSigintCount);
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount);
+    });
+
+    it('should clean up signal handlers on shutdown', async () => {
+      const initialSigintCount = process.listenerCount('SIGINT');
+      const initialSigtermCount = process.listenerCount('SIGTERM');
+      
+      const resultPromise = commandExecutor.executeCommand(['test']);
+      
+      // Wait for setup
+      await new Promise(resolve => setImmediate(resolve));
+      
+      // Verify handlers were added
+      expect(process.listenerCount('SIGINT')).toBe(initialSigintCount + 1);
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount + 1);
+
+      // Shutdown
+      const shutdownPromise = commandExecutor.shutdown();
+      mockChildProcess.emit('exit', 143, 'SIGTERM');
+      
+      await shutdownPromise;
+      await resultPromise;
+      
+      // Verify handlers were cleaned up
+      expect(process.listenerCount('SIGINT')).toBe(initialSigintCount);
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount);
+    });
+
+    it('should not accumulate signal handlers across multiple commands', async () => {
+      const initialSigintCount = process.listenerCount('SIGINT');
+      const initialSigtermCount = process.listenerCount('SIGTERM');
+      
+      // Run first command
+      const resultPromise1 = commandExecutor.executeCommand(['test']);
+      await new Promise(resolve => setImmediate(resolve));
+      mockChildProcess.emit('exit', 0, null);
+      await resultPromise1;
+      
+      // Run second command
+      const resultPromise2 = commandExecutor.executeCommand(['test']);
+      await new Promise(resolve => setImmediate(resolve));
+      
+      // Should only have one set of handlers, not accumulated
+      expect(process.listenerCount('SIGINT')).toBe(initialSigintCount + 1);
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount + 1);
+      
+      mockChildProcess.emit('exit', 0, null);
+      await resultPromise2;
+      
+      // All should be cleaned up
+      expect(process.listenerCount('SIGINT')).toBe(initialSigintCount);
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount);
+    });
+
+    it('should forward signals to child process', async () => {
+      const resultPromise = commandExecutor.executeCommand(['test']);
+      
+      // Wait for setup
+      await new Promise(resolve => setImmediate(resolve));
+      
+      // Emit SIGINT signal
+      process.emit('SIGINT', 'SIGINT');
+      
+      // Check that kill was called on child process
+      expect(mockChildProcess.kill).toHaveBeenCalledWith('SIGINT');
+      
+      // Complete the command
+      mockChildProcess.emit('exit', 130, 'SIGINT');
       await resultPromise;
     });
   });

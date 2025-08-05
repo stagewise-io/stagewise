@@ -102,7 +102,7 @@ describe('CLI Workflow Integration Tests', () => {
     it('should succeed in bridge mode with workspace argument', async () => {
       const child = spawn(
         'tsx',
-        ['src/index.ts', '-b', '-w', testDir, '-a', '3000', '-s'],
+        ['src/index.ts', '-b', '-w', testDir, '-a', '3000', '-p', '3101', '-s'],
         {
           cwd: process.cwd(),
           shell: false,
@@ -125,7 +125,7 @@ describe('CLI Workflow Integration Tests', () => {
       if (errorOutput) {
         console.error('Test stderr:', errorOutput);
       }
-      expect(output).toContain('Running in bridge mode');
+      expect(output).toContain('✓ Running in bridge mode');
 
       await killProcess(child);
     });
