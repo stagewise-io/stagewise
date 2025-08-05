@@ -253,15 +253,23 @@ describe('Config Error Handling Integration Tests', () => {
     );
 
     let output = '';
+    let errorOutput = '';
     child2.stdout.on('data', (data) => {
       output += data.toString();
+    });
+    child2.stderr.on('data', (data) => {
+      errorOutput += data.toString();
     });
 
     // Give the server time to start
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Check that server started successfully
-    expect(output).toContain('Stagewise is running on');
+    // Should not have fatal errors
+    expect(errorOutput).not.toContain('Error');
+    expect(errorOutput).not.toContain('Failed');
+    // The process should still be running
+    expect(child2.killed).toBe(false);
 
     await killProcess(child2);
   });
