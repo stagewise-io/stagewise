@@ -10,11 +10,6 @@ import type {
   AgentState,
   AgentStateType,
 } from '../router/capabilities/state/types';
-import type {
-  Tool,
-  ToolCallResult,
-  PendingToolCall,
-} from '../router/capabilities/tool-calling/types';
 
 export type AgentInterface = {
   /**
@@ -108,41 +103,6 @@ export type AgentInterface = {
 
     /** Clear all user message listeners */
     clearUserMessageListeners: () => void;
-  };
-
-  /**
-   * TOOL CALLING MANAGEMENT (Optional)
-   * Simplified tool calling with automatic lifecycle management
-   */
-  toolCalling: {
-    /** Set tool call support.
-     * Agents have to manually set this to true if they want to support tool calling.
-     *
-     * Calling other functions in the toolCalling object will throw an error
-     * if tool calling is not supported.
-     */
-    setToolCallSupport: (supported: boolean) => void;
-
-    /** Get a list of all available tools */
-    getAvailableTools: () => Tool[];
-
-    /** Add a listener that get's triggered whenever the list of available tools changes */
-    onToolListUpdate: (listener: (tools: Tool[]) => void) => void;
-
-    /** Remove a specific tool list update listener */
-    removeToolListUpdateListener: (listener: (tools: Tool[]) => void) => void;
-
-    /** Clear all tool list update listeners */
-    clearToolListUpdateListeners: () => void;
-
-    /** Make a tool call and wait for the result */
-    requestToolCall: (
-      toolName: string,
-      parameters: Record<string, unknown>,
-    ) => Promise<ToolCallResult>;
-
-    /** Get all pending tool calls */
-    getPendingToolCalls: () => PendingToolCall[];
   };
 
   /**
