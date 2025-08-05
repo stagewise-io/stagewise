@@ -30,7 +30,26 @@ export {
   type AgentState,
 } from '../router/capabilities/state/types';
 export type * from '../router/capabilities/messaging/types';
-export type * from '../router/capabilities/tool-calling/types';
+export {
+  // Re-export chat types, excluding those that conflict with messaging
+  type TextPart,
+  type ImagePart,
+  type FilePart,
+  type ReasoningPart,
+  type ToolCallPart,
+  type ToolResultPart,
+  type AssistantMessage,
+  type ToolMessage,
+  type ChatMessage,
+  type Chat,
+  type ChatListItem,
+  type MessagePartUpdate,
+  type ChatUpdate,
+  type CreateChatRequest,
+  type SendMessageRequest,
+  type ToolApprovalResponse,
+  type ToolDefinition,
+} from '../router/capabilities/chat/types';
 
 /**
  * Configuration options for creating an agent server
@@ -132,8 +151,8 @@ export const createAgentHook = async (config: AgentServerHookConfig) => {
     name,
     description,
     capabilities: {
-      toolCalling: impl.toolCalling !== undefined,
-      chatHistory: false,
+      toolCalling: false, // Removed, now integrated into chat
+      chatHistory: impl.chat !== undefined,
     },
   };
 
@@ -226,8 +245,8 @@ export const createAgentServer = async (
     name,
     description,
     capabilities: {
-      toolCalling: impl.toolCalling !== undefined,
-      chatHistory: false,
+      toolCalling: false, // Removed, now integrated into chat
+      chatHistory: impl.chat !== undefined,
     },
   };
 
