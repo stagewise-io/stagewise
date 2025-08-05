@@ -69,7 +69,7 @@ stagewise is developed by tiq UG (haftungsbeschränkt) and offered under the AGP
 
 For more information on the license model, visit the [FAQ about the GNU Licenses](https://www.gnu.org/licenses/gpl-faq.html).
 
-For use cases that fall outside the scope permitted by the AGPLv3 license, feel free to [📬 Contact Us](#contact-us-section).
+For use cases that fall outside the scope permitted by the AGPLv3 license, feel free to [📬 Contact Us](mailto:sales@stagewise.io).
 
 ## 🤝 Contributing
 
