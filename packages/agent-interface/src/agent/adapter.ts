@@ -11,7 +11,7 @@ import {
 import type {
   AgentMessageContentItemPart,
   AgentMessageUpdate,
-  UserMessage,
+  UserMessage as MessagingUserMessage,
 } from '../router/capabilities/messaging/types';
 import type { AvailabilityImplementation } from '../router/capabilities/availability';
 import type { MessagingImplementation } from '../router/capabilities/messaging';
@@ -30,6 +30,7 @@ import type {
   TextPart,
   ImagePart,
   FilePart,
+  UserMessage,
 } from '../router/capabilities/chat/types';
 
 /**
@@ -160,7 +161,7 @@ export class AgentTransportAdapter implements TransportInterface {
   private _state: AgentState;
   private _currentMessageId: string | null = null;
   private _messageContent: AgentMessageContentItemPart[] = [];
-  private _userMessageListeners: Set<(message: UserMessage) => void> =
+  private _userMessageListeners: Set<(message: MessagingUserMessage) => void> =
     new Set();
 
   // Chat state
@@ -497,10 +498,10 @@ export class AgentTransportAdapter implements TransportInterface {
           const chat = self._chats.get(self._activeChatId)!;
           const messageId = self._options.idGenerator();
           
-          const userMessage: ChatMessage = {
+          const userMessage: UserMessage = {
             id: messageId,
             role: 'user',
-            content: content as any, // Type assertion needed due to union types
+            content,
             metadata,
             createdAt: new Date(),
           };

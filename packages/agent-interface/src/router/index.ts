@@ -21,15 +21,12 @@ export interface TransportInterface {
 }
 
 export const interfaceRouter = (implementation: TransportInterface) => {
-  const routes: any = {
+  const routes = {
     availability: availabilityRouter(implementation.availability),
     messaging: messagingRouter(implementation.messaging),
     state: stateRouter(implementation.state),
+    ...(implementation.chat ? { chat: chatRouter(implementation.chat) } : {}),
   };
-  
-  if (implementation.chat) {
-    routes.chat = chatRouter(implementation.chat);
-  }
   
   return router(routes);
 };

@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AgentTransportAdapter } from '../../src/agent/adapter';
 import { AgentStateType } from '../../src/router/capabilities/state/types';
+import type { 
+  ChatUpdate, 
+  MessagePartUpdate, 
+  UserMessage 
+} from '../../src/router/capabilities/chat/types';
 
 describe('AgentTransportAdapter - Chat Capability', () => {
   let adapter: AgentTransportAdapter;
@@ -155,10 +160,20 @@ describe('AgentTransportAdapter - Chat Capability', () => {
     });
 
     it('should throw when sending message without active chat', async () => {
+      const mockMetadata: UserMessage['metadata'] = {
+        currentUrl: null,
+        currentTitle: null,
+        currentZoomLevel: 1,
+        viewportResolution: { width: 1920, height: 1080 },
+        devicePixelRatio: 1,
+        userAgent: 'test',
+        locale: 'en',
+        selectedElements: [],
+      };
       await expect(
         agent.chat.sendMessage(
           [{ type: 'text', text: 'No chat' }],
-          {} as any
+          mockMetadata
         )
       ).rejects.toThrow('No active chat');
     });
@@ -170,7 +185,7 @@ describe('AgentTransportAdapter - Chat Capability', () => {
     });
 
     it('should notify listeners of chat updates', async () => {
-      const updates: any[] = [];
+      const updates: ChatUpdate[] = [];
       const listener = vi.fn((update) => updates.push(update));
       
       agent.chat.addChatUpdateListener(listener);
@@ -190,10 +205,13 @@ describe('AgentTransportAdapter - Chat Capability', () => {
       // Create a chat first to have an active chat
       await agent.chat.createChat('Stream Test');
       
-      agent.chat.streamMessagePart('msg-1', 0, {
+      const partUpdate: MessagePartUpdate = {
+        messageId: 'msg-1',
+        partIndex: 0,
         content: { type: 'text', text: 'Streaming...' },
         updateType: 'create',
-      } as any);
+      };
+      agent.chat.streamMessagePart('msg-1', 0, partUpdate);
       
       expect(listener).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -322,7 +340,13 @@ describe('AgentTransportAdapter - Chat Capability', () => {
       agent.cleanup.clearAllListeners();
       
       // Trigger updates to verify listeners were removed
-      agent.chat.streamMessagePart('msg-1', 0, {} as any);
+      const emptyUpdate: MessagePartUpdate = {
+        messageId: 'msg-1',
+        partIndex: 0,
+        content: { type: 'text', text: '' },
+        updateType: 'create',
+      };
+      agent.chat.streamMessagePart('msg-1', 0, emptyUpdate);
       expect(listener1).not.toHaveBeenCalled();
     });
   });

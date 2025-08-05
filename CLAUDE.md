@@ -9,6 +9,7 @@
 - Only implement what you're being told to do
 - Don't impact existing functionality unless explicitly being told to do so
 - Focus on your final goal instead of optimizing other parts of the app
+- NEVER use any. NEVER use unknown unless absolutely necessary.
 
 # Workflow
 
