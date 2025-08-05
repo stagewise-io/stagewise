@@ -16,6 +16,21 @@ import type {
 import type { AvailabilityImplementation } from '../router/capabilities/availability';
 import type { MessagingImplementation } from '../router/capabilities/messaging';
 import type { StateImplementation } from '../router/capabilities/state';
+import type { ChatImplementation } from '../router/capabilities/chat';
+import type {
+  Chat,
+  ChatListItem,
+  ChatMessage,
+  ChatUpdate,
+  MessagePartUpdate,
+  SendMessageRequest,
+  CreateChatRequest,
+  ToolDefinition,
+  ToolApprovalResponse,
+  TextPart,
+  ImagePart,
+  FilePart,
+} from '../router/capabilities/chat/types';
 
 /**
  * Optional configuration for the AgentTransportAdapter.
@@ -128,6 +143,7 @@ export class AgentTransportAdapter implements TransportInterface {
   public readonly availability: AvailabilityImplementation;
   public readonly messaging: MessagingImplementation;
   public readonly state: StateImplementation;
+  public chat?: ChatImplementation;
 
   // --- Internal State Properties ---
   private _agentInterface: AgentInterface | null = null;
@@ -137,6 +153,7 @@ export class AgentTransportAdapter implements TransportInterface {
   private readonly _availabilityController: PushController<AgentAvailability>;
   private readonly _stateController: PushController<AgentState>;
   private readonly _messageController: PushController<AgentMessageUpdate>;
+  private readonly _chatUpdateController: PushController<ChatUpdate>;
 
   // Internal state stores
   private _availability: AgentAvailability;
@@ -145,6 +162,13 @@ export class AgentTransportAdapter implements TransportInterface {
   private _messageContent: AgentMessageContentItemPart[] = [];
   private _userMessageListeners: Set<(message: UserMessage) => void> =
     new Set();
+
+  // Chat state
+  private _chatSupported = false;
+  private _chats: Map<string, Chat> = new Map();
+  private _activeChatId: string | null = null;
+  private _availableTools: ToolDefinition[] = [];
+  private _chatUpdateListeners: Set<(update: ChatUpdate) => void> = new Set();
 
   constructor(options?: AdapterOptions) {
     // 1. Set default options
@@ -164,6 +188,7 @@ export class AgentTransportAdapter implements TransportInterface {
     this._availabilityController = new PushController(this._availability);
     this._stateController = new PushController(this._state);
     this._messageController = new PushController(); // No initial value, sends resync on subscribe
+    this._chatUpdateController = new PushController(); // No initial value, sends resync on subscribe
 
     // 4. Define the public TransportInterface properties
     this.availability = this.createAvailabilityImplementation();
@@ -364,9 +389,184 @@ export class AgentTransportAdapter implements TransportInterface {
           }
         },
       },
+      chat: {
+        setChatSupport: (supported) => {
+          self._chatSupported = supported;
+          if (supported) {
+            // Lazily create the implementation when enabled
+            self.chat = self.createChatImplementation();
+          } else {
+            // Cleanup on disable
+            self.chat = undefined;
+            self._chats.clear();
+            self._activeChatId = null;
+            self._chatUpdateListeners.clear();
+          }
+        },
+        isSupported: () => self._chatSupported,
+        getChats: () => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          return Array.from(self._chats.values()).map(chat => ({
+            id: chat.id,
+            title: chat.title,
+            createdAt: chat.createdAt,
+            isActive: chat.id === self._activeChatId,
+            messageCount: chat.messages.length,
+          }));
+        },
+        getActiveChat: () => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          return self._activeChatId ? self._chats.get(self._activeChatId) || null : null;
+        },
+        createChat: async (title) => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          if (self._activeChatId && self._state.state !== AgentStateType.IDLE) {
+            throw new Error('Cannot create new chat while current chat is active');
+          }
+          
+          const chatId = self._options.idGenerator();
+          const chat: Chat = {
+            id: chatId,
+            title: title || `Chat ${self._chats.size + 1}`,
+            createdAt: new Date(),
+            messages: [],
+            isActive: true,
+          };
+          
+          self._chats.set(chatId, chat);
+          self._activeChatId = chatId;
+          
+          const update: ChatUpdate = {
+            type: 'chat-created',
+            chat,
+          };
+          self._chatUpdateController.push(update);
+          self._chatUpdateListeners.forEach(listener => listener(update));
+          
+          return chatId;
+        },
+        deleteChat: async (chatId) => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          if (chatId === self._activeChatId && self._state.state !== AgentStateType.IDLE) {
+            throw new Error('Cannot delete active chat while not idle');
+          }
+          
+          self._chats.delete(chatId);
+          if (chatId === self._activeChatId) {
+            self._activeChatId = null;
+          }
+          
+          const update: ChatUpdate = {
+            type: 'chat-deleted',
+            chatId,
+          };
+          self._chatUpdateController.push(update);
+          self._chatUpdateListeners.forEach(listener => listener(update));
+        },
+        switchChat: async (chatId) => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          if (self._state.state !== AgentStateType.IDLE) {
+            throw new Error('Cannot switch chats while not idle');
+          }
+          if (!self._chats.has(chatId)) {
+            throw new Error('Chat not found');
+          }
+          
+          if (self._activeChatId) {
+            const previousChat = self._chats.get(self._activeChatId);
+            if (previousChat) {
+              previousChat.isActive = false;
+            }
+          }
+          
+          self._activeChatId = chatId;
+          const chat = self._chats.get(chatId)!;
+          chat.isActive = true;
+          
+          const update: ChatUpdate = {
+            type: 'chat-switched',
+            chatId,
+          };
+          self._chatUpdateController.push(update);
+          self._chatUpdateListeners.forEach(listener => listener(update));
+        },
+        sendMessage: async (content, metadata) => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          if (!self._activeChatId) throw new Error('No active chat');
+          
+          const chat = self._chats.get(self._activeChatId)!;
+          const messageId = self._options.idGenerator();
+          
+          const userMessage: ChatMessage = {
+            id: messageId,
+            role: 'user',
+            content: content as any, // Type assertion needed due to union types
+            metadata,
+            createdAt: new Date(),
+          };
+          
+          chat.messages.push(userMessage);
+          
+          const update: ChatUpdate = {
+            type: 'message-added',
+            chatId: self._activeChatId,
+            message: userMessage,
+          };
+          self._chatUpdateController.push(update);
+          self._chatUpdateListeners.forEach(listener => listener(update));
+        },
+        streamMessagePart: (messageId, partIndex, update) => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          if (!self._activeChatId) throw new Error('No active chat');
+          
+          const chatUpdate: ChatUpdate = {
+            type: 'message-updated',
+            chatId: self._activeChatId,
+            update: {
+              messageId,
+              partIndex,
+              content: update.content,
+              updateType: update.updateType,
+            },
+          };
+          self._chatUpdateController.push(chatUpdate);
+          self._chatUpdateListeners.forEach(listener => listener(chatUpdate));
+        },
+        handleToolApproval: async (response) => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          // Implementation would handle tool approval logic
+          // For now, this is a placeholder
+        },
+        registerTools: (tools) => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          self._availableTools = [...tools];
+        },
+        reportToolResult: (toolCallId, result, isError) => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          // Implementation would handle tool result reporting
+          // For now, this is a placeholder
+        },
+        addChatUpdateListener: (listener) => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          self._chatUpdateListeners.add(listener);
+        },
+        removeChatUpdateListener: (listener) => {
+          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
+          self._chatUpdateListeners.delete(listener);
+        },
+        loadChatHistory: async () => {
+          // Placeholder for future implementation
+          console.log('loadChatHistory: Not implemented yet');
+        },
+        saveChatHistory: async () => {
+          // Placeholder for future implementation
+          console.log('saveChatHistory: Not implemented yet');
+        },
+      },
       cleanup: {
         clearAllListeners: () => {
           self._userMessageListeners.clear();
+          self._chatUpdateListeners.clear();
         },
       },
     };
@@ -440,4 +640,186 @@ export class AgentTransportAdapter implements TransportInterface {
     };
   }
 
+  private createChatImplementation(): ChatImplementation {
+    const self = this;
+    return {
+      getChatUpdates: () => {
+        // This custom subscription logic handles the initial sync requirement
+        const sub = self._chatUpdateController.subscribe();
+        const originalIterator = sub[Symbol.asyncIterator]();
+
+        return {
+          [Symbol.asyncIterator]: () => {
+            let hasInitialized = false;
+
+            return {
+              next: async () => {
+                // On the very first call to next(), send initial state
+                if (!hasInitialized) {
+                  hasInitialized = true;
+                  
+                  // Send chat list
+                  const chatListUpdate: ChatUpdate = {
+                    type: 'chat-list',
+                    chats: Array.from(self._chats.values()).map(chat => ({
+                      id: chat.id,
+                      title: chat.title,
+                      createdAt: chat.createdAt,
+                      isActive: chat.id === self._activeChatId,
+                      messageCount: chat.messages.length,
+                    })),
+                  };
+                  return { value: chatListUpdate, done: false };
+                }
+                
+                // After initial sync, return updates from the controller
+                return originalIterator.next();
+              },
+              return: () => {
+                return originalIterator.return
+                  ? originalIterator.return()
+                  : Promise.resolve({ value: undefined, done: true });
+              },
+            };
+          },
+        };
+      },
+      
+      onSendMessage: async (request) => {
+        if (!self._activeChatId || self._activeChatId !== request.chatId) {
+          throw new Error('Invalid chat ID or no active chat');
+        }
+        
+        const chat = self._chats.get(request.chatId);
+        if (!chat) {
+          throw new Error('Chat not found');
+        }
+        
+        const messageId = self._options.idGenerator();
+        const userMessage: ChatMessage = {
+          id: messageId,
+          role: 'user',
+          content: request.content,
+          metadata: request.metadata,
+          createdAt: new Date(),
+        };
+        
+        chat.messages.push(userMessage);
+        
+        const update: ChatUpdate = {
+          type: 'message-added',
+          chatId: request.chatId,
+          message: userMessage,
+        };
+        self._chatUpdateController.push(update);
+        self._chatUpdateListeners.forEach(listener => listener(update));
+      },
+      
+      onCreateChat: async (request) => {
+        if (self._activeChatId && self._state.state !== AgentStateType.IDLE) {
+          throw new Error('Cannot create new chat while current chat is active');
+        }
+        
+        const chatId = self._options.idGenerator();
+        const chat: Chat = {
+          id: chatId,
+          title: request.title || `Chat ${self._chats.size + 1}`,
+          createdAt: new Date(),
+          messages: [],
+          isActive: true,
+        };
+        
+        // Deactivate previous chat
+        if (self._activeChatId) {
+          const previousChat = self._chats.get(self._activeChatId);
+          if (previousChat) {
+            previousChat.isActive = false;
+          }
+        }
+        
+        self._chats.set(chatId, chat);
+        self._activeChatId = chatId;
+        
+        const update: ChatUpdate = {
+          type: 'chat-created',
+          chat,
+        };
+        self._chatUpdateController.push(update);
+        self._chatUpdateListeners.forEach(listener => listener(update));
+        
+        return chatId;
+      },
+      
+      onDeleteChat: async (chatId) => {
+        if (chatId === self._activeChatId && self._state.state !== AgentStateType.IDLE) {
+          throw new Error('Cannot delete active chat while not idle');
+        }
+        
+        self._chats.delete(chatId);
+        if (chatId === self._activeChatId) {
+          self._activeChatId = null;
+        }
+        
+        const update: ChatUpdate = {
+          type: 'chat-deleted',
+          chatId,
+        };
+        self._chatUpdateController.push(update);
+        self._chatUpdateListeners.forEach(listener => listener(update));
+      },
+      
+      onSwitchChat: async (chatId) => {
+        if (self._state.state !== AgentStateType.IDLE) {
+          throw new Error('Cannot switch chats while not idle');
+        }
+        
+        if (!self._chats.has(chatId)) {
+          throw new Error('Chat not found');
+        }
+        
+        if (self._activeChatId) {
+          const previousChat = self._chats.get(self._activeChatId);
+          if (previousChat) {
+            previousChat.isActive = false;
+          }
+        }
+        
+        self._activeChatId = chatId;
+        const chat = self._chats.get(chatId)!;
+        chat.isActive = true;
+        
+        const switchUpdate: ChatUpdate = {
+          type: 'chat-switched',
+          chatId,
+        };
+        self._chatUpdateController.push(switchUpdate);
+        self._chatUpdateListeners.forEach(listener => listener(switchUpdate));
+        
+        // Send full sync of the newly active chat
+        const syncUpdate: ChatUpdate = {
+          type: 'chat-full-sync',
+          chat,
+        };
+        self._chatUpdateController.push(syncUpdate);
+        self._chatUpdateListeners.forEach(listener => listener(syncUpdate));
+      },
+      
+      onToolApproval: async (response) => {
+        // This would be implemented to handle tool approvals
+        // For now, it's a placeholder
+        console.log('Tool approval received:', response);
+      },
+      
+      onToolRegistration: (tools) => {
+        self._availableTools = [...tools];
+        // Could emit an update if needed
+      },
+      
+      onToolResult: (toolCallId, result, isError) => {
+        // This would be implemented to handle tool results
+        // For now, it's a placeholder
+        console.log('Tool result received:', toolCallId, result, isError);
+      },
+    };
+  }
 }
