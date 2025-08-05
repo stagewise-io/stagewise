@@ -73,6 +73,28 @@ npx stagewise -a 3002 # Set the port on which your dev app is hosted on
 pnpm dlx stagewise -a 3002
 ```
 
+### Wrap your dev command with stagewise
+
+Instead of running stagewise and your dev server in separate terminals, you can use the double-dash syntax to run both together:
+
+```bash
+# Wrap your dev command
+npx stagewise -- pnpm dev
+
+# You can still use stagewise options before the double-dash
+npx stagewise -p 3100 -a 3000 -- pnpm dev
+```
+
+Or wrap the dev script in your package.json:
+
+```json
+{
+  "scripts": {
+    "dev": "npx stagewise -- next dev"
+  }
+}
+```
+
 ## How the CLI works
 
 This section focuses on what capabilities the CLI has and how it actually works.
@@ -234,6 +256,16 @@ Provide an authentication token for the stagewise agent directly via the command
 Enable bridge mode, which disables the built-in stagewise agent server. In this mode, stagewise only provides the toolbar and proxy functionality, allowing you to connect to external agents or use stagewise with other AI coding assistants.
 
 > **Note**: Bridge mode is incompatible with the `--token` option.
+
+### `--`
+
+Use the double-dash to wrap your development command with stagewise, running both in a single terminal:
+
+```bash
+npx stagewise [options] -- <your-dev-command>
+```
+
+This allows you to run `npm run dev`, `pnpm dev`, or any other command while stagewise operates in the background.
 
 ## Authentication commands
 
