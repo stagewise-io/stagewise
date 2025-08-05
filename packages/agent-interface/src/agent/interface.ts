@@ -4,7 +4,7 @@ import type {
 } from '../router/capabilities/availability/types';
 import type {
   AgentMessageContentItemPart,
-  UserMessage,
+  UserMessage as MessagingUserMessage,
 } from '../router/capabilities/messaging/types';
 import type {
   AgentState,
@@ -17,6 +17,8 @@ import type {
   MessagePartUpdate,
   ToolDefinition,
   ToolApprovalResponse,
+  ChatUpdate,
+  UserMessage as ChatUserMessage,
 } from '../router/capabilities/chat/types';
 
 export type AgentInterface = {
@@ -102,11 +104,11 @@ export type AgentInterface = {
     };
 
     /** Add a listener for user messages */
-    addUserMessageListener: (listener: (message: UserMessage) => void) => void;
+    addUserMessageListener: (listener: (message: MessagingUserMessage) => void) => void;
 
     /** Remove a specific user message listener */
     removeUserMessageListener: (
-      listener: (message: UserMessage) => void,
+      listener: (message: MessagingUserMessage) => void,
     ) => void;
 
     /** Clear all user message listeners */
@@ -140,7 +142,7 @@ export type AgentInterface = {
     switchChat: (chatId: string) => Promise<void>;
 
     /** Send a message to the active chat */
-    sendMessage: (content: ChatMessage['content'], metadata: UserMessage['metadata']) => Promise<void>;
+    sendMessage: (content: ChatUserMessage['content'], metadata: ChatUserMessage['metadata']) => Promise<void>;
 
     /** Stream a message part update */
     streamMessagePart: (messageId: string, partIndex: number, update: MessagePartUpdate) => void;
@@ -155,10 +157,10 @@ export type AgentInterface = {
     reportToolResult: (toolCallId: string, result: unknown, isError?: boolean) => void;
 
     /** Add listener for chat updates */
-    addChatUpdateListener: (listener: (update: any) => void) => void;
+    addChatUpdateListener: (listener: (update: ChatUpdate) => void) => void;
 
     /** Remove chat update listener */
-    removeChatUpdateListener: (listener: (update: any) => void) => void;
+    removeChatUpdateListener: (listener: (update: ChatUpdate) => void) => void;
 
     // Persistence placeholders
     /** Load chat history (placeholder for future implementation) */
