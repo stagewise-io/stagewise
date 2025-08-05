@@ -92,11 +92,14 @@
 - ✓ Remove toolCalling from agent interface
 - ✓ Clean up toolCalling-related state and methods
 
-### Phase 2: Create chat capability types
-- Create `/src/router/capabilities/chat/types.ts`
-- Define message types (UserMessage, AssistantMessage, ToolMessage)
-- Define chat types (Chat, ChatUpdate)
-- Define tool-related types within messages
+### Phase 2: Create chat capability types - COMPLETED
+- ✓ Create `/src/router/capabilities/chat/types.ts`
+- ✓ Define message types aligned with Vercel AI SDK
+- ✓ Define chat management types (Chat, ChatListItem)
+- ✓ Define streaming update types (MessagePartUpdate, ChatUpdate)
+- ✓ Define user action types (CreateChat, SendMessage, ToolApproval)
+- ✓ Create chat router with ChatImplementation interface
+- ✓ Update main router to include chat capability
 
 ### Phase 3: Implement chat router
 - Create `/src/router/capabilities/chat/index.ts`

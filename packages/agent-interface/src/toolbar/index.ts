@@ -23,12 +23,26 @@ export {
   type AgentMessageUpdate,
 } from '../router/capabilities/messaging/types';
 
-export type {
-  PendingToolCall,
-  ToolCallResult,
-  Tool,
-  ToolList,
-} from '../router/capabilities/tool-calling/types';
+export {
+  // Re-export chat types, excluding those that conflict with messaging
+  type TextPart,
+  type ImagePart,
+  type FilePart,
+  type ReasoningPart,
+  type ToolCallPart,
+  type ToolResultPart,
+  type AssistantMessage,
+  type ToolMessage,
+  type ChatMessage,
+  type Chat,
+  type ChatListItem,
+  type MessagePartUpdate,
+  type ChatUpdate,
+  type CreateChatRequest,
+  type SendMessageRequest,
+  type ToolApprovalResponse,
+  type ToolDefinition,
+} from '../router/capabilities/chat/types';
 
 export type { StagewiseInfo } from '../info';
 
