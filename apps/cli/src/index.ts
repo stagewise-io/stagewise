@@ -172,6 +172,7 @@ async function main() {
       workspace_configured_manually: !hasConfigFile,
       auto_plugins_enabled: config.autoPlugins,
       manual_plugins_count: config.plugins.length,
+      has_wrapped_command: hasWrappedCommand,
     });
 
     // Track if config file was found

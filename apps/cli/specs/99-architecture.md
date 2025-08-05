@@ -102,10 +102,11 @@ src/
 
 ### 1. Entry Point (`index.ts`)
 - Initializes the application
-- Handles command execution (auth, telemetry, and proxy commands)
-- Sets up the HTTP server
-- Manages graceful shutdown
-- **Proxy Mode**: Executes external commands while running Stagewise server in background
+- Handles command routing (auth, telemetry, and main server commands)
+- Manages execution mode detection and configuration resolution
+- Sets up the HTTP server with Express
+- Manages graceful shutdown with signal handling
+- **Command Wrapping**: Executes external commands via CommandExecutor while running Stagewise server concurrently
 
 ### 2. Authentication (`auth/`)
 - **OAuth Manager**: Handles OAuth2 flow with PKCE
@@ -128,50 +129,58 @@ src/
   2. Environment variables
   3. Configuration file (stagewise.config.json)
   4. Default values
-- Handles authentication flow initialization
-- **Proxy Mode Support**: Provides minimal configuration for command proxying
-- **Argument Parser**: Detects double-dash delimiter for command separation
+- Handles authentication flow initialization and interactive setup
+- **Command Wrapping Support**: Provides minimal configuration for wrapped command execution
+- **Argument Parser**: Uses Commander.js with double-dash delimiter detection for command separation
+- **Cross-platform Validation**: Port conflict detection and path validation
 
 ### 5. Server (`server/`)
-- **Express Server**: Main HTTP server
-- **Agent Loader**: Initializes Stagewise agent for code assistance
-- **Proxy**: Proxies requests to the user's application
-- **Plugin Loader**: Discovers and loads UI plugins
-- **WebSocket Support**: Handles WebSocket connections for agent
+- **Express Server**: Main HTTP server with middleware pipeline
+- **Agent Loader**: Initializes Stagewise agent with WebSocket support (disabled in bridge mode)
+- **HTTP Proxy**: Proxies non-toolbar requests to user's application with header preservation
+- **Plugin Loader**: Discovers and loads framework-specific UI plugins with dependency compatibility checking
+- **WebSocket Support**: Handles WebSocket connections for agent communication and proxy upgrades
+- **Error Handling**: Custom error pages when proxied application is unavailable
 
 ### 6. Dependency Parser (`dependency-parser/`)
 - Discovers project dependencies from package.json files
 - Supports monorepo structures
 - Provides dependency information for plugins
 
-### 7. Analytics (`analytics/`)
-- **PostHog Client**: Manages PostHog integration with telemetry level support
-- **Events Module**: Defines and tracks analytics events:
-  - `cli-telemetry-config-set`: Tracks telemetry configuration changes
-  - `cli-start`: Tracks CLI startup with mode, workspace, and plugin info
-  - `cli-stored-config-json`: Tracks when users save configuration
-  - `cli-auth-initiated`: Tracks when authentication flow is started (with `initiated_automatically` property)
-  - `cli-auth-completed`: Tracks when authentication is successfully completed (with `initiated_automatically` property)
-  - `cli-found-config-json`: Tracks when workspace has existing config
-  - `cli-shutdown`: Tracks graceful CLI shutdown
-- **Machine Identification**: Uses persistent UUID stored in `identifier.json`
-  - Generated on first CLI startup using `crypto.randomUUID()`
-  - Initialized early in the startup sequence to ensure it exists before any analytics events
-  - Stored in the data directory with creation timestamp
-- **Privacy Levels**: Respects telemetry settings (off/anonymous/full)
+### 7. Analytics (`analytics/` and `utils/telemetry.ts`)
+- **TelemetryManager**: Centralized telemetry management with privacy-first approach
+- **PostHog Integration**: Configured via `POSTHOG_API_KEY` environment variable
+- **Three Privacy Levels**:
+  - `off`: Complete data collection disabled
+  - `anonymous`: Pseudonymized machine ID only (default)
+  - `full`: Includes authenticated user information
+- **Analytics Events**: Comprehensive event tracking including:
+  - `cli-telemetry-config-set`: Telemetry configuration changes
+  - `cli-start`: CLI startup with mode, workspace, and plugin metadata
+  - `cli-stored-config-json`: Configuration file creation
+  - `cli-auth-initiated/completed`: Authentication flow tracking
+  - `cli-found-config-json`: Existing workspace configuration detection
+  - `cli-shutdown`: Graceful shutdown tracking
+- **Machine Identification**: Persistent UUID in `identifier.json`
+  - Generated using `crypto.randomUUID()` on first startup
+  - Stored in platform-specific data directory
+  - Separate identifiers for dev vs production environments
 
 ### 8. Utilities (`utils/`)
-- **Logger**: Winston-based logging with different levels
-- **Banner**: ASCII art banner display
-- **User Input**: Terminal input handling
-- **Config Path**: Platform-specific configuration directory management using env-paths
-- **Identifier Manager**: Creates and manages persistent machine ID
-- **Telemetry Utils**: Helper functions for telemetry status checks
-- **Command Executor**: Manages child process execution for proxy mode
-  - Cross-platform command spawning
-  - Signal forwarding (SIGINT, SIGTERM)
-  - Graceful shutdown with timeout
-  - Real-time output streaming
+- **Logger**: Winston-based logging with configurable levels and formatting
+- **Banner**: ASCII art banner display with mode-specific information
+- **User Input**: Terminal input handling for interactive setup flows
+- **Config Path**: Platform-specific directory management using env-paths
+  - Separate directories for dev vs production environments
+  - Automatic dev mode detection via NODE_ENV and tsx execution
+- **Identifier Manager**: Creates and manages persistent machine ID for analytics
+- **Telemetry Manager**: Centralized telemetry configuration and event tracking
+- **Command Executor**: Manages child process execution for command wrapping mode
+  - Cross-platform command spawning with proper shell detection
+  - Signal forwarding (SIGINT, SIGTERM) between parent and child processes
+  - Graceful shutdown with timeout handling
+  - Real-time stdio streaming (stdout/stderr)
+  - Exit code forwarding from wrapped command to CLI process
 
 ## CLI Commands
 
@@ -180,35 +189,39 @@ src/
 stagewise [options] [-- <command>]
 ```
 
-Starts the Stagewise development proxy server.
+Starts the Stagewise development server with toolbar integration.
 
 **Options:**
-- `-p, --port <port>`: The port on which the stagewise-wrapped app will run
-- `-a, --app-port <app-port>`: The port of the developed app that stagewise will wrap with the toolbar
-- `-w, --workspace <workspace>`: The path to the repository of the developed app (default: current directory)
-- `-s, --silent`: Will not request user input or guide through setup
-- `-v, --verbose`: Output debug information to the CLI
-- `-t, --token <token>`: If set, will use the given auth token instead of using or asked for a stored one
-- `-b`: Bridge mode - will not start the coding agent server
+- `-p, --port <port>`: Port for the Stagewise server (default: 3000)
+- `-a, --app-port <app-port>`: Port of your application that Stagewise will proxy and enhance with toolbar
+- `-w, --workspace <workspace>`: Path to your application's repository (default: current directory)
+- `-s, --silent`: Disable interactive prompts and setup guidance
+- `-v, --verbose`: Enable debug logging and detailed output
+- `-t, --token <token>`: Use specific authentication token instead of stored credentials
+- `-b, --bridge`: Enable bridge mode (toolbar-only, no agent server)
+- `--auto-plugins`: Automatically load framework-specific plugins based on dependencies
+- `--plugins <plugins>`: Comma-separated list of manual plugin names to load
 
-### Proxy Mode
+### Command Wrapping Mode
 ```
 stagewise [options] -- <command> [args...]
 ```
 
-Runs a command while starting Stagewise server in the background. Similar to dotenv-cli pattern.
+Executes external commands while running Stagewise server concurrently in the background. Uses double-dash delimiter pattern similar to dotenv-cli.
 
 **Examples:**
-- `stagewise -- npm run build`
+- `stagewise -- npm run dev`
 - `stagewise -p 3100 -- tsx src/build.ts --watch`
 - `stagewise -- node script.js --flag value`
+- `stagewise -b -- pnpm build` (bridge mode with command wrapping)
 
 **Features:**
-- Executes command with real-time output
-- Forwards exit codes from proxied command
-- Handles signal forwarding (Ctrl+C, etc.)
-- Runs Stagewise server concurrently
-- Minimal configuration required
+- Executes wrapped command with real-time stdio streaming
+- Forwards exit codes from wrapped command to CLI process
+- Handles cross-platform signal forwarding (SIGINT, SIGTERM)
+- Runs Stagewise server concurrently in background
+- Minimal configuration required (silent mode enabled by default)
+- Works with both standard and bridge modes
 
 ### Auth Command
 ```
@@ -242,26 +255,29 @@ The CLI supports three distinct execution modes:
 
 ### 1. Standard Mode
 Default mode when no special flags or commands are provided.
-- Starts Stagewise server
-- Requires app-port configuration
-- Requires authentication (unless in bridge mode)
+- Starts full Stagewise server with agent capabilities
+- Requires app-port configuration for proxying
+- Requires authentication for agent features
 - Interactive setup if configuration is missing
+- Opens browser automatically to the Stagewise interface
 
 ### 2. Bridge Mode (`-b` flag)
 Lightweight mode that disables the agent server.
-- Starts proxy server only
+- Starts proxy server only (no agent capabilities)
 - No authentication required
-- Still requires app-port for proxying
+- Still requires app-port for proxying user's application
 - Suitable for environments where agent features aren't needed
+- Reduces resource usage and startup time
 
-### 3. Proxy Mode (`-- command`)
-Executes external commands while running Stagewise in background.
-- Detects double-dash delimiter in arguments
-- Runs Stagewise server concurrently with user command
-- Forwards stdio streams from proxied command
-- Returns exit code of proxied command
+### 3. Command Wrapping Mode (`-- command`)
+Executes external commands while running Stagewise server concurrently.
+- Uses double-dash delimiter pattern (similar to dotenv-cli)
+- Runs Stagewise server in background while executing user command
+- Forwards stdio streams and signals from wrapped command
+- Returns exit code of wrapped command
 - Minimal configuration (uses defaults when possible)
 - Silent mode enabled by default
+- Examples: `stagewise -- npm run dev`, `stagewise -p 3100 -- tsx build.ts`
 
 ## Key Features
 

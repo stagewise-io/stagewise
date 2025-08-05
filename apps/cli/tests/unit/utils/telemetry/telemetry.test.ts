@@ -335,6 +335,7 @@ describe('Unified TelemetryManager', () => {
         workspace_configured_manually: true,
         auto_plugins_enabled: false,
         manual_plugins_count: 2,
+        has_wrapped_command: false,
       });
 
       expect(mockPostHogInstance.capture).toHaveBeenCalledWith({
@@ -345,6 +346,7 @@ describe('Unified TelemetryManager', () => {
           workspace_configured_manually: true,
           auto_plugins_enabled: false,
           manual_plugins_count: 2,
+          has_wrapped_command: false,
           telemetry_level: 'anonymous',
         },
       });

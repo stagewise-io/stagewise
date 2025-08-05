@@ -25,6 +25,7 @@ export interface CliStartProperties {
   workspace_configured_manually: boolean;
   auto_plugins_enabled: boolean;
   manual_plugins_count: number;
+  has_wrapped_command: boolean;
 }
 
 const TELEMETRY_CONFIG_FILE = 'telemetry.json';

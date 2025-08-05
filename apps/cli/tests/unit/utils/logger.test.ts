@@ -74,7 +74,7 @@ describe('logger', () => {
       const lastCall = vi.mocked(winston.createLogger).mock.calls[
         vi.mocked(winston.createLogger).mock.calls.length - 1
       ];
-      expect(lastCall[0].level).toBe('info');
+      expect(lastCall?.[0]?.level).toBe('info');
     });
 
     it('should create logger with debug level when verbose is true', () => {
@@ -84,7 +84,7 @@ describe('logger', () => {
       const lastCall = vi.mocked(winston.createLogger).mock.calls[
         vi.mocked(winston.createLogger).mock.calls.length - 1
       ];
-      expect(lastCall[0].level).toBe('debug');
+      expect(lastCall?.[0]?.level).toBe('debug');
     });
   });
 
@@ -96,7 +96,7 @@ describe('logger', () => {
       const lastCall = vi.mocked(winston.createLogger).mock.calls[
         vi.mocked(winston.createLogger).mock.calls.length - 1
       ];
-      expect(lastCall[0].level).toBe('debug');
+      expect(lastCall?.[0]?.level).toBe('debug');
     });
   });
 });
