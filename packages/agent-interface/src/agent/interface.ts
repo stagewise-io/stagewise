@@ -10,6 +10,14 @@ import type {
   AgentState,
   AgentStateType,
 } from '../router/capabilities/state/types';
+import type {
+  Chat,
+  ChatListItem,
+  ChatMessage,
+  MessagePartUpdate,
+  ToolDefinition,
+  ToolApprovalResponse,
+} from '../router/capabilities/chat/types';
 
 export type AgentInterface = {
   /**
@@ -103,6 +111,61 @@ export type AgentInterface = {
 
     /** Clear all user message listeners */
     clearUserMessageListeners: () => void;
+  };
+
+  /**
+   * CHAT MANAGEMENT
+   * Comprehensive chat functionality with message history and tool integration
+   */
+  chat: {
+    /** Enable or disable chat support */
+    setChatSupport: (supported: boolean) => void;
+
+    /** Check if chat is supported */
+    isSupported: () => boolean;
+
+    /** Get list of all chats */
+    getChats: () => ChatListItem[];
+
+    /** Get the active chat */
+    getActiveChat: () => Chat | null;
+
+    /** Create a new chat */
+    createChat: (title?: string) => Promise<string>;
+
+    /** Delete a chat */
+    deleteChat: (chatId: string) => Promise<void>;
+
+    /** Switch to a different chat */
+    switchChat: (chatId: string) => Promise<void>;
+
+    /** Send a message to the active chat */
+    sendMessage: (content: ChatMessage['content'], metadata: UserMessage['metadata']) => Promise<void>;
+
+    /** Stream a message part update */
+    streamMessagePart: (messageId: string, partIndex: number, update: MessagePartUpdate) => void;
+
+    /** Handle tool approval response */
+    handleToolApproval: (response: ToolApprovalResponse) => Promise<void>;
+
+    /** Register toolbar-provided tools */
+    registerTools: (tools: ToolDefinition[]) => void;
+
+    /** Report tool execution result */
+    reportToolResult: (toolCallId: string, result: unknown, isError?: boolean) => void;
+
+    /** Add listener for chat updates */
+    addChatUpdateListener: (listener: (update: any) => void) => void;
+
+    /** Remove chat update listener */
+    removeChatUpdateListener: (listener: (update: any) => void) => void;
+
+    // Persistence placeholders
+    /** Load chat history (placeholder for future implementation) */
+    loadChatHistory: () => Promise<void>;
+
+    /** Save chat history (placeholder for future implementation) */
+    saveChatHistory: () => Promise<void>;
   };
 
   /**
