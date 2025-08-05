@@ -42,6 +42,7 @@ export {
   type SendMessageRequest,
   type ToolApprovalResponse,
   type ToolDefinition,
+  type UserMessage as ChatUserMessage, // Export with alias to avoid conflict
 } from '../router/capabilities/chat/types';
 
 export type { StagewiseInfo } from '../info';

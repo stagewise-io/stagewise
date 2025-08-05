@@ -16,7 +16,6 @@
 - Don't run tests or dev scripts from the root. Call scripts from individual project directories.
 - Always use pnpm as package manager and for script execution
 - Make commits when arriving at solid intermediary steps
-- Make commits in conventional commit format
 - When receiving a instruction in the form of a reference to a file in the `claude-instructions` folder, apply the following strategy:
   - Completely understand and parse the instructions
   - Create a new file called `{NAME_OF_INSTRUCTION_FILE}.progress.md`
