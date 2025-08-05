@@ -40,7 +40,7 @@
     "@types/node": "22.15.2",
     "@types/ws": "^8.18.1",
     "tsup": "^8.4.0",
-    "typescript": "^5.8.3",
+    "typescript": "^5.9.2",
     "vitest": "3.1.2"
   },
   "turbo": {

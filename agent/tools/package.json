@@ -24,10 +24,10 @@
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
-    "esbuild": "^0.20.1",
+    "esbuild": "^0.20.2",
     "rimraf": "^5.0.0",
-    "typescript": "^5.0.0",
+    "typescript": "^5.9.2",
     "zod": "3.25.76",
-    "zod-to-json-schema": "^3.24.5"
+    "zod-to-json-schema": "^3.24.6"
   }
 }

@@ -34,18 +34,18 @@
     "ai": "^4.3.16",
     "node-fetch": "^3.3.2",
     "zod": "3.25.76",
-    "zod-to-json-schema": "^3.24.5"
+    "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
     "@stagewise/agent-interface": "workspace:*",
-    "@stagewise/api-client": "0.1.0",
     "@stagewise/agent-prompt-snippets": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
+    "@stagewise/api-client": "0.1.0",
     "esbuild": "^0.20.2",
     "rimraf": "^5.0.0",
     "tsx": "^4.7.1",
-    "typescript": "^5.0.0"
+    "typescript": "^5.9.2"
   }
 }

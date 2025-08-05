@@ -44,15 +44,14 @@
   "peerDependencies": {
     "@stagewise/plugin-sdk": "workspace:*"
   },
-  "dependencies": {},
   "devDependencies": {
     "@stagewise/plugin-sdk": "workspace:*",
+    "@types/react": "^19.1.9",
+    "@vitejs/plugin-react-swc": "3.7.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
     "typescript": "~5.8.3",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "@types/react": "^19.1.8",
-    "vite": "7.0.6",
-    "@vitejs/plugin-react-swc": "3.7.0"
+    "vite": "7.0.6"
   },
   "packageManager": "pnpm@10.10.0"
 }

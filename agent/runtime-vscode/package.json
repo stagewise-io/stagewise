@@ -30,9 +30,9 @@
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
-    "esbuild": "^0.20.1",
+    "esbuild": "^0.20.2",
     "rimraf": "^5.0.0",
-    "typescript": "^5.0.0",
+    "typescript": "^5.9.2",
     "vscode": "^1.1.37"
   }
 }

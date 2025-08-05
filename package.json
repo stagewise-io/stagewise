@@ -32,8 +32,8 @@
     "@types/node": "22.15.2",
     "lefthook": "^1.12.2",
     "ts-node": "10.9.2",
-    "turbo": "^2.5.4",
-    "typescript": "^5.8.3"
+    "turbo": "^2.5.5",
+    "typescript": "^5.9.2"
   },
   "packageManager": "pnpm@10.10.0",
   "engines": {
