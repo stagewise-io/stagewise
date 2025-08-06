@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { userMessageMetadataSchema } from '../messaging/types';
+import { userMessageMetadataSchema } from '@/shared-types/metadata';
 
 // ============================================
 // Base Content Parts (aligned with Vercel AI SDK)
@@ -33,8 +33,12 @@ export const toolCallPartSchema = z.object({
   toolCallId: z.string(),
   toolName: z.string(),
   input: z.record(z.unknown()),
-  runtime: z.enum(['cli', 'toolbar', 'backend']).describe('Where the tool call should be executed'),
-  requiresApproval: z.boolean().describe('Whether user approval is required before execution'),
+  runtime: z
+    .enum(['cli', 'toolbar', 'backend'])
+    .describe('Where the tool call should be executed'),
+  requiresApproval: z
+    .boolean()
+    .describe('Whether user approval is required before execution'),
 });
 
 export const toolResultPartSchema = z.object({
@@ -52,11 +56,7 @@ export const toolResultPartSchema = z.object({
 export const userMessageSchema = z.object({
   id: z.string(),
   role: z.literal('user'),
-  content: z.array(z.union([
-    textPartSchema,
-    imagePartSchema,
-    filePartSchema,
-  ])),
+  content: z.array(z.union([textPartSchema, imagePartSchema, filePartSchema])),
   metadata: userMessageMetadataSchema,
   createdAt: z.date(),
 });
@@ -64,13 +64,15 @@ export const userMessageSchema = z.object({
 export const assistantMessageSchema = z.object({
   id: z.string(),
   role: z.literal('assistant'),
-  content: z.array(z.union([
-    textPartSchema,
-    filePartSchema,
-    reasoningPartSchema,
-    toolCallPartSchema,
-    toolResultPartSchema,
-  ])),
+  content: z.array(
+    z.union([
+      textPartSchema,
+      filePartSchema,
+      reasoningPartSchema,
+      toolCallPartSchema,
+      toolResultPartSchema,
+    ]),
+  ),
   createdAt: z.date(),
 });
 
@@ -137,9 +139,11 @@ export const messagePartUpdateSchema = z.object({
     toolCallPartSchema,
     toolResultPartSchema,
   ]),
-  updateType: z.enum(['create', 'append', 'replace']).describe(
-    'create: new part, append: append to existing text part, replace: replace entire part'
-  ),
+  updateType: z
+    .enum(['create', 'append', 'replace'])
+    .describe(
+      'create: new part, append: append to existing text part, replace: replace entire part',
+    ),
 });
 
 export type MessagePartUpdate = z.infer<typeof messagePartUpdateSchema>;
@@ -194,11 +198,7 @@ export const createChatRequestSchema = z.object({
 
 export const sendMessageRequestSchema = z.object({
   chatId: z.string(),
-  content: z.array(z.union([
-    textPartSchema,
-    imagePartSchema,
-    filePartSchema,
-  ])),
+  content: z.array(z.union([textPartSchema, imagePartSchema, filePartSchema])),
   metadata: userMessageMetadataSchema,
 });
 
@@ -210,12 +210,17 @@ export const updateChatTitleRequestSchema = z.object({
 export const toolApprovalResponseSchema = z.object({
   toolCallId: z.string(),
   approved: z.boolean(),
-  modifiedInput: z.record(z.unknown()).optional().describe('User-modified input parameters'),
+  modifiedInput: z
+    .record(z.unknown())
+    .optional()
+    .describe('User-modified input parameters'),
 });
 
 export type CreateChatRequest = z.infer<typeof createChatRequestSchema>;
 export type SendMessageRequest = z.infer<typeof sendMessageRequestSchema>;
-export type UpdateChatTitleRequest = z.infer<typeof updateChatTitleRequestSchema>;
+export type UpdateChatTitleRequest = z.infer<
+  typeof updateChatTitleRequestSchema
+>;
 export type ToolApprovalResponse = z.infer<typeof toolApprovalResponseSchema>;
 
 // ============================================
