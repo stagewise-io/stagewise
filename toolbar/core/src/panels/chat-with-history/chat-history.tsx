@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
-import { Loader2Icon, PauseIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Loader2Icon } from 'lucide-react';
 
 export function ChatHistory() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -12,36 +11,43 @@ export function ChatHistory() {
     message: string;
     timestamp: Date;
   }[] = [
-    { fromAgent: true, message: 'Hello, how are you?', timestamp: new Date() },
     {
       fromAgent: false,
-      message: 'I am fine, thank you!',
-      timestamp: new Date(),
-    },
-    { fromAgent: true, message: 'What is your name?', timestamp: new Date() },
-    {
-      fromAgent: false,
-      message: 'My name is John Doe.',
+      message: 'I want to clean up the design of the app',
       timestamp: new Date(),
     },
     {
       fromAgent: true,
-      message: 'What is your favorite color?',
+      message:
+        "Hey, okay let's do that! Do you have any kind of inspiration in mind?",
       timestamp: new Date(),
     },
     {
       fromAgent: false,
-      message: 'My favorite color is blue.',
+      message:
+        'The app is really cluttered right now. I want to clean it up a bit.',
+      timestamp: new Date(),
+    },
+    {
+      fromAgent: false,
+      message: 'A design like Notion would be awesome.',
       timestamp: new Date(),
     },
     {
       fromAgent: true,
-      message: 'What is your favorite food?',
+      message:
+        'Okay, so: Rounded corners, very minimalistic, and a lot of white space?',
       timestamp: new Date(),
     },
     {
       fromAgent: false,
-      message: 'My favorite food is pizza.',
+      message: 'Yes, that sounds great!',
+      timestamp: new Date(),
+    },
+    {
+      fromAgent: true,
+      message:
+        "Okay, I'll first revamp the page you're on right now. We can that take that as a starting point for the rest of the app.",
       timestamp: new Date(),
     },
   ];
@@ -111,16 +117,18 @@ export function ChatHistory() {
     <section
       ref={scrollContainerRef}
       aria-label="Agent message display"
-      className="scrollbar-thin pointer-events-auto gap-2 space-y-2 overflow-y-scroll overscroll-contain px-3 py-4 pt-16 pb-14 text-foreground text-sm focus-within:outline-none hover:bg-white/0 focus:outline-none"
+      className="scrollbar-thin pointer-events-auto overflow-y-scroll overscroll-contain px-3 py-4 pt-16 pb-14 text-foreground text-sm focus-within:outline-none hover:bg-white/0 focus:outline-none"
       onScroll={handleScroll}
       onMouseEnter={() => {
         scrollContainerRef.current?.focus();
       }}
     >
       {messages.map((message, index) => {
-        return <ChatBubble key={`item_${index + 1}`} {...message} />;
+        return (
+          <ChatBubble key={`item_${index + 1}`} {...message} ToolCalls={[]} />
+        );
       })}
-      <div className="flex w-full flex-row items-center justify-start gap-2 pl-1 text-xs text-zinc-500">
+      <div className="mt-2 flex w-full flex-row items-center justify-start gap-2 pl-1 text-xs text-zinc-500">
         <Loader2Icon className="size-4 animate-spin stroke-blue-600" />
         <span className="max-w-48 truncate">Looking for files...</span>
       </div>

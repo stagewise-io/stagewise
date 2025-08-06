@@ -10,7 +10,7 @@ export function ChatBubble(props: {
     args: Record<string, any>;
   }[];
 }) {
-  const [toolCallsExpanded, setToolCallsExpanded] = useState(false);
+  const [toolCallsExpanded, _setToolCallsExpanded] = useState(false);
   return (
     <div className="flex flex-col gap-1">
       <div
@@ -39,7 +39,9 @@ export function ChatBubble(props: {
         <div
           className={cn(
             'flex h-[calc-size(auto,size)] flex-col gap-1',
-            toolCallsExpanded ? 'flex-col gap-2' : 'flex-row gap-1',
+            toolCallsExpanded
+              ? 'flex-col gap-2 rounded-xl'
+              : 'absolute top-[calc(100%-6px)] left-1 flex-row gap-1 rounded-2xl',
           )}
         >
           {props.ToolCalls.map((toolCall) => (
