@@ -1,825 +1,470 @@
+/**
+ * AgentTransportAdapter - Main adapter for agent-toolbar communication
+ * 
+ * This is the primary class that agent implementations use to communicate with
+ * the Stagewise toolbar. It provides a unified interface that bridges between
+ * the agent's implementation and the toolbar's expectations.
+ * 
+ * The adapter is composed of several managers, each handling a specific aspect:
+ * - AvailabilityManager: Tracks whether the agent is available
+ * - StateManager: Tracks what the agent is currently doing
+ * - MessagingManager: Handles the legacy messaging interface
+ * - ChatManager: Handles the modern chat interface with full context
+ * 
+ * Usage:
+ * ```typescript
+ * const adapter = new AgentTransportAdapter();
+ * const agent = adapter.getAgent();
+ * 
+ * // Set availability
+ * agent.availability.set(true);
+ * 
+ * // Set state
+ * agent.state.set(AgentStateType.WORKING, 'Processing request...');
+ * 
+ * // Enable chat
+ * agent.chat.setChatSupport(true);
+ * ```
+ */
+
 import type { TransportInterface } from '../router';
 import type { AgentInterface } from './interface';
-import {
-  type AgentAvailability,
-  AgentAvailabilityError,
-} from '../router/capabilities/availability/types';
-import {
-  type AgentState,
-  AgentStateType,
-} from '../router/capabilities/state/types';
-import type {
-  AgentMessageContentItemPart,
-  AgentMessageUpdate,
-  UserMessage as MessagingUserMessage,
-} from '../router/capabilities/messaging/types';
 import type { AvailabilityImplementation } from '../router/capabilities/availability';
 import type { MessagingImplementation } from '../router/capabilities/messaging';
 import type { StateImplementation } from '../router/capabilities/state';
 import type { ChatImplementation } from '../router/capabilities/chat';
-import type {
-  Chat,
-  ChatListItem,
-  ChatMessage,
-  ChatUpdate,
-  MessagePartUpdate,
-  SendMessageRequest,
-  CreateChatRequest,
-  ToolDefinition,
-  ToolApprovalResponse,
-  TextPart,
-  ImagePart,
-  FilePart,
-  UserMessage,
-} from '../router/capabilities/chat/types';
+import { AgentAvailabilityError } from '../router/capabilities/availability/types';
+import { AgentStateType } from '../router/capabilities/state/types';
+
+// Import the split manager classes
+import { AvailabilityManager } from './adapter/availability-manager';
+import { StateManager } from './adapter/state-manager';
+import { MessagingManager } from './adapter/messaging-manager';
+import { ChatManager } from './adapter/chat-manager';
+
+// Re-export PushController for backward compatibility if needed
+export { PushController } from './adapter/push-controller';
 
 /**
- * Optional configuration for the AgentTransportAdapter.
+ * Optional configuration for the AgentTransportAdapter
  */
 export interface AdapterOptions {
+  /**
+   * Custom function to generate unique IDs
+   * Defaults to crypto.randomUUID() if not provided
+   */
   idGenerator?: () => string;
 }
 
-type RequiredAdapterOptions = Required<AdapterOptions>;
-
-
-// --- PushController Implementation ---
-
 /**
- * A controller for managing an AsyncIterable stream. It allows pushing new values
- * to all subscribers and ensures new subscribers immediately get the latest value.
+ * Main adapter class that composes all the managers and provides
+ * the unified interface for agent-toolbar communication
  */
-class PushController<T> {
-  private latestValue: T | undefined;
-  private subscribers: Set<(value: T) => void> = new Set();
-
-  constructor(initialValue?: T) {
-    this.latestValue = initialValue;
-  }
-
-  /**
-   * Pushes a new value to all current subscribers and updates the latest value.
-   * @param value The new value to push to the stream.
-   */
-  public push(value: T): void {
-    this.latestValue = value;
-    for (const subscriber of this.subscribers) {
-      subscriber(value);
-    }
-  }
-
-  /**
-   * Retrieves the most recently pushed value.
-   * @returns The latest value, or undefined if no value has been pushed.
-   */
-  public getLatestValue(): T | undefined {
-    return this.latestValue;
-  }
-
-  /**
-   * Creates and returns a new AsyncIterable for a consumer.
-   * @returns An async iterable that will yield the latest value upon subscription,
-   * and all subsequent values pushed to the controller.
-   */
-  public subscribe(): AsyncIterable<T> {
-    const controller = this;
-    let pullQueue: ((value: IteratorResult<T>) => void)[] = [];
-    let pushQueue: T[] = [];
-    let done = false;
-
-    const pushValue = (value: T) => {
-      if (pullQueue.length > 0) {
-        pullQueue.shift()!({ value, done: false });
-      } else {
-        pushQueue.push(value);
-      }
-    };
-
-    const listener = (value: T) => {
-      if (!done) {
-        pushValue(value);
-      }
-    };
-
-    return {
-      [Symbol.asyncIterator]: () => {
-        // Immediately yield the latest value upon subscription.
-        if (controller.getLatestValue() !== undefined) {
-          pushValue(controller.getLatestValue()!);
-        }
-        controller.subscribers.add(listener);
-
-        return {
-          next: (): Promise<IteratorResult<T>> => {
-            return new Promise((resolve) => {
-              if (pushQueue.length > 0) {
-                resolve({ value: pushQueue.shift()!, done: false });
-              } else if (done) {
-                resolve({ value: undefined, done: true });
-              } else {
-                pullQueue.push(resolve);
-              }
-            });
-          },
-          return: async (): Promise<IteratorResult<T>> => {
-            done = true;
-            controller.subscribers.delete(listener);
-            pullQueue.forEach((resolve) =>
-              resolve({ value: undefined, done: true }),
-            );
-            pullQueue = [];
-            pushQueue = [];
-            return { value: undefined, done: true };
-          },
-        };
-      },
-    };
-  }
-}
-
-// --- Main AgentTransportAdapter Class ---
-
 export class AgentTransportAdapter implements TransportInterface {
-  // --- Public TransportInterface Implementation ---
+  /**
+   * Public TransportInterface implementation
+   * These are used by the router to expose capabilities to the toolbar
+   */
   public readonly availability: AvailabilityImplementation;
   public readonly messaging: MessagingImplementation;
   public readonly state: StateImplementation;
   public chat?: ChatImplementation;
 
-  // --- Internal State Properties ---
+  /**
+   * Internal manager instances that handle specific functionality
+   */
+  private readonly availabilityManager: AvailabilityManager;
+  private readonly stateManager: StateManager;
+  private readonly messagingManager: MessagingManager;
+  private readonly chatManager: ChatManager;
+
+  /**
+   * Cached AgentInterface instance to ensure stability
+   */
   private _agentInterface: AgentInterface | null = null;
-  private readonly _options: RequiredAdapterOptions;
 
-  // State controllers
-  private readonly _availabilityController: PushController<AgentAvailability>;
-  private readonly _stateController: PushController<AgentState>;
-  private readonly _messageController: PushController<AgentMessageUpdate>;
-  private readonly _chatUpdateController: PushController<ChatUpdate>;
-
-  // Internal state stores
-  private _availability: AgentAvailability;
-  private _state: AgentState;
-  private _currentMessageId: string | null = null;
-  private _messageContent: AgentMessageContentItemPart[] = [];
-  private _userMessageListeners: Set<(message: MessagingUserMessage) => void> =
-    new Set();
-
-  // Chat state
-  private _chatSupported = false;
-  private _chats: Map<string, Chat> = new Map();
-  private _activeChatId: string | null = null;
-  private _availableTools: ToolDefinition[] = [];
-  private _chatUpdateListeners: Set<(update: ChatUpdate) => void> = new Set();
+  /**
+   * Configuration options with defaults applied
+   */
+  private readonly options: Required<AdapterOptions>;
 
   constructor(options?: AdapterOptions) {
-    // 1. Set default options
-    this._options = {
+    // Apply default options
+    this.options = {
       idGenerator: options?.idGenerator ?? (() => crypto.randomUUID()),
     };
 
-    // 2. Initialize state with defaults
-    this._availability = {
-      isAvailable: false,
-      error: AgentAvailabilityError.NO_CONNECTION,
-      errorMessage: 'Initializing',
-    } as AgentAvailability;
-    this._state = { state: AgentStateType.IDLE };
+    // Initialize all managers
+    // Each manager handles a specific aspect of agent functionality
+    this.availabilityManager = new AvailabilityManager();
+    this.stateManager = new StateManager();
+    this.messagingManager = new MessagingManager(this.options.idGenerator);
+    this.chatManager = new ChatManager(this.options.idGenerator, this.stateManager);
 
-    // 3. Initialize controllers
-    this._availabilityController = new PushController(this._availability);
-    this._stateController = new PushController(this._state);
-    this._messageController = new PushController(); // No initial value, sends resync on subscribe
-    this._chatUpdateController = new PushController(); // No initial value, sends resync on subscribe
-
-    // 4. Define the public TransportInterface properties
-    this.availability = this.createAvailabilityImplementation();
-    this.state = this.createStateImplementation();
-    this.messaging = this.createMessagingImplementation();
-
-    // 5. Initialize controllers with default state
-    this._availabilityController.push(this._availability);
-    this._stateController.push(this._state);
+    // Create the public TransportInterface implementations
+    // These are what the router exposes to the toolbar
+    this.availability = this.availabilityManager.createImplementation();
+    this.state = this.stateManager.createImplementation();
+    this.messaging = this.messagingManager.createImplementation();
+    
+    // Chat is optional and created on demand when enabled
+    // This maintains backward compatibility with agents that don't use chat
   }
 
   /**
-   * Retrieves the AgentInterface instance, which is the primary
-   * entry point for an agent to interact with the adapter.
+   * Gets the AgentInterface instance for the agent to use
+   * This is the primary entry point for agents to interact with the adapter
+   * 
+   * The interface is memoized to ensure stability - the same instance
+   * is returned on every call to prevent issues with reference equality
+   * 
+   * @returns The agent interface for controlling the adapter
    */
   public getAgent(): AgentInterface {
     if (this._agentInterface) {
       return this._agentInterface;
     }
 
-    // Memoize the interface to ensure stability
+    // Create and cache the interface
     this._agentInterface = this.createAgentInterface();
     return this._agentInterface;
   }
 
-  // --- Private Helper Methods ---
-
   /**
-   * Private method to clear the current message and generate a new ID.
-   * This logic is shared between the public clear() method and addPart().
+   * Creates the AgentInterface implementation that agents use
+   * This interface provides all the methods agents need to:
+   * - Set their availability status
+   * - Update their current state
+   * - Send and receive messages
+   * - Manage chat sessions (if enabled)
+   * 
+   * @returns A complete AgentInterface implementation
    */
-  private _clearMessage(): void {
-    this._currentMessageId = this._options.idGenerator();
-    this._messageContent = [];
-
-    const update: AgentMessageUpdate = {
-      messageId: this._currentMessageId,
-      updateParts: [],
-      createdAt: new Date(),
-      resync: true, // Signal to consumer to clear previous content
-    };
-    this._messageController.push(update);
-  }
-
-  // --- Interface Implementation Factories ---
-
   private createAgentInterface(): AgentInterface {
-    const self = this; // Capture 'this' for use in nested objects
+    const self = this; // Capture 'this' for use in the interface object
 
     return {
+      /**
+       * Availability management interface
+       * Allows the agent to indicate whether it's available and any errors
+       */
       availability: {
-        get: () => JSON.parse(JSON.stringify(self._availability)),
-        set: (available, ...args) => {
-          let newAvailability: AgentAvailability;
+        /**
+         * Gets the current availability state
+         * Returns a copy to prevent external modifications
+         */
+        get: () => self.availabilityManager.get(),
+        
+        /**
+         * Sets the availability state
+         * @param available - Whether the agent is available
+         * @param error - Error type if unavailable
+         * @param errorMessage - Human-readable error description
+         */
+        set: (available, error?, errorMessage?) => {
           if (available) {
-            newAvailability = { isAvailable: true };
+            self.availabilityManager.set(true);
           } else {
-            const [error, errorMessage] = args;
-            if (!error) {
-              throw new Error(
-                "An 'error' type is required when setting availability to false.",
-              );
-            }
-            newAvailability = { isAvailable: false, error, errorMessage };
+            self.availabilityManager.set(false, error, errorMessage);
           }
-          self._availability = newAvailability;
-          self._availabilityController.push(self._availability);
         },
       },
+
+      /**
+       * State management interface
+       * Allows the agent to indicate what it's currently doing
+       */
       state: {
-        get: () => JSON.parse(JSON.stringify(self._state)),
+        /**
+         * Gets the current state
+         * Returns a copy to prevent external modifications
+         */
+        get: () => self.stateManager.get(),
+        
+        /**
+         * Sets the current state
+         * @param state - The state type (IDLE, WORKING, etc.)
+         * @param description - Optional description of the current activity
+         */
         set: (state, description) => {
-          self._state = { state, description };
-          self._stateController.push(self._state);
+          self.stateManager.set(state, description);
         },
       },
+
+      /**
+       * Messaging interface (legacy)
+       * Provides methods for agents that use the older messaging system
+       * New agents should use the chat interface instead
+       */
       messaging: {
-        get: () => JSON.parse(JSON.stringify(self._messageContent)),
-        getCurrentId: () => self._currentMessageId,
-        getCurrentMessage: () => {
-          // Return by value using deep copy
-          return {
-            id: self._currentMessageId,
-            parts: JSON.parse(JSON.stringify(self._messageContent)),
-          };
-        },
+        /**
+         * Gets the current message content
+         */
+        get: () => self.messagingManager.get(),
+        
+        /**
+         * Gets the ID of the current message
+         */
+        getCurrentId: () => self.messagingManager.getCurrentId(),
+        
+        /**
+         * Gets the complete current message with ID and parts
+         */
+        getCurrentMessage: () => self.messagingManager.getCurrentMessage(),
+        
+        /**
+         * Adds a listener for incoming user messages
+         */
         addUserMessageListener: (listener) => {
-          self._userMessageListeners.add(listener);
+          self.messagingManager.addUserMessageListener(listener);
         },
+        
+        /**
+         * Removes a user message listener
+         */
         removeUserMessageListener: (listener) => {
-          self._userMessageListeners.delete(listener);
+          self.messagingManager.removeUserMessageListener(listener);
         },
+        
+        /**
+         * Removes all user message listeners
+         */
         clearUserMessageListeners: () => {
-          self._userMessageListeners.clear();
+          self.messagingManager.clearUserMessageListeners();
         },
+        
+        /**
+         * Clears the current message and starts a new one
+         */
         clear: () => {
-          this._clearMessage();
+          self.messagingManager.clear();
         },
+        
+        /**
+         * Sets the complete message content
+         */
         set: (content) => {
-          // Always create a new message ID when setting a new message
-          self._currentMessageId = self._options.idGenerator();
-          self._messageContent = JSON.parse(JSON.stringify(content));
-
-          const update: AgentMessageUpdate = {
-            messageId: self._currentMessageId,
-            updateParts: self._messageContent.map((part, i) => ({
-              contentIndex: i,
-              part: part,
-            })),
-            createdAt: new Date(),
-            resync: true,
-          };
-          self._messageController.push(update);
+          self.messagingManager.set(content);
         },
+        
+        /**
+         * Adds parts to the current message
+         */
         addPart: (content) => {
-          if (!self._currentMessageId) {
-            // Call the private clear method directly to avoid circular dependency
-            self._clearMessage();
-          }
-
-          const partsToAdd = Array.isArray(content) ? content : [content];
-          for (const part of partsToAdd) {
-            const contentIndex = self._messageContent.length;
-            self._messageContent.push(part);
-
-            const update: AgentMessageUpdate = {
-              messageId: self._currentMessageId!,
-              updateParts: [{ contentIndex, part }],
-              createdAt: new Date(),
-              resync: false,
-            };
-            self._messageController.push(update);
-          }
+          self.messagingManager.addPart(content);
         },
+        
+        /**
+         * Updates a specific part of the message
+         */
         updatePart: (content, index, type) => {
-          // Allow adding a new part if index is exactly highest + 1
-          if (index === self._messageContent.length) {
-            // If no message ID exists yet, create one
-            if (!self._currentMessageId) {
-              self._clearMessage();
-            }
-
-            // Handle union type - if content is an array, only take the first element
-            const contentPart = Array.isArray(content) ? content[0] : content;
-            if (!contentPart) {
-              throw new Error('Content cannot be empty');
-            }
-
-            // Add the new part
-            self._messageContent.push(contentPart);
-
-            const update: AgentMessageUpdate = {
-              messageId: self._currentMessageId!,
-              updateParts: [{ contentIndex: index, part: contentPart }],
-              createdAt: new Date(),
-              resync: type === 'replace',
-            };
-            self._messageController.push(update);
-            return;
-          }
-
-          if (index < 0 || index >= self._messageContent.length) {
-            throw new Error(
-              `Invalid index ${index} for message content update.`,
-            );
-          }
-
-          // Handle union type - if content is an array, only take the first element
-          const contentPart = Array.isArray(content) ? content[0] : content;
-          if (!contentPart) {
-            throw new Error('Content cannot be empty');
-          }
-
-          if (type === 'replace') {
-            self._messageContent[index] = contentPart;
-            const update: AgentMessageUpdate = {
-              messageId: self._currentMessageId!,
-              updateParts: [{ contentIndex: index, part: contentPart }],
-              createdAt: new Date(),
-              resync: true,
-            };
-            self._messageController.push(update);
-          } else if (type === 'append') {
-            const existingPart = self._messageContent[index];
-            if (existingPart.type !== 'text' || contentPart.type !== 'text') {
-              throw new Error(
-                'Append update is only valid for text-to-text parts.',
-              );
-            }
-            existingPart.text += contentPart.text;
-            const update: AgentMessageUpdate = {
-              messageId: self._currentMessageId!,
-              updateParts: [{ contentIndex: index, part: contentPart }],
-              createdAt: new Date(),
-              resync: false,
-            };
-            self._messageController.push(update);
-          }
+          self.messagingManager.updatePart(content, index, type);
         },
       },
+
+      /**
+       * Chat interface (modern)
+       * Provides methods for agents that use the chat system
+       * This is the preferred interface for new agents
+       */
       chat: {
+        /**
+         * Enables or disables chat support
+         * When enabled, creates the chat implementation for the router
+         */
         setChatSupport: (supported) => {
-          self._chatSupported = supported;
+          self.chatManager.setSupport(supported);
+          
           if (supported) {
-            // Lazily create the implementation when enabled
-            self.chat = self.createChatImplementation();
+            // Create the chat implementation for the router
+            self.chat = self.chatManager.createImplementation();
           } else {
-            // Cleanup on disable
+            // Remove chat implementation when disabled
             self.chat = undefined;
-            self._chats.clear();
-            self._activeChatId = null;
-            self._chatUpdateListeners.clear();
           }
         },
-        isSupported: () => self._chatSupported,
-        getChats: () => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          return Array.from(self._chats.values()).map(chat => ({
-            id: chat.id,
-            title: chat.title,
-            createdAt: chat.createdAt,
-            isActive: chat.id === self._activeChatId,
-            messageCount: chat.messages.length,
-          }));
-        },
-        getActiveChat: () => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          return self._activeChatId ? self._chats.get(self._activeChatId) || null : null;
-        },
-        createChat: async (title) => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          if (self._activeChatId && self._state.state !== AgentStateType.IDLE) {
-            throw new Error('Cannot create new chat while current chat is active');
-          }
-          
-          const chatId = self._options.idGenerator();
-          const chat: Chat = {
-            id: chatId,
-            title: title || `Chat ${self._chats.size + 1}`,
-            createdAt: new Date(),
-            messages: [],
-            isActive: true,
-          };
-          
-          self._chats.set(chatId, chat);
-          self._activeChatId = chatId;
-          
-          const update: ChatUpdate = {
-            type: 'chat-created',
-            chat,
-          };
-          self._chatUpdateController.push(update);
-          self._chatUpdateListeners.forEach(listener => listener(update));
-          
-          return chatId;
-        },
+        
+        /**
+         * Checks if chat is supported
+         */
+        isSupported: () => self.chatManager.isSupported(),
+        
+        /**
+         * Gets list of all chats
+         */
+        getChats: () => self.chatManager.getChats(),
+        
+        /**
+         * Gets the active chat with full message history
+         */
+        getActiveChat: () => self.chatManager.getActiveChat(),
+        
+        /**
+         * Creates a new chat
+         */
+        createChat: async (title) => self.chatManager.createChat(title),
+        
+        /**
+         * Deletes a chat
+         */
         deleteChat: async (chatId) => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          if (chatId === self._activeChatId && self._state.state !== AgentStateType.IDLE) {
-            throw new Error('Cannot delete active chat while not idle');
-          }
-          
-          self._chats.delete(chatId);
-          if (chatId === self._activeChatId) {
-            self._activeChatId = null;
-          }
-          
-          const update: ChatUpdate = {
-            type: 'chat-deleted',
-            chatId,
-          };
-          self._chatUpdateController.push(update);
-          self._chatUpdateListeners.forEach(listener => listener(update));
+          await self.chatManager.deleteChat(chatId);
         },
+        
+        /**
+         * Switches to a different chat
+         */
         switchChat: async (chatId) => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          if (self._state.state !== AgentStateType.IDLE) {
-            throw new Error('Cannot switch chats while not idle');
-          }
-          if (!self._chats.has(chatId)) {
-            throw new Error('Chat not found');
-          }
-          
-          if (self._activeChatId) {
-            const previousChat = self._chats.get(self._activeChatId);
-            if (previousChat) {
-              previousChat.isActive = false;
-            }
-          }
-          
-          self._activeChatId = chatId;
-          const chat = self._chats.get(chatId)!;
-          chat.isActive = true;
-          
-          const update: ChatUpdate = {
-            type: 'chat-switched',
-            chatId,
-          };
-          self._chatUpdateController.push(update);
-          self._chatUpdateListeners.forEach(listener => listener(update));
+          await self.chatManager.switchChat(chatId);
         },
+        
+        /**
+         * Updates the title of a chat
+         */
+        updateChatTitle: async (chatId, title) => {
+          await self.chatManager.updateChatTitle(chatId, title);
+        },
+        
+        /**
+         * Adds a message to the active chat
+         * Used by agents to add their responses
+         */
+        addMessage: (message) => {
+          self.chatManager.addMessage(message);
+        },
+        
+        /**
+         * Updates an existing message
+         * Used for streaming updates
+         */
+        updateMessage: (messageId, content) => {
+          self.chatManager.updateMessage(messageId, content);
+        },
+        
+        /**
+         * Deletes a message from the chat
+         */
+        deleteMessage: (messageId) => {
+          self.chatManager.deleteMessage(messageId);
+        },
+        
+        /**
+         * Clears all messages from the active chat
+         */
+        clearMessages: () => {
+          self.chatManager.clearMessages();
+        },
+        
+        /**
+         * Sends a user message (for testing or internal use)
+         */
         sendMessage: async (content, metadata) => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          if (!self._activeChatId) throw new Error('No active chat');
+          if (!self.chatManager.isSupported()) {
+            throw new Error('Chat is not supported by this agent.');
+          }
           
-          const chat = self._chats.get(self._activeChatId)!;
-          const messageId = self._options.idGenerator();
+          const activeChat = self.chatManager.getActiveChat();
+          if (!activeChat) {
+            throw new Error('No active chat');
+          }
           
-          const userMessage: UserMessage = {
+          // Create and add the user message
+          const messageId = self.options.idGenerator();
+          const userMessage = {
             id: messageId,
-            role: 'user',
+            role: 'user' as const,
             content,
             metadata,
             createdAt: new Date(),
           };
           
-          chat.messages.push(userMessage);
-          
-          const update: ChatUpdate = {
-            type: 'message-added',
-            chatId: self._activeChatId,
-            message: userMessage,
-          };
-          self._chatUpdateController.push(update);
-          self._chatUpdateListeners.forEach(listener => listener(update));
+          self.chatManager.addMessage(userMessage);
         },
+        
+        /**
+         * Streams updates for a message part
+         */
         streamMessagePart: (messageId, partIndex, update) => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          if (!self._activeChatId) throw new Error('No active chat');
-          
-          const chatUpdate: ChatUpdate = {
-            type: 'message-updated',
-            chatId: self._activeChatId,
-            update: {
-              messageId,
-              partIndex,
-              content: update.content,
-              updateType: update.updateType,
-            },
-          };
-          self._chatUpdateController.push(chatUpdate);
-          self._chatUpdateListeners.forEach(listener => listener(chatUpdate));
+          self.chatManager.streamMessagePart(messageId, partIndex, update);
         },
+        
+        /**
+         * Handles tool approval responses
+         */
         handleToolApproval: async (response) => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          // Implementation would handle tool approval logic
-          // For now, this is a placeholder
+          if (!self.chatManager.isSupported()) {
+            throw new Error('Chat is not supported by this agent.');
+          }
+          // Call the implementation's onToolApproval method
+          const implementation = self.chatManager.createImplementation();
+          await implementation.onToolApproval(response);
         },
+        
+        /**
+         * Registers available tools
+         */
         registerTools: (tools) => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          self._availableTools = [...tools];
+          self.chatManager.registerTools(tools);
         },
+        
+        /**
+         * Reports tool execution results
+         */
         reportToolResult: (toolCallId, result, isError) => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          // Implementation would handle tool result reporting
-          // For now, this is a placeholder
+          if (!self.chatManager.isSupported()) {
+            throw new Error('Chat is not supported by this agent.');
+          }
+          // Call the implementation's onToolResult method
+          const implementation = self.chatManager.createImplementation();
+          implementation.onToolResult(toolCallId, result, isError);
         },
+        
+        /**
+         * Adds a listener for chat updates
+         */
         addChatUpdateListener: (listener) => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          self._chatUpdateListeners.add(listener);
+          self.chatManager.addUpdateListener(listener);
         },
+        
+        /**
+         * Removes a chat update listener
+         */
         removeChatUpdateListener: (listener) => {
-          if (!self._chatSupported) throw new Error('Chat is not supported by this agent.');
-          self._chatUpdateListeners.delete(listener);
+          self.chatManager.removeUpdateListener(listener);
         },
+        
+        /**
+         * Loads chat history from storage
+         * Placeholder for future implementation
+         */
         loadChatHistory: async () => {
-          // Placeholder for future implementation
           console.log('loadChatHistory: Not implemented yet');
         },
+        
+        /**
+         * Saves chat history to storage
+         * Placeholder for future implementation
+         */
         saveChatHistory: async () => {
-          // Placeholder for future implementation
           console.log('saveChatHistory: Not implemented yet');
         },
       },
+
+      /**
+       * Cleanup utilities
+       * Provides methods to clean up resources
+       */
       cleanup: {
+        /**
+         * Removes all listeners to prevent memory leaks
+         */
         clearAllListeners: () => {
-          self._userMessageListeners.clear();
-          self._chatUpdateListeners.clear();
+          self.messagingManager.clearUserMessageListeners();
+          // Clear chat listeners if chat is supported
+          if (self.chatManager.isSupported()) {
+            self.chatManager.clearAllUpdateListeners();
+          }
         },
-      },
-    };
-  }
-
-  private createAvailabilityImplementation(): AvailabilityImplementation {
-    return {
-      getAvailability: () => this._availabilityController.subscribe(),
-    };
-  }
-
-  private createStateImplementation(): StateImplementation {
-    return {
-      getState: () => this._stateController.subscribe(),
-    };
-  }
-
-  private createMessagingImplementation(): MessagingImplementation {
-    const self = this;
-    return {
-      onUserMessage: (message) => {
-        // In a real implementation, you would use the imported zod schema
-        // const validation = userMessageSchema.safeParse(message);
-        // if (!validation.success) {
-        //     console.error("Invalid UserMessage received:", validation.error);
-        //     return;
-        // }
-        self._userMessageListeners.forEach((listener) => listener(message));
-      },
-      getMessage: () => {
-        // This custom subscription logic handles the resync requirement
-        const sub = self._messageController.subscribe();
-        const originalIterator = sub[Symbol.asyncIterator]();
-
-        return {
-          [Symbol.asyncIterator]: () => {
-            let nextCallResynced = false; // Per-iterator state
-
-            return {
-              next: async () => {
-                // On the very first call to next(), perform a resync
-                if (!nextCallResynced) {
-                  nextCallResynced = true;
-                  const resyncUpdate: AgentMessageUpdate = {
-                    messageId:
-                      self._currentMessageId ?? self._options.idGenerator(),
-                    updateParts: self._messageContent.map((part, i) => ({
-                      contentIndex: i,
-                      part: part,
-                    })),
-                    createdAt: new Date(),
-                    resync: true,
-                  };
-                  // If there's no messageId, create one but don't persist it yet
-                  if (!self._currentMessageId) {
-                    self._currentMessageId = resyncUpdate.messageId;
-                  }
-                  return { value: resyncUpdate, done: false };
-                }
-                return originalIterator.next();
-              },
-              return: () => {
-                return originalIterator.return
-                  ? originalIterator.return()
-                  : Promise.resolve({ value: undefined, done: true });
-              },
-            };
-          },
-        };
-      },
-    };
-  }
-
-  private createChatImplementation(): ChatImplementation {
-    const self = this;
-    return {
-      getChatUpdates: () => {
-        // This custom subscription logic handles the initial sync requirement
-        const sub = self._chatUpdateController.subscribe();
-        const originalIterator = sub[Symbol.asyncIterator]();
-
-        return {
-          [Symbol.asyncIterator]: () => {
-            let hasInitialized = false;
-
-            return {
-              next: async () => {
-                // On the very first call to next(), send initial state
-                if (!hasInitialized) {
-                  hasInitialized = true;
-                  
-                  // Send chat list
-                  const chatListUpdate: ChatUpdate = {
-                    type: 'chat-list',
-                    chats: Array.from(self._chats.values()).map(chat => ({
-                      id: chat.id,
-                      title: chat.title,
-                      createdAt: chat.createdAt,
-                      isActive: chat.id === self._activeChatId,
-                      messageCount: chat.messages.length,
-                    })),
-                  };
-                  return { value: chatListUpdate, done: false };
-                }
-                
-                // After initial sync, return updates from the controller
-                return originalIterator.next();
-              },
-              return: () => {
-                return originalIterator.return
-                  ? originalIterator.return()
-                  : Promise.resolve({ value: undefined, done: true });
-              },
-            };
-          },
-        };
-      },
-      
-      onSendMessage: async (request) => {
-        if (!self._activeChatId || self._activeChatId !== request.chatId) {
-          throw new Error('Invalid chat ID or no active chat');
-        }
-        
-        const chat = self._chats.get(request.chatId);
-        if (!chat) {
-          throw new Error('Chat not found');
-        }
-        
-        const messageId = self._options.idGenerator();
-        const userMessage: ChatMessage = {
-          id: messageId,
-          role: 'user',
-          content: request.content,
-          metadata: request.metadata,
-          createdAt: new Date(),
-        };
-        
-        chat.messages.push(userMessage);
-        
-        const update: ChatUpdate = {
-          type: 'message-added',
-          chatId: request.chatId,
-          message: userMessage,
-        };
-        self._chatUpdateController.push(update);
-        self._chatUpdateListeners.forEach(listener => listener(update));
-      },
-      
-      onCreateChat: async (request) => {
-        if (self._activeChatId && self._state.state !== AgentStateType.IDLE) {
-          throw new Error('Cannot create new chat while current chat is active');
-        }
-        
-        const chatId = self._options.idGenerator();
-        const chat: Chat = {
-          id: chatId,
-          title: request.title || `Chat ${self._chats.size + 1}`,
-          createdAt: new Date(),
-          messages: [],
-          isActive: true,
-        };
-        
-        // Deactivate previous chat
-        if (self._activeChatId) {
-          const previousChat = self._chats.get(self._activeChatId);
-          if (previousChat) {
-            previousChat.isActive = false;
-          }
-        }
-        
-        self._chats.set(chatId, chat);
-        self._activeChatId = chatId;
-        
-        const update: ChatUpdate = {
-          type: 'chat-created',
-          chat,
-        };
-        self._chatUpdateController.push(update);
-        self._chatUpdateListeners.forEach(listener => listener(update));
-        
-        return chatId;
-      },
-      
-      onDeleteChat: async (chatId) => {
-        if (chatId === self._activeChatId && self._state.state !== AgentStateType.IDLE) {
-          throw new Error('Cannot delete active chat while not idle');
-        }
-        
-        self._chats.delete(chatId);
-        if (chatId === self._activeChatId) {
-          self._activeChatId = null;
-        }
-        
-        const update: ChatUpdate = {
-          type: 'chat-deleted',
-          chatId,
-        };
-        self._chatUpdateController.push(update);
-        self._chatUpdateListeners.forEach(listener => listener(update));
-      },
-      
-      onSwitchChat: async (chatId) => {
-        if (self._state.state !== AgentStateType.IDLE) {
-          throw new Error('Cannot switch chats while not idle');
-        }
-        
-        if (!self._chats.has(chatId)) {
-          throw new Error('Chat not found');
-        }
-        
-        if (self._activeChatId) {
-          const previousChat = self._chats.get(self._activeChatId);
-          if (previousChat) {
-            previousChat.isActive = false;
-          }
-        }
-        
-        self._activeChatId = chatId;
-        const chat = self._chats.get(chatId)!;
-        chat.isActive = true;
-        
-        const switchUpdate: ChatUpdate = {
-          type: 'chat-switched',
-          chatId,
-        };
-        self._chatUpdateController.push(switchUpdate);
-        self._chatUpdateListeners.forEach(listener => listener(switchUpdate));
-        
-        // Send full sync of the newly active chat
-        const syncUpdate: ChatUpdate = {
-          type: 'chat-full-sync',
-          chat,
-        };
-        self._chatUpdateController.push(syncUpdate);
-        self._chatUpdateListeners.forEach(listener => listener(syncUpdate));
-      },
-      
-      onToolApproval: async (response) => {
-        // This would be implemented to handle tool approvals
-        // For now, it's a placeholder
-        console.log('Tool approval received:', response);
-      },
-      
-      onToolRegistration: (tools) => {
-        self._availableTools = [...tools];
-        // Could emit an update if needed
-      },
-      
-      onToolResult: (toolCallId, result, isError) => {
-        // This would be implemented to handle tool results
-        // For now, it's a placeholder
-        console.log('Tool result received:', toolCallId, result, isError);
       },
     };
   }
