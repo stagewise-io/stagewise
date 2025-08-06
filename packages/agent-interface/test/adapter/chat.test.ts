@@ -62,7 +62,7 @@ describe('AgentTransportAdapter - Chat Capability', () => {
     it('should create chat with default title', async () => {
       const chatId = await agent.chat.createChat();
       const chats = agent.chat.getChats();
-      expect(chats[0].title).toBe('Chat 1');
+      expect(chats[0].title).toBe('New chat');
     });
 
     it('should get active chat', async () => {
@@ -226,11 +226,12 @@ describe('AgentTransportAdapter - Chat Capability', () => {
   });
 
   describe('Tool Integration', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       agent.chat.setChatSupport(true);
+      await agent.chat.createChat('Test Chat');
     });
 
-    it('should register tools', () => {
+    it('should register and retrieve tools', () => {
       const tools = [
         {
           name: 'test-tool',
@@ -239,22 +240,140 @@ describe('AgentTransportAdapter - Chat Capability', () => {
         },
       ];
       
-      expect(() => agent.chat.registerTools(tools)).not.toThrow();
+      agent.chat.registerTools(tools);
+      
+      // Access the ChatManager through the adapter
+      const chatManager = (adapter as any).chatManager;
+      const registeredTools = chatManager.getAvailableTools();
+      expect(registeredTools).toEqual(tools);
     });
 
-    it('should report tool results', () => {
-      expect(() => 
-        agent.chat.reportToolResult('tool-1', { result: 'success' })
-      ).not.toThrow();
+    it('should add tool result messages when reporting results', () => {
+      const chatId = agent.chat.getActiveChat()?.id;
+      expect(chatId).toBeDefined();
+      
+      // Add an assistant message with a tool call
+      agent.chat.addMessage({
+        id: 'msg-1',
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Let me use a tool' },
+          {
+            type: 'tool-call',
+            toolCallId: 'tool-1',
+            toolName: 'test-tool',
+            input: { param: 'value' },
+            runtime: 'toolbar',
+            requiresApproval: false,
+          },
+        ],
+        createdAt: new Date(),
+      });
+      
+      // Report tool result
+      agent.chat.reportToolResult('tool-1', { result: 'success' }, false);
+      
+      // Check that a tool message was added
+      const chat = agent.chat.getActiveChat();
+      expect(chat?.messages).toHaveLength(2);
+      const toolMessage = chat?.messages[1];
+      expect(toolMessage?.role).toBe('tool');
+      expect(toolMessage?.content[0]).toMatchObject({
+        type: 'tool-result',
+        toolCallId: 'tool-1',
+        toolName: 'test-tool',
+        output: { result: 'success' },
+        isError: false,
+      });
     });
 
-    it('should handle tool approval', async () => {
+    it('should track and handle tool approvals', async () => {
+      // Add an assistant message with a tool call requiring approval
+      agent.chat.addMessage({
+        id: 'msg-1',
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'tool-2',
+            toolName: 'dangerous-tool',
+            input: { action: 'delete' },
+            runtime: 'cli',
+            requiresApproval: true,
+          },
+        ],
+        createdAt: new Date(),
+      });
+      
+      // Approve the tool call
+      await agent.chat.handleToolApproval({
+        toolCallId: 'tool-2',
+        approved: true,
+        modifiedInput: { action: 'delete', confirmed: true },
+      });
+      
+      // Check that approval message was added
+      const chat = agent.chat.getActiveChat();
+      expect(chat?.messages).toHaveLength(2);
+      const approvalMessage = chat?.messages[1];
+      expect(approvalMessage?.role).toBe('tool');
+      expect(approvalMessage?.content[0]).toMatchObject({
+        type: 'tool-result',
+        toolCallId: 'tool-2',
+        toolName: 'approval',
+        output: {
+          status: 'approved',
+          modifiedInput: { action: 'delete', confirmed: true },
+        },
+        isError: false,
+      });
+    });
+
+    it('should handle tool rejection', async () => {
+      // Add an assistant message with a tool call requiring approval
+      agent.chat.addMessage({
+        id: 'msg-1',
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'tool-3',
+            toolName: 'dangerous-tool',
+            input: { action: 'delete' },
+            runtime: 'cli',
+            requiresApproval: true,
+          },
+        ],
+        createdAt: new Date(),
+      });
+      
+      // Reject the tool call
+      await agent.chat.handleToolApproval({
+        toolCallId: 'tool-3',
+        approved: false,
+      });
+      
+      // Check that rejection message was added
+      const chat = agent.chat.getActiveChat();
+      expect(chat?.messages).toHaveLength(2);
+      const rejectionMessage = chat?.messages[1];
+      expect(rejectionMessage?.role).toBe('tool');
+      expect(rejectionMessage?.content[0]).toMatchObject({
+        type: 'tool-result',
+        toolCallId: 'tool-3',
+        toolName: 'approval',
+        output: { status: 'rejected' },
+        isError: true,
+      });
+    });
+
+    it('should throw error for non-existent tool approval', async () => {
       await expect(
         agent.chat.handleToolApproval({
-          toolCallId: 'tool-1',
+          toolCallId: 'non-existent',
           approved: true,
         })
-      ).resolves.not.toThrow();
+      ).rejects.toThrow('No pending approval for tool call non-existent');
     });
   });
 

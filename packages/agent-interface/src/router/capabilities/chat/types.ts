@@ -162,6 +162,11 @@ export const chatUpdateSchema = z.discriminatedUnion('type', [
     chatId: z.string(),
   }),
   z.object({
+    type: z.literal('chat-title-updated'),
+    chatId: z.string(),
+    title: z.string(),
+  }),
+  z.object({
     type: z.literal('message-added'),
     chatId: z.string(),
     message: chatMessageSchema,
@@ -197,6 +202,11 @@ export const sendMessageRequestSchema = z.object({
   metadata: userMessageMetadataSchema,
 });
 
+export const updateChatTitleRequestSchema = z.object({
+  chatId: z.string(),
+  title: z.string(),
+});
+
 export const toolApprovalResponseSchema = z.object({
   toolCallId: z.string(),
   approved: z.boolean(),
@@ -205,6 +215,7 @@ export const toolApprovalResponseSchema = z.object({
 
 export type CreateChatRequest = z.infer<typeof createChatRequestSchema>;
 export type SendMessageRequest = z.infer<typeof sendMessageRequestSchema>;
+export type UpdateChatTitleRequest = z.infer<typeof updateChatTitleRequestSchema>;
 export type ToolApprovalResponse = z.infer<typeof toolApprovalResponseSchema>;
 
 // ============================================

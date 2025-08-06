@@ -7,6 +7,8 @@ import {
   sendMessageRequestSchema,
   type CreateChatRequest,
   createChatRequestSchema,
+  type UpdateChatTitleRequest,
+  updateChatTitleRequestSchema,
   type ToolApprovalResponse,
   toolApprovalResponseSchema,
   type ToolDefinition,
@@ -59,6 +61,11 @@ export interface ChatImplementation {
   onSwitchChat: (chatId: string) => Promise<void>;
 
   /**
+   * Called when the user wants to update the title of a chat.
+   */
+  onUpdateChatTitle: (request: UpdateChatTitleRequest) => Promise<void>;
+
+  /**
    * Called when the user approves or rejects a tool call that requires approval.
    */
   onToolApproval: (response: ToolApprovalResponse) => Promise<void>;
@@ -103,6 +110,10 @@ export const chatRouter = (impl: ChatImplementation) =>
     switchChat: procedure
       .input(z.string())
       .mutation(({ input }) => impl.onSwitchChat(input)),
+    
+    updateChatTitle: procedure
+      .input(updateChatTitleRequestSchema)
+      .mutation(({ input }) => impl.onUpdateChatTitle(input)),
     
     approveToolCall: procedure
       .input(toolApprovalResponseSchema)

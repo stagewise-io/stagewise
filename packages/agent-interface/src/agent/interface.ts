@@ -14,6 +14,7 @@ import type {
   Chat,
   ChatListItem,
   ChatMessage,
+  AssistantMessage,
   MessagePartUpdate,
   ToolDefinition,
   ToolApprovalResponse,
@@ -140,6 +141,21 @@ export type AgentInterface = {
 
     /** Switch to a different chat */
     switchChat: (chatId: string) => Promise<void>;
+
+    /** Update the title of a chat */
+    updateChatTitle: (chatId: string, title: string) => Promise<void>;
+
+    /** Add a message to the active chat */
+    addMessage: (message: ChatMessage) => void;
+
+    /** Update an existing message */
+    updateMessage: (messageId: string, content: AssistantMessage['content']) => void;
+
+    /** Delete a message from the chat */
+    deleteMessage: (messageId: string) => void;
+
+    /** Clear all messages from the active chat */
+    clearMessages: () => void;
 
     /** Send a message to the active chat */
     sendMessage: (content: ChatUserMessage['content'], metadata: ChatUserMessage['metadata']) => Promise<void>;
