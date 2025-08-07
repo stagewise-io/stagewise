@@ -301,12 +301,12 @@ export const AgentChatProvider = ({ children }: { children?: ReactNode }) => {
     return chatState.chats.find(c => c.id === chatId);
   }, [chatState.chats]);
   
-  const canSwitchChat = useCallback((): boolean => {
+  const canSwitchChat = useMemo(() => {
     // Can switch if not currently loading
     return !chatState.isLoading;
   }, [chatState.isLoading]);
   
-  const canCreateChat = useCallback((): boolean => {
+  const canCreateChat = useMemo(() => {
     // Can create if not currently loading
     return !chatState.isLoading;
   }, [chatState.isLoading]);
