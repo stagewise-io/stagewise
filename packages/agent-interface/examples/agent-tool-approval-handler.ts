@@ -2,18 +2,25 @@
  * Example: How agents should handle tool approvals in the new UserMessage format
  */
 
-import type { ChatUpdate, ChatUserMessage as UserMessage, ToolApprovalPart } from '../dist/agent';
+import type {
+  ChatUpdate,
+  ChatUserMessage as UserMessage,
+  ToolApprovalPart,
+} from '../dist/agent';
 import type { AgentInterface } from '../dist/agent';
 
 /**
  * Example agent that properly handles tool approvals
  */
 export class ToolApprovalAwareAgent {
-  private pendingToolCalls = new Map<string, {
-    toolName: string;
-    originalInput: Record<string, unknown>;
-    callback?: (approved: boolean) => void;
-  }>();
+  private pendingToolCalls = new Map<
+    string,
+    {
+      toolName: string;
+      originalInput: Record<string, unknown>;
+      callback?: (approved: boolean) => void;
+    }
+  >();
 
   constructor(private agent: AgentInterface) {
     // Listen for chat updates
@@ -47,31 +54,37 @@ export class ToolApprovalAwareAgent {
    */
   private handleToolApproval(approval: ToolApprovalPart, chatId: string): void {
     const pending = this.pendingToolCalls.get(approval.toolCallId);
-    
+
     if (!pending) {
-      console.warn(`Received approval for unknown tool call: ${approval.toolCallId}`);
+      console.warn(
+        `Received approval for unknown tool call: ${approval.toolCallId}`,
+      );
       return;
     }
 
     if (approval.approved) {
-      console.log(`Tool call ${approval.toolCallId} (${pending.toolName}) was APPROVED`);
-      
+      console.log(
+        `Tool call ${approval.toolCallId} (${pending.toolName}) was APPROVED`,
+      );
+
       // Use original input
       const finalInput = pending.originalInput;
 
       // Execute the tool with the original input
       this.executeApprovedTool(pending.toolName, finalInput, chatId);
-      
+
       // Call the callback if provided
       if (pending.callback) {
         pending.callback(true);
       }
     } else {
-      console.log(`Tool call ${approval.toolCallId} (${pending.toolName}) was REJECTED`);
-      
+      console.log(
+        `Tool call ${approval.toolCallId} (${pending.toolName}) was REJECTED`,
+      );
+
       // Handle rejection - maybe ask for alternatives
       this.handleRejectedTool(pending.toolName, chatId);
-      
+
       // Call the callback if provided
       if (pending.callback) {
         pending.callback(false);
@@ -89,7 +102,7 @@ export class ToolApprovalAwareAgent {
     toolCallId: string,
     toolName: string,
     input: Record<string, unknown>,
-    callback?: (approved: boolean) => void
+    callback?: (approved: boolean) => void,
   ): void {
     this.pendingToolCalls.set(toolCallId, {
       toolName,
@@ -104,18 +117,23 @@ export class ToolApprovalAwareAgent {
   private executeApprovedTool(
     toolName: string,
     input: Record<string, unknown>,
-    chatId: string
+    chatId: string,
   ): void {
     // Add a message indicating tool execution
-    this.agent.chat.addMessage({
-      id: `assistant-${Date.now()}`,
-      role: 'assistant',
-      content: [{
-        type: 'text',
-        text: `Executing ${toolName} with approved parameters...`
-      }],
-      createdAt: new Date(),
-    }, chatId);
+    this.agent.chat.addMessage(
+      {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: [
+          {
+            type: 'text',
+            text: `Executing ${toolName} with approved parameters...`,
+          },
+        ],
+        createdAt: new Date(),
+      },
+      chatId,
+    );
 
     // Here you would actually execute the tool
     console.log(`Executing tool: ${toolName}`, input);
@@ -126,25 +144,30 @@ export class ToolApprovalAwareAgent {
    */
   private handleRejectedTool(toolName: string, chatId: string): void {
     // Add a message acknowledging the rejection
-    this.agent.chat.addMessage({
-      id: `assistant-${Date.now()}`,
-      role: 'assistant',
-      content: [{
-        type: 'text',
-        text: `Understood. I won't execute ${toolName}. Is there something else I can help you with?`
-      }],
-      createdAt: new Date(),
-    }, chatId);
+    this.agent.chat.addMessage(
+      {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: [
+          {
+            type: 'text',
+            text: `Understood. I won't execute ${toolName}. Is there something else I can help you with?`,
+          },
+        ],
+        createdAt: new Date(),
+      },
+      chatId,
+    );
   }
 }
 
 // Example usage
 export function setupAgent(agent: AgentInterface): ToolApprovalAwareAgent {
   const handler = new ToolApprovalAwareAgent(agent);
-  
+
   // Example: Request a tool that needs approval
-  const toolCallId = 'tool-' + Date.now();
-  
+  const toolCallId = `tool-${Date.now()}`;
+
   // Register the pending tool call
   handler.registerPendingToolCall(
     toolCallId,
@@ -156,9 +179,9 @@ export function setupAgent(agent: AgentInterface): ToolApprovalAwareAgent {
       } else {
         console.log('Tool was rejected');
       }
-    }
+    },
   );
-  
+
   // Add an assistant message requesting approval
   agent.chat.addMessage({
     id: 'assistant-request',
@@ -172,10 +195,10 @@ export function setupAgent(agent: AgentInterface): ToolApprovalAwareAgent {
         input: { path: '/important/file.txt' },
         runtime: 'cli',
         requiresApproval: true,
-      }
+      },
     ],
     createdAt: new Date(),
   });
-  
+
   return handler;
 }

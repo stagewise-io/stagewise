@@ -55,10 +55,10 @@ export type AgentInterface = {
 
     /** Set agent state with optional description */
     set: (state: AgentStateType, description?: string) => void;
-    
+
     /** Add listener for stop signals from toolbar */
     addStopListener: (listener: () => void) => void;
-    
+
     /** Remove stop listener */
     removeStopListener: (listener: () => void) => void;
   };
@@ -108,7 +108,9 @@ export type AgentInterface = {
     };
 
     /** Add a listener for user messages */
-    addUserMessageListener: (listener: (message: MessagingUserMessage) => void) => void;
+    addUserMessageListener: (
+      listener: (message: MessagingUserMessage) => void,
+    ) => void;
 
     /** Remove a specific user message listener */
     removeUserMessageListener: (
@@ -156,7 +158,11 @@ export type AgentInterface = {
     addMessage: (message: ChatMessage, chatId?: string) => void;
 
     /** Update an existing message in any chat */
-    updateMessage: (messageId: string, content: AssistantMessage['content'], chatId?: string) => void;
+    updateMessage: (
+      messageId: string,
+      content: AssistantMessage['content'],
+      chatId?: string,
+    ) => void;
 
     /** Delete a message from any chat */
     deleteMessage: (messageId: string, chatId?: string) => void;
@@ -168,7 +174,12 @@ export type AgentInterface = {
     clearMessages: (chatId?: string) => void;
 
     /** Stream a message part update */
-    streamMessagePart: (messageId: string, partIndex: number, update: MessagePartUpdate, chatId?: string) => void;
+    streamMessagePart: (
+      messageId: string,
+      partIndex: number,
+      update: MessagePartUpdate,
+      chatId?: string,
+    ) => void;
 
     /** Add listener for chat updates (includes user messages and tool approvals) */
     addChatUpdateListener: (listener: (update: ChatUpdate) => void) => void;

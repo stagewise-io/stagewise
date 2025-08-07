@@ -62,7 +62,14 @@ export const toolApprovalPartSchema = z.object({
 export const userMessageSchema = z.object({
   id: z.string(),
   role: z.literal('user'),
-  content: z.array(z.union([textPartSchema, imagePartSchema, filePartSchema, toolApprovalPartSchema])),
+  content: z.array(
+    z.union([
+      textPartSchema,
+      imagePartSchema,
+      filePartSchema,
+      toolApprovalPartSchema,
+    ]),
+  ),
   metadata: userMessageMetadataSchema,
   createdAt: z.date(),
 });

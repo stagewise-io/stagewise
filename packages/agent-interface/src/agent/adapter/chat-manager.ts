@@ -5,11 +5,9 @@ import type {
   ChatMessage,
   ChatUpdate,
   MessagePartUpdate,
-  ToolDefinition,
   UserMessage,
   AssistantMessage,
   ToolMessage,
-  ToolApprovalPart,
 } from '../../router/capabilities/chat/types';
 import { AgentStateType } from '../../router/capabilities/state/types';
 import { PushController } from './push-controller';
@@ -46,11 +44,13 @@ export class ChatManager {
    */
   private activeChatId: string | null = null;
 
-
   /**
    * Map of pending tool approvals by toolCallId
    */
-  private pendingToolApprovals: Map<string, { chatId: string; messageId: string }> = new Map();
+  private pendingToolApprovals: Map<
+    string,
+    { chatId: string; messageId: string }
+  > = new Map();
 
   /**
    * Set of listeners for chat update events
@@ -157,7 +157,10 @@ export class ChatManager {
    * @returns The ID of the newly created chat
    * @throws Error if chat is not supported or toolbar tries to create while busy
    */
-  public async createChat(title?: string, isFromAgent = false): Promise<string> {
+  public async createChat(
+    title?: string,
+    isFromAgent = false,
+  ): Promise<string> {
     this.ensureSupported();
 
     // Only enforce restrictions for toolbar-initiated creates
@@ -336,7 +339,7 @@ export class ChatManager {
     // Track pending tool approvals if this is an assistant message with tool calls
     if (message.role === 'assistant') {
       const assistantMsg = message as AssistantMessage;
-      assistantMsg.content.forEach(part => {
+      assistantMsg.content.forEach((part) => {
         if (part.type === 'tool-call' && part.requiresApproval) {
           this.pendingToolApprovals.set(part.toolCallId, {
             chatId: targetChatId,
@@ -514,7 +517,6 @@ export class ChatManager {
     this.broadcastUpdate(chatUpdate);
   }
 
-
   /**
    * Adds a listener for chat update events
    * Used internally by the agent
@@ -663,7 +665,10 @@ export class ChatManager {
        * Critical for maintaining consistency when users want to revise history
        */
       onDeleteMessageAndSubsequent: async (request) => {
-        await self.deleteMessageAndSubsequent(request.messageId, request.chatId);
+        await self.deleteMessageAndSubsequent(
+          request.messageId,
+          request.chatId,
+        );
       },
 
       /**
@@ -673,7 +678,9 @@ export class ChatManager {
         // Find the pending tool call
         const pendingInfo = self.pendingToolApprovals.get(response.toolCallId);
         if (!pendingInfo) {
-          throw new Error(`No pending approval for tool call ${response.toolCallId}`);
+          throw new Error(
+            `No pending approval for tool call ${response.toolCallId}`,
+          );
         }
 
         const chat = self.chats.get(pendingInfo.chatId);
@@ -685,13 +692,15 @@ export class ChatManager {
         const userMessage: UserMessage = {
           id: self.idGenerator(),
           role: 'user',
-          content: [{
-            type: 'tool-approval',
-            toolCallId: response.toolCallId,
-            approved: response.approved,
-          }],
+          content: [
+            {
+              type: 'tool-approval',
+              toolCallId: response.toolCallId,
+              approved: response.approved,
+            },
+          ],
           metadata: {
-            isToolApproval: true,  // Metadata to identify this as a tool approval
+            isToolApproval: true, // Metadata to identify this as a tool approval
           },
           createdAt: new Date(),
         };
@@ -707,7 +716,7 @@ export class ChatManager {
        * Registers tools from the toolbar
        * Currently a no-op as tool metadata is not used
        */
-      onToolRegistration: (tools) => {
+      onToolRegistration: (_tools) => {
         // Tool registration is handled by the toolbar
         // The agent doesn't need to track available tools
       },
@@ -734,7 +743,8 @@ export class ChatManager {
           if (msg.role === 'assistant') {
             const assistantMsg = msg as AssistantMessage;
             const toolCall = assistantMsg.content.find(
-              part => part.type === 'tool-call' && part.toolCallId === toolCallId
+              (part) =>
+                part.type === 'tool-call' && part.toolCallId === toolCallId,
             );
             if (toolCall && toolCall.type === 'tool-call') {
               toolName = toolCall.toolName;
@@ -747,13 +757,15 @@ export class ChatManager {
         const toolMessage: ToolMessage = {
           id: self.idGenerator(),
           role: 'tool',
-          content: [{
-            type: 'tool-result',
-            toolCallId,
-            toolName,
-            output: result,
-            isError,
-          }],
+          content: [
+            {
+              type: 'tool-result',
+              toolCallId,
+              toolName,
+              output: result,
+              isError,
+            },
+          ],
           createdAt: new Date(),
         };
 
