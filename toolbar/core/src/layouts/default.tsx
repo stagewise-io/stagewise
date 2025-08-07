@@ -210,7 +210,8 @@ function PanelsArea({
     }
 
     // Check if the connected agent supports chat history capability
-    return connected.info.capabilities?.chatHistory === true;
+    // Use optional chaining to safely access nested properties
+    return connected?.info?.capabilities?.chatHistory === true;
   }, [connected]);
 
   return (
