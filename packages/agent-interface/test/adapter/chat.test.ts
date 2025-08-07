@@ -118,13 +118,13 @@ describe('AgentTransportAdapter - Chat Capability', () => {
       );
     });
 
-    it('should not create new chat while current is active', async () => {
+    it('should allow agent to create new chat even while working', async () => {
       await agent.chat.createChat('Active');
       agent.state.set(AgentStateType.PROCESSING);
       
-      await expect(agent.chat.createChat('New')).rejects.toThrow(
-        'Cannot create new chat while current chat is active'
-      );
+      // Agent can create chats anytime (restriction only applies to toolbar)
+      const newChatId = await agent.chat.createChat('New');
+      expect(newChatId).toBeDefined();
     });
   });
 
@@ -133,7 +133,7 @@ describe('AgentTransportAdapter - Chat Capability', () => {
       agent.chat.setChatSupport(true);
     });
 
-    it('should send a message to active chat', async () => {
+    it('should add a message to active chat', async () => {
       const chatId = await agent.chat.createChat('Message Test');
       const metadata = {
         currentUrl: 'https://example.com',
@@ -146,10 +146,14 @@ describe('AgentTransportAdapter - Chat Capability', () => {
         selectedElements: [],
       };
       
-      await agent.chat.sendMessage(
-        [{ type: 'text', text: 'Hello, world!' }],
-        metadata
-      );
+      // Add message directly (sendMessage was removed from agent interface)
+      agent.chat.addMessage({
+        id: 'user-msg-1',
+        role: 'user',
+        content: [{ type: 'text', text: 'Hello, world!' }],
+        metadata,
+        createdAt: new Date(),
+      });
       
       const activeChat = agent.chat.getActiveChat();
       expect(activeChat?.messages).toHaveLength(1);
@@ -159,7 +163,11 @@ describe('AgentTransportAdapter - Chat Capability', () => {
       ]);
     });
 
-    it('should throw when sending message without active chat', async () => {
+    it('should throw when adding message without chat ID and no active chat', async () => {
+      // Disable and re-enable to clear chats  
+      agent.chat.setChatSupport(false);
+      agent.chat.setChatSupport(true);
+      
       const mockMetadata: UserMessage['metadata'] = {
         currentUrl: null,
         currentTitle: null,
@@ -170,12 +178,17 @@ describe('AgentTransportAdapter - Chat Capability', () => {
         locale: 'en',
         selectedElements: [],
       };
-      await expect(
-        agent.chat.sendMessage(
-          [{ type: 'text', text: 'No chat' }],
-          mockMetadata
-        )
-      ).rejects.toThrow('No active chat');
+      
+      // Trying to add message without chat ID and no active chat should throw
+      expect(() => {
+        agent.chat.addMessage({
+          id: 'user-msg-1',
+          role: 'user',
+          content: [{ type: 'text', text: 'No chat' }],
+          metadata: mockMetadata,
+          createdAt: new Date(),
+        });
+      }).toThrow('No chat ID provided and no active chat');
     });
   });
 
@@ -231,7 +244,7 @@ describe('AgentTransportAdapter - Chat Capability', () => {
       await agent.chat.createChat('Test Chat');
     });
 
-    it('should register and retrieve tools', () => {
+    it('should handle tool registration from toolbar (no-op)', () => {
       const tools = [
         {
           name: 'test-tool',
@@ -240,12 +253,14 @@ describe('AgentTransportAdapter - Chat Capability', () => {
         },
       ];
       
-      agent.chat.registerTools(tools);
-      
-      // Access the ChatManager through the adapter
+      // Get the chat implementation to simulate toolbar registration
       const chatManager = (adapter as any).chatManager;
-      const registeredTools = chatManager.getAvailableTools();
-      expect(registeredTools).toEqual(tools);
+      const chatImpl = chatManager.createImplementation();
+      
+      // This should be a no-op since tool metadata is not used
+      expect(() => {
+        chatImpl.onToolRegistration(tools);
+      }).not.toThrow();
     });
 
     it('should add tool result messages when reporting results', () => {
@@ -270,8 +285,10 @@ describe('AgentTransportAdapter - Chat Capability', () => {
         createdAt: new Date(),
       });
       
-      // Report tool result
-      agent.chat.reportToolResult('tool-1', { result: 'success' }, false);
+      // Report tool result through chat implementation (as toolbar would)
+      const chatManager = (adapter as any).chatManager;
+      const chatImpl = chatManager.createImplementation();
+      chatImpl.onToolResult('tool-1', { result: 'success' }, false);
       
       // Check that a tool message was added
       const chat = agent.chat.getActiveChat();
@@ -305,28 +322,26 @@ describe('AgentTransportAdapter - Chat Capability', () => {
         createdAt: new Date(),
       });
       
-      // Approve the tool call
-      await agent.chat.handleToolApproval({
+      // Simulate approval through the chat implementation (as toolbar would)
+      const chatManager = (adapter as any).chatManager;
+      const chatImpl = chatManager.createImplementation();
+      await chatImpl.onToolApproval({
         toolCallId: 'tool-2',
         approved: true,
-        modifiedInput: { action: 'delete', confirmed: true },
       });
       
-      // Check that approval message was added
+      // Check that approval message was added as a UserMessage
       const chat = agent.chat.getActiveChat();
       expect(chat?.messages).toHaveLength(2);
       const approvalMessage = chat?.messages[1];
-      expect(approvalMessage?.role).toBe('tool');
+      expect(approvalMessage?.role).toBe('user');
       expect(approvalMessage?.content[0]).toMatchObject({
-        type: 'tool-result',
+        type: 'tool-approval',
         toolCallId: 'tool-2',
-        toolName: 'approval',
-        output: {
-          status: 'approved',
-          modifiedInput: { action: 'delete', confirmed: true },
-        },
-        isError: false,
+        approved: true,
       });
+      // Check metadata indicates this is a tool approval
+      expect(approvalMessage?.metadata?.isToolApproval).toBe(true);
     });
 
     it('should handle tool rejection', async () => {
@@ -347,29 +362,33 @@ describe('AgentTransportAdapter - Chat Capability', () => {
         createdAt: new Date(),
       });
       
-      // Reject the tool call
-      await agent.chat.handleToolApproval({
+      // Simulate rejection through the chat implementation (as toolbar would)
+      const chatManager = (adapter as any).chatManager;
+      const chatImpl = chatManager.createImplementation();
+      await chatImpl.onToolApproval({
         toolCallId: 'tool-3',
         approved: false,
       });
       
-      // Check that rejection message was added
+      // Check that rejection message was added as a UserMessage
       const chat = agent.chat.getActiveChat();
       expect(chat?.messages).toHaveLength(2);
       const rejectionMessage = chat?.messages[1];
-      expect(rejectionMessage?.role).toBe('tool');
+      expect(rejectionMessage?.role).toBe('user');
       expect(rejectionMessage?.content[0]).toMatchObject({
-        type: 'tool-result',
+        type: 'tool-approval',
         toolCallId: 'tool-3',
-        toolName: 'approval',
-        output: { status: 'rejected' },
-        isError: true,
+        approved: false,
       });
+      // Check metadata indicates this is a tool approval
+      expect(rejectionMessage?.metadata?.isToolApproval).toBe(true);
     });
 
     it('should throw error for non-existent tool approval', async () => {
+      const chatManager = (adapter as any).chatManager;
+      const chatImpl = chatManager.createImplementation();
       await expect(
-        agent.chat.handleToolApproval({
+        chatImpl.onToolApproval({
           toolCallId: 'non-existent',
           approved: true,
         })
@@ -377,23 +396,6 @@ describe('AgentTransportAdapter - Chat Capability', () => {
     });
   });
 
-  describe('Persistence Placeholders', () => {
-    beforeEach(() => {
-      agent.chat.setChatSupport(true);
-    });
-
-    it('should have loadChatHistory placeholder', async () => {
-      const consoleSpy = vi.spyOn(console, 'log');
-      await agent.chat.loadChatHistory();
-      expect(consoleSpy).toHaveBeenCalledWith('loadChatHistory: Not implemented yet');
-    });
-
-    it('should have saveChatHistory placeholder', async () => {
-      const consoleSpy = vi.spyOn(console, 'log');
-      await agent.chat.saveChatHistory();
-      expect(consoleSpy).toHaveBeenCalledWith('saveChatHistory: Not implemented yet');
-    });
-  });
 
   describe('ChatImplementation Interface', () => {
     beforeEach(() => {
@@ -438,6 +440,357 @@ describe('AgentTransportAdapter - Chat Capability', () => {
       
       const chat = agent.chat.getActiveChat();
       expect(chat?.messages).toHaveLength(1);
+    });
+  });
+
+  describe('Delete Message and Subsequent', () => {
+    beforeEach(async () => {
+      agent.chat.setChatSupport(true);
+      await agent.chat.createChat('Test Chat');
+    });
+
+    it('should delete a message and all subsequent messages from active chat', async () => {
+      const chatId = agent.chat.getActiveChatId();
+      expect(chatId).toBeDefined();
+
+      // Add multiple messages
+      agent.chat.addMessage({
+        id: 'msg-1',
+        role: 'user',
+        content: [{ type: 'text', text: 'First message' }],
+        metadata: {
+          currentUrl: null,
+          currentTitle: null,
+          currentZoomLevel: 1,
+          viewportResolution: { width: 1920, height: 1080 },
+          devicePixelRatio: 1,
+          userAgent: 'test',
+          locale: 'en',
+          selectedElements: [],
+        },
+        createdAt: new Date(),
+      });
+
+      agent.chat.addMessage({
+        id: 'msg-2',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Second message' }],
+        createdAt: new Date(),
+      });
+
+      agent.chat.addMessage({
+        id: 'msg-3',
+        role: 'user',
+        content: [{ type: 'text', text: 'Third message' }],
+        metadata: {
+          currentUrl: null,
+          currentTitle: null,
+          currentZoomLevel: 1,
+          viewportResolution: { width: 1920, height: 1080 },
+          devicePixelRatio: 1,
+          userAgent: 'test',
+          locale: 'en',
+          selectedElements: [],
+        },
+        createdAt: new Date(),
+      });
+
+      agent.chat.addMessage({
+        id: 'msg-4',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Fourth message' }],
+        createdAt: new Date(),
+      });
+
+      // Verify all messages are present
+      let chat = agent.chat.getActiveChat();
+      expect(chat?.messages).toHaveLength(4);
+
+      // Delete from message 2 onwards
+      agent.chat.deleteMessageAndSubsequent('msg-2');
+
+      // Verify only first message remains
+      chat = agent.chat.getActiveChat();
+      expect(chat?.messages).toHaveLength(1);
+      expect(chat?.messages[0].id).toBe('msg-1');
+      expect(chat?.messages[0].content[0]).toEqual({ type: 'text', text: 'First message' });
+    });
+
+    it('should delete all messages when deleting from first message', async () => {
+      // Add multiple messages
+      agent.chat.addMessage({
+        id: 'msg-1',
+        role: 'user',
+        content: [{ type: 'text', text: 'First message' }],
+        metadata: {
+          currentUrl: null,
+          currentTitle: null,
+          currentZoomLevel: 1,
+          viewportResolution: { width: 1920, height: 1080 },
+          devicePixelRatio: 1,
+          userAgent: 'test',
+          locale: 'en',
+          selectedElements: [],
+        },
+        createdAt: new Date(),
+      });
+
+      agent.chat.addMessage({
+        id: 'msg-2',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Second message' }],
+        createdAt: new Date(),
+      });
+
+      // Delete from first message
+      agent.chat.deleteMessageAndSubsequent('msg-1');
+
+      // Verify all messages are deleted
+      const chat = agent.chat.getActiveChat();
+      expect(chat?.messages).toHaveLength(0);
+    });
+
+    it('should delete messages from specific chat', async () => {
+      const chatId1 = agent.chat.getActiveChatId();
+      
+      // Add messages to first chat
+      agent.chat.addMessage({
+        id: 'chat1-msg-1',
+        role: 'user',
+        content: [{ type: 'text', text: 'Chat 1 Message 1' }],
+        metadata: {
+          currentUrl: null,
+          currentTitle: null,
+          currentZoomLevel: 1,
+          viewportResolution: { width: 1920, height: 1080 },
+          devicePixelRatio: 1,
+          userAgent: 'test',
+          locale: 'en',
+          selectedElements: [],
+        },
+        createdAt: new Date(),
+      }, chatId1);
+
+      agent.chat.addMessage({
+        id: 'chat1-msg-2',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Chat 1 Message 2' }],
+        createdAt: new Date(),
+      }, chatId1);
+
+      // Create second chat
+      const chatId2 = await agent.chat.createChat('Chat 2');
+      
+      // Add messages to second chat
+      agent.chat.addMessage({
+        id: 'chat2-msg-1',
+        role: 'user',
+        content: [{ type: 'text', text: 'Chat 2 Message 1' }],
+        metadata: {
+          currentUrl: null,
+          currentTitle: null,
+          currentZoomLevel: 1,
+          viewportResolution: { width: 1920, height: 1080 },
+          devicePixelRatio: 1,
+          userAgent: 'test',
+          locale: 'en',
+          selectedElements: [],
+        },
+        createdAt: new Date(),
+      }, chatId2);
+
+      agent.chat.addMessage({
+        id: 'chat2-msg-2',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Chat 2 Message 2' }],
+        createdAt: new Date(),
+      }, chatId2);
+
+      // Delete from chat1-msg-2 in first chat (not active)
+      agent.chat.deleteMessageAndSubsequent('chat1-msg-2', chatId1);
+
+      // Switch back to first chat to verify
+      await agent.chat.switchChat(chatId1!);
+      const chat1 = agent.chat.getActiveChat();
+      expect(chat1?.messages).toHaveLength(1);
+      expect(chat1?.messages[0].id).toBe('chat1-msg-1');
+
+      // Verify second chat is unchanged
+      await agent.chat.switchChat(chatId2);
+      const chat2 = agent.chat.getActiveChat();
+      expect(chat2?.messages).toHaveLength(2);
+    });
+
+    it('should broadcast messages-deleted update', async () => {
+      const listener = vi.fn();
+      agent.chat.addChatUpdateListener(listener);
+
+      // Add messages
+      agent.chat.addMessage({
+        id: 'msg-1',
+        role: 'user',
+        content: [{ type: 'text', text: 'Message 1' }],
+        metadata: {
+          currentUrl: null,
+          currentTitle: null,
+          currentZoomLevel: 1,
+          viewportResolution: { width: 1920, height: 1080 },
+          devicePixelRatio: 1,
+          userAgent: 'test',
+          locale: 'en',
+          selectedElements: [],
+        },
+        createdAt: new Date(),
+      });
+
+      agent.chat.addMessage({
+        id: 'msg-2',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Message 2' }],
+        createdAt: new Date(),
+      });
+
+      agent.chat.addMessage({
+        id: 'msg-3',
+        role: 'user',
+        content: [{ type: 'text', text: 'Message 3' }],
+        metadata: {
+          currentUrl: null,
+          currentTitle: null,
+          currentZoomLevel: 1,
+          viewportResolution: { width: 1920, height: 1080 },
+          devicePixelRatio: 1,
+          userAgent: 'test',
+          locale: 'en',
+          selectedElements: [],
+        },
+        createdAt: new Date(),
+      });
+
+      // Clear previous calls to focus on delete event
+      listener.mockClear();
+
+      // Delete from msg-2
+      agent.chat.deleteMessageAndSubsequent('msg-2');
+
+      // Verify the messages-deleted update was broadcast
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'messages-deleted',
+          chatId: agent.chat.getActiveChatId(),
+          fromMessageId: 'msg-2',
+          deletedCount: 2, // msg-2 and msg-3
+        })
+      );
+    });
+
+    it('should throw error when message not found', () => {
+      expect(() => {
+        agent.chat.deleteMessageAndSubsequent('non-existent');
+      }).toThrow('Message non-existent not found in chat');
+    });
+
+    it('should throw error when no chat ID and no active chat', () => {
+      // Clear active chat
+      agent.chat.setChatSupport(false);
+      agent.chat.setChatSupport(true);
+
+      expect(() => {
+        agent.chat.deleteMessageAndSubsequent('msg-1');
+      }).toThrow('No chat ID provided and no active chat');
+    });
+
+    it('should handle deletion through router endpoint', async () => {
+      const implementation = adapter.chat!;
+      const chatId = agent.chat.getActiveChatId()!;
+
+      // Add messages
+      agent.chat.addMessage({
+        id: 'msg-1',
+        role: 'user',
+        content: [{ type: 'text', text: 'Message 1' }],
+        metadata: {
+          currentUrl: null,
+          currentTitle: null,
+          currentZoomLevel: 1,
+          viewportResolution: { width: 1920, height: 1080 },
+          devicePixelRatio: 1,
+          userAgent: 'test',
+          locale: 'en',
+          selectedElements: [],
+        },
+        createdAt: new Date(),
+      });
+
+      agent.chat.addMessage({
+        id: 'msg-2',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Message 2' }],
+        createdAt: new Date(),
+      });
+
+      agent.chat.addMessage({
+        id: 'msg-3',
+        role: 'user',
+        content: [{ type: 'text', text: 'Message 3' }],
+        metadata: {
+          currentUrl: null,
+          currentTitle: null,
+          currentZoomLevel: 1,
+          viewportResolution: { width: 1920, height: 1080 },
+          devicePixelRatio: 1,
+          userAgent: 'test',
+          locale: 'en',
+          selectedElements: [],
+        },
+        createdAt: new Date(),
+      });
+
+      // Delete through router endpoint (as toolbar would)
+      await implementation.onDeleteMessageAndSubsequent({
+        chatId,
+        messageId: 'msg-2',
+      });
+
+      // Verify deletion
+      const chat = agent.chat.getActiveChat();
+      expect(chat?.messages).toHaveLength(1);
+      expect(chat?.messages[0].id).toBe('msg-1');
+    });
+
+    it('should handle deletion of last message', async () => {
+      // Add messages
+      agent.chat.addMessage({
+        id: 'msg-1',
+        role: 'user',
+        content: [{ type: 'text', text: 'Message 1' }],
+        metadata: {
+          currentUrl: null,
+          currentTitle: null,
+          currentZoomLevel: 1,
+          viewportResolution: { width: 1920, height: 1080 },
+          devicePixelRatio: 1,
+          userAgent: 'test',
+          locale: 'en',
+          selectedElements: [],
+        },
+        createdAt: new Date(),
+      });
+
+      agent.chat.addMessage({
+        id: 'msg-2',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Message 2' }],
+        createdAt: new Date(),
+      });
+
+      // Delete only the last message
+      agent.chat.deleteMessageAndSubsequent('msg-2');
+
+      // Verify only first message remains
+      const chat = agent.chat.getActiveChat();
+      expect(chat?.messages).toHaveLength(1);
+      expect(chat?.messages[0].id).toBe('msg-1');
     });
   });
 

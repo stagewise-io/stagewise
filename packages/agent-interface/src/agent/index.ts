@@ -38,6 +38,8 @@ export {
   type ReasoningPart,
   type ToolCallPart,
   type ToolResultPart,
+  type ToolApprovalPart,
+  type UserMessage as ChatUserMessage,
   type AssistantMessage,
   type ToolMessage,
   type ChatMessage,

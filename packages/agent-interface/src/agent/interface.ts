@@ -16,10 +16,7 @@ import type {
   ChatMessage,
   AssistantMessage,
   MessagePartUpdate,
-  ToolDefinition,
-  ToolApprovalResponse,
   ChatUpdate,
-  UserMessage as ChatUserMessage,
 } from '../router/capabilities/chat/types';
 
 export type AgentInterface = {
@@ -50,7 +47,7 @@ export type AgentInterface = {
 
   /**
    * STATE MANAGEMENT
-   * Simple state operations with optional descriptions
+   * Simple state operations with optional descriptions and stop signal handling
    */
   state: {
     /** Get current agent state */
@@ -58,6 +55,12 @@ export type AgentInterface = {
 
     /** Set agent state with optional description */
     set: (state: AgentStateType, description?: string) => void;
+    
+    /** Add listener for stop signals from toolbar */
+    addStopListener: (listener: () => void) => void;
+    
+    /** Remove stop listener */
+    removeStopListener: (listener: () => void) => void;
   };
 
   /**
@@ -118,7 +121,8 @@ export type AgentInterface = {
 
   /**
    * CHAT MANAGEMENT
-   * Comprehensive chat functionality with message history and tool integration
+   * Chat functionality for the agent to manage conversations and messages
+   * Note: Tool approvals, registrations, and user messages come through router callbacks
    */
   chat: {
     /** Enable or disable chat support */
@@ -130,10 +134,13 @@ export type AgentInterface = {
     /** Get list of all chats */
     getChats: () => ChatListItem[];
 
+    /** Get the ID of the currently active chat */
+    getActiveChatId: () => string | null;
+
     /** Get the active chat */
     getActiveChat: () => Chat | null;
 
-    /** Create a new chat */
+    /** Create a new chat (agent can create anytime) */
     createChat: (title?: string) => Promise<string>;
 
     /** Delete a chat */
@@ -145,45 +152,29 @@ export type AgentInterface = {
     /** Update the title of a chat */
     updateChatTitle: (chatId: string, title: string) => Promise<void>;
 
-    /** Add a message to the active chat */
-    addMessage: (message: ChatMessage) => void;
+    /** Add a message to any chat (for agent-generated messages) */
+    addMessage: (message: ChatMessage, chatId?: string) => void;
 
-    /** Update an existing message */
-    updateMessage: (messageId: string, content: AssistantMessage['content']) => void;
+    /** Update an existing message in any chat */
+    updateMessage: (messageId: string, content: AssistantMessage['content'], chatId?: string) => void;
 
-    /** Delete a message from the chat */
-    deleteMessage: (messageId: string) => void;
+    /** Delete a message from any chat */
+    deleteMessage: (messageId: string, chatId?: string) => void;
 
-    /** Clear all messages from the active chat */
-    clearMessages: () => void;
+    /** Delete a message and all subsequent messages from any chat */
+    deleteMessageAndSubsequent: (messageId: string, chatId?: string) => void;
 
-    /** Send a message to the active chat */
-    sendMessage: (content: ChatUserMessage['content'], metadata: ChatUserMessage['metadata']) => Promise<void>;
+    /** Clear all messages from a specific chat */
+    clearMessages: (chatId?: string) => void;
 
     /** Stream a message part update */
-    streamMessagePart: (messageId: string, partIndex: number, update: MessagePartUpdate) => void;
+    streamMessagePart: (messageId: string, partIndex: number, update: MessagePartUpdate, chatId?: string) => void;
 
-    /** Handle tool approval response */
-    handleToolApproval: (response: ToolApprovalResponse) => Promise<void>;
-
-    /** Register toolbar-provided tools */
-    registerTools: (tools: ToolDefinition[]) => void;
-
-    /** Report tool execution result */
-    reportToolResult: (toolCallId: string, result: unknown, isError?: boolean) => void;
-
-    /** Add listener for chat updates */
+    /** Add listener for chat updates (includes user messages and tool approvals) */
     addChatUpdateListener: (listener: (update: ChatUpdate) => void) => void;
 
     /** Remove chat update listener */
     removeChatUpdateListener: (listener: (update: ChatUpdate) => void) => void;
-
-    // Persistence placeholders
-    /** Load chat history (placeholder for future implementation) */
-    loadChatHistory: () => Promise<void>;
-
-    /** Save chat history (placeholder for future implementation) */
-    saveChatHistory: () => Promise<void>;
   };
 
   /**

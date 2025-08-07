@@ -12,6 +12,7 @@ import { PushController } from './push-controller';
  * - Current state (IDLE, WORKING, CALLING_TOOL, etc.)
  * - Optional description of what the agent is doing
  * - Broadcasting state changes to subscribers
+ * - Stop signals from the toolbar to interrupt processing
  * 
  * The state helps the toolbar show what the agent is currently doing
  * and whether it can accept new requests.
@@ -26,6 +27,11 @@ export class StateManager {
    * Controller for broadcasting state updates to subscribers
    */
   private readonly controller: PushController<AgentState>;
+  
+  /**
+   * Set of listeners for stop signals from toolbar
+   */
+  private stopListeners: Set<() => void> = new Set();
 
   constructor() {
     // Initialize with IDLE state - agent is ready but not doing anything
@@ -65,18 +71,84 @@ export class StateManager {
   }
 
   /**
+   * Adds a listener for stop signals
+   * The agent uses this to listen for stop requests from the toolbar
+   * 
+   * @param listener - Function to call when stop is requested
+   */
+  public addStopListener(listener: () => void): void {
+    this.stopListeners.add(listener);
+  }
+
+  /**
+   * Removes a stop listener
+   * 
+   * @param listener - The listener to remove
+   */
+  public removeStopListener(listener: () => void): void {
+    this.stopListeners.delete(listener);
+  }
+
+  /**
+   * Clears all stop listeners
+   * Used during cleanup to prevent memory leaks
+   */
+  public clearStopListeners(): void {
+    this.stopListeners.clear();
+  }
+
+  /**
+   * Triggers a stop signal to all listeners
+   * Called when the toolbar requests the agent to stop processing
+   */
+  public triggerStop(): void {
+    // Notify all stop listeners, catching any errors to prevent one bad listener from breaking others
+    this.stopListeners.forEach(listener => {
+      try {
+        listener();
+      } catch (error) {
+        // Log error but continue with other listeners
+        console.error('Error in stop listener:', error);
+      }
+    });
+  }
+
+  /**
    * Creates the implementation object for the router's state capability
    * This is what the toolbar uses to subscribe to state changes
    * 
    * @returns The state implementation for the transport interface
    */
   public createImplementation(): StateImplementation {
+    const self = this;
+    
     return {
       /**
        * Returns an AsyncIterable that yields state updates
        * New subscribers immediately receive the current state
        */
       getState: () => this.controller.subscribe(),
+      
+      /**
+       * Called when the toolbar wants to stop the agent's processing
+       * Only valid when agent is in a working state
+       */
+      onStop: async () => {
+        // Check if agent is in a stoppable state
+        const currentState = self.get();
+        const stoppableStates = [
+          AgentStateType.THINKING,
+          AgentStateType.WORKING,
+          AgentStateType.CALLING_TOOL,
+        ];
+        
+        if (!stoppableStates.includes(currentState.state)) {
+          throw new Error(`Cannot stop agent in ${currentState.state} state`);
+        }
+        
+        // Trigger stop signal to all listeners
+        self.triggerStop();
+      },
     };
   }
 }

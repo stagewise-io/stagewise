@@ -49,6 +49,12 @@ export const toolResultPartSchema = z.object({
   isError: z.boolean().optional().describe('Indicates if the tool call failed'),
 });
 
+export const toolApprovalPartSchema = z.object({
+  type: z.literal('tool-approval'),
+  toolCallId: z.string(),
+  approved: z.boolean(),
+});
+
 // ============================================
 // Message Types
 // ============================================
@@ -56,7 +62,7 @@ export const toolResultPartSchema = z.object({
 export const userMessageSchema = z.object({
   id: z.string(),
   role: z.literal('user'),
-  content: z.array(z.union([textPartSchema, imagePartSchema, filePartSchema])),
+  content: z.array(z.union([textPartSchema, imagePartSchema, filePartSchema, toolApprovalPartSchema])),
   metadata: userMessageMetadataSchema,
   createdAt: z.date(),
 });
@@ -95,6 +101,7 @@ export type FilePart = z.infer<typeof filePartSchema>;
 export type ReasoningPart = z.infer<typeof reasoningPartSchema>;
 export type ToolCallPart = z.infer<typeof toolCallPartSchema>;
 export type ToolResultPart = z.infer<typeof toolResultPartSchema>;
+export type ToolApprovalPart = z.infer<typeof toolApprovalPartSchema>;
 
 export type UserMessage = z.infer<typeof userMessageSchema>;
 export type AssistantMessage = z.infer<typeof assistantMessageSchema>;
@@ -138,6 +145,7 @@ export const messagePartUpdateSchema = z.object({
     reasoningPartSchema,
     toolCallPartSchema,
     toolResultPartSchema,
+    toolApprovalPartSchema,
   ]),
   updateType: z
     .enum(['create', 'append', 'replace'])
@@ -181,6 +189,12 @@ export const chatUpdateSchema = z.discriminatedUnion('type', [
     update: messagePartUpdateSchema,
   }),
   z.object({
+    type: z.literal('messages-deleted'),
+    chatId: z.string(),
+    fromMessageId: z.string(),
+    deletedCount: z.number(),
+  }),
+  z.object({
     type: z.literal('chat-full-sync'),
     chat: chatSchema,
   }),
@@ -207,19 +221,23 @@ export const updateChatTitleRequestSchema = z.object({
   title: z.string(),
 });
 
+export const deleteMessageAndSubsequentRequestSchema = z.object({
+  chatId: z.string(),
+  messageId: z.string(),
+});
+
 export const toolApprovalResponseSchema = z.object({
   toolCallId: z.string(),
   approved: z.boolean(),
-  modifiedInput: z
-    .record(z.unknown())
-    .optional()
-    .describe('User-modified input parameters'),
 });
 
 export type CreateChatRequest = z.infer<typeof createChatRequestSchema>;
 export type SendMessageRequest = z.infer<typeof sendMessageRequestSchema>;
 export type UpdateChatTitleRequest = z.infer<
   typeof updateChatTitleRequestSchema
+>;
+export type DeleteMessageAndSubsequentRequest = z.infer<
+  typeof deleteMessageAndSubsequentRequestSchema
 >;
 export type ToolApprovalResponse = z.infer<typeof toolApprovalResponseSchema>;
 

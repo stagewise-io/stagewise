@@ -9,6 +9,8 @@ import {
   createChatRequestSchema,
   type UpdateChatTitleRequest,
   updateChatTitleRequestSchema,
+  type DeleteMessageAndSubsequentRequest,
+  deleteMessageAndSubsequentRequestSchema,
   type ToolApprovalResponse,
   toolApprovalResponseSchema,
   type ToolDefinition,
@@ -66,6 +68,12 @@ export interface ChatImplementation {
   onUpdateChatTitle: (request: UpdateChatTitleRequest) => Promise<void>;
 
   /**
+   * Called when the user wants to delete a message and all subsequent messages.
+   * This is critical for maintaining consistency when users want to revise history.
+   */
+  onDeleteMessageAndSubsequent: (request: DeleteMessageAndSubsequentRequest) => Promise<void>;
+
+  /**
    * Called when the user approves or rejects a tool call that requires approval.
    */
   onToolApproval: (response: ToolApprovalResponse) => Promise<void>;
@@ -114,6 +122,10 @@ export const chatRouter = (impl: ChatImplementation) =>
     updateChatTitle: procedure
       .input(updateChatTitleRequestSchema)
       .mutation(({ input }) => impl.onUpdateChatTitle(input)),
+    
+    deleteMessageAndSubsequent: procedure
+      .input(deleteMessageAndSubsequentRequestSchema)
+      .mutation(({ input }) => impl.onDeleteMessageAndSubsequent(input)),
     
     approveToolCall: procedure
       .input(toolApprovalResponseSchema)
