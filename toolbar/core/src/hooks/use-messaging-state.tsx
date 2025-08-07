@@ -12,10 +12,8 @@ import { useAgentState } from './agent/use-agent-state';
 import type {
   UserMessage,
   UserMessageContentItem,
-  UserMessageMetadata,
-  PluginContentItem,
-} from '@stagewise/agent-interface-internal/toolbar';
-import { AgentStateType } from '@stagewise/agent-interface-internal/toolbar';
+} from '@stagewise/agent-interface/toolbar';
+import { AgentStateType } from '@stagewise/agent-interface/toolbar';
 import { usePanels } from './use-panels';
 
 interface ContextSnippet {
@@ -164,11 +162,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     setIsSending(true);
 
     try {
-      // Collect metadata for selected elements
-      const metadata = collectUserMessageMetadata(
-        domContextElements.map((item) => getSelectedElementInfo(item.element)),
-      );
-
       // Generate the base for the user message
       const baseUserMessage: UserMessage = {
         id: generateId(),
@@ -179,7 +172,11 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
             text: chatInput,
           },
         ],
-        metadata,
+        metadata: collectUserMessageMetadata(
+          domContextElements.map((item) =>
+            getSelectedElementInfo(item.element),
+          ),
+        ),
         pluginContent: {},
         sentByPlugin: false,
       };
@@ -222,53 +219,23 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       const allPluginContexts = await Promise.all(pluginProcessingPromises);
 
-      // Build pluginContent for the message
       const pluginContent: Record<
         string,
         Record<string, UserMessageContentItem>
       > = {};
-
-      // Build pluginContentItems for metadata
-      const pluginContentItems: UserMessageMetadata['pluginContentItems'] = {};
-
       allPluginContexts.forEach((context) => {
         if (!context) return;
-
-        // Add to pluginContent (for the message)
         pluginContent[context.pluginName] = {};
-
-        // Add to pluginContentItems (for metadata)
-        pluginContentItems[context.pluginName] = {};
-
         context.contextSnippets.forEach((snippet) => {
-          // For pluginContent
           pluginContent[context.pluginName][snippet.promptContextName] = {
             type: 'text',
             text: `${snippet.content}`,
           };
-
-          // For metadata pluginContentItems (already resolved)
-          const contentItem: PluginContentItem = {
-            type: 'text',
-            text: `${snippet.content}`,
-          };
-          pluginContentItems[context.pluginName][snippet.promptContextName] =
-            contentItem;
         });
       });
 
-      // Update metadata with pluginContentItems
-      const enrichedMetadata: UserMessageMetadata = {
-        ...metadata,
-        pluginContentItems:
-          Object.keys(pluginContentItems).length > 0
-            ? pluginContentItems
-            : undefined,
-      };
-
       const userMessageInput: UserMessage = {
         ...baseUserMessage,
-        metadata: enrichedMetadata,
         pluginContent,
       };
 

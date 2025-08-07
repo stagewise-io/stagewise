@@ -1,10 +1,10 @@
-import { ContextElementsChips } from '@/components/context-elements-chips';
+import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
 import { TextSlideshow } from '@/components/ui/text-slideshow';
 import { Button } from '@/components/ui/button';
 import { PanelFooter } from '@/components/ui/panel';
 import { useAgents } from '@/hooks/agent/use-agent-provider';
 import { useAgentState } from '@/hooks/agent/use-agent-state';
-import { useChatState } from '@/hooks/use-chat-state';
+import { useChatHistoryState } from '@/hooks/use-chat-history-state';
 import { cn } from '@/utils';
 import { Textarea } from '@headlessui/react';
 import { AgentStateType } from '@stagewise/agent-interface/toolbar';
@@ -16,7 +16,7 @@ const GlassyTextInputClassNames =
 
 export function ChatPanelFooter() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const chatState = useChatState();
+  const chatState = useChatHistoryState();
   const agentState = useAgentState();
   const { connected } = useAgents();
   const [isComposing, setIsComposing] = useState(false);
@@ -68,7 +68,10 @@ export function ChatPanelFooter() {
       clear
       className="absolute right-px bottom-px left-px z-10 flex flex-col items-stretch gap-1"
     >
-      <ContextElementsChips />
+      <ContextElementsChipsFlexible
+        domContextElements={chatState.domContextElements}
+        removeChatDomContext={chatState.removeChatDomContext}
+      />
       <div className="flex h-fit flex-1 flex-row items-end justify-between gap-1">
         <div className="relative flex flex-1">
           <Textarea

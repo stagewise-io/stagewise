@@ -18,6 +18,11 @@
     "dist"
   ],
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
     "./toolbar": {
       "types": "./dist/toolbar.d.ts",
       "import": "./dist/toolbar.js",

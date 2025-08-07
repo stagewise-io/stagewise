@@ -1,19 +1,22 @@
 import { Panel, PanelContent } from '@/components/ui/panel';
 import { useAgentState } from '@/hooks/agent/use-agent-state';
-import { useChatState } from '@/hooks/use-chat-state';
+import {
+  ChatHistoryStateProvider,
+  useChatHistoryState,
+} from '@/hooks/use-chat-history-state';
 import { cn } from '@/utils';
 import { AgentStateType } from '@stagewise/agent-interface/toolbar';
 import { useEffect, useMemo, useRef } from 'react';
-import { useAgentMessaging } from '@/hooks/agent/use-agent-messaging';
+import { useAgentChat } from '@/hooks/agent/chat/use-agent-chat';
 import { useAgents } from '@/hooks/agent/use-agent-provider';
 import { ChatHistory } from './chat-with-history/chat-history';
 import { ChatPanelFooter } from './chat-with-history/panel-footer';
 import { ChatPanelHeader } from './chat-with-history/panel-header';
 
-export function ChatWithHistoryPanel() {
+function ChatWithHistoryPanelContent() {
   const agentState = useAgentState();
-  const chatState = useChatState();
-  const chatMessaging = useAgentMessaging();
+  const chatState = useChatHistoryState();
+  const { activeChat } = useAgentChat();
   const { connected } = useAgents();
 
   const enableInputField = useMemo(() => {
@@ -28,8 +31,8 @@ export function ChatWithHistoryPanel() {
   }, [agentState.state, connected]);
 
   const anyMessageInChat = useMemo(() => {
-    return chatMessaging.agentMessage?.contentItems?.length > 0;
-  }, [chatMessaging.agentMessage?.contentItems]);
+    return activeChat?.messages?.length > 0;
+  }, [activeChat?.messages]);
 
   /* If the user clicks on prompt creation mode, we force-focus the input field all the time. */
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -85,5 +88,13 @@ export function ChatWithHistoryPanel() {
       </PanelContent>
       <ChatPanelFooter />
     </Panel>
+  );
+}
+
+export function ChatWithHistoryPanel() {
+  return (
+    <ChatHistoryStateProvider>
+      <ChatWithHistoryPanelContent />
+    </ChatHistoryStateProvider>
   );
 }

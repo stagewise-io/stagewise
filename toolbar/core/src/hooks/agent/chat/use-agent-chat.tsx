@@ -17,9 +17,9 @@ import {
 } from 'react';
 import type {
   ChatUpdate,
-  ChatUserMessage,
   AssistantMessage,
   ToolDefinition,
+  SendMessageRequest,
 } from '@stagewise/agent-interface/toolbar';
 import { useAgents } from '../use-agent-provider';
 import { ChatContext } from './context';
@@ -215,8 +215,8 @@ export const AgentChatProvider = ({ children }: { children?: ReactNode }) => {
 
   const sendMessage = useCallback(
     async (
-      content: ChatUserMessage['content'],
-      metadata: ChatUserMessage['metadata'],
+      content: SendMessageRequest['content'],
+      metadata: SendMessageRequest['metadata'],
     ): Promise<void> => {
       if (!agent || !chatState.activeChat) {
         setChatState((prev) => ({
@@ -247,18 +247,13 @@ export const AgentChatProvider = ({ children }: { children?: ReactNode }) => {
   // ===== Tool Functions =====
 
   const approveToolCall = useCallback(
-    async (
-      toolCallId: string,
-      approved: boolean,
-      modifiedInput?: Record<string, unknown>,
-    ): Promise<void> => {
+    async (toolCallId: string, approved: boolean): Promise<void> => {
       if (!agent) return;
 
       try {
         await agent.agent.chat.approveToolCall.mutate({
           toolCallId,
           approved,
-          modifiedInput,
         });
 
         // Remove from pending calls

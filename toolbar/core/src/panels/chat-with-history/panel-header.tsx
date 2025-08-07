@@ -5,10 +5,13 @@ import { ListFilterIcon, XIcon, PlusIcon } from 'lucide-react';
 import { useAgentState } from '@/hooks/agent/use-agent-state';
 import { useState } from 'react';
 import { ChatList } from './chat-list';
+import { useAgentChat } from '@/hooks/agent/chat';
 
 export function ChatPanelHeader() {
   const agentState = useAgentState();
   const [chatListOpen, setChatListOpen] = useState(false);
+
+  const { canCreateChat, createChat } = useAgentChat();
 
   return (
     <PanelHeader
@@ -48,6 +51,8 @@ export function ChatPanelHeader() {
                   '!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg transition-all duration-150 ease-out !disabled:*:opacity-10 hover:bg-white/60 active:bg-zinc-50/60',
                   chatListOpen && 'w-fit px-2.5',
                 )}
+                disabled={!canCreateChat}
+                onClick={() => createChat().then(() => setChatListOpen(false))}
               >
                 {chatListOpen && <span className="mr-1">New chat</span>}
                 <PlusIcon className="size-4 stroke-2" />

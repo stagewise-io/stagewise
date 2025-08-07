@@ -52,6 +52,13 @@ export type {
   ToolDefinition,
 } from '../router/capabilities/chat/types';
 
+// Export shared types for metadata
+export type {
+  UserMessageMetadata,
+  SelectedElement,
+  PluginContentItem,
+} from '../shared-types/metadata';
+
 /**
  * Configuration options for creating an agent server
  */

@@ -11,6 +11,22 @@ import { defineConfig } from 'tsup';
  * - Tree-shaking enabled for smaller bundle sizes
  */
 export default defineConfig([
+  // JavaScript bundles (ESM + CJS) for main entry
+  {
+    entry: {
+      index: 'src/index.ts',
+    },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: false,
+    minify: false,
+    bundle: true,
+    clean: true,
+    outDir: 'dist',
+    external: ['express', 'ws', 'cors'],
+    splitting: false,
+    treeshake: true,
+  },
   // JavaScript bundles (ESM + CJS) for toolbar
   {
     entry: {
@@ -21,7 +37,7 @@ export default defineConfig([
     sourcemap: false,
     minify: false,
     bundle: true,
-    clean: true,
+    clean: false, // Don't clean since main already cleaned
     outDir: 'dist',
     external: [],
     splitting: false,
@@ -37,7 +53,7 @@ export default defineConfig([
     sourcemap: false,
     minify: false,
     bundle: true,
-    clean: false, // Don't clean since toolbar already cleaned
+    clean: false, // Don't clean since main already cleaned
     outDir: 'dist',
     external: ['express', 'ws', 'cors'],
     splitting: false,
