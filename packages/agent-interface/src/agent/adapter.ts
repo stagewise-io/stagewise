@@ -173,6 +173,7 @@ export class AgentTransportAdapter implements TransportInterface {
       /**
        * State management interface
        * Allows the agent to indicate what it's currently doing
+       * and listen for stop signals from the toolbar
        */
       state: {
         /**
@@ -188,6 +189,21 @@ export class AgentTransportAdapter implements TransportInterface {
          */
         set: (state, description) => {
           self.stateManager.set(state, description);
+        },
+        
+        /**
+         * Adds a listener for stop signals from the toolbar
+         * The agent should use this to listen for requests to stop processing
+         */
+        addStopListener: (listener) => {
+          self.stateManager.addStopListener(listener);
+        },
+        
+        /**
+         * Removes a stop listener
+         */
+        removeStopListener: (listener) => {
+          self.stateManager.removeStopListener(listener);
         },
       },
 
@@ -295,14 +311,19 @@ export class AgentTransportAdapter implements TransportInterface {
         getChats: () => self.chatManager.getChats(),
         
         /**
+         * Gets the ID of the currently active chat
+         */
+        getActiveChatId: () => self.chatManager.getActiveChatId(),
+        
+        /**
          * Gets the active chat with full message history
          */
         getActiveChat: () => self.chatManager.getActiveChat(),
         
         /**
-         * Creates a new chat
+         * Creates a new chat (agent can create anytime)
          */
-        createChat: async (title) => self.chatManager.createChat(title),
+        createChat: async (title) => self.chatManager.createChat(title, true),
         
         /**
          * Deletes a chat
@@ -326,101 +347,53 @@ export class AgentTransportAdapter implements TransportInterface {
         },
         
         /**
-         * Adds a message to the active chat
+         * Adds a message to any chat
          * Used by agents to add their responses
          */
-        addMessage: (message) => {
-          self.chatManager.addMessage(message);
+        addMessage: (message, chatId) => {
+          self.chatManager.addMessage(message, chatId);
         },
         
         /**
-         * Updates an existing message
+         * Updates an existing message in any chat
          * Used for streaming updates
          */
-        updateMessage: (messageId, content) => {
-          self.chatManager.updateMessage(messageId, content);
+        updateMessage: (messageId, content, chatId) => {
+          self.chatManager.updateMessage(messageId, content, chatId);
         },
         
         /**
-         * Deletes a message from the chat
+         * Deletes a message from any chat
          */
-        deleteMessage: (messageId) => {
-          self.chatManager.deleteMessage(messageId);
+        deleteMessage: (messageId, chatId) => {
+          self.chatManager.deleteMessage(messageId, chatId);
         },
         
         /**
-         * Clears all messages from the active chat
+         * Deletes a message and all subsequent messages
+         * Critical for maintaining consistency when revising history
          */
-        clearMessages: () => {
-          self.chatManager.clearMessages();
+        deleteMessageAndSubsequent: (messageId, chatId) => {
+          self.chatManager.deleteMessageAndSubsequent(messageId, chatId);
         },
         
         /**
-         * Sends a user message (for testing or internal use)
+         * Clears all messages from a specific chat
          */
-        sendMessage: async (content, metadata) => {
-          if (!self.chatManager.isSupported()) {
-            throw new Error('Chat is not supported by this agent.');
-          }
-          
-          const activeChat = self.chatManager.getActiveChat();
-          if (!activeChat) {
-            throw new Error('No active chat');
-          }
-          
-          // Create and add the user message
-          const messageId = self.options.idGenerator();
-          const userMessage = {
-            id: messageId,
-            role: 'user' as const,
-            content,
-            metadata,
-            createdAt: new Date(),
-          };
-          
-          self.chatManager.addMessage(userMessage);
+        clearMessages: (chatId) => {
+          self.chatManager.clearMessages(chatId);
         },
         
         /**
          * Streams updates for a message part
          */
-        streamMessagePart: (messageId, partIndex, update) => {
-          self.chatManager.streamMessagePart(messageId, partIndex, update);
-        },
-        
-        /**
-         * Handles tool approval responses
-         */
-        handleToolApproval: async (response) => {
-          if (!self.chatManager.isSupported()) {
-            throw new Error('Chat is not supported by this agent.');
-          }
-          // Call the implementation's onToolApproval method
-          const implementation = self.chatManager.createImplementation();
-          await implementation.onToolApproval(response);
-        },
-        
-        /**
-         * Registers available tools
-         */
-        registerTools: (tools) => {
-          self.chatManager.registerTools(tools);
-        },
-        
-        /**
-         * Reports tool execution results
-         */
-        reportToolResult: (toolCallId, result, isError) => {
-          if (!self.chatManager.isSupported()) {
-            throw new Error('Chat is not supported by this agent.');
-          }
-          // Call the implementation's onToolResult method
-          const implementation = self.chatManager.createImplementation();
-          implementation.onToolResult(toolCallId, result, isError);
+        streamMessagePart: (messageId, partIndex, update, chatId) => {
+          self.chatManager.streamMessagePart(messageId, partIndex, update, chatId);
         },
         
         /**
          * Adds a listener for chat updates
+         * The agent uses this to listen for user messages and tool approvals
          */
         addChatUpdateListener: (listener) => {
           self.chatManager.addUpdateListener(listener);
@@ -431,22 +404,6 @@ export class AgentTransportAdapter implements TransportInterface {
          */
         removeChatUpdateListener: (listener) => {
           self.chatManager.removeUpdateListener(listener);
-        },
-        
-        /**
-         * Loads chat history from storage
-         * Placeholder for future implementation
-         */
-        loadChatHistory: async () => {
-          console.log('loadChatHistory: Not implemented yet');
-        },
-        
-        /**
-         * Saves chat history to storage
-         * Placeholder for future implementation
-         */
-        saveChatHistory: async () => {
-          console.log('saveChatHistory: Not implemented yet');
         },
       },
 
@@ -460,6 +417,7 @@ export class AgentTransportAdapter implements TransportInterface {
          */
         clearAllListeners: () => {
           self.messagingManager.clearUserMessageListeners();
+          self.stateManager.clearStopListeners();
           // Clear chat listeners if chat is supported
           if (self.chatManager.isSupported()) {
             self.chatManager.clearAllUpdateListeners();

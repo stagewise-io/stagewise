@@ -28,6 +28,7 @@ export type {
   ReasoningPart,
   ToolCallPart,
   ToolResultPart,
+  ToolApprovalPart,
   AssistantMessage,
   ToolMessage,
   ChatMessage,
