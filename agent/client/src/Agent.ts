@@ -471,6 +471,7 @@ export class Agent {
     );
 
     this.server.interface.availability.set(true);
+    this.server.interface.chat.setChatSupport(true);
     this.setAgentState(AgentStateType.IDLE);
 
     this.server.interface.chat.addChatUpdateListener(async (update) => {
@@ -631,6 +632,7 @@ export class Agent {
 
       // Start stream consumption with timeout protection
       const streamConsumptionPromise = consumeStreamWithTimeout(
+        chatId,
         fullStream,
         this.server,
         this.agentTimeout,

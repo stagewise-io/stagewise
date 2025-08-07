@@ -22,19 +22,29 @@ export function createTimeoutPromise(
 export async function consumeAgentStream(
   fullStream: AsyncIterable<{ type: string; textDelta?: string }>,
   server: AgentServer,
+  chatId: string,
   onError?: (error: unknown) => void,
 ): Promise<void> {
+  const messageId = crypto.randomUUID();
   try {
+    let partIndex = 0;
     for await (const chunk of fullStream) {
       if (chunk.type === 'text-delta' && chunk.textDelta) {
-        server.interface.messaging.updatePart(
+        server.interface.chat.streamMessagePart(
+          messageId,
+          partIndex,
           {
-            type: 'text',
-            text: chunk.textDelta,
+            messageId,
+            content: {
+              type: 'text',
+              text: chunk.textDelta, // TODO: Add a timestamp
+            },
+            partIndex,
+            updateType: 'append',
           },
-          0,
-          'append',
+          chatId,
         );
+        partIndex++;
       }
     }
   } catch (streamError) {
@@ -105,17 +115,27 @@ export class TimeoutManager {
  * Consumes stream with timeout protection
  */
 export async function consumeStreamWithTimeout(
+  chatId: string,
   fullStream: AsyncIterable<{ type: string; textDelta?: string }>,
   server: AgentServer,
   timeout: number,
   setAgentState: (state: AgentStateType, description?: string) => void,
 ): Promise<void> {
-  const streamPromise = consumeAgentStream(fullStream, server, (error) => {
-    const errorDesc = formatErrorDescription('Stream processing error', error, {
-      operation: 'consumeAgentStream',
-    });
-    setAgentState(AgentStateType.FAILED, errorDesc);
-  });
+  const streamPromise = consumeAgentStream(
+    fullStream,
+    server,
+    chatId,
+    (error) => {
+      const errorDesc = formatErrorDescription(
+        'Stream processing error',
+        error,
+        {
+          operation: 'consumeAgentStream',
+        },
+      );
+      setAgentState(AgentStateType.FAILED, errorDesc);
+    },
+  );
 
   try {
     await withTimeout(
