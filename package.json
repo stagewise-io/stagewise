@@ -12,6 +12,7 @@
     "dev": "turbo watch dev --concurrency 20",
     "dev:playgrounds": "turbo watch dev --filter='./playgrounds/*' --concurrency 20",
     "dev:examples": "turbo watch dev --filter='./examples/*' --concurrency 20",
+    "dev:rails": "turbo watch dev --filter='./examples/rails-example' --concurrency 20",
     "dev:toolbar": "turbo watch dev --filter='./toolbar/*' --concurrency 20",
     "dev:plugins": "turbo watch dev --filter='./plugins/*' --concurrency 20",
     "changeset": "pnpm dlx @changesets/cli",

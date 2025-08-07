@@ -1,0 +1,15 @@
+{
+  "name": "rails-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "clean": "rm -rf .turbo node_modules tmp/cache log/*.log",
+    "dev": "./bin/dev",
+    "build": "bin/rails assets:precompile",
+    "preview": "bin/rails server -p 3009 -e production"
+  },
+  "dependencies": {
+    "@stagewise/toolbar": "workspace:*"
+  },
+  "devDependencies": {}
+}
