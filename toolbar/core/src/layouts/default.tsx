@@ -16,6 +16,7 @@ import { ChatPanel } from '@/panels/chat';
 import { ChatWithHistoryPanel } from '@/panels/chat-with-history';
 import { AgentConnectivityPanel } from '@/panels/agent-connectivity';
 import { usePlugins } from '@/hooks/use-plugins';
+import { useAgents } from '@/hooks/agent/use-agent-provider';
 
 const TOOLBAR_POSITION_KEY = 'stagewise_toolbar_toolbar_position';
 
@@ -178,6 +179,7 @@ function PanelsArea({
   } = usePanels();
 
   const plugins = usePlugins();
+  const { connected } = useAgents();
 
   const pluginPanel = useMemo(() => {
     if (!openPluginName) {
@@ -200,7 +202,16 @@ function PanelsArea({
     return null;
   }, [openPluginName, plugins]);
 
-  const showChatPanelWithHistory = true;
+  // Determine which chat panel to show based on agent capabilities
+  const showChatPanelWithHistory = useMemo(() => {
+    // If no agent is connected, default to the basic chat panel
+    if (!connected) {
+      return false;
+    }
+
+    // Check if the connected agent supports chat history capability
+    return connected.info.capabilities?.chatHistory === true;
+  }, [connected]);
 
   return (
     <div

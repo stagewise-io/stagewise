@@ -44,6 +44,13 @@ export type {
 
 export type { StagewiseInfo } from '../info';
 
+// Export shared types for metadata
+export type {
+  UserMessageMetadata,
+  SelectedElement,
+  PluginContentItem,
+} from '../shared-types/metadata';
+
 export { DEFAULT_STARTING_PORT } from '../constants';
 
 export { transformer } from '../transformer';

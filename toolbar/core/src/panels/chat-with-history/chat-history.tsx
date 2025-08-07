@@ -1,56 +1,17 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
 import { Loader2Icon } from 'lucide-react';
+import { useAgentChat } from '@/hooks/agent/chat';
+import type {
+  ToolApprovalPart,
+  ToolResultPart,
+} from '@stagewise/agent-interface/toolbar';
 
 export function ChatHistory() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const wasAtBottomRef = useRef(true);
 
-  const messages: {
-    fromAgent: boolean;
-    message: string;
-    timestamp: Date;
-  }[] = [
-    {
-      fromAgent: false,
-      message: 'I want to clean up the design of the app',
-      timestamp: new Date(),
-    },
-    {
-      fromAgent: true,
-      message:
-        "Hey, okay let's do that! Do you have any kind of inspiration in mind?",
-      timestamp: new Date(),
-    },
-    {
-      fromAgent: false,
-      message:
-        'The app is really cluttered right now. I want to clean it up a bit.',
-      timestamp: new Date(),
-    },
-    {
-      fromAgent: false,
-      message: 'A design like Notion would be awesome.',
-      timestamp: new Date(),
-    },
-    {
-      fromAgent: true,
-      message:
-        'Okay, so: Rounded corners, very minimalistic, and a lot of white space?',
-      timestamp: new Date(),
-    },
-    {
-      fromAgent: false,
-      message: 'Yes, that sounds great!',
-      timestamp: new Date(),
-    },
-    {
-      fromAgent: true,
-      message:
-        "Okay, I'll first revamp the page you're on right now. We can that take that as a starting point for the rest of the app.",
-      timestamp: new Date(),
-    },
-  ];
+  const activeChat = useAgentChat().activeChat;
 
   // Force scroll to the very bottom
   const scrollToBottom = () => {
@@ -91,7 +52,7 @@ export function ChatHistory() {
       // Always scroll to bottom if user was at bottom before the update
       scrollToBottom();
     }
-  }, [messages]);
+  }, [activeChat]);
 
   // Initialize scroll position tracking
   useEffect(() => {
@@ -109,6 +70,34 @@ export function ChatHistory() {
     };
   }, []);
 
+  const _renderedMessages = useMemo(() => {
+    return activeChat.messages.filter((message) => {
+      return message.role === 'user' || message.role === 'assistant';
+    });
+  }, [activeChat]);
+
+  const toolResultParts = useMemo(() => {
+    return activeChat.messages.reduce((acc, message) => {
+      for (const part of message.content) {
+        if (part.type === 'tool-result') {
+          acc.push(part);
+        }
+      }
+      return acc;
+    }, [] as ToolResultPart[]);
+  }, [activeChat]);
+
+  const toolApprovalParts = useMemo(() => {
+    return activeChat.messages.reduce((acc, message) => {
+      for (const part of message.content) {
+        if (part.type === 'tool-approval') {
+          acc.push(part);
+        }
+      }
+      return acc;
+    }, [] as ToolApprovalPart[]);
+  }, [activeChat]);
+
   /* We're adding a bg color on hover because there's a brower bug
      that prevents auto scroll-capturing if we don't do this.
      The onMouseEnter methods is also in place to help with another heuristic to get the browser to capture scroll in this element on hover. */
@@ -123,9 +112,14 @@ export function ChatHistory() {
         scrollContainerRef.current?.focus();
       }}
     >
-      {messages.map((message, index) => {
+      {activeChat.messages.map((message) => {
         return (
-          <ChatBubble key={`item_${index + 1}`} {...message} ToolCalls={[]} />
+          <ChatBubble
+            key={message.id}
+            message={message}
+            toolResultParts={toolResultParts}
+            toolApprovalParts={toolApprovalParts}
+          />
         );
       })}
       <div className="mt-2 flex w-full flex-row items-center justify-start gap-2 pl-1 text-xs text-zinc-500">

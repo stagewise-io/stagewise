@@ -126,6 +126,13 @@ export const selectedElementSchema = baseSelectedElementSchema.extend({
   parent: baseSelectedElementSchema.optional(),
 });
 
+export const pluginContentItemSchema = z.object({
+  type: z.literal('text'),
+  text: z.string(),
+});
+
+export type PluginContentItem = z.infer<typeof pluginContentItemSchema>;
+
 export const userMessageMetadataSchema = z.object({
   currentUrl: z.string().max(1024).url().nullable(),
   currentTitle: z.string().max(256).nullable(),
@@ -140,6 +147,12 @@ export const userMessageMetadataSchema = z.object({
   userAgent: z.string().max(1024),
   locale: z.string().max(64),
   selectedElements: z.array(selectedElementSchema),
+  pluginContentItems: z
+    .record(z.string(), z.record(z.string(), pluginContentItemSchema))
+    .optional()
+    .describe(
+      'Plugin content items organized by plugin name and content item name. Structure: pluginContentItems[pluginName][contentItemName] = { type: "text", text: "..." }',
+    ),
 });
 
 export type UserMessageMetadata = z.infer<typeof userMessageMetadataSchema>;
