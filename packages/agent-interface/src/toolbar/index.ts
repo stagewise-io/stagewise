@@ -23,7 +23,6 @@ export {
 export type {
   // Re-export chat types, excluding those that conflict with messaging
   TextPart,
-  ImagePart,
   FilePart,
   ReasoningPart,
   ToolCallPart,
