@@ -71,12 +71,14 @@ export function ChatHistory() {
   }, []);
 
   const _renderedMessages = useMemo(() => {
+    if (!activeChat?.messages) return [];
     return activeChat.messages.filter((message) => {
       return message.role === 'user' || message.role === 'assistant';
     });
   }, [activeChat]);
 
   const toolResultParts = useMemo(() => {
+    if (!activeChat?.messages) return [];
     return activeChat.messages.reduce((acc, message) => {
       for (const part of message.content) {
         if (part.type === 'tool-result') {
@@ -88,6 +90,7 @@ export function ChatHistory() {
   }, [activeChat]);
 
   const toolApprovalParts = useMemo(() => {
+    if (!activeChat?.messages) return [];
     return activeChat.messages.reduce((acc, message) => {
       for (const part of message.content) {
         if (part.type === 'tool-approval') {
@@ -112,7 +115,7 @@ export function ChatHistory() {
         scrollContainerRef.current?.focus();
       }}
     >
-      {activeChat.messages.map((message) => {
+      {activeChat?.messages?.map((message) => {
         return (
           <ChatBubble
             key={message.id}
@@ -121,7 +124,7 @@ export function ChatHistory() {
             toolApprovalParts={toolApprovalParts}
           />
         );
-      })}
+      }) ?? []}
       <div className="mt-2 flex w-full flex-row items-center justify-start gap-2 pl-1 text-xs text-zinc-500">
         <Loader2Icon className="size-4 animate-spin stroke-blue-600" />
         <span className="max-w-48 truncate">Looking for files...</span>
