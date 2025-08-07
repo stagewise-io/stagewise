@@ -7,6 +7,7 @@ import { AgentProvider } from '@/hooks/agent/use-agent-provider';
 import { AgentStateProvider } from '@/hooks/agent/use-agent-state';
 import { AgentMessagingProvider } from '@/hooks/agent/use-agent-messaging';
 import { PanelsProvider } from '@/hooks/use-panels';
+import { ChatHistoryStateProvider } from '@/hooks/use-chat-history-state';
 
 export function ContextProviders({
   children,
@@ -22,7 +23,11 @@ export function ContextProviders({
           <AgentMessagingProvider>
             <PanelsProvider>
               <PluginProvider>
-                <ChatStateProvider>{children}</ChatStateProvider>
+                <ChatStateProvider>
+                  <ChatHistoryStateProvider>
+                    {children}
+                  </ChatHistoryStateProvider>
+                </ChatStateProvider>
               </PluginProvider>
             </PanelsProvider>
           </AgentMessagingProvider>
