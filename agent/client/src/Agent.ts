@@ -5,29 +5,19 @@ import type {
   CoreToolMessage,
   LanguageModelResponseMetadata,
 } from 'ai';
-import type {
-  ChatUpdate,
-  MessagePartUpdate,
-  UserMessage as ChatUserMessage,
-} from '@stagewise/agent-interface/agent';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
 import type { Tools } from '@stagewise/agent-types';
 import {
   AgentStateType,
   createAgentServer,
-  createAgentHook,
-  type UserMessage,
+  type ChatUserMessage,
   type AgentServer,
-  type Chat,
-  type ChatMessage,
-  type AssistantMessage,
-  type ToolMessage,
-  type TextPart,
-  type ToolCallPart,
-  type ToolResultPart,
 } from '@stagewise/agent-interface-internal/agent';
-import { getProjectPath } from '@stagewise/agent-prompt-snippets';
+import {
+  getProjectPath,
+  // getProjectInfo,
+} from '@stagewise/agent-prompt-snippets';
 import { createAuthenticatedClient } from './utils/create-authenticated-client.js';
 import type {
   AppRouter,
@@ -67,6 +57,13 @@ type Response = LanguageModelResponseMetadata & {
   messages: Array<ResponseMessage>;
 };
 
+type History = {
+  messages: (CoreMessage | ChatUserMessage)[];
+  chatId: string;
+};
+
+type Chats = History[];
+
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
 const MAX_RECURSION_DEPTH = 20;
@@ -77,7 +74,7 @@ export class Agent {
   private server: AgentServer | null = null;
   private clientRuntime: ClientRuntime;
   private tools: Tools;
-  private history: (CoreMessage | UserMessage)[];
+  private chats: Chats;
   private client: TRPCClient<AppRouter> | null = null;
   private accessToken: string | null = null;
   private eventEmitter: ReturnType<typeof createEventEmitter>;
@@ -89,9 +86,7 @@ export class Agent {
   private authRetryCount = 0;
   private maxAuthRetries = 2;
   private isExpressMode = false;
-  private activeChatId: string | null = null;
-  private currentAssistantMessageId: string | null = null;
-  private currentMessagePartIndex = 0;
+  private abortController: AbortController = new AbortController();
 
   private constructor(config: {
     clientRuntime: ClientRuntime;
@@ -105,7 +100,7 @@ export class Agent {
     this.tools = config.tools;
     this.accessToken = config.accessToken || null;
     this.eventEmitter = createEventEmitter(config.onEvent);
-    this.history = [];
+    this.chats = []; // TODO: potentially load chats from local storage
     this.client = createAuthenticatedClient(this.accessToken);
     this.agentDescription = config.agentDescription;
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
@@ -215,7 +210,9 @@ export class Agent {
         throw new Error('TRPC API client not initialized');
       }
 
-      const result = await this.client.agent.callAgent.mutate(request);
+      const result = await this.client.agent.callAgent.mutate(request, {
+        signal: this.abortController.signal,
+      });
       // Reset auth retry count on successful call
       this.authRetryCount = 0;
       return result;
@@ -352,6 +349,7 @@ export class Agent {
 
   public async initialize() {
     this.server = await createAgentServer();
+    this.server.interface.chat.setChatSupport(true);
     this.server.setAgentName('stagewise agent');
     this.server.setAgentDescription(
       this.agentDescription || 'Your frontend and design agent',
@@ -360,22 +358,24 @@ export class Agent {
     this.server.interface.availability.set(true);
     this.setAgentState(AgentStateType.IDLE);
 
-    // Initialize chat capability if available
-    if (this.server.interface.chat) {
-      // Create initial chat
-      const chatId = await this.server.interface.chat.createChat();
-      this.activeChatId = chatId;
+    this.server.interface.state.addStopListener(() => {
+      this.abortController.abort();
+      this.abortController = new AbortController();
+    });
 
-      // Subscribe to chat updates would be done via subscriptions in real implementation
-      // For now, we'll use messaging listener as a bridge
-    } else {
-      // Fallback to messaging for backward compatibility
-      this.server.interface.messaging.addUserMessageListener(
-        async (message) => {
+    this.server.interface.chat.addChatUpdateListener(async (update) => {
+      switch (update.type) {
+        case 'chat-created':
+          this.chats.push({
+            messages: [],
+            chatId: update.chat.id,
+          });
+          break;
+        case 'message-added': {
+          const chat = this.chats.find((c) => c.chatId === update.chatId);
+          if (!chat || update.message.role !== 'user') return;
           this.setAgentState(AgentStateType.WORKING);
-
           const promptSnippets: PromptSnippet[] = [];
-
           const projectPathPromptSnippet = await getProjectPath(
             this.clientRuntime,
           );
@@ -383,15 +383,61 @@ export class Agent {
             promptSnippets.push(projectPathPromptSnippet);
           }
 
+          // TODO: Use again after rebase
+          // const projectInfoPromptSnippet = await getProjectInfo(
+          //   this.clientRuntime,
+          // );
+          // if (projectInfoPromptSnippet) {
+          //   promptSnippets.push(projectInfoPromptSnippet);
+          // }
+
           this.callAgent({
-            history: this.history,
+            chatId: chat.chatId,
+            history: chat.messages,
             clientRuntime: this.clientRuntime,
-            userMessage: message,
+            userMessage: update.message,
             promptSnippets,
           });
-        },
-      );
-    }
+          break;
+        }
+        case 'message-updated':
+          break;
+        case 'messages-deleted':
+          break;
+        case 'chat-full-sync':
+          break;
+        case 'chat-list':
+          break;
+        case 'chat-switched':
+          break;
+        case 'chat-title-updated':
+          break;
+      }
+    });
+
+    // this.server.interface.messaging.addUserMessageListener(async (message) => {
+    //   // TODO: check, if a history exists for the given chatId
+    //   this.setAgentState(AgentStateType.WORKING);
+
+    //   const promptSnippets: PromptSnippet[] = [];
+
+    //   const projectPathPromptSnippet = await getProjectPath(this.clientRuntime);
+    //   if (projectPathPromptSnippet) {
+    //     promptSnippets.push(projectPathPromptSnippet);
+    //   }
+
+    //   const projectInfoPromptSnippet = await getProjectInfo(this.clientRuntime);
+    //   if (projectInfoPromptSnippet) {
+    //     promptSnippets.push(projectInfoPromptSnippet);
+    //   }
+
+    //   this.callAgent({
+    //     history: this.history,
+    //     clientRuntime: this.clientRuntime,
+    //     userMessage: message,
+    //     promptSnippets,
+    //   });
+    // });
   }
 
   /**
@@ -400,65 +446,56 @@ export class Agent {
    * @param pathPrefix - Optional path prefix for agent endpoints (default: '/agent')
    * @param httpServer - Optional HTTP server instance for WebSocket support
    */
-  public async initializeWithExpress(
-    expressApp: Parameters<typeof createAgentHook>[0]['app'],
-    httpServer: Parameters<typeof createAgentHook>[0]['server'],
-    pathPrefix = '/agent',
-  ): Promise<{
-    wss: Awaited<ReturnType<typeof createAgentHook>>['wss'];
-  }> {
-    this.isExpressMode = true;
-    this.server = await createAgentHook({
-      app: expressApp,
-      server: httpServer,
-      wsPath: `${pathPrefix}/ws`,
-      infoPath: `${pathPrefix}/info`,
-      startServer: false,
-    });
-    this.server.setAgentName('stagewise agent');
-    this.server.setAgentDescription(
-      this.agentDescription || 'Your frontend and design agent',
-    );
+  // public async initializeWithExpress(
+  //   expressApp: Parameters<typeof createAgentHook>[0]['app'],
+  //   httpServer: Parameters<typeof createAgentHook>[0]['server'],
+  //   pathPrefix = '/agent',
+  // ): Promise<{
+  //   wss: Awaited<ReturnType<typeof createAgentHook>>['wss'];
+  // }> {
+  //   this.isExpressMode = true;
+  //   this.server = await createAgentHook({
+  //     app: expressApp,
+  //     server: httpServer,
+  //     wsPath: `${pathPrefix}/ws`,
+  //     infoPath: `${pathPrefix}/info`,
+  //     startServer: false,
+  //   });
+  //   this.server.setAgentName('stagewise agent');
+  //   this.server.setAgentDescription(
+  //     this.agentDescription || 'Your frontend and design agent',
+  //   );
 
-    this.server.interface.availability.set(true);
-    this.setAgentState(AgentStateType.IDLE);
+  //   this.server.interface.availability.set(true);
+  //   this.setAgentState(AgentStateType.IDLE);
 
-    // Initialize chat capability if available
-    if (this.server.interface.chat) {
-      // Create initial chat
-      const chatId = await this.server.interface.chat.createChat();
-      this.activeChatId = chatId;
+  //   this.server.interface.messaging.addUserMessageListener(async (message) => {
+  //     this.setAgentState(AgentStateType.WORKING);
 
-      // Subscribe to chat updates would be done via subscriptions in real implementation
-      // For now, we'll use messaging listener as a bridge
-    } else {
-      // Fallback to messaging for backward compatibility
-      this.server.interface.messaging.addUserMessageListener(
-        async (message) => {
-          this.setAgentState(AgentStateType.WORKING);
+  //     const promptSnippets: PromptSnippet[] = [];
 
-          const promptSnippets: PromptSnippet[] = [];
+  //     const projectPathPromptSnippet = await getProjectPath(this.clientRuntime);
+  //     if (projectPathPromptSnippet) {
+  //       promptSnippets.push(projectPathPromptSnippet);
+  //     }
 
-          const projectPathPromptSnippet = await getProjectPath(
-            this.clientRuntime,
-          );
-          if (projectPathPromptSnippet) {
-            promptSnippets.push(projectPathPromptSnippet);
-          }
-          this.callAgent({
-            history: this.history,
-            clientRuntime: this.clientRuntime,
-            userMessage: message,
-            promptSnippets,
-          });
-        },
-      );
-    }
+  //     const projectInfoPromptSnippet = await getProjectInfo(this.clientRuntime);
+  //     if (projectInfoPromptSnippet) {
+  //       promptSnippets.push(projectInfoPromptSnippet);
+  //     }
 
-    return {
-      wss: this.server.wss,
-    };
-  }
+  //     this.callAgent({
+  //       history: this.history,
+  //       clientRuntime: this.clientRuntime,
+  //       userMessage: message,
+  //       promptSnippets,
+  //     });
+  //   });
+
+  //   return {
+  //     wss: this.server.wss,
+  //   };
+  // }
 
   /**
    * Calls the agent API
@@ -468,18 +505,20 @@ export class Agent {
    * @param promptSnippets - Prompt snippets to append
    */
   private async callAgent({
+    chatId,
     userMessage,
     history,
     clientRuntime,
     promptSnippets,
   }: {
-    userMessage?: UserMessage;
-    history?: (CoreMessage | UserMessage)[];
+    chatId: string;
+    userMessage?: ChatUserMessage;
+    history?: (CoreMessage | ChatUserMessage)[];
     clientRuntime: ClientRuntime;
     promptSnippets?: PromptSnippet[];
   }): Promise<{
     response: Promise<Response>;
-    history: (CoreMessage | UserMessage)[];
+    history: (CoreMessage | ChatUserMessage)[];
   }> {
     // Validate prerequisites
     if (!this.server) throw new Error('Agent not initialized');
@@ -502,10 +541,6 @@ export class Agent {
 
     try {
       // Initialize and prepare request
-      if (this.server.interface.messaging) {
-        this.server.interface.messaging.clear();
-      }
-      if (userMessage) history = [userMessage]; // For backward compatibility
 
       // Emit prompt triggered event
       this.eventEmitter.emit(
@@ -524,7 +559,23 @@ export class Agent {
         promptSnippets,
       };
 
-      const agentResponse = await this.callAgentWithRetry(request);
+      // TODO: find out how we handle tool approvals, then remove this
+      const requestWithoutToolApprovals = {
+        ...request,
+        messages: request.messages.map((m) => {
+          if (typeof m.content === 'string') {
+            return m;
+          }
+          return {
+            ...m,
+            content: m.content.filter((c) => c.type !== 'tool-approval'),
+          };
+        }),
+      };
+
+      const agentResponse = await this.callAgentWithRetry(
+        requestWithoutToolApprovals as RouterInputs['agent']['callAgent'],
+      );
 
       if (agentResponse.syntheticToolCalls) {
         await this.processParallelToolCallsContent(
@@ -535,6 +586,7 @@ export class Agent {
           },
         );
         return this.callAgent({
+          chatId,
           history: history ?? [],
           clientRuntime,
           userMessage: undefined,
@@ -547,7 +599,7 @@ export class Agent {
       this.setAgentState(AgentStateType.WORKING);
 
       // Start stream consumption with timeout protection
-      const streamConsumptionPromise = this.consumeStreamWithChat(
+      const streamConsumptionPromise = consumeStreamWithTimeout(
         fullStream,
         this.server,
         this.agentTimeout,
@@ -593,6 +645,7 @@ export class Agent {
       // Check if recursion is needed
       if (shouldRecurseAfterToolCall(history ?? [])) {
         return this.callAgent({
+          chatId,
           history: history ?? [],
           clientRuntime,
           userMessage: undefined,
@@ -602,7 +655,11 @@ export class Agent {
 
       // Clean up and finalize
       this.cleanupPendingOperations('Agent task completed successfully', false);
-      this.history = history ?? [];
+      this.chats.forEach((c, index, array) => {
+        if (c.chatId === chatId) {
+          array[index]!.messages = history ?? [];
+        }
+      });
 
       return {
         response: response as Promise<Response>,
@@ -620,8 +677,6 @@ export class Agent {
           this.setAgentState(AgentStateType.IDLE);
         }
       }, STATE_RECOVERY_DELAY);
-
-      this.history = [];
       return {
         response: Promise.resolve({} as Response),
         history: [],
@@ -633,256 +688,11 @@ export class Agent {
   }
 
   /**
-   * Handles chat updates from the chat capability
-   */
-  private async handleChatUpdates(
-    subscription: AsyncIterable<ChatUpdate>,
-  ): Promise<void> {
-    try {
-      for await (const update of subscription) {
-        switch (update.type) {
-          case 'chat-created':
-            this.activeChatId = update.chat.id;
-            break;
-
-          case 'chat-switched':
-            this.activeChatId = update.chatId;
-            break;
-
-          case 'message-added':
-            if (update.message.role === 'user') {
-              // Handle new user message - convert from chat format to UserMessage
-              const userMessage = update.message as any;
-              await this.handleUserMessage(userMessage);
-            }
-            break;
-
-          case 'message-updated':
-            // Handle streaming updates
-            this.handleMessageUpdate(update.update);
-            break;
-        }
-      }
-    } catch (error) {
-      console.error('Error handling chat updates:', error);
-    }
-  }
-
-  /**
-   * Handles a new user message from chat
-   */
-  private async handleUserMessage(message: any): Promise<void> {
-    if (!this.server || !this.activeChatId) return;
-
-    this.setAgentState(AgentStateType.WORKING);
-
-    const promptSnippets: PromptSnippet[] = [];
-    const projectPathPromptSnippet = await getProjectPath(this.clientRuntime);
-    if (projectPathPromptSnippet) {
-      promptSnippets.push(projectPathPromptSnippet);
-    }
-
-    // Convert chat message to core message format for API
-    const coreMessage: CoreMessage = {
-      role: 'user',
-      content: message.content.map((part: any) => {
-        if (part.type === 'text') return { type: 'text', text: part.text };
-        if (part.type === 'image') return { type: 'image', image: part.image };
-        if (part.type === 'file')
-          return { type: 'file', data: part.data, mimeType: part.mimeType };
-        return part;
-      }) as CoreMessage['content'],
-    };
-
-    // Get chat history from server
-    const chatHistory = await this.getChatHistory();
-
-    // Call the agent with the chat history
-    await this.callAgent({
-      history: chatHistory,
-      clientRuntime: this.clientRuntime,
-      userMessage: undefined, // Using history instead
-      promptSnippets,
-    });
-  }
-
-  /**
-   * Gets the current chat history
-   */
-  private async getChatHistory(): Promise<CoreMessage[]> {
-    if (!this.server?.interface.chat || !this.activeChatId) {
-      return this.history;
-    }
-
-    // Get full chat from server - using getActiveChat since we don't have direct getChat method
-    const activeChat = this.server.interface.chat.getActiveChat();
-    if (activeChat) {
-      // Convert chat messages to core messages
-      return activeChat.messages.map((msg: any) => {
-        if (msg.role === 'user') {
-          const userMsg = msg;
-          return {
-            role: 'user' as const,
-            content: userMsg.content.map((part: any) => {
-              if (part.type === 'text')
-                return { type: 'text' as const, text: part.text };
-              if (part.type === 'image')
-                return { type: 'image' as const, image: part.image };
-              if (part.type === 'file')
-                return {
-                  type: 'file' as const,
-                  data: part.data,
-                  mimeType: part.mimeType,
-                };
-              return part;
-            }) as CoreMessage['content'],
-          };
-        } else if (msg.role === 'assistant') {
-          const assistantMsg = msg;
-          return {
-            role: 'assistant' as const,
-            content: assistantMsg.content.map((part: any) => {
-              if (part.type === 'text')
-                return { type: 'text' as const, text: part.text };
-              if (part.type === 'tool-call') {
-                return {
-                  type: 'tool-call' as const,
-                  toolName: part.toolName,
-                  toolCallId: part.toolCallId,
-                  args: part.args,
-                };
-              }
-              return part;
-            }) as CoreMessage['content'],
-          };
-        } else if (msg.role === 'tool') {
-          const toolMsg = msg;
-          return {
-            role: 'tool' as const,
-            content: toolMsg.content.map((part: any) => ({
-              type: 'tool-result' as const,
-              toolCallId: part.toolCallId,
-              toolName: part.toolName,
-              result: part.result,
-              isError: part.isError,
-            })) as CoreMessage['content'],
-          };
-        }
-        return msg as CoreMessage;
-      });
-    }
-
-    return this.history;
-  }
-
-  /**
-   * Handles streaming message updates
-   */
-  private handleMessageUpdate(update: MessagePartUpdate): void {
-    if (!this.server?.interface.chat) return;
-
-    // Track the current message being streamed
-    if (update.messageId !== this.currentAssistantMessageId) {
-      this.currentAssistantMessageId = update.messageId;
-      this.currentMessagePartIndex = 0;
-    }
-
-    // Stream the update to the chat interface
-    if (update.updateType === 'create' || update.updateType === 'replace') {
-      this.currentMessagePartIndex = update.partIndex;
-    }
-  }
-
-  /**
-   * Consumes stream and sends updates to chat interface
-   */
-  private async consumeStreamWithChat(
-    fullStream: AsyncIterable<any>,
-    server: AgentServer,
-    timeout: number,
-    setAgentState: (state: AgentStateType, desc?: string) => void,
-  ): Promise<void> {
-    if (server.interface.chat && this.activeChatId) {
-      // Create assistant message in chat
-      const messageId = `msg-${Date.now()}`;
-      this.currentAssistantMessageId = messageId;
-      this.currentMessagePartIndex = 0;
-
-      // Add initial assistant message
-      const assistantMessage: AssistantMessage = {
-        id: messageId,
-        role: 'assistant',
-        content: [],
-        createdAt: new Date(),
-      };
-      server.interface.chat.addMessage(assistantMessage);
-
-      // Stream updates
-      for await (const chunk of fullStream) {
-        if (chunk.type === 'text-delta') {
-          // Stream text updates directly
-          if (this.currentMessagePartIndex === 0) {
-            server.interface.chat.updateMessage(messageId, [
-              {
-                type: 'text',
-                text: chunk.textDelta,
-              },
-            ]);
-          } else {
-            // Append to existing text
-            const currentMessage = server.interface.chat
-              .getActiveChat()
-              ?.messages.find((m: any) => m.id === messageId);
-            if (
-              currentMessage &&
-              currentMessage.content[this.currentMessagePartIndex]
-            ) {
-              currentMessage.content[this.currentMessagePartIndex].text +=
-                chunk.textDelta;
-              server.interface.chat.updateMessage(
-                messageId,
-                currentMessage.content,
-              );
-            }
-          }
-        } else if (chunk.type === 'tool-call') {
-          this.currentMessagePartIndex++;
-          // Add tool call to message
-          const currentMessage = server.interface.chat
-            .getActiveChat()
-            ?.messages.find((m: any) => m.id === messageId);
-          if (currentMessage) {
-            currentMessage.content.push({
-              type: 'tool-call',
-              toolCallId: chunk.toolCallId,
-              toolName: chunk.toolName,
-              args: chunk.args,
-              requiresApproval: false,
-            });
-            server.interface.chat.updateMessage(
-              messageId,
-              currentMessage.content,
-            );
-          }
-        }
-      }
-    } else {
-      // Fallback to original stream consumption
-      await consumeStreamWithTimeout(
-        fullStream,
-        server,
-        timeout,
-        setAgentState,
-      );
-    }
-  }
-
-  /**
    * Processes response messages from the agent, handling text and tool calls
    */
   private async processResponseMessages(
     messages: Array<ResponseMessage>,
-    history: (CoreMessage | UserMessage)[],
+    history: (CoreMessage | ChatUserMessage)[],
   ): Promise<void> {
     for (const message of messages) {
       const assistantMessage = {
@@ -916,32 +726,6 @@ export class Agent {
         // Add assistant message to history
         history.push(assistantMessage);
 
-        // Add to chat if using chat capability
-        if (this.server?.interface.chat && this.activeChatId) {
-          // Create chat message
-          const chatMessage: AssistantMessage = {
-            id: `msg-${Date.now()}`,
-            role: 'assistant',
-            content: assistantMessage.content.map((part) => {
-              if (part.type === 'text') {
-                return { type: 'text' as const, text: part.text };
-              } else if (part.type === 'tool-call') {
-                return {
-                  type: 'tool-call' as const,
-                  toolCallId: part.toolCallId,
-                  toolName: part.toolName,
-                  args: part.args,
-                  requiresApproval: false,
-                };
-              }
-              return part;
-            }) as AssistantMessage['content'],
-            createdAt: new Date(),
-          };
-
-          this.server.interface.chat.addMessage(chatMessage);
-        }
-
         // Process all tool calls together if any
         if (toolCalls.length > 0) {
           await this.processParallelToolCallsContent(toolCalls, history);
@@ -964,7 +748,7 @@ export class Agent {
       toolCallId: string;
       args: any;
     }>,
-    history: (CoreMessage | UserMessage)[],
+    history: (CoreMessage | ChatUserMessage)[],
     options?: {
       syntheticCall?: boolean;
     },
@@ -1030,45 +814,5 @@ export class Agent {
         );
       },
     );
-
-    // Add tool results to chat if using chat capability
-    if (
-      this.server?.interface.chat &&
-      this.activeChatId &&
-      !options?.syntheticCall
-    ) {
-      for (const tc of toolCalls) {
-        const toolResult = history.find(
-          (msg): msg is CoreToolMessage =>
-            msg.role === 'tool' &&
-            Array.isArray(msg.content) &&
-            msg.content.some((r: any) => r.toolCallId === tc.toolCallId),
-        );
-
-        if (toolResult) {
-          const toolMessage: ToolMessage = {
-            id: `tool-${Date.now()}-${tc.toolCallId}`,
-            role: 'tool',
-            content: toolResult.content.map((r: any) => ({
-              toolCallId: r.toolCallId,
-              toolName: r.toolName,
-              result: r.result,
-              isError: r.isError || false,
-            })),
-            createdAt: new Date(),
-          };
-
-          this.server.interface.chat.addMessage(toolMessage);
-        }
-      }
-    }
-
-    // Update history for browser tools
-    const hasBrowserTools = toolCalls.some(
-      (tc) => this.tools[tc.toolName]?.stagewiseMetadata?.runtime === 'browser',
-    );
-    if (hasBrowserTools) {
-      this.history = history;
-    }
   }
 }
