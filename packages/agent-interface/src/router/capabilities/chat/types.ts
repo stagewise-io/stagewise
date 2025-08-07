@@ -10,17 +10,15 @@ export const textPartSchema = z.object({
   text: z.string(),
 });
 
-export const imagePartSchema = z.object({
-  type: z.literal('image'),
-  mimeType: z.string().max(32),
-  data: z.string().base64(),
-});
-
 export const filePartSchema = z.object({
   type: z.literal('file'),
   data: z.string().base64().describe('Base64 encoded dataURL'),
   filename: z.string().optional(),
-  mimeType: z.string().describe('mimeType of the file'),
+  mimeType: z
+    .string()
+    .describe(
+      'mimeType of the file, including image types like image/png, image/jpeg, etc.',
+    ),
 });
 
 export const reasoningPartSchema = z.object({
@@ -63,12 +61,7 @@ export const userMessageSchema = z.object({
   id: z.string(),
   role: z.literal('user'),
   content: z.array(
-    z.union([
-      textPartSchema,
-      imagePartSchema,
-      filePartSchema,
-      toolApprovalPartSchema,
-    ]),
+    z.union([textPartSchema, filePartSchema, toolApprovalPartSchema]),
   ),
   metadata: userMessageMetadataSchema,
   createdAt: z.date(),
@@ -103,7 +96,6 @@ export const chatMessageSchema = z.discriminatedUnion('role', [
 ]);
 
 export type TextPart = z.infer<typeof textPartSchema>;
-export type ImagePart = z.infer<typeof imagePartSchema>;
 export type FilePart = z.infer<typeof filePartSchema>;
 export type ReasoningPart = z.infer<typeof reasoningPartSchema>;
 export type ToolCallPart = z.infer<typeof toolCallPartSchema>;
@@ -219,7 +211,7 @@ export const createChatRequestSchema = z.object({
 
 export const sendMessageRequestSchema = z.object({
   chatId: z.string(),
-  content: z.array(z.union([textPartSchema, imagePartSchema, filePartSchema])),
+  content: z.array(z.union([textPartSchema, filePartSchema])),
   metadata: userMessageMetadataSchema,
 });
 
