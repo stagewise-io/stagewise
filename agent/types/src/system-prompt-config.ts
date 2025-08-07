@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { promptSnippetSchema } from '@stagewise/api-client';
-import { userMessageMetadataSchema } from '@stagewise/agent-interface-internal/toolbar';
+import { userMessageSchema } from '@stagewise/agent-interface-internal/toolbar';
 
 export const systemPromptConfigSchema = z.object({
-  userMessageMetadata: userMessageMetadataSchema.optional(),
+  userMessage: userMessageSchema.optional(),
   promptSnippets: z.array(promptSnippetSchema).optional(),
 });
 

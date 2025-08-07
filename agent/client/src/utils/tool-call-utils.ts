@@ -1,7 +1,7 @@
 import type { CoreMessage } from 'ai';
 import type {
   AgentServer,
-  UserMessage,
+  ChatUserMessage,
 } from '@stagewise/agent-interface-internal/agent';
 import type { Tools } from '@stagewise/agent-types';
 import { AgentStateType } from '@stagewise/agent-interface-internal/agent';
@@ -10,7 +10,7 @@ import {
   createAssistantToolCallsMessage,
   messagesToCoreMessages,
 } from './message-utils.js';
-import { withTimeout, type TimeoutManager } from './stream-utils.js';
+import type { TimeoutManager } from './stream-utils.js';
 import { ErrorDescriptions } from './error-utils.js';
 
 // Configuration constants
@@ -26,7 +26,7 @@ interface ToolCallContext {
   toolCallId: string;
   args: any;
   server: AgentServer;
-  history: (CoreMessage | UserMessage)[];
+  history: (CoreMessage | ChatUserMessage)[];
   setAgentState: (state: AgentStateType, description?: string) => void;
   onToolCallComplete?: (result: ToolCallProcessingResult) => void;
 }
@@ -61,14 +61,22 @@ export async function processBrowserToolCall(
   );
 
   try {
-    const toolCallResult = await withTimeout(
-      server.interface.toolCalling.requestToolCall(
+    // const toolCallResult = await withTimeout(
+    //   server.interface.toolCalling.requestToolCall(
+    //     toolName,
+    //     args as Record<string, unknown>,
+    //   ),
+    //   BROWSER_TOOL_TIMEOUT,
+    //   'Browser tool timeout',
+    // );
+    const toolCallResult = {
+      result: {
+        type: 'tool-result' as const,
         toolName,
-        args as Record<string, unknown>,
-      ),
-      BROWSER_TOOL_TIMEOUT,
-      'Browser tool timeout',
-    );
+        toolCallId,
+        result: "Not yet implemented, don't try again",
+      },
+    };
 
     // Clear timeout if successful
     timeoutManager.clear(timeoutKey);
@@ -218,7 +226,7 @@ export async function processParallelToolCalls(
   }>,
   tools: Tools,
   server: AgentServer,
-  history: (CoreMessage | UserMessage)[],
+  history: (CoreMessage | ChatUserMessage)[],
   setAgentState: (state: AgentStateType, description?: string) => void,
   timeoutManager: TimeoutManager,
   onToolCallComplete?: (result: ToolCallProcessingResult) => void,
@@ -315,7 +323,7 @@ export async function processParallelToolCalls(
  * Determines if the agent should make a recursive call after tool execution
  */
 export function shouldRecurseAfterToolCall(
-  history: (CoreMessage | UserMessage)[],
+  history: (CoreMessage | ChatUserMessage)[],
 ): boolean {
   const lastMessage = history[history.length - 1];
 
