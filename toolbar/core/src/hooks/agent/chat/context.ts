@@ -1,6 +1,6 @@
 /**
  * Chat context definition
- * 
+ *
  * This file defines the React context for the chat system,
  * including the default values for all context properties.
  */
@@ -19,32 +19,32 @@ const defaultContextValue: ChatContextValue = {
   isLoading: false,
   error: null,
   isSupported: false,
-  
+
   // Streaming state
   streamingMessages: new Map(),
-  
+
   // Tool state
   pendingToolCalls: [],
   availableTools: [],
-  
+
   // Chat management - all return appropriate defaults
   createChat: async () => null,
   deleteChat: async () => false,
   switchChat: async () => false,
   updateChatTitle: async () => false,
-  
+
   // Messaging
   sendMessage: async () => {},
-  
+
   // Tool handling
   approveToolCall: async () => {},
   registerTools: () => {},
   reportToolResult: () => {},
-  
+
   // Utility
   refreshChats: () => {},
   clearError: () => {},
-  
+
   // Computed helpers
   getMessageById: () => undefined,
   getChatById: () => undefined,
