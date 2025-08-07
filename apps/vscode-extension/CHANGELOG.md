@@ -1,5 +1,11 @@
 # stagewise-vscode-extension
 
+## 0.10.2
+
+### Patch Changes
+
+- 1a8085e: Update npx stagewise docs to use stagewise@latest.
+
 ## 0.10.1
 
 ### Patch Changes

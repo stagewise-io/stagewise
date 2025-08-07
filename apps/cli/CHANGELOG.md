@@ -1,5 +1,11 @@
 # stagewise
 
+## 0.2.3
+
+### Patch Changes
+
+- 1a8085e: Update npx stagewise docs to use stagewise@latest.
+
 ## 0.2.2
 
 ### Patch Changes
