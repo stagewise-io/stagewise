@@ -48,8 +48,8 @@ const defaultContextValue: ChatContextValue = {
   // Computed helpers
   getMessageById: () => undefined,
   getChatById: () => undefined,
-  canSwitchChat: () => false,
-  canCreateChat: () => false,
+  canSwitchChat: false,
+  canCreateChat: false,
 };
 
 /**

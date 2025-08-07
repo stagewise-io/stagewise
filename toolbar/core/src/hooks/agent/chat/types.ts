@@ -199,14 +199,12 @@ export interface ChatContextValue {
   getChatById: (chatId: string) => ChatListItem | undefined;
   
   /**
-   * Checks if it's currently possible to switch chats
-   * @returns True if chat switching is allowed
+   * Whether it's currently possible to switch chats
    */
-  canSwitchChat: () => boolean;
+  canSwitchChat: boolean;
   
   /**
-   * Checks if it's currently possible to create a new chat
-   * @returns True if chat creation is allowed
+   * Whether it's currently possible to create a new chat
    */
-  canCreateChat: () => boolean;
+  canCreateChat: boolean;
 }
