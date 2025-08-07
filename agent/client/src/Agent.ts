@@ -47,6 +47,7 @@ import {
   ErrorDescriptions,
   formatErrorDescription,
 } from './utils/error-utils.js';
+import { createAgentHook } from '@stagewise/agent-interface/agent';
 
 type ResponseMessage = (CoreAssistantMessage | CoreToolMessage) & {
   id: string;
@@ -446,56 +447,86 @@ export class Agent {
    * @param pathPrefix - Optional path prefix for agent endpoints (default: '/agent')
    * @param httpServer - Optional HTTP server instance for WebSocket support
    */
-  // public async initializeWithExpress(
-  //   expressApp: Parameters<typeof createAgentHook>[0]['app'],
-  //   httpServer: Parameters<typeof createAgentHook>[0]['server'],
-  //   pathPrefix = '/agent',
-  // ): Promise<{
-  //   wss: Awaited<ReturnType<typeof createAgentHook>>['wss'];
-  // }> {
-  //   this.isExpressMode = true;
-  //   this.server = await createAgentHook({
-  //     app: expressApp,
-  //     server: httpServer,
-  //     wsPath: `${pathPrefix}/ws`,
-  //     infoPath: `${pathPrefix}/info`,
-  //     startServer: false,
-  //   });
-  //   this.server.setAgentName('stagewise agent');
-  //   this.server.setAgentDescription(
-  //     this.agentDescription || 'Your frontend and design agent',
-  //   );
+  public async initializeWithExpress(
+    expressApp: Parameters<typeof createAgentHook>[0]['app'],
+    httpServer: Parameters<typeof createAgentHook>[0]['server'],
+    pathPrefix = '/agent',
+  ): Promise<{
+    wss: Awaited<ReturnType<typeof createAgentHook>>['wss'];
+  }> {
+    this.isExpressMode = true;
+    this.server = await createAgentHook({
+      app: expressApp,
+      server: httpServer,
+      wsPath: `${pathPrefix}/ws`,
+      infoPath: `${pathPrefix}/info`,
+      startServer: false,
+    });
+    if (!this.server) {
+      throw new Error('Failed to create agent server');
+    }
+    this.server.setAgentName('stagewise agent');
+    this.server.setAgentDescription(
+      this.agentDescription || 'Your frontend and design agent',
+    );
 
-  //   this.server.interface.availability.set(true);
-  //   this.setAgentState(AgentStateType.IDLE);
+    this.server.interface.availability.set(true);
+    this.setAgentState(AgentStateType.IDLE);
 
-  //   this.server.interface.messaging.addUserMessageListener(async (message) => {
-  //     this.setAgentState(AgentStateType.WORKING);
+    this.server.interface.chat.addChatUpdateListener(async (update) => {
+      switch (update.type) {
+        case 'chat-created':
+          this.chats.push({
+            messages: [],
+            chatId: update.chat.id,
+          });
+          break;
+        case 'message-added': {
+          const chat = this.chats.find((c) => c.chatId === update.chatId);
+          if (!chat || update.message.role !== 'user') return;
+          this.setAgentState(AgentStateType.WORKING);
+          const promptSnippets: PromptSnippet[] = [];
+          const projectPathPromptSnippet = await getProjectPath(
+            this.clientRuntime,
+          );
+          if (projectPathPromptSnippet) {
+            promptSnippets.push(projectPathPromptSnippet);
+          }
 
-  //     const promptSnippets: PromptSnippet[] = [];
+          // TODO: Use again after rebase
+          // const projectInfoPromptSnippet = await getProjectInfo(this.clientRuntime);
+          // if (projectInfoPromptSnippet) {
+          //   promptSnippets.push(projectInfoPromptSnippet);
+          // }
 
-  //     const projectPathPromptSnippet = await getProjectPath(this.clientRuntime);
-  //     if (projectPathPromptSnippet) {
-  //       promptSnippets.push(projectPathPromptSnippet);
-  //     }
+          this.callAgent({
+            chatId: chat.chatId,
+            history: chat.messages,
+            clientRuntime: this.clientRuntime,
+            userMessage: update.message,
+            promptSnippets,
+          });
+          break;
+        }
+        case 'message-updated':
+          break;
+        case 'messages-deleted':
+          break;
+        case 'chat-full-sync':
+          break;
+        case 'chat-list':
+          break;
+        case 'chat-switched':
+          break;
+        case 'chat-title-updated':
+          break;
+      }
+    });
 
-  //     const projectInfoPromptSnippet = await getProjectInfo(this.clientRuntime);
-  //     if (projectInfoPromptSnippet) {
-  //       promptSnippets.push(projectInfoPromptSnippet);
-  //     }
-
-  //     this.callAgent({
-  //       history: this.history,
-  //       clientRuntime: this.clientRuntime,
-  //       userMessage: message,
-  //       promptSnippets,
-  //     });
-  //   });
-
-  //   return {
-  //     wss: this.server.wss,
-  //   };
-  // }
+    return {
+      wss: this.server!.wss,
+    };
+  }
 
   /**
    * Calls the agent API
