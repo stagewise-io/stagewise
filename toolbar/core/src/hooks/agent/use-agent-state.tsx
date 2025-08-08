@@ -1,35 +1,44 @@
-import { useContext, useEffect, useState } from 'react';
-import {
-  type AgentState,
-  AgentStateType,
-} from '@stagewise/agent-interface-internal/toolbar';
-
-import { useAgents } from './use-agent-provider.tsx';
+import { useContext, useEffect, useState, useCallback } from 'react';
+import { useAgents } from './use-agent-provider';
 import { type ReactNode, createContext } from 'react';
 
-const fallbackState: AgentState = {
-  state: AgentStateType.IDLE,
-};
+interface AgentStateContextValue {
+  isWorking: boolean;
+  stateDescription?: string;
+  stopAgent: () => Promise<void>;
+  canStop: boolean;
+}
 
-const agentStateContext = createContext<AgentState>(fallbackState);
+const agentStateContext = createContext<AgentStateContextValue>({
+  isWorking: false,
+  stateDescription: undefined,
+  stopAgent: async () => {},
+  canStop: false,
+});
 
 export function AgentStateProvider({ children }: { children?: ReactNode }) {
   const agent = useAgents().connected;
-  const [state, setState] = useState<AgentState>(fallbackState);
+  const [isWorking, setIsWorking] = useState(false);
+  const [stateDescription, setStateDescription] = useState<
+    string | undefined
+  >();
 
+  // Listen for state updates from chat
   useEffect(() => {
-    if (agent) {
-      const subscription = agent.state.getState.subscribe(undefined, {
-        onData: (value) => {
-          // Double-check that agent is still available when data arrives
-          setState(value);
+    if (agent?.chat?.getChatUpdates) {
+      const subscription = agent.chat.getChatUpdates.subscribe(undefined, {
+        onData: (update) => {
+          if (update.type === 'agent-state') {
+            setIsWorking(update.isWorking);
+            setStateDescription(update.stateDescription);
+          }
         },
         onError: () => {
-          setState(fallbackState);
+          setIsWorking(false);
+          setStateDescription(undefined);
         },
       });
 
-      // Cleanup function to unsubscribe when agent changes or component unmounts
       return () => {
         try {
           subscription.unsubscribe();
@@ -41,15 +50,48 @@ export function AgentStateProvider({ children }: { children?: ReactNode }) {
         }
       };
     } else {
-      setState(fallbackState);
+      setIsWorking(false);
+      setStateDescription(undefined);
     }
   }, [agent]);
 
+  const stopAgent = useCallback(async () => {
+    if (agent?.chat?.stop) {
+      try {
+        await agent.chat.stop.mutate();
+      } catch (error) {
+        console.error('[AgentStateProvider] Error stopping agent:', error);
+        throw error;
+      }
+    }
+  }, [agent]);
+
+  const canStop = isWorking;
+
+  const contextValue: AgentStateContextValue = {
+    isWorking,
+    stateDescription,
+    stopAgent,
+    canStop,
+  };
+
   return (
-    <agentStateContext.Provider value={state}>
+    <agentStateContext.Provider value={contextValue}>
       {children}
     </agentStateContext.Provider>
   );
 }
 
-export const useAgentState = () => useContext(agentStateContext);
+export const useAgentState = () => {
+  const context = useContext(agentStateContext);
+  return {
+    isWorking: context.isWorking,
+    stateDescription: context.stateDescription,
+    stopAgent: context.stopAgent,
+    canStop: context.canStop,
+    // For backward compatibility with components expecting state.state
+    state: {
+      description: context.stateDescription,
+    },
+  };
+};

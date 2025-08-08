@@ -153,6 +153,10 @@ export const userMessageMetadataSchema = z.object({
     .describe(
       'Plugin content items organized by plugin name and content item name. Structure: pluginContentItems[pluginName][contentItemName] = { type: "text", text: "..." }',
     ),
+  sentByPlugin: z
+    .boolean()
+    .optional()
+    .describe('Whether the message was sent by a plugin'),
 });
 
 export type UserMessageMetadata = z.infer<typeof userMessageMetadataSchema>;

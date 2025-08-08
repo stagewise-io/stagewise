@@ -5,7 +5,6 @@ import {
   useChatHistoryState,
 } from '@/hooks/use-chat-history-state';
 import { cn } from '@/utils';
-import { AgentStateType } from '@stagewise/agent-interface-internal/toolbar';
 import { useEffect, useMemo, useRef } from 'react';
 import { useAgentChat } from '@/hooks/agent/chat/use-agent-chat';
 import { useAgents } from '@/hooks/agent/use-agent-provider';
@@ -24,11 +23,8 @@ function ChatWithHistoryPanelContent() {
     if (!connected) {
       return false;
     }
-    return (
-      agentState.state === AgentStateType.WAITING_FOR_USER_RESPONSE ||
-      agentState.state === AgentStateType.IDLE
-    );
-  }, [agentState.state, connected]);
+    return !agentState.isWorking;
+  }, [agentState.isWorking, connected]);
 
   const anyMessageInChat = useMemo(() => {
     return activeChat?.messages?.length > 0;

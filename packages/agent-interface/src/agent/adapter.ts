@@ -74,6 +74,7 @@ export class AgentTransportAdapter implements TransportInterface {
     // Initialize all managers
     // Each manager handles a specific aspect of agent functionality
     this.chatManager = new ChatManager(this.options.idGenerator);
+
     this.chat = this.chatManager.createImplementation();
   }
 
@@ -221,6 +222,27 @@ export class AgentTransportAdapter implements TransportInterface {
         removeChatUpdateListener: (listener) => {
           self.chatManager.removeUpdateListener(listener);
         },
+
+        /**
+         * Sets the agent's working state
+         */
+        setWorkingState: (isWorking, description) => {
+          self.chatManager.setWorkingState(isWorking, description);
+        },
+
+        /**
+         * Adds a listener for stop signals
+         */
+        addStopListener: (listener) => {
+          self.chatManager.addStopListener(listener);
+        },
+
+        /**
+         * Removes a stop listener
+         */
+        removeStopListener: (listener) => {
+          self.chatManager.removeStopListener(listener);
+        },
       },
 
       /**
@@ -233,6 +255,7 @@ export class AgentTransportAdapter implements TransportInterface {
          */
         clearAllListeners: () => {
           self.chatManager.clearAllUpdateListeners();
+          self.chatManager.clearAllStopListeners();
         },
       },
     };

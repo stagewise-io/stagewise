@@ -95,6 +95,12 @@ export interface ChatImplementation {
     result: unknown,
     isError?: boolean,
   ) => void;
+
+  /**
+   * Called when the user wants to stop the agent's current operation.
+   * The agent should handle this gracefully.
+   */
+  onStop?: () => Promise<void>;
 }
 
 // Define the sub-router
@@ -152,4 +158,8 @@ export const chatRouter = (impl: ChatImplementation) =>
       .mutation(({ input }) =>
         impl.onToolResult(input.toolCallId, input.result, input.isError),
       ),
+
+    stop: procedure.mutation(() =>
+      impl.onStop ? impl.onStop() : Promise.resolve(),
+    ),
   });

@@ -67,6 +67,15 @@ export type AgentInterface = {
 
     /** Remove chat update listener */
     removeChatUpdateListener: (listener: (update: ChatUpdate) => void) => void;
+
+    /** Set the agent's working state (broadcasts to toolbar via chat updates) */
+    setWorkingState: (isWorking: boolean, description?: string) => void;
+
+    /** Add a listener for stop signals from the toolbar */
+    addStopListener: (listener: () => void) => void;
+
+    /** Remove a stop listener */
+    removeStopListener: (listener: () => void) => void;
   };
 
   /**

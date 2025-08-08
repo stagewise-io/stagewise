@@ -6,14 +6,10 @@ import type {
   ToolbarPlugin,
 } from '@/plugin-sdk/plugin';
 import { useConfig } from './use-config';
-import type { UserMessage } from '@stagewise/agent-interface-internal/toolbar';
-import { useAgentMessaging } from './agent/use-agent-messaging';
-import {
-  collectUserMessageMetadata,
-  generateId,
-  getIFrameWindow,
-} from '@/utils';
+import type { PluginContentItem } from '@stagewise/agent-interface-internal/toolbar';
+import { collectUserMessageMetadata, getIFrameWindow } from '@/utils';
 import { usePanels } from './use-panels';
+import { useAgentChat } from './agent/chat';
 
 export interface PluginContextType {
   plugins: ToolbarPlugin[];
@@ -31,7 +27,7 @@ const PluginContext = createContext<PluginContextType>({
 export function PluginProvider({ children }: { children?: ReactNode }) {
   const { config } = useConfig();
 
-  const { sendMessage } = useAgentMessaging();
+  const { sendMessage } = useAgentChat();
 
   const { openChat } = usePanels();
 
@@ -40,15 +36,17 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
   const toolbarContext = useMemo(() => {
     return {
       sendPrompt: async (prompt: PluginUserMessage) => {
-        const userMessage: UserMessage = {
-          ...prompt,
-          id: generateId(),
-          createdAt: new Date(),
-          sentByPlugin: true,
-          metadata: collectUserMessageMetadata([]),
-          pluginContent: {},
-        };
-        sendMessage(userMessage);
+        const pluginContentItems = plugins.reduce(
+          (acc, plugin) => {
+            acc[plugin.pluginName] = plugin.onPromptSend?.(prompt);
+            return acc;
+          },
+          {} as Record<string, Record<string, PluginContentItem>>,
+        );
+        sendMessage(
+          prompt.content,
+          collectUserMessageMetadata([], pluginContentItems, true),
+        );
         openChat();
       },
       mainAppWindow: getIFrameWindow(),
