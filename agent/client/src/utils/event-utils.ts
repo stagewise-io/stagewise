@@ -116,9 +116,9 @@ export const EventFactories = {
     data: {
       hasUserMessage: !!userMessage,
       messageId: userMessage?.id,
-      currentUrl: userMessage?.metadata?.currentUrl || null,
+      currentUrl: userMessage?.metadata?.browserData?.currentUrl || null,
       selectedElementsCount:
-        userMessage?.metadata?.selectedElements?.length || 0,
+        userMessage?.metadata?.browserData?.selectedElements?.length || 0,
       promptSnippetsCount,
     },
   }),

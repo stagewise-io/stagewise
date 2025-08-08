@@ -200,7 +200,6 @@ export const chatUpdateSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('agent-state'),
     isWorking: z.boolean(),
-    stateDescription: z.string().optional(),
   }),
 ]);
 

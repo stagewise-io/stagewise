@@ -456,16 +456,18 @@ export const collectUserMessageMetadata = (
 ): UserMessageMetadata => {
   const iframeWindow = getIFrameWindow();
   return {
-    currentUrl: truncateString(iframeWindow?.location.href, 1024),
-    currentTitle: truncateString(iframeWindow?.document.title, 256),
-    currentZoomLevel: 0,
-    devicePixelRatio: iframeWindow?.devicePixelRatio,
-    userAgent: truncateString(iframeWindow?.navigator.userAgent, 1024),
-    locale: truncateString(iframeWindow?.navigator.language, 64),
-    selectedElements,
-    viewportResolution: {
-      width: iframeWindow?.innerWidth,
-      height: iframeWindow?.innerHeight,
+    browserData: {
+      currentUrl: truncateString(iframeWindow?.location.href, 1024),
+      currentTitle: truncateString(iframeWindow?.document.title, 256),
+      currentZoomLevel: 0,
+      devicePixelRatio: iframeWindow?.devicePixelRatio,
+      userAgent: truncateString(iframeWindow?.navigator.userAgent, 1024),
+      locale: truncateString(iframeWindow?.navigator.language, 64),
+      selectedElements,
+      viewportResolution: {
+        width: iframeWindow?.innerWidth,
+        height: iframeWindow?.innerHeight,
+      },
     },
     pluginContentItems: {}, // This should be modified afterward sto add all plugin content items
     sentByPlugin,

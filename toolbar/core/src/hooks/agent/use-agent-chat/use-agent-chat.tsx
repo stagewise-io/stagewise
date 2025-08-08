@@ -52,9 +52,6 @@ export const AgentChatProvider = ({ children }: { children?: ReactNode }) => {
   });
 
   const [isWorking, setIsWorking] = useState(false);
-  const [stateDescription, setStateDescription] = useState<
-    string | undefined
-  >();
 
   const [streamingState, setStreamingState] = useState<MessageStreamingState>({
     streamingParts: new Map(),
@@ -79,7 +76,6 @@ export const AgentChatProvider = ({ children }: { children?: ReactNode }) => {
       setPendingToolCalls,
       processedUpdatesRef,
       setIsWorking,
-      setStateDescription,
     ),
     [],
   );
@@ -425,7 +421,6 @@ export const AgentChatProvider = ({ children }: { children?: ReactNode }) => {
     isLoading: chatState.isLoading,
     error: chatState.error,
     isWorking,
-    stateDescription,
 
     // Agent control
     stopAgent,
