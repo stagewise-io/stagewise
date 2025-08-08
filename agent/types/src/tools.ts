@@ -1,5 +1,6 @@
 import type { Tool } from 'ai';
 import { z } from 'zod';
+import { undoExecuteResultSchema } from '@stagewise/agent-interface/agent';
 
 export type { Tool };
 
@@ -11,12 +12,15 @@ export const stagewiseToolMetadataSchema = z.object({
 
 export type StagewiseToolMetadata = z.infer<typeof stagewiseToolMetadataSchema>;
 
+export const undoExecuteSchema = z
+  .function()
+  .args(z.void())
+  .returns(z.promise(undoExecuteResultSchema));
+
+export type UndoExecute = z.infer<typeof undoExecuteSchema>;
+
 export const toolResultSchema = z.object({
-  undoExecute: z
-    .function()
-    .args(z.void())
-    .returns(z.promise(z.void()))
-    .optional(),
+  undoExecute: undoExecuteSchema.optional(),
   success: z.boolean(),
   error: z.string().optional(),
   message: z.string().optional(),

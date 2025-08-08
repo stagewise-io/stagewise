@@ -22,6 +22,7 @@
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
+    "@stagewise/agent-interface": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
     "esbuild": "^0.20.1",

@@ -1,5 +1,6 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { ToolResult } from '@stagewise/agent-types';
+import type { UndoExecuteResult } from '@stagewise/agent-interface/agent';
 import { z } from 'zod';
 
 export const DESCRIPTION =
@@ -96,27 +97,48 @@ export async function overwriteFileTool(
     }
 
     // Create the undo function
-    const undoExecute = async (): Promise<void> => {
-      if (fileExists && originalContent !== undefined) {
-        // File existed before, restore its original content
-        const restoreResult = await clientRuntime.fileSystem.writeFile(
-          absolutePath,
-          originalContent,
-        );
-
-        if (!restoreResult.success) {
-          throw new Error(
-            `Failed to restore original content for file: ${relPath}`,
+    const undoExecute = async (): Promise<UndoExecuteResult> => {
+      try {
+        if (fileExists && originalContent !== undefined) {
+          // File existed before, restore its original content
+          const restoreResult = await clientRuntime.fileSystem.writeFile(
+            absolutePath,
+            originalContent,
           );
-        }
-      } else {
-        // File didn't exist before, delete it
-        const deleteResult =
-          await clientRuntime.fileSystem.deleteFile(absolutePath);
 
-        if (!deleteResult.success) {
-          throw new Error(`Failed to delete newly created file: ${relPath}`);
+          if (!restoreResult.success) {
+            return {
+              success: false,
+              error: `Failed to restore original content for file: ${relPath}`,
+            };
+          }
+
+          return {
+            success: true,
+            message: `Successfully restored original content for file: ${relPath}`,
+          };
+        } else {
+          // File didn't exist before, delete it
+          const deleteResult =
+            await clientRuntime.fileSystem.deleteFile(absolutePath);
+
+          if (!deleteResult.success) {
+            return {
+              success: false,
+              error: `Failed to delete newly created file: ${relPath}`,
+            };
+          }
+
+          return {
+            success: true,
+            message: `Successfully deleted newly created file: ${relPath}`,
+          };
         }
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
       }
     };
 

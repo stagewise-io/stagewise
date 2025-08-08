@@ -1,8 +1,8 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { ToolResult } from '@stagewise/agent-types';
 import { z } from 'zod';
-import { checkFileSize } from './file-utils';
-import { FILE_SIZE_LIMITS } from './constants';
+import { checkFileSize } from './file-utils.js';
+import { FILE_SIZE_LIMITS } from './constants.js';
 
 export const DESCRIPTION =
   'Read the contents of a file with line-by-line control';

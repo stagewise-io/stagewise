@@ -7,6 +7,7 @@ import type {
 } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
+import type { UndoExecuteResult } from '@stagewise/agent-interface/agent';
 import type { Tools } from '@stagewise/agent-types';
 import {
   AgentStateType,
@@ -84,7 +85,7 @@ export class Agent {
   private undoToolCallStack: Array<{
     toolName: string;
     toolCallId: string;
-    undoExecute: () => Promise<void>;
+    undoExecute: () => Promise<UndoExecuteResult>;
   }> = [];
 
   private constructor(config: {

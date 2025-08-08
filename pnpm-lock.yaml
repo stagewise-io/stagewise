@@ -234,6 +234,9 @@ importers:
 
   agent/tools:
     devDependencies:
+      '@stagewise/agent-interface':
+        specifier: workspace:*
+        version: link:../../packages/agent-interface
       '@stagewise/agent-runtime-interface':
         specifier: workspace:*
         version: link:../runtime-interface

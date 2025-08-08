@@ -22,6 +22,8 @@ import type { AvailabilityImplementation } from '../router/capabilities/availabi
 import type { MessagingImplementation } from '../router/capabilities/messaging';
 import type { StateImplementation } from '../router/capabilities/state';
 import type { ToolCallingImplementation } from '../router/capabilities/tool-calling';
+import type { UndoImplementation } from '../router/capabilities/undo';
+import type { UndoExecuteResult } from '../router/capabilities/undo/types';
 
 /**
  * Optional configuration for the AgentTransportAdapter.
@@ -143,6 +145,7 @@ export class AgentTransportAdapter implements TransportInterface {
   public readonly messaging: MessagingImplementation;
   public readonly state: StateImplementation;
   public toolCalling?: ToolCallingImplementation;
+  public undo?: UndoImplementation;
 
   // --- Internal State Properties ---
   private _agentInterface: AgentInterface | null = null;
@@ -161,6 +164,7 @@ export class AgentTransportAdapter implements TransportInterface {
   private _messageContent: AgentMessageContentItemPart[] = [];
   private _userMessageListeners: Set<(message: UserMessage) => void> =
     new Set();
+  private _undoListeners: Set<() => Promise<UndoExecuteResult>> = new Set();
 
   // Tool calling state
   private _toolCallingSupported = false;
@@ -195,6 +199,7 @@ export class AgentTransportAdapter implements TransportInterface {
     this.availability = this.createAvailabilityImplementation();
     this.state = this.createStateImplementation();
     this.messaging = this.createMessagingImplementation();
+    this.undo = this.createUndoImplementation();
 
     // 5. Initialize controllers with default state
     this._availabilityController.push(this._availability);
@@ -474,11 +479,23 @@ export class AgentTransportAdapter implements TransportInterface {
           });
         },
       },
+      undo: {
+        addUndoListener: (listener) => {
+          self._undoListeners.add(listener);
+        },
+        removeUndoListener: (listener) => {
+          self._undoListeners.delete(listener);
+        },
+        clearUndoListeners: () => {
+          self._undoListeners.clear();
+        },
+      },
       cleanup: {
         clearAllListeners: () => {
           self._userMessageListeners.clear();
           self._toolListUpdateListeners.clear();
           self._toolCallSubscribers.clear();
+          self._undoListeners.clear();
         },
       },
     };
@@ -651,6 +668,20 @@ export class AgentTransportAdapter implements TransportInterface {
             };
           },
         };
+      },
+    };
+  }
+
+  private createUndoImplementation(): UndoImplementation {
+    const self = this;
+    return {
+      onUndoRequest: async () => {
+        // Call the first undo listener if available
+        const listener = self._undoListeners.values().next().value;
+        if (listener) {
+          return listener();
+        }
+        return { success: false, error: 'No undo listener registered' };
       },
     };
   }

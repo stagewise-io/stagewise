@@ -1,8 +1,9 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { ToolResult } from '@stagewise/agent-types';
+import type { UndoExecuteResult } from '@stagewise/agent-interface/agent';
 import { z } from 'zod';
-import { checkFileSize } from './file-utils';
-import { FILE_SIZE_LIMITS } from './constants';
+import { checkFileSize } from './file-utils.js';
+import { FILE_SIZE_LIMITS } from './constants.js';
 
 export const DESCRIPTION =
   'Make multiple edits to a single file in one operation';
@@ -178,16 +179,29 @@ export async function multiEditTool(
       }
 
       // Create the undo function to restore the original content
-      const undoExecute = async (): Promise<void> => {
-        const restoreResult = await clientRuntime.fileSystem.writeFile(
-          absolutePath,
-          originalContent,
-        );
-
-        if (!restoreResult.success) {
-          throw new Error(
-            `Failed to restore original content for file: ${file_path}`,
+      const undoExecute = async (): Promise<UndoExecuteResult> => {
+        try {
+          const restoreResult = await clientRuntime.fileSystem.writeFile(
+            absolutePath,
+            originalContent,
           );
+
+          if (!restoreResult.success) {
+            return {
+              success: false,
+              error: `Failed to restore original content for file: ${file_path}`,
+            };
+          }
+
+          return {
+            success: true,
+            message: `Successfully restored original content for file: ${file_path}`,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          };
         }
       };
 

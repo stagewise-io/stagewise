@@ -1,5 +1,6 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { ToolResult } from '@stagewise/agent-types';
+import type { UndoExecuteResult } from '@stagewise/agent-interface/agent';
 import { z } from 'zod';
 
 export const DESCRIPTION = 'Delete a file from the file system';
@@ -69,19 +70,34 @@ export async function deleteFileTool(
     }
 
     // Create the undo function
-    const undoExecute = async (): Promise<void> => {
-      // Ensure directory exists
-      const dir = clientRuntime.fileSystem.getDirectoryName(absolutePath);
-      await clientRuntime.fileSystem.createDirectory(dir);
+    const undoExecute = async (): Promise<UndoExecuteResult> => {
+      try {
+        // Ensure directory exists
+        const dir = clientRuntime.fileSystem.getDirectoryName(absolutePath);
+        await clientRuntime.fileSystem.createDirectory(dir);
 
-      // Restore the file with its original content
-      const restoreResult = await clientRuntime.fileSystem.writeFile(
-        absolutePath,
-        fileContent,
-      );
+        // Restore the file with its original content
+        const restoreResult = await clientRuntime.fileSystem.writeFile(
+          absolutePath,
+          fileContent,
+        );
 
-      if (!restoreResult.success) {
-        throw new Error(`Failed to restore deleted file: ${relPath}`);
+        if (!restoreResult.success) {
+          return {
+            success: false,
+            error: `Failed to restore deleted file: ${relPath}`,
+          };
+        }
+
+        return {
+          success: true,
+          message: `Successfully restored deleted file: ${relPath}`,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
       }
     };
 

@@ -15,6 +15,7 @@ import type {
   ToolCallResult,
   PendingToolCall,
 } from '../router/capabilities/tool-calling/types';
+import type { UndoExecuteResult } from '../router/capabilities/undo/types';
 
 export type AgentInterface = {
   /**
@@ -143,6 +144,21 @@ export type AgentInterface = {
 
     /** Get all pending tool calls */
     getPendingToolCalls: () => PendingToolCall[];
+  };
+
+  /**
+   * UNDO MANAGEMENT
+   * Methods to handle undo requests
+   */
+  undo: {
+    /** Add a listener for undo requests */
+    addUndoListener: (listener: () => Promise<UndoExecuteResult>) => void;
+
+    /** Remove a specific undo listener */
+    removeUndoListener: (listener: () => Promise<UndoExecuteResult>) => void;
+
+    /** Clear all undo listeners */
+    clearUndoListeners: () => void;
   };
 
   /**

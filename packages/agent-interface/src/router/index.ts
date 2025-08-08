@@ -12,12 +12,14 @@ import {
   type MessagingImplementation,
   messagingRouter,
 } from './capabilities/messaging';
+import { type UndoImplementation, undoRouter } from './capabilities/undo';
 
 export interface TransportInterface {
   availability: AvailabilityImplementation;
   messaging: MessagingImplementation;
   state: StateImplementation;
   toolCalling?: ToolCallingImplementation;
+  undo?: UndoImplementation;
 }
 
 export const interfaceRouter = (implementation: TransportInterface) =>
@@ -26,6 +28,7 @@ export const interfaceRouter = (implementation: TransportInterface) =>
     messaging: messagingRouter(implementation.messaging),
     state: stateRouter(implementation.state),
     toolCalling: toolCallingRouter(implementation.toolCalling),
+    undo: undoRouter(implementation.undo),
   });
 
 export type InterfaceRouter = ReturnType<typeof interfaceRouter>;

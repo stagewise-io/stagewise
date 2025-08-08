@@ -4,8 +4,8 @@
     "noEmit": false,
     "outDir": "./dist",
     "rootDir": "./src",
-    "module": "ESNext",
-    "moduleResolution": "Node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "target": "ESNext",
     "emitDeclarationOnly": true
   },
