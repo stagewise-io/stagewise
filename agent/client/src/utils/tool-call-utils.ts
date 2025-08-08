@@ -4,7 +4,6 @@ import type {
   ChatUserMessage,
 } from '@stagewise/agent-interface-internal/agent';
 import type { Tools } from '@stagewise/agent-types';
-import { AgentStateType } from '@stagewise/agent-interface-internal/agent';
 import { handleClientsideToolCall } from './handle-clientside-tool-call.js';
 import {
   createAssistantToolCallsMessage,
@@ -27,7 +26,7 @@ interface ToolCallContext {
   args: any;
   server: AgentServer;
   history: (CoreMessage | ChatUserMessage)[];
-  setAgentState: (state: AgentStateType, description?: string) => void;
+  setWorkingState: (state: boolean, description?: string) => void;
   onToolCallComplete?: (result: ToolCallProcessingResult) => void;
 }
 
@@ -47,7 +46,7 @@ export async function processBrowserToolCall(
   context: ToolCallContext,
   timeoutManager: TimeoutManager,
 ): Promise<ToolCallProcessingResult> {
-  const { toolName, toolCallId, args, server, setAgentState } = context;
+  const { toolName, toolCallId, setWorkingState } = context;
 
   // Set up timeout for browser tool
   const timeoutKey = `browser-tool-${toolCallId}`;
@@ -55,7 +54,7 @@ export async function processBrowserToolCall(
     timeoutKey,
     () => {
       console.warn(`[Agent]: Browser tool ${toolName} timed out`);
-      setAgentState(AgentStateType.IDLE, 'Browser tool timeout');
+      setWorkingState(false, 'Browser tool timeout');
     },
     BROWSER_TOOL_TIMEOUT,
   );
@@ -101,7 +100,7 @@ export async function processBrowserToolCall(
     );
     console.error(`[Agent]: ${errorDescription}`);
     timeoutManager.clear(timeoutKey);
-    setAgentState(AgentStateType.FAILED, errorDescription);
+    setWorkingState(false, errorDescription);
 
     const result: ToolCallProcessingResult = {
       success: false,
@@ -125,7 +124,8 @@ export async function processBrowserToolCall(
 export async function processClientSideToolCall(
   context: ToolCallContext,
 ): Promise<ToolCallProcessingResult> {
-  const { tool, toolName, toolCallId, args, history, setAgentState } = context;
+  const { tool, toolName, toolCallId, args, history, setWorkingState } =
+    context;
 
   const startTime = Date.now();
   const result = await handleClientsideToolCall(
@@ -143,7 +143,7 @@ export async function processClientSideToolCall(
       args,
       duration,
     );
-    setAgentState(AgentStateType.FAILED, errorDescription);
+    setWorkingState(false, errorDescription);
 
     const processResult: ToolCallProcessingResult = {
       success: false,
@@ -159,12 +159,12 @@ export async function processClientSideToolCall(
 
     // Reset to idle after 2 seconds
     setTimeout(() => {
-      setAgentState(AgentStateType.IDLE);
+      setWorkingState(false);
     }, 2000);
 
     return processResult;
   } else if (result.userInteractionRequired) {
-    setAgentState(AgentStateType.WAITING_FOR_USER_RESPONSE);
+    setWorkingState(true);
 
     const processResult: ToolCallProcessingResult = {
       success: false,
@@ -227,7 +227,7 @@ export async function processParallelToolCalls(
   tools: Tools,
   server: AgentServer,
   history: (CoreMessage | ChatUserMessage)[],
-  setAgentState: (state: AgentStateType, description?: string) => void,
+  setWorkingState: (state: boolean, description?: string) => void,
   timeoutManager: TimeoutManager,
   onToolCallComplete?: (result: ToolCallProcessingResult) => void,
 ): Promise<void> {
@@ -257,7 +257,7 @@ export async function processParallelToolCalls(
       args: tc.args,
       server,
       history,
-      setAgentState,
+      setWorkingState,
       onToolCallComplete,
     };
 
@@ -281,7 +281,7 @@ export async function processParallelToolCalls(
       args: tc.args,
       server,
       history,
-      setAgentState,
+      setWorkingState,
       onToolCallComplete,
     };
 

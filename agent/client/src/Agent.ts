@@ -8,15 +8,13 @@ import type {
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
 import type { Tools } from '@stagewise/agent-types';
-import {
-  AgentStateType,
-  createAgentServer,
-  type ChatUserMessage,
-  type AgentServer,
+import type {
+  ChatUserMessage,
+  AgentServer,
 } from '@stagewise/agent-interface-internal/agent';
 import {
   getProjectPath,
-  // getProjectInfo,
+  getProjectInfo,
 } from '@stagewise/agent-prompt-snippets';
 import { createAuthenticatedClient } from './utils/create-authenticated-client.js';
 import type {
@@ -47,7 +45,7 @@ import {
   ErrorDescriptions,
   formatErrorDescription,
 } from './utils/error-utils.js';
-import { createAgentHook } from '@stagewise/agent-interface/agent';
+import { createAgentHook } from '@stagewise/agent-interface-internal/agent';
 
 type ResponseMessage = (CoreAssistantMessage | CoreToolMessage) & {
   id: string;
@@ -79,7 +77,7 @@ export class Agent {
   private client: TRPCClient<AppRouter> | null = null;
   private accessToken: string | null = null;
   private eventEmitter: ReturnType<typeof createEventEmitter>;
-  private currentState?: AgentStateType;
+  private isWorking = false;
   private agentDescription?: string;
   private timeoutManager: TimeoutManager;
   private recursionDepth = 0;
@@ -101,7 +99,7 @@ export class Agent {
     this.tools = config.tools;
     this.accessToken = config.accessToken || null;
     this.eventEmitter = createEventEmitter(config.onEvent);
-    this.chats = []; // TODO: potentially load chats from local storage
+    this.chats = []; // TODO: load chats from local storage
     this.client = createAuthenticatedClient(this.accessToken);
     this.agentDescription = config.agentDescription;
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
@@ -151,41 +149,33 @@ export class Agent {
    * @param newState - The new state to set
    * @param description - Optional description of the state change
    */
-  private setAgentState(newState: AgentStateType, description?: string): void {
+  private setAgentWorking(isWorking: boolean, description?: string): void {
     if (!this.server) return;
-
-    const previousState = this.currentState;
-    this.currentState = newState;
-
-    // Clear any existing state timeout
-    this.timeoutManager.clear('current-state');
+    this.timeoutManager.clear('is-working');
+    this.isWorking = isWorking;
 
     // Set automatic recovery for stuck states
-    if (
-      newState === AgentStateType.WORKING ||
-      newState === AgentStateType.CALLING_TOOL
-    ) {
+    if (isWorking) {
       this.timeoutManager.set(
-        'current-state',
+        'is-working',
         () => {
-          this.setAgentState(
-            AgentStateType.IDLE,
-            'Automatic recovery from stuck state',
-          );
+          this.setAgentWorking(false, 'Automatic recovery from stuck state');
         },
         this.agentTimeout,
       );
     }
 
     const validatedDescription = this.validateDescription(description);
-    if (validatedDescription) {
-      this.server.interface.state.set(newState, validatedDescription);
-    } else {
-      this.server.interface.state.set(newState);
-    }
-
+    this.server.interface.chat.setWorkingState(
+      this.isWorking,
+      validatedDescription,
+    );
     this.eventEmitter.emit(
-      EventFactories.agentStateChanged(newState, previousState, description),
+      EventFactories.agentStateChanged(
+        this.isWorking,
+        !this.isWorking,
+        description,
+      ),
     );
   }
 
@@ -304,10 +294,7 @@ export class Agent {
     }
 
     // Set state to IDLE
-    this.setAgentState(
-      AgentStateType.IDLE,
-      reason || 'Cleanup pending operations',
-    );
+    this.setAgentWorking(false, reason || 'Cleanup pending operations');
   }
 
   /**
@@ -348,106 +335,13 @@ export class Agent {
     return Agent.instance;
   }
 
-  public async initialize() {
-    this.server = await createAgentServer();
-    this.server.interface.chat.setChatSupport(true);
-    this.server.setAgentName('stagewise agent');
-    this.server.setAgentDescription(
-      this.agentDescription || 'Your frontend and design agent',
-    );
-
-    this.server.interface.availability.set(true);
-    this.setAgentState(AgentStateType.IDLE);
-
-    this.server.interface.state.addStopListener(() => {
-      this.abortController.abort();
-      this.abortController = new AbortController();
-    });
-
-    this.server.interface.chat.addChatUpdateListener(async (update) => {
-      switch (update.type) {
-        case 'chat-created':
-          this.chats.push({
-            messages: [],
-            chatId: update.chat.id,
-          });
-          break;
-        case 'message-added': {
-          const chat = this.chats.find((c) => c.chatId === update.chatId);
-          if (!chat || update.message.role !== 'user') return;
-          this.setAgentState(AgentStateType.WORKING);
-          const promptSnippets: PromptSnippet[] = [];
-          const projectPathPromptSnippet = await getProjectPath(
-            this.clientRuntime,
-          );
-          if (projectPathPromptSnippet) {
-            promptSnippets.push(projectPathPromptSnippet);
-          }
-
-          // TODO: Use again after rebase
-          // const projectInfoPromptSnippet = await getProjectInfo(
-          //   this.clientRuntime,
-          // );
-          // if (projectInfoPromptSnippet) {
-          //   promptSnippets.push(projectInfoPromptSnippet);
-          // }
-
-          this.callAgent({
-            chatId: chat.chatId,
-            history: chat.messages,
-            clientRuntime: this.clientRuntime,
-            userMessage: update.message,
-            promptSnippets,
-          });
-          break;
-        }
-        case 'message-updated':
-          break;
-        case 'messages-deleted':
-          break;
-        case 'chat-full-sync':
-          break;
-        case 'chat-list':
-          break;
-        case 'chat-switched':
-          break;
-        case 'chat-title-updated':
-          break;
-      }
-    });
-
-    // this.server.interface.messaging.addUserMessageListener(async (message) => {
-    //   // TODO: check, if a history exists for the given chatId
-    //   this.setAgentState(AgentStateType.WORKING);
-
-    //   const promptSnippets: PromptSnippet[] = [];
-
-    //   const projectPathPromptSnippet = await getProjectPath(this.clientRuntime);
-    //   if (projectPathPromptSnippet) {
-    //     promptSnippets.push(projectPathPromptSnippet);
-    //   }
-
-    //   const projectInfoPromptSnippet = await getProjectInfo(this.clientRuntime);
-    //   if (projectInfoPromptSnippet) {
-    //     promptSnippets.push(projectInfoPromptSnippet);
-    //   }
-
-    //   this.callAgent({
-    //     history: this.history,
-    //     clientRuntime: this.clientRuntime,
-    //     userMessage: message,
-    //     promptSnippets,
-    //   });
-    // });
-  }
-
   /**
    * Initialize the agent by hooking into a user-provided Express server
    * @param expressApp - The Express application to hook into
    * @param pathPrefix - Optional path prefix for agent endpoints (default: '/agent')
    * @param httpServer - Optional HTTP server instance for WebSocket support
    */
-  public async initializeWithExpress(
+  public async initialize(
     expressApp: Parameters<typeof createAgentHook>[0]['app'],
     httpServer: Parameters<typeof createAgentHook>[0]['server'],
     pathPrefix = '/agent',
@@ -470,9 +364,7 @@ export class Agent {
       this.agentDescription || 'Your frontend and design agent',
     );
 
-    this.server.interface.availability.set(true);
-    this.server.interface.chat.setChatSupport(true);
-    this.setAgentState(AgentStateType.IDLE);
+    this.setAgentWorking(false);
 
     this.server.interface.chat.addChatUpdateListener(async (update) => {
       switch (update.type) {
@@ -485,7 +377,7 @@ export class Agent {
         case 'message-added': {
           const chat = this.chats.find((c) => c.chatId === update.chatId);
           if (!chat || update.message.role !== 'user') return;
-          this.setAgentState(AgentStateType.WORKING);
+          this.setAgentWorking(true);
           const promptSnippets: PromptSnippet[] = [];
           const projectPathPromptSnippet = await getProjectPath(
             this.clientRuntime,
@@ -494,11 +386,12 @@ export class Agent {
             promptSnippets.push(projectPathPromptSnippet);
           }
 
-          // TODO: Use again after rebase
-          // const projectInfoPromptSnippet = await getProjectInfo(this.clientRuntime);
-          // if (projectInfoPromptSnippet) {
-          //   promptSnippets.push(projectInfoPromptSnippet);
-          // }
+          const projectInfoPromptSnippet = await getProjectInfo(
+            this.clientRuntime,
+          );
+          if (projectInfoPromptSnippet) {
+            promptSnippets.push(projectInfoPromptSnippet);
+          }
 
           this.callAgent({
             chatId: chat.chatId,
@@ -562,7 +455,8 @@ export class Agent {
         this.recursionDepth,
         MAX_RECURSION_DEPTH,
       );
-      this.setAgentState(AgentStateType.FAILED, errorDesc);
+      // TODO: add an error message to the chat
+      this.setAgentWorking(false, errorDesc);
       return {
         response: Promise.resolve({} as Response),
         history: [],
@@ -628,7 +522,7 @@ export class Agent {
 
       const { fullStream, response, finishReason } = agentResponse;
 
-      this.setAgentState(AgentStateType.WORKING);
+      this.setAgentWorking(true);
 
       // Start stream consumption with timeout protection
       const streamConsumptionPromise = consumeStreamWithTimeout(
@@ -636,7 +530,7 @@ export class Agent {
         fullStream,
         this.server,
         this.agentTimeout,
-        (state, desc) => this.setAgentState(state, desc),
+        (state, desc) => this.setAgentWorking(state, desc),
       );
 
       streamConsumptionPromise.catch((_error) => {});
@@ -700,15 +594,11 @@ export class Agent {
       };
     } catch (error) {
       const errorDesc = formatErrorDescription('Agent task failed', error);
-      this.setAgentState(AgentStateType.FAILED, errorDesc);
+      this.setAgentWorking(false, errorDesc);
 
       // Reset to idle after delay
       setTimeout(() => {
-        if (
-          this.server?.interface.state.get()?.state === AgentStateType.FAILED
-        ) {
-          this.setAgentState(AgentStateType.IDLE);
-        }
+        this.setAgentWorking(false);
       }, STATE_RECOVERY_DELAY);
       return {
         response: Promise.resolve({} as Response),
@@ -808,9 +698,9 @@ export class Agent {
           }
         }
 
-        this.setAgentState(AgentStateType.CALLING_TOOL, combinedDescription);
+        this.setAgentWorking(true, combinedDescription);
       } else {
-        this.setAgentState(AgentStateType.CALLING_TOOL);
+        this.setAgentWorking(true);
       }
     }
 
@@ -834,7 +724,7 @@ export class Agent {
       this.tools,
       this.server!,
       history,
-      (state, desc) => this.setAgentState(state, desc),
+      (state, desc) => this.setAgentWorking(state, desc),
       this.timeoutManager,
       (result) => {
         this.eventEmitter.emit(
