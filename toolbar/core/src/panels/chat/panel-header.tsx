@@ -2,16 +2,14 @@ import { PanelHeader } from '@/components/ui/panel';
 import { cn } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { ListFilterIcon, XIcon, PlusIcon } from 'lucide-react';
-import { useAgentState } from '@/hooks/agent/use-agent-state';
 import { useState } from 'react';
 import { ChatList } from './chat-list';
-import { useAgentChat } from '@/hooks/agent/chat';
+import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
 
 export function ChatPanelHeader() {
-  const agentState = useAgentState();
   const [chatListOpen, setChatListOpen] = useState(false);
 
-  const { canCreateChat, createChat } = useAgentChat();
+  const { canCreateChat, createChat, stateDescription } = useAgentChat();
 
   return (
     <PanelHeader
@@ -23,9 +21,7 @@ export function ChatPanelHeader() {
       )}
       title={chatListOpen && <span className="mt-0.5">Chats</span>}
       description={
-        agentState.state.description && (
-          <span className="text-sm">{agentState.state.description}</span>
-        )
+        stateDescription && <span className="text-sm">{stateDescription}</span>
       }
       clear
       actionArea={

@@ -3,22 +3,20 @@ import { TextSlideshow } from '@/components/ui/text-slideshow';
 import { Button } from '@/components/ui/button';
 import { PanelFooter } from '@/components/ui/panel';
 import { useAgents } from '@/hooks/agent/use-agent-provider';
-import { useAgentState } from '@/hooks/agent/use-agent-state';
-import { useChatHistoryState } from '@/hooks/use-chat-history-state';
+import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
 import { Textarea } from '@headlessui/react';
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useAgentChat } from '@/hooks/agent/chat';
+import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
 
 const GlassyTextInputClassNames =
   'origin-center rounded-xl border border-black/10 ring-1 ring-white/20 transition-all duration-150 ease-out after:absolute after:inset-0 after:size-full after:content-normal after:rounded-[inherit] after:bg-gradient-to-b after:from-white/5 after:to-white/0 after:transition-colors after:duration-150 after:ease-out disabled:pointer-events-none disabled:bg-black/5 disabled:text-foreground/60 disabled:opacity-30';
 
 export function ChatPanelFooter() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const chatState = useChatHistoryState();
-  const _agentChat = useAgentChat();
-  const agentState = useAgentState();
+  const chatState = useChatState();
+  const { isWorking, activeChat, stopAgent, canStop } = useAgentChat();
   const { connected } = useAgents();
   const [isComposing, setIsComposing] = useState(false);
 
@@ -27,8 +25,8 @@ export function ChatPanelFooter() {
     if (!connected) {
       return false;
     }
-    return !agentState.isWorking;
-  }, [agentState.isWorking, connected]);
+    return !isWorking;
+  }, [isWorking, connected]);
 
   const canSendMessage = useMemo(() => {
     return (
@@ -61,6 +59,19 @@ export function ChatPanelFooter() {
     setIsComposing(false);
   }, []);
 
+  const showMultiLineTextArea = useMemo(() => {
+    // Show a large text area if we have a line break or more than 40 characters.
+    return (
+      chatState.chatInput.includes('\n') || chatState.chatInput.length > 40
+    );
+  }, [chatState.chatInput]);
+
+  const showTextSlideshow = useMemo(() => {
+    return (
+      activeChat?.messages.length === 0 && chatState.chatInput.length === 0
+    );
+  }, [activeChat?.messages.length]);
+
   return (
     <PanelFooter
       clear
@@ -88,14 +99,16 @@ export function ChatPanelFooter() {
             className={cn(
               GlassyTextInputClassNames,
               'z-10 h-8 w-full resize-none rounded-2xl bg-zinc-500/5 px-2 py-1 text-zinc-950 shadow-md backdrop-blur-lg focus:bg-blue-200/20 focus:shadow-blue-400/10 focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+              showMultiLineTextArea ? 'h-26' : 'h-8',
             )}
+            placeholder={!showTextSlideshow && 'Type a message...'}
           />
           <div className="pointer-events-none absolute inset-0 z-20 size-full px-[9px] py-[5px]">
             {/* TODO: Only render this if there is no chat history yet. */}
             <TextSlideshow
               className={cn(
                 'text-foreground/40 text-sm',
-                chatState.chatInput.length !== 0 && 'opacity-0',
+                showTextSlideshow && 'opacity-0',
               )}
               texts={[
                 'Try: Add a new button into the top right corner',
@@ -105,14 +118,16 @@ export function ChatPanelFooter() {
             />
           </div>
         </div>
-        <Button
-          onClick={handleSubmit}
-          glassy
-          variant="secondary"
-          className="!opacity-100 group z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg !disabled:*:opacity-10 hover:bg-rose-600/20"
-        >
-          <SquareIcon className="size-3 fill-zinc-500 stroke-zinc-500 group-hover:fill-zinc-800 group-hover:stroke-zinc-800" />
-        </Button>
+        {canStop && (
+          <Button
+            onClick={stopAgent}
+            glassy
+            variant="secondary"
+            className="!opacity-100 group z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg !disabled:*:opacity-10 hover:bg-rose-600/20"
+          >
+            <SquareIcon className="size-3 fill-zinc-500 stroke-zinc-500 group-hover:fill-zinc-800 group-hover:stroke-zinc-800" />
+          </Button>
+        )}
         <Button
           disabled={!canSendMessage}
           onClick={handleSubmit}

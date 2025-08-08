@@ -1,6 +1,6 @@
 /**
  * Agent Chat Hook Module
- * 
+ *
  * This module provides hooks and components for managing chat
  * functionality with the connected agent.
  */

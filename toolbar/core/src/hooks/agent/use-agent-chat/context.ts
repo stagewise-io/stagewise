@@ -18,7 +18,8 @@ const defaultContextValue: ChatContextValue = {
   activeChat: null,
   isLoading: false,
   error: null,
-  isSupported: false,
+  isWorking: false,
+  stateDescription: undefined,
 
   // Streaming state
   streamingMessages: new Map(),
@@ -51,6 +52,10 @@ const defaultContextValue: ChatContextValue = {
   getChatById: () => undefined,
   canSwitchChat: false,
   canCreateChat: false,
+
+  // Agent control
+  stopAgent: async () => {},
+  canStop: false,
 };
 
 /**

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
 import { Loader2Icon } from 'lucide-react';
-import { useAgentChat } from '@/hooks/agent/chat';
+import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
 import type {
   ToolApprovalPart,
   ToolResultPart,
@@ -11,7 +11,7 @@ export function ChatHistory() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const wasAtBottomRef = useRef(true);
 
-  const activeChat = useAgentChat().activeChat;
+  const { activeChat, isWorking } = useAgentChat();
 
   // Force scroll to the very bottom
   const scrollToBottom = () => {
@@ -70,7 +70,7 @@ export function ChatHistory() {
     };
   }, []);
 
-  const _renderedMessages = useMemo(() => {
+  const renderedMessages = useMemo(() => {
     if (!activeChat?.messages) return [];
     return activeChat.messages.filter((message) => {
       return message.role === 'user' || message.role === 'assistant';
@@ -109,13 +109,13 @@ export function ChatHistory() {
     <section
       ref={scrollContainerRef}
       aria-label="Agent message display"
-      className="scrollbar-thin pointer-events-auto overflow-y-scroll overscroll-contain px-3 py-4 pt-16 pb-14 text-foreground text-sm focus-within:outline-none hover:bg-white/0 focus:outline-none"
+      className="scrollbar-thin pointer-events-auto min-h-full overflow-y-scroll overscroll-contain px-3 py-4 pt-16 pb-14 text-foreground text-sm focus-within:outline-none hover:bg-white/0 focus:outline-none"
       onScroll={handleScroll}
       onMouseEnter={() => {
         scrollContainerRef.current?.focus();
       }}
     >
-      {activeChat?.messages?.map((message) => {
+      {renderedMessages.map((message) => {
         return (
           <ChatBubble
             key={message.id}
@@ -125,10 +125,12 @@ export function ChatHistory() {
           />
         );
       }) ?? []}
-      <div className="mt-2 flex w-full flex-row items-center justify-start gap-2 pl-1 text-xs text-zinc-500">
-        <Loader2Icon className="size-4 animate-spin stroke-blue-600" />
-        <span className="max-w-48 truncate">Looking for files...</span>
-      </div>
+
+      {isWorking && (
+        <div className="mt-2 flex w-full flex-row items-center justify-start gap-2 pl-1 text-xs text-zinc-500">
+          <Loader2Icon className="size-4 animate-spin stroke-blue-600" />
+        </div>
+      )}
     </section>
   );
 }

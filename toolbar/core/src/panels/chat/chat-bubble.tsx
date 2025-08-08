@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { useAgentChat } from '@/hooks/agent/chat';
+import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
 import { cn, getDataUriForData } from '@/utils';
 import type {
   ChatMessage,
