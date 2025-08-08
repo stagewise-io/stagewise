@@ -1,5 +1,4 @@
 import type { AgentServer } from '@stagewise/agent-interface-internal/agent';
-import { AgentStateType } from '@stagewise/agent-interface-internal/agent';
 import { ErrorDescriptions, formatErrorDescription } from './error-utils.js';
 
 /**
@@ -29,6 +28,20 @@ export async function consumeAgentStream(
   try {
     let partIndex = 0;
     for await (const chunk of fullStream) {
+      server.interface.chat.addMessage(
+        {
+          id: messageId,
+          content: [
+            {
+              type: 'text',
+              text: '',
+            },
+          ],
+          role: 'assistant',
+          createdAt: new Date(),
+        },
+        chatId,
+      );
       if (chunk.type === 'text-delta' && chunk.textDelta) {
         server.interface.chat.streamMessagePart(
           messageId,
@@ -119,7 +132,7 @@ export async function consumeStreamWithTimeout(
   fullStream: AsyncIterable<{ type: string; textDelta?: string }>,
   server: AgentServer,
   timeout: number,
-  setAgentState: (state: AgentStateType, description?: string) => void,
+  setWorkingState: (state: boolean, description?: string) => void,
 ): Promise<void> {
   const streamPromise = consumeAgentStream(
     fullStream,
@@ -133,7 +146,7 @@ export async function consumeStreamWithTimeout(
           operation: 'consumeAgentStream',
         },
       );
-      setAgentState(AgentStateType.FAILED, errorDesc);
+      setWorkingState(false, errorDesc);
     },
   );
 
@@ -149,7 +162,7 @@ export async function consumeStreamWithTimeout(
       'consumeStreamWithTimeout',
     );
     console.error('[Agent]:', errorDesc);
-    setAgentState(AgentStateType.FAILED, errorDesc);
+    setWorkingState(false, errorDesc);
     throw error;
   }
 }

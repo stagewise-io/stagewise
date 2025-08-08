@@ -1,4 +1,3 @@
-import type { AgentStateType } from '@stagewise/agent-interface-internal/agent';
 import type { ChatUserMessage } from '@stagewise/agent-interface-internal/agent';
 import type { RouterOutputs } from '@stagewise/api-client';
 
@@ -49,8 +48,8 @@ export interface ToolCallCompletedEvent extends BaseAgentEvent {
 export interface AgentStateChangedEvent extends BaseAgentEvent {
   type: 'agent_state_changed';
   data: {
-    previousState?: AgentStateType;
-    newState: AgentStateType;
+    previousIsWorking?: boolean;
+    isWorking: boolean;
     description?: string;
   };
 }
@@ -155,15 +154,15 @@ export const EventFactories = {
   }),
 
   agentStateChanged: (
-    newState: AgentStateType,
-    previousState?: AgentStateType,
+    isWorking: boolean,
+    previousIsWorking?: boolean,
     description?: string,
   ): AgentStateChangedEvent => ({
     type: 'agent_state_changed',
     timestamp: new Date(),
     data: {
-      previousState,
-      newState,
+      previousIsWorking,
+      isWorking,
       description,
     },
   }),
