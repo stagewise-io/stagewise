@@ -11,7 +11,7 @@ export interface ToolbarItemProps {
 
 export function ToolbarItem(props: ToolbarItemProps) {
   return (
-    <div className="relative flex w-full shrink-0 items-center justify-center">
+    <div className="relative flex min-h-8 w-8 shrink-0 items-center justify-center">
       {props.children}
       {props.badgeContent && (
         <div

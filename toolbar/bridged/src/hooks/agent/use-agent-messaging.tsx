@@ -123,7 +123,7 @@ export const AgentMessagingProvider = ({
   );
 
   useEffect(() => {
-    if (agent !== null) {
+    if (agent) {
       const subscription = agent.agent.messaging.getMessage.subscribe(
         undefined,
         {

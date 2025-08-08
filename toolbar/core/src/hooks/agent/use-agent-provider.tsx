@@ -34,11 +34,7 @@ interface AgentProviderInterface {
   /**
    * The agent that the toolbar is currently connected to.
    */
-  connected:
-    | null
-    | (AgentInfo & {
-        agent: ReturnType<typeof createTRPCClient<InterfaceRouter>>;
-      });
+  connected: ReturnType<typeof createTRPCClient<InterfaceRouter>> | null;
 
   /**
    * Whether the currently connected agent is unavailable (connection lost).
@@ -67,27 +63,6 @@ const agentContext = createContext<AgentProviderInterface>({
 });
 
 /**
- * Generates a unique key for an agent by concatenating name, description, and port.
- * Used for persisting agent selection in sessionStorage.
- */
-function getAgentUniqueKey(agent: AgentInfo): string {
-  return `${agent.name}|||${agent.description}|||${agent.port}`;
-}
-
-/**
- * Persists the selected agent to sessionStorage.
- */
-function persistSelectedAgent(agent: AgentInfo): void {
-  try {
-    const uniqueKey = getAgentUniqueKey(agent);
-    sessionStorage.setItem('stagewise_toolbar_selected_agent', uniqueKey);
-    console.debug(`[AgentProvider] Persisted selected agent: ${uniqueKey}`);
-  } catch (error) {
-    console.warn('[AgentProvider] Failed to persist selected agent:', error);
-  }
-}
-
-/**
  * Creates a tRPC WebSocket client configured to connect to an agent on the specified port.
  * Returns both the client and the underlying websocket for connection monitoring.
  * Uses a stability check to only consider connections established after they remain open for 200ms.
@@ -98,22 +73,19 @@ function createWebSocketClient(
   onConnectionEstablished: () => void,
   onConnectionFailed: () => void,
   connectionStabilityTimeoutRef: React.RefObject<NodeJS.Timeout | null>,
-  isAppHosted = false,
 ): {
   client: ReturnType<typeof createTRPCClient<InterfaceRouter>>;
   wsClient: ReturnType<typeof createWSClient>;
 } {
   console.debug(
-    `[AgentProvider] Creating WebSocket client for port ${port} (app-hosted: ${isAppHosted})...`,
+    `[AgentProvider] Creating WebSocket client for port ${port}...`,
   );
 
   let isConnectionStable = false;
   let connectionFailedCalled = false;
 
   const hostname = window.location.hostname;
-  const wsPath = isAppHosted
-    ? '/stagewise-toolbar-app/server/ws'
-    : '/stagewise/ws';
+  const wsPath = '/stagewise-toolbar-app/server/ws';
   const wsClient = createWSClient({
     url: `ws://${hostname}:${port}${wsPath}`,
     onClose(cause) {
@@ -186,15 +158,13 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
   console.debug('[AgentProvider] AgentProvider component initializing...');
 
   // ===== STATE MANAGEMENT =====
-  const [availableAgents, setAvailableAgents] = useState<AgentInfo[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
   const connected = useRef<ReturnType<
     typeof createTRPCClient<InterfaceRouter>
   > | null>(null);
   const connectedWsClient = useRef<ReturnType<typeof createWSClient> | null>(
     null,
   );
-  const [connectedPort, setConnectedPort] = useState<number | null>(null);
-  const [finishedInitialScan, setFinishedInitialScan] = useState(false);
   const [connectedUnavailable, setConnectedUnavailable] = useState(false);
   const [requiresUserAttention, setRequiresUserAttention] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -206,16 +176,8 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
   const isManualSelectionRef = useRef<boolean>(false);
   const delayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const connectionStabilityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isAppHostedAgentRef = useRef<boolean>(false);
 
   // ===== RETRY LOGIC FUNCTIONS =====
-
-  /**
-   * Starts retry attempts for the specified port every 2 seconds.
-   * Only retries if the connection loss wasn't due to manual user action.
-   * Limited to a maximum of 5 retry attempts for regular agents.
-   * App-hosted agents retry indefinitely.
-   */
   const startRetryConnection = useCallback(
     (port: number) => {
       console.debug(
@@ -238,7 +200,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
         retryIntervalRef.current = setInterval(() => {
           if (
             previouslySelectedPortRef.current === port &&
-            !connected.current &&
+            !connected &&
             !isManualSelectionRef.current
           ) {
             retryCountRef.current++;
@@ -263,7 +225,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
         );
       }
     },
-    [connected, availableAgents],
+    [connected],
   );
 
   /**
@@ -297,11 +259,9 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
         // Stop any ongoing retry attempts
         stopRetryConnection();
 
-        if (connected.current) {
+        if (connected) {
           // Clean up existing connection
-          console.debug(
-            `[AgentProvider] Cleaning up existing connection (port ${connectedPort})...`,
-          );
+          console.debug(`[AgentProvider] Cleaning up existing connection...`);
 
           // Clear any pending connection stability timeout
           if (connectionStabilityTimeoutRef.current) {
@@ -326,8 +286,8 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
           }
 
           connected.current = null;
+          setIsConnected(false);
           connectedWsClient.current = null;
-          setConnectedPort(null);
 
           // Small delay to ensure WebSocket is fully closed before creating new connection
           await new Promise((resolve) => setTimeout(resolve, 100));
@@ -359,8 +319,8 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
             }
 
             connected.current = null;
+            setIsConnected(false);
             connectedWsClient.current = null;
-            setConnectedPort(null);
 
             console.debug(
               `[AgentProvider] App-hosted agent disconnected, starting permanent retry...`,
@@ -371,7 +331,6 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
             console.debug(
               `[AgentProvider] Connection established to agent on port ${port}`,
             );
-            setConnectedPort(port);
             setConnectedUnavailable(false); // Reset unavailable state on successful connection
 
             // Reset retry counter on successful connection
@@ -379,17 +338,6 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
 
             // Clear initial load state immediately upon successful connection
             setIsInitialLoad(false);
-
-            // Persist the agent selection for automatic connections (like single agent auto-connect)
-            // Manual connections are already persisted in connectAgent
-            if (!isManual) {
-              const agentToPersist = availableAgents.find(
-                (agent) => agent.port === port,
-              );
-              if (agentToPersist) {
-                persistSelectedAgent(agentToPersist);
-              }
-            }
 
             // No need to refresh agent list after successful connection
             console.debug(
@@ -404,7 +352,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
             // Clean up the failed connection state
             connected.current = null;
             connectedWsClient.current = null;
-            setConnectedPort(null);
+            setIsConnected(false);
             setConnectedUnavailable(true);
 
             // Start retry attempts if this wasn't a manual selection
@@ -419,6 +367,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
         );
         connected.current = client;
         connectedWsClient.current = wsClient;
+        setIsConnected(true);
 
         console.debug(
           `[AgentProvider] WebSocket client created for port ${port} - waiting for stability confirmation...`,
@@ -453,8 +402,8 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
 
         connected.current = null;
         connectedWsClient.current = null;
-        setConnectedPort(null);
         setConnectedUnavailable(true);
+        setIsConnected(false);
 
         // Start retry attempts if this wasn't a manual selection and connection failed
         if (!isManual) {
@@ -465,61 +414,23 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
         }
       }
     },
-    [connectedPort, startRetryConnection, stopRetryConnection, availableAgents],
+    [startRetryConnection, stopRetryConnection],
   );
 
   // ===== LIFECYCLE EFFECTS =====
 
-  // Log state changes
   useEffect(() => {
     console.debug(
-      `[AgentProvider] State change - Available agents: ${availableAgents.length}`,
-      availableAgents.map((a) => `${a.name} (${a.port})`),
+      `[AgentProvider] Connection state changed: ${connected ? `Connected` : 'Not connected'}`,
     );
-  }, [availableAgents]);
-
-  useEffect(() => {
-    console.debug(
-      `[AgentProvider] Connection state changed: ${connected ? `Connected to port ${connectedPort}` : 'Not connected'}`,
-    );
-  }, [connected, connectedPort]);
+  }, [connected]);
 
   // Initial scan on mount - check config for app-hosted agent
   useEffect(() => {
-    // Only run on initial mount
-    if (!finishedInitialScan) {
-      console.debug(
-        '[AgentProvider] Config indicates Stagewise agent usage, connecting to app port...',
-      );
+    const url = new URL(window.location.href);
+    const appPort = Number.parseInt(url.port);
 
-      // Get the current port from the URL
-      const url = new URL(window.location.href);
-      const appPort = Number.parseInt(url.port);
-
-      // Create a fake agent info for the app-hosted agent
-      const appAgent: AgentInfo = {
-        port: appPort,
-        name: 'Stagewise CLI Agent',
-        description: 'Integrated with application',
-        info: {
-          name: 'Stagewise CLI Agent',
-          description: 'Integrated with application',
-          capabilities: {
-            toolCalling: true,
-            chatHistory: true,
-          },
-        },
-      };
-
-      isAppHostedAgentRef.current = true;
-      setAvailableAgents([appAgent]); // Only show the app-hosted agent
-      setFinishedInitialScan(true);
-
-      // Connect to the app-hosted agent
-      setTimeout(() => {
-        connectAgentInternal(appPort, false);
-      }, 10);
-    }
+    connectAgentInternal(appPort, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array to run only once on mount
 
@@ -532,7 +443,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
 
   // Handle 500ms delay for requiresUserAttention
   useEffect(() => {
-    const isConnectedAndAvailable = connected.current && !connectedUnavailable;
+    const isConnectedAndAvailable = connected && !connectedUnavailable;
 
     if (isConnectedAndAvailable) {
       // Agent is connected and available - immediately clear attention requirement
@@ -558,7 +469,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
         delayTimeoutRef.current = null;
       }
     };
-  }, [connectedPort, connectedUnavailable]);
+  }, [connectedUnavailable, connected]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -594,28 +505,17 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
 
   // ===== PROVIDER INTERFACE =====
 
-  const agentGetter = useMemo(() => {
-    return {
-      agent: connected.current,
-    };
-  }, [connectedPort]);
-
   /**
    * Memoized provider value to prevent unnecessary re-renders.
    */
   const providerInterface = useMemo(
     (): AgentProviderInterface => ({
-      connected: connected.current
-        ? {
-            agent: connected.current,
-            ...availableAgents.find((a) => a.port === connectedPort),
-          }
-        : null,
+      connected: isConnected ? connected.current : null,
       connectedUnavailable,
       requiresUserAttention,
       isInitialLoad,
     }),
-    [agentGetter, connectedUnavailable, requiresUserAttention, isInitialLoad],
+    [connected, connectedUnavailable, requiresUserAttention, isInitialLoad],
   );
 
   return (

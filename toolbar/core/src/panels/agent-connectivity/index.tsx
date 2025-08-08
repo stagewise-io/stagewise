@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export function AgentConnectivityPanel() {
-  const { connectedUnavailable, connected } = useAgents();
+  const { connectedUnavailable } = useAgents();
 
   return (
     <Panel
@@ -28,25 +28,22 @@ export function AgentConnectivityPanel() {
         actionArea={<WifiOffIcon className="size-6" />}
       />
       <PanelContent>
-        {/* Special content for app-hosted agents */}
-        {!connected && (
-          <div className="space-y-3">
-            <p className="text-muted-foreground text-sm">
-              {connectedUnavailable
-                ? 'The connection to the Stagewise CLI has been lost. The toolbar is attempting to reconnect automatically.'
-                : 'Establishing connection to the Stagewise CLI...'}
-            </p>
-            <p className="text-muted-foreground text-sm">Please ensure that:</p>
-            <ul className="list-inside list-disc space-y-1 text-muted-foreground text-sm">
-              <li>The CLI application is still running</li>
-              <li>The development server hasn't crashed</li>
-              <li>Your network connection is stable</li>
-            </ul>
-            <p className="text-muted-foreground text-sm">
-              If the problem persists, try restarting the CLI application.
-            </p>
-          </div>
-        )}
+        <div className="space-y-3">
+          <p className="text-muted-foreground text-sm">
+            {connectedUnavailable
+              ? 'The connection to the Stagewise CLI has been lost. The toolbar is attempting to reconnect automatically.'
+              : 'Establishing connection to the Stagewise CLI...'}
+          </p>
+          <p className="text-muted-foreground text-sm">Please ensure that:</p>
+          <ul className="list-inside list-disc space-y-1 text-muted-foreground text-sm">
+            <li>The CLI application is still running</li>
+            <li>The development server hasn't crashed</li>
+            <li>Your network connection is stable</li>
+          </ul>
+          <p className="text-muted-foreground text-sm">
+            If the problem persists, try restarting the CLI application.
+          </p>
+        </div>
       </PanelContent>
       <PanelFooter>
         <DropdownMenu>

@@ -23,7 +23,7 @@ export function AgentAvailabilityProvider({
   });
 
   useEffect(() => {
-    if (agent !== null) {
+    if (agent) {
       const subscription = agent.agent.availability.getAvailability.subscribe(
         undefined,
         {

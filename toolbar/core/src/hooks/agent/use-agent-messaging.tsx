@@ -123,19 +123,16 @@ export const AgentMessagingProvider = ({
   );
 
   useEffect(() => {
-    if (agent !== null) {
-      const subscription = agent.agent.messaging.getMessage.subscribe(
-        undefined,
-        {
-          onData: (value) => {
-            // Double-check that agent is still available when data arrives
-            handleMessageUpdate(value);
-          },
-          onError: () => {
-            setAgentMessage(null);
-          },
+    if (agent) {
+      const subscription = agent?.messaging.getMessage.subscribe(undefined, {
+        onData: (value) => {
+          // Double-check that agent is still available when data arrives
+          handleMessageUpdate(value);
         },
-      );
+        onError: () => {
+          setAgentMessage(null);
+        },
+      });
 
       // Cleanup function to unsubscribe when agent changes or component unmounts
       return () => {
@@ -154,7 +151,7 @@ export const AgentMessagingProvider = ({
   }, [agent, handleMessageUpdate]);
 
   const handleUserMessage = (message: UserMessage) => {
-    agent?.agent.messaging.sendUserMessage.mutate(message);
+    agent?.messaging.sendUserMessage.mutate(message);
   };
 
   return (

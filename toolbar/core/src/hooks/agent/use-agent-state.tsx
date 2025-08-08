@@ -18,8 +18,8 @@ export function AgentStateProvider({ children }: { children?: ReactNode }) {
   const [state, setState] = useState<AgentState>(fallbackState);
 
   useEffect(() => {
-    if (agent !== null) {
-      const subscription = agent.agent.state.getState.subscribe(undefined, {
+    if (agent) {
+      const subscription = agent.state.getState.subscribe(undefined, {
         onData: (value) => {
           // Double-check that agent is still available when data arrives
           setState(value);
