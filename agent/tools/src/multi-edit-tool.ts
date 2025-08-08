@@ -1,4 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import type { ToolResult } from '@stagewise/agent-types';
 import { z } from 'zod';
 import { checkFileSize } from './file-utils';
 import { FILE_SIZE_LIMITS } from './constants';
@@ -21,15 +22,6 @@ export const multiEditParamsSchema = z.object({
 });
 
 export type MultiEditParams = z.infer<typeof multiEditParamsSchema>;
-
-const toolResultSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-  editsApplied: z.number().optional(),
-  error: z.string().optional(),
-});
-
-type ToolResult = z.infer<typeof toolResultSchema>;
 
 /**
  * MultiEdit tool for making multiple edits to a single file
@@ -133,6 +125,9 @@ export async function multiEditTool(
       };
     }
 
+    // Store the original content for undo capability
+    const originalContent = readResult.content;
+
     let content = readResult.content;
     let totalEditsApplied = 0;
 
@@ -181,12 +176,37 @@ export async function multiEditTool(
           error: writeResult.error || 'WRITE_ERROR',
         };
       }
+
+      // Create the undo function to restore the original content
+      const undoExecute = async (): Promise<void> => {
+        const restoreResult = await clientRuntime.fileSystem.writeFile(
+          absolutePath,
+          originalContent,
+        );
+
+        if (!restoreResult.success) {
+          throw new Error(
+            `Failed to restore original content for file: ${file_path}`,
+          );
+        }
+      };
+
+      return {
+        success: true,
+        message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,
+        result: {
+          editsApplied: totalEditsApplied,
+        },
+        undoExecute,
+      };
     }
 
     return {
       success: true,
       message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,
-      editsApplied: totalEditsApplied,
+      result: {
+        editsApplied: totalEditsApplied,
+      },
     };
   } catch (error) {
     return {

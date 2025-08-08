@@ -1,4 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import type { ToolResult } from '@stagewise/agent-types';
 import { z } from 'zod';
 
 export const DESCRIPTION = 'Find files and directories matching a glob pattern';
@@ -9,16 +10,6 @@ export const globParamsSchema = z.object({
 });
 
 export type GlobParams = z.infer<typeof globParamsSchema>;
-
-const toolResultSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-  paths: z.array(z.string()).optional(),
-  totalMatches: z.number().optional(),
-  error: z.string().optional(),
-});
-
-type ToolResult = z.infer<typeof toolResultSchema>;
 
 /**
  * Glob tool for finding files and directories matching a pattern
@@ -69,8 +60,10 @@ export async function globTool(
     return {
       success: true,
       message,
-      paths: globResult.paths,
-      totalMatches: globResult.totalMatches,
+      result: {
+        paths: globResult.paths,
+        totalMatches: globResult.totalMatches,
+      },
     };
   } catch (error) {
     return {

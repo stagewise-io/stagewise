@@ -1,4 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import type { ToolResult } from '@stagewise/agent-types';
 import { z } from 'zod';
 
 export const DESCRIPTION =
@@ -10,14 +11,6 @@ export const overwriteFileParamsSchema = z.object({
 });
 
 export type OverwriteFileParams = z.infer<typeof overwriteFileParamsSchema>;
-
-const toolResultSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-  error: z.string().optional(),
-});
-
-type ToolResult = z.infer<typeof toolResultSchema>;
 
 /**
  * Overwrite file content tool
@@ -50,8 +43,21 @@ export async function overwriteFileTool(
   try {
     const absolutePath = clientRuntime.fileSystem.resolvePath(relPath);
 
-    // Check if file exists
+    // Check if file exists and read original content for undo capability
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
+    let originalContent: string | undefined;
+
+    if (fileExists) {
+      const readResult = await clientRuntime.fileSystem.readFile(absolutePath);
+      if (!readResult.success || readResult.content === undefined) {
+        return {
+          success: false,
+          message: `Failed to read existing file: ${relPath}`,
+          error: 'READ_ERROR',
+        };
+      }
+      originalContent = readResult.content;
+    }
 
     // Clean up content - remove markdown code blocks if present
     let cleanContent = content;
@@ -89,6 +95,31 @@ export async function overwriteFileTool(
       };
     }
 
+    // Create the undo function
+    const undoExecute = async (): Promise<void> => {
+      if (fileExists && originalContent !== undefined) {
+        // File existed before, restore its original content
+        const restoreResult = await clientRuntime.fileSystem.writeFile(
+          absolutePath,
+          originalContent,
+        );
+
+        if (!restoreResult.success) {
+          throw new Error(
+            `Failed to restore original content for file: ${relPath}`,
+          );
+        }
+      } else {
+        // File didn't exist before, delete it
+        const deleteResult =
+          await clientRuntime.fileSystem.deleteFile(absolutePath);
+
+        if (!deleteResult.success) {
+          throw new Error(`Failed to delete newly created file: ${relPath}`);
+        }
+      }
+    };
+
     // Build success message
     const action = fileExists ? 'updated' : 'created';
     const message = `Successfully ${action} file: ${relPath}`;
@@ -96,6 +127,7 @@ export async function overwriteFileTool(
     return {
       success: true,
       message,
+      undoExecute,
     };
   } catch (error) {
     return {

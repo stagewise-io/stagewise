@@ -1,10 +1,10 @@
 import type { CoreMessage } from 'ai';
+import type { ToolResult } from '@stagewise/agent-types';
 import type {
   AgentServer,
   ChatUserMessage,
 } from '@stagewise/agent-interface-internal/agent';
 import type { Tools } from '@stagewise/agent-types';
-import { handleClientsideToolCall } from './handle-clientside-tool-call.js';
 import {
   createAssistantToolCallsMessage,
   messagesToCoreMessages,
@@ -98,7 +98,6 @@ export async function processBrowserToolCall(
       toolName,
       error,
     );
-    console.error(`[Agent]: ${errorDescription}`);
     timeoutManager.clear(timeoutKey);
     setWorkingState(false, errorDescription);
 
@@ -119,6 +118,14 @@ export async function processBrowserToolCall(
 }
 
 /**
+ * Helper function to check if auto tool calls are allowed
+ */
+function isAutoToolCallAllowed(tool: Tool) {
+  if (tool.stagewiseMetadata?.runtime === 'client') return true;
+  else return false;
+}
+
+/**
  * Processes a client-side tool call
  */
 export async function processClientSideToolCall(
@@ -128,18 +135,55 @@ export async function processClientSideToolCall(
     context;
 
   const startTime = Date.now();
-  const result = await handleClientsideToolCall(
-    tool,
-    toolCallId,
-    messagesToCoreMessages(history),
-    args,
-  );
+
+  // Inline handleClientsideToolCall logic
+  let result: {
+    error: boolean;
+    userInteractionRequired?: boolean;
+    userInteractionType?: string;
+    userInteractionParams?: any;
+    errorMessage?: string;
+    result?: ToolResult;
+  };
+
+  if (!isAutoToolCallAllowed(tool)) {
+    result = {
+      error: false,
+      userInteractionType: 'user-permission',
+      userInteractionRequired: true,
+      userInteractionParams: {},
+    };
+  } else if (tool.stagewiseMetadata?.runtime !== 'client') {
+    // This should not happen given the isAutoToolCallAllowed check, but keeping for safety
+    result = {
+      error: true,
+      errorMessage: 'Tool is not clientside',
+    };
+  } else if (!tool.execute) {
+    result = {
+      error: true,
+      errorMessage: 'Client-side tool needs execute-function',
+    };
+  } else {
+    // Execute the tool
+    const executeResult = await tool.execute(args, {
+      toolCallId,
+      messages: messagesToCoreMessages(history),
+    });
+
+    result = {
+      error: false,
+      userInteractionRequired: false,
+      result: executeResult,
+    };
+  }
+
   const duration = Date.now() - startTime;
 
   if (result.error) {
     const errorDescription = ErrorDescriptions.toolCallFailed(
       toolName,
-      result.error,
+      result.errorMessage || result.error,
       args,
       duration,
     );
@@ -230,7 +274,7 @@ export async function processParallelToolCalls(
   setWorkingState: (state: boolean, description?: string) => void,
   timeoutManager: TimeoutManager,
   onToolCallComplete?: (result: ToolCallProcessingResult) => void,
-) {
+): Promise<ToolCallProcessingResult[]> {
   // Add assistant message with all tool calls
   history.push(createAssistantToolCallsMessage(toolCalls));
 
@@ -318,7 +362,7 @@ export async function processParallelToolCalls(
     });
   }
 
-  return successfulResults;
+  return results;
 }
 
 /**
