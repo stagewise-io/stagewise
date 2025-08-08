@@ -1,0 +1,19 @@
+{
+  "extends": "./base.json",
+  "mainEntryPointFilePath": "<projectFolder>/tmp/plugin-sdk/unbundled-types/index.d.ts",
+  "dtsRollup": {
+    "untrimmedFilePath": "<projectFolder>/tmp/plugin-sdk/index.d.ts"
+  },
+  "compiler": {
+    "overrideTsconfig": {
+      "extends": "./tsconfig.app.json",
+      "compilerOptions": {
+        "paths": {
+          "@/*": ["tmp/plugin-sdk/unbundled-types/*"]
+        }
+      },
+      "include": ["tmp/plugin-sdk/unbundled-types/**/*.d.ts"],
+      "exclude": ["node_modules"]
+    }
+  }
+}

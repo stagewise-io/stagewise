@@ -1,7 +1,6 @@
 import { createContext, useContext, useMemo, useState, useEffect } from 'react';
 import { useAgents } from './agent/use-agent-provider';
 import { useAppState } from './use-app-state';
-import { useAgentAvailability } from './agent/use-agent-availability';
 
 const STORAGE_KEY = 'stagewise_toolbar_open_panels';
 
@@ -145,10 +144,7 @@ export const PanelsProvider = ({
     connectedUnavailable,
     requiresUserAttention,
     isInitialLoad,
-    isAppHostedAgent,
   } = useAgents();
-
-  const availabilityStatus = useAgentAvailability();
 
   const [
     agentConnectivityManuallyDismissed,
@@ -175,16 +171,16 @@ export const PanelsProvider = ({
   ]);
 
   useEffect(() => {
-    if (connected && !connectedUnavailable && availabilityStatus.isAvailable) {
+    if (connected && !connectedUnavailable) {
       setAgentConnectivityManuallyDismissed(false);
     }
-  }, [connected, connectedUnavailable, availabilityStatus]);
+  }, [connected, connectedUnavailable]);
 
   // Handle 500ms delay for app-hosted agent warning on initial load
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | null = null;
 
-    if (isAppHostedAgent && !connected) {
+    if (!connected) {
       // If this is an app-hosted agent and not connected, wait 500ms before showing warning
       timeoutId = setTimeout(() => {
         setShowAppHostedWarning(true);
@@ -199,12 +195,11 @@ export const PanelsProvider = ({
         clearTimeout(timeoutId);
       }
     };
-  }, [isAppHostedAgent, connected]);
+  }, [connected]);
 
   const isAgentConnectivityOpen = useMemo(() => {
     // Special case: For app-hosted agents, use the delayed warning state
     if (
-      isAppHostedAgent &&
       !connected &&
       showAppHostedWarning &&
       !agentConnectivityManuallyDismissed &&
@@ -217,17 +212,15 @@ export const PanelsProvider = ({
     }
 
     const result =
-      (requiresUserAttention || !availabilityStatus.isAvailable) &&
+      requiresUserAttention &&
       !agentConnectivityManuallyDismissed &&
       !minimized &&
       !isInitialLoad;
     console.debug('[PanelsProvider] isAgentConnectivityOpen calculation:', {
       requiresUserAttention,
-      availabilityStatus: availabilityStatus.isAvailable,
       agentConnectivityManuallyDismissed,
       minimized,
       isInitialLoad,
-      isAppHostedAgent,
       connected,
       showAppHostedWarning,
       result,
@@ -238,8 +231,6 @@ export const PanelsProvider = ({
     agentConnectivityManuallyDismissed,
     minimized,
     isInitialLoad,
-    availabilityStatus,
-    isAppHostedAgent,
     connected,
     showAppHostedWarning,
   ]);
@@ -247,49 +238,26 @@ export const PanelsProvider = ({
   const isSettingsOpen = useMemo(() => {
     return (
       !requiresUserAttention &&
-      availabilityStatus.isAvailable &&
       isSettingsOpenInternal &&
       !minimized &&
       !isInitialLoad
     );
-  }, [
-    requiresUserAttention,
-    availabilityStatus,
-    isSettingsOpenInternal,
-    minimized,
-    isInitialLoad,
-  ]);
+  }, [requiresUserAttention, isSettingsOpenInternal, minimized, isInitialLoad]);
 
   const isChatOpen = useMemo(() => {
     return (
       !requiresUserAttention &&
-      availabilityStatus.isAvailable &&
       isChatOpenInternal &&
       !minimized &&
       !isInitialLoad
     );
-  }, [
-    requiresUserAttention,
-    availabilityStatus,
-    isChatOpenInternal,
-    minimized,
-    isInitialLoad,
-  ]);
+  }, [requiresUserAttention, isChatOpenInternal, minimized, isInitialLoad]);
 
   const openPluginName = useMemo(() => {
-    return !requiresUserAttention &&
-      availabilityStatus.isAvailable &&
-      !isInitialLoad &&
-      !minimized
+    return !requiresUserAttention && !isInitialLoad && !minimized
       ? openPluginInternal
       : null;
-  }, [
-    requiresUserAttention,
-    availabilityStatus,
-    openPluginInternal,
-    minimized,
-    isInitialLoad,
-  ]);
+  }, [requiresUserAttention, openPluginInternal, minimized, isInitialLoad]);
 
   return (
     <PanelsContext.Provider

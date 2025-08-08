@@ -20,12 +20,6 @@ export interface InternalToolbarConfig {
     debounceDelay?: number;
   };
 
-  /**
-   * If true, the toolbar will connect to a Stagewise agent hosted on the same port as the app.
-   * This disables agent scanning and uses permanent reconnection logic.
-   */
-  usesStagewiseAgent?: boolean;
-
   /** Experimental features that are not yet stable and might change in the future. */
   experimental?: {
     /**

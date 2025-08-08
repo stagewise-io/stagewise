@@ -4,7 +4,6 @@ import {
   PanelFooter,
   PanelHeader,
 } from '@/components/ui/panel';
-import { AgentSelection } from './shared-content/agent-selection';
 import {
   DropdownMenu,
   DropdownMenuButton,
@@ -14,13 +13,12 @@ import {
 import { MessageCircleQuestionMarkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+// FYI: We don't show this panel at all in agent hosted mode right now
 export function SettingsPanel() {
   return (
     <Panel>
       <PanelHeader title="Settings" />
-      <PanelContent>
-        <AgentSelection showConnectedDetails />
-      </PanelContent>
+      <PanelContent>Nothing to see :o</PanelContent>
       <PanelFooter>
         <DropdownMenu>
           <DropdownMenuButton>

@@ -12,8 +12,8 @@ import { useAgentState } from './agent/use-agent-state';
 import type {
   UserMessage,
   UserMessageContentItem,
-} from '@stagewise/agent-interface/toolbar';
-import { AgentStateType } from '@stagewise/agent-interface/toolbar';
+} from '@stagewise/agent-interface-internal/toolbar';
+import { AgentStateType } from '@stagewise/agent-interface-internal/toolbar';
 import { usePanels } from './use-panels';
 
 interface ContextSnippet {

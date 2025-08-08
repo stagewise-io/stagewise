@@ -1,4 +1,4 @@
-import type { UserMessage } from '@stagewise/agent-interface/agent';
+import type { UserMessage } from '@stagewise/agent-interface-internal/agent';
 import type { CoreMessage } from 'ai';
 
 export function isUserMessage(

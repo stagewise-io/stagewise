@@ -1,5 +1,5 @@
 import type { CoreMessage, ToolResultPart } from 'ai';
-import type { UserMessage } from '@stagewise/agent-interface/agent';
+import type { UserMessage } from '@stagewise/agent-interface-internal/agent';
 import { isUserMessage } from '@stagewise/agent-types';
 
 /**

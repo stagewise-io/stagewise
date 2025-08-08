@@ -3,7 +3,7 @@ export interface UIHandle {
 }
 
 import type { ReactNode } from 'react';
-import type { UserMessage } from '@stagewise/agent-interface/toolbar';
+import type { UserMessage } from '@stagewise/agent-interface-internal/toolbar';
 
 export type PluginUserMessage = Omit<
   UserMessage,
@@ -44,7 +44,7 @@ export interface ContextElementContext {
   annotation: string | null;
 }
 
-export type { SelectedElement } from '@stagewise/agent-interface/toolbar';
+export type { SelectedElement } from '@stagewise/agent-interface-internal/toolbar';
 
 export interface ToolbarPlugin {
   /** The name of the plugin shown to the user. */

@@ -1,5 +1,5 @@
 {
-  "name": "@stagewise/agent-interface",
+  "name": "@stagewise/agent-interface-internal",
   "author": "tiq UG (haftungsbeschränkt)",
   "version": "0.2.3",
   "license": "AGPL-3.0-only",

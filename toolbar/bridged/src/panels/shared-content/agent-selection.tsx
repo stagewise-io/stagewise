@@ -6,13 +6,8 @@ export function AgentSelection({
 }: {
   showConnectedDetails?: boolean;
 }) {
-  const {
-    connected,
-    isRefreshing,
-    availableAgents,
-    connectAgent,
-    isAppHostedAgent,
-  } = useAgents();
+  const { connected, isRefreshing, availableAgents, connectAgent } =
+    useAgents();
 
   const handleAgentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const port = Number.parseInt(e.target.value);
@@ -24,11 +19,6 @@ export function AgentSelection({
   // Use stable placeholder text that doesn't change during refresh to prevent layout shifts
   const placeholderText =
     availableAgents.length > 0 ? 'Select an agent...' : 'No agents available';
-
-  // For app-hosted agents, only show the connected agent info
-  if (isAppHostedAgent) {
-    return null;
-  }
 
   return (
     <div className="space-y-3">

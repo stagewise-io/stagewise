@@ -2,9 +2,9 @@ import type { CoreMessage } from 'ai';
 import type {
   AgentServer,
   UserMessage,
-} from '@stagewise/agent-interface/agent';
+} from '@stagewise/agent-interface-internal/agent';
 import type { Tools } from '@stagewise/agent-types';
-import { AgentStateType } from '@stagewise/agent-interface/agent';
+import { AgentStateType } from '@stagewise/agent-interface-internal/agent';
 import { handleClientsideToolCall } from './handle-clientside-tool-call.js';
 import {
   createAssistantToolCallsMessage,

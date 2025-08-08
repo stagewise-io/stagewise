@@ -1,7 +1,7 @@
 import type {
   SelectedElement,
   UserMessageMetadata,
-} from '@stagewise/agent-interface/toolbar';
+} from '@stagewise/agent-interface-internal/toolbar';
 
 export const companionAnchorTagName = 'stagewise-companion-anchor';
 

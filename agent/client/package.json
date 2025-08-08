@@ -37,7 +37,7 @@
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
-    "@stagewise/agent-interface": "workspace:*",
+    "@stagewise/agent-interface-internal": "workspace:*",
     "@stagewise/api-client": "0.1.0",
     "@stagewise/agent-prompt-snippets": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",

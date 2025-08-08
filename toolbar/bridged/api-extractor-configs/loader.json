@@ -1,0 +1,19 @@
+{
+  "extends": "./base.json",
+  "mainEntryPointFilePath": "<projectFolder>/tmp/toolbar-loader/unbundled-types/index.d.ts",
+  "dtsRollup": {
+    "untrimmedFilePath": "<projectFolder>/tmp/toolbar-loader/index.d.ts"
+  },
+  "compiler": {
+    "overrideTsconfig": {
+      "extends": "./tsconfig.app.json",
+      "compilerOptions": {
+        "paths": {
+          "@/*": ["tmp/toolbar-loader/unbundled-types/*"]
+        }
+      },
+      "include": ["tmp/toolbar-loader/unbundled-types/**/*.d.ts"],
+      "exclude": ["node_modules"]
+    }
+  }
+}

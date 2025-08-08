@@ -73,7 +73,7 @@ export default async function buildToolbarMain() {
     optimizeDeps: {
       include: [
         '@trpc/client',
-        '@stagewise/agent-interface',
+        '@stagewise/agent-interface-internal',
         'lucide-react',
         'zod',
         '@headlessui/react',

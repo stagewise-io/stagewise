@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 import {
   type AgentState,
   AgentStateType,
-} from '@stagewise/agent-interface/toolbar';
+} from '@stagewise/agent-interface-internal/toolbar';
 
 import { useAgents } from './use-agent-provider.tsx';
 import { type ReactNode, createContext } from 'react';

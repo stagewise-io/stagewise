@@ -9,7 +9,7 @@ const baseOptions: BuildOptions = {
   bundle: true,
   platform: 'node',
   target: 'es2020',
-  external: ['@stagewise/agent-interface', 'vscode'], // Keep this as peer dependency - workspace deps must be bundled
+  external: ['@stagewise/agent-interface-internal'], // Keep Node.js built-ins external
   sourcemap: false, // Disable source maps for production
   minify: true,
   treeShaking: true,

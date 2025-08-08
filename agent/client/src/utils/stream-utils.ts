@@ -1,5 +1,5 @@
-import type { AgentServer } from '@stagewise/agent-interface/agent';
-import { AgentStateType } from '@stagewise/agent-interface/agent';
+import type { AgentServer } from '@stagewise/agent-interface-internal/agent';
+import { AgentStateType } from '@stagewise/agent-interface-internal/agent';
 import { ErrorDescriptions, formatErrorDescription } from './error-utils.js';
 
 /**

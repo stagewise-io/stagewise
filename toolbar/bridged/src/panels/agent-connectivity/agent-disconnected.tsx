@@ -1,4 +1,4 @@
-import { AgentSelection } from '../shared-content/agent-selection';
+import { AgentSelection } from '../shared-content/agent-selection.js';
 
 export function AgentDisconnected() {
   return (

@@ -1,5 +1,5 @@
-import type { AgentStateType } from '@stagewise/agent-interface/agent';
-import type { UserMessage } from '@stagewise/agent-interface/agent';
+import type { AgentStateType } from '@stagewise/agent-interface-internal/agent';
+import type { UserMessage } from '@stagewise/agent-interface-internal/agent';
 import type { RouterOutputs } from '@stagewise/api-client';
 
 // Event types for analytics tracking

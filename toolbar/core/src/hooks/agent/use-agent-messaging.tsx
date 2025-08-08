@@ -10,7 +10,7 @@ import type {
   AgentMessageContentItemPart,
   UserMessage,
   AgentMessageUpdate,
-} from '@stagewise/agent-interface/toolbar';
+} from '@stagewise/agent-interface-internal/toolbar';
 import { type ReactNode, createContext } from 'react';
 import { useAgents } from './use-agent-provider.tsx';
 

@@ -1,6 +1,6 @@
 import { useAgentMessaging } from '@/hooks/agent/use-agent-messaging';
 import { useAgentState } from '@/hooks/agent/use-agent-state';
-import { AgentStateType } from '@stagewise/agent-interface/toolbar';
+import { AgentStateType } from '@stagewise/agent-interface-internal/toolbar';
 import { useEffect, useRef } from 'react';
 
 export function AgentMessageDisplay() {

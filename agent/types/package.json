@@ -25,7 +25,7 @@
     "rimraf": "^5.0.0",
     "typescript": "^5.8.3",
     "zod": "3.25.76",
-    "@stagewise/agent-interface": "workspace:*",
+    "@stagewise/agent-interface-internal": "workspace:*",
     "@stagewise/api-client": "0.1.0"
   },
   "dependencies": {

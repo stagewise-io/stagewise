@@ -14,7 +14,7 @@ import {
   createAgentHook,
   type UserMessage,
   type AgentServer,
-} from '@stagewise/agent-interface/agent';
+} from '@stagewise/agent-interface-internal/agent';
 import {
   getProjectPath,
   getProjectInfo,

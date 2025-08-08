@@ -1,5 +1,5 @@
 import { useAgentAvailability } from '@/hooks/agent/use-agent-availability';
-import { AgentSelection } from '../shared-content/agent-selection';
+import { AgentSelection } from '../shared-content/agent-selection.js';
 import { AgentAvailabilityError } from '@stagewise/agent-interface/toolbar';
 
 const availabilityErrorMessages = {

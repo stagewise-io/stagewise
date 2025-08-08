@@ -3,7 +3,7 @@ import {
   AgentAvailabilityError,
   type AgentAvailability,
 } from '@stagewise/agent-interface/toolbar';
-import { useAgents } from './use-agent-provider.tsx';
+import { useAgents } from './use-agent-provider.js';
 import { type ReactNode, createContext } from 'react';
 
 const agentAvailabilityContext = createContext<AgentAvailability>({
@@ -16,21 +16,13 @@ export function AgentAvailabilityProvider({
 }: {
   children?: ReactNode;
 }) {
-  const { connected: agent, isAppHostedAgent } = useAgents();
+  const { connected: agent } = useAgents();
   const [availability, setAvailability] = useState<AgentAvailability>({
     isAvailable: false,
     error: AgentAvailabilityError.NO_CONNECTION,
   });
 
   useEffect(() => {
-    // For app-hosted agents, always report as available
-    if (isAppHostedAgent) {
-      setAvailability({
-        isAvailable: true,
-      });
-      return;
-    }
-
     if (agent !== null) {
       const subscription = agent.agent.availability.getAvailability.subscribe(
         undefined,
@@ -65,7 +57,7 @@ export function AgentAvailabilityProvider({
         error: AgentAvailabilityError.NO_CONNECTION,
       });
     }
-  }, [agent, isAppHostedAgent]);
+  }, [agent]);
 
   return (
     <agentAvailabilityContext.Provider value={availability}>

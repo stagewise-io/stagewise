@@ -17,12 +17,19 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const getImportMap = async (plugins: Plugin[]) => {
-  const manifestPath =
-    process.env.NODE_ENV === 'production'
+  const config = configResolver.getConfig();
+  const manifestPath = config.bridgeMode
+    ? process.env.NODE_ENV === 'production'
+      ? resolve(__dirname, 'toolbar-bridged/.vite/manifest.json')
+      : resolve(
+          'node_modules/@stagewise/toolbar-bridged/dist/toolbar-main/.vite/manifest.json',
+        )
+    : process.env.NODE_ENV === 'production'
       ? resolve(__dirname, 'toolbar-app/.vite/manifest.json')
       : resolve(
           'node_modules/@stagewise/toolbar/dist/toolbar-main/.vite/manifest.json',
         );
+
   const mainAppManifest = JSON.parse(await readFile(manifestPath, 'utf-8'));
   const mainAppEntries: Record<string, string> = {};
   for (const [_, entry] of Object.entries(mainAppManifest) as [
@@ -89,7 +96,6 @@ try {
       const convertedConfig = {
         plugins: '__PLUGIN_PLACEHOLDER__',
         devAppPort: config.appPort,
-        usesStagewiseAgent: !config.bridgeMode,
       };
 
       let configString = JSON.stringify(convertedConfig);
@@ -183,8 +189,11 @@ export const getServer = async () => {
     }
 
     // Set up basic middleware and static routes
-    const toolbarPath =
-      process.env.NODE_ENV === 'production'
+    const toolbarPath = config.bridgeMode
+      ? process.env.NODE_ENV === 'production'
+        ? resolve(__dirname, 'toolbar-bridged')
+        : resolve('node_modules/@stagewise/toolbar-bridged/dist/toolbar-main')
+      : process.env.NODE_ENV === 'production'
         ? resolve(__dirname, 'toolbar-app')
         : resolve('node_modules/@stagewise/toolbar/dist/toolbar-main');
     app.use('/stagewise-toolbar-app', express.static(toolbarPath));

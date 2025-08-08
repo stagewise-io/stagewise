@@ -9,7 +9,7 @@ import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
 import { Textarea } from '@headlessui/react';
 import { Button } from '@/components/ui/button';
-import { AgentStateType } from '@stagewise/agent-interface/toolbar';
+import { AgentStateType } from '@stagewise/agent-interface-internal/toolbar';
 import {
   Loader2Icon,
   MessageCircleQuestionIcon,
