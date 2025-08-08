@@ -205,14 +205,14 @@ export async function multiEditTool(
         }
       };
 
-      return {
+      const result = {
         success: true,
         message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,
-        result: {
-          editsApplied: totalEditsApplied,
-        },
-        undoExecute,
+        result: { editsApplied: totalEditsApplied },
+        undoExecute: undoExecute,
       };
+
+      return result;
     }
 
     return {

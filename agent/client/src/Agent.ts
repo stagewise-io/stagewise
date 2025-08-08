@@ -496,7 +496,7 @@ export class Agent {
     // Validate prerequisites
     if (!this.server) throw new Error('Agent not initialized');
     if (!this.client) throw new Error('TRPC API client not initialized');
-    this.undoToolCallStack = []; // Reset undo stack for each call - only allow undoing the last task
+    if (userMessage) this.undoToolCallStack = [];
 
     // Check recursion depth
     if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
@@ -629,6 +629,7 @@ export class Agent {
           this.server?.interface.state.get()?.state === AgentStateType.FAILED
         ) {
           this.setAgentState(AgentStateType.IDLE);
+          this.undoToolCallStack = [];
         }
       }, STATE_RECOVERY_DELAY);
 
@@ -688,7 +689,7 @@ export class Agent {
             toolCalls,
             history,
           );
-          console.log('results', JSON.stringify(results, null, 2));
+
           for (const result of results) {
             if (result.success) {
               if (result.result?.undoExecute) {
