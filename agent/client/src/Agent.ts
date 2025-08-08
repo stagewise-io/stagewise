@@ -525,15 +525,13 @@ export class Agent {
       this.setAgentWorking(true);
 
       // Start stream consumption with timeout protection
-      const streamConsumptionPromise = consumeStreamWithTimeout(
+      const { messageId } = await consumeStreamWithTimeout(
         chatId,
         fullStream,
         this.server,
         this.agentTimeout,
         (state, desc) => this.setAgentWorking(state, desc),
       );
-
-      streamConsumptionPromise.catch((_error) => {});
 
       // Wait for response with timeout
       const r = await withTimeout(
@@ -567,7 +565,12 @@ export class Agent {
       );
 
       // Process response messages
-      await this.processResponseMessages(r.messages, history ?? []);
+      await this.processResponseMessages(
+        r.messages,
+        history ?? [],
+        chatId,
+        messageId,
+      );
 
       // Check if recursion is needed
       if (shouldRecurseAfterToolCall(history ?? [])) {
@@ -616,6 +619,8 @@ export class Agent {
   private async processResponseMessages(
     messages: Array<ResponseMessage>,
     history: (CoreMessage | ChatUserMessage)[],
+    chatId: string,
+    messageId: string,
   ): Promise<void> {
     for (const message of messages) {
       const assistantMessage = {
@@ -651,7 +656,10 @@ export class Agent {
 
         // Process all tool calls together if any
         if (toolCalls.length > 0) {
-          await this.processParallelToolCallsContent(toolCalls, history);
+          await this.processParallelToolCallsContent(toolCalls, history, {
+            chatId,
+            messageId,
+          });
         }
       } else if (typeof message.content === 'string') {
         history.push({
@@ -674,6 +682,8 @@ export class Agent {
     history: (CoreMessage | ChatUserMessage)[],
     options?: {
       syntheticCall?: boolean;
+      chatId?: string;
+      messageId?: string;
     },
   ): Promise<void> {
     const explanations = toolCalls
@@ -719,7 +729,7 @@ export class Agent {
     }
 
     // Process all tool calls
-    await processParallelToolCalls(
+    const results = await processParallelToolCalls(
       toolCalls,
       this.tools,
       this.server!,
@@ -737,5 +747,16 @@ export class Agent {
         );
       },
     );
+    if (results.length > 0) {
+      this.server?.interface.chat.addMessage(
+        {
+          id: crypto.randomUUID(),
+          createdAt: new Date(),
+          role: 'tool',
+          content: results,
+        },
+        options?.chatId,
+      );
+    }
   }
 }
