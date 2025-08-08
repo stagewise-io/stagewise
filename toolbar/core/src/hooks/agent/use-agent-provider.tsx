@@ -77,9 +77,7 @@ function createWebSocketClient(
   client: ReturnType<typeof createTRPCClient<InterfaceRouter>>;
   wsClient: ReturnType<typeof createWSClient>;
 } {
-  console.debug(
-    `[AgentProvider] Creating WebSocket client for port ${port}...`,
-  );
+  console.debug(`[AgentProvider] Creating WebSocket client for...`);
 
   let isConnectionStable = false;
   let connectionFailedCalled = false;
@@ -89,14 +87,12 @@ function createWebSocketClient(
   const wsClient = createWSClient({
     url: `ws://${hostname}:${port}${wsPath}`,
     onClose(cause) {
-      console.debug(
-        `[AgentProvider] WebSocket closed for port ${port}: ${cause}`,
-      );
+      console.debug(`[AgentProvider] WebSocket closed: ${cause}`);
 
       // Clear the stability timeout if connection closes before it's considered stable
       if (connectionStabilityTimeoutRef.current && !isConnectionStable) {
         console.debug(
-          `[AgentProvider] Connection closed before stability timeout - clearing timeout for port ${port}`,
+          `[AgentProvider] Connection closed before stability timeout - clearing timeout`,
         );
         clearTimeout(connectionStabilityTimeoutRef.current);
         connectionStabilityTimeoutRef.current = null;
@@ -104,7 +100,7 @@ function createWebSocketClient(
         // For unstable connections, call onConnectionFailed to trigger retry logic
         if (!connectionFailedCalled) {
           console.debug(
-            `[AgentProvider] Unstable connection detected for port ${port} - calling onConnectionFailed`,
+            `[AgentProvider] Unstable connection detected - calling onConnectionFailed`,
           );
           connectionFailedCalled = true;
           onConnectionFailed();
@@ -114,14 +110,14 @@ function createWebSocketClient(
       // Only call onConnectionLost if the connection was previously considered stable
       if (isConnectionStable) {
         console.debug(
-          `[AgentProvider] Stable connection lost for port ${port} - calling onConnectionLost`,
+          `[AgentProvider] Stable connection lost - calling onConnectionLost`,
         );
         onConnectionLost();
       }
     },
     onOpen() {
       console.debug(
-        `[AgentProvider] WebSocket opened for port ${port} - starting stability check...`,
+        `[AgentProvider] WebSocket opened for - starting stability check...`,
       );
 
       // Clear any existing stability timeout
@@ -131,9 +127,7 @@ function createWebSocketClient(
 
       // Wait 200ms to ensure the connection is stable before considering it established
       connectionStabilityTimeoutRef.current = setTimeout(() => {
-        console.debug(
-          `[AgentProvider] Connection stability confirmed for port ${port}`,
-        );
+        console.debug(`[AgentProvider] Connection stability confirmed`);
         isConnectionStable = true;
         connectionStabilityTimeoutRef.current = null;
         onConnectionEstablished();
@@ -150,7 +144,7 @@ function createWebSocketClient(
     ],
   });
 
-  console.debug(`[AgentProvider] WebSocket client created for port ${port}`);
+  console.debug(`[AgentProvider] WebSocket client created`);
   return { client, wsClient };
 }
 
@@ -170,7 +164,6 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // ===== REFS FOR CONNECTION MANAGEMENT =====
-  const previouslySelectedPortRef = useRef<number | null>(null);
   const retryIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef<number>(0);
   const isManualSelectionRef = useRef<boolean>(false);
@@ -180,9 +173,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
   // ===== RETRY LOGIC FUNCTIONS =====
   const startRetryConnection = useCallback(
     (port: number) => {
-      console.debug(
-        `[AgentProvider] Starting retry connection logic for port ${port}...`,
-      );
+      console.debug(`[AgentProvider] Starting retry connection logic...`);
       // Clear any existing retry interval
       if (retryIntervalRef.current) {
         console.debug(`[AgentProvider] Clearing existing retry interval...`);
@@ -198,20 +189,14 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
           `[AgentProvider] Setting up retry interval (every 2s)...`,
         );
         retryIntervalRef.current = setInterval(() => {
-          if (
-            previouslySelectedPortRef.current === port &&
-            !connected &&
-            !isManualSelectionRef.current
-          ) {
+          if (!connected && !isManualSelectionRef.current) {
             retryCountRef.current++;
-            console.debug(
-              `[AgentProvider] Retrying connection to agent on port ${port}...`,
-            );
-            connectAgentInternal(port, false);
+            console.debug(`[AgentProvider] Retrying connection to agent...`);
+            connectAgentInternal(port);
           } else {
             // Stop retrying if conditions are no longer met
             console.debug(
-              `[AgentProvider] Stopping retry attempts for port ${port} (conditions no longer met)`,
+              `[AgentProvider] Stopping retry attempts (conditions no longer met)`,
             );
             if (retryIntervalRef.current) {
               clearInterval(retryIntervalRef.current);
@@ -246,14 +231,8 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
    * Sets up health monitoring and retry logic based on connection type.
    */
   const connectAgentInternal = useCallback(
-    async (port: number, isManual = false) => {
-      console.debug(
-        `[AgentProvider] Attempting to connect to agent on port ${port} (manual: ${isManual})...`,
-      );
-
-      // Set the previously selected port immediately to enable retry logic
-      previouslySelectedPortRef.current = port;
-      isManualSelectionRef.current = isManual;
+    async (port: number) => {
+      console.debug(`[AgentProvider] Attempting to connect to agent...`);
 
       try {
         // Stop any ongoing retry attempts
@@ -297,9 +276,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
         const { client, wsClient } = createWebSocketClient(
           port,
           () => {
-            console.debug(
-              `[AgentProvider] Connection lost to agent on port ${port}`,
-            );
+            console.debug(`[AgentProvider] Connection lost to agent`);
             setConnectedUnavailable(true);
 
             // Explicitly close WebSocket connection on connection loss
@@ -328,9 +305,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
             startRetryConnection(port);
           },
           () => {
-            console.debug(
-              `[AgentProvider] Connection established to agent on port ${port}`,
-            );
+            console.debug(`[AgentProvider] Connection established to agent`);
             setConnectedUnavailable(false); // Reset unavailable state on successful connection
 
             // Reset retry counter on successful connection
@@ -346,7 +321,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
           },
           () => {
             console.debug(
-              `[AgentProvider] Connection failed for agent on port ${port} (unstable)`,
+              `[AgentProvider] Connection failed for agent (unstable)`,
             );
 
             // Clean up the failed connection state
@@ -355,13 +330,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
             setIsConnected(false);
             setConnectedUnavailable(true);
 
-            // Start retry attempts if this wasn't a manual selection
-            if (!isManual) {
-              console.debug(
-                `[AgentProvider] Starting retry attempts for unstable connection on port ${port}...`,
-              );
-              startRetryConnection(port);
-            }
+            startRetryConnection(port);
           },
           connectionStabilityTimeoutRef,
         );
@@ -370,13 +339,10 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
         setIsConnected(true);
 
         console.debug(
-          `[AgentProvider] WebSocket client created for port ${port} - waiting for stability confirmation...`,
+          `[AgentProvider] WebSocket client created - waiting for stability confirmation...`,
         );
       } catch (error) {
-        console.error(
-          `[AgentProvider] Failed to connect to agent on port ${port}:`,
-          error,
-        );
+        console.error(`[AgentProvider] Failed to connect to agent:`, error);
 
         // Clear any pending connection stability timeout
         if (connectionStabilityTimeoutRef.current) {
@@ -405,13 +371,10 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
         setConnectedUnavailable(true);
         setIsConnected(false);
 
-        // Start retry attempts if this wasn't a manual selection and connection failed
-        if (!isManual) {
-          console.debug(
-            `[AgentProvider] Failed to connect to agent on port ${port}, starting retry attempts...`,
-          );
-          startRetryConnection(port);
-        }
+        console.debug(
+          `[AgentProvider] Failed to connect to agent, starting retry attempts...`,
+        );
+        startRetryConnection(port);
       }
     },
     [startRetryConnection, stopRetryConnection],
@@ -430,7 +393,7 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
     const url = new URL(window.location.href);
     const appPort = Number.parseInt(url.port);
 
-    connectAgentInternal(appPort, false);
+    connectAgentInternal(appPort);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array to run only once on mount
 

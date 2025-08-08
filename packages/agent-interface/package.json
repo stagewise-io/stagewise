@@ -4,7 +4,7 @@
   "version": "0.2.3",
   "license": "AGPL-3.0-only",
   "type": "module",
-  "private": false,
+  "private": true,
   "scripts": {
     "build": "tsup --config build.config.ts",
     "clean": "rm -rf dist",
@@ -13,9 +13,6 @@
     "test": "vitest --run",
     "example:standalone": "tsx examples/standalone-server.ts",
     "example:express": "tsx examples/express-integration.ts"
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "files": [
     "dist"

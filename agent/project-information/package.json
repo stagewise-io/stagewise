@@ -20,7 +20,7 @@
     "clean": "rimraf dist",
     "lint": "echo 'No linting for project information package'",
     "type-check": "tsc --noEmit",
-    "test": "vitest",
+    "test": "vitest --run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage"
   },
