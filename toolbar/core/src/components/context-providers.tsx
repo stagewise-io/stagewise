@@ -7,6 +7,7 @@ import { AgentProvider } from '@/hooks/agent/use-agent-provider';
 import { AgentAvailabilityProvider } from '@/hooks/agent/use-agent-availability';
 import { AgentStateProvider } from '@/hooks/agent/use-agent-state';
 import { AgentMessagingProvider } from '@/hooks/agent/use-agent-messaging';
+import { AgentUndoProvider } from '@/hooks/agent/use-agent-undo';
 import { PanelsProvider } from '@/hooks/use-panels';
 
 export function ContextProviders({
@@ -22,11 +23,13 @@ export function ContextProviders({
         <AgentAvailabilityProvider>
           <AgentStateProvider>
             <AgentMessagingProvider>
-              <PanelsProvider>
-                <PluginProvider>
-                  <ChatStateProvider>{children}</ChatStateProvider>
-                </PluginProvider>
-              </PanelsProvider>
+              <AgentUndoProvider>
+                <PanelsProvider>
+                  <PluginProvider>
+                    <ChatStateProvider>{children}</ChatStateProvider>
+                  </PluginProvider>
+                </PanelsProvider>
+              </AgentUndoProvider>
             </AgentMessagingProvider>
           </AgentStateProvider>
         </AgentAvailabilityProvider>

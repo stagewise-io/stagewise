@@ -355,6 +355,24 @@ export class Agent {
     this.server.interface.availability.set(true);
     this.setAgentState(AgentStateType.IDLE);
 
+    this.server.interface.undo.addUndoListener(async () => {
+      if (this.undoToolCallStack.length === 0) {
+        return {
+          success: false,
+          error: 'No undo available',
+        } as UndoExecuteResult;
+      }
+
+      for (const undo of this.undoToolCallStack) {
+        const undoResult = await undo.undoExecute();
+        if (!undoResult?.success) {
+          return { success: false, error: 'Undo failed' } as UndoExecuteResult;
+        }
+      }
+      this.undoToolCallStack = [];
+      return { success: true, message: 'Undo successful' } as UndoExecuteResult;
+    });
+
     this.server.interface.messaging.addUserMessageListener(async (message) => {
       this.setAgentState(AgentStateType.WORKING);
 
@@ -407,6 +425,24 @@ export class Agent {
 
     this.server.interface.availability.set(true);
     this.setAgentState(AgentStateType.IDLE);
+
+    this.server.interface.undo.addUndoListener(async () => {
+      if (this.undoToolCallStack.length === 0) {
+        return {
+          success: false,
+          error: 'No undo available',
+        } as UndoExecuteResult;
+      }
+
+      for (const undo of this.undoToolCallStack) {
+        const undoResult = await undo.undoExecute();
+        if (!undoResult?.success) {
+          return { success: false, error: 'Undo failed' } as UndoExecuteResult;
+        }
+      }
+      this.undoToolCallStack = [];
+      return { success: true, message: 'Undo successful' } as UndoExecuteResult;
+    });
 
     this.server.interface.messaging.addUserMessageListener(async (message) => {
       this.setAgentState(AgentStateType.WORKING);
@@ -652,6 +688,7 @@ export class Agent {
             toolCalls,
             history,
           );
+          console.log('results', JSON.stringify(results, null, 2));
           for (const result of results) {
             if (result.success) {
               if (result.result?.undoExecute) {

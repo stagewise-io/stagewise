@@ -30,6 +30,8 @@ export type {
   ToolList,
 } from '../router/capabilities/tool-calling/types';
 
+export type { UndoExecuteResult } from '../router/capabilities/undo/types';
+
 export type { StagewiseInfo } from '../info';
 
 export { DEFAULT_STARTING_PORT } from '../constants';

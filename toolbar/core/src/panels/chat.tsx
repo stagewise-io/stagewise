@@ -17,6 +17,7 @@ import {
   CheckIcon,
   CogIcon,
   ArrowUpIcon,
+  Undo2Icon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ContextElementsChips } from '@/components/context-elements-chips';
@@ -28,6 +29,7 @@ import {
 import { TextSlideshow } from '@/components/ui/text-slideshow';
 import { useAgentMessaging } from '@/hooks/agent/use-agent-messaging';
 import { useAgents } from '@/hooks/agent/use-agent-provider';
+import { useAgentUndo } from '@/hooks/agent/use-agent-undo';
 
 const agentStateToText: Record<AgentStateType, string> = {
   [AgentStateType.WAITING_FOR_USER_RESPONSE]: 'Waiting for user response',
@@ -62,7 +64,9 @@ export function ChatPanel() {
   const chatState = useChatState();
   const chatMessaging = useAgentMessaging();
   const [isComposing, setIsComposing] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
   const { connected } = useAgents();
+  const { requestUndo, isUndoAvailable } = useAgentUndo();
 
   const enableInputField = useMemo(() => {
     // Disable input if agent is not connected
@@ -109,6 +113,22 @@ export function ChatPanel() {
   const handleCompositionEnd = useCallback(() => {
     setIsComposing(false);
   }, []);
+
+  const handleUndo = useCallback(async () => {
+    if (!isUndoAvailable || isUndoing) return;
+
+    setIsUndoing(true);
+    try {
+      const result = await requestUndo();
+      if (!result.success) {
+        console.error('Undo failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Undo error:', error);
+    } finally {
+      setIsUndoing(false);
+    }
+  }, [isUndoAvailable, isUndoing, requestUndo]);
 
   /* If the user clicks on prompt creation mode, we force-focus the input field all the time. */
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -209,7 +229,7 @@ export function ChatPanel() {
       />
       <PanelContent
         className={cn(
-          'flex basis-[initial] flex-col gap-0 px-1 py-0',
+          'relative flex basis-[initial] flex-col gap-0 px-1 py-0',
           anyMessageInChat ? '!h-[calc-size(auto,size)] h-auto flex-1' : 'h-0',
           agentState.state === AgentStateType.IDLE
             ? 'rounded-t-[inherit]'
@@ -220,6 +240,32 @@ export function ChatPanel() {
       >
         {/* This are renders the output of the agent as markdown and makes it scrollable if necessary. */}
         <AgentMessageDisplay />
+
+        {/* Undo button - appears at bottom right when agent is idle and there's a message */}
+        {anyMessageInChat &&
+          agentState.state === AgentStateType.IDLE &&
+          isUndoAvailable && (
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={isUndoing}
+              className={cn(
+                'absolute right-2 bottom-2 z-10',
+                'flex items-center gap-1 px-2 py-1',
+                'text-gray-500 hover:text-gray-700',
+                'transition-colors duration-200',
+                'cursor-pointer disabled:cursor-not-allowed',
+                'disabled:opacity-50',
+                isUndoing && 'animate-pulse',
+              )}
+              aria-label="Undo last action"
+            >
+              <Undo2Icon className="size-4" />
+              <span className="font-medium text-sm">
+                {isUndoing ? 'Undoing...' : 'Undo'}
+              </span>
+            </button>
+          )}
       </PanelContent>
       <PanelFooter
         className={cn(
