@@ -15,29 +15,14 @@
  * ```typescript
  * const adapter = new AgentTransportAdapter();
  * const agent = adapter.getAgent();
- *
- * // Set availability
- * agent.availability.set(true);
- *
- * // Set state
- * agent.state.set(AgentStateType.WORKING, 'Processing request...');
- *
- * // Enable chat
- * agent.chat.setChatSupport(true);
  * ```
  */
 
 import type { TransportInterface } from '../router';
 import type { AgentInterface } from './interface';
-import type { AvailabilityImplementation } from '../router/capabilities/availability';
-import type { MessagingImplementation } from '../router/capabilities/messaging';
-import type { StateImplementation } from '../router/capabilities/state';
 import type { ChatImplementation } from '../router/capabilities/chat';
 
 // Import the split manager classes
-import { AvailabilityManager } from './adapter/availability-manager';
-import { StateManager } from './adapter/state-manager';
-import { MessagingManager } from './adapter/messaging-manager';
 import { ChatManager } from './adapter/chat-manager';
 
 // Re-export PushController for backward compatibility if needed
@@ -63,17 +48,11 @@ export class AgentTransportAdapter implements TransportInterface {
    * Public TransportInterface implementation
    * These are used by the router to expose capabilities to the toolbar
    */
-  public readonly availability: AvailabilityImplementation;
-  public readonly messaging: MessagingImplementation;
-  public readonly state: StateImplementation;
-  public chat?: ChatImplementation;
+  public readonly chat: ChatImplementation;
 
   /**
    * Internal manager instances that handle specific functionality
    */
-  private readonly availabilityManager: AvailabilityManager;
-  private readonly stateManager: StateManager;
-  private readonly messagingManager: MessagingManager;
   private readonly chatManager: ChatManager;
 
   /**
@@ -94,22 +73,8 @@ export class AgentTransportAdapter implements TransportInterface {
 
     // Initialize all managers
     // Each manager handles a specific aspect of agent functionality
-    this.availabilityManager = new AvailabilityManager();
-    this.stateManager = new StateManager();
-    this.messagingManager = new MessagingManager(this.options.idGenerator);
-    this.chatManager = new ChatManager(
-      this.options.idGenerator,
-      this.stateManager,
-    );
-
-    // Create the public TransportInterface implementations
-    // These are what the router exposes to the toolbar
-    this.availability = this.availabilityManager.createImplementation();
-    this.state = this.stateManager.createImplementation();
-    this.messaging = this.messagingManager.createImplementation();
-
-    // Chat is optional and created on demand when enabled
-    // This maintains backward compatibility with agents that don't use chat
+    this.chatManager = new ChatManager(this.options.idGenerator);
+    this.chat = this.chatManager.createImplementation();
   }
 
   /**
@@ -146,166 +111,11 @@ export class AgentTransportAdapter implements TransportInterface {
 
     return {
       /**
-       * Availability management interface
-       * Allows the agent to indicate whether it's available and any errors
-       */
-      availability: {
-        /**
-         * Gets the current availability state
-         * Returns a copy to prevent external modifications
-         */
-        get: () => self.availabilityManager.get(),
-
-        /**
-         * Sets the availability state
-         * @param available - Whether the agent is available
-         * @param error - Error type if unavailable
-         * @param errorMessage - Human-readable error description
-         */
-        set: (available, error?, errorMessage?) => {
-          if (available) {
-            self.availabilityManager.set(true);
-          } else {
-            self.availabilityManager.set(false, error, errorMessage);
-          }
-        },
-      },
-
-      /**
-       * State management interface
-       * Allows the agent to indicate what it's currently doing
-       * and listen for stop signals from the toolbar
-       */
-      state: {
-        /**
-         * Gets the current state
-         * Returns a copy to prevent external modifications
-         */
-        get: () => self.stateManager.get(),
-
-        /**
-         * Sets the current state
-         * @param state - The state type (IDLE, WORKING, etc.)
-         * @param description - Optional description of the current activity
-         */
-        set: (state, description) => {
-          self.stateManager.set(state, description);
-        },
-
-        /**
-         * Adds a listener for stop signals from the toolbar
-         * The agent should use this to listen for requests to stop processing
-         */
-        addStopListener: (listener) => {
-          self.stateManager.addStopListener(listener);
-        },
-
-        /**
-         * Removes a stop listener
-         */
-        removeStopListener: (listener) => {
-          self.stateManager.removeStopListener(listener);
-        },
-      },
-
-      /**
-       * Messaging interface (legacy)
-       * Provides methods for agents that use the older messaging system
-       * New agents should use the chat interface instead
-       */
-      messaging: {
-        /**
-         * Gets the current message content
-         */
-        get: () => self.messagingManager.get(),
-
-        /**
-         * Gets the ID of the current message
-         */
-        getCurrentId: () => self.messagingManager.getCurrentId(),
-
-        /**
-         * Gets the complete current message with ID and parts
-         */
-        getCurrentMessage: () => self.messagingManager.getCurrentMessage(),
-
-        /**
-         * Adds a listener for incoming user messages
-         */
-        addUserMessageListener: (listener) => {
-          self.messagingManager.addUserMessageListener(listener);
-        },
-
-        /**
-         * Removes a user message listener
-         */
-        removeUserMessageListener: (listener) => {
-          self.messagingManager.removeUserMessageListener(listener);
-        },
-
-        /**
-         * Removes all user message listeners
-         */
-        clearUserMessageListeners: () => {
-          self.messagingManager.clearUserMessageListeners();
-        },
-
-        /**
-         * Clears the current message and starts a new one
-         */
-        clear: () => {
-          self.messagingManager.clear();
-        },
-
-        /**
-         * Sets the complete message content
-         */
-        set: (content) => {
-          self.messagingManager.set(content);
-        },
-
-        /**
-         * Adds parts to the current message
-         */
-        addPart: (content) => {
-          self.messagingManager.addPart(content);
-        },
-
-        /**
-         * Updates a specific part of the message
-         */
-        updatePart: (content, index, type) => {
-          self.messagingManager.updatePart(content, index, type);
-        },
-      },
-
-      /**
        * Chat interface (modern)
        * Provides methods for agents that use the chat system
        * This is the preferred interface for new agents
        */
       chat: {
-        /**
-         * Enables or disables chat support
-         * When enabled, creates the chat implementation for the router
-         */
-        setChatSupport: (supported) => {
-          self.chatManager.setSupport(supported);
-
-          if (supported) {
-            // Create the chat implementation for the router
-            self.chat = self.chatManager.createImplementation();
-          } else {
-            // Remove chat implementation when disabled
-            self.chat = undefined;
-          }
-        },
-
-        /**
-         * Checks if chat is supported
-         */
-        isSupported: () => self.chatManager.isSupported(),
-
         /**
          * Gets list of all chats
          */
@@ -422,12 +232,7 @@ export class AgentTransportAdapter implements TransportInterface {
          * Removes all listeners to prevent memory leaks
          */
         clearAllListeners: () => {
-          self.messagingManager.clearUserMessageListeners();
-          self.stateManager.clearStopListeners();
-          // Clear chat listeners if chat is supported
-          if (self.chatManager.isSupported()) {
-            self.chatManager.clearAllUpdateListeners();
-          }
+          self.chatManager.clearAllUpdateListeners();
         },
       },
     };

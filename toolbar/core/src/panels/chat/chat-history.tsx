@@ -5,7 +5,7 @@ import { useAgentChat } from '@/hooks/agent/chat';
 import type {
   ToolApprovalPart,
   ToolResultPart,
-} from '@stagewise/agent-interface/toolbar';
+} from '@stagewise/agent-interface-internal/toolbar';
 
 export function ChatHistory() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);

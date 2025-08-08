@@ -7,7 +7,7 @@ import { useAgentState } from '@/hooks/agent/use-agent-state';
 import { useChatHistoryState } from '@/hooks/use-chat-history-state';
 import { cn } from '@/utils';
 import { Textarea } from '@headlessui/react';
-import { AgentStateType } from '@stagewise/agent-interface/toolbar';
+import { AgentStateType } from '@stagewise/agent-interface-internal/toolbar';
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 

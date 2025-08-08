@@ -2,7 +2,7 @@ import { Trash2Icon } from 'lucide-react';
 import TimeAgo from 'react-timeago';
 import { useAgentChat } from '@/hooks/agent/chat';
 import { useCallback } from 'react';
-import type { ChatListItem } from '@stagewise/agent-interface/toolbar';
+import type { ChatListItem } from '@stagewise/agent-interface-internal/toolbar';
 
 export function ChatList() {
   const chats = useAgentChat().chats;

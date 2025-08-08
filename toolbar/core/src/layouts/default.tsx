@@ -13,7 +13,6 @@ import { Toolbar } from '@/toolbar';
 import { usePanels } from '@/hooks/use-panels';
 import { SettingsPanel } from '@/panels/settings';
 import { ChatPanel } from '@/panels/chat';
-import { ChatWithHistoryPanel } from '@/panels/chat-with-history';
 import { AgentConnectivityPanel } from '@/panels/agent-connectivity';
 import { usePlugins } from '@/hooks/use-plugins';
 import { useAgents } from '@/hooks/agent/use-agent-provider';
@@ -202,18 +201,6 @@ function PanelsArea({
     return null;
   }, [openPluginName, plugins]);
 
-  // Determine which chat panel to show based on agent capabilities
-  const showChatPanelWithHistory = useMemo(() => {
-    // If no agent is connected, default to the basic chat panel
-    if (!connected) {
-      return false;
-    }
-
-    // Check if the connected agent supports chat history capability
-    // Use optional chaining to safely access nested properties
-    return connected?.info?.capabilities?.chatHistory === true;
-  }, [connected]);
-
   return (
     <div
       className={cn(
@@ -226,7 +213,7 @@ function PanelsArea({
       )}
     >
       <PanelWrapper position={position} isOpen={isChatOpen}>
-        {showChatPanelWithHistory ? <ChatWithHistoryPanel /> : <ChatPanel />}
+        <ChatPanel />
       </PanelWrapper>
 
       <PanelWrapper position={position} isOpen={isSettingsOpen}>

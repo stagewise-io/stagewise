@@ -7,7 +7,7 @@ import type {
   ToolApprovalPart,
   ToolCallPart,
   ToolResultPart,
-} from '@stagewise/agent-interface/toolbar';
+} from '@stagewise/agent-interface-internal/toolbar';
 import {
   CheckIcon,
   CogIcon,
