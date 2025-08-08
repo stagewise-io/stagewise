@@ -1,4 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import type { ToolResult } from '@stagewise/agent-types';
 import { z } from 'zod';
 import { checkFileSize } from './file-utils';
 import { FILE_SIZE_LIMITS } from './constants';
@@ -27,16 +28,6 @@ export const readFileParamsSchema = z.object({
 });
 
 export type ReadFileParams = z.infer<typeof readFileParamsSchema>;
-
-const toolResultSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-  content: z.string().optional(),
-  error: z.string().optional(),
-  totalLines: z.number().optional(),
-});
-
-type ToolResult = z.infer<typeof toolResultSchema>;
 
 /**
  * Read content from a file tool
@@ -166,8 +157,10 @@ export async function readFileTool(
     return {
       success: true,
       message,
-      content,
-      totalLines,
+      result: {
+        content,
+        totalLines,
+      },
     };
   } catch (error) {
     return {

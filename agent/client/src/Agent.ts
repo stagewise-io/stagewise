@@ -33,6 +33,7 @@ import {
 import {
   processParallelToolCalls,
   shouldRecurseAfterToolCall,
+  type ToolCallProcessingResult,
 } from './utils/tool-call-utils.js';
 import {
   createEventEmitter,
@@ -86,6 +87,11 @@ export class Agent {
   private isExpressMode = false;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
+  private undoToolCallStack: Array<{
+    toolName: string;
+    toolCallId: string;
+    undoExecute: () => Promise<void>;
+  }> = [];
 
   private constructor(config: {
     clientRuntime: ClientRuntime;
@@ -461,6 +467,7 @@ export class Agent {
     // Validate prerequisites
     if (!this.server) throw new Error('Agent not initialized');
     if (!this.client) throw new Error('TRPC API client not initialized');
+    this.undoToolCallStack = []; // Reset undo stack for each call - only allow undoing the last task
 
     // Check recursion depth
     if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
@@ -688,10 +695,22 @@ export class Agent {
 
         // Process all tool calls together if any
         if (toolCalls.length > 0) {
-          await this.processParallelToolCallsContent(toolCalls, history, {
-            chatId,
-            messageId,
-          });
+          const results = await this.processParallelToolCallsContent(
+            toolCalls,
+            history,
+            { chatId, messageId },
+          );
+          for (const result of results) {
+            if (result.success) {
+              if (result.result?.undoExecute) {
+                this.undoToolCallStack.push({
+                  toolName: result.toolName,
+                  toolCallId: result.toolCallId,
+                  undoExecute: result.result.undoExecute,
+                });
+              }
+            }
+          }
         }
       } else if (typeof message.content === 'string') {
         history.push({
@@ -717,7 +736,7 @@ export class Agent {
       chatId?: string;
       messageId?: string;
     },
-  ): Promise<void> {
+  ): Promise<ToolCallProcessingResult[]> {
     const explanations = toolCalls
       .map((tc) => ('explanation' in tc.args ? tc.args.explanation : null))
       .filter((explanation) => explanation !== null);
@@ -785,10 +804,18 @@ export class Agent {
           id: crypto.randomUUID(),
           createdAt: new Date(),
           role: 'tool',
-          content: results,
+          content: results.map((r) => ({
+            type: 'tool-result',
+            toolCallId: r.toolCallId,
+            toolName: r.toolName,
+            output: r.result,
+            isError: r.error === 'error',
+          })),
         },
         options?.chatId,
       );
     }
+
+    return results;
   }
 }
