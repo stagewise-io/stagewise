@@ -9,9 +9,7 @@ import type {
   AssistantMessage,
   ToolMessage,
 } from '../../router/capabilities/chat/types';
-import { AgentStateType } from '../../router/capabilities/state/types';
 import { PushController } from './push-controller';
-import type { StateManager } from './state-manager';
 
 /**
  * ChatManager - Manages chat functionality
@@ -68,15 +66,8 @@ export class ChatManager {
    */
   private readonly idGenerator: () => string;
 
-  /**
-   * Reference to state manager for checking agent state
-   * Used to prevent chat operations during active work
-   */
-  private readonly stateManager: StateManager;
-
-  constructor(idGenerator: () => string, stateManager: StateManager) {
+  constructor(idGenerator: () => string) {
     this.idGenerator = idGenerator;
-    this.stateManager = stateManager;
 
     // Create controller without initial value
     // Initial state is sent on first subscription

@@ -20,7 +20,7 @@ import type {
   AssistantMessage,
   ToolDefinition,
   SendMessageRequest,
-} from '@stagewise/agent-interface/toolbar';
+} from '@stagewise/agent-interface-internal/toolbar';
 import { useAgents } from '../use-agent-provider';
 import { ChatContext } from './context';
 import { createChatUpdateHandler } from './update-handler';
@@ -82,7 +82,7 @@ export const AgentChatProvider = ({ children }: { children?: ReactNode }) => {
   // ===== Subscription Management =====
 
   useEffect(() => {
-    if (agent?.info.capabilities?.chatHistory) {
+    if (agent.chat.chatHistory) {
       setIsSupported(true);
 
       // Subscribe to chat updates from the agent

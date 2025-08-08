@@ -10,7 +10,7 @@ import type {
   ChatUpdate,
   AssistantMessage,
   ToolMessage,
-} from '@stagewise/agent-interface/toolbar';
+} from '@stagewise/agent-interface-internal/toolbar';
 import type {
   ChatState,
   MessageStreamingState,

@@ -5,13 +5,13 @@ import {
   useChatHistoryState,
 } from '@/hooks/use-chat-history-state';
 import { cn } from '@/utils';
-import { AgentStateType } from '@stagewise/agent-interface/toolbar';
+import { AgentStateType } from '@stagewise/agent-interface-internal/toolbar';
 import { useEffect, useMemo, useRef } from 'react';
 import { useAgentChat } from '@/hooks/agent/chat/use-agent-chat';
 import { useAgents } from '@/hooks/agent/use-agent-provider';
-import { ChatHistory } from './chat-with-history/chat-history';
-import { ChatPanelFooter } from './chat-with-history/panel-footer';
-import { ChatPanelHeader } from './chat-with-history/panel-header';
+import { ChatHistory } from './chat-history';
+import { ChatPanelFooter } from './panel-footer';
+import { ChatPanelHeader } from './panel-header';
 
 function ChatWithHistoryPanelContent() {
   const agentState = useAgentState();
@@ -91,7 +91,7 @@ function ChatWithHistoryPanelContent() {
   );
 }
 
-export function ChatWithHistoryPanel() {
+export function ChatPanel() {
   return (
     <ChatHistoryStateProvider>
       <ChatWithHistoryPanelContent />
