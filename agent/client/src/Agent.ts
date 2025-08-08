@@ -499,11 +499,14 @@ export class Agent {
       const request = {
         messages,
         tools: mapZodToolsToJsonSchemaTools(this.tools),
-        userMessageMetadata: {
-          ...userMessage?.metadata.browserData,
-        },
         promptSnippets,
-      };
+      } as RouterInputs['agent']['callAgent'];
+
+      if (userMessage?.metadata.browserData) {
+        request.userMessageMetadata = {
+          ...userMessage.metadata.browserData,
+        };
+      }
 
       const agentResponse = await this.callAgentWithRetry(
         request as RouterInputs['agent']['callAgent'],
