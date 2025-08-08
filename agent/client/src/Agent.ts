@@ -377,6 +377,7 @@ export class Agent {
         case 'message-added': {
           const chat = this.chats.find((c) => c.chatId === update.chatId);
           if (!chat || update.message.role !== 'user') return;
+          chat.messages.push(update.message);
           this.setAgentWorking(true);
           const promptSnippets: PromptSnippet[] = [];
           const projectPathPromptSnippet = await getProjectPath(
@@ -476,31 +477,36 @@ export class Agent {
         ),
       );
 
+      // Keeping compatibility with the old agent API
+      const messages = (history ?? []).map((m) => {
+        if (m.role === 'user' && 'metadata' in m) {
+          return {
+            id: m.id,
+            contentItems: m.content.filter((c) => c.type !== 'tool-approval'),
+            createdAt: m.createdAt,
+            metadata: {
+              ...m.metadata.browserData,
+            },
+            pluginContent: m.metadata.pluginContentItems,
+            sentByPlugin: m.metadata.sentByPlugin,
+          };
+        }
+        return m;
+      });
+
       // Call the agent API
       const startTime = Date.now();
       const request = {
-        messages: history ?? [],
+        messages,
         tools: mapZodToolsToJsonSchemaTools(this.tools),
-        userMessageMetadata: userMessage?.metadata,
+        userMessageMetadata: {
+          ...userMessage?.metadata.browserData,
+        },
         promptSnippets,
       };
 
-      // TODO: find out how we handle tool approvals, then remove this
-      const requestWithoutToolApprovals = {
-        ...request,
-        messages: request.messages.map((m) => {
-          if (typeof m.content === 'string') {
-            return m;
-          }
-          return {
-            ...m,
-            content: m.content.filter((c) => c.type !== 'tool-approval'),
-          };
-        }),
-      };
-
       const agentResponse = await this.callAgentWithRetry(
-        requestWithoutToolApprovals as RouterInputs['agent']['callAgent'],
+        request as RouterInputs['agent']['callAgent'],
       );
 
       if (agentResponse.syntheticToolCalls) {
