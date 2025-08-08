@@ -3,7 +3,7 @@
   "displayName": "stagewise",
   "private": true,
   "description": "Visual vibe coding. Right in your codebase.",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "publisher": "stagewise",
   "icon": "icon.png",
   "engines": {

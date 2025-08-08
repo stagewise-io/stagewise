@@ -1,5 +1,11 @@
 # stagewise
 
+## 0.4.0
+
+### Minor Changes
+
+- 6e4c218: Split bridged and non-bridged toolbars and agent-interfaces for faster development of new agent features
+
 ## 0.3.0
 
 ### Minor Changes

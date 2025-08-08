@@ -2,7 +2,7 @@
   "name": "stagewise",
   "module": "src/index.ts",
   "type": "module",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Stagewise CLI",
   "author": "stagewise GmbH",
   "license": "AGPL-3.0-only",
