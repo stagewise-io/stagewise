@@ -32,6 +32,7 @@ const defaultContextValue: ChatContextValue = {
   deleteChat: async () => false,
   switchChat: async () => false,
   updateChatTitle: async () => false,
+  deleteMessageAndSubsequent: async () => false,
 
   // Messaging
   sendMessage: async () => {},

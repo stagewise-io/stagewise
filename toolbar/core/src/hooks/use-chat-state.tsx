@@ -7,11 +7,9 @@ import {
   getSelectedElementInfo,
   collectUserMessageMetadata,
 } from '@/utils';
-import { useAgentMessaging } from './agent/use-agent-messaging';
 import { useAgentState } from './agent/use-agent-state';
 import type {
   UserMessage,
-  UserMessageContentItem,
   UserMessageMetadata,
   PluginContentItem,
 } from '@stagewise/agent-interface-internal/toolbar';

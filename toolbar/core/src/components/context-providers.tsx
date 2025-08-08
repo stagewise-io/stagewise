@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { ConfigProvider } from '@/hooks/use-config';
 import { AgentProvider } from '@/hooks/agent/use-agent-provider';
 import { AgentStateProvider } from '@/hooks/agent/use-agent-state';
+import { AgentChatProvider } from '@/hooks/agent/chat';
 import { AgentMessagingProvider } from '@/hooks/agent/use-agent-messaging';
 import { PanelsProvider } from '@/hooks/use-panels';
 import { ChatHistoryStateProvider } from '@/hooks/use-chat-history-state';
@@ -20,17 +21,19 @@ export function ContextProviders({
     <ConfigProvider config={config}>
       <AgentProvider>
         <AgentStateProvider>
-          <AgentMessagingProvider>
-            <PanelsProvider>
-              <PluginProvider>
-                <ChatStateProvider>
-                  <ChatHistoryStateProvider>
-                    {children}
-                  </ChatHistoryStateProvider>
-                </ChatStateProvider>
-              </PluginProvider>
-            </PanelsProvider>
-          </AgentMessagingProvider>
+          <AgentChatProvider>
+            <AgentMessagingProvider>
+              <PanelsProvider>
+                <PluginProvider>
+                  <ChatStateProvider>
+                    <ChatHistoryStateProvider>
+                      {children}
+                    </ChatHistoryStateProvider>
+                  </ChatStateProvider>
+                </PluginProvider>
+              </PanelsProvider>
+            </AgentMessagingProvider>
+          </AgentChatProvider>
         </AgentStateProvider>
       </AgentProvider>
     </ConfigProvider>

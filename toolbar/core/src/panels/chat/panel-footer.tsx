@@ -7,9 +7,9 @@ import { useAgentState } from '@/hooks/agent/use-agent-state';
 import { useChatHistoryState } from '@/hooks/use-chat-history-state';
 import { cn } from '@/utils';
 import { Textarea } from '@headlessui/react';
-import { AgentStateType } from '@stagewise/agent-interface-internal/toolbar';
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useAgentChat } from '@/hooks/agent/chat';
 
 const GlassyTextInputClassNames =
   'origin-center rounded-xl border border-black/10 ring-1 ring-white/20 transition-all duration-150 ease-out after:absolute after:inset-0 after:size-full after:content-normal after:rounded-[inherit] after:bg-gradient-to-b after:from-white/5 after:to-white/0 after:transition-colors after:duration-150 after:ease-out disabled:pointer-events-none disabled:bg-black/5 disabled:text-foreground/60 disabled:opacity-30';
@@ -17,6 +17,7 @@ const GlassyTextInputClassNames =
 export function ChatPanelFooter() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatState = useChatHistoryState();
+  const _agentChat = useAgentChat();
   const agentState = useAgentState();
   const { connected } = useAgents();
   const [isComposing, setIsComposing] = useState(false);
@@ -26,11 +27,8 @@ export function ChatPanelFooter() {
     if (!connected) {
       return false;
     }
-    return (
-      agentState.state === AgentStateType.WAITING_FOR_USER_RESPONSE ||
-      agentState.state === AgentStateType.IDLE
-    );
-  }, [agentState.state, connected]);
+    return !agentState.isWorking;
+  }, [agentState.isWorking, connected]);
 
   const canSendMessage = useMemo(() => {
     return (

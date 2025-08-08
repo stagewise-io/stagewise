@@ -43,6 +43,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(initial).toEqual({
         state: AgentStateType.IDLE,
         description: undefined,
+        isWorking: false,
       });
     });
   });
@@ -58,6 +59,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(update).toEqual({
         state: AgentStateType.THINKING,
         description: undefined,
+        isWorking: true,
       });
     });
 
@@ -74,6 +76,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(update).toEqual({
         state: AgentStateType.WORKING,
         description: 'Processing your request',
+        isWorking: true,
       });
     });
 
@@ -87,6 +90,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(update).toEqual({
         state: AgentStateType.FAILED,
         description: '',
+        isWorking: false,
       });
     });
 
@@ -115,6 +119,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(thinking).toEqual({
         state: AgentStateType.THINKING,
         description: 'Analyzing request',
+        isWorking: true,
       });
 
       agentInterface.state.set(AgentStateType.WORKING, 'Executing task');
@@ -122,6 +127,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(working).toEqual({
         state: AgentStateType.WORKING,
         description: 'Executing task',
+        isWorking: true,
       });
 
       agentInterface.state.set(AgentStateType.COMPLETED, 'Task finished');
@@ -129,6 +135,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(completed).toEqual({
         state: AgentStateType.COMPLETED,
         description: 'Task finished',
+        isWorking: false,
       });
     });
 
@@ -145,6 +152,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(failed).toEqual({
         state: AgentStateType.FAILED,
         description: 'Network error occurred',
+        isWorking: false,
       });
     });
 
@@ -162,18 +170,21 @@ describe('AgentTransportAdapter - State', () => {
       expect(update1).toEqual({
         state: AgentStateType.THINKING,
         description: 'Step 1',
+        isWorking: true,
       });
 
       const update2 = (await getNext(iterator)) as AgentState;
       expect(update2).toEqual({
         state: AgentStateType.WORKING,
         description: 'Step 2',
+        isWorking: true,
       });
 
       const update3 = (await getNext(iterator)) as AgentState;
       expect(update3).toEqual({
         state: AgentStateType.COMPLETED,
         description: 'Step 3',
+        isWorking: false,
       });
     });
 
@@ -207,6 +218,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(idle).toEqual({
         state: AgentStateType.IDLE,
         description: undefined,
+        isWorking: false,
       });
     });
   });
@@ -227,10 +239,12 @@ describe('AgentTransportAdapter - State', () => {
       expect(update1).toEqual({
         state: AgentStateType.THINKING,
         description: 'Processing',
+        isWorking: true,
       });
       expect(update2).toEqual({
         state: AgentStateType.THINKING,
         description: 'Processing',
+        isWorking: true,
       });
     });
 
@@ -249,10 +263,12 @@ describe('AgentTransportAdapter - State', () => {
         name: 'provides current state with no description to new subscribers',
         state: AgentStateType.WAITING_FOR_USER_RESPONSE,
         description: undefined,
+        isWorking: false,
         setupStates: [
           {
             state: AgentStateType.WAITING_FOR_USER_RESPONSE,
             description: undefined,
+        isWorking: false,
           },
         ],
       },
@@ -277,6 +293,7 @@ describe('AgentTransportAdapter - State', () => {
         expect(immediateValue).toEqual({
           state,
           description,
+          isWorking: setupStates[setupStates.length - 1].isWorking ?? false,
         });
       },
     );
@@ -355,9 +372,11 @@ describe('AgentTransportAdapter - State', () => {
         agentInterface.state.set(state, description);
         const update = (await getNext(iterator)) as AgentState;
 
+        const isWorking = state === AgentStateType.THINKING || state === AgentStateType.WORKING || state === AgentStateType.CALLING_TOOL;
         expect(update).toEqual({
           state,
           description,
+          isWorking,
         });
       },
     );
@@ -379,9 +398,11 @@ describe('AgentTransportAdapter - State', () => {
       for (const state of states) {
         agentInterface.state.set(state);
         const update = (await getNext(iterator)) as AgentState;
+        const isWorking = state === AgentStateType.THINKING || state === AgentStateType.WORKING || state === AgentStateType.CALLING_TOOL;
         expect(update).toEqual({
           state,
           description: undefined,
+          isWorking,
         });
       }
     });
@@ -399,6 +420,7 @@ describe('AgentTransportAdapter - State', () => {
         name: 'returns current state without description',
         state: AgentStateType.THINKING,
         description: undefined,
+        isWorking: false,
       },
     ];
 
@@ -409,9 +431,11 @@ describe('AgentTransportAdapter - State', () => {
         agentInterface.state.set(state);
       }
       const current = agentInterface.state.get();
+      const isWorking = state === AgentStateType.THINKING || state === AgentStateType.WORKING || state === AgentStateType.CALLING_TOOL;
       expect(current).toEqual({
         state,
         description,
+        isWorking,
       });
     });
 
@@ -420,6 +444,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(current).toEqual({
         state: AgentStateType.IDLE,
         description: undefined,
+        isWorking: false,
       });
     });
 
@@ -722,6 +747,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(initial).toEqual({
         state: AgentStateType.WORKING,
         description: 'Pre-iterator state',
+        isWorking: true,
       });
     });
 

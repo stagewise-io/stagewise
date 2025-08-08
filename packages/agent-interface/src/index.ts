@@ -1,14 +1,3 @@
-// Export all the types users might need
-export type * from './router/capabilities/availability/types';
-export type * from './router/capabilities/state/types';
-
-// Export messaging types except UserMessage and userMessageSchema which conflict with chat
-export type {
-  AgentMessageContentItemPart,
-  AgentMessageUpdate,
-  UserMessageContentItem,
-} from './router/capabilities/messaging/types';
-
 // Export chat types with UserMessage as ChatUserMessage to avoid conflict
 export type {
   TextPart,
@@ -17,6 +6,7 @@ export type {
   ToolCallPart,
   ToolResultPart,
   ToolApprovalPart,
+  UserMessage,
   UserMessage as ChatUserMessage,
   AssistantMessage,
   ToolMessage,
@@ -42,3 +32,6 @@ export type {
 
 export { createAgentServer as createOriginalAgentServer } from './agent/index';
 export type { AgentInterface } from './agent/interface';
+export type { InterfaceRouter } from './router';
+export { transformer } from './transformer';
+export type { StagewiseInfo } from './info';

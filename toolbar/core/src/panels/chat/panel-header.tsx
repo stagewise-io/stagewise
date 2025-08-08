@@ -23,8 +23,8 @@ export function ChatPanelHeader() {
       )}
       title={chatListOpen && <span className="mt-0.5">Chats</span>}
       description={
-        agentState.description && (
-          <span className="text-sm">{agentState.description}</span>
+        agentState.state.description && (
+          <span className="text-sm">{agentState.state.description}</span>
         )
       }
       clear

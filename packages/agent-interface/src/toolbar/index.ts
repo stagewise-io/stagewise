@@ -24,6 +24,8 @@ export type {
   UserMessage,
 } from '../router/capabilities/chat/types';
 
+export { userMessageSchema } from '../router/capabilities/chat/types';
+
 export type { StagewiseInfo } from '../info';
 
 // Export shared types for metadata

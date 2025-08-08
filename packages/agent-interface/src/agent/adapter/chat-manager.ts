@@ -51,6 +51,21 @@ export class ChatManager {
   > = new Map();
 
   /**
+   * Current agent working state
+   */
+  private isWorking = false;
+
+  /**
+   * Current state description
+   */
+  private stateDescription: string | undefined;
+
+  /**
+   * Stop listeners
+   */
+  private stopListeners: Array<() => void> = [];
+
+  /**
    * Set of listeners for chat update events
    * Used internally by the agent to react to chat changes
    */
@@ -763,7 +778,65 @@ export class ChatManager {
         // Add to chat and broadcast
         self.addMessage(toolMessage);
       },
+
+      /**
+       * Handles stop requests from the toolbar
+       */
+      onStop: async () => {
+        if (!self.isWorking) {
+          throw new Error('Agent is not currently working');
+        }
+
+        // Trigger all stop listeners
+        for (const listener of self.stopListeners) {
+          try {
+            listener();
+          } catch (error) {
+            console.error('Error in stop listener:', error);
+          }
+        }
+      },
     };
+  }
+
+  /**
+   * Sets the agent's working state and broadcasts it
+   */
+  public setWorkingState(isWorking: boolean, description?: string): void {
+    this.isWorking = isWorking;
+    this.stateDescription = description;
+
+    const update: ChatUpdate = {
+      type: 'agent-state',
+      isWorking,
+      stateDescription: description,
+    };
+
+    this.broadcastUpdate(update);
+  }
+
+  /**
+   * Adds a stop listener
+   */
+  public addStopListener(listener: () => void): void {
+    this.stopListeners.push(listener);
+  }
+
+  /**
+   * Removes a stop listener
+   */
+  public removeStopListener(listener: () => void): void {
+    const index = this.stopListeners.indexOf(listener);
+    if (index !== -1) {
+      this.stopListeners.splice(index, 1);
+    }
+  }
+
+  /**
+   * Clears all stop listeners
+   */
+  public clearAllStopListeners(): void {
+    this.stopListeners = [];
   }
 
   /**
