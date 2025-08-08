@@ -1,5 +1,6 @@
 import type { AgentServer } from '@stagewise/agent-interface-internal/agent';
 import { ErrorDescriptions, formatErrorDescription } from './error-utils.js';
+import type { TextStreamPart, Tool } from 'ai';
 
 /**
  * Creates a timeout promise that rejects after the specified duration
@@ -19,29 +20,32 @@ export function createTimeoutPromise(
  * Consumes the agent stream and updates the UI with text deltas
  */
 export async function consumeAgentStream(
-  fullStream: AsyncIterable<{ type: string; textDelta?: string }>,
+  fullStream: AsyncIterable<TextStreamPart<Record<string, Tool>>>,
   server: AgentServer,
   chatId: string,
   onError?: (error: unknown) => void,
-): Promise<void> {
-  const messageId = crypto.randomUUID();
+) {
+  let messageId: string | undefined = crypto.randomUUID(); // the crypto id won't be used, it's a fallback (step-start should always override it)
   try {
     let partIndex = 0;
     for await (const chunk of fullStream) {
-      server.interface.chat.addMessage(
-        {
-          id: messageId,
-          content: [
-            {
-              type: 'text',
-              text: '',
-            },
-          ],
-          role: 'assistant',
-          createdAt: new Date(),
-        },
-        chatId,
-      );
+      if (chunk.type === 'step-start') {
+        messageId = chunk.messageId;
+        server.interface.chat.addMessage(
+          {
+            id: messageId,
+            content: [
+              {
+                type: 'text',
+                text: '',
+              },
+            ],
+            role: 'assistant',
+            createdAt: new Date(),
+          },
+          chatId,
+        );
+      }
       if (chunk.type === 'text-delta' && chunk.textDelta) {
         server.interface.chat.streamMessagePart(
           messageId,
@@ -50,16 +54,37 @@ export async function consumeAgentStream(
             messageId,
             content: {
               type: 'text',
-              text: chunk.textDelta, // TODO: Add a timestamp
+              text: chunk.textDelta,
             },
             partIndex,
             updateType: 'append',
           },
           chatId,
         );
+      }
+      if (chunk.type === 'tool-call') {
+        server.interface.chat.streamMessagePart(
+          messageId,
+          partIndex,
+          {
+            messageId,
+            partIndex,
+            content: {
+              type: 'tool-call',
+              toolCallId: chunk.toolCallId,
+              toolName: chunk.toolName,
+              input: chunk.args,
+              runtime: 'cli',
+              requiresApproval: false,
+            },
+            updateType: 'create',
+          },
+          chatId,
+        );
         partIndex++;
       }
     }
+    return { messageId };
   } catch (streamError) {
     console.error('[Agent]: Error consuming stream:', streamError);
     if (onError) {
@@ -129,11 +154,11 @@ export class TimeoutManager {
  */
 export async function consumeStreamWithTimeout(
   chatId: string,
-  fullStream: AsyncIterable<{ type: string; textDelta?: string }>,
+  fullStream: AsyncIterable<TextStreamPart<Record<string, Tool>>>,
   server: AgentServer,
   timeout: number,
   setWorkingState: (state: boolean, description?: string) => void,
-): Promise<void> {
+) {
   const streamPromise = consumeAgentStream(
     fullStream,
     server,
@@ -151,7 +176,7 @@ export async function consumeStreamWithTimeout(
   );
 
   try {
-    await withTimeout(
+    return await withTimeout(
       streamPromise,
       timeout,
       `Stream timeout after ${timeout}ms`,

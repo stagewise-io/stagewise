@@ -230,7 +230,7 @@ export async function processParallelToolCalls(
   setWorkingState: (state: boolean, description?: string) => void,
   timeoutManager: TimeoutManager,
   onToolCallComplete?: (result: ToolCallProcessingResult) => void,
-): Promise<void> {
+) {
   // Add assistant message with all tool calls
   history.push(createAssistantToolCallsMessage(toolCalls));
 
@@ -317,6 +317,8 @@ export async function processParallelToolCalls(
       content: successfulResults,
     });
   }
+
+  return successfulResults;
 }
 
 /**
