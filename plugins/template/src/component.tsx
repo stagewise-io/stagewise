@@ -17,10 +17,11 @@ export const ExampleComponent = () => {
         <Button
           onClick={() => {
             toolbar.sendPrompt({
-              contentItems: [
+              role: 'user',
+              content: [
                 {
                   type: 'text',
-                  text: "Hello Agent! This is just a test prompt. Could you please repsond with 'Hello toolbar plugin!'",
+                  text: "Hello Agent! This is just a test prompt. Could you please respond with 'Hello toolbar plugin!'",
                 },
               ],
             });
