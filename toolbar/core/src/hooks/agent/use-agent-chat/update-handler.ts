@@ -33,6 +33,8 @@ export function createChatUpdateHandler(
   >,
   setPendingToolCalls: React.Dispatch<React.SetStateAction<PendingToolCall[]>>,
   processedUpdatesRef: React.MutableRefObject<Set<string>>,
+  setIsWorking: React.Dispatch<React.SetStateAction<boolean>>,
+  setStateDescription: React.Dispatch<React.SetStateAction<string | undefined>>,
 ) {
   return (update: ChatUpdate) => {
     // Prevent duplicate processing of the same update
@@ -82,6 +84,10 @@ export function createChatUpdateHandler(
 
       case 'chat-title-updated':
         handleChatTitleUpdated(update, setChatState);
+        break;
+
+      case 'agent-state':
+        handleAgentState(update, setIsWorking, setStateDescription);
         break;
     }
   };
@@ -381,4 +387,16 @@ function handleMessageUpdated(
       },
     };
   });
+}
+
+/**
+ * Handles agent state updates
+ */
+function handleAgentState(
+  update: Extract<ChatUpdate, { type: 'agent-state' }>,
+  setIsWorking: React.Dispatch<React.SetStateAction<boolean>>,
+  setStateDescription: React.Dispatch<React.SetStateAction<string | undefined>>,
+) {
+  setIsWorking(update.isWorking);
+  setStateDescription(update.stateDescription);
 }

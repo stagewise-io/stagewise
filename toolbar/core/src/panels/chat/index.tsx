@@ -1,21 +1,16 @@
 import { Panel, PanelContent } from '@/components/ui/panel';
-import { useAgentState } from '@/hooks/agent/use-agent-state';
-import {
-  ChatHistoryStateProvider,
-  useChatHistoryState,
-} from '@/hooks/use-chat-history-state';
+import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
 import { useEffect, useMemo, useRef } from 'react';
-import { useAgentChat } from '@/hooks/agent/chat/use-agent-chat';
+import { useAgentChat } from '@/hooks/agent/use-agent-chat/use-agent-chat';
 import { useAgents } from '@/hooks/agent/use-agent-provider';
 import { ChatHistory } from './chat-history';
 import { ChatPanelFooter } from './panel-footer';
 import { ChatPanelHeader } from './panel-header';
 
-function ChatWithHistoryPanelContent() {
-  const agentState = useAgentState();
-  const chatState = useChatHistoryState();
-  const { activeChat } = useAgentChat();
+export function ChatPanel() {
+  const chatState = useChatState();
+  const { activeChat, isWorking } = useAgentChat();
   const { connected } = useAgents();
 
   const enableInputField = useMemo(() => {
@@ -23,8 +18,8 @@ function ChatWithHistoryPanelContent() {
     if (!connected) {
       return false;
     }
-    return !agentState.isWorking;
-  }, [agentState.isWorking, connected]);
+    return !isWorking;
+  }, [isWorking, connected]);
 
   const anyMessageInChat = useMemo(() => {
     return activeChat?.messages?.length > 0;
@@ -84,13 +79,5 @@ function ChatWithHistoryPanelContent() {
       </PanelContent>
       <ChatPanelFooter />
     </Panel>
-  );
-}
-
-export function ChatPanel() {
-  return (
-    <ChatHistoryStateProvider>
-      <ChatWithHistoryPanelContent />
-    </ChatHistoryStateProvider>
   );
 }

@@ -7,19 +7,18 @@ import {
   getSelectedElementInfo,
   collectUserMessageMetadata,
 } from '@/utils';
-import { useAgentState } from './agent/use-agent-state';
+import { useAgentChat } from './agent/use-agent-chat/use-agent-chat';
 import type {
-  UserMessage,
-  UserMessageMetadata,
   PluginContentItem,
+  UserMessage,
 } from '@stagewise/agent-interface-internal/toolbar';
-import { AgentStateType } from '@stagewise/agent-interface-internal/toolbar';
 import { usePanels } from './use-panels';
 
 interface ContextSnippet {
   promptContextName: string;
   content: (() => string | Promise<string>) | string;
 }
+
 export type PluginContextSnippets = {
   pluginName: string;
   contextSnippets: ContextSnippet[];
@@ -47,7 +46,7 @@ interface ChatContext {
   isSending: boolean;
 }
 
-const ChatContext = createContext<ChatContext>({
+const ChatHistoryContext = createContext<ChatContext>({
   chatInput: '',
   setChatInput: () => {},
   domContextElements: [],
@@ -81,9 +80,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const { minimized } = useAppState();
   const { plugins } = usePlugins();
-  const { sendMessage: sendAgentMessage } = useAgentMessaging();
+  const { sendMessage: sendChatMessage, isWorking } = useAgentChat();
   const { isChatOpen } = usePanels();
-  const agentState = useAgentState();
 
   const startPromptCreation = useCallback(() => {
     setIsPromptCreationMode(true);
@@ -104,8 +102,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     if (!isChatOpen) {
       stopPromptCreation();
     }
-    // Note: We removed automatic startPromptCreation() when chat opens
-    // Prompt creation should only start when user explicitly focuses input
   }, [isChatOpen, stopPromptCreation]);
 
   useEffect(() => {
@@ -116,19 +112,10 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   // Auto-stop prompt creation when agent is busy
   useEffect(() => {
-    const allowedStates = [
-      AgentStateType.IDLE,
-      AgentStateType.WAITING_FOR_USER_RESPONSE,
-    ];
-
-    if (
-      isPromptCreationMode &&
-      agentState.state &&
-      !allowedStates.includes(agentState.state)
-    ) {
+    if (isPromptCreationMode && isWorking) {
       stopPromptCreation();
     }
-  }, [agentState.state, isPromptCreationMode, stopPromptCreation]);
+  }, [isWorking, isPromptCreationMode, stopPromptCreation]);
 
   const addChatDomContext = useCallback(
     (element: HTMLElement) => {
@@ -165,25 +152,20 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       // Collect metadata for selected elements
       const metadata = collectUserMessageMetadata(
         domContextElements.map((item) => getSelectedElementInfo(item.element)),
+        false,
       );
 
-      // Generate the base for the user message
-      const baseUserMessage: UserMessage = {
+      const message: UserMessage = {
         id: generateId(),
         createdAt: new Date(),
-        contentItems: [
-          {
-            type: 'text',
-            text: chatInput,
-          },
-        ],
+        content: [{ type: 'text' as const, text: chatInput }],
+        role: 'user',
         metadata,
-        pluginContent: {},
-        sentByPlugin: false,
       };
 
+      // Process plugin content for both old and new format
       const pluginProcessingPromises = plugins.map(async (plugin) => {
-        const handlerResult = await plugin.onPromptSend?.(baseUserMessage);
+        const handlerResult = await plugin.onPromptSend?.(message);
 
         if (
           !handlerResult ||
@@ -209,68 +191,36 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         const resolvedSnippets = await Promise.all(snippetPromises);
 
         if (resolvedSnippets.length > 0) {
-          const pluginSnippets: PluginContextSnippets = {
+          return {
             pluginName: plugin.pluginName,
             contextSnippets: resolvedSnippets,
           };
-          return pluginSnippets;
         }
         return null;
       });
 
       const allPluginContexts = await Promise.all(pluginProcessingPromises);
 
-      // Build pluginContent for the message
-      const pluginContent: Record<
-        string,
-        Record<string, UserMessageContentItem>
-      > = {};
-
-      // Build pluginContentItems for metadata
-      const pluginContentItems: UserMessageMetadata['pluginContentItems'] = {};
-
+      // Add plugin content as additional text parts if needed
       allPluginContexts.forEach((context) => {
         if (!context) return;
 
-        // Add to pluginContent (for the message)
-        pluginContent[context.pluginName] = {};
-
-        // Add to pluginContentItems (for metadata)
-        pluginContentItems[context.pluginName] = {};
+        // Add to pluginContentItems in metadata
+        message.metadata.pluginContentItems[context.pluginName] = {};
 
         context.contextSnippets.forEach((snippet) => {
-          // For pluginContent
-          pluginContent[context.pluginName][snippet.promptContextName] = {
-            type: 'text',
-            text: `${snippet.content}`,
-          };
-
-          // For metadata pluginContentItems (already resolved)
           const contentItem: PluginContentItem = {
             type: 'text',
-            text: `${snippet.content}`,
+            text: snippet.content,
           };
-          pluginContentItems[context.pluginName][snippet.promptContextName] =
-            contentItem;
+          message.metadata.pluginContentItems[context.pluginName][
+            snippet.promptContextName
+          ] = contentItem;
         });
       });
 
-      // Update metadata with pluginContentItems
-      const enrichedMetadata: UserMessageMetadata = {
-        ...metadata,
-        pluginContentItems:
-          Object.keys(pluginContentItems).length > 0
-            ? pluginContentItems
-            : undefined,
-      };
-
-      const userMessageInput: UserMessage = {
-        ...baseUserMessage,
-        metadata: enrichedMetadata,
-        pluginContent,
-      };
-
-      sendAgentMessage(userMessageInput);
+      // Send the message using the chat capability
+      await sendChatMessage(message.content, message.metadata);
 
       // Reset state after sending
       setChatInput('');
@@ -279,7 +229,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     } finally {
       setIsSending(false);
     }
-  }, [chatInput, domContextElements, plugins, sendAgentMessage]);
+  }, [chatInput, domContextElements, plugins, sendChatMessage]);
 
   const value: ChatContext = {
     chatInput,
@@ -294,11 +244,15 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     isSending,
   };
 
-  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
+  return (
+    <ChatHistoryContext.Provider value={value}>
+      {children}
+    </ChatHistoryContext.Provider>
+  );
 };
 
 export function useChatState() {
-  const context = useContext(ChatContext);
+  const context = useContext(ChatHistoryContext);
   if (!context) {
     throw new Error('useChatState must be used within a ChatStateProvider');
   }

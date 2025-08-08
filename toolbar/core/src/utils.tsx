@@ -1,5 +1,4 @@
 import type {
-  PluginContentItem,
   SelectedElement,
   UserMessageMetadata,
 } from '@stagewise/agent-interface-internal/toolbar';
@@ -453,7 +452,6 @@ export const getSelectedElementInfo = (
 
 export const collectUserMessageMetadata = (
   selectedElements: SelectedElement[],
-  pluginContentItems?: Record<string, Record<string, PluginContentItem>>,
   sentByPlugin?: boolean,
 ): UserMessageMetadata => {
   const iframeWindow = getIFrameWindow();
@@ -469,7 +467,7 @@ export const collectUserMessageMetadata = (
       width: iframeWindow?.innerWidth,
       height: iframeWindow?.innerHeight,
     },
-    pluginContentItems: pluginContentItems || {},
+    pluginContentItems: {}, // This should be modified afterward sto add all plugin content items
     sentByPlugin,
   };
 };

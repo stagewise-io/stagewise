@@ -1,6 +1,6 @@
 import { Trash2Icon } from 'lucide-react';
 import TimeAgo from 'react-timeago';
-import { useAgentChat } from '@/hooks/agent/chat';
+import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
 import { useCallback } from 'react';
 import type { ChatListItem } from '@stagewise/agent-interface-internal/toolbar';
 

@@ -83,8 +83,11 @@ export interface ChatContextValue {
   /** Current error message, if any */
   error: string | null;
 
-  /** Whether the connected agent supports chat */
-  isSupported: boolean;
+  /** Whether the agent is currently working/processing */
+  isWorking: boolean;
+
+  /** Optional description of what the agent is currently doing */
+  stateDescription?: string;
 
   // ===== Streaming State =====
 
@@ -218,4 +221,16 @@ export interface ChatContextValue {
    * Whether it's currently possible to create a new chat
    */
   canCreateChat: boolean;
+
+  // ===== Agent Control Functions =====
+
+  /**
+   * Stops the agent's current operation
+   */
+  stopAgent: () => Promise<void>;
+
+  /**
+   * Whether the agent can currently be stopped
+   */
+  canStop: boolean;
 }
