@@ -1,4 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import type { ToolResult } from '@stagewise/agent-types';
 import { z } from 'zod';
 
 export const DESCRIPTION =
@@ -14,25 +15,6 @@ export const listFilesParamsSchema = z.object({
 });
 
 export type ListFilesParams = z.infer<typeof listFilesParamsSchema>;
-
-const fileItemSchema = z.object({
-  path: z.string(),
-  name: z.string(),
-  type: z.enum(['file', 'directory']),
-  size: z.number().optional(),
-  depth: z.number(),
-});
-
-const toolResultSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-  files: z.array(fileItemSchema).optional(),
-  totalFiles: z.number().optional(),
-  totalDirectories: z.number().optional(),
-  error: z.string().optional(),
-});
-
-type ToolResult = z.infer<typeof toolResultSchema>;
 
 /**
  * List files and directories tool
@@ -128,9 +110,11 @@ export async function listFilesTool(
     return {
       success: true,
       message,
-      files: result.files,
-      totalFiles: result.totalFiles,
-      totalDirectories: result.totalDirectories,
+      result: {
+        files: result.files,
+        totalFiles: result.totalFiles,
+        totalDirectories: result.totalDirectories,
+      },
     };
   } catch (error) {
     return {

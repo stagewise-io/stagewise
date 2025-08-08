@@ -37,6 +37,7 @@ import {
 import {
   processParallelToolCalls,
   shouldRecurseAfterToolCall,
+  type ToolCallProcessingResult,
 } from './utils/tool-call-utils.js';
 import {
   createEventEmitter,
@@ -80,6 +81,11 @@ export class Agent {
   private authRetryCount = 0;
   private maxAuthRetries = 2;
   private isExpressMode = false;
+  private undoToolCallStack: Array<{
+    toolName: string;
+    toolCallId: string;
+    undoExecute: () => Promise<void>;
+  }> = [];
 
   private constructor(config: {
     clientRuntime: ClientRuntime;
@@ -453,6 +459,7 @@ export class Agent {
     // Validate prerequisites
     if (!this.server) throw new Error('Agent not initialized');
     if (!this.client) throw new Error('TRPC API client not initialized');
+    this.undoToolCallStack = []; // Reset undo stack for each call - only allow undoing the last task
 
     // Check recursion depth
     if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
@@ -640,7 +647,21 @@ export class Agent {
 
         // Process all tool calls together if any
         if (toolCalls.length > 0) {
-          await this.processParallelToolCallsContent(toolCalls, history);
+          const results = await this.processParallelToolCallsContent(
+            toolCalls,
+            history,
+          );
+          for (const result of results) {
+            if (result.success) {
+              if (result.result?.undoExecute) {
+                this.undoToolCallStack.push({
+                  toolName: result.toolName,
+                  toolCallId: result.toolCallId,
+                  undoExecute: result.result.undoExecute,
+                });
+              }
+            }
+          }
         }
       } else if (typeof message.content === 'string') {
         history.push({
@@ -664,7 +685,7 @@ export class Agent {
     options?: {
       syntheticCall?: boolean;
     },
-  ): Promise<void> {
+  ): Promise<ToolCallProcessingResult[]> {
     const explanations = toolCalls
       .map((tc) => ('explanation' in tc.args ? tc.args.explanation : null))
       .filter((explanation) => explanation !== null);
@@ -708,7 +729,7 @@ export class Agent {
     }
 
     // Process all tool calls
-    await processParallelToolCalls(
+    const results = await processParallelToolCalls(
       toolCalls,
       this.tools,
       this.server!,
@@ -734,5 +755,7 @@ export class Agent {
     if (hasBrowserTools) {
       this.history = history;
     }
+
+    return results;
   }
 }

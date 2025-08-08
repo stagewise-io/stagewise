@@ -11,7 +11,23 @@ export const stagewiseToolMetadataSchema = z.object({
 
 export type StagewiseToolMetadata = z.infer<typeof stagewiseToolMetadataSchema>;
 
+export const toolResultSchema = z.object({
+  undoExecute: z
+    .function()
+    .args(z.void())
+    .returns(z.promise(z.void()))
+    .optional(),
+  success: z.boolean(),
+  error: z.string().optional(),
+  message: z.string().optional(),
+  result: z.any().optional(),
+});
+
+export type ToolResult = z.infer<typeof toolResultSchema>;
+
 export type Tools = Record<
   string,
-  Tool<any, any> & { stagewiseMetadata?: StagewiseToolMetadata }
+  Tool<any, ToolResult> & {
+    stagewiseMetadata?: StagewiseToolMetadata;
+  }
 >;

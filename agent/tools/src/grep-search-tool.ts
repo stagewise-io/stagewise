@@ -1,4 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import type { ToolResult } from '@stagewise/agent-types';
 import { z } from 'zod';
 
 export const DESCRIPTION =
@@ -25,24 +26,13 @@ export const grepSearchParamsSchema = z.object({
 
 export type GrepSearchParams = z.infer<typeof grepSearchParamsSchema>;
 
-const grepMatchSchema = z.object({
+const _grepMatchSchema = z.object({
   path: z.string(),
   line: z.number(),
   column: z.number(),
   match: z.string(),
   preview: z.string(),
 });
-
-const toolResultSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-  matches: z.array(grepMatchSchema).optional(),
-  totalMatches: z.number().optional(),
-  filesSearched: z.number().optional(),
-  error: z.string().optional(),
-});
-
-type ToolResult = z.infer<typeof toolResultSchema>;
 
 /**
  * Grep search tool for fast regex searches across files
@@ -123,9 +113,11 @@ export async function grepSearchTool(
     return {
       success: true,
       message,
-      matches: grepResult.matches,
-      totalMatches: grepResult.totalMatches,
-      filesSearched: grepResult.filesSearched,
+      result: {
+        matches: grepResult.matches,
+        totalMatches: grepResult.totalMatches,
+        filesSearched: grepResult.filesSearched,
+      },
     };
   } catch (error) {
     return {
