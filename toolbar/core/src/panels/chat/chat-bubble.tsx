@@ -152,7 +152,7 @@ const ToolCallPartItem = memo(
             <span className="font-medium text-xs">
               {getToolName(toolCall.toolName)}
             </span>
-            {true && !approvalPart && (
+            {toolCall.requiresApproval && !approvalPart && (
               <span className="text-black/60 text-xs">
                 Waiting for approval
               </span>
