@@ -68,6 +68,7 @@ function PanelHeader({
 export interface PanelContentProps
   extends React.HTMLAttributes<HTMLDivElement> {
   children?: ReactNode;
+  ref?: React.RefObject<HTMLDivElement>;
 }
 
 function PanelContent({ children, className, ...props }: PanelContentProps) {
@@ -88,10 +89,12 @@ function PanelFooter({
   children,
   className,
   clear = false,
+  ref,
 }: {
   children?: ReactNode;
   className?: string;
   clear?: boolean;
+  ref?: React.RefObject<HTMLDivElement>;
 }) {
   return (
     <footer
@@ -100,6 +103,7 @@ function PanelFooter({
         !clear && 'border-zinc-500/15 border-t bg-white/5',
         className,
       )}
+      ref={ref}
     >
       {!clear && (
         <div className="absolute top-0 right-0 left-0 h-px w-full bg-gradient-to-r from-zinc-100/10 via-zinc-100/30 to-zinc-100/10" />
