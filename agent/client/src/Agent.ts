@@ -366,6 +366,14 @@ export class Agent {
 
     this.setAgentWorking(false);
 
+    const activeChatId =
+      await this.server.interface.chat.createChat('New Chat');
+    this.chats.push({
+      messages: [],
+      chatId: activeChatId,
+    });
+    await this.server.interface.chat.switchChat(activeChatId);
+
     this.server.interface.chat.addChatUpdateListener(async (update) => {
       switch (update.type) {
         case 'chat-created':
@@ -467,7 +475,28 @@ export class Agent {
     this.recursionDepth++;
 
     try {
-      // Initialize and prepare request
+      // Prepare update to the chat title
+      if (
+        history?.filter((m) => m.role === 'user').length === 1 &&
+        userMessage?.metadata.browserData
+      ) {
+        this.client.chat.generateChatTitle
+          .mutate({
+            userMessage: {
+              id: userMessage.id,
+              contentItems: userMessage.content.filter(
+                (c) => c.type === 'text',
+              ),
+              metadata: userMessage.metadata.browserData,
+              createdAt: userMessage.createdAt,
+              pluginContent: {},
+              sentByPlugin: false,
+            },
+          })
+          .then((result) => {
+            this.server?.interface.chat.updateChatTitle(chatId, result.title);
+          });
+      }
 
       // Emit prompt triggered event
       this.eventEmitter.emit(
