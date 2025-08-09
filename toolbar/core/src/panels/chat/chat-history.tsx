@@ -1,21 +1,20 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
-import { Loader2Icon } from 'lucide-react';
+import { Loader2Icon, SparklesIcon } from 'lucide-react';
 import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
 import type {
   ToolApprovalPart,
   ToolResultPart,
 } from '@stagewise/agent-interface-internal/toolbar';
 
-export function ChatHistory() {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
   const wasAtBottomRef = useRef(true);
 
   const { activeChat, isWorking } = useAgentChat();
 
   // Force scroll to the very bottom
   const scrollToBottom = () => {
-    const container = scrollContainerRef.current;
+    const container = ref.current;
     if (!container) return;
 
     // Use setTimeout to ensure DOM has updated
@@ -26,7 +25,7 @@ export function ChatHistory() {
 
   // Check if user is at the bottom of the scroll container
   const checkIfAtBottom = () => {
-    const container = scrollContainerRef.current;
+    const container = ref.current;
     if (!container) return true;
 
     // Use a more generous threshold to account for sub-pixel differences
@@ -45,7 +44,7 @@ export function ChatHistory() {
 
   // Auto-scroll to bottom when content changes, but only if user was at bottom
   useEffect(() => {
-    const container = scrollContainerRef.current;
+    const container = ref.current;
     if (!container) return;
 
     if (wasAtBottomRef.current) {
@@ -56,7 +55,7 @@ export function ChatHistory() {
 
   // Initialize scroll position tracking
   useEffect(() => {
-    const container = scrollContainerRef.current;
+    const container = ref.current;
     if (!container) return;
 
     container.addEventListener('scroll', handleScroll);
@@ -107,12 +106,12 @@ export function ChatHistory() {
 
   return (
     <section
-      ref={scrollContainerRef}
+      ref={ref}
       aria-label="Agent message display"
-      className="scrollbar-thin pointer-events-auto min-h-full overflow-y-scroll overscroll-contain px-3 py-4 pt-16 pb-14 text-foreground text-sm focus-within:outline-none hover:bg-white/0 focus:outline-none"
+      className="scrollbar-thin scrollbar-thumb-black/10 scrollbar-track-transparent pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-3 py-4 pt-16 pb-14 text-foreground text-sm focus-within:outline-none hover:bg-white/0 focus:outline-none"
       onScroll={handleScroll}
       onMouseEnter={() => {
-        scrollContainerRef.current?.focus();
+        ref.current?.focus();
       }}
     >
       {renderedMessages.map((message) => {
@@ -131,6 +130,10 @@ export function ChatHistory() {
           <Loader2Icon className="size-4 animate-spin stroke-blue-600" />
         </div>
       )}
+      <div className="flex flex-col items-center justify-center gap-3 px-4 py-2 text-black/30 text-sm">
+        <SparklesIcon className="size-8 stroke-black opacity-10" />
+        <span>Start by writing a message</span>
+      </div>
     </section>
   );
 }
