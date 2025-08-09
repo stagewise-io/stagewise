@@ -85,7 +85,7 @@ export class Agent {
   private authRetryCount = 0;
   private maxAuthRetries = 2;
   private isExpressMode = false;
-  private abortController: AbortController = new AbortController();
+  private abortController: AbortController;
 
   private constructor(config: {
     clientRuntime: ClientRuntime;
@@ -104,6 +104,7 @@ export class Agent {
     this.agentDescription = config.agentDescription;
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
     this.timeoutManager = new TimeoutManager();
+    this.abortController = new AbortController();
   }
 
   public shutdown() {
@@ -373,6 +374,12 @@ export class Agent {
       chatId: activeChatId,
     });
     await this.server.interface.chat.switchChat(activeChatId);
+
+    this.server.interface.chat.addStopListener(() => {
+      this.setAgentWorking(false, 'Agent stopped');
+      this.abortController.abort();
+      this.abortController = new AbortController();
+    });
 
     this.server.interface.chat.addChatUpdateListener(async (update) => {
       switch (update.type) {
