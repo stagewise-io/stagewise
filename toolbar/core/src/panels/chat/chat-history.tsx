@@ -130,10 +130,12 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
           <Loader2Icon className="size-4 animate-spin stroke-blue-600" />
         </div>
       )}
-      <div className="flex flex-col items-center justify-center gap-3 px-4 py-2 text-black/30 text-sm">
-        <SparklesIcon className="size-8 stroke-black opacity-10" />
-        <span>Start by writing a message</span>
-      </div>
+      {renderedMessages.length === 0 && (
+        <div className="flex flex-col items-center justify-center gap-3 px-4 py-2 text-black/30 text-sm">
+          <SparklesIcon className="size-8 stroke-black opacity-10" />
+          <span>Start by writing a message</span>
+        </div>
+      )}
     </section>
   );
 }

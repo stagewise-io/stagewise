@@ -2,6 +2,7 @@ import { Trash2Icon } from 'lucide-react';
 import TimeAgo from 'react-timeago';
 import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
 import type { ChatListItem } from '@stagewise/agent-interface-internal/toolbar';
+import { useEffect } from 'react';
 
 export function ChatList({ onClose }: { onClose: () => void }) {
   const chats = useAgentChat().chats;
@@ -22,7 +23,13 @@ function ChatListEntry({
   chat: ChatListItem;
   onClose: () => void;
 }) {
-  const { deleteChat, switchChat } = useAgentChat();
+  const { deleteChat, switchChat, chats } = useAgentChat();
+
+  useEffect(() => {
+    if (chats.length === 0) {
+      onClose();
+    }
+  }, [chats.length]);
 
   return (
     <div className="py-0.5">
