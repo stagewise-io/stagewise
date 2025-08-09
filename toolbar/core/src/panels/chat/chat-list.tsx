@@ -7,6 +7,12 @@ import { useEffect } from 'react';
 export function ChatList({ onClose }: { onClose: () => void }) {
   const chats = useAgentChat().chats;
 
+  useEffect(() => {
+    if (chats.length === 0) {
+      onClose();
+    }
+  }, [chats.length]);
+
   return (
     <div className="flex flex-col divide-y divide-zinc-500/10">
       {chats.map((chat) => (
@@ -23,13 +29,7 @@ function ChatListEntry({
   chat: ChatListItem;
   onClose: () => void;
 }) {
-  const { deleteChat, switchChat, chats } = useAgentChat();
-
-  useEffect(() => {
-    if (chats.length === 0) {
-      onClose();
-    }
-  }, [chats.length]);
+  const { deleteChat, switchChat } = useAgentChat();
 
   return (
     <div className="py-0.5">
