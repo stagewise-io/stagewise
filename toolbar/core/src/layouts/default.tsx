@@ -15,6 +15,7 @@ import { SettingsPanel } from '@/panels/settings';
 import { ChatPanel } from '@/panels/chat';
 import { AgentConnectivityPanel } from '@/panels/agent-connectivity';
 import { usePlugins } from '@/hooks/use-plugins';
+import { useAgents } from '@/hooks/agent/use-agent-provider';
 
 const TOOLBAR_POSITION_KEY = 'stagewise_toolbar_toolbar_position';
 
@@ -177,6 +178,7 @@ function PanelsArea({
   } = usePanels();
 
   const plugins = usePlugins();
+  const { connected } = useAgents();
 
   const pluginPanel = useMemo(() => {
     if (!openPluginName) {

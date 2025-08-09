@@ -452,19 +452,57 @@ export const getSelectedElementInfo = (
 
 export const collectUserMessageMetadata = (
   selectedElements: SelectedElement[],
+  sentByPlugin?: boolean,
 ): UserMessageMetadata => {
   const iframeWindow = getIFrameWindow();
   return {
-    currentUrl: truncateString(iframeWindow?.location.href, 1024),
-    currentTitle: truncateString(iframeWindow?.document.title, 256),
-    currentZoomLevel: 0,
-    devicePixelRatio: iframeWindow?.devicePixelRatio,
-    userAgent: truncateString(iframeWindow?.navigator.userAgent, 1024),
-    locale: truncateString(iframeWindow?.navigator.language, 64),
-    selectedElements,
-    viewportResolution: {
-      width: iframeWindow?.innerWidth,
-      height: iframeWindow?.innerHeight,
+    browserData: {
+      currentUrl: truncateString(iframeWindow?.location.href, 1024),
+      currentTitle: truncateString(iframeWindow?.document.title, 256),
+      currentZoomLevel: 0,
+      devicePixelRatio: iframeWindow?.devicePixelRatio,
+      userAgent: truncateString(iframeWindow?.navigator.userAgent, 1024),
+      locale: truncateString(iframeWindow?.navigator.language, 64),
+      selectedElements,
+      viewportResolution: {
+        width: iframeWindow?.innerWidth,
+        height: iframeWindow?.innerHeight,
+      },
     },
+    pluginContentItems: {}, // This should be modified afterward sto add all plugin content items
+    sentByPlugin,
   };
+};
+
+export const getDataUriForData = (data: string) => {
+  // Convert base64 data to a blob URL for opening in a new tab
+  if (!data) return '';
+
+  try {
+    // If it's already a data URI, extract the base64 part
+    let base64Data = data;
+    if (data.startsWith('data:')) {
+      const base64Index = data.indexOf('base64,');
+      if (base64Index !== -1) {
+        base64Data = data.substring(base64Index + 7);
+      }
+    }
+
+    // Remove any whitespace from base64 string
+    base64Data = base64Data.replace(/\s+/g, '');
+
+    // Convert base64 to binary
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    // Create blob and return blob URL
+    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    return URL.createObjectURL(blob);
+  } catch (error) {
+    console.error('Failed to create blob URL from base64 data:', error);
+    return '';
+  }
 };

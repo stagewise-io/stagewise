@@ -74,8 +74,8 @@ importers:
         specifier: workspace:*
         version: link:../types
       '@stagewise/api-client':
-        specifier: 0.2.0
-        version: 0.2.0(react@19.1.0)(typescript@5.8.3)
+        specifier: 0.3.0
+        version: 0.3.0(react@19.1.0)(typescript@5.8.3)
       esbuild:
         specifier: ^0.20.2
         version: 0.20.2
@@ -266,8 +266,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/agent-interface
       '@stagewise/api-client':
-        specifier: 0.1.0
-        version: 0.1.0(react@19.1.0)(typescript@5.8.3)
+        specifier: 0.3.0
+        version: 0.3.0(react@19.1.0)(typescript@5.8.3)
       rimraf:
         specifier: ^5.0.0
         version: 5.0.10
@@ -299,8 +299,8 @@ importers:
         specifier: workspace:*
         version: link:../../agent/runtime-node
       '@stagewise/api-client':
-        specifier: 0.2.0
-        version: 0.2.0(react@19.1.0)(typescript@5.8.3)
+        specifier: 0.3.0
+        version: 0.3.0(react@19.1.0)(typescript@5.8.3)
       '@stagewise/toolbar':
         specifier: workspace:*
         version: link:../../toolbar/core
@@ -1387,6 +1387,9 @@ importers:
       react-dom:
         specifier: ^19.1.0
         version: 19.1.0(react@19.1.0)
+      react-timeago:
+        specifier: ^8.3.0
+        version: 8.3.0(react@19.1.0)
       rollup:
         specifier: ^4.44.2
         version: 4.45.0
@@ -5849,11 +5852,8 @@ packages:
   '@speed-highlight/core@1.2.7':
     resolution: {integrity: sha512-0dxmVj4gxg3Jg879kvFS/msl4s9F3T9UXC1InxgOf7t5NvcPD97u/WTA5vL/IxWHMn7qSxBozqrnnE2wvl1m8g==}
 
-  '@stagewise/api-client@0.1.0':
-    resolution: {integrity: sha512-rLCJ0q42gZd5lC1/Zs4dwlJvj6dyf5hTO3ULkg3INKKJUPO+M1HtVTZtzRNiXiuydMH/AOQzAJ724BmIEZDrVQ==}
-
-  '@stagewise/api-client@0.2.0':
-    resolution: {integrity: sha512-HF50JQnb/kz6r0ogy1kC4vH5Qn6uARVn7hOC6JCWpUipWyydpcSNhP/qtYhQlG40TGxiPOL/H8wxibsizA2zYg==}
+  '@stagewise/api-client@0.3.0':
+    resolution: {integrity: sha512-fh7SGP/bBGqpMDCybtYGy97yDcipO1XUrptgn4zi6M/pHyQfSqJP0A/NqyZU5vizYrQ3ZDjjsZJMYvXumbkMkQ==}
 
   '@standard-schema/spec@1.0.0':
     resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
@@ -12253,6 +12253,11 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  react-timeago@8.3.0:
+    resolution: {integrity: sha512-BeR0hj/5qqTc2+zxzBSQZMky6MmqwOtKseU3CSmcjKR5uXerej2QY34v2d+cdz11PoeVfAdWLX+qjM/UdZkUUg==}
+    peerDependencies:
+      react: ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   react-transition-group@4.4.5:
     resolution: {integrity: sha512-pZcd1MCJoiKiBR2NRxeCRg13uCXbydPnmB4EOeRrY7480qNWO8IIgQG6zlDkm6uRMsURXPuKq0GWtiM59a5Q6g==}
@@ -19495,18 +19500,7 @@ snapshots:
 
   '@speed-highlight/core@1.2.7': {}
 
-  '@stagewise/api-client@0.1.0(react@19.1.0)(typescript@5.8.3)':
-    dependencies:
-      '@trpc/client': 11.4.3(@trpc/server@11.4.3(typescript@5.8.3))(typescript@5.8.3)
-      '@trpc/server': 11.4.3(typescript@5.8.3)
-      ai: 4.3.19(react@19.1.0)(zod@3.25.76)
-      superjson: 2.2.2
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - react
-      - typescript
-
-  '@stagewise/api-client@0.2.0(react@19.1.0)(typescript@5.8.3)':
+  '@stagewise/api-client@0.3.0(react@19.1.0)(typescript@5.8.3)':
     dependencies:
       '@trpc/client': 11.4.3(@trpc/server@11.4.3(typescript@5.8.3))(typescript@5.8.3)
       '@trpc/server': 11.4.3(typescript@5.8.3)
@@ -27373,6 +27367,10 @@ snapshots:
       tslib: 2.8.1
     optionalDependencies:
       '@types/react': 19.1.8
+
+  react-timeago@8.3.0(react@19.1.0):
+    dependencies:
+      react: 19.1.0
 
   react-transition-group@4.4.5(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:

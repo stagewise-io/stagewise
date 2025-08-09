@@ -43,6 +43,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(initial).toEqual({
         state: AgentStateType.IDLE,
         description: undefined,
+        isWorking: false,
       });
     });
   });
@@ -58,6 +59,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(update).toEqual({
         state: AgentStateType.THINKING,
         description: undefined,
+        isWorking: true,
       });
     });
 
@@ -74,6 +76,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(update).toEqual({
         state: AgentStateType.WORKING,
         description: 'Processing your request',
+        isWorking: true,
       });
     });
 
@@ -87,6 +90,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(update).toEqual({
         state: AgentStateType.FAILED,
         description: '',
+        isWorking: false,
       });
     });
 
@@ -115,6 +119,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(thinking).toEqual({
         state: AgentStateType.THINKING,
         description: 'Analyzing request',
+        isWorking: true,
       });
 
       agentInterface.state.set(AgentStateType.WORKING, 'Executing task');
@@ -122,6 +127,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(working).toEqual({
         state: AgentStateType.WORKING,
         description: 'Executing task',
+        isWorking: true,
       });
 
       agentInterface.state.set(AgentStateType.COMPLETED, 'Task finished');
@@ -129,6 +135,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(completed).toEqual({
         state: AgentStateType.COMPLETED,
         description: 'Task finished',
+        isWorking: false,
       });
     });
 
@@ -145,6 +152,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(failed).toEqual({
         state: AgentStateType.FAILED,
         description: 'Network error occurred',
+        isWorking: false,
       });
     });
 
@@ -162,18 +170,21 @@ describe('AgentTransportAdapter - State', () => {
       expect(update1).toEqual({
         state: AgentStateType.THINKING,
         description: 'Step 1',
+        isWorking: true,
       });
 
       const update2 = (await getNext(iterator)) as AgentState;
       expect(update2).toEqual({
         state: AgentStateType.WORKING,
         description: 'Step 2',
+        isWorking: true,
       });
 
       const update3 = (await getNext(iterator)) as AgentState;
       expect(update3).toEqual({
         state: AgentStateType.COMPLETED,
         description: 'Step 3',
+        isWorking: false,
       });
     });
 
@@ -207,6 +218,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(idle).toEqual({
         state: AgentStateType.IDLE,
         description: undefined,
+        isWorking: false,
       });
     });
   });
@@ -227,10 +239,12 @@ describe('AgentTransportAdapter - State', () => {
       expect(update1).toEqual({
         state: AgentStateType.THINKING,
         description: 'Processing',
+        isWorking: true,
       });
       expect(update2).toEqual({
         state: AgentStateType.THINKING,
         description: 'Processing',
+        isWorking: true,
       });
     });
 
@@ -249,10 +263,12 @@ describe('AgentTransportAdapter - State', () => {
         name: 'provides current state with no description to new subscribers',
         state: AgentStateType.WAITING_FOR_USER_RESPONSE,
         description: undefined,
+        isWorking: false,
         setupStates: [
           {
             state: AgentStateType.WAITING_FOR_USER_RESPONSE,
             description: undefined,
+        isWorking: false,
           },
         ],
       },
@@ -277,6 +293,7 @@ describe('AgentTransportAdapter - State', () => {
         expect(immediateValue).toEqual({
           state,
           description,
+          isWorking: setupStates[setupStates.length - 1].isWorking ?? false,
         });
       },
     );
@@ -355,9 +372,11 @@ describe('AgentTransportAdapter - State', () => {
         agentInterface.state.set(state, description);
         const update = (await getNext(iterator)) as AgentState;
 
+        const isWorking = state === AgentStateType.THINKING || state === AgentStateType.WORKING || state === AgentStateType.CALLING_TOOL;
         expect(update).toEqual({
           state,
           description,
+          isWorking,
         });
       },
     );
@@ -379,9 +398,11 @@ describe('AgentTransportAdapter - State', () => {
       for (const state of states) {
         agentInterface.state.set(state);
         const update = (await getNext(iterator)) as AgentState;
+        const isWorking = state === AgentStateType.THINKING || state === AgentStateType.WORKING || state === AgentStateType.CALLING_TOOL;
         expect(update).toEqual({
           state,
           description: undefined,
+          isWorking,
         });
       }
     });
@@ -399,6 +420,7 @@ describe('AgentTransportAdapter - State', () => {
         name: 'returns current state without description',
         state: AgentStateType.THINKING,
         description: undefined,
+        isWorking: false,
       },
     ];
 
@@ -409,9 +431,11 @@ describe('AgentTransportAdapter - State', () => {
         agentInterface.state.set(state);
       }
       const current = agentInterface.state.get();
+      const isWorking = state === AgentStateType.THINKING || state === AgentStateType.WORKING || state === AgentStateType.CALLING_TOOL;
       expect(current).toEqual({
         state,
         description,
+        isWorking,
       });
     });
 
@@ -420,6 +444,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(current).toEqual({
         state: AgentStateType.IDLE,
         description: undefined,
+        isWorking: false,
       });
     });
 
@@ -441,6 +466,239 @@ describe('AgentTransportAdapter - State', () => {
       const state2 = agentInterface.state.get();
       expect(state2.description).toBe('Updated');
       expect(state2.state).toBe(AgentStateType.WORKING);
+    });
+  });
+
+  describe('Stop Signal Handling', () => {
+    it('should add and trigger stop listeners', async () => {
+      const stopListener = vi.fn();
+      agentInterface.state.addStopListener(stopListener);
+      
+      // Set agent to working state
+      agentInterface.state.set(AgentStateType.WORKING, 'Processing task');
+      
+      // Trigger stop from toolbar
+      await adapter.state.onStop();
+      
+      expect(stopListener).toHaveBeenCalled();
+    });
+    
+    it('should trigger multiple stop listeners', async () => {
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+      const listener3 = vi.fn();
+      
+      agentInterface.state.addStopListener(listener1);
+      agentInterface.state.addStopListener(listener2);
+      agentInterface.state.addStopListener(listener3);
+      
+      // Set agent to working state
+      agentInterface.state.set(AgentStateType.WORKING);
+      
+      // Trigger stop
+      await adapter.state.onStop();
+      
+      expect(listener1).toHaveBeenCalled();
+      expect(listener2).toHaveBeenCalled();
+      expect(listener3).toHaveBeenCalled();
+    });
+    
+    it('should remove specific stop listener', async () => {
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+      
+      agentInterface.state.addStopListener(listener1);
+      agentInterface.state.addStopListener(listener2);
+      
+      // Remove first listener
+      agentInterface.state.removeStopListener(listener1);
+      
+      // Set agent to working state
+      agentInterface.state.set(AgentStateType.WORKING);
+      
+      // Trigger stop
+      await adapter.state.onStop();
+      
+      expect(listener1).not.toHaveBeenCalled();
+      expect(listener2).toHaveBeenCalled();
+    });
+    
+    it('should only allow stop in working states', async () => {
+      const stopListener = vi.fn();
+      agentInterface.state.addStopListener(stopListener);
+      
+      // Test IDLE state - should throw
+      agentInterface.state.set(AgentStateType.IDLE);
+      await expect(adapter.state.onStop()).rejects.toThrow(
+        'Cannot stop agent in idle state'
+      );
+      expect(stopListener).not.toHaveBeenCalled();
+      
+      // Test THINKING state - should work
+      agentInterface.state.set(AgentStateType.THINKING);
+      await adapter.state.onStop();
+      expect(stopListener).toHaveBeenCalledTimes(1);
+      
+      // Test WORKING state - should work
+      stopListener.mockClear();
+      agentInterface.state.set(AgentStateType.WORKING);
+      await adapter.state.onStop();
+      expect(stopListener).toHaveBeenCalledTimes(1);
+      
+      // Test CALLING_TOOL state - should work
+      stopListener.mockClear();
+      agentInterface.state.set(AgentStateType.CALLING_TOOL);
+      await adapter.state.onStop();
+      expect(stopListener).toHaveBeenCalledTimes(1);
+      
+      // Test COMPLETED state - should throw
+      stopListener.mockClear();
+      agentInterface.state.set(AgentStateType.COMPLETED);
+      await expect(adapter.state.onStop()).rejects.toThrow(
+        'Cannot stop agent in completed state'
+      );
+      expect(stopListener).not.toHaveBeenCalled();
+      
+      // Test FAILED state - should throw
+      agentInterface.state.set(AgentStateType.FAILED);
+      await expect(adapter.state.onStop()).rejects.toThrow(
+        'Cannot stop agent in failed state'
+      );
+      expect(stopListener).not.toHaveBeenCalled();
+      
+      // Test WAITING_FOR_USER_RESPONSE state - should throw
+      agentInterface.state.set(AgentStateType.WAITING_FOR_USER_RESPONSE);
+      await expect(adapter.state.onStop()).rejects.toThrow(
+        'Cannot stop agent in waiting_for_user_response state'
+      );
+      expect(stopListener).not.toHaveBeenCalled();
+    });
+    
+    it('should clear all stop listeners', async () => {
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+      const listener3 = vi.fn();
+      
+      agentInterface.state.addStopListener(listener1);
+      agentInterface.state.addStopListener(listener2);
+      agentInterface.state.addStopListener(listener3);
+      
+      // Clear all listeners through cleanup
+      agentInterface.cleanup.clearAllListeners();
+      
+      // Set agent to working state
+      agentInterface.state.set(AgentStateType.WORKING);
+      
+      // Try to trigger stop
+      await adapter.state.onStop();
+      
+      // No listeners should have been called
+      expect(listener1).not.toHaveBeenCalled();
+      expect(listener2).not.toHaveBeenCalled();
+      expect(listener3).not.toHaveBeenCalled();
+    });
+    
+    it('should handle stop during different processing phases', async () => {
+      const stateChanges: string[] = [];
+      const stopListener = vi.fn(() => {
+        // Record what state we were in when stopped
+        const currentState = agentInterface.state.get();
+        stateChanges.push(currentState.state);
+      });
+      
+      agentInterface.state.addStopListener(stopListener);
+      
+      // Test stopping during THINKING
+      agentInterface.state.set(AgentStateType.THINKING, 'Analyzing');
+      await adapter.state.onStop();
+      expect(stateChanges).toContain(AgentStateType.THINKING);
+      
+      // Test stopping during WORKING
+      agentInterface.state.set(AgentStateType.WORKING, 'Processing');
+      await adapter.state.onStop();
+      expect(stateChanges).toContain(AgentStateType.WORKING);
+      
+      // Test stopping during CALLING_TOOL
+      agentInterface.state.set(AgentStateType.CALLING_TOOL, 'Executing tool');
+      await adapter.state.onStop();
+      expect(stateChanges).toContain(AgentStateType.CALLING_TOOL);
+      
+      expect(stopListener).toHaveBeenCalledTimes(3);
+    });
+    
+    it('should handle async stop listeners', async () => {
+      let stopProcessed = false;
+      
+      const asyncStopListener = vi.fn(async () => {
+        // Simulate async cleanup
+        await new Promise(resolve => setTimeout(resolve, 10));
+        stopProcessed = true;
+      });
+      
+      agentInterface.state.addStopListener(asyncStopListener);
+      agentInterface.state.set(AgentStateType.WORKING);
+      
+      await adapter.state.onStop();
+      
+      // The listener should have been called
+      expect(asyncStopListener).toHaveBeenCalled();
+      
+      // Wait for async processing
+      await vi.advanceTimersByTimeAsync(10);
+      expect(stopProcessed).toBe(true);
+    });
+    
+    it('should handle errors in stop listeners gracefully', async () => {
+      const errorListener = vi.fn(() => {
+        throw new Error('Stop listener error');
+      });
+      const goodListener = vi.fn();
+      
+      agentInterface.state.addStopListener(errorListener);
+      agentInterface.state.addStopListener(goodListener);
+      
+      agentInterface.state.set(AgentStateType.WORKING);
+      
+      // Should not throw despite error in listener
+      await expect(adapter.state.onStop()).resolves.not.toThrow();
+      
+      // Both listeners should have been called
+      expect(errorListener).toHaveBeenCalled();
+      expect(goodListener).toHaveBeenCalled();
+    });
+    
+    it('should not trigger stop listeners when stop is rejected', async () => {
+      const stopListener = vi.fn();
+      agentInterface.state.addStopListener(stopListener);
+      
+      // Set to non-stoppable state
+      agentInterface.state.set(AgentStateType.IDLE);
+      
+      // Try to stop - should be rejected
+      await expect(adapter.state.onStop()).rejects.toThrow();
+      
+      // Listener should not have been called
+      expect(stopListener).not.toHaveBeenCalled();
+    });
+    
+    it('should handle rapid stop requests', async () => {
+      let stopCount = 0;
+      const stopListener = vi.fn(() => {
+        stopCount++;
+      });
+      
+      agentInterface.state.addStopListener(stopListener);
+      agentInterface.state.set(AgentStateType.WORKING);
+      
+      // Send multiple stop requests rapidly
+      await Promise.all([
+        adapter.state.onStop(),
+        adapter.state.onStop(),
+        adapter.state.onStop(),
+      ]);
+      
+      // Listener should have been called 3 times
+      expect(stopCount).toBe(3);
     });
   });
 
@@ -489,6 +747,7 @@ describe('AgentTransportAdapter - State', () => {
       expect(initial).toEqual({
         state: AgentStateType.WORKING,
         description: 'Pre-iterator state',
+        isWorking: true,
       });
     });
 

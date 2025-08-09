@@ -1,36 +1,37 @@
 import type { CoreMessage, ToolResultPart } from 'ai';
-import type { UserMessage } from '@stagewise/agent-interface-internal/agent';
+import type { ChatUserMessage } from '@stagewise/agent-interface-internal/agent';
 import { isUserMessage } from '@stagewise/agent-types';
 
 /**
  * Converts an array of messages (including UserMessage types) to CoreMessage format
  */
 export function messagesToCoreMessages(
-  messages: (CoreMessage | UserMessage)[],
+  messages: (CoreMessage | ChatUserMessage)[],
 ): CoreMessage[] {
   return messages.map((m) => {
     if (!isUserMessage(m)) {
       return m;
     }
 
-    const content = m.contentItems.map((c) => {
+    const content = m.content.map((c) => {
       if (c.type === 'text') {
         return {
           type: 'text' as const,
           text: c.text,
         };
-      } else {
+      } else if (c.type === 'file') {
         return {
-          type: 'image' as const,
-          image: c.data,
+          type: 'file' as const,
+          data: c.data,
           mimeType: c.mimeType,
         };
       }
     });
+    const validContent = content.filter((c) => c !== undefined);
 
     return {
       role: 'user',
-      content,
+      content: validContent,
     };
   });
 }
@@ -99,7 +100,7 @@ export function countToolCalls(
  * Checks if the last message in history is a tool result
  */
 export function isLastMessageToolResult(
-  history: (CoreMessage | UserMessage)[],
+  history: (CoreMessage | ChatUserMessage)[],
 ): boolean {
   const lastMessage = history[history.length - 1];
 

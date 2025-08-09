@@ -12,6 +12,7 @@ export interface ToolbarButtonProps extends ButtonProps {
   tooltipHint?: string;
   variant?: 'default' | 'promoted';
   active?: boolean;
+  itemClassName?: string;
 }
 
 export const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
@@ -24,6 +25,7 @@ export const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
       tooltipHint,
       variant = 'default',
       active,
+      itemClassName,
       ...props
     },
     ref,
@@ -47,6 +49,7 @@ export const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
         badgeClassName={badgeClassName}
         statusDot={statusDot}
         statusDotClassName={statusDotClassName}
+        className={itemClassName}
       >
         {button}
       </ToolbarItem>

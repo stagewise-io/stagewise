@@ -8,12 +8,9 @@ import type {
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
 import type { Tools } from '@stagewise/agent-types';
-import {
-  AgentStateType,
-  createAgentServer,
-  createAgentHook,
-  type UserMessage,
-  type AgentServer,
+import type {
+  ChatUserMessage,
+  AgentServer,
 } from '@stagewise/agent-interface-internal/agent';
 import {
   getProjectPath,
@@ -48,6 +45,7 @@ import {
   ErrorDescriptions,
   formatErrorDescription,
 } from './utils/error-utils.js';
+import { createAgentHook } from '@stagewise/agent-interface-internal/agent';
 
 type ResponseMessage = (CoreAssistantMessage | CoreToolMessage) & {
   id: string;
@@ -57,6 +55,13 @@ type ResponseMessage = (CoreAssistantMessage | CoreToolMessage) & {
 type Response = LanguageModelResponseMetadata & {
   messages: Array<ResponseMessage>;
 };
+
+type History = {
+  messages: (CoreMessage | ChatUserMessage)[];
+  chatId: string;
+};
+
+type Chats = History[];
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
@@ -68,11 +73,11 @@ export class Agent {
   private server: AgentServer | null = null;
   private clientRuntime: ClientRuntime;
   private tools: Tools;
-  private history: (CoreMessage | UserMessage)[];
+  private chats: Chats;
   private client: TRPCClient<AppRouter> | null = null;
   private accessToken: string | null = null;
   private eventEmitter: ReturnType<typeof createEventEmitter>;
-  private currentState?: AgentStateType;
+  private isWorking = false;
   private agentDescription?: string;
   private timeoutManager: TimeoutManager;
   private recursionDepth = 0;
@@ -80,6 +85,7 @@ export class Agent {
   private authRetryCount = 0;
   private maxAuthRetries = 2;
   private isExpressMode = false;
+  private abortController: AbortController;
 
   private constructor(config: {
     clientRuntime: ClientRuntime;
@@ -93,11 +99,12 @@ export class Agent {
     this.tools = config.tools;
     this.accessToken = config.accessToken || null;
     this.eventEmitter = createEventEmitter(config.onEvent);
-    this.history = [];
+    this.chats = []; // TODO: load chats from local storage
     this.client = createAuthenticatedClient(this.accessToken);
     this.agentDescription = config.agentDescription;
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
     this.timeoutManager = new TimeoutManager();
+    this.abortController = new AbortController();
   }
 
   public shutdown() {
@@ -143,41 +150,33 @@ export class Agent {
    * @param newState - The new state to set
    * @param description - Optional description of the state change
    */
-  private setAgentState(newState: AgentStateType, description?: string): void {
+  private setAgentWorking(isWorking: boolean, description?: string): void {
     if (!this.server) return;
-
-    const previousState = this.currentState;
-    this.currentState = newState;
-
-    // Clear any existing state timeout
-    this.timeoutManager.clear('current-state');
+    this.timeoutManager.clear('is-working');
+    this.isWorking = isWorking;
 
     // Set automatic recovery for stuck states
-    if (
-      newState === AgentStateType.WORKING ||
-      newState === AgentStateType.CALLING_TOOL
-    ) {
+    if (isWorking) {
       this.timeoutManager.set(
-        'current-state',
+        'is-working',
         () => {
-          this.setAgentState(
-            AgentStateType.IDLE,
-            'Automatic recovery from stuck state',
-          );
+          this.setAgentWorking(false, 'Automatic recovery from stuck state');
         },
         this.agentTimeout,
       );
     }
 
     const validatedDescription = this.validateDescription(description);
-    if (validatedDescription) {
-      this.server.interface.state.set(newState, validatedDescription);
-    } else {
-      this.server.interface.state.set(newState);
-    }
-
+    this.server.interface.chat.setWorkingState(
+      this.isWorking,
+      validatedDescription,
+    );
     this.eventEmitter.emit(
-      EventFactories.agentStateChanged(newState, previousState, description),
+      EventFactories.agentStateChanged(
+        this.isWorking,
+        !this.isWorking,
+        description,
+      ),
     );
   }
 
@@ -203,7 +202,9 @@ export class Agent {
         throw new Error('TRPC API client not initialized');
       }
 
-      const result = await this.client.agent.callAgent.mutate(request);
+      const result = await this.client.agent.callAgent.mutate(request, {
+        signal: this.abortController.signal,
+      });
       // Reset auth retry count on successful call
       this.authRetryCount = 0;
       return result;
@@ -294,10 +295,7 @@ export class Agent {
     }
 
     // Set state to IDLE
-    this.setAgentState(
-      AgentStateType.IDLE,
-      reason || 'Cleanup pending operations',
-    );
+    this.setAgentWorking(false, reason || 'Cleanup pending operations');
   }
 
   /**
@@ -338,47 +336,13 @@ export class Agent {
     return Agent.instance;
   }
 
-  public async initialize() {
-    this.server = await createAgentServer();
-    this.server.setAgentName('stagewise agent');
-    this.server.setAgentDescription(
-      this.agentDescription || 'Your frontend and design agent',
-    );
-
-    this.server.interface.availability.set(true);
-    this.setAgentState(AgentStateType.IDLE);
-
-    this.server.interface.messaging.addUserMessageListener(async (message) => {
-      this.setAgentState(AgentStateType.WORKING);
-
-      const promptSnippets: PromptSnippet[] = [];
-
-      const projectPathPromptSnippet = await getProjectPath(this.clientRuntime);
-      if (projectPathPromptSnippet) {
-        promptSnippets.push(projectPathPromptSnippet);
-      }
-
-      const projectInfoPromptSnippet = await getProjectInfo(this.clientRuntime);
-      if (projectInfoPromptSnippet) {
-        promptSnippets.push(projectInfoPromptSnippet);
-      }
-
-      this.callAgent({
-        history: this.history,
-        clientRuntime: this.clientRuntime,
-        userMessage: message,
-        promptSnippets,
-      });
-    });
-  }
-
   /**
    * Initialize the agent by hooking into a user-provided Express server
    * @param expressApp - The Express application to hook into
    * @param pathPrefix - Optional path prefix for agent endpoints (default: '/agent')
    * @param httpServer - Optional HTTP server instance for WebSocket support
    */
-  public async initializeWithExpress(
+  public async initialize(
     expressApp: Parameters<typeof createAgentHook>[0]['app'],
     httpServer: Parameters<typeof createAgentHook>[0]['server'],
     pathPrefix = '/agent',
@@ -393,39 +357,84 @@ export class Agent {
       infoPath: `${pathPrefix}/info`,
       startServer: false,
     });
+    if (!this.server) {
+      throw new Error('Failed to create agent server');
+    }
     this.server.setAgentName('stagewise agent');
     this.server.setAgentDescription(
       this.agentDescription || 'Your frontend and design agent',
     );
 
-    this.server.interface.availability.set(true);
-    this.setAgentState(AgentStateType.IDLE);
+    this.setAgentWorking(false);
 
-    this.server.interface.messaging.addUserMessageListener(async (message) => {
-      this.setAgentState(AgentStateType.WORKING);
+    const activeChatId =
+      await this.server.interface.chat.createChat('New Chat');
+    this.chats.push({
+      messages: [],
+      chatId: activeChatId,
+    });
+    await this.server.interface.chat.switchChat(activeChatId);
 
-      const promptSnippets: PromptSnippet[] = [];
+    this.server.interface.chat.addStopListener(() => {
+      this.setAgentWorking(false, 'Agent stopped');
+      this.abortController.abort();
+      this.abortController = new AbortController();
+    });
 
-      const projectPathPromptSnippet = await getProjectPath(this.clientRuntime);
-      if (projectPathPromptSnippet) {
-        promptSnippets.push(projectPathPromptSnippet);
+    this.server.interface.chat.addChatUpdateListener(async (update) => {
+      switch (update.type) {
+        case 'chat-created':
+          this.chats.push({
+            messages: [],
+            chatId: update.chat.id,
+          });
+          break;
+        case 'message-added': {
+          const chat = this.chats.find((c) => c.chatId === update.chatId);
+          if (!chat || update.message.role !== 'user') return;
+          chat.messages.push(update.message);
+          this.setAgentWorking(true);
+          const promptSnippets: PromptSnippet[] = [];
+          const projectPathPromptSnippet = await getProjectPath(
+            this.clientRuntime,
+          );
+          if (projectPathPromptSnippet) {
+            promptSnippets.push(projectPathPromptSnippet);
+          }
+
+          const projectInfoPromptSnippet = await getProjectInfo(
+            this.clientRuntime,
+          );
+          if (projectInfoPromptSnippet) {
+            promptSnippets.push(projectInfoPromptSnippet);
+          }
+
+          this.callAgent({
+            chatId: chat.chatId,
+            history: chat.messages,
+            clientRuntime: this.clientRuntime,
+            userMessage: update.message,
+            promptSnippets,
+          });
+          break;
+        }
+        case 'message-updated':
+          break;
+        case 'messages-deleted':
+          break;
+        case 'chat-full-sync':
+          break;
+        case 'chat-list':
+          break;
+        case 'chat-switched':
+          break;
+        case 'chat-title-updated':
+          break;
       }
-
-      const projectInfoPromptSnippet = await getProjectInfo(this.clientRuntime);
-      if (projectInfoPromptSnippet) {
-        promptSnippets.push(projectInfoPromptSnippet);
-      }
-
-      this.callAgent({
-        history: this.history,
-        clientRuntime: this.clientRuntime,
-        userMessage: message,
-        promptSnippets,
-      });
     });
 
     return {
-      wss: this.server.wss,
+      wss: this.server!.wss,
     };
   }
 
@@ -437,18 +446,20 @@ export class Agent {
    * @param promptSnippets - Prompt snippets to append
    */
   private async callAgent({
+    chatId,
     userMessage,
     history,
     clientRuntime,
     promptSnippets,
   }: {
-    userMessage?: UserMessage;
-    history?: (CoreMessage | UserMessage)[];
+    chatId: string;
+    userMessage?: ChatUserMessage;
+    history?: (CoreMessage | ChatUserMessage)[];
     clientRuntime: ClientRuntime;
     promptSnippets?: PromptSnippet[];
   }): Promise<{
     response: Promise<Response>;
-    history: (CoreMessage | UserMessage)[];
+    history: (CoreMessage | ChatUserMessage)[];
   }> {
     // Validate prerequisites
     if (!this.server) throw new Error('Agent not initialized');
@@ -460,7 +471,8 @@ export class Agent {
         this.recursionDepth,
         MAX_RECURSION_DEPTH,
       );
-      this.setAgentState(AgentStateType.FAILED, errorDesc);
+      // TODO: add an error message to the chat
+      this.setAgentWorking(false, errorDesc);
       return {
         response: Promise.resolve({} as Response),
         history: [],
@@ -470,9 +482,28 @@ export class Agent {
     this.recursionDepth++;
 
     try {
-      // Initialize and prepare request
-      this.server.interface.messaging.clear();
-      if (userMessage) history = [userMessage]; // TODO: Support chat history in the frontend
+      // Prepare update to the chat title
+      if (
+        history?.filter((m) => m.role === 'user').length === 1 &&
+        userMessage?.metadata.browserData
+      ) {
+        this.client.chat.generateChatTitle
+          .mutate({
+            userMessage: {
+              id: userMessage.id,
+              contentItems: userMessage.content.filter(
+                (c) => c.type === 'text',
+              ),
+              metadata: userMessage.metadata.browserData,
+              createdAt: userMessage.createdAt,
+              pluginContent: {},
+              sentByPlugin: false,
+            },
+          })
+          .then((result) => {
+            this.server?.interface.chat.updateChatTitle(chatId, result.title);
+          });
+      }
 
       // Emit prompt triggered event
       this.eventEmitter.emit(
@@ -482,16 +513,40 @@ export class Agent {
         ),
       );
 
+      // Keeping compatibility with the old agent API
+      const messages = (history ?? []).map((m) => {
+        if (m.role === 'user' && 'metadata' in m) {
+          return {
+            id: m.id,
+            contentItems: m.content.filter((c) => c.type !== 'tool-approval'),
+            createdAt: m.createdAt,
+            metadata: {
+              ...m.metadata.browserData,
+            },
+            pluginContent: m.metadata.pluginContentItems,
+            sentByPlugin: m.metadata.sentByPlugin,
+          };
+        }
+        return m;
+      });
+
       // Call the agent API
       const startTime = Date.now();
       const request = {
-        messages: history ?? [],
+        messages,
         tools: mapZodToolsToJsonSchemaTools(this.tools),
-        userMessageMetadata: userMessage?.metadata,
         promptSnippets,
-      };
+      } as RouterInputs['agent']['callAgent'];
 
-      const agentResponse = await this.callAgentWithRetry(request);
+      if (userMessage?.metadata.browserData) {
+        request.userMessageMetadata = {
+          ...userMessage.metadata.browserData,
+        };
+      }
+
+      const agentResponse = await this.callAgentWithRetry(
+        request as RouterInputs['agent']['callAgent'],
+      );
 
       if (agentResponse.syntheticToolCalls) {
         await this.processParallelToolCallsContent(
@@ -502,6 +557,7 @@ export class Agent {
           },
         );
         return this.callAgent({
+          chatId,
           history: history ?? [],
           clientRuntime,
           userMessage: undefined,
@@ -511,17 +567,16 @@ export class Agent {
 
       const { fullStream, response, finishReason } = agentResponse;
 
-      this.setAgentState(AgentStateType.WORKING);
+      this.setAgentWorking(true);
 
       // Start stream consumption with timeout protection
-      const streamConsumptionPromise = consumeStreamWithTimeout(
+      const { messageId } = await consumeStreamWithTimeout(
+        chatId,
         fullStream,
         this.server,
         this.agentTimeout,
-        (state, desc) => this.setAgentState(state, desc),
+        (state, desc) => this.setAgentWorking(state, desc),
       );
-
-      streamConsumptionPromise.catch((_error) => {});
 
       // Wait for response with timeout
       const r = await withTimeout(
@@ -555,11 +610,17 @@ export class Agent {
       );
 
       // Process response messages
-      await this.processResponseMessages(r.messages, history ?? []);
+      await this.processResponseMessages(
+        r.messages,
+        history ?? [],
+        chatId,
+        messageId,
+      );
 
       // Check if recursion is needed
       if (shouldRecurseAfterToolCall(history ?? [])) {
         return this.callAgent({
+          chatId,
           history: history ?? [],
           clientRuntime,
           userMessage: undefined,
@@ -569,7 +630,11 @@ export class Agent {
 
       // Clean up and finalize
       this.cleanupPendingOperations('Agent task completed successfully', false);
-      this.history = history ?? [];
+      this.chats.forEach((c, index, array) => {
+        if (c.chatId === chatId) {
+          array[index]!.messages = history ?? [];
+        }
+      });
 
       return {
         response: response as Promise<Response>,
@@ -577,18 +642,12 @@ export class Agent {
       };
     } catch (error) {
       const errorDesc = formatErrorDescription('Agent task failed', error);
-      this.setAgentState(AgentStateType.FAILED, errorDesc);
+      this.setAgentWorking(false, errorDesc);
 
       // Reset to idle after delay
       setTimeout(() => {
-        if (
-          this.server?.interface.state.get()?.state === AgentStateType.FAILED
-        ) {
-          this.setAgentState(AgentStateType.IDLE);
-        }
+        this.setAgentWorking(false);
       }, STATE_RECOVERY_DELAY);
-
-      this.history = [];
       return {
         response: Promise.resolve({} as Response),
         history: [],
@@ -604,7 +663,9 @@ export class Agent {
    */
   private async processResponseMessages(
     messages: Array<ResponseMessage>,
-    history: (CoreMessage | UserMessage)[],
+    history: (CoreMessage | ChatUserMessage)[],
+    chatId: string,
+    messageId: string,
   ): Promise<void> {
     for (const message of messages) {
       const assistantMessage = {
@@ -640,7 +701,10 @@ export class Agent {
 
         // Process all tool calls together if any
         if (toolCalls.length > 0) {
-          await this.processParallelToolCallsContent(toolCalls, history);
+          await this.processParallelToolCallsContent(toolCalls, history, {
+            chatId,
+            messageId,
+          });
         }
       } else if (typeof message.content === 'string') {
         history.push({
@@ -660,9 +724,11 @@ export class Agent {
       toolCallId: string;
       args: any;
     }>,
-    history: (CoreMessage | UserMessage)[],
+    history: (CoreMessage | ChatUserMessage)[],
     options?: {
       syntheticCall?: boolean;
+      chatId?: string;
+      messageId?: string;
     },
   ): Promise<void> {
     const explanations = toolCalls
@@ -687,9 +753,9 @@ export class Agent {
           }
         }
 
-        this.setAgentState(AgentStateType.CALLING_TOOL, combinedDescription);
+        this.setAgentWorking(true, combinedDescription);
       } else {
-        this.setAgentState(AgentStateType.CALLING_TOOL);
+        this.setAgentWorking(true);
       }
     }
 
@@ -708,12 +774,12 @@ export class Agent {
     }
 
     // Process all tool calls
-    await processParallelToolCalls(
+    const results = await processParallelToolCalls(
       toolCalls,
       this.tools,
       this.server!,
       history,
-      (state, desc) => this.setAgentState(state, desc),
+      (state, desc) => this.setAgentWorking(state, desc),
       this.timeoutManager,
       (result) => {
         this.eventEmitter.emit(
@@ -726,13 +792,16 @@ export class Agent {
         );
       },
     );
-
-    // Update history for browser tools
-    const hasBrowserTools = toolCalls.some(
-      (tc) => this.tools[tc.toolName]?.stagewiseMetadata?.runtime === 'browser',
-    );
-    if (hasBrowserTools) {
-      this.history = history;
+    if (results.length > 0) {
+      this.server?.interface.chat.addMessage(
+        {
+          id: crypto.randomUUID(),
+          createdAt: new Date(),
+          role: 'tool',
+          content: results,
+        },
+        options?.chatId,
+      );
     }
   }
 }

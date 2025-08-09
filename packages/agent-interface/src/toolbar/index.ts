@@ -2,35 +2,38 @@ import type { InterfaceRouter } from '../router';
 
 export type { InterfaceRouter };
 
-export {
-  type AgentAvailability,
-  AgentAvailabilityError,
-} from '../router/capabilities/availability/types';
-
-export {
-  type AgentState,
-  AgentStateType,
-} from '../router/capabilities/state/types';
-
-export {
-  type UserMessage,
-  userMessageSchema,
-  type UserMessageContentItem,
-  type UserMessageMetadata,
-  userMessageMetadataSchema,
-  type SelectedElement,
-  type AgentMessageContentItemPart,
-  type AgentMessageUpdate,
-} from '../router/capabilities/messaging/types';
-
 export type {
-  PendingToolCall,
-  ToolCallResult,
-  Tool,
-  ToolList,
-} from '../router/capabilities/tool-calling/types';
+  // Re-export chat types, excluding those that conflict with messaging
+  TextPart,
+  FilePart,
+  ReasoningPart,
+  ToolCallPart,
+  ToolResultPart,
+  ToolApprovalPart,
+  AssistantMessage,
+  ToolMessage,
+  ChatMessage,
+  Chat,
+  ChatListItem,
+  MessagePartUpdate,
+  ChatUpdate,
+  CreateChatRequest,
+  SendMessageRequest,
+  ToolApprovalResponse,
+  ToolDefinition,
+  UserMessage,
+} from '../router/capabilities/chat/types';
+
+export { userMessageSchema } from '../router/capabilities/chat/types';
 
 export type { StagewiseInfo } from '../info';
+
+// Export shared types for metadata
+export type {
+  UserMessageMetadata,
+  SelectedElement,
+  PluginContentItem,
+} from '../shared-types/metadata';
 
 export { DEFAULT_STARTING_PORT } from '../constants';
 

@@ -21,16 +21,34 @@ import { AgentTransportAdapter } from './adapter';
 
 export type AgentServer = Awaited<ReturnType<typeof createAgentServer>>;
 export type { StagewiseInfo } from '../info';
-export {
-  AgentAvailabilityError,
-  type AgentAvailability,
-} from '../router/capabilities/availability/types';
-export {
-  AgentStateType,
-  type AgentState,
-} from '../router/capabilities/state/types';
-export type * from '../router/capabilities/messaging/types';
-export type * from '../router/capabilities/tool-calling/types';
+export type {
+  // Re-export chat types, excluding those that conflict with messaging
+  TextPart,
+  FilePart,
+  ReasoningPart,
+  ToolCallPart,
+  ToolResultPart,
+  ToolApprovalPart,
+  UserMessage as ChatUserMessage,
+  AssistantMessage,
+  ToolMessage,
+  ChatMessage,
+  Chat,
+  ChatListItem,
+  MessagePartUpdate,
+  ChatUpdate,
+  CreateChatRequest,
+  SendMessageRequest,
+  ToolApprovalResponse,
+  ToolDefinition,
+} from '../router/capabilities/chat/types';
+
+// Export shared types for metadata
+export type {
+  UserMessageMetadata,
+  SelectedElement,
+  PluginContentItem,
+} from '../shared-types/metadata';
 
 /**
  * Configuration options for creating an agent server
@@ -132,8 +150,8 @@ export const createAgentHook = async (config: AgentServerHookConfig) => {
     name,
     description,
     capabilities: {
-      toolCalling: impl.toolCalling !== undefined,
-      chatHistory: false,
+      toolCalling: false, // Removed, now integrated into chat
+      chatHistory: impl.chat !== undefined,
     },
   };
 
@@ -226,8 +244,8 @@ export const createAgentServer = async (
     name,
     description,
     capabilities: {
-      toolCalling: impl.toolCalling !== undefined,
-      chatHistory: false,
+      toolCalling: false, // Removed, now integrated into chat
+      chatHistory: impl.chat !== undefined,
     },
   };
 

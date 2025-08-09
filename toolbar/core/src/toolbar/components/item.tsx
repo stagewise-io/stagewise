@@ -7,11 +7,17 @@ export interface ToolbarItemProps {
   statusDot?: boolean;
   statusDotClassName?: string;
   children?: ReactNode;
+  className?: string;
 }
 
 export function ToolbarItem(props: ToolbarItemProps) {
   return (
-    <div className="relative flex min-h-8 w-8 shrink-0 items-center justify-center">
+    <div
+      className={cn(
+        'relative flex h-8 w-8 shrink-0 items-center justify-center',
+        props.className,
+      )}
+    >
       {props.children}
       {props.badgeContent && (
         <div

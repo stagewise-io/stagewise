@@ -4,8 +4,7 @@ import { ChatStateProvider } from '@/hooks/use-chat-state';
 import type { ReactNode } from 'react';
 import { ConfigProvider } from '@/hooks/use-config';
 import { AgentProvider } from '@/hooks/agent/use-agent-provider';
-import { AgentStateProvider } from '@/hooks/agent/use-agent-state';
-import { AgentMessagingProvider } from '@/hooks/agent/use-agent-messaging';
+import { AgentChatProvider } from '@/hooks/agent/use-agent-chat/index';
 import { PanelsProvider } from '@/hooks/use-panels';
 
 export function ContextProviders({
@@ -18,15 +17,13 @@ export function ContextProviders({
   return (
     <ConfigProvider config={config}>
       <AgentProvider>
-        <AgentStateProvider>
-          <AgentMessagingProvider>
-            <PanelsProvider>
-              <PluginProvider>
-                <ChatStateProvider>{children}</ChatStateProvider>
-              </PluginProvider>
-            </PanelsProvider>
-          </AgentMessagingProvider>
-        </AgentStateProvider>
+        <AgentChatProvider>
+          <PanelsProvider>
+            <PluginProvider>
+              <ChatStateProvider>{children}</ChatStateProvider>
+            </PluginProvider>
+          </PanelsProvider>
+        </AgentChatProvider>
       </AgentProvider>
     </ConfigProvider>
   );

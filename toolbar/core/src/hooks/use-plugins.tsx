@@ -6,14 +6,9 @@ import type {
   ToolbarPlugin,
 } from '@/plugin-sdk/plugin';
 import { useConfig } from './use-config';
-import type { UserMessage } from '@stagewise/agent-interface-internal/toolbar';
-import { useAgentMessaging } from './agent/use-agent-messaging';
-import {
-  collectUserMessageMetadata,
-  generateId,
-  getIFrameWindow,
-} from '@/utils';
+import { collectUserMessageMetadata, getIFrameWindow } from '@/utils';
 import { usePanels } from './use-panels';
+import { useAgentChat } from './agent/use-agent-chat';
 
 export interface PluginContextType {
   plugins: ToolbarPlugin[];
@@ -31,7 +26,7 @@ const PluginContext = createContext<PluginContextType>({
 export function PluginProvider({ children }: { children?: ReactNode }) {
   const { config } = useConfig();
 
-  const { sendMessage } = useAgentMessaging();
+  const { sendMessage } = useAgentChat();
 
   const { openChat } = usePanels();
 
@@ -40,15 +35,15 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
   const toolbarContext = useMemo(() => {
     return {
       sendPrompt: async (prompt: PluginUserMessage) => {
-        const userMessage: UserMessage = {
-          ...prompt,
-          id: generateId(),
-          createdAt: new Date(),
-          sentByPlugin: true,
-          metadata: collectUserMessageMetadata([]),
-          pluginContent: {},
-        };
-        sendMessage(userMessage);
+        // Reject messages that contain approval content parts since plugins shouldn't be able to do that
+        if (prompt.content.some((part) => part.type === 'tool-approval')) {
+          console.error('Plugins are not allowed to send tool call approvals');
+          return;
+        }
+
+        // We don't collect additional pluginContentItems when plugins send messages since it's probably a very specific message anyway
+
+        sendMessage(prompt.content, collectUserMessageMetadata([], true));
         openChat();
       },
       mainAppWindow: getIFrameWindow(),

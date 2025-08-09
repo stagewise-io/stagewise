@@ -1,148 +1,81 @@
 import type {
-  AgentAvailability,
-  AgentAvailabilityError,
-} from '../router/capabilities/availability/types';
-import type {
-  AgentMessageContentItemPart,
-  UserMessage,
-} from '../router/capabilities/messaging/types';
-import type {
-  AgentState,
-  AgentStateType,
-} from '../router/capabilities/state/types';
-import type {
-  Tool,
-  ToolCallResult,
-  PendingToolCall,
-} from '../router/capabilities/tool-calling/types';
+  Chat,
+  ChatListItem,
+  ChatMessage,
+  AssistantMessage,
+  MessagePartUpdate,
+  ChatUpdate,
+} from '../router/capabilities/chat/types';
 
 export type AgentInterface = {
   /**
-   * AVAILABILITY MANAGEMENT
-   * Simple boolean-based availability with error handling
+   * CHAT MANAGEMENT
+   * Chat functionality for the agent to manage conversations and messages
+   * Note: Tool approvals, registrations, and user messages come through router callbacks
    */
-  availability: {
-    /** Get current availability status */
-    get: () => AgentAvailability;
+  chat: {
+    /** Get list of all chats */
+    getChats: () => ChatListItem[];
 
-    /**
-     * Set agent availability.
-     *
-     * When setting available to false, an error type is required to indicate
-     * the reason for unavailability. The errorMessage parameter is optional
-     * and provides additional context about the error.
-     *
-     * When setting available to true, error parameters are ignored.
-     */
-    set: <T extends boolean>(
-      available: T,
-      ...args: T extends false
-        ? [error: AgentAvailabilityError, errorMessage?: string]
-        : []
-    ) => void;
-  };
+    /** Get the ID of the currently active chat */
+    getActiveChatId: () => string | null;
 
-  /**
-   * STATE MANAGEMENT
-   * Simple state operations with optional descriptions
-   */
-  state: {
-    /** Get current agent state */
-    get: () => AgentState;
+    /** Get the active chat */
+    getActiveChat: () => Chat | null;
 
-    /** Set agent state with optional description */
-    set: (state: AgentStateType, description?: string) => void;
-  };
+    /** Create a new chat (agent can create anytime) */
+    createChat: (title?: string) => Promise<string>;
 
-  /**
-   * MESSAGE MANAGEMENT
-   * High-level message operations with automatic concatenation
-   */
-  messaging: {
-    /** Get current agent message content (returns concatenated message) */
-    get: () => AgentMessageContentItemPart[];
+    /** Delete a chat */
+    deleteChat: (chatId: string) => Promise<void>;
 
-    /** Set complete agent message (replaces all content) */
-    set: (content: AgentMessageContentItemPart[]) => void;
+    /** Switch to a different chat */
+    switchChat: (chatId: string) => Promise<void>;
 
-    /** Append a new part to current message */
-    addPart: (
-      content: AgentMessageContentItemPart | AgentMessageContentItemPart[],
+    /** Update the title of a chat */
+    updateChatTitle: (chatId: string, title: string) => Promise<void>;
+
+    /** Add a message to any chat (for agent-generated messages) */
+    addMessage: (message: ChatMessage, chatId?: string) => void;
+
+    /** Update an existing message in any chat */
+    updateMessage: (
+      messageId: string,
+      content: AssistantMessage['content'],
+      chatId?: string,
     ) => void;
 
-    /**
-     * Update a part of the current message.
-     *
-     * @param content - The content to update with
-     * @param index - The index of the part to update. If index equals the current
-     *                message length (highest index + 1), a new part will be added.
-     * @param type - 'replace' to replace the part, 'append' to append text (text parts only).
-     *               When using 'append', only the delta (new text) is sent in the update,
-     *               not the entire content.
-     */
-    updatePart: (
-      content: AgentMessageContentItemPart | AgentMessageContentItemPart[],
-      index: number,
-      type: 'replace' | 'append',
+    /** Delete a message from any chat */
+    deleteMessage: (messageId: string, chatId?: string) => void;
+
+    /** Delete a message and all subsequent messages from any chat */
+    deleteMessageAndSubsequent: (messageId: string, chatId?: string) => void;
+
+    /** Clear all messages from a specific chat */
+    clearMessages: (chatId?: string) => void;
+
+    /** Stream a message part update */
+    streamMessagePart: (
+      messageId: string,
+      partIndex: number,
+      update: MessagePartUpdate,
+      chatId?: string,
     ) => void;
 
-    /** Clears current message and starts a new one. Will change the current ID.*/
-    clear: () => void;
+    /** Add listener for chat updates (includes user messages and tool approvals) */
+    addChatUpdateListener: (listener: (update: ChatUpdate) => void) => void;
 
-    /** Get current message ID */
-    getCurrentId: () => string | null;
+    /** Remove chat update listener */
+    removeChatUpdateListener: (listener: (update: ChatUpdate) => void) => void;
 
-    /** Get current message state as an object (returns by value, not reference) */
-    getCurrentMessage: () => {
-      id: string | null;
-      parts: AgentMessageContentItemPart[];
-    };
+    /** Set the agent's working state (broadcasts to toolbar via chat updates) */
+    setWorkingState: (isWorking: boolean, description?: string) => void;
 
-    /** Add a listener for user messages */
-    addUserMessageListener: (listener: (message: UserMessage) => void) => void;
+    /** Add a listener for stop signals from the toolbar */
+    addStopListener: (listener: () => void) => void;
 
-    /** Remove a specific user message listener */
-    removeUserMessageListener: (
-      listener: (message: UserMessage) => void,
-    ) => void;
-
-    /** Clear all user message listeners */
-    clearUserMessageListeners: () => void;
-  };
-
-  /**
-   * TOOL CALLING MANAGEMENT (Optional)
-   * Simplified tool calling with automatic lifecycle management
-   */
-  toolCalling: {
-    /** Set tool call support.
-     * Agents have to manually set this to true if they want to support tool calling.
-     *
-     * Calling other functions in the toolCalling object will throw an error
-     * if tool calling is not supported.
-     */
-    setToolCallSupport: (supported: boolean) => void;
-
-    /** Get a list of all available tools */
-    getAvailableTools: () => Tool[];
-
-    /** Add a listener that get's triggered whenever the list of available tools changes */
-    onToolListUpdate: (listener: (tools: Tool[]) => void) => void;
-
-    /** Remove a specific tool list update listener */
-    removeToolListUpdateListener: (listener: (tools: Tool[]) => void) => void;
-
-    /** Clear all tool list update listeners */
-    clearToolListUpdateListeners: () => void;
-
-    /** Make a tool call and wait for the result */
-    requestToolCall: (
-      toolName: string,
-      parameters: Record<string, unknown>,
-    ) => Promise<ToolCallResult>;
-
-    /** Get all pending tool calls */
-    getPendingToolCalls: () => PendingToolCall[];
+    /** Remove a stop listener */
+    removeStopListener: (listener: () => void) => void;
   };
 
   /**

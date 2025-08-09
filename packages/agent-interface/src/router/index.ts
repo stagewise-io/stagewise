@@ -1,31 +1,11 @@
-import { router } from './trpc';
-import {
-  type AvailabilityImplementation,
-  availabilityRouter,
-} from './capabilities/availability';
-import { type StateImplementation, stateRouter } from './capabilities/state';
-import {
-  type ToolCallingImplementation,
-  toolCallingRouter,
-} from './capabilities/tool-calling';
-import {
-  type MessagingImplementation,
-  messagingRouter,
-} from './capabilities/messaging';
+import { type ChatImplementation, chatRouter } from './capabilities/chat';
 
 export interface TransportInterface {
-  availability: AvailabilityImplementation;
-  messaging: MessagingImplementation;
-  state: StateImplementation;
-  toolCalling?: ToolCallingImplementation;
+  chat: ChatImplementation;
 }
 
-export const interfaceRouter = (implementation: TransportInterface) =>
-  router({
-    availability: availabilityRouter(implementation.availability),
-    messaging: messagingRouter(implementation.messaging),
-    state: stateRouter(implementation.state),
-    toolCalling: toolCallingRouter(implementation.toolCalling),
-  });
+export const interfaceRouter = (implementation: TransportInterface) => {
+  return chatRouter(implementation.chat);
+};
 
 export type InterfaceRouter = ReturnType<typeof interfaceRouter>;

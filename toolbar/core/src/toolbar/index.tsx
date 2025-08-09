@@ -87,6 +87,7 @@ export function Toolbar({
                 ? 'rounded-t-3xl rounded-b-lg'
                 : 'rounded-t-lg rounded-b-3xl',
             )}
+            itemClassName="h-5"
           >
             {position.isTopHalf ? (
               <ChevronUpIcon className="size-4" />

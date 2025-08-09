@@ -56,7 +56,7 @@ export async function loadAndInitializeAgent(
     // This will automatically set up the following endpoints:
     // - /stagewise-toolbar-app/server/ws (WebSocket endpoint)
     // - /stagewise-toolbar-app/server/info (HTTP info endpoint)
-    const agentServer = await agentInstance.initializeWithExpress(
+    const agentServer = await agentInstance.initialize(
       app as any,
       server,
       '/stagewise-toolbar-app/server',

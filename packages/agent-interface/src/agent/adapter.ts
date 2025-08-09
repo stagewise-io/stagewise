@@ -1,656 +1,262 @@
+/**
+ * AgentTransportAdapter - Main adapter for agent-toolbar communication
+ *
+ * This is the primary class that agent implementations use to communicate with
+ * the Stagewise toolbar. It provides a unified interface that bridges between
+ * the agent's implementation and the toolbar's expectations.
+ *
+ * The adapter is composed of several managers, each handling a specific aspect:
+ * - AvailabilityManager: Tracks whether the agent is available
+ * - StateManager: Tracks what the agent is currently doing
+ * - MessagingManager: Handles the legacy messaging interface
+ * - ChatManager: Handles the modern chat interface with full context
+ *
+ * Usage:
+ * ```typescript
+ * const adapter = new AgentTransportAdapter();
+ * const agent = adapter.getAgent();
+ * ```
+ */
+
 import type { TransportInterface } from '../router';
 import type { AgentInterface } from './interface';
-import {
-  type AgentAvailability,
-  AgentAvailabilityError,
-} from '../router/capabilities/availability/types';
-import {
-  type AgentState,
-  AgentStateType,
-} from '../router/capabilities/state/types';
-import type {
-  AgentMessageContentItemPart,
-  AgentMessageUpdate,
-  UserMessage,
-} from '../router/capabilities/messaging/types';
-import type {
-  PendingToolCall,
-  ToolCallResult,
-  Tool,
-} from '../router/capabilities/tool-calling/types';
-import type { AvailabilityImplementation } from '../router/capabilities/availability';
-import type { MessagingImplementation } from '../router/capabilities/messaging';
-import type { StateImplementation } from '../router/capabilities/state';
-import type { ToolCallingImplementation } from '../router/capabilities/tool-calling';
+import type { ChatImplementation } from '../router/capabilities/chat';
+
+// Import the split manager classes
+import { ChatManager } from './adapter/chat-manager';
+
+// Re-export PushController for backward compatibility if needed
+export { PushController } from './adapter/push-controller';
 
 /**
- * Optional configuration for the AgentTransportAdapter.
+ * Optional configuration for the AgentTransportAdapter
  */
 export interface AdapterOptions {
-  toolCallTimeoutMs?: number;
+  /**
+   * Custom function to generate unique IDs
+   * Defaults to crypto.randomUUID() if not provided
+   */
   idGenerator?: () => string;
 }
 
-type RequiredAdapterOptions = Required<AdapterOptions>;
-
-// Internal type for tracking pending tool calls with their promise resolvers
-type PendingToolCallRequest = {
-  call: PendingToolCall;
-  resolve: (result: ToolCallResult) => void;
-  reject: (reason?: any) => void;
-  timeoutTimer: ReturnType<typeof setTimeout>;
-};
-
-// --- PushController Implementation ---
-
 /**
- * A controller for managing an AsyncIterable stream. It allows pushing new values
- * to all subscribers and ensures new subscribers immediately get the latest value.
+ * Main adapter class that composes all the managers and provides
+ * the unified interface for agent-toolbar communication
  */
-class PushController<T> {
-  private latestValue: T | undefined;
-  private subscribers: Set<(value: T) => void> = new Set();
-
-  constructor(initialValue?: T) {
-    this.latestValue = initialValue;
-  }
-
-  /**
-   * Pushes a new value to all current subscribers and updates the latest value.
-   * @param value The new value to push to the stream.
-   */
-  public push(value: T): void {
-    this.latestValue = value;
-    for (const subscriber of this.subscribers) {
-      subscriber(value);
-    }
-  }
-
-  /**
-   * Retrieves the most recently pushed value.
-   * @returns The latest value, or undefined if no value has been pushed.
-   */
-  public getLatestValue(): T | undefined {
-    return this.latestValue;
-  }
-
-  /**
-   * Creates and returns a new AsyncIterable for a consumer.
-   * @returns An async iterable that will yield the latest value upon subscription,
-   * and all subsequent values pushed to the controller.
-   */
-  public subscribe(): AsyncIterable<T> {
-    const controller = this;
-    let pullQueue: ((value: IteratorResult<T>) => void)[] = [];
-    let pushQueue: T[] = [];
-    let done = false;
-
-    const pushValue = (value: T) => {
-      if (pullQueue.length > 0) {
-        pullQueue.shift()!({ value, done: false });
-      } else {
-        pushQueue.push(value);
-      }
-    };
-
-    const listener = (value: T) => {
-      if (!done) {
-        pushValue(value);
-      }
-    };
-
-    return {
-      [Symbol.asyncIterator]: () => {
-        // Immediately yield the latest value upon subscription.
-        if (controller.getLatestValue() !== undefined) {
-          pushValue(controller.getLatestValue()!);
-        }
-        controller.subscribers.add(listener);
-
-        return {
-          next: (): Promise<IteratorResult<T>> => {
-            return new Promise((resolve) => {
-              if (pushQueue.length > 0) {
-                resolve({ value: pushQueue.shift()!, done: false });
-              } else if (done) {
-                resolve({ value: undefined, done: true });
-              } else {
-                pullQueue.push(resolve);
-              }
-            });
-          },
-          return: async (): Promise<IteratorResult<T>> => {
-            done = true;
-            controller.subscribers.delete(listener);
-            pullQueue.forEach((resolve) =>
-              resolve({ value: undefined, done: true }),
-            );
-            pullQueue = [];
-            pushQueue = [];
-            return { value: undefined, done: true };
-          },
-        };
-      },
-    };
-  }
-}
-
-// --- Main AgentTransportAdapter Class ---
-
 export class AgentTransportAdapter implements TransportInterface {
-  // --- Public TransportInterface Implementation ---
-  public readonly availability: AvailabilityImplementation;
-  public readonly messaging: MessagingImplementation;
-  public readonly state: StateImplementation;
-  public toolCalling?: ToolCallingImplementation;
+  /**
+   * Public TransportInterface implementation
+   * These are used by the router to expose capabilities to the toolbar
+   */
+  public readonly chat: ChatImplementation;
 
-  // --- Internal State Properties ---
+  /**
+   * Internal manager instances that handle specific functionality
+   */
+  private readonly chatManager: ChatManager;
+
+  /**
+   * Cached AgentInterface instance to ensure stability
+   */
   private _agentInterface: AgentInterface | null = null;
-  private readonly _options: RequiredAdapterOptions;
 
-  // State controllers
-  private readonly _availabilityController: PushController<AgentAvailability>;
-  private readonly _stateController: PushController<AgentState>;
-  private readonly _messageController: PushController<AgentMessageUpdate>;
-  private readonly _pendingToolCallsController: PushController<PendingToolCall>;
-
-  // Internal state stores
-  private _availability: AgentAvailability;
-  private _state: AgentState;
-  private _currentMessageId: string | null = null;
-  private _messageContent: AgentMessageContentItemPart[] = [];
-  private _userMessageListeners: Set<(message: UserMessage) => void> =
-    new Set();
-
-  // Tool calling state
-  private _toolCallingSupported = false;
-  private _availableTools: Tool[] = [];
-  private _toolListUpdateListeners: Set<(tools: Tool[]) => void> = new Set();
-  private _pendingToolCalls: Map<string, PendingToolCallRequest> = new Map();
-  private _toolCallSubscribers: Set<(call: PendingToolCall) => void> =
-    new Set();
+  /**
+   * Configuration options with defaults applied
+   */
+  private readonly options: Required<AdapterOptions>;
 
   constructor(options?: AdapterOptions) {
-    // 1. Set default options
-    this._options = {
-      toolCallTimeoutMs: options?.toolCallTimeoutMs ?? 30000,
+    // Apply default options
+    this.options = {
       idGenerator: options?.idGenerator ?? (() => crypto.randomUUID()),
     };
 
-    // 2. Initialize state with defaults
-    this._availability = {
-      isAvailable: false,
-      error: AgentAvailabilityError.NO_CONNECTION,
-      errorMessage: 'Initializing',
-    } as AgentAvailability;
-    this._state = { state: AgentStateType.IDLE };
+    // Initialize all managers
+    // Each manager handles a specific aspect of agent functionality
+    this.chatManager = new ChatManager(this.options.idGenerator);
 
-    // 3. Initialize controllers
-    this._availabilityController = new PushController(this._availability);
-    this._stateController = new PushController(this._state);
-    this._messageController = new PushController(); // No initial value, sends resync on subscribe
-    this._pendingToolCallsController = new PushController(); // No initial value, sends resync on subscribe
-
-    // 4. Define the public TransportInterface properties
-    this.availability = this.createAvailabilityImplementation();
-    this.state = this.createStateImplementation();
-    this.messaging = this.createMessagingImplementation();
-
-    // 5. Initialize controllers with default state
-    this._availabilityController.push(this._availability);
-    this._stateController.push(this._state);
+    this.chat = this.chatManager.createImplementation();
   }
 
   /**
-   * Retrieves the AgentInterface instance, which is the primary
-   * entry point for an agent to interact with the adapter.
+   * Gets the AgentInterface instance for the agent to use
+   * This is the primary entry point for agents to interact with the adapter
+   *
+   * The interface is memoized to ensure stability - the same instance
+   * is returned on every call to prevent issues with reference equality
+   *
+   * @returns The agent interface for controlling the adapter
    */
   public getAgent(): AgentInterface {
     if (this._agentInterface) {
       return this._agentInterface;
     }
 
-    // Memoize the interface to ensure stability
+    // Create and cache the interface
     this._agentInterface = this.createAgentInterface();
     return this._agentInterface;
   }
 
-  // --- Private Helper Methods ---
-
   /**
-   * Private method to clear the current message and generate a new ID.
-   * This logic is shared between the public clear() method and addPart().
+   * Creates the AgentInterface implementation that agents use
+   * This interface provides all the methods agents need to:
+   * - Set their availability status
+   * - Update their current state
+   * - Send and receive messages
+   * - Manage chat sessions (if enabled)
+   *
+   * @returns A complete AgentInterface implementation
    */
-  private _clearMessage(): void {
-    this._currentMessageId = this._options.idGenerator();
-    this._messageContent = [];
-
-    const update: AgentMessageUpdate = {
-      messageId: this._currentMessageId,
-      updateParts: [],
-      createdAt: new Date(),
-      resync: true, // Signal to consumer to clear previous content
-    };
-    this._messageController.push(update);
-  }
-
-  // --- Interface Implementation Factories ---
-
   private createAgentInterface(): AgentInterface {
-    const self = this; // Capture 'this' for use in nested objects
+    const self = this; // Capture 'this' for use in the interface object
 
     return {
-      availability: {
-        get: () => JSON.parse(JSON.stringify(self._availability)),
-        set: (available, ...args) => {
-          let newAvailability: AgentAvailability;
-          if (available) {
-            newAvailability = { isAvailable: true };
-          } else {
-            const [error, errorMessage] = args;
-            if (!error) {
-              throw new Error(
-                "An 'error' type is required when setting availability to false.",
-              );
-            }
-            newAvailability = { isAvailable: false, error, errorMessage };
-          }
-          self._availability = newAvailability;
-          self._availabilityController.push(self._availability);
-        },
-      },
-      state: {
-        get: () => JSON.parse(JSON.stringify(self._state)),
-        set: (state, description) => {
-          self._state = { state, description };
-          self._stateController.push(self._state);
-        },
-      },
-      messaging: {
-        get: () => JSON.parse(JSON.stringify(self._messageContent)),
-        getCurrentId: () => self._currentMessageId,
-        getCurrentMessage: () => {
-          // Return by value using deep copy
-          return {
-            id: self._currentMessageId,
-            parts: JSON.parse(JSON.stringify(self._messageContent)),
-          };
-        },
-        addUserMessageListener: (listener) => {
-          self._userMessageListeners.add(listener);
-        },
-        removeUserMessageListener: (listener) => {
-          self._userMessageListeners.delete(listener);
-        },
-        clearUserMessageListeners: () => {
-          self._userMessageListeners.clear();
-        },
-        clear: () => {
-          this._clearMessage();
-        },
-        set: (content) => {
-          // Always create a new message ID when setting a new message
-          self._currentMessageId = self._options.idGenerator();
-          self._messageContent = JSON.parse(JSON.stringify(content));
+      /**
+       * Chat interface (modern)
+       * Provides methods for agents that use the chat system
+       * This is the preferred interface for new agents
+       */
+      chat: {
+        /**
+         * Gets list of all chats
+         */
+        getChats: () => self.chatManager.getChats(),
 
-          const update: AgentMessageUpdate = {
-            messageId: self._currentMessageId,
-            updateParts: self._messageContent.map((part, i) => ({
-              contentIndex: i,
-              part: part,
-            })),
-            createdAt: new Date(),
-            resync: true,
-          };
-          self._messageController.push(update);
-        },
-        addPart: (content) => {
-          if (!self._currentMessageId) {
-            // Call the private clear method directly to avoid circular dependency
-            self._clearMessage();
-          }
+        /**
+         * Gets the ID of the currently active chat
+         */
+        getActiveChatId: () => self.chatManager.getActiveChatId(),
 
-          const partsToAdd = Array.isArray(content) ? content : [content];
-          for (const part of partsToAdd) {
-            const contentIndex = self._messageContent.length;
-            self._messageContent.push(part);
+        /**
+         * Gets the active chat with full message history
+         */
+        getActiveChat: () => self.chatManager.getActiveChat(),
 
-            const update: AgentMessageUpdate = {
-              messageId: self._currentMessageId!,
-              updateParts: [{ contentIndex, part }],
-              createdAt: new Date(),
-              resync: false,
-            };
-            self._messageController.push(update);
-          }
-        },
-        updatePart: (content, index, type) => {
-          // Allow adding a new part if index is exactly highest + 1
-          if (index === self._messageContent.length) {
-            // If no message ID exists yet, create one
-            if (!self._currentMessageId) {
-              self._clearMessage();
-            }
+        /**
+         * Creates a new chat (agent can create anytime)
+         */
+        createChat: async (title) => self.chatManager.createChat(title, true),
 
-            // Handle union type - if content is an array, only take the first element
-            const contentPart = Array.isArray(content) ? content[0] : content;
-            if (!contentPart) {
-              throw new Error('Content cannot be empty');
-            }
+        /**
+         * Deletes a chat
+         */
+        deleteChat: async (chatId) => {
+          await self.chatManager.deleteChat(chatId);
+        },
 
-            // Add the new part
-            self._messageContent.push(contentPart);
+        /**
+         * Switches to a different chat
+         */
+        switchChat: async (chatId) => {
+          await self.chatManager.switchChat(chatId);
+        },
 
-            const update: AgentMessageUpdate = {
-              messageId: self._currentMessageId!,
-              updateParts: [{ contentIndex: index, part: contentPart }],
-              createdAt: new Date(),
-              resync: type === 'replace',
-            };
-            self._messageController.push(update);
-            return;
-          }
+        /**
+         * Updates the title of a chat
+         */
+        updateChatTitle: async (chatId, title) => {
+          await self.chatManager.updateChatTitle(chatId, title);
+        },
 
-          if (index < 0 || index >= self._messageContent.length) {
-            throw new Error(
-              `Invalid index ${index} for message content update.`,
-            );
-          }
+        /**
+         * Adds a message to any chat
+         * Used by agents to add their responses
+         */
+        addMessage: (message, chatId) => {
+          self.chatManager.addMessage(message, chatId);
+        },
 
-          // Handle union type - if content is an array, only take the first element
-          const contentPart = Array.isArray(content) ? content[0] : content;
-          if (!contentPart) {
-            throw new Error('Content cannot be empty');
-          }
+        /**
+         * Updates an existing message in any chat
+         * Used for streaming updates
+         */
+        updateMessage: (messageId, content, chatId) => {
+          self.chatManager.updateMessage(messageId, content, chatId);
+        },
 
-          if (type === 'replace') {
-            self._messageContent[index] = contentPart;
-            const update: AgentMessageUpdate = {
-              messageId: self._currentMessageId!,
-              updateParts: [{ contentIndex: index, part: contentPart }],
-              createdAt: new Date(),
-              resync: true,
-            };
-            self._messageController.push(update);
-          } else if (type === 'append') {
-            const existingPart = self._messageContent[index];
-            if (existingPart.type !== 'text' || contentPart.type !== 'text') {
-              throw new Error(
-                'Append update is only valid for text-to-text parts.',
-              );
-            }
-            existingPart.text += contentPart.text;
-            const update: AgentMessageUpdate = {
-              messageId: self._currentMessageId!,
-              updateParts: [{ contentIndex: index, part: contentPart }],
-              createdAt: new Date(),
-              resync: false,
-            };
-            self._messageController.push(update);
-          }
+        /**
+         * Deletes a message from any chat
+         */
+        deleteMessage: (messageId, chatId) => {
+          self.chatManager.deleteMessage(messageId, chatId);
         },
-      },
-      toolCalling: {
-        setToolCallSupport: (supported) => {
-          self._toolCallingSupported = supported;
-          if (supported) {
-            // Lazily create the implementation when enabled
-            self.toolCalling = self.createToolCallingImplementation();
-          } else {
-            // Cleanup on disable
-            self.toolCalling = undefined;
-            self._pendingToolCalls.forEach((request) => {
-              clearTimeout(request.timeoutTimer);
-              request.reject(
-                new Error('Tool calling was disabled by the agent.'),
-              );
-            });
-            self._pendingToolCalls.clear();
-            self._toolListUpdateListeners.clear();
-          }
+
+        /**
+         * Deletes a message and all subsequent messages
+         * Critical for maintaining consistency when revising history
+         */
+        deleteMessageAndSubsequent: (messageId, chatId) => {
+          self.chatManager.deleteMessageAndSubsequent(messageId, chatId);
         },
-        getAvailableTools: () => {
-          if (!self._toolCallingSupported)
-            throw new Error('Tool calling is not supported by this agent.');
-          return JSON.parse(JSON.stringify(self._availableTools));
+
+        /**
+         * Clears all messages from a specific chat
+         */
+        clearMessages: (chatId) => {
+          self.chatManager.clearMessages(chatId);
         },
-        onToolListUpdate: (listener: (tools: Tool[]) => void) => {
-          if (!self._toolCallingSupported)
-            throw new Error('Tool calling is not supported by this agent.');
-          self._toolListUpdateListeners.add(listener);
-          // Immediately provide the current list
-          listener(JSON.parse(JSON.stringify(self._availableTools)));
-        },
-        removeToolListUpdateListener: (listener: (tools: Tool[]) => void) => {
-          if (!self._toolCallingSupported)
-            throw new Error('Tool calling is not supported by this agent.');
-          self._toolListUpdateListeners.delete(listener);
-        },
-        clearToolListUpdateListeners: () => {
-          if (!self._toolCallingSupported)
-            throw new Error('Tool calling is not supported by this agent.');
-          self._toolListUpdateListeners.clear();
-        },
-        getPendingToolCalls: () => {
-          if (!self._toolCallingSupported)
-            throw new Error('Tool calling is not supported by this agent.');
-          return Array.from(self._pendingToolCalls.values()).map(
-            (req) => req.call,
+
+        /**
+         * Streams updates for a message part
+         */
+        streamMessagePart: (messageId, partIndex, update, chatId) => {
+          self.chatManager.streamMessagePart(
+            messageId,
+            partIndex,
+            update,
+            chatId,
           );
         },
-        requestToolCall: (toolName, parameters) => {
-          if (!self._toolCallingSupported) {
-            return Promise.reject(
-              new Error('Tool calling is not supported by this agent.'),
-            );
-          }
 
-          const id = self._options.idGenerator();
-          const call: PendingToolCall = { id, toolName, parameters };
+        /**
+         * Adds a listener for chat updates
+         * The agent uses this to listen for user messages and tool approvals
+         */
+        addChatUpdateListener: (listener) => {
+          self.chatManager.addUpdateListener(listener);
+        },
 
-          return new Promise<ToolCallResult>((resolve, reject) => {
-            const timeoutTimer = setTimeout(() => {
-              self._pendingToolCalls.delete(id);
-              reject(
-                new Error(
-                  `Tool call '${toolName}' (id: ${id}) timed out after ${self._options.toolCallTimeoutMs}ms.`,
-                ),
-              );
-            }, self._options.toolCallTimeoutMs);
+        /**
+         * Removes a chat update listener
+         */
+        removeChatUpdateListener: (listener) => {
+          self.chatManager.removeUpdateListener(listener);
+        },
 
-            const request: PendingToolCallRequest = {
-              call,
-              resolve,
-              reject,
-              timeoutTimer,
-            };
-            self._pendingToolCalls.set(id, request);
+        /**
+         * Sets the agent's working state
+         */
+        setWorkingState: (isWorking, description) => {
+          self.chatManager.setWorkingState(isWorking, description);
+        },
 
-            // Notify all subscribers directly
-            self._toolCallSubscribers.forEach((subscriber) => subscriber(call));
+        /**
+         * Adds a listener for stop signals
+         */
+        addStopListener: (listener) => {
+          self.chatManager.addStopListener(listener);
+        },
 
-            // Also push to controller for any other subscribers
-            self._pendingToolCallsController.push(call);
-          });
+        /**
+         * Removes a stop listener
+         */
+        removeStopListener: (listener) => {
+          self.chatManager.removeStopListener(listener);
         },
       },
+
+      /**
+       * Cleanup utilities
+       * Provides methods to clean up resources
+       */
       cleanup: {
+        /**
+         * Removes all listeners to prevent memory leaks
+         */
         clearAllListeners: () => {
-          self._userMessageListeners.clear();
-          self._toolListUpdateListeners.clear();
-          self._toolCallSubscribers.clear();
+          self.chatManager.clearAllUpdateListeners();
+          self.chatManager.clearAllStopListeners();
         },
-      },
-    };
-  }
-
-  private createAvailabilityImplementation(): AvailabilityImplementation {
-    return {
-      getAvailability: () => this._availabilityController.subscribe(),
-    };
-  }
-
-  private createStateImplementation(): StateImplementation {
-    return {
-      getState: () => this._stateController.subscribe(),
-    };
-  }
-
-  private createMessagingImplementation(): MessagingImplementation {
-    const self = this;
-    return {
-      onUserMessage: (message) => {
-        // In a real implementation, you would use the imported zod schema
-        // const validation = userMessageSchema.safeParse(message);
-        // if (!validation.success) {
-        //     console.error("Invalid UserMessage received:", validation.error);
-        //     return;
-        // }
-        self._userMessageListeners.forEach((listener) => listener(message));
-      },
-      getMessage: () => {
-        // This custom subscription logic handles the resync requirement
-        const sub = self._messageController.subscribe();
-        const originalIterator = sub[Symbol.asyncIterator]();
-
-        return {
-          [Symbol.asyncIterator]: () => {
-            let nextCallResynced = false; // Per-iterator state
-
-            return {
-              next: async () => {
-                // On the very first call to next(), perform a resync
-                if (!nextCallResynced) {
-                  nextCallResynced = true;
-                  const resyncUpdate: AgentMessageUpdate = {
-                    messageId:
-                      self._currentMessageId ?? self._options.idGenerator(),
-                    updateParts: self._messageContent.map((part, i) => ({
-                      contentIndex: i,
-                      part: part,
-                    })),
-                    createdAt: new Date(),
-                    resync: true,
-                  };
-                  // If there's no messageId, create one but don't persist it yet
-                  if (!self._currentMessageId) {
-                    self._currentMessageId = resyncUpdate.messageId;
-                  }
-                  return { value: resyncUpdate, done: false };
-                }
-                return originalIterator.next();
-              },
-              return: () => {
-                return originalIterator.return
-                  ? originalIterator.return()
-                  : Promise.resolve({ value: undefined, done: true });
-              },
-            };
-          },
-        };
-      },
-    };
-  }
-
-  private createToolCallingImplementation(): ToolCallingImplementation {
-    const self = this;
-    return {
-      onToolListUpdate: (toolList) => {
-        // const validation = toolListSchema.safeParse(toolList);
-        // if (!validation.success) {
-        //     console.error("Invalid ToolList received:", validation.error);
-        //     return;
-        // }
-        self._availableTools = JSON.parse(JSON.stringify(toolList));
-        self._toolListUpdateListeners.forEach((listener) =>
-          listener(self._availableTools),
-        );
-      },
-      onToolCallResult: (response) => {
-        // const validation = toolCallResultSchema.safeParse(response);
-        // if (!validation.success) {
-        //     console.error("Invalid ToolCallResult received:", validation.error);
-        //     return;
-        // }
-        const request = self._pendingToolCalls.get(response.id);
-        if (request) {
-          clearTimeout(request.timeoutTimer);
-          request.resolve(response);
-          self._pendingToolCalls.delete(response.id);
-        } else {
-          // Silently ignore as per spec (already timed out, invalid, etc.)
-          console.debug(
-            `AgentTransportAdapter: Ignored tool call result for unknown or timed-out ID: ${response.id}`,
-          );
-        }
-      },
-      getPendingToolCalls: () => {
-        return {
-          [Symbol.asyncIterator]: () => {
-            const pendingQueue: PendingToolCall[] = [];
-            let pullQueue: ((
-              value: IteratorResult<PendingToolCall>,
-            ) => void)[] = [];
-            let done = false;
-            let hasInitialized = false;
-
-            const pushValue = (value: PendingToolCall) => {
-              if (pullQueue.length > 0) {
-                pullQueue.shift()!({ value, done: false });
-              } else {
-                pendingQueue.push(value);
-              }
-            };
-
-            // Snapshot existing tool calls before setting up listener
-            const existingCallsSnapshot = Array.from(
-              self._pendingToolCalls.values(),
-            ).map((req) => req.call);
-
-            // Create subscriber function for new tool calls
-            const toolCallSubscriber = (call: PendingToolCall) => {
-              if (!done) {
-                pushValue(call);
-              }
-            };
-
-            // Add subscriber to our custom subscriber set
-            self._toolCallSubscribers.add(toolCallSubscriber);
-
-            return {
-              next: (): Promise<IteratorResult<PendingToolCall>> => {
-                return new Promise((resolve) => {
-                  // On first call, initialize with existing pending calls from snapshot
-                  if (!hasInitialized) {
-                    hasInitialized = true;
-                    existingCallsSnapshot.forEach((call) =>
-                      pendingQueue.push(call),
-                    );
-                  }
-
-                  if (pendingQueue.length > 0) {
-                    resolve({ value: pendingQueue.shift()!, done: false });
-                  } else if (done) {
-                    resolve({ value: undefined, done: true });
-                  } else {
-                    pullQueue.push(resolve);
-                  }
-                });
-              },
-              return: async (): Promise<IteratorResult<PendingToolCall>> => {
-                done = true;
-                // Clean up the subscription using our custom subscriber management
-                self._toolCallSubscribers.delete(toolCallSubscriber);
-                pullQueue.forEach((resolve) =>
-                  resolve({ value: undefined, done: true }),
-                );
-                pullQueue = [];
-                pendingQueue.length = 0;
-                return { value: undefined, done: true };
-              },
-            };
-          },
-        };
       },
     };
   }

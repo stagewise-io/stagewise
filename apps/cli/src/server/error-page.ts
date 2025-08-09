@@ -24,6 +24,7 @@ export const errorPage = (appPort: number) => `<!DOCTYPE html>
       background-color: var(--bg-color);
       width: 100vw;
       height: 100vh;
+      overflow: hidden;
       margin: 0px;
       display: flex;
       justify-content: center;
