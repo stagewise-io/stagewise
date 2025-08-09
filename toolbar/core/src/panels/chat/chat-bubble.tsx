@@ -40,9 +40,9 @@ export function ChatBubble({
       >
         <div
           className={cn(
-            'group relative flex min-h-8 items-center space-y-2 rounded-2xl bg-white/5 px-2.5 py-1 font-normal text-sm ring-1 ring-inset',
+            'group relative flex min-h-8 items-center space-y-2 rounded-2xl bg-white/5 px-2.5 py-1 font-normal text-sm shadow-lg shadow-zinc-950/10 ring-1 ring-inset',
             msg.role === 'assistant'
-              ? 'rounded-bl-xs bg-zinc-200/50 text-zinc-950 ring-zinc-950/5'
+              ? 'rounded-bl-xs bg-zinc-100/60 text-zinc-950 ring-zinc-950/5'
               : 'rounded-br-xs bg-blue-600/90 text-white ring-white/5',
           )}
         >
