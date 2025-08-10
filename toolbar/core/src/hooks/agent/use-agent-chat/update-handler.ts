@@ -38,7 +38,7 @@ export function createChatUpdateHandler(
   return (update: ChatUpdate) => {
     // Create a more intelligent update key that doesn't stringify large objects
     let updateKey: string;
-    
+
     switch (update.type) {
       case 'chat-full-sync':
         // For full sync, use chat ID and message count to detect duplicates

@@ -1,0 +1,71 @@
+{
+  "name": "@stagewise/karton",
+  "author": "stagewise GmbH",
+  "version": "0.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stagewise-io/stagewise.git"
+  },
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    "./shared": {
+      "types": "./dist/shared/index.d.ts",
+      "import": "./dist/shared/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js"
+    },
+    "./react/client": {
+      "types": "./dist/react/client/index.d.ts",
+      "import": "./dist/react/client/index.js"
+    }
+  },
+  "scripts": {
+    "test": "vitest --run",
+    "typecheck": "tsc --noEmit",
+    "build": "node build.js",
+    "dev": "node build.js"
+  },
+  "dependencies": {
+    "superjson": "^2.2.2",
+    "uuid": "^11.0.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "immer": "^10.1.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/react-hooks": "^8.0.1",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.1.9",
+    "@types/react-dom": "^19.1.7",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.14",
+    "esbuild": "^0.24.2",
+    "jsdom": "^26.1.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
+}
