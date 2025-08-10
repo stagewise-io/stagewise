@@ -102,7 +102,7 @@ export function tools(clientRuntime: ClientRuntime) {
   return {
     overwriteFileTool: {
       description: OVERWRITE_FILE_DESCRIPTION,
-      parameters: overwriteFileParamsSchema,
+      inputSchema: overwriteFileParamsSchema,
       stagewiseMetadata: {
         runtime: 'client',
       },
@@ -112,7 +112,7 @@ export function tools(clientRuntime: ClientRuntime) {
     },
     readFileTool: {
       description: READ_FILE_DESCRIPTION,
-      parameters: readFileParamsSchema,
+      inputSchema: readFileParamsSchema,
       stagewiseMetadata: {
         runtime: 'client',
       },
@@ -122,7 +122,7 @@ export function tools(clientRuntime: ClientRuntime) {
     },
     listFilesTool: {
       description: LIST_FILES_DESCRIPTION,
-      parameters: listFilesParamsSchema,
+      inputSchema: listFilesParamsSchema,
       stagewiseMetadata: {
         runtime: 'client',
       },
@@ -152,7 +152,7 @@ export function tools(clientRuntime: ClientRuntime) {
     // },
     grepSearchTool: {
       description: GREP_SEARCH_DESCRIPTION,
-      parameters: grepSearchParamsSchema,
+      inputSchema: grepSearchParamsSchema,
       stagewiseMetadata: {
         runtime: 'client',
       },
@@ -162,7 +162,7 @@ export function tools(clientRuntime: ClientRuntime) {
     },
     globTool: {
       description: GLOB_DESCRIPTION,
-      parameters: globParamsSchema,
+      inputSchema: globParamsSchema,
       stagewiseMetadata: {
         runtime: 'client',
       },
@@ -172,7 +172,7 @@ export function tools(clientRuntime: ClientRuntime) {
     },
     multiEditTool: {
       description: MULTI_EDIT_DESCRIPTION,
-      parameters: multiEditParamsSchema,
+      inputSchema: multiEditParamsSchema,
       stagewiseMetadata: {
         runtime: 'client',
       },
@@ -182,7 +182,7 @@ export function tools(clientRuntime: ClientRuntime) {
     },
     deleteFileTool: {
       description: DELETE_FILE_DESCRIPTION,
-      parameters: deleteFileParamsSchema,
+      inputSchema: deleteFileParamsSchema,
       stagewiseMetadata: {
         runtime: 'client',
       },
