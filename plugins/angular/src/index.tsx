@@ -15,9 +15,7 @@ const AngularPlugin: ToolbarPlugin = {
   onContextElementSelect: getSelectedElementAnnotation,
   onPromptSend: (prompt) => {
     const content = getSelectedElementsPrompt(
-      // @ts-expect-error - TODO: we have to be compatible with both the old and the new format in the plugins...
-      prompt.metadata.selectedElements ??
-        prompt.metadata.browserData?.selectedElements,
+      prompt.metadata.browserData?.selectedElements,
     );
 
     if (!content) {

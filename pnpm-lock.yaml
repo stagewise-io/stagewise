@@ -1335,6 +1335,9 @@ importers:
       '@stagewise/extension-toolbar-srpc-contract':
         specifier: workspace:*
         version: link:../../packages/extension-toolbar-srpc-contract
+      '@stagewise/plugin-sdk':
+        specifier: workspace:*
+        version: link:../plugin-sdk
       '@stagewise/srpc':
         specifier: workspace:*
         version: link:../../packages/srpc

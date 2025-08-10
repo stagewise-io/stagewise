@@ -9,7 +9,7 @@ import {
 } from '@/utils';
 import { usePanels } from './use-panels';
 import { useKarton } from './use-karton';
-import type { UserMessage } from '@stagewise/karton-contract';
+import type { ChatMessage } from '@stagewise/karton-contract';
 
 interface ContextSnippet {
   promptContextName: string;
@@ -156,9 +156,9 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         false,
       );
 
-      const message: UserMessage = {
+      const message: ChatMessage = {
         id: generateId(),
-        content: [{ type: 'text' as const, text: chatInput }],
+        parts: [{ type: 'text' as const, text: chatInput }],
         role: 'user',
         metadata,
       };
@@ -209,7 +209,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         message.metadata.pluginContentItems[context.pluginName] = {};
 
         context.contextSnippets.forEach((snippet) => {
-          const contentItem: UserMessage['metadata']['pluginContentItems'][string][string] =
+          const contentItem: ChatMessage['metadata']['pluginContentItems'][string][string] =
             {
               type: 'text',
               text: snippet.content,

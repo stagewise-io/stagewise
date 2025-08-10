@@ -2,12 +2,15 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/utils';
 import type {
   ChatMessage,
-  ToolCallPart,
-  ToolResultPart,
-  FilePart,
+  TextUIPart,
+  FileUIPart,
+  DynamicToolUIPart,
+  ReasoningUIPart,
 } from '@stagewise/karton-contract';
 import {
+  BrainIcon,
   CheckIcon,
+  ChevronDownIcon,
   CogIcon,
   EyeIcon,
   FileIcon,
@@ -19,14 +22,13 @@ import {
 import { memo, useMemo } from 'react';
 import TimeAgo from 'react-timeago';
 import { useKarton } from '@/hooks/use-karton';
+import {
+  Disclosure,
+  DisclosureButton,
+  DisclosurePanel,
+} from '@headlessui/react';
 
-export function ChatBubble({
-  message: msg,
-  toolResultParts,
-}: {
-  message: ChatMessage;
-  toolResultParts: ToolResultPart[];
-}) {
+export function ChatBubble({ message: msg }: { message: ChatMessage }) {
   return (
     <div className="flex flex-col gap-1">
       <div
@@ -49,36 +51,36 @@ export function ChatBubble({
               msg.role === 'assistant' ? 'left-1' : 'right-1',
             )}
           >
-            <TimeAgo date={msg.createdAt} />
+            <TimeAgo date={msg.metadata.createdAt} />
           </div>
-          {(Array.isArray(msg.content)
-            ? msg.content
-            : [{ type: 'text', text: msg.content }]
-          ).map((part, index) => {
+          {msg.parts.map((part, index) => {
             switch (part.type) {
               case 'text':
                 return (
-                  <p
+                  <TextPartItem
                     key={`content_part_${index.toString()}`}
-                    className="whitespace-pre-wrap"
-                  >
-                    {part.text}
-                  </p>
+                    textPart={part}
+                  />
+                );
+              case 'reasoning':
+                return (
+                  <ReasoningPartItem
+                    key={`content_part_${index.toString()}`}
+                    reasoningPart={part}
+                  />
                 );
               case 'file':
-              case 'image':
                 return (
                   <FilePartItem
                     key={`content_part_${index.toString()}`}
-                    file={part}
+                    filePart={part}
                   />
                 );
-              case 'tool-call':
+              case 'dynamic-tool':
                 return (
-                  <ToolCallPartItem
+                  <ToolPartItem
                     key={`content_part_${index.toString()}`}
-                    toolCall={part}
-                    toolResultParts={toolResultParts}
+                    toolPart={part}
                   />
                 );
               default:
@@ -93,122 +95,130 @@ export function ChatBubble({
   );
 }
 
-const FilePartItem = memo(({ file }: { file: FilePart }) => {
-  const dataUri = useMemo(
-    () =>
-      /*(file.data instanceof URL ? file.data : getDataUriForData(file.data))*/
-      '', // Add, support back in once types are fixed
-    [file.data],
-  );
+const TextPartItem = memo(({ textPart }: { textPart: TextUIPart }) => {
+  return <p className="whitespace-pre-wrap">{textPart.text}</p>;
+});
 
-  if (file.type.startsWith('image/')) {
-    return null; // TODO Add support back in once types are fixed
-    /*
+const ReasoningPartItem = memo(
+  ({ reasoningPart }: { reasoningPart: ReasoningUIPart }) => {
     return (
-      <a href={dataUri} target="_blank" rel="noopener noreferrer">
+      <div className="rounded-lg bg-black/15 p-1.5">
+        <Disclosure>
+          <DisclosureButton className="group flex flex-row items-center justify-between gap-2">
+            <BrainIcon className="size-3" />
+            <span className="flex-1 text-xs">Thinking...</span>
+            <ChevronDownIcon
+              className={
+                'size-3 stroke-black/50 transition-all duration-150 ease-out group-hover:stroke-black group-data-open:rotate-180'
+              }
+            />
+          </DisclosureButton>
+          <DisclosurePanel>
+            <p className="whitespace-pre-wrap rounded-md p-1 text-black/80 text-sm italic">
+              {reasoningPart.text}
+            </p>
+          </DisclosurePanel>
+        </Disclosure>
+      </div>
+    );
+  },
+);
+
+const FilePartItem = memo(({ filePart }: { filePart: FileUIPart }) => {
+  if (filePart.type.startsWith('image/')) {
+    return (
+      <a href={filePart.url} target="_blank" rel="noopener noreferrer">
         <img
-          src={dataUri}
-          alt={file.filename ?? 'Generated file'}
+          src={filePart.url}
+          alt={filePart.filename ?? 'Generated file'}
           className="h-auto max-w-full rounded-lg"
         />
       </a>
     );
-    */
   }
   return (
     <div
       role="button"
       className="flex w-full cursor-pointer items-center gap-2 rounded-lg bg-black/5 p-2 hover:bg-black/10"
       onClick={() => {
-        window.open(dataUri, '_blank');
+        window.open(filePart.url, '_blank');
       }}
     >
       <FileIcon className="size-4" />
-      <span className="text-xs">{file.filename ?? 'Generated file'}</span>
+      <span className="text-xs">{filePart.filename ?? 'Generated file'}</span>
     </div>
   );
 });
 
-const ToolCallPartItem = memo(
-  ({
-    toolCall,
-    toolResultParts,
-  }: {
-    toolCall: ToolCallPart;
-    toolResultParts: ToolResultPart[];
-  }) => {
-    const { approveToolCall, rejectToolCall, toolCallApprovalRequests } =
-      useKarton((s) => ({
-        approveToolCall: s.serverProcedures.approveToolCall,
-        rejectToolCall: s.serverProcedures.rejectToolCall,
-        toolCallApprovalRequests: s.state.toolCallApprovalRequests,
-      }));
+const ToolPartItem = memo(({ toolPart }: { toolPart: DynamicToolUIPart }) => {
+  const { approveToolCall, rejectToolCall, toolCallApprovalRequests } =
+    useKarton((s) => ({
+      approveToolCall: s.serverProcedures.approveToolCall,
+      rejectToolCall: s.serverProcedures.rejectToolCall,
+      toolCallApprovalRequests: s.state.toolCallApprovalRequests,
+    }));
 
-    const requiresApproval = useMemo(
-      () => toolCallApprovalRequests.includes(toolCall.toolCallId),
-      [toolCallApprovalRequests, toolCall.toolCallId],
-    );
+  const requiresApproval = useMemo(
+    () =>
+      toolCallApprovalRequests.includes(toolPart.toolCallId) &&
+      (toolPart.state === 'output-available' ||
+        toolPart.state === 'output-error'),
+    [toolCallApprovalRequests, toolPart.toolCallId, toolPart.state],
+  );
 
-    const toolResultPart = useMemo(
-      () =>
-        toolResultParts.find((part) => part.toolCallId === toolCall.toolCallId),
-      [toolResultParts, toolCall.toolCallId],
-    );
-
-    return (
-      <div className="flex flex-call gap-2 rounded-xl bg-black/5 p-2 hover:bg-black/10">
-        <div className="flex w-full flex-row items-center justify-between gap-3 stroke-black/80">
-          {getToolIcon(toolCall.toolName)}
-          <div className="flex flex-col items-start gap-0">
-            <span className="font-medium text-xs">
-              {getToolName(toolCall.toolName)}
-            </span>
-            {requiresApproval && (
-              <span className="text-black/60 text-xs">
-                Waiting for approval
-              </span>
-            )}
-          </div>
+  return (
+    <div className="flex flex-call gap-2 rounded-xl bg-black/5 p-2 hover:bg-black/10">
+      <div className="flex w-full flex-row items-center justify-between gap-3 stroke-black/80">
+        {getToolIcon(toolPart.toolName)}
+        <div className="flex flex-col items-start gap-0">
+          <span className="font-medium text-xs">
+            {getToolName(toolPart.toolName)}
+          </span>
           {requiresApproval && (
-            <div className="flex flex-row items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-4 w-5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  rejectToolCall(toolCall.toolCallId);
-                }}
-              >
-                <XIcon className="size-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-4 w-5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  approveToolCall(toolCall.toolCallId);
-                }}
-              >
-                <CheckIcon className="size-4" />
-              </Button>
-            </div>
-          )}
-          {toolResultPart &&
-            (toolResultPart.isError ? (
-              <XIcon className="size-3 text-rose-600" />
-            ) : (
-              <CheckIcon className="size-3 text-green-600" />
-            ))}
-          {!toolResultPart && !requiresApproval && (
-            <CogIcon className="size-3 animate-spin text-blue-600" />
+            <span className="text-black/60 text-xs">Waiting for approval</span>
           )}
         </div>
+        {requiresApproval && (
+          <div className="flex flex-row items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-4 w-5"
+              onClick={(e) => {
+                e.stopPropagation();
+                rejectToolCall(toolPart.toolCallId);
+              }}
+            >
+              <XIcon className="size-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-4 w-5"
+              onClick={(e) => {
+                e.stopPropagation();
+                approveToolCall(toolPart.toolCallId);
+              }}
+            >
+              <CheckIcon className="size-4" />
+            </Button>
+          </div>
+        )}
+        {toolPart.state === 'output-available' && (
+          <CheckIcon className="size-3 text-green-600" />
+        )}
+        {toolPart.state === 'output-error' && (
+          <XIcon className="size-3 text-rose-600" />
+        )}
+        {(toolPart.state === 'input-streaming' ||
+          toolPart.state === 'input-available') &&
+          !requiresApproval && (
+            <CogIcon className="size-3 animate-spin text-blue-600" />
+          )}
       </div>
-    );
-  },
-);
+    </div>
+  );
+});
 
 const getToolIcon = (toolName: string) => {
   switch (toolName) {

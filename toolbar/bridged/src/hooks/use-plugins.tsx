@@ -1,7 +1,7 @@
 import { createContext, type ReactNode } from 'react';
 import { useContext, useEffect, useMemo, useRef } from 'react';
 import type {
-  PluginUserMessage,
+  PluginChatMessage,
   ToolbarContext,
   ToolbarPlugin,
 } from '@/plugin-sdk/plugin';
@@ -39,9 +39,9 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
 
   const toolbarContext = useMemo(() => {
     return {
-      sendPrompt: async (prompt: PluginUserMessage) => {
+      sendPrompt: async (prompt: PluginChatMessage) => {
         const userMessage: UserMessage = {
-          ...prompt,
+          contentItems: [{ type: 'text', text: prompt.parts[0].text }],
           id: generateId(),
           createdAt: new Date(),
           sentByPlugin: true,

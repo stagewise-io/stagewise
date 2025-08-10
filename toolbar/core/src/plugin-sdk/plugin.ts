@@ -3,14 +3,13 @@ export interface UIHandle {
 }
 
 import type { ReactNode } from 'react';
-import type { UserMessage } from '@stagewise/karton-contract';
+import type { ChatMessage } from '@stagewise/karton-contract';
 
-export type PluginUserMessage = Omit<
-  UserMessage,
-  'id' | 'createdAt' | 'sentByPlugin' | 'metadata' | 'pluginContent'
->;
+export type PluginChatMessage = Omit<ChatMessage, 'role' | 'metadata'> & {
+  role: 'plugin';
+};
 export interface ToolbarContext {
-  sendPrompt: (prompt: PluginUserMessage) => void;
+  sendPrompt: (prompt: PluginChatMessage) => void;
   mainAppWindow: Window;
 }
 
@@ -76,7 +75,7 @@ export interface ToolbarPlugin {
   /** Called just before a prompt is sent. Plugins can use this to automatically provide additional context for the prompt or simply listen to some change. */
   onPromptSend?:
     | ((
-        prompt: Omit<UserMessage, 'id'>,
+        prompt: Omit<ChatMessage, 'id'>,
       ) => PromptContext | Promise<PromptContext> | null)
     | null;
 

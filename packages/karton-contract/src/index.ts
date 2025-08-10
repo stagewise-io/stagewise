@@ -6,11 +6,10 @@ import type { Tool } from '@stagewise/agent-types';
 export type ChatMessage = UIMessage<UserMessageMetadata>;
 
 export type {
-  ToolResultPart,
-  ToolCallPart,
-  FilePart,
-  TextPart,
-  ImagePart,
+  TextUIPart,
+  FileUIPart,
+  ReasoningUIPart,
+  DynamicToolUIPart,
 } from 'ai';
 
 export type History = ChatMessage[];

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
 import { Loader2Icon, SparklesIcon } from 'lucide-react';
 import { useKarton } from '@/hooks/use-karton';
-import type { ToolResultPart } from '@stagewise/karton-contract';
 
 export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
   const wasAtBottomRef = useRef(true);
@@ -81,18 +80,6 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
     });
   }, [activeChat]);
 
-  const toolResultParts = useMemo(() => {
-    if (!activeChat?.messages) return [];
-    return activeChat.messages.reduce((acc, message) => {
-      for (const part of message.content) {
-        if (typeof part !== 'string' && part.type === 'tool-result') {
-          acc.push(part);
-        }
-      }
-      return acc;
-    }, [] as ToolResultPart[]);
-  }, [activeChat]);
-
   /* We're adding a bg color on hover because there's a brower bug
      that prevents auto scroll-capturing if we don't do this.
      The onMouseEnter methods is also in place to help with another heuristic to get the browser to capture scroll in this element on hover. */
@@ -109,11 +96,7 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
     >
       {renderedMessages.map((message, index) => {
         return (
-          <ChatBubble
-            key={`${message.role}-${index}`}
-            message={message}
-            toolResultParts={toolResultParts}
-          />
+          <ChatBubble key={`${message.role}-${index}`} message={message} />
         );
       }) ?? []}
 

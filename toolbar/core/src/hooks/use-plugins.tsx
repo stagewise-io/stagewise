@@ -1,11 +1,14 @@
 import { createContext, type ReactNode } from 'react';
 import { useContext, useEffect, useMemo, useRef } from 'react';
-import type { ToolbarContext, ToolbarPlugin } from '@/plugin-sdk/plugin';
+import type {
+  PluginChatMessage,
+  ToolbarContext,
+  ToolbarPlugin,
+} from '@/plugin-sdk/plugin';
 import { useConfig } from './use-config';
-import { getIFrameWindow } from '@/utils';
+import { collectUserMessageMetadata, getIFrameWindow } from '@/utils';
 import { usePanels } from './use-panels';
 import { useKarton } from './use-karton';
-import type { UserMessage } from '@stagewise/karton-contract';
 
 export interface PluginContextType {
   plugins: ToolbarPlugin[];
@@ -33,11 +36,12 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
 
   const toolbarContext = useMemo(() => {
     return {
-      sendPrompt: async (prompt: UserMessage) => {
+      sendPrompt: async (prompt: PluginChatMessage) => {
         // We don't collect additional pluginContentItems when plugins send messages since it's probably a very specific message anyway
         sendUserMessage({
           ...prompt,
-          metadata: { ...prompt.metadata, sentByPlugin: true },
+          metadata: { ...collectUserMessageMetadata([], true) },
+          role: 'user',
         });
         openChat();
       },
