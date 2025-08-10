@@ -1,22 +1,9 @@
 import type { AppType } from '@stagewise/karton/shared';
-import {
-  type CoreAssistantMessage,
-  type CoreToolMessage,
-  coreUserMessageSchema,
-  type Tool,
-} from 'ai';
-import { userMessageMetadataSchema } from './metadata';
-import { z } from 'zod';
+import type { UserMessageMetadata } from './metadata';
+import type { UIMessage } from 'ai';
+import type { Tool } from '@stagewise/agent-types';
 
-export const userMessageSchema = z.intersection(
-  coreUserMessageSchema,
-  z.object({
-    metadata: userMessageMetadataSchema,
-    id: z.string(),
-  }),
-);
-
-export type UserMessage = z.infer<typeof userMessageSchema>;
+export type ChatMessage = UIMessage<UserMessageMetadata>;
 
 export type {
   ToolResultPart,
@@ -26,16 +13,10 @@ export type {
   ImagePart,
 } from 'ai';
 
-export type ChatMessage = (
-  | CoreAssistantMessage
-  | CoreToolMessage
-  | UserMessage
-) & {
-  createdAt: Date;
-};
-
 export type History = ChatMessage[];
+
 type ChatId = string;
+
 export type Chat = {
   title: string;
   createdAt: Date;
@@ -65,7 +46,7 @@ export type KartonContract = AppType<{
     createChat: () => Promise<string>;
     switchChat: (chatId: string) => Promise<void>;
     deleteChat: (chatId: string) => Promise<void>;
-    sendUserMessage: (message: UserMessage) => Promise<void>;
+    sendUserMessage: (message: ChatMessage) => Promise<void>;
     abortAgentCall: () => Promise<void>;
     approveToolCall: (toolCallId: string) => Promise<void>;
     rejectToolCall: (toolCallId: string) => Promise<void>;

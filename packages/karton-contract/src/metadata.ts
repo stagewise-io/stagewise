@@ -161,6 +161,10 @@ export const userMessageMetadataSchema = z.object({
     .boolean()
     .optional()
     .describe('Whether the message was sent by a plugin'),
+  createdAt: z
+    .date()
+    .optional()
+    .describe('The date and time the message was created'),
 });
 
 export type UserMessageMetadata = z.infer<typeof userMessageMetadataSchema>;

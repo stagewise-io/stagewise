@@ -19,7 +19,8 @@
   },
   "dependencies": {
     "@stagewise/karton": "workspace:*",
-    "ai": "4.3.16"
+    "@stagewise/agent-types": "workspace:*",
+    "ai": "5.0.9"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
