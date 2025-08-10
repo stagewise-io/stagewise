@@ -20,73 +20,73 @@ export function createTimeoutPromise(
  * Consumes the agent stream and updates the UI with text deltas
  */
 export async function consumeAgentStream(
-  fullStream: AsyncIterable<TextStreamPart<Record<string, Tool>>>,
+  _fullStream: AsyncIterable<TextStreamPart<Record<string, Tool>>>,
   _karton: KartonServer<KartonContract>,
   _chatId: string,
-  onNewMessage?: (messageId: string) => void,
+  _onNewMessage?: (messageId: string) => void,
 ) {
-  let messageId: string | undefined = crypto.randomUUID(); // the crypto id won't be used, it's a fallback (step-start should always override it)
-  let _partIndex = 0;
-  for await (const chunk of fullStream) {
-    if (chunk.type === 'step-start') {
-      messageId = chunk.messageId;
-      onNewMessage?.(messageId);
-      // TODO: add the message to the chat using karton
-      // server.interface.chat.addMessage(
-      //   {
-      //     id: messageId,
-      //     content: [
-      //       {
-      //         type: 'text',
-      //         text: '',
-      //       },
-      //     ],
-      //     role: 'assistant',
-      //     createdAt: new Date(),
-      //   },
-      //   chatId,
-      // );
-    }
-    if (chunk.type === 'text-delta' && chunk.textDelta) {
-      // TODO: stream the message part using karton
-      // server.interface.chat.streamMessagePart(
-      //   messageId,
-      //   partIndex,
-      //   {
-      //     messageId,
-      //     content: {
-      //       type: 'text',
-      //       text: chunk.textDelta,
-      //     },
-      //     partIndex,
-      //     updateType: 'append',
-      //   },
-      //   chatId,
-      // );
-    }
-    if (chunk.type === 'tool-call') {
-      // TODO: stream the message part using karton
-      // server.interface.chat.streamMessagePart(
-      // messageId,
-      // partIndex,
-      // {
-      //   messageId,
-      //   partIndex,
-      //   content: {
-      //     type: 'tool-call',
-      //     toolCallId: chunk.toolCallId,
-      //     toolName: chunk.toolName,
-      //     input: chunk.args,
-      //     runtime: 'cli',
-      //     requiresApproval: false,
-      //   },
-      //   updateType: 'create',
-      //   },
-      //   chatId,
-      // );
-      _partIndex++;
-    }
-  }
+  const messageId: string | undefined = crypto.randomUUID(); // the crypto id won't be used, it's a fallback (step-start should always override it)
+  const _partIndex = 0;
+  // for await (const chunk of fullStream) {
+  // if (chunk.type === 'step-start') {
+  //   messageId = chunk.messageId;
+  // onNewMessage?.(messageId);
+  // TODO: add the message to the chat using karton
+  // server.interface.chat.addMessage(
+  //   {
+  //     id: messageId,
+  //     content: [
+  //       {
+  //         type: 'text',
+  //         text: '',
+  //       },
+  //     ],
+  //     role: 'assistant',
+  //     createdAt: new Date(),
+  //   },
+  //   chatId,
+  // );
+  // }
+  // if (chunk.type === 'text-delta' && chunk.textDelta) {
+  // TODO: stream the message part using karton
+  // server.interface.chat.streamMessagePart(
+  //   messageId,
+  //   partIndex,
+  //   {
+  //     messageId,
+  //     content: {
+  //       type: 'text',
+  //       text: chunk.textDelta,
+  //     },
+  //     partIndex,
+  //     updateType: 'append',
+  //   },
+  //   chatId,
+  // );
+  // }
+  // if (chunk.type === 'tool-call') {
+  // TODO: stream the message part using karton
+  // server.interface.chat.streamMessagePart(
+  // messageId,
+  // partIndex,
+  // {
+  //   messageId,
+  //   partIndex,
+  //   content: {
+  //     type: 'tool-call',
+  //     toolCallId: chunk.toolCallId,
+  //     toolName: chunk.toolName,
+  //     input: chunk.args,
+  //     runtime: 'cli',
+  //     requiresApproval: false,
+  //   },
+  //   updateType: 'create',
+  //   },
+  //   chatId,
+  // );
+  // _partIndex++;
+  // }
+  // }
   return { messageId };
 }
 

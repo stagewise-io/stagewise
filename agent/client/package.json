@@ -31,7 +31,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "ai": "^4.3.16",
+    "ai": "5.0.9",
     "node-fetch": "^3.3.2",
     "zod": "3.25.76",
     "zod-to-json-schema": "^3.24.5"

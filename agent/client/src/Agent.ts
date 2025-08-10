@@ -1,18 +1,14 @@
 import { tools as clientTools } from '@stagewise/agent-tools';
-import type {
-  KartonContract,
-  UserMessage,
-  History,
-} from '@stagewise/karton-contract';
+import type { KartonContract, History } from '@stagewise/karton-contract';
 import {
   createKartonServer,
   type KartonServer,
 } from '@stagewise/karton/server';
-import type {
-  CoreMessage,
-  CoreAssistantMessage,
-  CoreToolMessage,
-  LanguageModelResponseMetadata,
+import {
+  convertToModelMessages,
+  type AssistantModelMessage,
+  type ToolModelMessage,
+  type LanguageModelResponseMetadata,
 } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
@@ -27,10 +23,7 @@ import type {
 
 // Import all the new utilities
 import { countToolCalls } from './utils/message-utils.js';
-import {
-  TimeoutManager,
-  consumeStreamWithTimeout,
-} from './utils/stream-utils.js';
+import { TimeoutManager } from './utils/stream-utils.js';
 import {
   processParallelToolCalls,
   shouldRecurseAfterToolCall,
@@ -48,7 +41,7 @@ import {
 } from './utils/error-utils.js';
 import type { createAgentHook } from '@stagewise/agent-interface-internal/agent';
 
-type ResponseMessage = (CoreAssistantMessage | CoreToolMessage) & {
+type ResponseMessage = (AssistantModelMessage | ToolModelMessage) & {
   id: string;
 };
 
@@ -426,7 +419,6 @@ export class Agent {
     clientRuntime: ClientRuntime;
     promptSnippets?: PromptSnippet[];
   }): Promise<{
-    response: Response;
     history: History;
   }> {
     // Validate prerequisites
@@ -447,7 +439,6 @@ export class Agent {
         };
       });
       return {
-        response: {} as Response,
         history: [],
       };
     }
@@ -459,22 +450,35 @@ export class Agent {
         'metadata' in (history?.at(-1) || {})
           ? {
               isUserMessage: true as const,
-              message: history?.at(-1) as UserMessage,
+              message: history?.at(-1),
             }
           : {
               isUserMessage: false as const,
-              message: history?.at(-1) as CoreMessage,
+              message: history?.at(-1),
             };
 
       if (lastMessage.isUserMessage) {
-        this.lastUserMessageId = lastMessage.message.id;
+        this.lastUserMessageId = lastMessage.message?.id ?? null;
       }
 
       // Prepare update to the chat title
-      if (lastMessage.isUserMessage) {
+      if (lastMessage.isUserMessage && lastMessage.message) {
+        const content = convertToModelMessages([lastMessage.message])[0]!
+          .content;
         this.client.chat.generateChatTitle
           .mutate({
-            userMessage: lastMessage.message,
+            userMessage: {
+              role: 'user',
+              content:
+                typeof content === 'string'
+                  ? content
+                  : content.map((c) =>
+                      c.type === 'text'
+                        ? { type: 'text', text: c.text }
+                        : { type: 'text', text: '' },
+                    ),
+              metadata: lastMessage.message.metadata,
+            },
           })
           .then((_result) => {
             // TODO: update the title
@@ -496,11 +500,17 @@ export class Agent {
 
       // Call the agent API
       const startTime = Date.now();
+      // TODO: fix this
+      // const request = {
+      //   messages: history ?? [],
+      //   tools: mapZodToolsToJsonSchemaTools(this.tools),
+      //   promptSnippets,
+      // } as RouterInputs['chat']['callAgent'];
       const request = {
-        messages: history ?? [],
+        messages: [],
         tools: mapZodToolsToJsonSchemaTools(this.tools),
         promptSnippets,
-      } as RouterInputs['chat']['callAgent'];
+      };
 
       const agentResponse = await this.callAgentWithRetry(request);
 
@@ -525,12 +535,12 @@ export class Agent {
       this.setAgentWorking(true);
 
       // Start stream consumption with timeout protection
-      const { messageId } = await consumeStreamWithTimeout(
-        chatId,
-        fullStream,
-        this.karton!,
-        this.agentTimeout,
-      );
+      // const { messageId } = await consumeStreamWithTimeout(
+      //   chatId,
+      //   fullStream,
+      //   this.karton!,
+      //   this.agentTimeout,
+      // );
 
       const r = await response; // this will throw an error if the user has aborted, will be handled in the catch below
 
@@ -549,12 +559,12 @@ export class Agent {
       );
 
       // Process response messages
-      await this.processResponseMessages(
-        r.messages,
-        history ?? [],
-        chatId,
-        messageId,
-      );
+      // await this.processResponseMessages(
+      //   r.messages,
+      //   history ?? [],
+      //   chatId,
+      //   messageId,
+      // );
 
       // Check if recursion is needed
       if (shouldRecurseAfterToolCall(history ?? [])) {
@@ -576,7 +586,7 @@ export class Agent {
       });
 
       return {
-        response: r,
+        // response: r,
         history: history ?? [],
       };
     } catch (error) {
@@ -586,7 +596,7 @@ export class Agent {
         this.setAgentWorking(false);
 
         return {
-          response: {} as Response,
+          // response: {} as Response,
           history: [],
         };
       }
@@ -605,7 +615,7 @@ export class Agent {
         this.setAgentWorking(false);
       }, STATE_RECOVERY_DELAY);
       return {
-        response: {} as Response,
+        // response: {} as Response,
         history: [],
       };
     } finally {
@@ -628,9 +638,9 @@ export class Agent {
     messageId: string,
   ): Promise<void> {
     for (const message of messages) {
-      const assistantMessage = {
+      const _assistantMessage = {
         role: 'assistant' as const,
-        content: [] as Exclude<CoreAssistantMessage['content'], string>,
+        content: [] as Exclude<AssistantModelMessage['content'], string>,
       };
       if (Array.isArray(message.content)) {
         // Collect all tool calls from this message
@@ -641,23 +651,25 @@ export class Agent {
         }> = [];
 
         // Process text content immediately, collect tool calls
-        for (const content of message.content) {
-          if (content.type === 'text') {
-            assistantMessage.content.push({
-              type: 'text',
-              text: content.text,
-            });
-          } else if (content.type === 'tool-call') {
-            toolCalls.push({
-              toolName: content.toolName,
-              toolCallId: content.toolCallId,
-              args: content.args,
-            });
-          }
-        }
+        // TODO: fix
+        // for (const content of message.content) {
+        //   if (content.type === 'text') {
+        //     assistantMessage.content.push({
+        //       type: 'text',
+        //       text: content.text,
+        //     });
+        //   } else if (content.type === 'tool-call') {
+        //     toolCalls.push({
+        //       toolName: content.toolName,
+        //       toolCallId: content.toolCallId,
+        //       args: content.args,
+        //     });
+        //   }
+        // }
 
         // Add assistant message to history
-        history.push(assistantMessage);
+        // TODO: fix
+        // history.push(assistantMessage);
 
         // Process all tool calls together if any
         if (toolCalls.length > 0) {
@@ -684,10 +696,10 @@ export class Agent {
           }
         }
       } else if (typeof message.content === 'string') {
-        history.push({
-          role: 'assistant',
-          content: [{ type: 'text', text: message.content }],
-        });
+        // history.push({
+        //   role: 'assistant',
+        //   content: [{ type: 'text', text: message.content }],
+        // });
       }
     }
   }

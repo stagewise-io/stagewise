@@ -371,9 +371,11 @@ export function shouldRecurseAfterToolCall(history: History): boolean {
     return false;
   }
 
-  return (
-    lastMessage.role === 'tool' &&
-    Array.isArray(lastMessage.content) &&
-    lastMessage.content[0]?.type === 'tool-result'
-  );
+  return false;
+  // TODO: fix this
+  // return (
+  //   lastMessage.role === 'tool' &&
+  //   Array.isArray(lastMessage.content) &&
+  //   lastMessage.content[0]?.type === 'tool-result'
+  // );
 }
