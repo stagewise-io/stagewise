@@ -1,0 +1,28 @@
+{
+  "name": "@stagewise/karton-contract",
+  "author": "tiq UG (haftungsbeschränkt)",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "dependencies": {
+    "@stagewise/karton": "workspace:*",
+    "ai": "4.3.16"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "zod": "3.25.76"
+  }
+}
