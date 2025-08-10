@@ -9,8 +9,14 @@ import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
 export function ChatPanelHeader() {
   const [chatListOpen, setChatListOpen] = useState(false);
 
-  const { canCreateChat, createChat, stateDescription, chats, activeChat } =
-    useAgentChat();
+  const {
+    canCreateChat,
+    createChat,
+    stateDescription,
+    chats,
+    activeChat,
+    isWorking,
+  } = useAgentChat();
 
   const showChatListButton = chats.length > 1;
   const showNewChatButton = activeChat && activeChat.messages.length > 0;
@@ -38,6 +44,7 @@ export function ChatPanelHeader() {
                   glassy
                   className="!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg !disabled:*:opacity-10 hover:bg-white/60 active:bg-zinc-50/60"
                   onClick={() => setChatListOpen(!chatListOpen)}
+                  disabled={isWorking}
                 >
                   {chatListOpen ? (
                     <XIcon className="size-4 stroke-2" />
@@ -54,7 +61,7 @@ export function ChatPanelHeader() {
                     '!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg transition-all duration-150 ease-out !disabled:*:opacity-10 hover:bg-white/60 active:bg-zinc-50/60',
                     chatListOpen && 'w-fit px-2.5',
                   )}
-                  disabled={!canCreateChat}
+                  disabled={!canCreateChat || isWorking}
                   onClick={() =>
                     createChat().then(() => setChatListOpen(false))
                   }

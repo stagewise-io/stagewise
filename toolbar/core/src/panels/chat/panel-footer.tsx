@@ -80,7 +80,7 @@ export function ChatPanelFooter({
   return (
     <PanelFooter
       clear
-      className="absolute right-px bottom-px left-px z-10 flex flex-col items-stretch gap-1 px-3 pt-1 pb-3"
+      className="absolute right-px bottom-px left-px z-10 flex flex-col items-stretch gap-1 px-3 pt-2 pb-3"
       ref={ref}
     >
       <ContextElementsChipsFlexible
