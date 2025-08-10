@@ -264,9 +264,6 @@ importers:
 
   agent/types:
     dependencies:
-      '@stagewise/karton-contract':
-        specifier: workspace:*
-        version: link:../../packages/karton-contract
       ai:
         specifier: ^4.3.16
         version: 4.3.19(react@19.1.1)(zod@3.25.76)
@@ -277,6 +274,9 @@ importers:
       '@stagewise/api-client':
         specifier: 0.4.0
         version: 0.4.0(react@19.1.1)(typescript@5.8.3)
+      '@stagewise/karton-contract':
+        specifier: workspace:*
+        version: link:../../packages/karton-contract
       rimraf:
         specifier: ^5.0.0
         version: 5.0.10
@@ -1431,6 +1431,12 @@ importers:
       '@stagewise/extension-toolbar-srpc-contract':
         specifier: workspace:*
         version: link:../../packages/extension-toolbar-srpc-contract
+      '@stagewise/karton':
+        specifier: workspace:*
+        version: link:../../packages/karton
+      '@stagewise/karton-contract':
+        specifier: workspace:*
+        version: link:../../packages/karton-contract
       '@stagewise/srpc':
         specifier: workspace:*
         version: link:../../packages/srpc

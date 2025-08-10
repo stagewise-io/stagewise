@@ -3,9 +3,8 @@ import type { InternalToolbarConfig } from '../config';
 import { ChatStateProvider } from '@/hooks/use-chat-state';
 import type { ReactNode } from 'react';
 import { ConfigProvider } from '@/hooks/use-config';
-import { AgentProvider } from '@/hooks/agent/use-agent-provider';
-import { AgentChatProvider } from '@/hooks/agent/use-agent-chat/index';
 import { PanelsProvider } from '@/hooks/use-panels';
+import { KartonProvider } from '@/hooks/use-karton';
 
 export function ContextProviders({
   children,
@@ -16,15 +15,13 @@ export function ContextProviders({
 }) {
   return (
     <ConfigProvider config={config}>
-      <AgentProvider>
-        <AgentChatProvider>
-          <PanelsProvider>
-            <PluginProvider>
-              <ChatStateProvider>{children}</ChatStateProvider>
-            </PluginProvider>
-          </PanelsProvider>
-        </AgentChatProvider>
-      </AgentProvider>
+      <KartonProvider>
+        <PanelsProvider>
+          <PluginProvider>
+            <ChatStateProvider>{children}</ChatStateProvider>
+          </PluginProvider>
+        </PanelsProvider>
+      </KartonProvider>
     </ConfigProvider>
   );
 }
