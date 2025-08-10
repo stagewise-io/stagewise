@@ -87,11 +87,19 @@ export class Agent {
   private isExpressMode = false;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
-  private undoToolCallStack: Array<{
-    toolName: string;
-    toolCallId: string;
-    undoExecute: () => Promise<void>;
-  }> = [];
+  // undo is only allowed for one chat at a time.
+  // if the user switches to a new chat, the undo stack is cleared
+  private undoToolCallStack: {
+    chatId: string | null;
+    stack: {
+      toolName: string;
+      toolCallId: string;
+      undoExecute: () => Promise<void>;
+    }[];
+  } = {
+    chatId: null,
+    stack: [],
+  };
 
   private constructor(config: {
     clientRuntime: ClientRuntime;
@@ -190,6 +198,7 @@ export class Agent {
   /**
    * Reinitialize the TRPC client with fresh credentials
    * Call this after authentication changes
+   * @param accessToken - The new access token
    */
   public async reauthenticateTRPCClient(accessToken: string) {
     this.accessToken = accessToken;
@@ -200,6 +209,8 @@ export class Agent {
 
   /**
    * Calls the agent API with automatic retry on authentication failures
+   * @param request - The request to call the agent API with
+   * @returns The result of the agent API call
    */
   private async callAgentWithRetry(
     request: RouterInputs['chat']['callAgent'],
@@ -256,6 +267,8 @@ export class Agent {
 
   /**
    * Checks if an error is an authentication error
+   * @param error - The error to check
+   * @returns True if the error is an authentication error, false otherwise
    */
   private isAuthenticationError(error: any): boolean {
     // Check for TRPC error with UNAUTHORIZED code
@@ -653,6 +666,10 @@ export class Agent {
 
   /**
    * Processes response messages from the agent, handling text and tool calls
+   * @param messages - The messages to process
+   * @param history - The history of messages so far (NOT including the current assistant message - past assistant messages are included)
+   * @param chatId - The id of the chat
+   * @param messageId - The id of the message
    */
   private async processResponseMessages(
     messages: Array<ResponseMessage>,
@@ -703,7 +720,11 @@ export class Agent {
           for (const result of results) {
             if (result.success) {
               if (result.result?.undoExecute) {
-                this.undoToolCallStack.push({
+                if (this.undoToolCallStack.chatId !== chatId) {
+                  this.undoToolCallStack.stack = [];
+                  this.undoToolCallStack.chatId = chatId;
+                }
+                this.undoToolCallStack.stack.push({
                   toolName: result.toolName,
                   toolCallId: result.toolCallId,
                   undoExecute: result.result.undoExecute,
@@ -817,5 +838,43 @@ export class Agent {
     }
 
     return results;
+  }
+
+  /**
+   * Undoes all tool calls until the user message is reached
+   * @param userMessageId - The id of the user message
+   * @param chatId - The id of the chat
+   */
+  private async undoToolCallsUntilUserMessage(
+    userMessageId: string,
+    chatId: string,
+  ): Promise<void> {
+    if (this.undoToolCallStack.chatId !== chatId) return;
+    const chat = this.chats.find((c) => c.chatId === chatId);
+
+    const reversedHistory = [...(chat?.messages ?? [])].reverse();
+    const messagesBeforeUserMessage = reversedHistory.slice(
+      reversedHistory.findIndex(
+        (m) => m.role === 'user' && 'id' in m && m.id === userMessageId,
+      ),
+    );
+
+    const toolCallIdsBeforeUserMessage: string[] = [];
+    for (const message of messagesBeforeUserMessage) {
+      if (message.role !== 'tool') continue;
+      for (const content of message.content)
+        toolCallIdsBeforeUserMessage.push(content.toolCallId);
+    }
+
+    while (
+      this.undoToolCallStack.stack.at(-1)?.toolCallId &&
+      toolCallIdsBeforeUserMessage.includes(
+        this.undoToolCallStack.stack.at(-1)!.toolCallId,
+      )
+    ) {
+      const undo = this.undoToolCallStack.stack.pop();
+      if (!undo) break;
+      await undo.undoExecute();
+    }
   }
 }
