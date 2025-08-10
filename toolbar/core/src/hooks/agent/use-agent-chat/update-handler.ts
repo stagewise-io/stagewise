@@ -36,11 +36,42 @@ export function createChatUpdateHandler(
   setIsWorking: React.Dispatch<React.SetStateAction<boolean>>,
 ) {
   return (update: ChatUpdate) => {
-    // Prevent duplicate processing of the same update
-    const updateKey = `${update.type}-${JSON.stringify(update)}`;
+    // Create a more intelligent update key that doesn't stringify large objects
+    let updateKey: string;
+    
+    switch (update.type) {
+      case 'chat-full-sync':
+        // For full sync, use chat ID and message count to detect duplicates
+        // Don't stringify the entire chat object as it's too large
+        updateKey = `${update.type}-${update.chat.id}-${update.chat.messages.length}`;
+        break;
+      case 'chat-switched':
+        // For chat switches, always process them (no duplicate check)
+        // This ensures we can switch back and forth between chats
+        updateKey = `${update.type}-${update.chatId}-${Date.now()}`;
+        break;
+      case 'message-added':
+        // Use message ID for duplicate detection
+        updateKey = `${update.type}-${update.chatId}-${update.message.id}`;
+        break;
+      case 'message-updated':
+        // Use message ID and part index for streaming updates
+        updateKey = `${update.type}-${update.chatId}-${update.update.messageId}-${update.update.partIndex}-${update.update.updateType}`;
+        break;
+      case 'chat-list':
+        // For chat list, use count and timestamp to allow refreshes
+        updateKey = `${update.type}-${update.chats.length}-${Date.now()}`;
+        break;
+      default:
+        // For other updates, use a simpler key
+        updateKey = `${update.type}-${JSON.stringify(update)}`;
+    }
 
     if (processedUpdatesRef.current.has(updateKey)) {
-      return;
+      // Only skip if it's not a chat-switched event
+      if (update.type !== 'chat-switched') {
+        return;
+      }
     }
 
     processedUpdatesRef.current.add(updateKey);
@@ -177,7 +208,9 @@ function handleChatSwitched(
       ...c,
       isActive: c.id === update.chatId,
     })),
-    isLoading: false,
+    // Don't clear activeChat here - wait for the full-sync
+    // Just mark as loading
+    isLoading: true,
   }));
 }
 
@@ -315,15 +348,20 @@ function handleMessageUpdated(
       }
     } else if (update.update.updateType === 'append') {
       const existingPart = messageParts.get(update.update.partIndex);
-      if (
-        existingPart &&
-        existingPart.type === 'text' &&
-        update.update.content.type === 'text'
-      ) {
-        messageParts.set(update.update.partIndex, {
-          ...existingPart,
-          text: existingPart.text + update.update.content.text,
-        });
+      if (update.update.content.type === 'text') {
+        if (existingPart && existingPart.type === 'text') {
+          // Append to existing text
+          messageParts.set(update.update.partIndex, {
+            ...existingPart,
+            text: existingPart.text + update.update.content.text,
+          });
+        } else {
+          // No existing part, create new one with the text
+          messageParts.set(update.update.partIndex, {
+            type: 'text',
+            text: update.update.content.text,
+          });
+        }
       }
     }
 
@@ -353,6 +391,11 @@ function handleMessageUpdated(
           return msg; // Skip invalid content types like tool-approval
         }
 
+        // Ensure the content array is large enough
+        while (newContent.length <= update.update.partIndex) {
+          newContent.push({ type: 'text', text: '' });
+        }
+
         if (
           update.update.updateType === 'create' ||
           update.update.updateType === 'replace'
@@ -361,15 +404,20 @@ function handleMessageUpdated(
             .content as AssistantMessage['content'][0];
         } else if (update.update.updateType === 'append') {
           const existingPart = newContent[update.update.partIndex];
-          if (
-            existingPart &&
-            existingPart.type === 'text' &&
-            update.update.content.type === 'text'
-          ) {
-            newContent[update.update.partIndex] = {
-              ...existingPart,
-              text: existingPart.text + update.update.content.text,
-            };
+          if (update.update.content.type === 'text') {
+            if (existingPart && existingPart.type === 'text') {
+              // Append to existing text
+              newContent[update.update.partIndex] = {
+                ...existingPart,
+                text: existingPart.text + update.update.content.text,
+              };
+            } else {
+              // Replace with text content
+              newContent[update.update.partIndex] = {
+                type: 'text',
+                text: update.update.content.text,
+              };
+            }
           }
         }
 
