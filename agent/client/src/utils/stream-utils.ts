@@ -1,5 +1,4 @@
 import type { AgentServer } from '@stagewise/agent-interface-internal/agent';
-import { ErrorDescriptions, formatErrorDescription } from './error-utils.js';
 import type { TextStreamPart, Tool } from 'ai';
 
 /**
@@ -23,75 +22,68 @@ export async function consumeAgentStream(
   fullStream: AsyncIterable<TextStreamPart<Record<string, Tool>>>,
   server: AgentServer,
   chatId: string,
-  onError?: (error: unknown) => void,
+  onNewMessage?: (messageId: string) => void,
 ) {
   let messageId: string | undefined = crypto.randomUUID(); // the crypto id won't be used, it's a fallback (step-start should always override it)
-  try {
-    let partIndex = 0;
-    for await (const chunk of fullStream) {
-      if (chunk.type === 'step-start') {
-        messageId = chunk.messageId;
-        server.interface.chat.addMessage(
-          {
-            id: messageId,
-            content: [
-              {
-                type: 'text',
-                text: '',
-              },
-            ],
-            role: 'assistant',
-            createdAt: new Date(),
-          },
-          chatId,
-        );
-      }
-      if (chunk.type === 'text-delta' && chunk.textDelta) {
-        server.interface.chat.streamMessagePart(
-          messageId,
-          partIndex,
-          {
-            messageId,
-            content: {
+  let partIndex = 0;
+  for await (const chunk of fullStream) {
+    if (chunk.type === 'step-start') {
+      messageId = chunk.messageId;
+      onNewMessage?.(messageId);
+      server.interface.chat.addMessage(
+        {
+          id: messageId,
+          content: [
+            {
               type: 'text',
-              text: chunk.textDelta,
+              text: '',
             },
-            partIndex,
-            updateType: 'append',
+          ],
+          role: 'assistant',
+          createdAt: new Date(),
+        },
+        chatId,
+      );
+    }
+    if (chunk.type === 'text-delta' && chunk.textDelta) {
+      server.interface.chat.streamMessagePart(
+        messageId,
+        partIndex,
+        {
+          messageId,
+          content: {
+            type: 'text',
+            text: chunk.textDelta,
           },
-          chatId,
-        );
-      }
-      if (chunk.type === 'tool-call') {
-        server.interface.chat.streamMessagePart(
+          partIndex,
+          updateType: 'append',
+        },
+        chatId,
+      );
+    }
+    if (chunk.type === 'tool-call') {
+      server.interface.chat.streamMessagePart(
+        messageId,
+        partIndex,
+        {
           messageId,
           partIndex,
-          {
-            messageId,
-            partIndex,
-            content: {
-              type: 'tool-call',
-              toolCallId: chunk.toolCallId,
-              toolName: chunk.toolName,
-              input: chunk.args,
-              runtime: 'cli',
-              requiresApproval: false,
-            },
-            updateType: 'create',
+          content: {
+            type: 'tool-call',
+            toolCallId: chunk.toolCallId,
+            toolName: chunk.toolName,
+            input: chunk.args,
+            runtime: 'cli',
+            requiresApproval: false,
           },
-          chatId,
-        );
-        partIndex++;
-      }
+          updateType: 'create',
+        },
+        chatId,
+      );
+      partIndex++;
     }
-    return { messageId };
-  } catch (streamError) {
-    console.error('[Agent]: Error consuming stream:', streamError);
-    if (onError) {
-      onError(streamError);
-    }
-    throw streamError;
   }
+  return { messageId };
 }
 
 /**
@@ -157,37 +149,25 @@ export async function consumeStreamWithTimeout(
   fullStream: AsyncIterable<TextStreamPart<Record<string, Tool>>>,
   server: AgentServer,
   timeout: number,
-  setWorkingState: (state: boolean, description?: string) => void,
+  onNewMessage?: (messageId: string) => void,
 ) {
-  const streamPromise = consumeAgentStream(
-    fullStream,
-    server,
-    chatId,
-    (error) => {
-      const errorDesc = formatErrorDescription(
-        'Stream processing error',
-        error,
-        {
-          operation: 'consumeAgentStream',
-        },
-      );
-      setWorkingState(false, errorDesc);
-    },
-  );
-
   try {
+    const streamPromise = consumeAgentStream(
+      fullStream,
+      server,
+      chatId,
+      onNewMessage,
+    );
+
     return await withTimeout(
       streamPromise,
       timeout,
       `Stream timeout after ${timeout}ms`,
     );
   } catch (error) {
-    const errorDesc = ErrorDescriptions.streamTimeout(
-      timeout,
-      'consumeStreamWithTimeout',
-    );
-    console.error('[Agent]:', errorDesc);
-    setWorkingState(false, errorDesc);
-    throw error;
+    if (error instanceof Error && error.name === 'AbortError') {
+      // User has aborted, an error will be thrown in the catch of `await response` - we don't need to handle it here
+      return { messageId: 'error' };
+    } else throw error;
   }
 }

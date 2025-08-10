@@ -27,7 +27,6 @@ import type {
 // Import all the new utilities
 import { countToolCalls } from './utils/message-utils.js';
 import {
-  withTimeout,
   TimeoutManager,
   consumeStreamWithTimeout,
 } from './utils/stream-utils.js';
@@ -86,6 +85,7 @@ export class Agent {
   private maxAuthRetries = 2;
   private isExpressMode = false;
   private abortController: AbortController;
+  private lastMessageId: string | null = null;
 
   private constructor(config: {
     clientRuntime: ClientRuntime;
@@ -105,6 +105,7 @@ export class Agent {
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
     this.timeoutManager = new TimeoutManager();
     this.abortController = new AbortController();
+    this.lastMessageId = null;
   }
 
   public shutdown() {
@@ -195,14 +196,13 @@ export class Agent {
    * Calls the agent API with automatic retry on authentication failures
    */
   private async callAgentWithRetry(
-    request: RouterInputs['agent']['callAgent'],
-  ): Promise<RouterOutputs['agent']['callAgent']> {
+    request: RouterInputs['chat']['callAgent'],
+  ): Promise<RouterOutputs['chat']['callAgent']> {
     try {
       if (!this.client) {
         throw new Error('TRPC API client not initialized');
       }
-
-      const result = await this.client.agent.callAgent.mutate(request, {
+      const result = await this.client.chat.callAgent.mutate(request, {
         signal: this.abortController.signal,
       });
       // Reset auth retry count on successful call
@@ -413,7 +413,6 @@ export class Agent {
             chatId: chat.chatId,
             history: chat.messages,
             clientRuntime: this.clientRuntime,
-            userMessage: update.message,
             promptSnippets,
           });
           break;
@@ -447,18 +446,16 @@ export class Agent {
    */
   private async callAgent({
     chatId,
-    userMessage,
     history,
     clientRuntime,
     promptSnippets,
   }: {
     chatId: string;
-    userMessage?: ChatUserMessage;
     history?: (CoreMessage | ChatUserMessage)[];
     clientRuntime: ClientRuntime;
     promptSnippets?: PromptSnippet[];
   }): Promise<{
-    response: Promise<Response>;
+    response: Response;
     history: (CoreMessage | ChatUserMessage)[];
   }> {
     // Validate prerequisites
@@ -474,7 +471,7 @@ export class Agent {
       // TODO: add an error message to the chat
       this.setAgentWorking(false, errorDesc);
       return {
-        response: Promise.resolve({} as Response),
+        response: {} as Response,
         history: [],
       };
     }
@@ -482,22 +479,26 @@ export class Agent {
     this.recursionDepth++;
 
     try {
+      const lastMessage =
+        'metadata' in (history?.at(-1) || {})
+          ? {
+              isUserMessage: true as const,
+              message: history?.at(-1) as ChatUserMessage,
+            }
+          : {
+              isUserMessage: false as const,
+              message: history?.at(-1) as CoreMessage,
+            };
+
       // Prepare update to the chat title
-      if (
-        history?.filter((m) => m.role === 'user').length === 1 &&
-        userMessage?.metadata.browserData
-      ) {
+      if (lastMessage.isUserMessage) {
         this.client.chat.generateChatTitle
           .mutate({
             userMessage: {
-              id: userMessage.id,
-              contentItems: userMessage.content.filter(
-                (c) => c.type === 'text',
+              ...lastMessage.message,
+              content: lastMessage.message.content.filter(
+                (c) => c.type !== 'tool-approval',
               ),
-              metadata: userMessage.metadata.browserData,
-              createdAt: userMessage.createdAt,
-              pluginContent: {},
-              sentByPlugin: false,
             },
           })
           .then((result) => {
@@ -506,25 +507,21 @@ export class Agent {
       }
 
       // Emit prompt triggered event
-      this.eventEmitter.emit(
-        EventFactories.agentPromptTriggered(
-          userMessage,
-          promptSnippets?.length || 0,
-        ),
-      );
+
+      if (lastMessage.isUserMessage)
+        this.eventEmitter.emit(
+          EventFactories.agentPromptTriggered(
+            lastMessage.message,
+            promptSnippets?.length || 0,
+          ),
+        );
 
       // Keeping compatibility with the old agent API
       const messages = (history ?? []).map((m) => {
         if (m.role === 'user' && 'metadata' in m) {
           return {
-            id: m.id,
-            contentItems: m.content.filter((c) => c.type !== 'tool-approval'),
-            createdAt: m.createdAt,
-            metadata: {
-              ...m.metadata.browserData,
-            },
-            pluginContent: m.metadata.pluginContentItems,
-            sentByPlugin: m.metadata.sentByPlugin,
+            ...m,
+            content: m.content.filter((c) => c.type !== 'tool-approval'),
           };
         }
         return m;
@@ -536,17 +533,9 @@ export class Agent {
         messages,
         tools: mapZodToolsToJsonSchemaTools(this.tools),
         promptSnippets,
-      } as RouterInputs['agent']['callAgent'];
+      } as RouterInputs['chat']['callAgent'];
 
-      if (userMessage?.metadata.browserData) {
-        request.userMessageMetadata = {
-          ...userMessage.metadata.browserData,
-        };
-      }
-
-      const agentResponse = await this.callAgentWithRetry(
-        request as RouterInputs['agent']['callAgent'],
-      );
+      const agentResponse = await this.callAgentWithRetry(request);
 
       if (agentResponse.syntheticToolCalls) {
         await this.processParallelToolCallsContent(
@@ -560,12 +549,11 @@ export class Agent {
           chatId,
           history: history ?? [],
           clientRuntime,
-          userMessage: undefined,
           promptSnippets,
         });
       }
 
-      const { fullStream, response, finishReason } = agentResponse;
+      const { fullStream, response } = agentResponse;
 
       this.setAgentWorking(true);
 
@@ -575,24 +563,13 @@ export class Agent {
         fullStream,
         this.server,
         this.agentTimeout,
-        (state, desc) => this.setAgentWorking(state, desc),
+        (messageId) => {
+          console.log('New message with id ', messageId);
+          this.lastMessageId = messageId;
+        },
       );
 
-      // Wait for response with timeout
-      const r = await withTimeout(
-        response,
-        this.agentTimeout,
-        `Response timeout after ${this.agentTimeout}ms`,
-      );
-
-      const f = await finishReason;
-      if (f === 'error') {
-        throw new Error('Agent task failed');
-      } else if (f === 'length') {
-        throw new Error('Max tokens per request reached');
-      } else if (f === 'content-filter') {
-        throw new Error('Content needed to be filtered');
-      }
+      const r = await response; // this will throw an error if the user has aborted, will be handled in the catch below
 
       const responseTime = Date.now() - startTime;
 
@@ -604,7 +581,6 @@ export class Agent {
           hasToolCalls,
           toolCallCount,
           responseTime,
-          reason: f,
           credits: r.credits,
         }),
       );
@@ -623,7 +599,6 @@ export class Agent {
           chatId,
           history: history ?? [],
           clientRuntime,
-          userMessage: undefined,
           promptSnippets,
         });
       }
@@ -637,10 +612,22 @@ export class Agent {
       });
 
       return {
-        response: response as Promise<Response>,
+        response: r,
         history: history ?? [],
       };
     } catch (error) {
+      // If the user has aborted the agent, delete the last message
+      if (error instanceof Error && error.name === 'AbortError') {
+        if (this.lastMessageId)
+          this.server?.interface.chat.deleteMessage(this.lastMessageId, chatId);
+        this.setAgentWorking(false, 'Agent aborted by user');
+
+        return {
+          response: {} as Response,
+          history: [],
+        };
+      }
+
       const errorDesc = formatErrorDescription('Agent task failed', error);
       this.setAgentWorking(false, errorDesc);
 
@@ -649,7 +636,7 @@ export class Agent {
         this.setAgentWorking(false);
       }, STATE_RECOVERY_DELAY);
       return {
-        response: Promise.resolve({} as Response),
+        response: {} as Response,
         history: [],
       };
     } finally {
