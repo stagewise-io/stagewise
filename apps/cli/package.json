@@ -32,13 +32,15 @@
     "reset-data": "tsx reset.ts"
   },
   "devDependencies": {
+    "@stagewise/karton-contract": "workspace:*",
+    "@stagewise/karton": "workspace:*",
     "@inquirer/prompts": "^7.0.0",
     "@stagewise-plugins/angular": "workspace:*",
     "@stagewise-plugins/react": "workspace:*",
     "@stagewise-plugins/vue": "workspace:*",
     "@stagewise/agent-client": "workspace:*",
     "@stagewise/agent-runtime-node": "workspace:*",
-    "@stagewise/api-client": "0.3.0",
+    "@stagewise/api-client": "0.4.0",
     "@stagewise/toolbar": "workspace:*",
     "@stagewise/toolbar-bridged": "workspace:*",
     "@types/express": "^4.17.21",

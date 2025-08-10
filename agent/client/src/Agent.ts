@@ -845,7 +845,10 @@ export class Agent {
     userMessageId: string,
     chatId: string,
   ): Promise<void> {
-    if (this.undoToolCallStack.chatId !== chatId) return;
+    if (this.undoToolCallStack.chatId !== chatId) {
+      // should never happen
+      return;
+    }
     const chat = this.chats[chatId];
 
     const reversedHistory = [...(chat?.messages ?? [])].reverse();

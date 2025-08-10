@@ -38,7 +38,9 @@
   },
   "devDependencies": {
     "@stagewise/agent-interface-internal": "workspace:*",
-    "@stagewise/api-client": "0.3.0",
+    "@stagewise/karton-contract": "workspace:*",
+    "@stagewise/karton": "workspace:*",
+    "@stagewise/api-client": "0.4.0",
     "@stagewise/agent-prompt-snippets": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
