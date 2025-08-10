@@ -1,0 +1,9 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "dev": {
+      "persistent": false,
+      "outputs": ["dist/**"]
+    }
+  }
+}
