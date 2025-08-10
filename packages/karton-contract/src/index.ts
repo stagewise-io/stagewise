@@ -1,5 +1,10 @@
 import type { AppType } from '@stagewise/karton/shared';
-import { type CoreMessage, coreUserMessageSchema, type Tool } from 'ai';
+import {
+  type CoreAssistantMessage,
+  type CoreToolMessage,
+  coreUserMessageSchema,
+  type Tool,
+} from 'ai';
 import { userMessageMetadataSchema } from './metadata';
 import { z } from 'zod';
 
@@ -7,28 +12,29 @@ export const userMessageSchema = z.intersection(
   coreUserMessageSchema,
   z.object({
     metadata: userMessageMetadataSchema,
+    id: z.string(),
   }),
 );
 
 export type UserMessage = z.infer<typeof userMessageSchema>;
+
+export type History = (CoreAssistantMessage | CoreToolMessage | UserMessage)[];
+type ChatId = string;
+export type Chat = {
+  title: string;
+  createdAt: Date;
+  messages: History;
+  error?: AgentError;
+};
 
 type AgentError = {
   type: 'agent-error';
   error: Error;
 };
 
-type ChatId = string;
-
 type AppState = {
-  chats: Record<
-    ChatId,
-    {
-      title: string;
-      createdAt: Date;
-      messages: (CoreMessage | UserMessage)[];
-      error?: AgentError;
-    }
-  >;
+  activeChatId: ChatId | null;
+  chats: Record<ChatId, Chat>;
   isWorking: boolean;
 };
 

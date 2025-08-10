@@ -1,12 +1,12 @@
 import type { CoreMessage, ToolResultPart } from 'ai';
-import type { ChatUserMessage } from '@stagewise/agent-interface-internal/agent';
+import type { UserMessage } from '@stagewise/karton-contract';
 import { isUserMessage } from '@stagewise/agent-types';
 
 /**
  * Converts an array of messages (including UserMessage types) to CoreMessage format
  */
 export function messagesToCoreMessages(
-  messages: (CoreMessage | ChatUserMessage)[],
+  messages: (CoreMessage | UserMessage)[],
 ): CoreMessage[] {
   return messages.map((m) => {
     if (!isUserMessage(m)) {
@@ -100,7 +100,7 @@ export function countToolCalls(
  * Checks if the last message in history is a tool result
  */
 export function isLastMessageToolResult(
-  history: (CoreMessage | ChatUserMessage)[],
+  history: (CoreMessage | UserMessage)[],
 ): boolean {
   const lastMessage = history[history.length - 1];
 

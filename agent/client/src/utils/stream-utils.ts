@@ -1,4 +1,5 @@
-import type { AgentServer } from '@stagewise/agent-interface-internal/agent';
+import type { KartonServer } from '@stagewise/karton/server';
+import type { KartonContract } from '@stagewise/karton-contract';
 import type { TextStreamPart, Tool } from 'ai';
 
 /**
@@ -20,67 +21,70 @@ export function createTimeoutPromise(
  */
 export async function consumeAgentStream(
   fullStream: AsyncIterable<TextStreamPart<Record<string, Tool>>>,
-  server: AgentServer,
-  chatId: string,
+  _karton: KartonServer<KartonContract>,
+  _chatId: string,
   onNewMessage?: (messageId: string) => void,
 ) {
   let messageId: string | undefined = crypto.randomUUID(); // the crypto id won't be used, it's a fallback (step-start should always override it)
-  let partIndex = 0;
+  let _partIndex = 0;
   for await (const chunk of fullStream) {
     if (chunk.type === 'step-start') {
       messageId = chunk.messageId;
       onNewMessage?.(messageId);
-      server.interface.chat.addMessage(
-        {
-          id: messageId,
-          content: [
-            {
-              type: 'text',
-              text: '',
-            },
-          ],
-          role: 'assistant',
-          createdAt: new Date(),
-        },
-        chatId,
-      );
+      // TODO: add the message to the chat using karton
+      // server.interface.chat.addMessage(
+      //   {
+      //     id: messageId,
+      //     content: [
+      //       {
+      //         type: 'text',
+      //         text: '',
+      //       },
+      //     ],
+      //     role: 'assistant',
+      //     createdAt: new Date(),
+      //   },
+      //   chatId,
+      // );
     }
     if (chunk.type === 'text-delta' && chunk.textDelta) {
-      server.interface.chat.streamMessagePart(
-        messageId,
-        partIndex,
-        {
-          messageId,
-          content: {
-            type: 'text',
-            text: chunk.textDelta,
-          },
-          partIndex,
-          updateType: 'append',
-        },
-        chatId,
-      );
+      // TODO: stream the message part using karton
+      // server.interface.chat.streamMessagePart(
+      //   messageId,
+      //   partIndex,
+      //   {
+      //     messageId,
+      //     content: {
+      //       type: 'text',
+      //       text: chunk.textDelta,
+      //     },
+      //     partIndex,
+      //     updateType: 'append',
+      //   },
+      //   chatId,
+      // );
     }
     if (chunk.type === 'tool-call') {
-      server.interface.chat.streamMessagePart(
-        messageId,
-        partIndex,
-        {
-          messageId,
-          partIndex,
-          content: {
-            type: 'tool-call',
-            toolCallId: chunk.toolCallId,
-            toolName: chunk.toolName,
-            input: chunk.args,
-            runtime: 'cli',
-            requiresApproval: false,
-          },
-          updateType: 'create',
-        },
-        chatId,
-      );
-      partIndex++;
+      // TODO: stream the message part using karton
+      // server.interface.chat.streamMessagePart(
+      // messageId,
+      // partIndex,
+      // {
+      //   messageId,
+      //   partIndex,
+      //   content: {
+      //     type: 'tool-call',
+      //     toolCallId: chunk.toolCallId,
+      //     toolName: chunk.toolName,
+      //     input: chunk.args,
+      //     runtime: 'cli',
+      //     requiresApproval: false,
+      //   },
+      //   updateType: 'create',
+      //   },
+      //   chatId,
+      // );
+      _partIndex++;
     }
   }
   return { messageId };
@@ -147,14 +151,14 @@ export class TimeoutManager {
 export async function consumeStreamWithTimeout(
   chatId: string,
   fullStream: AsyncIterable<TextStreamPart<Record<string, Tool>>>,
-  server: AgentServer,
+  karton: KartonServer<KartonContract>,
   timeout: number,
   onNewMessage?: (messageId: string) => void,
 ) {
   try {
     const streamPromise = consumeAgentStream(
       fullStream,
-      server,
+      karton,
       chatId,
       onNewMessage,
     );

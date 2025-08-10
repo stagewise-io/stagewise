@@ -1,14 +1,8 @@
-import type { CoreMessage } from 'ai';
 import type { ToolResult } from '@stagewise/agent-types';
-import type {
-  AgentServer,
-  ChatUserMessage,
-} from '@stagewise/agent-interface-internal/agent';
+import type { KartonServer } from '@stagewise/karton/server';
+import type { KartonContract, History } from '@stagewise/karton-contract';
 import type { Tools } from '@stagewise/agent-types';
-import {
-  createAssistantToolCallsMessage,
-  messagesToCoreMessages,
-} from './message-utils.js';
+import { messagesToCoreMessages } from './message-utils.js';
 import type { TimeoutManager } from './stream-utils.js';
 import { ErrorDescriptions } from './error-utils.js';
 
@@ -24,8 +18,8 @@ interface ToolCallContext {
   toolName: string;
   toolCallId: string;
   args: any;
-  server: AgentServer;
-  history: (CoreMessage | ChatUserMessage)[];
+  karton: KartonServer<KartonContract>;
+  history: History;
   setWorkingState: (state: boolean, description?: string) => void;
   onToolCallComplete?: (result: ToolCallProcessingResult) => void;
 }
@@ -269,14 +263,15 @@ export async function processParallelToolCalls(
     args: any;
   }>,
   tools: Tools,
-  server: AgentServer,
-  history: (CoreMessage | ChatUserMessage)[],
-  setWorkingState: (state: boolean, description?: string) => void,
+  karton: KartonServer<KartonContract>,
+  history: History,
+  setWorkingState: (state: boolean) => void,
   timeoutManager: TimeoutManager,
   onToolCallComplete?: (result: ToolCallProcessingResult) => void,
 ): Promise<ToolCallProcessingResult[]> {
   // Add assistant message with all tool calls
-  history.push(createAssistantToolCallsMessage(toolCalls));
+  // TODO: update the history via karton
+  // history.push(createAssistantToolCallsMessage(toolCalls));
 
   // Process all tool calls
   const results: ToolCallProcessingResult[] = [];
@@ -299,7 +294,7 @@ export async function processParallelToolCalls(
       toolName: tc.toolName,
       toolCallId: tc.toolCallId,
       args: tc.args,
-      server,
+      karton,
       history,
       setWorkingState,
       onToolCallComplete,
@@ -323,7 +318,7 @@ export async function processParallelToolCalls(
       toolName: tc.toolName,
       toolCallId: tc.toolCallId,
       args: tc.args,
-      server,
+      karton,
       history,
       setWorkingState,
       onToolCallComplete,
@@ -356,10 +351,11 @@ export async function processParallelToolCalls(
     }));
 
   if (successfulResults.length > 0) {
-    history.push({
-      role: 'tool',
-      content: successfulResults,
-    });
+    // TODO: update the history via karton
+    // history.push({
+    //   role: 'tool',
+    //   content: successfulResults,
+    // });
   }
 
   return results;
@@ -368,9 +364,7 @@ export async function processParallelToolCalls(
 /**
  * Determines if the agent should make a recursive call after tool execution
  */
-export function shouldRecurseAfterToolCall(
-  history: (CoreMessage | ChatUserMessage)[],
-): boolean {
+export function shouldRecurseAfterToolCall(history: History): boolean {
   const lastMessage = history[history.length - 1];
 
   if (!lastMessage || 'contentItems' in lastMessage) {

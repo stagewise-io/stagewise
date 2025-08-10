@@ -1,4 +1,4 @@
-import type { ChatUserMessage } from '@stagewise/agent-interface-internal/agent';
+import type { UserMessage } from '@stagewise/karton-contract';
 import type { RouterOutputs } from '@stagewise/api-client';
 
 // Event types for analytics tracking
@@ -108,7 +108,7 @@ export function createEventEmitter(callback?: AgentEventCallback) {
  */
 export const EventFactories = {
   agentPromptTriggered: (
-    userMessage?: ChatUserMessage,
+    userMessage?: UserMessage,
     promptSnippetsCount = 0,
   ): AgentPromptTriggeredEvent => ({
     type: 'agent_prompt_triggered',
