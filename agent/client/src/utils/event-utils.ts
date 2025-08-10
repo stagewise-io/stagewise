@@ -178,7 +178,6 @@ export const EventFactories = {
     hasToolCalls: boolean;
     toolCallCount: number;
     responseTime: number;
-    reason: string;
     credits: Awaited<
       NonNullable<RouterOutputs['agent']['callAgent']['response']>
     >['credits'];
