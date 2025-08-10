@@ -1,17 +1,182 @@
 import type { Draft } from 'immer';
 import type { Patch } from 'immer';
 
-export interface AppType<
+// Deep validation helpers to ensure `state` does not contain functions or generator-like types
+type IsFunction<T> = T extends (...args: any[]) => any ? true : false;
+type IsAsyncFunction<T> = T extends (...args: any[]) => Promise<any>
+  ? true
+  : false;
+type IsGeneratorLikeObject<T> = T extends
+  | Generator<any, any, any>
+  | AsyncGenerator<any, any, any>
+  | Iterator<any>
+  | IterableIterator<any>
+  ? true
+  : false;
+
+// Whitelisted leaf object types that may have method properties but are allowed in state
+type AllowedLeafObject =
+  | Date
+  | Error
+  | RegExp
+  | ArrayBuffer
+  | SharedArrayBuffer
+  | DataView
+  | Int8Array
+  | Uint8Array
+  | Uint8ClampedArray
+  | Int16Array
+  | Uint16Array
+  | Int32Array
+  | Uint32Array
+  | Float32Array
+  | Float64Array
+  | BigInt64Array
+  | BigUint64Array;
+type IsAllowedLeafObject<T> = T extends AllowedLeafObject ? true : false;
+
+// Depth helpers to avoid pathological recursion on complex lib types
+type DecDepth<D extends number> = D extends 0
+  ? 0
+  : D extends 1
+    ? 0
+    : D extends 2
+      ? 1
+      : D extends 3
+        ? 2
+        : D extends 4
+          ? 3
+          : D extends 5
+            ? 4
+            : D extends 6
+              ? 5
+              : D extends 7
+                ? 6
+                : D extends 8
+                  ? 7
+                  : D extends 9
+                    ? 8
+                    : 9;
+
+type NonSymbolKeys<T> = Exclude<keyof T, symbol>;
+
+// Recursively checks whether a type contains any disallowed entries
+type DeepHasFunctionTypes<T, D extends number = 6> = D extends 0 // Stop recursion when depth budget is exhausted
+  ? false
+  : // Disallow any function types directly
+    IsFunction<T> extends true
+    ? true
+    : // Disallow generator-like objects and iterators
+      IsGeneratorLikeObject<T> extends true
+      ? true
+      : // Handle arrays/tuples by checking their element types only
+        T extends readonly unknown[]
+        ? DeepHasFunctionTypes<T[number], DecDepth<D>>
+        : // Recurse into objects, but allow specific leaf objects
+          T extends object
+          ? IsAllowedLeafObject<T> extends true
+            ? false
+            : // If the object only has symbol keys, do not recurse further
+              NonSymbolKeys<T> extends never
+              ? false
+              : // For objects, check all non-symbol property types
+                true extends {
+                    [K in NonSymbolKeys<T>]-?: DeepHasFunctionTypes<
+                      T[K],
+                      DecDepth<D>
+                    >;
+                  }[NonSymbolKeys<T>]
+                ? true
+                : false
+          : // Primitives are fine
+            false;
+
+// Recursively checks whether a type contains any disallowed entries (anything else than objects with async-functions)
+type DeepHasNonFunctionTypes<T, D extends number = 6> = D extends 0 // Stop recursion when depth budget is exhausted
+  ? false
+  : // Allow async function leaves
+    IsAsyncFunction<T> extends true
+    ? false
+    : // Explicitly reject synchronous functions
+      IsFunction<T> extends true
+      ? true
+      : // Disallow arrays/tuples and common container types
+        T extends Map<any, any> | Set<any> | WeakMap<any, any> | WeakSet<any>
+        ? true
+        : T extends readonly unknown[]
+          ? true
+          : // Recurse into objects; primitives are invalid
+            T extends object
+            ? NonSymbolKeys<T> extends never
+              ? false
+              : true extends {
+                    [K in NonSymbolKeys<T>]-?: DeepHasNonFunctionTypes<
+                      T[K],
+                      DecDepth<D>
+                    >;
+                  }[NonSymbolKeys<T>]
+                ? true
+                : false
+            : true;
+
+// Returns true if T['state'] is valid (contains no functions/generators deeply)
+type KartonStateIsValid<T> = T extends { state: infer S }
+  ? DeepHasFunctionTypes<S> extends true
+    ? false
+    : true
+  : false;
+
+// If the state is invalid, require a phantom error property to force a type error at the usage site
+type RequireValidState<S> = DeepHasFunctionTypes<S> extends true
+  ? {
+      __error_state_contains_functions_or_generators: 'Karton state must not contain functions or generator-like types';
+    }
+  : Record<never, never>;
+
+type KartonClientProceduresAreValid<T> = T extends {
+  clientProcedures: infer S;
+}
+  ? [S] extends [undefined]
+    ? true
+    : DeepHasNonFunctionTypes<Exclude<S, undefined>> extends true
+      ? false
+      : true
+  : true;
+
+type KartonServerProceduresAreValid<T> = T extends {
+  serverProcedures: infer S;
+}
+  ? [S] extends [undefined]
+    ? true
+    : DeepHasNonFunctionTypes<Exclude<S, undefined>> extends true
+      ? false
+      : true
+  : true;
+
+// If the procedures are invalid, require a phantom error property to force a type error at the usage site
+type RequireValidProcedures<S> = [S] extends [undefined]
+  ? Record<never, never>
+  : DeepHasNonFunctionTypes<Exclude<S, undefined>> extends true
+    ? {
+        __error_procedures_must_only_contain_async_functions: 'Karton procedures must only contain asynchronous functions';
+      }
+    : Record<never, never>;
+
+export type AppType<
   T extends {
     state: any;
-    serverProcedures?: any;
-    clientProcedures?: any;
-  } = any,
-> {
-  state: T['state'];
-  serverProcedures?: T['serverProcedures'];
-  clientProcedures?: T['clientProcedures'];
-}
+    serverProcedures: any;
+    clientProcedures: any;
+  } & RequireValidState<T['state']> &
+    RequireValidProcedures<T['serverProcedures']> &
+    RequireValidProcedures<T['clientProcedures']> = any,
+> = KartonStateIsValid<T> extends true
+  ? KartonClientProceduresAreValid<T> extends true
+    ? KartonServerProceduresAreValid<T> extends true
+      ? T
+      : never
+    : never
+  : never;
 
 export type KartonState<T> = T extends { state: infer S } ? S : never;
 
@@ -21,7 +186,9 @@ export type ProcedureTree = {
   [key: string]: AsyncFunction | ProcedureTree;
 };
 
-export type ExtractProcedures<T> = T extends undefined ? {} : T;
+export type ExtractProcedures<T> = T extends undefined
+  ? Record<string, never>
+  : T;
 
 export type AddClientIdToFunction<T> = T extends (...args: infer P) => infer R
   ? (...args: [...P, callingClientId: string]) => R
@@ -37,11 +204,11 @@ export type AddClientIdToImplementations<T> = T extends AsyncFunction
 
 export type KartonServerProcedures<T> = T extends { serverProcedures: infer P }
   ? ExtractProcedures<P>
-  : {};
+  : Record<string, never>;
 
 export type KartonClientProcedures<T> = T extends { clientProcedures: infer P }
   ? ExtractProcedures<P>
-  : {};
+  : Record<string, never>;
 
 export type KartonServerProcedureImplementations<T> =
   AddClientIdToImplementations<KartonServerProcedures<T>>;
