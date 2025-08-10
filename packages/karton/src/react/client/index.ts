@@ -1,4 +1,7 @@
-export { createKartonReactClient } from './karton-react-client';
+export {
+  createKartonReactClient,
+  type SelectorData,
+} from './karton-react-client';
 
 export type {
   KartonClient,

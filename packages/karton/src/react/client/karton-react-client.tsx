@@ -18,7 +18,7 @@ interface KartonContextValue<T> {
   subscribe: (listener: () => void) => () => void;
 }
 
-interface SelectorData<T> {
+export interface SelectorData<T> {
   state: Readonly<KartonState<T>>;
   serverProcedures: KartonServerProcedures<T>;
   isConnected: boolean;
@@ -32,7 +32,13 @@ export function createKartonReactClient<T>(
   config: KartonClientConfig<T>,
 ): [
   React.FC<{ children?: React.ReactNode }>,
-  <R>(selector: (data: SelectorData<T>) => R) => R,
+  <R>(
+    selector: (data: {
+      state: Readonly<KartonState<T>>;
+      serverProcedures: KartonServerProcedures<T>;
+      isConnected: boolean;
+    }) => R,
+  ) => R,
 ] {
   const KartonContext = createKartonContext<T>();
 
@@ -78,7 +84,13 @@ export function createKartonReactClient<T>(
     );
   };
 
-  const useKarton = <R,>(selector: (data: SelectorData<T>) => R): R => {
+  const useKarton = <R,>(
+    selector: (data: {
+      state: Readonly<KartonState<T>>;
+      serverProcedures: KartonServerProcedures<T>;
+      isConnected: boolean;
+    }) => R,
+  ): R => {
     const context = useContext(KartonContext);
 
     if (!context) {
@@ -88,11 +100,22 @@ export function createKartonReactClient<T>(
     const { client, subscribe } = context;
 
     // Create stable selector data reference
-    const selectorDataRef = useRef<SelectorData<T> | undefined>(undefined);
+    const selectorDataRef = useRef<
+      | {
+          state: Readonly<KartonState<T>>;
+          serverProcedures: KartonServerProcedures<T>;
+          isConnected: boolean;
+        }
+      | undefined
+    >(undefined);
     const selectedValueRef = useRef<R | undefined>(undefined);
 
     const getSnapshot = useCallback(() => {
-      const data: SelectorData<T> = {
+      const data: {
+        state: Readonly<KartonState<T>>;
+        serverProcedures: KartonServerProcedures<T>;
+        isConnected: boolean;
+      } = {
         state: client.state,
         serverProcedures: client.serverProcedures,
         isConnected: client.isConnected,
