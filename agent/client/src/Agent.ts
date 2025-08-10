@@ -61,7 +61,7 @@ type History = {
   chatId: string;
 };
 
-type Chats = History[];
+type Chats = Record<string, History>;
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
@@ -113,7 +113,7 @@ export class Agent {
     this.tools = config.tools;
     this.accessToken = config.accessToken || null;
     this.eventEmitter = createEventEmitter(config.onEvent);
-    this.chats = []; // TODO: load chats from local storage
+    this.chats = {}; // TODO: load chats from local storage
     this.client = createAuthenticatedClient(this.accessToken);
     this.agentDescription = config.agentDescription;
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
@@ -388,10 +388,10 @@ export class Agent {
 
     const activeChatId =
       await this.server.interface.chat.createChat('New Chat');
-    this.chats.push({
+    this.chats[activeChatId] = {
       messages: [],
       chatId: activeChatId,
-    });
+    };
     await this.server.interface.chat.switchChat(activeChatId);
 
     this.server.interface.chat.addStopListener(() => {
@@ -403,13 +403,13 @@ export class Agent {
     this.server.interface.chat.addChatUpdateListener(async (update) => {
       switch (update.type) {
         case 'chat-created':
-          this.chats.push({
+          this.chats[update.chat.id] = {
             messages: [],
             chatId: update.chat.id,
-          });
+          };
           break;
         case 'message-added': {
-          const chat = this.chats.find((c) => c.chatId === update.chatId);
+          const chat = this.chats[update.chatId];
           if (!chat || update.message.role !== 'user') return;
           chat.messages.push(update.message);
           this.setAgentWorking(true);
@@ -624,11 +624,7 @@ export class Agent {
 
       // Clean up and finalize
       this.cleanupPendingOperations('Agent task completed successfully', false);
-      this.chats.forEach((c, index, array) => {
-        if (c.chatId === chatId) {
-          array[index]!.messages = history ?? [];
-        }
-      });
+      if (this.chats[chatId]) this.chats[chatId].messages = history ?? [];
 
       return {
         response: r,
@@ -850,7 +846,7 @@ export class Agent {
     chatId: string,
   ): Promise<void> {
     if (this.undoToolCallStack.chatId !== chatId) return;
-    const chat = this.chats.find((c) => c.chatId === chatId);
+    const chat = this.chats[chatId];
 
     const reversedHistory = [...(chat?.messages ?? [])].reverse();
     const messagesBeforeUserMessage = reversedHistory.slice(
