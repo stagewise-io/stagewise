@@ -2,24 +2,31 @@ import { Panel, PanelContent } from '@/components/ui/panel';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
 import { useEffect, useMemo, useRef } from 'react';
-import { useAgentChat } from '@/hooks/agent/use-agent-chat/use-agent-chat';
-import { useAgents } from '@/hooks/agent/use-agent-provider';
 import { ChatHistory } from './chat-history';
 import { ChatPanelFooter } from './panel-footer';
 import { ChatPanelHeader } from './panel-header';
+import { useKarton } from '@/hooks/use-karton';
 
 export function ChatPanel() {
   const chatState = useChatState();
-  const { activeChat, isWorking } = useAgentChat();
-  const { connected } = useAgents();
+  const { activeChatId, isWorking, chats, isConnected } = useKarton((s) => ({
+    activeChatId: s.state.activeChatId,
+    isWorking: s.state.isWorking,
+    chats: s.state.chats,
+    isConnected: s.isConnected,
+  }));
+
+  const activeChat = useMemo(() => {
+    return activeChatId ? (chats[activeChatId] ?? null) : null;
+  }, [activeChatId, chats]);
 
   const enableInputField = useMemo(() => {
     // Disable input if agent is not connected
-    if (!connected) {
+    if (!isConnected) {
       return false;
     }
     return !isWorking;
-  }, [isWorking, connected]);
+  }, [isWorking, isConnected]);
 
   const anyMessageInChat = useMemo(() => {
     return activeChat?.messages?.length > 0;
@@ -70,12 +77,8 @@ export function ChatPanel() {
               .getPropertyValue('padding-bottom'),
           ) - chatHistoryRef.current.clientHeight;
 
-        console.log(heightDifference);
-
         // scroll the chat history by the height difference after applying the updated padding
-
         chatHistoryRef.current.style.paddingBottom = `${footerRef.current.clientHeight}px`;
-
         chatHistoryRef.current.scrollTop -= heightDifference;
       });
       resizeObserver.observe(footerRef.current);

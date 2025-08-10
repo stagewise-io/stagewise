@@ -7,12 +7,9 @@ import {
   getSelectedElementInfo,
   collectUserMessageMetadata,
 } from '@/utils';
-import { useAgentChat } from './agent/use-agent-chat/use-agent-chat';
-import type {
-  PluginContentItem,
-  UserMessage,
-} from '@stagewise/agent-interface-internal/toolbar';
 import { usePanels } from './use-panels';
+import { useKarton } from './use-karton';
+import type { UserMessage } from '@stagewise/karton-contract';
 
 interface ContextSnippet {
   promptContextName: string;
@@ -80,7 +77,11 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const { minimized } = useAppState();
   const { plugins } = usePlugins();
-  const { sendMessage: sendChatMessage, isWorking } = useAgentChat();
+
+  const { sendUserMessage: sendChatMessage, isWorking } = useKarton((s) => ({
+    sendUserMessage: s.serverProcedures.sendUserMessage,
+    isWorking: s.state.isWorking,
+  }));
   const { isChatOpen } = usePanels();
 
   const startPromptCreation = useCallback(() => {
@@ -157,7 +158,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       const message: UserMessage = {
         id: generateId(),
-        createdAt: new Date(),
         content: [{ type: 'text' as const, text: chatInput }],
         role: 'user',
         metadata,
@@ -209,10 +209,11 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         message.metadata.pluginContentItems[context.pluginName] = {};
 
         context.contextSnippets.forEach((snippet) => {
-          const contentItem: PluginContentItem = {
-            type: 'text',
-            text: snippet.content,
-          };
+          const contentItem: UserMessage['metadata']['pluginContentItems'][string][string] =
+            {
+              type: 'text',
+              text: snippet.content,
+            };
           message.metadata.pluginContentItems[context.pluginName][
             snippet.promptContextName
           ] = contentItem;
@@ -220,7 +221,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       });
 
       // Send the message using the chat capability
-      await sendChatMessage(message.content, message.metadata);
+      await sendChatMessage(message);
 
       // Reset state after sending
       setChatInput('');

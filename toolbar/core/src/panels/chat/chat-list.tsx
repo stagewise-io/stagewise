@@ -1,22 +1,31 @@
 import { Trash2Icon } from 'lucide-react';
 import TimeAgo from 'react-timeago';
-import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
-import type { ChatListItem } from '@stagewise/agent-interface-internal/toolbar';
 import { useEffect } from 'react';
+import { useKarton } from '@/hooks/use-karton';
+import type { Chat } from '@stagewise/karton-contract';
 
 export function ChatList({ onClose }: { onClose: () => void }) {
-  const chats = useAgentChat().chats;
+  const { chats, activeChatId } = useKarton((s) => ({
+    chats: s.state.chats,
+    activeChatId: s.state.activeChatId,
+  }));
 
   useEffect(() => {
-    if (chats.length === 0) {
+    if (Object.keys(chats).length === 0) {
       onClose();
     }
-  }, [chats.length]);
+  }, [chats]);
 
   return (
     <div className="flex flex-col divide-y divide-zinc-500/10">
-      {chats.map((chat) => (
-        <ChatListEntry key={chat.id} chat={chat} onClose={onClose} />
+      {Object.entries(chats).map(([chatId, chat]) => (
+        <ChatListEntry
+          key={chatId}
+          chatId={chatId}
+          chat={chat}
+          isActive={chatId === activeChatId}
+          onClose={onClose}
+        />
       ))}
     </div>
   );
@@ -24,12 +33,19 @@ export function ChatList({ onClose }: { onClose: () => void }) {
 
 function ChatListEntry({
   chat,
+  chatId,
+  isActive,
   onClose,
 }: {
-  chat: ChatListItem;
+  chatId: string;
+  chat: Chat;
+  isActive: boolean;
   onClose: () => void;
 }) {
-  const { deleteChat, switchChat } = useAgentChat();
+  const { deleteChat, switchChat } = useKarton((s) => ({
+    deleteChat: s.serverProcedures.deleteChat,
+    switchChat: s.serverProcedures.switchChat,
+  }));
 
   return (
     <div className="py-0.5">
@@ -37,7 +53,7 @@ function ChatListEntry({
         className="flex shrink-0 cursor-pointer flex-row items-center justify-between gap-4 rounded-lg px-2 py-2 transition-colors duration-150 hover:bg-zinc-500/5"
         role="button"
         onClick={() => {
-          switchChat(chat.id);
+          switchChat(chatId);
           onClose();
         }}
       >
@@ -55,7 +71,7 @@ function ChatListEntry({
             type="button"
             onClick={(ev) => {
               ev.stopPropagation();
-              deleteChat(chat.id);
+              deleteChat(chatId);
             }}
           >
             <Trash2Icon className="size-4" />

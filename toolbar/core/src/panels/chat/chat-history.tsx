@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
 import { Loader2Icon, SparklesIcon } from 'lucide-react';
-import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
-import type {
-  ToolApprovalPart,
-  ToolResultPart,
-} from '@stagewise/agent-interface-internal/toolbar';
+import { useKarton } from '@/hooks/use-karton';
+import type { ToolResultPart } from '@stagewise/karton-contract';
 
 export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
   const wasAtBottomRef = useRef(true);
 
-  const { activeChat, isWorking } = useAgentChat();
+  const { activeChatId, isWorking, chats } = useKarton((s) => ({
+    activeChatId: s.state.activeChatId,
+    isWorking: s.state.isWorking,
+    chats: s.state.chats,
+  }));
+
+  const activeChat = useMemo(() => {
+    return activeChatId ? chats[activeChatId] : null;
+  }, [activeChatId, chats]);
 
   // Force scroll to the very bottom
   const scrollToBottom = () => {
@@ -80,24 +85,12 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
     if (!activeChat?.messages) return [];
     return activeChat.messages.reduce((acc, message) => {
       for (const part of message.content) {
-        if (part.type === 'tool-result') {
+        if (typeof part !== 'string' && part.type === 'tool-result') {
           acc.push(part);
         }
       }
       return acc;
     }, [] as ToolResultPart[]);
-  }, [activeChat]);
-
-  const toolApprovalParts = useMemo(() => {
-    if (!activeChat?.messages) return [];
-    return activeChat.messages.reduce((acc, message) => {
-      for (const part of message.content) {
-        if (part.type === 'tool-approval') {
-          acc.push(part);
-        }
-      }
-      return acc;
-    }, [] as ToolApprovalPart[]);
   }, [activeChat]);
 
   /* We're adding a bg color on hover because there's a brower bug
@@ -114,13 +107,12 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
         ref.current?.focus();
       }}
     >
-      {renderedMessages.map((message) => {
+      {renderedMessages.map((message, index) => {
         return (
           <ChatBubble
-            key={message.id}
+            key={`${message.role}-${index}`}
             message={message}
             toolResultParts={toolResultParts}
-            toolApprovalParts={toolApprovalParts}
           />
         );
       }) ?? []}

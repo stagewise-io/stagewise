@@ -3,7 +3,7 @@ export interface UIHandle {
 }
 
 import type { ReactNode } from 'react';
-import type { UserMessage } from '@stagewise/agent-interface-internal/toolbar';
+import type { UserMessage } from '@stagewise/karton-contract';
 
 export type PluginUserMessage = Omit<
   UserMessage,

@@ -9,7 +9,9 @@ const [KartonProvider, useKarton] = createKartonReactClient<KartonContract>({
   },
   fallbackState: {
     chats: {},
+    activeChatId: '',
     isWorking: false,
+    toolCallApprovalRequests: [],
   },
 });
 

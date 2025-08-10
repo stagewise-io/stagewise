@@ -2,13 +2,12 @@ import { ContextElementsChipsFlexible } from '@/components/context-elements-chip
 import { TextSlideshow } from '@/components/ui/text-slideshow';
 import { Button } from '@/components/ui/button';
 import { PanelFooter } from '@/components/ui/panel';
-import { useAgents } from '@/hooks/agent/use-agent-provider';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
 import { Textarea } from '@headlessui/react';
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
+import { useKarton } from '@/hooks/use-karton';
 
 const GlassyTextInputClassNames =
   'origin-center rounded-xl border border-black/10 ring-1 ring-white/20 transition-all duration-150 ease-out after:absolute after:inset-0 after:size-full after:content-normal after:rounded-[inherit] after:bg-gradient-to-b after:from-white/5 after:to-white/0 after:transition-colors after:duration-150 after:ease-out disabled:pointer-events-none disabled:bg-black/5 disabled:text-foreground/60 disabled:opacity-30';
@@ -20,17 +19,28 @@ export function ChatPanelFooter({
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatState = useChatState();
-  const { isWorking, activeChat, stopAgent, canStop } = useAgentChat();
-  const { connected } = useAgents();
+  const { isWorking, activeChatId, stopAgent, canStop, chats, isConnected } =
+    useKarton((s) => ({
+      isWorking: s.state.isWorking,
+      activeChatId: s.state.activeChatId,
+      stopAgent: s.serverProcedures.abortAgentCall,
+      canStop: s.state.isWorking,
+      chats: s.state.chats,
+      isConnected: s.isConnected,
+    }));
+  const activeChat = useMemo(() => {
+    return activeChatId ? chats[activeChatId] : null;
+  }, [activeChatId, chats]);
+
   const [isComposing, setIsComposing] = useState(false);
 
   const enableInputField = useMemo(() => {
     // Disable input if agent is not connected
-    if (!connected) {
+    if (!isConnected) {
       return false;
     }
     return !isWorking;
-  }, [isWorking, connected]);
+  }, [isWorking, isConnected]);
 
   const canSendMessage = useMemo(() => {
     return (

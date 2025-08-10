@@ -4,22 +4,21 @@ import { Button } from '@/components/ui/button';
 import { XIcon, PlusIcon, AlignJustifyIcon } from 'lucide-react';
 import { useState } from 'react';
 import { ChatList } from './chat-list';
-import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
+import { useKarton } from '@/hooks/use-karton';
 
 export function ChatPanelHeader() {
   const [chatListOpen, setChatListOpen] = useState(false);
 
-  const {
-    canCreateChat,
-    createChat,
-    stateDescription,
-    chats,
-    activeChat,
-    isWorking,
-  } = useAgentChat();
+  const { createChat, chats, activeChatId, isWorking } = useKarton((s) => ({
+    createChat: s.serverProcedures.createChat,
+    chats: s.state.chats,
+    activeChatId: s.state.activeChatId,
+    isWorking: s.state.isWorking,
+  }));
 
-  const showChatListButton = chats.length > 1;
-  const showNewChatButton = activeChat && activeChat.messages.length > 0;
+  const showChatListButton = Object.keys(chats).length > 1;
+  const showNewChatButton =
+    activeChatId && (chats[activeChatId]?.messages.length ?? 0) > 0;
 
   return (
     <PanelHeader
@@ -30,9 +29,6 @@ export function ChatPanelHeader() {
           : '!h-[calc-size(auto,size)] h-auto',
       )}
       title={chatListOpen && <span className="mt-0.5">Chats</span>}
-      description={
-        stateDescription && <span className="text-sm">{stateDescription}</span>
-      }
       clear
       actionArea={
         <>
@@ -61,7 +57,7 @@ export function ChatPanelHeader() {
                     '!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg transition-all duration-150 ease-out !disabled:*:opacity-10 hover:bg-white/60 active:bg-zinc-50/60',
                     chatListOpen && 'w-fit px-2.5',
                   )}
-                  disabled={!canCreateChat || isWorking}
+                  disabled={isWorking}
                   onClick={() =>
                     createChat().then(() => setChatListOpen(false))
                   }

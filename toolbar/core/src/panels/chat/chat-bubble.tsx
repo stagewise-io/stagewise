@@ -1,13 +1,12 @@
 import { Button } from '@/components/ui/button';
-import { useAgentChat } from '@/hooks/agent/use-agent-chat/index';
 import { cn, getDataUriForData } from '@/utils';
 import type {
   ChatMessage,
-  FilePart,
-  ToolApprovalPart,
   ToolCallPart,
   ToolResultPart,
-} from '@stagewise/agent-interface-internal/toolbar';
+  FilePart,
+  ImagePart,
+} from '@stagewise/karton-contract';
 import {
   CheckIcon,
   CogIcon,
@@ -20,15 +19,14 @@ import {
 } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import TimeAgo from 'react-timeago';
+import { useKarton } from '@/hooks/use-karton';
 
 export function ChatBubble({
   message: msg,
   toolResultParts,
-  toolApprovalParts,
 }: {
   message: ChatMessage;
   toolResultParts: ToolResultPart[];
-  toolApprovalParts: ToolApprovalPart[];
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -54,7 +52,10 @@ export function ChatBubble({
           >
             <TimeAgo date={msg.createdAt} />
           </div>
-          {msg.content.map((part, index) => {
+          {(Array.isArray(msg.content)
+            ? msg.content
+            : [{ type: 'text', text: msg.content }]
+          ).map((part, index) => {
             switch (part.type) {
               case 'text':
                 return (
@@ -66,6 +67,7 @@ export function ChatBubble({
                   </p>
                 );
               case 'file':
+              case 'image':
                 return (
                   <FilePartItem
                     key={`content_part_${index.toString()}`}
@@ -77,7 +79,6 @@ export function ChatBubble({
                   <ToolCallPartItem
                     key={`content_part_${index.toString()}`}
                     toolCall={part}
-                    approvalParts={toolApprovalParts}
                     toolResultParts={toolResultParts}
                   />
                 );
@@ -94,9 +95,16 @@ export function ChatBubble({
 }
 
 const FilePartItem = memo(({ file }: { file: FilePart }) => {
-  const dataUri = useMemo(() => getDataUriForData(file.data), [file.data]);
+  const dataUri = useMemo(
+    () =>
+      /*(file.data instanceof URL ? file.data : getDataUriForData(file.data))*/
+      '', // Add, support back in once types are fixed
+    [file.data],
+  );
 
   if (file.type.startsWith('image/')) {
+    return null; // TODO Add support back in once types are fixed
+    /*
     return (
       <a href={dataUri} target="_blank" rel="noopener noreferrer">
         <img
@@ -106,6 +114,7 @@ const FilePartItem = memo(({ file }: { file: FilePart }) => {
         />
       </a>
     );
+    */
   }
   return (
     <div
@@ -124,20 +133,23 @@ const FilePartItem = memo(({ file }: { file: FilePart }) => {
 const ToolCallPartItem = memo(
   ({
     toolCall,
-    approvalParts,
     toolResultParts,
   }: {
     toolCall: ToolCallPart;
-    approvalParts: ToolApprovalPart[];
     toolResultParts: ToolResultPart[];
   }) => {
-    const { approveToolCall } = useAgentChat();
+    const { approveToolCall, rejectToolCall, toolCallApprovalRequests } =
+      useKarton((s) => ({
+        approveToolCall: s.serverProcedures.approveToolCall,
+        rejectToolCall: s.serverProcedures.rejectToolCall,
+        toolCallApprovalRequests: s.state.toolCallApprovalRequests,
+      }));
 
-    const approvalPart = useMemo(
-      () =>
-        approvalParts.find((part) => part.toolCallId === toolCall.toolCallId),
-      [approvalParts, toolCall.toolCallId],
+    const requiresApproval = useMemo(
+      () => toolCallApprovalRequests.includes(toolCall.toolCallId),
+      [toolCallApprovalRequests, toolCall.toolCallId],
     );
+
     const toolResultPart = useMemo(
       () =>
         toolResultParts.find((part) => part.toolCallId === toolCall.toolCallId),
@@ -152,13 +164,13 @@ const ToolCallPartItem = memo(
             <span className="font-medium text-xs">
               {getToolName(toolCall.toolName)}
             </span>
-            {toolCall.requiresApproval && !approvalPart && (
+            {requiresApproval && (
               <span className="text-black/60 text-xs">
                 Waiting for approval
               </span>
             )}
           </div>
-          {toolCall.requiresApproval && !approvalPart && (
+          {requiresApproval && (
             <div className="flex flex-row items-center gap-1">
               <Button
                 variant="outline"
@@ -166,7 +178,7 @@ const ToolCallPartItem = memo(
                 className="h-4 w-5"
                 onClick={(e) => {
                   e.stopPropagation();
-                  approveToolCall(toolCall.toolCallId, false);
+                  rejectToolCall(toolCall.toolCallId);
                 }}
               >
                 <XIcon className="size-4" />
@@ -177,7 +189,7 @@ const ToolCallPartItem = memo(
                 className="h-4 w-5"
                 onClick={(e) => {
                   e.stopPropagation();
-                  approveToolCall(toolCall.toolCallId, true);
+                  approveToolCall(toolCall.toolCallId);
                 }}
               >
                 <CheckIcon className="size-4" />
@@ -190,7 +202,7 @@ const ToolCallPartItem = memo(
             ) : (
               <CheckIcon className="size-3 text-green-600" />
             ))}
-          {!toolResultPart && (!toolCall.requiresApproval || approvalPart) && (
+          {!toolResultPart && !requiresApproval && (
             <CogIcon className="size-3 animate-spin text-blue-600" />
           )}
         </div>

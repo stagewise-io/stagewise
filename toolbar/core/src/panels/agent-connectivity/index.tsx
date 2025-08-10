@@ -4,7 +4,6 @@ import {
   PanelHeader,
   PanelFooter,
 } from '@/components/ui/panel';
-import { useAgents } from '@/hooks/agent/use-agent-provider';
 import { MessageCircleQuestionMarkIcon, WifiOffIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,9 +12,10 @@ import {
   DropdownMenuContent,
   DropdownMenuLinkItem,
 } from '@/components/ui/dropdown-menu';
+import { useKarton } from '@/hooks/use-karton';
 
 export function AgentConnectivityPanel() {
-  const { connectedUnavailable } = useAgents();
+  const isConnected = useKarton((s) => s.isConnected);
 
   return (
     <Panel
@@ -28,9 +28,10 @@ export function AgentConnectivityPanel() {
         actionArea={<WifiOffIcon className="size-6" />}
       />
       <PanelContent>
+        x
         <div className="space-y-3">
           <p className="text-muted-foreground text-sm">
-            {connectedUnavailable
+            {!isConnected
               ? 'The connection to the Stagewise CLI has been lost. The toolbar is attempting to reconnect automatically.'
               : 'Establishing connection to the Stagewise CLI...'}
           </p>

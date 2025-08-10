@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState, useEffect } from 'react';
-import { useAgents } from './agent/use-agent-provider';
 import { useAppState } from './use-app-state';
+import { useKarton } from './use-karton';
 
 const STORAGE_KEY = 'stagewise_toolbar_open_panels';
 
@@ -8,7 +8,6 @@ interface PersistedState {
   isSettingsOpen: boolean;
   isChatOpen: boolean;
   openPlugin: string | null;
-  agentConnectivityManuallyDismissed: boolean;
 }
 
 const loadPersistedState = (): Partial<PersistedState> => {
@@ -85,20 +84,6 @@ interface PanelsContext {
    * Whether the agent connectivity panel is open
    */
   isAgentConnectivityOpen: boolean;
-
-  /**
-   * Manually open the agent connectivity panel
-   *
-   * *This will only happen if the toolbar is in a state that requires the user to connect to an agent*
-   */
-  openAgentConnectivity: () => void;
-
-  /**
-   * Manually close the agent connectivity panel
-   *
-   * *This can be used to hide the connectivity panel, if the user doesn't care about stagewise in this moment.*
-   */
-  closeAgentConnectivity: () => void;
 }
 
 const PanelsContext = createContext<PanelsContext>({
@@ -115,8 +100,6 @@ const PanelsContext = createContext<PanelsContext>({
   closePlugin: () => null,
 
   isAgentConnectivityOpen: false,
-  openAgentConnectivity: () => null,
-  closeAgentConnectivity: () => null,
 });
 
 export const PanelsProvider = ({
@@ -139,20 +122,15 @@ export const PanelsProvider = ({
     persistedState.openPlugin ?? null,
   );
 
-  const {
-    connected,
-    connectedUnavailable,
-    requiresUserAttention,
-    isInitialLoad,
-  } = useAgents();
+  const isConnected = useKarton((s) => s.isConnected);
 
-  const [
-    agentConnectivityManuallyDismissed,
-    setAgentConnectivityManuallyDismissed,
-  ] = useState(persistedState.agentConnectivityManuallyDismissed ?? false);
-
-  // Track if we should show the warning for app-hosted agents (with delay)
-  const [showAppHostedWarning, setShowAppHostedWarning] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoad(false);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Persist state changes to sessionStorage
   useEffect(() => {
@@ -160,104 +138,43 @@ export const PanelsProvider = ({
       isSettingsOpen: isSettingsOpenInternal,
       isChatOpen: isChatOpenInternal,
       openPlugin: openPluginInternal,
-      agentConnectivityManuallyDismissed,
     };
     savePersistedState(currentState);
-  }, [
-    isSettingsOpenInternal,
-    isChatOpenInternal,
-    openPluginInternal,
-    agentConnectivityManuallyDismissed,
-  ]);
+  }, [isSettingsOpenInternal, isChatOpenInternal, openPluginInternal]);
 
-  useEffect(() => {
-    if (connected && !connectedUnavailable) {
-      setAgentConnectivityManuallyDismissed(false);
-    }
-  }, [connected, connectedUnavailable]);
-
-  // Handle 500ms delay for app-hosted agent warning on initial load
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout | null = null;
-
-    if (!connected) {
-      // If this is an app-hosted agent and not connected, wait 500ms before showing warning
-      timeoutId = setTimeout(() => {
-        setShowAppHostedWarning(true);
-      }, 500);
-    } else if (connected) {
-      // Clear the warning immediately when connected
-      setShowAppHostedWarning(false);
-    }
-
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [connected]);
-
-  const isAgentConnectivityOpen = useMemo(() => {
-    // Special case: For app-hosted agents, use the delayed warning state
-    if (
-      !connected &&
-      showAppHostedWarning &&
-      !agentConnectivityManuallyDismissed &&
-      !minimized
-    ) {
-      console.debug(
-        '[PanelsProvider] Showing agent connectivity panel for app-hosted agent (after delay)',
-      );
-      return true;
-    }
-
-    const result =
-      requiresUserAttention &&
-      !agentConnectivityManuallyDismissed &&
-      !minimized &&
-      !isInitialLoad;
-    console.debug('[PanelsProvider] isAgentConnectivityOpen calculation:', {
-      requiresUserAttention,
-      agentConnectivityManuallyDismissed,
-      minimized,
-      isInitialLoad,
-      connected,
-      showAppHostedWarning,
-      result,
-    });
-    return result;
-  }, [
-    requiresUserAttention,
-    agentConnectivityManuallyDismissed,
-    minimized,
-    isInitialLoad,
-    connected,
-    showAppHostedWarning,
-  ]);
+  const isAgentConnectivityOpen = useMemo(
+    () => !isConnected && !isInitialLoad,
+    [isConnected, isInitialLoad],
+  );
 
   const isSettingsOpen = useMemo(() => {
     return (
-      !requiresUserAttention &&
+      !isAgentConnectivityOpen &&
       isSettingsOpenInternal &&
       !minimized &&
       !isInitialLoad
     );
-  }, [requiresUserAttention, isSettingsOpenInternal, minimized, isInitialLoad]);
+  }, [
+    isAgentConnectivityOpen,
+    isSettingsOpenInternal,
+    minimized,
+    isInitialLoad,
+  ]);
 
   const isChatOpen = useMemo(() => {
     return (
-      !requiresUserAttention &&
+      !isAgentConnectivityOpen &&
       isChatOpenInternal &&
       !minimized &&
       !isInitialLoad
     );
-  }, [requiresUserAttention, isChatOpenInternal, minimized, isInitialLoad]);
+  }, [isAgentConnectivityOpen, isChatOpenInternal, minimized, isInitialLoad]);
 
   const openPluginName = useMemo(() => {
-    return !requiresUserAttention && !isInitialLoad && !minimized
+    return !isAgentConnectivityOpen && !isInitialLoad && !minimized
       ? openPluginInternal
       : null;
-  }, [requiresUserAttention, openPluginInternal, minimized, isInitialLoad]);
+  }, [isAgentConnectivityOpen, openPluginInternal, minimized, isInitialLoad]);
 
   return (
     <PanelsContext.Provider
@@ -275,10 +192,6 @@ export const PanelsProvider = ({
         closePlugin: () => setOpenPlugin(null),
 
         isAgentConnectivityOpen,
-        openAgentConnectivity: () =>
-          setAgentConnectivityManuallyDismissed(false),
-        closeAgentConnectivity: () =>
-          setAgentConnectivityManuallyDismissed(true),
       }}
     >
       {children}
