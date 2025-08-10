@@ -1,11 +1,10 @@
 import { Button } from '@/components/ui/button';
-import { cn, getDataUriForData } from '@/utils';
+import { cn } from '@/utils';
 import type {
   ChatMessage,
   ToolCallPart,
   ToolResultPart,
   FilePart,
-  ImagePart,
 } from '@stagewise/karton-contract';
 import {
   CheckIcon,
