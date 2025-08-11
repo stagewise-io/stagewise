@@ -299,17 +299,10 @@ export class Agent {
    * @param pathPrefix - Optional path prefix for agent endpoints (default: '/agent')
    * @param httpServer - Optional HTTP server instance for WebSocket support
    */
-  public async initialize(
-    expressApp: Parameters<typeof createAgentHook>[0]['app'],
-    httpServer: Parameters<typeof createAgentHook>[0]['server'],
-    path = '/stagewise-toolbar-app/karton',
-  ): Promise<{
+  public async initialize(): Promise<{
     wss: Awaited<ReturnType<typeof createAgentHook>>['wss'];
   }> {
     this.karton = await createKartonServer({
-      expressApp,
-      httpServer,
-      webSocketPath: path,
       procedures: {
         abortAgentCall: async () => {
           this.setAgentWorking(false);

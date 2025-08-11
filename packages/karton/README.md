@@ -51,9 +51,6 @@ const app = express();
 const httpServer = createServer(app);
 
 const server = await createKartonServer<MyApp>({
-  expressApp: app,
-  httpServer,
-  webSocketPath: '/ws',
   procedures: {
     increment: async (callingClientId) => {
       server.setState(draft => {
@@ -72,6 +69,15 @@ const server = await createKartonServer<MyApp>({
   }
 });
 
+// Hook the upgrade handler of the karton created websockert server into your local webserver
+httpServer.on('upgrade', (req, socket, head) => {
+  if(req.url === '/path-for-karton-ws-connection') {
+    server.wss.handleUpgrade(request, socket, head, (ws: any) => {
+      server.wss.emit('connection', ws, request);
+    })
+  }
+})
+
 httpServer.listen(3000);
 ```
 
@@ -81,7 +87,7 @@ httpServer.listen(3000);
 import { createKartonClient } from '@stagewise/karton/client';
 
 const client = createKartonClient<MyApp>({
-  webSocketPath: 'ws://localhost:3000/ws',
+  webSocketPath: 'ws://localhost:3000/path-for-karton-ws-connection',
   procedures: {
     notify: async (message) => {
       console.log('Server notification:', message);
@@ -107,7 +113,7 @@ await client.serverProcedures.addUser('Alice');
 import { createKartonReactClient } from '@stagewise/karton/react/client';
 
 const [KartonProvider, useKarton] = createKartonReactClient<MyApp>({
-  webSocketPath: 'ws://localhost:3000/ws',
+  webSocketPath: 'ws://localhost:3000/path-for-karton-ws-connection',
   procedures: {
     notify: async (message) => {
       console.log('Server notification:', message);

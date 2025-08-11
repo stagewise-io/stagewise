@@ -311,9 +311,6 @@ export interface WebSocketMessage {
 }
 
 export interface KartonServerConfig<T> {
-  expressApp: any;
-  httpServer: any;
-  webSocketPath: string;
   procedures: KartonServerProcedureImplementations<T>;
   initialState: KartonState<T>;
 }

@@ -262,14 +262,13 @@ export const getServer = async () => {
         log.debug(`Proxying WebSocket request to app port ${config.appPort}`);
         proxy.upgrade?.(request, socket as any, head);
       } else {
-        if (agentWss) {
+        if (agentWss && url === '/stagewise-toolbar-app/karton') {
           // Handle agent WebSocket requests
           log.debug('Handling agent WebSocket upgrade');
           agentWss.handleUpgrade(request, socket, head, (ws: any) => {
             agentWss.emit('connection', ws, request);
           });
         } else {
-          // Unknown WebSocket path under /stagewise-toolbar-app
           log.debug(`Unknown WebSocket path: ${url}`);
           socket.destroy();
         }
