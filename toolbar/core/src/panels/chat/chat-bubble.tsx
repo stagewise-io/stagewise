@@ -29,6 +29,7 @@ import {
 } from '@headlessui/react';
 
 export function ChatBubble({ message: msg }: { message: ChatMessage }) {
+  console.log('msg', msg);
   return (
     <div className="flex flex-col gap-1">
       <div
@@ -39,10 +40,10 @@ export function ChatBubble({ message: msg }: { message: ChatMessage }) {
       >
         <div
           className={cn(
-            'group relative flex min-h-8 items-center space-y-2 rounded-2xl bg-white/5 px-2.5 py-1 font-normal text-sm shadow-lg shadow-zinc-950/10 ring-1 ring-inset',
+            'group relative flex min-h-8 animate-chat-bubble-appear flex-col items-stretch justify-center space-y-2 rounded-2xl bg-white/5 px-2.5 py-1 font-normal text-sm shadow-lg shadow-zinc-950/10 ring-1 ring-inset',
             msg.role === 'assistant'
-              ? 'rounded-bl-xs bg-zinc-100/60 text-zinc-950 ring-zinc-950/5'
-              : 'rounded-br-xs bg-blue-600/90 text-white ring-white/5',
+              ? 'min-w-48 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-zinc-950 ring-zinc-950/5'
+              : 'origin-bottom-right rounded-br-xs bg-blue-600/90 text-white ring-white/5',
           )}
         >
           <div
@@ -96,25 +97,25 @@ export function ChatBubble({ message: msg }: { message: ChatMessage }) {
 }
 
 const TextPartItem = memo(({ textPart }: { textPart: TextUIPart }) => {
-  return <p className="whitespace-pre-wrap">{textPart.text}</p>;
+  return <p className="block whitespace-pre-wrap">{textPart.text}</p>;
 });
 
 const ReasoningPartItem = memo(
   ({ reasoningPart }: { reasoningPart: ReasoningUIPart }) => {
     return (
-      <div className="rounded-lg bg-black/15 p-1.5">
+      <div className="-mx-1 block min-w-32 rounded-xl border-border/20 bg-zinc-500/5 px-2 py-0.5">
         <Disclosure>
-          <DisclosureButton className="group flex flex-row items-center justify-between gap-2">
+          <DisclosureButton className="group flex w-full flex-row items-center justify-between gap-2 text-black/60 hover:text-black/90">
             <BrainIcon className="size-3" />
-            <span className="flex-1 text-xs">Thinking...</span>
+            <span className="block flex-1 text-start text-xs">Thinking...</span>
             <ChevronDownIcon
               className={
-                'size-3 stroke-black/50 transition-all duration-150 ease-out group-hover:stroke-black group-data-open:rotate-180'
+                'size-3 transition-all duration-150 ease-out group-hover:stroke-black group-data-open:rotate-180'
               }
             />
           </DisclosureButton>
           <DisclosurePanel>
-            <p className="whitespace-pre-wrap rounded-md p-1 text-black/80 text-sm italic">
+            <p className="whitespace-pre-wrap rounded-md p-1 text-black/80 text-xs italic">
               {reasoningPart.text}
             </p>
           </DisclosurePanel>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
 import { Loader2Icon, SparklesIcon } from 'lucide-react';
 import { useKarton } from '@/hooks/use-karton';
+import { cn } from '@/utils';
 
 export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
   const wasAtBottomRef = useRef(true);
@@ -100,11 +101,15 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
         );
       }) ?? []}
 
-      {isWorking && (
-        <div className="mt-2 flex w-full flex-row items-center justify-start gap-2 pl-1 text-xs text-zinc-500">
-          <Loader2Icon className="size-4 animate-spin stroke-blue-600" />
-        </div>
-      )}
+      <div
+        className={cn(
+          'mt-4 flex h-0 w-full flex-row items-center justify-start gap-2 pl-1 text-xs text-zinc-500 opacity-0',
+          isWorking && 'h-auto opacity-100',
+        )}
+      >
+        <Loader2Icon className="size-4 animate-spin stroke-blue-600" />
+      </div>
+
       {renderedMessages.length === 0 && (
         <div className="flex flex-col items-center justify-center gap-3 px-4 py-2 text-black/30 text-sm">
           <SparklesIcon className="size-8 stroke-black opacity-10" />

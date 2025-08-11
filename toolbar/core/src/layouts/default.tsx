@@ -56,7 +56,9 @@ export function DefaultLayout() {
   return (
     <ContextChipHoverProvider>
       <div
-        className={cn('pointer-events-none fixed inset-0 h-screen w-screen')}
+        className={cn(
+          'root pointer-events-none fixed inset-0 h-screen w-screen',
+        )}
       >
         <DOMContextSelector />
         <DraggingArea />
@@ -178,7 +180,7 @@ function PanelsArea({
   } = usePanels();
 
   const plugins = usePlugins();
-  const isConnected = useKarton((s) => s.isConnected);
+  const _isConnected = useKarton((s) => s.isConnected);
 
   const pluginPanel = useMemo(() => {
     if (!openPluginName) {

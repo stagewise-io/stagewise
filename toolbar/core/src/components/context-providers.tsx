@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { ConfigProvider } from '@/hooks/use-config';
 import { PanelsProvider } from '@/hooks/use-panels';
 import { KartonProvider } from '@/hooks/use-karton';
+import { Tooltip } from '@base-ui-components/react/tooltip';
 
 export function ContextProviders({
   children,
@@ -14,14 +15,16 @@ export function ContextProviders({
   config?: InternalToolbarConfig;
 }) {
   return (
-    <ConfigProvider config={config}>
-      <KartonProvider>
-        <PanelsProvider>
-          <PluginProvider>
-            <ChatStateProvider>{children}</ChatStateProvider>
-          </PluginProvider>
-        </PanelsProvider>
-      </KartonProvider>
-    </ConfigProvider>
+    <Tooltip.Provider>
+      <ConfigProvider config={config}>
+        <KartonProvider>
+          <PanelsProvider>
+            <PluginProvider>
+              <ChatStateProvider>{children}</ChatStateProvider>
+            </PluginProvider>
+          </PanelsProvider>
+        </KartonProvider>
+      </ConfigProvider>
+    </Tooltip.Provider>
   );
 }

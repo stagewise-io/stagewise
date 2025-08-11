@@ -5,16 +5,17 @@ import { useKarton } from '@/hooks/use-karton';
 import type { Chat } from '@stagewise/karton-contract';
 
 export function ChatList({ onClose }: { onClose: () => void }) {
-  const { chats, activeChatId } = useKarton((s) => ({
+  const { chats, activeChatId, isWorking } = useKarton((s) => ({
     chats: s.state.chats,
     activeChatId: s.state.activeChatId,
+    isWorking: s.state.isWorking,
   }));
 
   useEffect(() => {
-    if (Object.keys(chats).length === 0) {
+    if (Object.keys(chats).length === 0 || isWorking) {
       onClose();
     }
-  }, [chats]);
+  }, [chats, isWorking, onClose]);
 
   return (
     <div className="flex flex-col divide-y divide-zinc-500/10">

@@ -115,7 +115,7 @@ export function ChatPanelFooter({
             className={cn(
               GlassyTextInputClassNames,
               'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent z-10 w-full resize-none rounded-2xl bg-zinc-500/5 px-2 py-1 text-zinc-950 shadow-md backdrop-blur-lg transition-all duration-300 ease-out placeholder:text-foreground/40 focus:bg-blue-200/20 focus:shadow-blue-400/10 focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
-              showMultiLineTextArea ? 'h-26' : 'h-8',
+              showMultiLineTextArea && !isWorking ? 'h-26' : 'h-8',
             )}
             placeholder={!showTextSlideshow && 'Type a message...'}
           />
