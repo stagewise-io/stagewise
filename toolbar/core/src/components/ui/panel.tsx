@@ -2,18 +2,21 @@ import { cn } from '@/utils';
 import type { ReactNode } from 'react';
 import { Glassy } from './glassy';
 
-function Panel({
+const Panel = ({
   children,
   alwaysFullHeight = false,
   className,
+  ref,
 }: {
   children?: ReactNode;
   alwaysFullHeight?: boolean;
   className?: string;
-}) {
+  ref?: React.RefObject<HTMLDivElement>;
+}) => {
   return (
     <Glassy
       as="section"
+      ref={ref}
       className={cn(
         'pointer-events-auto flex max-h-full min-h-48 flex-col items-stretch justify-start rounded-3xl',
         alwaysFullHeight && 'h-full',
@@ -23,7 +26,7 @@ function Panel({
       {children}
     </Glassy>
   );
-}
+};
 
 function PanelHeader({
   title,

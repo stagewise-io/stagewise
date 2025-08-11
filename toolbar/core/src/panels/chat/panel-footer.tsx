@@ -6,7 +6,7 @@ import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
 import { Textarea } from '@headlessui/react';
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useKarton } from '@/hooks/use-karton';
 import {
   Tooltip,
@@ -19,10 +19,11 @@ const GlassyTextInputClassNames =
 
 export function ChatPanelFooter({
   ref,
+  inputRef,
 }: {
   ref: React.RefObject<HTMLDivElement>;
+  inputRef: React.RefObject<HTMLTextAreaElement>;
 }) {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatState = useChatState();
   const { isWorking, activeChatId, stopAgent, canStop, chats, isConnected } =
     useKarton((s) => ({
@@ -56,9 +57,11 @@ export function ChatPanelFooter({
   }, [enableInputField, chatState]);
 
   const handleSubmit = useCallback(() => {
-    chatState.sendMessage();
-    chatState.stopPromptCreation();
-  }, [chatState]);
+    if (canSendMessage) {
+      chatState.sendMessage();
+      // stopPromptCreation is already called in sendMessage
+    }
+  }, [chatState, canSendMessage]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -111,7 +114,9 @@ export function ChatPanelFooter({
               chatState.setChatInput(e.target.value);
             }}
             onFocus={() => {
-              chatState.startPromptCreation();
+              if (!chatState.isPromptCreationActive) {
+                chatState.startPromptCreation();
+              }
             }}
             onKeyDown={handleKeyDown}
             onCompositionStart={handleCompositionStart}

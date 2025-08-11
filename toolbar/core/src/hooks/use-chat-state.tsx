@@ -226,7 +226,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       // Reset state after sending
       setChatInput('');
       setDomContextElements([]);
-      setIsPromptCreationMode(false);
+      stopPromptCreation();
     } finally {
       setIsSending(false);
     }

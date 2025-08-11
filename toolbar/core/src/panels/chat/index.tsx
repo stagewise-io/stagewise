@@ -34,38 +34,122 @@ export function ChatPanel() {
 
   /* If the user clicks on prompt creation mode, we force-focus the input field all the time. */
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const isIntentionallyStoppingRef = useRef<boolean>(false);
+  const focusIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const shouldMaintainFocusRef = useRef<boolean>(false);
 
+  // Start prompt creation mode when chat panel opens
   useEffect(() => {
-    const blurHandler = () => {
-      // Don't refocus if we're intentionally stopping prompt creation
-      if (isIntentionallyStoppingRef.current) {
-        isIntentionallyStoppingRef.current = false;
-        return;
-      }
-      inputRef.current?.focus();
-    };
+    if (enableInputField) {
+      chatState.startPromptCreation();
+    }
+  }, []);
 
+  // Handle escape key to stop prompt creation
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && chatState.isPromptCreationActive) {
+        chatState.stopPromptCreation();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [chatState.isPromptCreationActive, chatState.stopPromptCreation]);
+
+  // Focus management for prompt creation mode
+  useEffect(() => {
     if (chatState.isPromptCreationActive && enableInputField) {
-      inputRef.current?.focus();
-      // We only force re-focus if the prompt creation is active.
-      inputRef.current?.addEventListener('blur', blurHandler);
-      isIntentionallyStoppingRef.current = false;
+      shouldMaintainFocusRef.current = true;
+
+      // Initial focus
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+
+      // Set up interval to check and maintain focus
+      focusIntervalRef.current = setInterval(() => {
+        if (
+          shouldMaintainFocusRef.current &&
+          chatState.isPromptCreationActive
+        ) {
+          const activeElement = document.activeElement;
+          const inputElement = inputRef.current;
+
+          // Only refocus if the active element is not the input and not within the footer
+          if (inputElement && activeElement !== inputElement) {
+            // Check if focus is on something within the footer (like buttons)
+            const isFooterElement = footerRef.current?.contains(
+              activeElement as Node,
+            );
+            if (!isFooterElement) {
+              inputElement.focus();
+            }
+          }
+        }
+      }, 100); // Check every 100ms
     } else {
-      // When stopping prompt creation, set the flag to prevent refocus
-      if (inputRef.current === document.activeElement) {
-        isIntentionallyStoppingRef.current = true;
+      shouldMaintainFocusRef.current = false;
+      if (focusIntervalRef.current) {
+        clearInterval(focusIntervalRef.current);
+        focusIntervalRef.current = null;
       }
       inputRef.current?.blur();
     }
 
     return () => {
-      inputRef.current?.removeEventListener('blur', blurHandler);
+      if (focusIntervalRef.current) {
+        clearInterval(focusIntervalRef.current);
+        focusIntervalRef.current = null;
+      }
     };
   }, [chatState.isPromptCreationActive, enableInputField]);
 
   const footerRef = useRef<HTMLDivElement>(null);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Handle clicks outside footer to stop prompt creation
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (!chatState.isPromptCreationActive) return;
+
+      const target = e.target as HTMLElement;
+      // Check if click is outside the footer
+      if (footerRef.current && !footerRef.current.contains(target)) {
+        shouldMaintainFocusRef.current = false;
+        chatState.stopPromptCreation();
+      }
+    };
+
+    // Also handle clicks on the document to catch iframe clicks
+    const handleDocumentClick = (e: MouseEvent) => {
+      if (!chatState.isPromptCreationActive) return;
+
+      const target = e.target as HTMLElement;
+      // Check if the click target is the iframe
+      if (target.id === 'user-app-iframe' || target.tagName === 'IFRAME') {
+        // Don't stop prompt creation when clicking on iframe - just refocus
+        setTimeout(() => {
+          if (
+            chatState.isPromptCreationActive &&
+            shouldMaintainFocusRef.current
+          ) {
+            inputRef.current?.focus();
+          }
+        }, 50);
+      }
+    };
+
+    if (panelRef.current && chatState.isPromptCreationActive) {
+      panelRef.current.addEventListener('click', handleClick);
+      document.addEventListener('click', handleDocumentClick, true);
+    }
+
+    return () => {
+      panelRef.current?.removeEventListener('click', handleClick);
+      document.removeEventListener('click', handleDocumentClick, true);
+    };
+  }, [chatState.isPromptCreationActive, chatState.stopPromptCreation]);
+
   useEffect(() => {
     if (chatHistoryRef.current && footerRef.current) {
       const resizeObserver = new ResizeObserver(() => {
@@ -90,6 +174,7 @@ export function ChatPanel() {
 
   return (
     <Panel
+      ref={panelRef}
       className={cn(
         anyMessageInChat
           ? 'h-[35vh] max-h-[50vh] min-h-[20vh]'
@@ -108,7 +193,7 @@ export function ChatPanel() {
         {/* This are renders the output of the agent as markdown and makes it scrollable if necessary. */}
         <ChatHistory ref={chatHistoryRef} />
       </PanelContent>
-      <ChatPanelFooter ref={footerRef} />
+      <ChatPanelFooter ref={footerRef} inputRef={inputRef} />
     </Panel>
   );
 }
