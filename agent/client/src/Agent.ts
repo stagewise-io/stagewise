@@ -4,11 +4,10 @@ import {
   createKartonServer,
   type KartonServer,
 } from '@stagewise/karton/server';
-import {
-  convertToModelMessages,
-  type AssistantModelMessage,
-  type ToolModelMessage,
-  type LanguageModelResponseMetadata,
+import type {
+  AssistantModelMessage,
+  ToolModelMessage,
+  LanguageModelResponseMetadata,
 } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
@@ -21,8 +20,6 @@ import type {
   RouterOutputs,
 } from '@stagewise/api-client';
 
-// Import all the new utilities
-import { countToolCalls } from './utils/message-utils.js';
 import { TimeoutManager } from './utils/stream-utils.js';
 import {
   processParallelToolCalls,
@@ -305,16 +302,29 @@ export class Agent {
     this.karton = await createKartonServer<KartonContract>({
       procedures: {
         abortAgentCall: async () => {
-          this.setAgentWorking(false);
           this.abortController.abort();
           this.abortController = new AbortController();
         },
-        // TODO: fix the type here
+        approveToolCall: async (_toolCallId, _callingClientId) => {},
+        rejectToolCall: async (_toolCallId, _callingClientId) => {},
+        createChat: async () => {
+          return 'TODO: replace';
+        },
+        switchChat: async (_chatId, _callingClientId) => {},
+        deleteChat: async (_chatId, _callingClientId) => {},
+        sendUserMessage: async (message, _callingClientId) => {
+          await this.callAgent({
+            chatId: this.karton!.state.activeChatId!,
+            history: [message],
+            clientRuntime: this.clientRuntime,
+            promptSnippets: [],
+          });
+        },
       },
       initialState: {
+        activeChatId: null,
         chats: {},
         isWorking: false,
-        activeChatId: null,
         toolCallApprovalRequests: [],
       },
     });
@@ -456,26 +466,14 @@ export class Agent {
 
       // Prepare update to the chat title
       if (lastMessage.isUserMessage && lastMessage.message) {
-        const content = convertToModelMessages([lastMessage.message])[0]!
-          .content;
         this.client.chat.generateChatTitle
           .mutate({
-            userMessage: {
-              role: 'user',
-              content:
-                typeof content === 'string'
-                  ? content
-                  : content.map((c) =>
-                      c.type === 'text'
-                        ? { type: 'text', text: c.text }
-                        : { type: 'text', text: '' },
-                    ),
-              metadata: lastMessage.message.metadata,
-            },
+            userMessage: lastMessage.message,
           })
-          .then((_result) => {
-            // TODO: update the title
-            // this.server?.interface.chat.updateChatTitle(chatId, result.title);
+          .then((result) => {
+            this.karton?.setState((draft) => {
+              draft.chats[chatId]!.title = result.title;
+            });
           });
       }
 
@@ -493,37 +491,41 @@ export class Agent {
 
       // Call the agent API
       const startTime = Date.now();
-      // TODO: fix this
-      // const request = {
-      //   messages: history ?? [],
-      //   tools: mapZodToolsToJsonSchemaTools(this.tools),
-      //   promptSnippets,
-      // } as RouterInputs['chat']['callAgent'];
+
       const request = {
-        messages: [],
+        messages: history ?? [],
         tools: mapZodToolsToJsonSchemaTools(this.tools),
         promptSnippets,
       };
 
       const agentResponse = await this.callAgentWithRetry(request);
 
-      if (agentResponse.syntheticToolCalls) {
-        await this.processParallelToolCallsContent(
-          agentResponse.syntheticToolCalls,
-          history ?? [],
-          {
-            syntheticCall: true,
-          },
-        );
-        return this.callAgent({
-          chatId,
-          history: history ?? [],
-          clientRuntime,
-          promptSnippets,
+      const { uiStream } = agentResponse;
+
+      // const t = await response;
+
+      // console.log('\nt\n', t);
+
+      for await (const chunk of uiStream) {
+        this.karton?.setState((draft) => {
+          if (!chatId) return console.log('\nchatId missing\n', chatId);
+          if (!draft.chats[chatId])
+            return console.log('\nchat not found\n', chatId);
+          draft.chats[chatId]!.messages.push({
+            role: 'assistant',
+            id: crypto.randomUUID(),
+            metadata: {
+              createdAt: new Date(),
+            },
+            parts: [
+              {
+                type: 'text',
+                text: chunk.type === 'text-delta' ? chunk.delta : '',
+              },
+            ],
+          });
         });
       }
-
-      const { fullStream, response } = agentResponse;
 
       this.setAgentWorking(true);
 
@@ -535,21 +537,21 @@ export class Agent {
       //   this.agentTimeout,
       // );
 
-      const r = await response; // this will throw an error if the user has aborted, will be handled in the catch below
+      // const r = await response; // this will throw an error if the user has aborted, will be handled in the catch below
 
-      const responseTime = Date.now() - startTime;
+      const _responseTime = Date.now() - startTime;
 
       // Count and emit response metrics
-      const { hasToolCalls, toolCallCount } = countToolCalls(r.messages);
-      this.eventEmitter.emit(
-        EventFactories.agentResponseReceived({
-          messageCount: r.messages.length,
-          hasToolCalls,
-          toolCallCount,
-          responseTime,
-          credits: r.credits,
-        }),
-      );
+      // const { hasToolCalls, toolCallCount } = countToolCalls(r.messages);
+      // this.eventEmitter.emit(
+      //   EventFactories.agentResponseReceived({
+      //     messageCount: r.messages.length,
+      //     hasToolCalls,
+      //     toolCallCount,
+      //     responseTime,
+      //     credits: r.credits,
+      //   }),
+      // );
 
       // Process response messages
       // await this.processResponseMessages(
@@ -758,22 +760,23 @@ export class Agent {
     );
     if (results.length > 0) {
       // update the chat with the tool results
-      this.karton?.setState((draft) => {
-        draft.chats[options?.chatId!]!.messages.push(
-          ...results.map((r) => ({
-            role: 'tool' as const,
-            content: [
-              {
-                type: 'tool-result' as const,
-                toolCallId: r.toolCallId,
-                toolName: r.toolName,
-                result: r.result,
-                isError: r.error === 'error',
-              },
-            ],
-          })),
-        );
-      });
+      // TODO: this will be a bit hacky
+      // this.karton?.setState((draft) => {
+      //   draft.chats[options?.chatId!]!.messages.push(
+      //     ...results.map((r) => ({
+      //       role: 'tool' as const,
+      //       content: [
+      //         {
+      //           type: 'tool-result' as const,
+      //           toolCallId: r.toolCallId,
+      //           toolName: r.toolName,
+      //           result: r.result,
+      //           isError: r.error === 'error',
+      //         },
+      //       ],
+      //     })),
+      //   );
+      // });
       // this.server?.interface.chat.addMessage(
       //   {
       //     id: crypto.randomUUID(),
@@ -818,9 +821,10 @@ export class Agent {
 
     const toolCallIdsBeforeUserMessage: string[] = [];
     for (const message of messagesBeforeUserMessage) {
-      if (message.role !== 'tool') continue;
-      for (const content of message.content)
-        toolCallIdsBeforeUserMessage.push(content.toolCallId);
+      if (message.role !== 'assistant') continue;
+      for (const content of message.parts)
+        if (content.type === 'tool-call')
+          toolCallIdsBeforeUserMessage.push(content.toolCallId);
     }
 
     while (

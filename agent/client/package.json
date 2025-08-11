@@ -33,7 +33,7 @@
   "dependencies": {
     "ai": "5.0.9",
     "node-fetch": "^3.3.2",
-    "zod": "3.25.76",
+    "zod": "4.0.17",
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {

@@ -17,7 +17,7 @@ export const ExampleComponent = () => {
         <Button
           onClick={() => {
             toolbar.sendPrompt({
-              role: 'user',
+              role: 'plugin',
               content: [
                 {
                   type: 'text',

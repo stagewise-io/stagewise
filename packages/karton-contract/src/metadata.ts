@@ -5,7 +5,7 @@ export const baseSelectedElementSchema = z.object({
   nodeType: z.string().min(1).max(96).describe('The node type of the element.'),
   xpath: z.string().min(1).max(1024).describe('The XPath of the element.'),
   attributes: z
-    .record(z.union([z.string(), z.boolean(), z.number()]))
+    .record(z.string(), z.union([z.string(), z.boolean(), z.number()]))
     .transform((obj) => {
       // Define the important attributes that should never be truncated
       const importantAttributes = new Set([
@@ -85,7 +85,7 @@ export const baseSelectedElementSchema = z.object({
       'Text content of the element. Will be truncated after 2048 characters.',
     ),
   ownProperties: z
-    .record(z.any())
+    .record(z.string(), z.any())
     .transform((obj) => {
       // Truncate to first 500 entries
       const entries = Object.entries(obj);

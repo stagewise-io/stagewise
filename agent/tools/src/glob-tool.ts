@@ -27,6 +27,7 @@ export async function globTool(
   // Validate required parameters
   if (!pattern) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: 'Missing required parameter: pattern',
       error: 'MISSING_PATTERN',
@@ -47,6 +48,7 @@ export async function globTool(
 
     if (!globResult.success) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Glob search failed: ${globResult.message}`,
         error: globResult.error || 'GLOB_ERROR',
@@ -58,6 +60,7 @@ export async function globTool(
     const message = `Found ${globResult.totalMatches || 0} matches for pattern "${pattern}"${searchLocation}`;
 
     return {
+      undoExecute: () => Promise.resolve(),
       success: true,
       message,
       result: {
@@ -67,6 +70,7 @@ export async function globTool(
     };
   } catch (error) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: `Glob search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       error: error instanceof Error ? error.message : 'Unknown error',

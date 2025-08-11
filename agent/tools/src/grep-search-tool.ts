@@ -56,6 +56,7 @@ export async function grepSearchTool(
   // Validate required parameters
   if (!query) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: 'Missing required parameter: query',
       error: 'MISSING_QUERY',
@@ -64,6 +65,7 @@ export async function grepSearchTool(
 
   if (!explanation) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: 'Missing required parameter: explanation',
       error: 'MISSING_EXPLANATION',
@@ -92,6 +94,7 @@ export async function grepSearchTool(
 
     if (!grepResult.success) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Grep search failed: ${grepResult.message}`,
         error: grepResult.error || 'GREP_ERROR',
@@ -111,6 +114,7 @@ export async function grepSearchTool(
     }
 
     return {
+      undoExecute: () => Promise.resolve(),
       success: true,
       message,
       result: {
@@ -121,6 +125,7 @@ export async function grepSearchTool(
     };
   } catch (error) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: `Grep search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       error: error instanceof Error ? error.message : 'Unknown error',

@@ -47,16 +47,16 @@ importers:
     dependencies:
       ai:
         specifier: 5.0.9
-        version: 5.0.9(zod@3.25.76)
+        version: 5.0.9(zod@4.0.17)
       node-fetch:
         specifier: ^3.3.2
         version: 3.3.2
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.0.17
+        version: 4.0.17
       zod-to-json-schema:
         specifier: ^3.24.5
-        version: 3.24.5(zod@3.25.76)
+        version: 3.24.5(zod@4.0.17)
     devDependencies:
       '@stagewise/agent-interface-internal':
         specifier: workspace:*
@@ -74,8 +74,8 @@ importers:
         specifier: workspace:*
         version: link:../types
       '@stagewise/api-client':
-        specifier: 0.4.0
-        version: 0.4.0(react@19.1.1)(typescript@5.9.2)
+        specifier: ../../../platform/packages/api-client
+        version: link:../../../platform/packages/api-client
       '@stagewise/karton':
         specifier: workspace:*
         version: link:../../packages/karton
@@ -117,8 +117,8 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@24.0.3)(@vitest/ui@2.1.9)(jsdom@26.1.0)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.0.17
+        version: 4.0.17
 
   agent/prompt-snippets:
     dependencies:
@@ -139,8 +139,8 @@ importers:
         specifier: ^5.0.0
         version: 5.9.2
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.0.17
+        version: 4.0.17
 
   agent/runtime-interface:
     devDependencies:
@@ -151,8 +151,8 @@ importers:
         specifier: ^5.0.0
         version: 5.9.2
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.0.17
+        version: 4.0.17
 
   agent/runtime-mock:
     dependencies:
@@ -256,24 +256,24 @@ importers:
         specifier: ^5.0.0
         version: 5.9.2
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.0.17
+        version: 4.0.17
       zod-to-json-schema:
         specifier: ^3.24.5
-        version: 3.24.5(zod@3.25.76)
+        version: 3.24.5(zod@4.0.17)
 
   agent/types:
     dependencies:
       ai:
         specifier: 5.0.9
-        version: 5.0.9(zod@3.25.76)
+        version: 5.0.9(zod@4.0.17)
     devDependencies:
       '@stagewise/agent-interface-internal':
         specifier: workspace:*
         version: link:../../packages/agent-interface
       '@stagewise/api-client':
-        specifier: 0.4.0
-        version: 0.4.0(react@19.1.1)(typescript@5.9.2)
+        specifier: ../../../platform/packages/api-client
+        version: link:../../../platform/packages/api-client
       rimraf:
         specifier: ^5.0.0
         version: 5.0.10
@@ -281,8 +281,8 @@ importers:
         specifier: ^5.8.3
         version: 5.9.2
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.0.17
+        version: 4.0.17
 
   apps/cli:
     devDependencies:
@@ -1023,14 +1023,14 @@ importers:
         version: link:../karton
       ai:
         specifier: 5.0.9
-        version: 5.0.9(zod@3.25.76)
+        version: 5.0.9(zod@4.0.17)
     devDependencies:
       typescript:
         specifier: ^5.8.3
         version: 5.9.2
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.0.17
+        version: 4.0.17
 
   packages/srpc:
     dependencies:
@@ -15203,6 +15203,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.0.17:
+    resolution: {integrity: sha512-1PHjlYRevNxxdy2JZ8JcNAw7rX8V9P1AKkP+x/xZfxB0K5FYfuV+Ug6P/6NVSR2jHQ+FzDDoDHS04nYUsOIyLQ==}
+
   zone.js@0.15.1:
     resolution: {integrity: sha512-XE96n56IQpJM7NAoXswY3XRLcWFW83xe0BiAOeMD7K5k5xecOeul3Qcpx6GqEeeHNkW5DWL5zOyTbEfB4eti8w==}
 
@@ -15211,11 +15214,11 @@ packages:
 
 snapshots:
 
-  '@ai-sdk/gateway@1.0.4(zod@3.25.76)':
+  '@ai-sdk/gateway@1.0.4(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.1(zod@3.25.76)
-      zod: 3.25.76
+      '@ai-sdk/provider-utils': 3.0.1(zod@4.0.17)
+      zod: 4.0.17
 
   '@ai-sdk/provider-utils@2.2.8(zod@3.25.76)':
     dependencies:
@@ -15224,13 +15227,13 @@ snapshots:
       secure-json-parse: 2.7.0
       zod: 3.25.76
 
-  '@ai-sdk/provider-utils@3.0.1(zod@3.25.76)':
+  '@ai-sdk/provider-utils@3.0.1(zod@4.0.17)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
       eventsource-parser: 3.0.3
-      zod: 3.25.76
-      zod-to-json-schema: 3.24.5(zod@3.25.76)
+      zod: 4.0.17
+      zod-to-json-schema: 3.24.5(zod@4.0.17)
 
   '@ai-sdk/provider@1.1.3':
     dependencies:
@@ -21741,13 +21744,13 @@ snapshots:
     optionalDependencies:
       react: 19.1.1
 
-  ai@5.0.9(zod@3.25.76):
+  ai@5.0.9(zod@4.0.17):
     dependencies:
-      '@ai-sdk/gateway': 1.0.4(zod@3.25.76)
+      '@ai-sdk/gateway': 1.0.4(zod@4.0.17)
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.1(zod@3.25.76)
+      '@ai-sdk/provider-utils': 3.0.1(zod@4.0.17)
       '@opentelemetry/api': 1.9.0
-      zod: 3.25.76
+      zod: 4.0.17
 
   ajv-draft-04@1.0.0(ajv@8.13.0):
     optionalDependencies:
@@ -31287,7 +31290,13 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
+  zod-to-json-schema@3.24.5(zod@4.0.17):
+    dependencies:
+      zod: 4.0.17
+
   zod@3.25.76: {}
+
+  zod@4.0.17: {}
 
   zone.js@0.15.1: {}
 

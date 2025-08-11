@@ -39,6 +39,7 @@ export async function multiEditTool(
   // Validate required parameters
   if (!file_path) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: 'Missing required parameter: file_path',
       error: 'MISSING_FILE_PATH',
@@ -47,6 +48,7 @@ export async function multiEditTool(
 
   if (!edits || edits.length === 0) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message:
         'Missing required parameter: edits (must contain at least one edit)',
@@ -59,6 +61,7 @@ export async function multiEditTool(
     const edit = edits[i];
     if (!edit) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Edit at index ${i} is undefined`,
         error: 'INVALID_EDIT',
@@ -66,6 +69,7 @@ export async function multiEditTool(
     }
     if (!edit.old_string) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Edit at index ${i} missing required field: old_string`,
         error: 'INVALID_EDIT',
@@ -73,6 +77,7 @@ export async function multiEditTool(
     }
     if (edit.new_string === undefined) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Edit at index ${i} missing required field: new_string`,
         error: 'INVALID_EDIT',
@@ -80,6 +85,7 @@ export async function multiEditTool(
     }
     if (edit.old_string === edit.new_string) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Edit at index ${i} has identical old_string and new_string`,
         error: 'INVALID_EDIT',
@@ -94,6 +100,7 @@ export async function multiEditTool(
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
     if (!fileExists) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `File does not exist: ${file_path}`,
         error: 'FILE_NOT_FOUND',
@@ -109,6 +116,7 @@ export async function multiEditTool(
 
     if (!sizeCheck.isWithinLimit) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: sizeCheck.error || `File is too large to edit: ${file_path}`,
         error: 'FILE_TOO_LARGE',
@@ -119,6 +127,7 @@ export async function multiEditTool(
     const readResult = await clientRuntime.fileSystem.readFile(absolutePath);
     if (!readResult.success || !readResult.content) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Failed to read file: ${file_path}`,
         error: readResult.error || 'READ_ERROR',
@@ -171,6 +180,7 @@ export async function multiEditTool(
       );
       if (!writeResult.success) {
         return {
+          undoExecute: () => Promise.resolve(),
           success: false,
           message: `Failed to write file: ${file_path}`,
           error: writeResult.error || 'WRITE_ERROR',
@@ -202,6 +212,7 @@ export async function multiEditTool(
     }
 
     return {
+      undoExecute: () => Promise.resolve(),
       success: true,
       message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,
       result: {
@@ -210,6 +221,7 @@ export async function multiEditTool(
     };
   } catch (error) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: `MultiEdit failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       error: error instanceof Error ? error.message : 'Unknown error',

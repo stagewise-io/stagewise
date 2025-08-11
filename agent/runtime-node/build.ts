@@ -16,9 +16,6 @@ const buildOptions: BuildOptions = {
   treeShaking: true,
   // Additional obfuscation options
   keepNames: false, // Don't preserve function/class names
-  mangleProps: /^_/, // Mangle private properties starting with _
-  mangleCache: {}, // Consistent mangling across builds
-  legalComments: 'none', // Remove all comments
 };
 
 if (isWatch) {

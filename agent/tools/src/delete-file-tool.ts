@@ -24,6 +24,7 @@ export async function deleteFileTool(
   // Validate required parameters
   if (!relPath) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: 'Missing required parameter: path',
       error: 'MISSING_PATH',
@@ -37,6 +38,7 @@ export async function deleteFileTool(
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
     if (!fileExists) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `File not found: ${relPath}`,
         error: 'FILE_NOT_FOUND',
@@ -48,6 +50,7 @@ export async function deleteFileTool(
       await clientRuntime.fileSystem.readFile(absolutePath);
     if (!originalContent.success || originalContent.content === undefined) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Failed to read file before deletion: ${relPath}`,
         error: 'READ_ERROR',
@@ -62,6 +65,7 @@ export async function deleteFileTool(
       await clientRuntime.fileSystem.deleteFile(absolutePath);
     if (!deleteResult.success) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Failed to delete file: ${relPath}`,
         error: deleteResult.error || 'DELETE_ERROR',
@@ -92,6 +96,7 @@ export async function deleteFileTool(
     };
   } catch (error) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: `Failed to delete file: ${relPath}`,
       error: error instanceof Error ? error.message : 'Unknown error',

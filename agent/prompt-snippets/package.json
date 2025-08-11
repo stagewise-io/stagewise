@@ -27,7 +27,7 @@
     "@stagewise/agent-project-information": "workspace:*"
   },
   "devDependencies": {
-    "zod": "3.25.76",
+    "zod": "4.0.17",
     "typescript": "^5.0.0",
     "rimraf": "^5.0.0"
   }

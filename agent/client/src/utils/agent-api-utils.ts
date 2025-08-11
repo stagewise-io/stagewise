@@ -1,5 +1,4 @@
 import type { Tools } from '@stagewise/agent-types';
-import { zodSchema } from 'ai';
 import { z } from 'zod';
 
 /**
@@ -7,18 +6,18 @@ import { z } from 'zod';
  */
 export function mapZodToolsToJsonSchemaTools(
   tools: Tools,
-): Record<string, { description: string; parameters: any }> {
+): Record<string, { description: string; inputSchema: any }> {
   return Object.entries(tools).reduce(
     (acc, [key, value]) => {
       acc[key] = {
         description: value.description ?? `Tool: ${key}`,
-        parameters:
-          value.inputSchema instanceof z.ZodObject
-            ? zodSchema(value.inputSchema)
-            : value.inputSchema,
+        inputSchema: z.toJSONSchema(value.inputSchema as z.ZodType),
       };
       return acc;
     },
-    {} as Record<string, { description: string; parameters: any }>,
+    {} as Record<
+      string,
+      { description: string; inputSchema: z.core.JSONSchema.BaseSchema }
+    >,
   );
 }

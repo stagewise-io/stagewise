@@ -40,6 +40,7 @@ export async function listFilesTool(
   if (maxDepth !== undefined) {
     if (!Number.isInteger(maxDepth) || maxDepth < 0) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: 'maxDepth must be a non-negative integer',
         error: 'INVALID_MAX_DEPTH',
@@ -49,6 +50,7 @@ export async function listFilesTool(
 
   if (!includeFiles && !includeDirectories) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message:
         'At least one of includeFiles or includeDirectories must be true',
@@ -63,6 +65,7 @@ export async function listFilesTool(
     const pathExists = await clientRuntime.fileSystem.fileExists(absolutePath);
     if (!pathExists) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Path does not exist or is not accessible: ${relPath}`,
         error: 'PATH_NOT_FOUND',
@@ -73,6 +76,7 @@ export async function listFilesTool(
     const isDir = await clientRuntime.fileSystem.isDirectory(absolutePath);
     if (!isDir) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Path is not a directory: ${relPath}`,
         error: 'NOT_A_DIRECTORY',
@@ -91,6 +95,7 @@ export async function listFilesTool(
 
     if (!result.success) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Failed to list files in: ${relPath}`,
         error: result.error,
@@ -108,6 +113,7 @@ export async function listFilesTool(
     message += ` - ${result.totalFiles || 0} files, ${result.totalDirectories || 0} directories`;
 
     return {
+      undoExecute: () => Promise.resolve(),
       success: true,
       message,
       result: {
@@ -118,6 +124,7 @@ export async function listFilesTool(
     };
   } catch (error) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: `Failed to list files in: ${relPath}`,
       error: error instanceof Error ? error.message : 'Unknown error',

@@ -26,6 +26,7 @@ export async function overwriteFileTool(
   // Validate required parameters
   if (!relPath) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: 'Missing required parameter: path',
       error: 'MISSING_PATH',
@@ -34,6 +35,7 @@ export async function overwriteFileTool(
 
   if (content === undefined) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: 'Missing required parameter: content',
       error: 'MISSING_CONTENT',
@@ -51,6 +53,7 @@ export async function overwriteFileTool(
       const readResult = await clientRuntime.fileSystem.readFile(absolutePath);
       if (!readResult.success || readResult.content === undefined) {
         return {
+          undoExecute: () => Promise.resolve(),
           success: false,
           message: `Failed to read existing file: ${relPath}`,
           error: 'READ_ERROR',
@@ -89,6 +92,7 @@ export async function overwriteFileTool(
     );
     if (!writeResult.success) {
       return {
+        undoExecute: () => Promise.resolve(),
         success: false,
         message: `Failed to write file: ${relPath}`,
         error: writeResult.error || 'WRITE_ERROR',
@@ -131,6 +135,7 @@ export async function overwriteFileTool(
     };
   } catch (error) {
     return {
+      undoExecute: () => Promise.resolve(),
       success: false,
       message: `Failed to overwrite file: ${relPath}`,
       error: error instanceof Error ? error.message : 'Unknown error',

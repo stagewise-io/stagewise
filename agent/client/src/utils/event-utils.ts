@@ -62,7 +62,7 @@ export interface AgentResponseReceivedEvent extends BaseAgentEvent {
     toolCallCount: number;
     responseTime: number;
     credits: Awaited<
-      NonNullable<RouterOutputs['agent']['callAgent']['response']>
+      NonNullable<RouterOutputs['chat']['callAgent']['response']>
     >['credits'];
   };
 }
@@ -179,7 +179,7 @@ export const EventFactories = {
     toolCallCount: number;
     responseTime: number;
     credits: Awaited<
-      NonNullable<RouterOutputs['agent']['callAgent']['response']>
+      NonNullable<RouterOutputs['chat']['callAgent']['response']>
     >['credits'];
   }): AgentResponseReceivedEvent => ({
     type: 'agent_response_received',

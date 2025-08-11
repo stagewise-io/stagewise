@@ -27,7 +27,7 @@
     "esbuild": "^0.20.1",
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0",
-    "zod": "3.25.76",
+    "zod": "4.0.17",
     "zod-to-json-schema": "^3.24.5"
   }
 }
