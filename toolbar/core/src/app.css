@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+@plugin "@tailwindcss/typography";
+@plugin 'tailwind-scrollbar';
+
 :root {
   background-color: transparent;
   color-scheme: normal;
@@ -12,6 +15,22 @@ body {
 
 .root {
   isolation: isolate;
+}
+
+.markdown {
+  a {
+    @apply text-blue-600 hover:text-blue-700;
+  }
+
+  ul {
+    @apply list-disc;
+    @apply ml-4;
+  }
+
+  ol {
+    @apply list-decimal;
+    @apply ml-4;
+  }
 }
 
 /* Custom animations for chat box states */
@@ -133,7 +152,6 @@ body {
   .g-fast { opacity: var(--chat-grad-bg-opacity-fast); transition: opacity 1s ease-in-out; }
 }
 
-@plugin 'tailwind-scrollbar';
 
 @theme default {
   --color-background: var(--color-white);
