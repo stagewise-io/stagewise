@@ -38,7 +38,6 @@ export type KartonContract = {
   state: AppState;
   clientProcedures: {
     getAvailableTools: () => Promise<Tool[]>;
-    getActiveChat: () => Promise<string>;
   };
   serverProcedures: {
     createChat: () => Promise<string>;
