@@ -40,7 +40,7 @@ export function ChatBubble({ message: msg }: { message: ChatMessage }) {
       >
         <div
           className={cn(
-            'group relative flex min-h-8 animate-chat-bubble-appear flex-col items-stretch justify-center space-y-2 rounded-2xl bg-white/5 px-2.5 py-1 font-normal text-sm shadow-lg shadow-zinc-950/10 ring-1 ring-inset',
+            'group relative flex min-h-8 animate-chat-bubble-appear flex-col items-stretch justify-center space-y-2 break-words rounded-2xl bg-white/5 px-2.5 py-1 font-normal text-sm shadow-lg shadow-zinc-950/10 ring-1 ring-inset',
             msg.role === 'assistant'
               ? 'min-w-48 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-zinc-950 ring-zinc-950/5'
               : 'origin-bottom-right rounded-br-xs bg-blue-600/90 text-white ring-white/5',
@@ -115,7 +115,7 @@ const ReasoningPartItem = memo(
             />
           </DisclosureButton>
           <DisclosurePanel>
-            <p className="whitespace-pre-wrap rounded-md p-1 text-black/80 text-xs italic">
+            <p className="whitespace-pre-wrap rounded-md p-0.5 pt-2 pl-1 text-black/80 text-xs italic">
               {reasoningPart.text}
             </p>
           </DisclosurePanel>
