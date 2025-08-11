@@ -302,7 +302,7 @@ export class Agent {
   public async initialize(): Promise<{
     wss: Awaited<ReturnType<typeof createAgentHook>>['wss'];
   }> {
-    this.karton = await createKartonServer({
+    this.karton = await createKartonServer<KartonContract>({
       procedures: {
         abortAgentCall: async () => {
           this.setAgentWorking(false);
@@ -315,6 +315,7 @@ export class Agent {
         chats: {},
         isWorking: false,
         activeChatId: null,
+        toolCallApprovalRequests: [],
       },
     });
     this.setAgentWorking(false);
@@ -389,8 +390,7 @@ export class Agent {
     // });
 
     return {
-      wss: this.karton.wss, // TODO: find out how karton manages this
-      // wss: this.server!.wss,
+      wss: this.karton.wss,
     };
   }
 

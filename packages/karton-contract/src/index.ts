@@ -1,4 +1,3 @@
-import type { AppType } from '@stagewise/karton/shared';
 import type { UserMessageMetadata } from './metadata';
 import type { UIMessage } from 'ai';
 import type { Tool } from '@stagewise/agent-types';
@@ -35,7 +34,7 @@ type AppState = {
   isWorking: boolean;
 };
 
-export type KartonContract = AppType<{
+export type KartonContract = {
   state: AppState;
   clientProcedures: {
     getAvailableTools: () => Promise<Tool[]>;
@@ -50,4 +49,4 @@ export type KartonContract = AppType<{
     approveToolCall: (toolCallId: string) => Promise<void>;
     rejectToolCall: (toolCallId: string) => Promise<void>;
   };
-}>;
+};
