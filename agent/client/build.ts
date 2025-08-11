@@ -9,15 +9,12 @@ const baseOptions: BuildOptions = {
   bundle: true,
   platform: 'node',
   target: 'es2020',
-  external: ['@stagewise/agent-interface-internal'], // Keep Node.js built-ins external
-  sourcemap: false, // Disable source maps for production
+  external: ['@stagewise/agent-interface-internal', '@stagewise/karton'],
+  sourcemap: 'inline',
   minify: true,
   treeShaking: true,
   // Additional obfuscation options
   keepNames: false, // Don't preserve function/class names
-  mangleProps: /^_/, // Mangle private properties starting with _
-  mangleCache: {}, // Consistent mangling across builds
-  legalComments: 'none', // Remove all comments
 };
 
 const esmBuildOptions: BuildOptions = {

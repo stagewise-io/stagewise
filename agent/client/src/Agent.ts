@@ -396,7 +396,7 @@ export class Agent {
     // });
 
     return {
-      wss: null as any, // TODO: find out how karton manages this
+      wss: this.karton.wss, // TODO: find out how karton manages this
       // wss: this.server!.wss,
     };
   }

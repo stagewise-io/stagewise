@@ -46,7 +46,7 @@ export function Toolbar({
         minimized || isInitialLoad ? 'size-10 bg-blue-950/80' : 'size-auto',
         isDragged &&
           'scale-110 bg-sky-100/60 shadow-lg shadow-sky-500/10 blur-[0.2px]',
-        !isConnected && !isInitialLoad
+        isConnected || isInitialLoad
           ? '[--active-secondary:var(--color-blue-100)] [--active:var(--color-blue-600)] [--primary:var(--color-zinc-950)] [--secondary:var(--color-zinc-400)]'
           : 'bg-orange-200/50 [--active-secondary:var(--color-orange-100)] [--active:var(--color-orange-600)] [--primary:var(--color-orange-900)] [--secondary:var(--color-orange-100)]',
         'stroke-[var(--primary)] text-[var(--primary)]',

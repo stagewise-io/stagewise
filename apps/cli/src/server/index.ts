@@ -227,7 +227,7 @@ export const getServer = async () => {
           if (agentResult.success && agentResult.wss) {
             agentWss = agentResult.wss;
             log.debug('Received websocket server from agent loader');
-            agentWsPath = '/stagewise-toolbar-app/server/ws';
+            agentWsPath = '/stagewise-toolbar-app/karton';
             log.debug(
               `Agent WebSocket server configured for path: ${agentWsPath}`,
             );
@@ -261,16 +261,18 @@ export const getServer = async () => {
       if (!url.startsWith('/stagewise-toolbar-app')) {
         log.debug(`Proxying WebSocket request to app port ${config.appPort}`);
         proxy.upgrade?.(request, socket as any, head);
-      } else if (agentWss) {
-        // Handle agent WebSocket requests
-        log.debug('Handling agent WebSocket upgrade');
-        agentWss.handleUpgrade(request, socket, head, (ws: any) => {
-          agentWss.emit('connection', ws, request);
-        });
       } else {
-        // Unknown WebSocket path under /stagewise-toolbar-app
-        log.debug(`Unknown WebSocket path: ${url}`);
-        socket.destroy();
+        if (agentWss) {
+          // Handle agent WebSocket requests
+          log.debug('Handling agent WebSocket upgrade');
+          agentWss.handleUpgrade(request, socket, head, (ws: any) => {
+            agentWss.emit('connection', ws, request);
+          });
+        } else {
+          // Unknown WebSocket path under /stagewise-toolbar-app
+          log.debug(`Unknown WebSocket path: ${url}`);
+          socket.destroy();
+        }
       }
     });
 

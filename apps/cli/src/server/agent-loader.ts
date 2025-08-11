@@ -38,8 +38,6 @@ export async function loadAndInitializeAgent(
     agentInstance = Agent.getInstance({
       clientRuntime,
       accessToken,
-      agentDescription:
-        'Stagewise CLI Agent - Provides development tools and codebase interaction capabilities',
       onEvent: (event) => {
         printInfoMessages(event);
         switch (event.type) {
@@ -53,16 +51,14 @@ export async function loadAndInitializeAgent(
     });
 
     // Initialize agent with Express integration
-    // This will automatically set up the following endpoints:
-    // - /stagewise-toolbar-app/server/ws (WebSocket endpoint)
-    // - /stagewise-toolbar-app/server/info (HTTP info endpoint)
+    // This will automatically set up the Karton endpoint
     const agentServer = await agentInstance.initialize(
       app as any,
       server,
-      '/stagewise-toolbar-app/server',
+      '/stagewise-toolbar-app/karton',
     );
 
-    log.debug('Agent endpoints available at /stagewise-toolbar-app/server/*');
+    log.debug('Agent endpoints available at /stagewise-toolbar-app/karton');
 
     // Return the WebSocket server instance if available
     // The agent SDK may not return the WebSocket server in current versions

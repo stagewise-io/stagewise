@@ -27,14 +27,14 @@ interface ClientConnection {
 }
 
 class KartonServerImpl<T> implements KartonServer<T> {
-  private wss: WebSocketServer;
+  private internalWss: WebSocketServer;
   private clients: Map<string, ClientConnection> = new Map();
   private stateManager: StateManager<KartonState<T>>;
   private serverProcedures: KartonServerProcedureImplementations<T>;
   private _clientProcedures: KartonClientProceduresWithClientId<T>;
 
   constructor(config: KartonServerConfig<T>, wss: WebSocketServer) {
-    this.wss = wss;
+    this.internalWss = wss;
     this.serverProcedures = config.procedures;
 
     // Initialize state manager with broadcast function
@@ -80,7 +80,7 @@ class KartonServerImpl<T> implements KartonServer<T> {
   }
 
   private setupWebSocketServer(): void {
-    this.wss.on('connection', (ws: WebSocket) => {
+    this.internalWss.on('connection', (ws: WebSocket) => {
       this.handleNewConnection(ws);
     });
   }
@@ -139,6 +139,10 @@ class KartonServerImpl<T> implements KartonServer<T> {
     }
   }
 
+  public get wss(): WebSocketServer {
+    return this.internalWss;
+  }
+
   public get state(): Readonly<KartonState<T>> {
     return this.stateManager.getState();
   }
@@ -165,7 +169,7 @@ class KartonServerImpl<T> implements KartonServer<T> {
     this.clients.clear();
 
     return new Promise((resolve) => {
-      this.wss.close(() => resolve());
+      this.internalWss.close(() => resolve());
     });
   }
 }
@@ -175,8 +179,7 @@ export async function createKartonServer<T>(
 ): Promise<KartonServer<T>> {
   // Create WebSocket server
   const wss = new WebSocketServer({
-    server: config.httpServer,
-    path: config.webSocketPath,
+    noServer: true,
   });
 
   // Create and return the server implementation

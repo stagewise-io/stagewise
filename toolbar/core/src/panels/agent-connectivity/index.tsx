@@ -28,7 +28,6 @@ export function AgentConnectivityPanel() {
         actionArea={<WifiOffIcon className="size-6" />}
       />
       <PanelContent>
-        x
         <div className="space-y-3">
           <p className="text-muted-foreground text-sm">
             {!isConnected

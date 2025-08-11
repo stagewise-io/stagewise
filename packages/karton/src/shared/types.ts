@@ -1,5 +1,6 @@
 import type { Draft } from 'immer';
 import type { Patch } from 'immer';
+import type { WebSocketServer } from 'ws';
 
 // Deep validation helpers to ensure `state` does not contain functions or generator-like types
 type IsFunction<T> = T extends (...args: any[]) => any ? true : false;
@@ -322,6 +323,7 @@ export interface KartonServer<T> {
   setState: (recipe: (draft: Draft<KartonState<T>>) => void) => KartonState<T>;
   clientProcedures: KartonClientProceduresWithClientId<T>;
   connectedClients: ReadonlyArray<string>;
+  wss: WebSocketServer;
 }
 
 export interface KartonClientConfig<T> {
