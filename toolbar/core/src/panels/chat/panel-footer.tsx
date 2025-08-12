@@ -34,6 +34,11 @@ export function ChatPanelFooter({
       chats: s.state.chats,
       isConnected: s.isConnected,
     }));
+
+  const abortAgent = useCallback(() => {
+    stopAgent();
+  }, [stopAgent]);
+
   const activeChat = useMemo(() => {
     return activeChatId ? chats[activeChatId] : null;
   }, [activeChatId, chats]);
@@ -148,7 +153,7 @@ export function ChatPanelFooter({
           <Tooltip>
             <TooltipTrigger>
               <Button
-                onClick={stopAgent}
+                onClick={abortAgent}
                 aria-label="Stop agent"
                 glassy
                 variant="secondary"
