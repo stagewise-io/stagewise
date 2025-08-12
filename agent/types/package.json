@@ -26,7 +26,7 @@
     "typescript": "^5.8.3",
     "zod": "4.0.17",
     "@stagewise/agent-interface-internal": "workspace:*",
-    "@stagewise/api-client": "0.4.0"
+    "@stagewise/api-client": "1.0.0"
   },
   "dependencies": {
     "ai": "5.0.9"
