@@ -20,7 +20,7 @@ export function AgentConnectivityPanel() {
   return (
     <Panel
       className={
-        '[--color-foreground:var(--color-orange-700)] [--color-muted-foreground:var(--color-orange-600)] before:bg-orange-50/80'
+        '[--color-foreground:var(--color-orange-700)] [--color-muted-foreground:var(--color-orange-700)] before:bg-orange-50/80'
       }
     >
       <PanelHeader
