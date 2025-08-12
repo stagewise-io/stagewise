@@ -1,14 +1,14 @@
 import { tools as clientTools } from '@stagewise/agent-tools';
-import type { KartonContract, History } from '@stagewise/karton-contract';
+import type {
+  KartonContract,
+  History,
+  ChatMessage,
+} from '@stagewise/karton-contract';
 import {
   createKartonServer,
   type KartonServer,
 } from '@stagewise/karton/server';
-import type {
-  AssistantModelMessage,
-  ToolModelMessage,
-  LanguageModelResponseMetadata,
-} from 'ai';
+import type { InferUIMessageChunk } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
 import type { Tools } from '@stagewise/agent-types';
@@ -21,11 +21,7 @@ import type {
 } from '@stagewise/api-client';
 
 import { TimeoutManager } from './utils/stream-utils.js';
-import {
-  processParallelToolCalls,
-  shouldRecurseAfterToolCall,
-  type ToolCallProcessingResult,
-} from './utils/tool-call-utils.js';
+import { processParallelToolCalls } from './utils/tool-call-utils.js';
 import {
   createEventEmitter,
   EventFactories,
@@ -37,15 +33,14 @@ import {
   formatErrorDescription,
 } from './utils/error-utils.js';
 import type { createAgentHook } from '@stagewise/agent-interface-internal/agent';
-
-type ResponseMessage = (AssistantModelMessage | ToolModelMessage) & {
-  id: string;
-};
-
-// Type that represents what we actually get from tRPC (with serialized dates)
-type Response = LanguageModelResponseMetadata & {
-  messages: Array<ResponseMessage>;
-};
+import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
+import { getProjectPath } from '@stagewise/agent-prompt-snippets';
+import {
+  appendTextDeltaToMessage,
+  attachToolOutputToMessage,
+  createAndActivateNewChat,
+  appendToolInputToMessage,
+} from './utils/karton-helpers.js';
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
@@ -308,17 +303,54 @@ export class Agent {
         approveToolCall: async (_toolCallId, _callingClientId) => {},
         rejectToolCall: async (_toolCallId, _callingClientId) => {},
         createChat: async () => {
-          return 'TODO: replace';
+          return createAndActivateNewChat(this.karton!);
         },
-        switchChat: async (_chatId, _callingClientId) => {},
-        deleteChat: async (_chatId, _callingClientId) => {},
+        switchChat: async (chatId, _callingClientId) => {
+          this.karton?.setState((draft) => {
+            draft.activeChatId = chatId;
+          });
+        },
+        deleteChat: async (chatId, _callingClientId) => {
+          this.karton?.setState((draft) => {
+            if (draft.activeChatId === chatId) {
+              const nextChatId = Object.keys(draft.chats).find(
+                (id) => id !== chatId,
+              );
+              if (nextChatId) draft.activeChatId = nextChatId;
+              else createAndActivateNewChat(this.karton!);
+            }
+            delete draft.chats[chatId];
+          });
+        },
         sendUserMessage: async (message, _callingClientId) => {
+          this.setAgentWorking(true);
+          const newstate = this.karton?.setState((draft) => {
+            const chatId = this.karton!.state.activeChatId!;
+            draft.chats[chatId]!.messages.push(message as any); // TODO: fix the type issue here
+          });
+          const messages =
+            newstate?.chats[this.karton!.state.activeChatId!]!.messages;
+          const promptSnippets: PromptSnippet[] = [];
+          const projectPathPromptSnippet = await getProjectPath(
+            this.clientRuntime,
+          );
+          if (projectPathPromptSnippet) {
+            promptSnippets.push(projectPathPromptSnippet);
+          }
+          const projectInfoPromptSnippet = await getProjectInfo(
+            this.clientRuntime,
+          );
+          if (projectInfoPromptSnippet) {
+            promptSnippets.push(projectInfoPromptSnippet);
+          }
           await this.callAgent({
             chatId: this.karton!.state.activeChatId!,
-            history: [message],
+            history: messages,
             clientRuntime: this.clientRuntime,
-            promptSnippets: [],
+            promptSnippets,
           });
+
+          this.setAgentWorking(false);
         },
       },
       initialState: {
@@ -328,76 +360,9 @@ export class Agent {
         toolCallApprovalRequests: [],
       },
     });
+
     this.setAgentWorking(false);
-
-    this.karton.setState((draft) => {
-      const chatId = crypto.randomUUID();
-      // Will look like this: "New Chat - Aug 10, 12:00 PM"
-      const title = `New Chat - ${new Date().toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      })}`;
-      draft.chats[chatId] = {
-        title,
-        createdAt: new Date(),
-        messages: [],
-      };
-      draft.activeChatId = chatId;
-    });
-
-    // this.server.interface.chat.addChatUpdateListener(async (update) => {
-    //   switch (update.type) {
-    //     case 'chat-created':
-    //       this.chats[update.chat.id] = {
-    //         messages: [],
-    //         chatId: update.chat.id,
-    //       };
-    //       break;
-    //     case 'message-added': {
-    //       const chat = this.chats[update.chatId];
-    //       if (!chat || update.message.role !== 'user') return;
-    //       chat.messages.push(update.message);
-    //       this.setAgentWorking(true);
-    //       const promptSnippets: PromptSnippet[] = [];
-    //       const projectPathPromptSnippet = await getProjectPath(
-    //         this.clientRuntime,
-    //       );
-    //       if (projectPathPromptSnippet) {
-    //         promptSnippets.push(projectPathPromptSnippet);
-    //       }
-
-    //       const projectInfoPromptSnippet = await getProjectInfo(
-    //         this.clientRuntime,
-    //       );
-    //       if (projectInfoPromptSnippet) {
-    //         promptSnippets.push(projectInfoPromptSnippet);
-    //       }
-
-    //       this.callAgent({
-    //         chatId: chat.chatId,
-    //         history: chat.messages,
-    //         clientRuntime: this.clientRuntime,
-    //         promptSnippets,
-    //       });
-    //       break;
-    //     }
-    //     case 'message-updated':
-    //       break;
-    //     case 'messages-deleted':
-    //       break;
-    //     case 'chat-full-sync':
-    //       break;
-    //     case 'chat-list':
-    //       break;
-    //     case 'chat-switched':
-    //       break;
-    //     case 'chat-title-updated':
-    //       break;
-    //   }
-    // });
+    createAndActivateNewChat(this.karton);
 
     return {
       wss: this.karton.wss,
@@ -421,9 +386,7 @@ export class Agent {
     history?: History;
     clientRuntime: ClientRuntime;
     promptSnippets?: PromptSnippet[];
-  }): Promise<{
-    history: History;
-  }> {
+  }): Promise<void> {
     // Validate prerequisites
     if (!this.client) throw new Error('TRPC API client not initialized');
 
@@ -441,34 +404,36 @@ export class Agent {
           error: new Error(errorDesc),
         };
       });
-      return {
-        history: [],
-      };
+      return;
     }
 
     this.recursionDepth++;
 
     try {
-      const lastMessage =
-        'metadata' in (history?.at(-1) || {})
-          ? {
-              isUserMessage: true as const,
-              message: history?.at(-1),
-            }
-          : {
-              isUserMessage: false as const,
-              message: history?.at(-1),
-            };
+      const lastMessage = history?.at(-1);
+      const isUserMessage = lastMessage?.metadata?.browserData !== undefined;
+      const isFirstUserMessage =
+        history?.filter((m) => m.metadata?.browserData !== undefined).length ===
+        1;
+      const lastMessageIsUserMessage = isUserMessage
+        ? {
+            isUserMessage: true as const,
+            message: lastMessage,
+          }
+        : {
+            isUserMessage: false as const,
+            message: lastMessage,
+          };
 
-      if (lastMessage.isUserMessage) {
-        this.lastUserMessageId = lastMessage.message?.id ?? null;
+      if (lastMessageIsUserMessage.isUserMessage) {
+        this.lastUserMessageId = lastMessageIsUserMessage.message?.id ?? null;
       }
 
       // Prepare update to the chat title
-      if (lastMessage.isUserMessage && lastMessage.message) {
+      if (isFirstUserMessage && lastMessageIsUserMessage.message) {
         this.client.chat.generateChatTitle
           .mutate({
-            userMessage: lastMessage.message,
+            userMessage: lastMessageIsUserMessage.message,
           })
           .then((result) => {
             this.karton?.setState((draft) => {
@@ -479,18 +444,13 @@ export class Agent {
 
       // Emit prompt triggered event
 
-      if (lastMessage.isUserMessage)
+      if (lastMessageIsUserMessage.isUserMessage)
         this.eventEmitter.emit(
           EventFactories.agentPromptTriggered(
-            lastMessage.message,
+            lastMessageIsUserMessage.message,
             promptSnippets?.length || 0,
           ),
         );
-
-      // Keeping compatibility with the old agent API
-
-      // Call the agent API
-      const startTime = Date.now();
 
       const request = {
         messages: history ?? [],
@@ -500,72 +460,29 @@ export class Agent {
 
       const agentResponse = await this.callAgentWithRetry(request);
 
-      const { uiStream } = agentResponse;
+      const { uiStream, response } = agentResponse;
 
-      // const t = await response;
+      const { lastMessageId } = await this.parseUiStream(
+        uiStream as AsyncIterable<InferUIMessageChunk<ChatMessage>>,
+      );
 
-      // console.log('\nt\n', t);
+      const toolCalls = (await response).toolCalls;
 
-      for await (const chunk of uiStream) {
-        this.karton?.setState((draft) => {
-          if (!chatId) return console.log('\nchatId missing\n', chatId);
-          if (!draft.chats[chatId])
-            return console.log('\nchat not found\n', chatId);
-          draft.chats[chatId]!.messages.push({
-            role: 'assistant',
-            id: crypto.randomUUID(),
-            metadata: {
-              createdAt: new Date(),
-            },
-            parts: [
-              {
-                type: 'text',
-                text: chunk.type === 'text-delta' ? chunk.delta : '',
-              },
-            ],
-          });
-        });
-      }
-
-      this.setAgentWorking(true);
-
-      // Start stream consumption with timeout protection
-      // const { messageId } = await consumeStreamWithTimeout(
-      //   chatId,
-      //   fullStream,
-      //   this.karton!,
-      //   this.agentTimeout,
-      // );
-
-      // const r = await response; // this will throw an error if the user has aborted, will be handled in the catch below
-
-      const _responseTime = Date.now() - startTime;
-
-      // Count and emit response metrics
-      // const { hasToolCalls, toolCallCount } = countToolCalls(r.messages);
-      // this.eventEmitter.emit(
-      //   EventFactories.agentResponseReceived({
-      //     messageCount: r.messages.length,
-      //     hasToolCalls,
-      //     toolCallCount,
-      //     responseTime,
-      //     credits: r.credits,
-      //   }),
-      // );
-
-      // Process response messages
-      // await this.processResponseMessages(
-      //   r.messages,
-      //   history ?? [],
-      //   chatId,
-      //   messageId,
-      // );
+      const toolResults = await processParallelToolCalls(
+        toolCalls,
+        this.tools,
+        this.karton?.state.chats[chatId]!.messages ?? [],
+        this.timeoutManager,
+        (result) => {
+          attachToolOutputToMessage(this.karton!, [result], lastMessageId);
+        },
+      );
 
       // Check if recursion is needed
-      if (shouldRecurseAfterToolCall(history ?? [])) {
+      if (toolResults.length > 0) {
         return this.callAgent({
           chatId,
-          history: history ?? [],
+          history: this.karton?.state.chats[chatId]!.messages,
           clientRuntime,
           promptSnippets,
         });
@@ -573,27 +490,14 @@ export class Agent {
 
       // Clean up and finalize
       this.cleanupPendingOperations('Agent task completed successfully', false);
-      this.karton?.setState((draft) => {
-        if (draft.chats[chatId]) {
-          // TODO: fix the type issue here
-          // draft.chats[chatId]!.messages = history || [];
-        }
-      });
-
-      return {
-        // response: r,
-        history: history ?? [],
-      };
+      return;
     } catch (error) {
+      console.error('Error in callAgent', error);
       // If the user has aborted the agent, delete the last message
       if (error instanceof Error && error.name === 'AbortError') {
         // TODO: delete everything until the last user message
         this.setAgentWorking(false);
-
-        return {
-          // response: {} as Response,
-          history: [],
-        };
+        return;
       }
 
       const errorDesc = formatErrorDescription('Agent task failed', error);
@@ -609,192 +513,54 @@ export class Agent {
       setTimeout(() => {
         this.setAgentWorking(false);
       }, STATE_RECOVERY_DELAY);
-      return {
-        // response: {} as Response,
-        history: [],
-      };
+      return;
     } finally {
       // Ensure recursion depth is decremented
       this.recursionDepth = Math.max(0, this.recursionDepth - 1);
     }
   }
 
-  /**
-   * Processes response messages from the agent, handling text and tool calls
-   * @param messages - The messages to process
-   * @param history - The history of messages so far (NOT including the current assistant message - past assistant messages are included)
-   * @param chatId - The id of the chat
-   * @param messageId - The id of the message
-   */
-  private async processResponseMessages(
-    messages: Array<ResponseMessage>,
-    history: History,
-    chatId: string,
-    messageId: string,
-  ): Promise<void> {
-    for (const message of messages) {
-      const _assistantMessage = {
-        role: 'assistant' as const,
-        content: [] as Exclude<AssistantModelMessage['content'], string>,
-      };
-      if (Array.isArray(message.content)) {
-        // Collect all tool calls from this message
-        const toolCalls: Array<{
-          toolName: string;
-          toolCallId: string;
-          args: any;
-        }> = [];
-
-        // Process text content immediately, collect tool calls
-        // TODO: fix
-        // for (const content of message.content) {
-        //   if (content.type === 'text') {
-        //     assistantMessage.content.push({
-        //       type: 'text',
-        //       text: content.text,
-        //     });
-        //   } else if (content.type === 'tool-call') {
-        //     toolCalls.push({
-        //       toolName: content.toolName,
-        //       toolCallId: content.toolCallId,
-        //       args: content.args,
-        //     });
-        //   }
-        // }
-
-        // Add assistant message to history
-        // TODO: fix
-        // history.push(assistantMessage);
-
-        // Process all tool calls together if any
-        if (toolCalls.length > 0) {
-          const results = await this.processParallelToolCallsContent(
-            toolCalls,
-            history,
-            { chatId, messageId },
-          );
-
-          for (const result of results) {
-            if (result.success) {
-              if (result.result?.undoExecute) {
-                if (this.undoToolCallStack.chatId !== chatId) {
-                  this.undoToolCallStack.stack = [];
-                  this.undoToolCallStack.chatId = chatId;
-                }
-                this.undoToolCallStack.stack.push({
-                  toolName: result.toolName,
-                  toolCallId: result.toolCallId,
-                  undoExecute: result.result.undoExecute,
-                });
-              }
-            }
-          }
+  private async parseUiStream(
+    uiStream: AsyncIterable<InferUIMessageChunk<ChatMessage>>,
+  ) {
+    let messageId = 'julian-is-cool';
+    let partIndex = -1;
+    try {
+      for await (const chunk of uiStream) {
+        switch (chunk.type) {
+          case 'start':
+            messageId = chunk.messageId ?? 'julian-is-cool';
+            partIndex++;
+            break;
+          case 'text-start':
+            break;
+          case 'text-delta':
+            appendTextDeltaToMessage(
+              this.karton!,
+              messageId,
+              chunk.delta,
+              partIndex,
+            );
+            break;
+          case 'tool-input-start':
+            partIndex++;
+            break;
+          case 'tool-input-delta':
+          case 'tool-input-error':
+            break; // Skipped for now
+          case 'tool-input-available':
+            appendToolInputToMessage(this.karton!, messageId, chunk, partIndex);
+            break;
+          case 'tool-output-available':
+            // Should not happen - we append the output and this message
+            break;
         }
-      } else if (typeof message.content === 'string') {
-        // history.push({
-        //   role: 'assistant',
-        //   content: [{ type: 'text', text: message.content }],
-        // });
       }
+      return { lastMessageId: messageId };
+    } catch (error) {
+      console.error('Error parsing ui stream', error);
+      return { lastMessageId: messageId };
     }
-  }
-
-  /**
-   * Processes parallel tool calls from the response
-   */
-  private async processParallelToolCallsContent(
-    toolCalls: Array<{
-      toolName: string;
-      toolCallId: string;
-      args: any;
-    }>,
-    history: History,
-    options?: {
-      syntheticCall?: boolean;
-      chatId?: string;
-      messageId?: string;
-    },
-  ): Promise<ToolCallProcessingResult[]> {
-    const _explanations = toolCalls
-      .map((tc) => ('explanation' in tc.args ? tc.args.explanation : null))
-      .filter((explanation) => explanation !== null);
-
-    if (!options?.syntheticCall) {
-      this.setAgentWorking(true);
-    } else {
-      // Find a way to 'hide' synthetic tool calls
-    }
-
-    // Emit events for each tool call
-    for (const tc of toolCalls) {
-      const tool = this.tools[tc.toolName];
-      if (!tool) continue;
-
-      this.eventEmitter.emit(
-        EventFactories.toolCallRequested(
-          tc.toolName,
-          tool.stagewiseMetadata?.runtime !== 'browser',
-          tool.stagewiseMetadata?.runtime === 'browser',
-        ),
-      );
-    }
-
-    // Process all tool calls
-    const results = await processParallelToolCalls(
-      toolCalls,
-      this.tools,
-      this.karton!,
-      history,
-      (state) => this.setAgentWorking(state),
-      this.timeoutManager,
-      (result) => {
-        this.eventEmitter.emit(
-          EventFactories.toolCallCompleted(
-            result.toolName,
-            result.success,
-            result.duration,
-            result.error,
-          ),
-        );
-      },
-    );
-    if (results.length > 0) {
-      // update the chat with the tool results
-      // TODO: this will be a bit hacky
-      // this.karton?.setState((draft) => {
-      //   draft.chats[options?.chatId!]!.messages.push(
-      //     ...results.map((r) => ({
-      //       role: 'tool' as const,
-      //       content: [
-      //         {
-      //           type: 'tool-result' as const,
-      //           toolCallId: r.toolCallId,
-      //           toolName: r.toolName,
-      //           result: r.result,
-      //           isError: r.error === 'error',
-      //         },
-      //       ],
-      //     })),
-      //   );
-      // });
-      // this.server?.interface.chat.addMessage(
-      //   {
-      //     id: crypto.randomUUID(),
-      //     createdAt: new Date(),
-      //     role: 'tool',
-      //     content: results.map((r) => ({
-      //       type: 'tool-result',
-      //       toolCallId: r.toolCallId,
-      //       toolName: r.toolName,
-      //       output: r.result,
-      //       isError: r.error === 'error',
-      //     })),
-      //   },
-      //   options?.chatId,
-      // );
-    }
-
-    return results;
   }
 
   /**

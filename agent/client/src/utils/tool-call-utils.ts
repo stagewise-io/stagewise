@@ -1,10 +1,10 @@
 import type { ToolResult } from '@stagewise/agent-types';
-import type { KartonServer } from '@stagewise/karton/server';
-import type { KartonContract, History } from '@stagewise/karton-contract';
+import type { History } from '@stagewise/karton-contract';
 import type { Tools } from '@stagewise/agent-types';
 import { messagesToCoreMessages } from './message-utils.js';
 import type { TimeoutManager } from './stream-utils.js';
 import { ErrorDescriptions } from './error-utils.js';
+import type { TypedToolCall } from 'ai';
 
 // Configuration constants
 const BROWSER_TOOL_TIMEOUT = 60000; // 60 seconds for browser tools
@@ -17,10 +17,8 @@ interface ToolCallContext {
   tool: Tool;
   toolName: string;
   toolCallId: string;
-  args: any;
-  karton: KartonServer<KartonContract>;
+  input: any;
   history: History;
-  setWorkingState: (state: boolean, description?: string) => void;
   onToolCallComplete?: (result: ToolCallProcessingResult) => void;
 }
 
@@ -29,7 +27,10 @@ export interface ToolCallProcessingResult {
   toolName: string;
   toolCallId: string;
   duration: number;
-  error?: 'error' | 'user_interaction_required';
+  error?: {
+    type: 'error' | 'user_interaction_required';
+    message: string;
+  };
   result?: any;
 }
 
@@ -40,7 +41,7 @@ export async function processBrowserToolCall(
   context: ToolCallContext,
   timeoutManager: TimeoutManager,
 ): Promise<ToolCallProcessingResult> {
-  const { toolName, toolCallId, setWorkingState } = context;
+  const { toolName, toolCallId } = context;
 
   // Set up timeout for browser tool
   const timeoutKey = `browser-tool-${toolCallId}`;
@@ -48,20 +49,12 @@ export async function processBrowserToolCall(
     timeoutKey,
     () => {
       console.warn(`[Agent]: Browser tool ${toolName} timed out`);
-      setWorkingState(false, 'Browser tool timeout');
     },
     BROWSER_TOOL_TIMEOUT,
   );
 
   try {
-    // const toolCallResult = await withTimeout(
-    //   server.interface.toolCalling.requestToolCall(
-    //     toolName,
-    //     args as Record<string, unknown>,
-    //   ),
-    //   BROWSER_TOOL_TIMEOUT,
-    //   'Browser tool timeout',
-    // );
+    // TODO: call
     const toolCallResult = {
       result: {
         type: 'tool-result' as const,
@@ -82,10 +75,6 @@ export async function processBrowserToolCall(
       result: toolCallResult.result,
     };
 
-    if (context.onToolCallComplete) {
-      context.onToolCallComplete(result);
-    }
-
     return result;
   } catch (error) {
     const errorDescription = ErrorDescriptions.browserToolError(
@@ -93,14 +82,16 @@ export async function processBrowserToolCall(
       error,
     );
     timeoutManager.clear(timeoutKey);
-    setWorkingState(false, errorDescription);
 
     const result: ToolCallProcessingResult = {
       success: false,
       toolName,
       toolCallId,
       duration: 0,
-      error: 'error',
+      error: {
+        type: 'error',
+        message: errorDescription,
+      },
     };
 
     if (context.onToolCallComplete) {
@@ -112,21 +103,12 @@ export async function processBrowserToolCall(
 }
 
 /**
- * Helper function to check if auto tool calls are allowed
- */
-function isAutoToolCallAllowed(tool: Tool) {
-  if (tool.stagewiseMetadata?.runtime === 'client') return true;
-  else return false;
-}
-
-/**
  * Processes a client-side tool call
  */
 export async function processClientSideToolCall(
   context: ToolCallContext,
 ): Promise<ToolCallProcessingResult> {
-  const { tool, toolName, toolCallId, args, history, setWorkingState } =
-    context;
+  const { tool, toolName, toolCallId, input, history } = context;
 
   const startTime = Date.now();
 
@@ -140,15 +122,7 @@ export async function processClientSideToolCall(
     result?: ToolResult;
   };
 
-  if (!isAutoToolCallAllowed(tool)) {
-    result = {
-      error: false,
-      userInteractionType: 'user-permission',
-      userInteractionRequired: true,
-      userInteractionParams: {},
-    };
-  } else if (tool.stagewiseMetadata?.runtime !== 'client') {
-    // This should not happen given the isAutoToolCallAllowed check, but keeping for safety
+  if (tool.stagewiseMetadata?.runtime !== 'client') {
     result = {
       error: true,
       errorMessage: 'Tool is not clientside',
@@ -156,11 +130,11 @@ export async function processClientSideToolCall(
   } else if (!tool.execute) {
     result = {
       error: true,
-      errorMessage: 'Client-side tool needs execute-function',
+      errorMessage: 'Issue with the tool - no handler found',
     };
   } else {
     // Execute the tool
-    const executeResult = await tool.execute(args, {
+    const executeResult = await tool.execute(input, {
       toolCallId,
       messages: messagesToCoreMessages(history),
     });
@@ -178,38 +152,36 @@ export async function processClientSideToolCall(
     const errorDescription = ErrorDescriptions.toolCallFailed(
       toolName,
       result.errorMessage || result.error,
-      args,
+      input,
       duration,
     );
-    setWorkingState(false, errorDescription);
 
     const processResult: ToolCallProcessingResult = {
       success: false,
       toolName,
       toolCallId,
       duration,
-      error: 'error',
+      error: {
+        type: 'error',
+        message: errorDescription,
+      },
     };
 
     if (context.onToolCallComplete) {
       context.onToolCallComplete(processResult);
     }
 
-    // Reset to idle after 2 seconds
-    setTimeout(() => {
-      setWorkingState(false);
-    }, 2000);
-
     return processResult;
   } else if (result.userInteractionRequired) {
-    setWorkingState(true);
-
     const processResult: ToolCallProcessingResult = {
       success: false,
       toolName,
       toolCallId,
       duration,
-      error: 'user_interaction_required',
+      error: {
+        type: 'user_interaction_required',
+        message: 'User interaction required',
+      },
     };
 
     if (context.onToolCallComplete) {
@@ -257,22 +229,14 @@ export async function processToolCall(
  * Processes multiple tool calls in parallel
  */
 export async function processParallelToolCalls(
-  toolCalls: Array<{
-    toolName: string;
-    toolCallId: string;
-    args: any;
-  }>,
+  toolCalls: TypedToolCall<
+    Record<string, { description: string; inputSchema: any }>
+  >[],
   tools: Tools,
-  karton: KartonServer<KartonContract>,
   history: History,
-  setWorkingState: (state: boolean) => void,
   timeoutManager: TimeoutManager,
   onToolCallComplete?: (result: ToolCallProcessingResult) => void,
 ): Promise<ToolCallProcessingResult[]> {
-  // Add assistant message with all tool calls
-  // TODO: update the history via karton
-  // history.push(createAssistantToolCallsMessage(toolCalls));
-
   // Process all tool calls
   const results: ToolCallProcessingResult[] = [];
 
@@ -293,10 +257,8 @@ export async function processParallelToolCalls(
       tool,
       toolName: tc.toolName,
       toolCallId: tc.toolCallId,
-      args: tc.args,
-      karton,
+      input: tc.input,
       history,
-      setWorkingState,
       onToolCallComplete,
     };
 
@@ -317,11 +279,8 @@ export async function processParallelToolCalls(
       tool,
       toolName: tc.toolName,
       toolCallId: tc.toolCallId,
-      args: tc.args,
-      karton,
+      input: tc.input,
       history,
-      setWorkingState,
-      onToolCallComplete,
     };
 
     try {
@@ -338,44 +297,5 @@ export async function processParallelToolCalls(
     ...clientResults.filter((r): r is ToolCallProcessingResult => r !== null),
   );
 
-  // Add tool results message with all successful results
-  // NOTE: 'successful' means NOT that the tool call itself was successful, but the execution of the tool call was successful
-  // So the result may still include an error (e.g. agent has picked invalid parameters)
-  const successfulResults = results
-    .filter((r) => r.success)
-    .map((r) => ({
-      type: 'tool-result' as const,
-      toolName: r.toolName,
-      toolCallId: r.toolCallId,
-      result: r.result,
-    }));
-
-  if (successfulResults.length > 0) {
-    // TODO: update the history via karton
-    // history.push({
-    //   role: 'tool',
-    //   content: successfulResults,
-    // });
-  }
-
   return results;
-}
-
-/**
- * Determines if the agent should make a recursive call after tool execution
- */
-export function shouldRecurseAfterToolCall(history: History): boolean {
-  const lastMessage = history[history.length - 1];
-
-  if (!lastMessage || 'contentItems' in lastMessage) {
-    return false;
-  }
-
-  return false;
-  // TODO: fix this
-  // return (
-  //   lastMessage.role === 'tool' &&
-  //   Array.isArray(lastMessage.content) &&
-  //   lastMessage.content[0]?.type === 'tool-result'
-  // );
 }

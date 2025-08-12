@@ -1,7 +1,7 @@
 import type {
   SelectedElement,
   UserMessageMetadata,
-} from '@stagewise/agent-interface-internal/toolbar';
+} from '@stagewise/karton-contract';
 
 export const companionAnchorTagName = 'stagewise-companion-anchor';
 
@@ -456,6 +456,7 @@ export const collectUserMessageMetadata = (
 ): UserMessageMetadata => {
   const iframeWindow = getIFrameWindow();
   return {
+    createdAt: new Date(),
     browserData: {
       currentUrl: truncateString(iframeWindow?.location.href, 1024),
       currentTitle: truncateString(iframeWindow?.document.title, 256),

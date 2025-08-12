@@ -40,7 +40,7 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
         // We don't collect additional pluginContentItems when plugins send messages since it's probably a very specific message anyway
         sendUserMessage({
           ...prompt,
-          metadata: { ...collectUserMessageMetadata([], true) },
+          metadata: collectUserMessageMetadata([], true),
           role: 'user',
         });
         openChat();

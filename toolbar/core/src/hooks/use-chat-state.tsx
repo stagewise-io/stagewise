@@ -160,7 +160,10 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         id: generateId(),
         parts: [{ type: 'text' as const, text: chatInput }],
         role: 'user',
-        metadata,
+        metadata: {
+          ...metadata,
+          createdAt: new Date(),
+        },
       };
 
       // Process plugin content for both old and new format

@@ -1,8 +1,9 @@
-import type { UserMessageMetadata } from './metadata';
+import type { UserMessageMetadata, SelectedElement } from './metadata.js';
 import type { UIMessage } from 'ai';
 import type { Tool } from '@stagewise/agent-types';
 
 export type ChatMessage = UIMessage<UserMessageMetadata>;
+export type { UserMessageMetadata, SelectedElement };
 
 export type {
   TextUIPart,
