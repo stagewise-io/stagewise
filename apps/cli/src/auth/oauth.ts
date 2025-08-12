@@ -11,7 +11,7 @@ import { createNodeApiClient } from '@stagewise/api-client';
 const STAGEWISE_CONSOLE_URL =
   process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
 
-const API_URL = process.env.API_URL || 'https://api.stagewise.io';
+const API_URL = process.env.API_URL || 'https://v1.api.stagewise.io';
 
 interface TokenPair {
   accessToken: string;

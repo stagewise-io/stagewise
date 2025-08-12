@@ -93,7 +93,7 @@ const import_meta_url = require('url').pathToFileURL(__filename).href;
           process.env.STAGEWISE_CONSOLE_URL ?? 'https://console.stagewise.io',
         ),
         'process.env.API_URL': JSON.stringify(
-          process.env.API_URL ?? 'https://api.stagewise.io',
+          process.env.API_URL ?? 'https://v1.api.stagewise.io',
         ),
       },
       sourcemap: true,
