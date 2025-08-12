@@ -41,11 +41,11 @@ import {
   createAndActivateNewChat,
   appendToolInputToMessage,
 } from './utils/karton-helpers.js';
+import { isAbortError } from './utils/is-abort-error.js';
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
 const MAX_RECURSION_DEPTH = 20;
-const STATE_RECOVERY_DELAY = 5000; // 5 seconds
 
 export class Agent {
   private static instance: Agent;
@@ -62,7 +62,7 @@ export class Agent {
   private authRetryCount = 0;
   private maxAuthRetries = 2;
   private abortController: AbortController;
-  private lastUserMessageId: string | null = null;
+  private lastMessageId: string | null = null;
   // undo is only allowed for one chat at a time.
   // if the user switches to a new chat, the undo stack is cleared
   private undoToolCallStack: {
@@ -92,7 +92,6 @@ export class Agent {
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
     this.timeoutManager = new TimeoutManager();
     this.abortController = new AbortController();
-    this.lastUserMessageId = null;
   }
 
   public shutdown() {
@@ -182,6 +181,9 @@ export class Agent {
 
           // Retry the request
           return this.callAgentWithRetry(request);
+        } else if (error instanceof Error && error.name === 'AbortError') {
+          // Abort error is not an auth error
+          throw error;
         } else {
           // Max retries exceeded
           this.authRetryCount = 0;
@@ -296,6 +298,28 @@ export class Agent {
   }> {
     this.karton = await createKartonServer<KartonContract>({
       procedures: {
+        retrySendingUserMessage: async () => {
+          this.setAgentWorking(true);
+          this.karton?.setState((draft) => {
+            draft.chats[draft.activeChatId!]!.error = undefined;
+          });
+          const promptSnippets: PromptSnippet[] = [];
+          const projectPathPromptSnippet = await getProjectPath(
+            this.clientRuntime,
+          );
+          if (projectPathPromptSnippet) {
+            promptSnippets.push(projectPathPromptSnippet);
+          }
+          await this.callAgent({
+            chatId: this.karton!.state.activeChatId!,
+            history:
+              this.karton!.state.chats[this.karton!.state.activeChatId!]!
+                .messages,
+            clientRuntime: this.clientRuntime,
+            promptSnippets,
+          });
+          this.setAgentWorking(false);
+        },
         abortAgentCall: async () => {
           this.abortController.abort();
           this.abortController = new AbortController();
@@ -327,6 +351,7 @@ export class Agent {
           const newstate = this.karton?.setState((draft) => {
             const chatId = this.karton!.state.activeChatId!;
             draft.chats[chatId]!.messages.push(message as any); // TODO: fix the type issue here
+            draft.chats[chatId]!.error = undefined;
           });
           const messages =
             newstate?.chats[this.karton!.state.activeChatId!]!.messages;
@@ -396,7 +421,6 @@ export class Agent {
         this.recursionDepth,
         MAX_RECURSION_DEPTH,
       );
-      // TODO: add an error message to the chat
       this.setAgentWorking(false);
       this.karton?.setState((draft) => {
         draft.chats[chatId]!.error = {
@@ -424,10 +448,6 @@ export class Agent {
             isUserMessage: false as const,
             message: lastMessage,
           };
-
-      if (lastMessageIsUserMessage.isUserMessage) {
-        this.lastUserMessageId = lastMessageIsUserMessage.message?.id ?? null;
-      }
 
       // Prepare update to the chat title
       if (isFirstUserMessage && lastMessageIsUserMessage.message) {
@@ -460,11 +480,23 @@ export class Agent {
 
       const agentResponse = await this.callAgentWithRetry(request);
 
-      const { uiStream, response } = agentResponse;
+      const { uiStream, response, fullStream } = agentResponse;
 
-      const { lastMessageId } = await this.parseUiStream(
-        uiStream as AsyncIterable<InferUIMessageChunk<ChatMessage>>,
-      );
+      try {
+        await this.parseUiStream(
+          uiStream as AsyncIterable<InferUIMessageChunk<ChatMessage>>,
+          (messageId) => {
+            this.lastMessageId = messageId;
+          },
+        );
+      } catch (error) {
+        // Ignore abort errors, they are handled in the catch block below
+        if (!isAbortError(error)) throw error;
+      }
+
+      try {
+        for await (const _ of fullStream) continue; // consume the full stream to catch all errors
+      } catch (_) {}
 
       const toolCalls = (await response).toolCalls;
 
@@ -474,7 +506,11 @@ export class Agent {
         this.karton?.state.chats[chatId]!.messages ?? [],
         this.timeoutManager,
         (result) => {
-          attachToolOutputToMessage(this.karton!, [result], lastMessageId);
+          attachToolOutputToMessage(
+            this.karton!,
+            [result],
+            this.lastMessageId!,
+          );
         },
       );
 
@@ -492,15 +528,13 @@ export class Agent {
       this.cleanupPendingOperations('Agent task completed successfully', false);
       return;
     } catch (error) {
-      console.error('Error in callAgent', error);
-      // If the user has aborted the agent, delete the last message
-      if (error instanceof Error && error.name === 'AbortError') {
-        // TODO: delete everything until the last user message
+      // If the user has aborted the agent, set the agent to idle
+      if (isAbortError(error)) {
         this.setAgentWorking(false);
         return;
       }
 
-      const errorDesc = formatErrorDescription('Agent task failed', error);
+      const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
       this.karton?.setState((draft) => {
         draft.chats[chatId]!.error = {
@@ -509,10 +543,6 @@ export class Agent {
         };
       });
 
-      // Reset to idle after delay
-      setTimeout(() => {
-        this.setAgentWorking(false);
-      }, STATE_RECOVERY_DELAY);
       return;
     } finally {
       // Ensure recursion depth is decremented
@@ -522,44 +552,41 @@ export class Agent {
 
   private async parseUiStream(
     uiStream: AsyncIterable<InferUIMessageChunk<ChatMessage>>,
+    onNewMessage?: (messageId: string) => void,
   ) {
+    // Only throw test error with 20% probability
     let messageId = 'julian-is-cool';
     let partIndex = -1;
-    try {
-      for await (const chunk of uiStream) {
-        switch (chunk.type) {
-          case 'start':
-            messageId = chunk.messageId ?? 'julian-is-cool';
-            partIndex++;
-            break;
-          case 'text-start':
-            break;
-          case 'text-delta':
-            appendTextDeltaToMessage(
-              this.karton!,
-              messageId,
-              chunk.delta,
-              partIndex,
-            );
-            break;
-          case 'tool-input-start':
-            partIndex++;
-            break;
-          case 'tool-input-delta':
-          case 'tool-input-error':
-            break; // Skipped for now
-          case 'tool-input-available':
-            appendToolInputToMessage(this.karton!, messageId, chunk, partIndex);
-            break;
-          case 'tool-output-available':
-            // Should not happen - we append the output and this message
-            break;
-        }
+    for await (const chunk of uiStream) {
+      switch (chunk.type) {
+        case 'start':
+          messageId = chunk.messageId ?? 'julian-is-cool';
+          partIndex++;
+          onNewMessage?.(messageId);
+          break;
+        case 'text-start':
+          break;
+        case 'text-delta':
+          appendTextDeltaToMessage(
+            this.karton!,
+            messageId,
+            chunk.delta,
+            partIndex,
+          );
+          break;
+        case 'tool-input-start':
+          partIndex++;
+          break;
+        case 'tool-input-delta':
+        case 'tool-input-error':
+          break; // Skipped for now
+        case 'tool-input-available':
+          appendToolInputToMessage(this.karton!, messageId, chunk, partIndex);
+          break;
+        case 'tool-output-available':
+          // Should not happen - we append the output and this message
+          break;
       }
-      return { lastMessageId: messageId };
-    } catch (error) {
-      console.error('Error parsing ui stream', error);
-      return { lastMessageId: messageId };
     }
   }
 

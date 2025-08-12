@@ -95,7 +95,6 @@ export function appendToolInputToMessage(
     );
     if (!message) {
       // If the message doesn't exist, create it
-      console.error('\n\nmessage does not exist\n\n', messageId);
       draft.chats[karton.state.activeChatId!]!.messages.push({
         role: 'assistant',
         id: messageId,
