@@ -335,14 +335,21 @@ export class Agent {
           });
         },
         deleteChat: async (chatId, _callingClientId) => {
+          // if the active chat is being deleted, figure out which chat to switch to
+          if (this.karton!.state.activeChatId === chatId) {
+            const nextChatId = Object.keys(this.karton!.state.chats).find(
+              (id) => id !== chatId,
+            );
+            // if there are no other chats, create a new one
+            if (!nextChatId) createAndActivateNewChat(this.karton!);
+            // if there are other chats, switch to the next one
+            else
+              this.karton?.setState((draft) => {
+                draft.activeChatId = nextChatId;
+              });
+          }
+          // finally delete the chat
           this.karton?.setState((draft) => {
-            if (draft.activeChatId === chatId) {
-              const nextChatId = Object.keys(draft.chats).find(
-                (id) => id !== chatId,
-              );
-              if (nextChatId) draft.activeChatId = nextChatId;
-              else createAndActivateNewChat(this.karton!);
-            }
             delete draft.chats[chatId];
           });
         },
@@ -457,7 +464,9 @@ export class Agent {
           })
           .then((result) => {
             this.karton?.setState((draft) => {
-              draft.chats[chatId]!.title = result.title;
+              // chat could've been deleted in the meantime
+              const chatExists = draft.chats[chatId] !== undefined;
+              if (chatExists) draft.chats[chatId]!.title = result.title;
             });
           });
       }
