@@ -30,7 +30,6 @@ import {
 import ReactMarkdown from 'react-markdown';
 
 export function ChatBubble({ message: msg }: { message: ChatMessage }) {
-  console.log('msg', msg);
   return (
     <div className="flex flex-col gap-1">
       <div

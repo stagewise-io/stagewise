@@ -3,6 +3,8 @@ import { ChatBubble } from './chat-bubble';
 import { Loader2Icon, SparklesIcon } from 'lucide-react';
 import { useKarton } from '@/hooks/use-karton';
 import { cn } from '@/utils';
+import { ChatErrorBubble } from './chat-error-bubble';
+import type { AgentError } from '@stagewise/karton-contract';
 
 export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
   const wasAtBottomRef = useRef(true);
@@ -16,6 +18,11 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
   const activeChat = useMemo(() => {
     return activeChatId ? chats[activeChatId] : null;
   }, [activeChatId, chats]);
+
+  const dummyError: AgentError = {
+    type: 'agent-error',
+    error: new Error('This is a test error'),
+  };
 
   // Force scroll to the very bottom
   const scrollToBottom = () => {
@@ -100,6 +107,8 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
           <ChatBubble key={`${message.role}-${index}`} message={message} />
         );
       }) ?? []}
+
+      {true && <ChatErrorBubble error={dummyError} />}
 
       <div
         className={cn(
