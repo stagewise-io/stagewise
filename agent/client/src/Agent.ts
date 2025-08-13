@@ -381,14 +381,14 @@ export class Agent {
           if (projectInfoPromptSnippet) {
             promptSnippets.push(projectInfoPromptSnippet);
           }
-          await this.callAgent({
+          this.callAgent({
             chatId: this.karton!.state.activeChatId!,
             history: messages,
             clientRuntime: this.clientRuntime,
             promptSnippets,
+          }).then(() => {
+            this.setAgentWorking(false);
           });
-
-          this.setAgentWorking(false);
         },
       },
       initialState: {
@@ -452,7 +452,7 @@ export class Agent {
       const isFirstUserMessage =
         history?.filter((m) => m.metadata?.browserData !== undefined).length ===
         1;
-      const lastMessageIsUserMessage = isUserMessage
+      const lastMessageMetadata = isUserMessage
         ? {
             isUserMessage: true as const,
             message: lastMessage,
@@ -463,10 +463,10 @@ export class Agent {
           };
 
       // Prepare update to the chat title
-      if (isFirstUserMessage && lastMessageIsUserMessage.message) {
+      if (isFirstUserMessage && lastMessageMetadata.isUserMessage) {
         this.client.chat.generateChatTitle
           .mutate({
-            userMessage: lastMessageIsUserMessage.message,
+            userMessage: lastMessageMetadata.message,
           })
           .then((result) => {
             this.karton?.setState((draft) => {
@@ -479,10 +479,10 @@ export class Agent {
 
       // Emit prompt triggered event
 
-      if (lastMessageIsUserMessage.isUserMessage)
+      if (lastMessageMetadata.isUserMessage)
         this.eventEmitter.emit(
           EventFactories.agentPromptTriggered(
-            lastMessageIsUserMessage.message,
+            lastMessageMetadata.message,
             promptSnippets?.length || 0,
           ),
         );
