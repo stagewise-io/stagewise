@@ -40,7 +40,7 @@
     "@stagewise/agent-interface-internal": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
     "@stagewise/karton": "workspace:*",
-    "@stagewise/api-client": "1.0.0",
+    "@stagewise/api-client": "1.1.0",
     "@stagewise/agent-prompt-snippets": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
