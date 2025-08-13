@@ -221,13 +221,13 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         });
       });
 
-      // Send the message using the chat capability
-      await sendChatMessage(message);
-
       // Reset state after sending
       setChatInput('');
       setDomContextElements([]);
       stopPromptCreation();
+
+      // Send the message using the chat capability
+      await sendChatMessage(message);
     } finally {
       setIsSending(false);
     }
