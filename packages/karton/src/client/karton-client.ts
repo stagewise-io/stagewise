@@ -88,12 +88,14 @@ class KartonClientImpl<T> implements KartonClient<T> {
       // Handle connection open
       this.connection.onOpen(() => {
         this._isConnected = true;
+        this.onStateChange?.();
         this.clearReconnectTimer();
       });
 
       // Handle connection close
       this.connection.onClose(() => {
         this._isConnected = false;
+        this.onStateChange?.();
         this.scheduleReconnect();
       });
 
@@ -156,6 +158,7 @@ class KartonClientImpl<T> implements KartonClient<T> {
   public close(): void {
     this.clearReconnectTimer();
     this.cleanup();
+    this.onStateChange?.();
   }
 }
 

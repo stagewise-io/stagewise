@@ -7,6 +7,7 @@ import {
   useKartonState,
 } from '@/hooks/use-karton';
 import type { Chat } from '@stagewise/karton-contract';
+import { cn } from '@/utils';
 
 export function ChatList({ onClose }: { onClose: () => void }) {
   const { chats, activeChatId, isWorking } = useKartonState(
@@ -31,6 +32,7 @@ export function ChatList({ onClose }: { onClose: () => void }) {
           chatId={chatId}
           chat={chat}
           isActive={chatId === activeChatId}
+          isOnly={Object.keys(chats).length === 1}
           onClose={onClose}
         />
       ))}
@@ -43,11 +45,13 @@ function ChatListEntry({
   chatId,
   isActive,
   onClose,
+  isOnly,
 }: {
   chatId: string;
   chat: Chat;
   isActive: boolean;
   onClose: () => void;
+  isOnly: boolean;
 }) {
   const deleteChat = useKartonProcedure((p) => p.deleteChat);
   const switchChat = useKartonProcedure((p) => p.switchChat);
@@ -63,7 +67,12 @@ function ChatListEntry({
         }}
       >
         <div className="flex flex-1 flex-col items-start justify-start gap-0">
-          <span className="truncate font-medium text-sm text-zinc-950">
+          <span
+            className={cn(
+              'truncate font-medium text-sm text-zinc-950',
+              isActive && 'text-blue-600',
+            )}
+          >
             {chat.title}
           </span>
           <span className="text-xs text-zinc-600">
@@ -77,6 +86,9 @@ function ChatListEntry({
             onClick={(ev) => {
               ev.stopPropagation();
               deleteChat(chatId);
+              if (isOnly) {
+                onClose();
+              }
             }}
           >
             <Trash2Icon className="size-4" />

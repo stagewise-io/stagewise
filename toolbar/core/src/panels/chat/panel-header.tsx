@@ -2,7 +2,7 @@ import { PanelHeader } from '@/components/ui/panel';
 import { cn } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { XIcon, PlusIcon, AlignJustifyIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ChatList } from './chat-list';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import {
@@ -10,18 +10,34 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useChatState } from '@/hooks/use-chat-state';
 
 export function ChatPanelHeader() {
   const [chatListOpen, setChatListOpen] = useState(false);
 
-  const createChat = useKartonProcedure((p) => p.createChat);
+  const createChatProcedure = useKartonProcedure((p) => p.createChat);
   const chats = useKartonState((s) => s.chats);
   const activeChatId = useKartonState((s) => s.activeChatId);
   const isWorking = useKartonState((s) => s.isWorking);
 
+  const { startPromptCreation } = useChatState();
+
+  const createChat = useCallback(() => {
+    createChatProcedure().then(() => {
+      setChatListOpen(false);
+      startPromptCreation();
+    });
+  }, [createChatProcedure, setChatListOpen, startPromptCreation]);
+
+  const emptyChatExists = useMemo(
+    () =>
+      Object.values(chats).length === 0 ||
+      Object.values(chats).some((chat) => chat.messages.length === 0),
+    [chats],
+  );
+
   const showChatListButton = Object.keys(chats).length > 1;
-  const showNewChatButton =
-    activeChatId && (chats[activeChatId]?.messages.length ?? 0) > 0;
+  const showNewChatButton = activeChatId && !emptyChatExists;
 
   return (
     <PanelHeader
@@ -74,9 +90,7 @@ export function ChatPanelHeader() {
                         chatListOpen && 'w-fit px-2.5',
                       )}
                       disabled={isWorking}
-                      onClick={() =>
-                        createChat().then(() => setChatListOpen(false))
-                      }
+                      onClick={createChat}
                     >
                       {chatListOpen && <span className="mr-1">New chat</span>}
                       <PlusIcon className="size-4 stroke-2" />
