@@ -333,6 +333,12 @@ export class Agent {
           this.karton?.setState((draft) => {
             draft.activeChatId = chatId;
           });
+          Object.entries(this.karton!.state.chats).forEach(([id, chat]) => {
+            if (chat.messages.length === 0 && id !== chatId)
+              this.karton?.setState((draft) => {
+                delete draft.chats[id];
+              });
+          });
         },
         deleteChat: async (chatId, _callingClientId) => {
           // if the active chat is being deleted, figure out which chat to switch to
