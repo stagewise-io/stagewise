@@ -92,7 +92,7 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
     <section
       ref={ref}
       aria-label="Agent message display"
-      className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain py-4 pt-16 pr-0 pb-14 pl-3 text-foreground text-sm focus-within:outline-none hover:bg-white/0 focus:outline-none"
+      className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-3 py-4 pt-16 pb-14 text-foreground text-sm focus-within:outline-none hover:bg-white/0 focus:outline-none"
       onScroll={handleScroll}
       onMouseEnter={() => {
         ref.current?.focus();
