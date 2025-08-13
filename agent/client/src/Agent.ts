@@ -466,7 +466,7 @@ export class Agent {
       if (isFirstUserMessage && lastMessageMetadata.isUserMessage) {
         this.client.chat.generateChatTitle
           .mutate({
-            userMessage: lastMessageMetadata.message,
+            messages: history ?? [],
           })
           .then((result) => {
             this.karton?.setState((draft) => {
