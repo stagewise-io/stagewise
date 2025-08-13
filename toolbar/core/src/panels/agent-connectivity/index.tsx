@@ -12,10 +12,10 @@ import {
   DropdownMenuContent,
   DropdownMenuLinkItem,
 } from '@/components/ui/dropdown-menu';
-import { useKarton } from '@/hooks/use-karton';
+import { useKartonConnected } from '@/hooks/use-karton';
 
 export function AgentConnectivityPanel() {
-  const isConnected = useKarton((s) => s.isConnected);
+  const isConnected = useKartonConnected();
 
   return (
     <Panel

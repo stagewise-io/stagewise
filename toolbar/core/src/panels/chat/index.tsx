@@ -5,16 +5,22 @@ import { useEffect, useMemo, useRef } from 'react';
 import { ChatHistory } from './chat-history';
 import { ChatPanelFooter } from './panel-footer';
 import { ChatPanelHeader } from './panel-header';
-import { useKarton } from '@/hooks/use-karton';
+import {
+  useComparingSelector,
+  useKartonConnected,
+  useKartonState,
+} from '@/hooks/use-karton';
 
 export function ChatPanel() {
   const chatState = useChatState();
-  const { activeChatId, isWorking, chats, isConnected } = useKarton((s) => ({
-    activeChatId: s.state.activeChatId,
-    isWorking: s.state.isWorking,
-    chats: s.state.chats,
-    isConnected: s.isConnected,
-  }));
+  const { activeChatId, isWorking, chats } = useKartonState(
+    useComparingSelector((s) => ({
+      activeChatId: s.activeChatId,
+      isWorking: s.isWorking,
+      chats: s.chats,
+    })),
+  );
+  const isConnected = useKartonConnected();
 
   const activeChat = useMemo(() => {
     return activeChatId ? (chats[activeChatId] ?? null) : null;

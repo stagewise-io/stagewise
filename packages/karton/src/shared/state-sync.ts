@@ -63,15 +63,20 @@ export class ClientStateManager<T> {
     this.state = this.fallbackState;
   }
 
-  public handleMessage(message: WebSocketMessage): void {
+  public handleMessage(
+    message: WebSocketMessage,
+    onStateChange?: () => void,
+  ): void {
     if (isStateSyncMessage(message)) {
       // Full state sync - replace entire state
       this.state = freeze((message.data as any).state as any, true) as T;
+      onStateChange?.();
     } else if (isStatePatchMessage(message)) {
       // Apply patches to current state
       const patches = (message.data as any).patch as Patch[];
       const newState = applyPatches(this.state as any, patches);
       this.state = freeze(newState as any, true) as T;
+      onStateChange?.();
     }
   }
 

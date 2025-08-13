@@ -1,15 +1,21 @@
 import { Trash2Icon } from 'lucide-react';
 import TimeAgo from 'react-timeago';
 import { useEffect } from 'react';
-import { useKarton } from '@/hooks/use-karton';
+import {
+  useComparingSelector,
+  useKartonProcedure,
+  useKartonState,
+} from '@/hooks/use-karton';
 import type { Chat } from '@stagewise/karton-contract';
 
 export function ChatList({ onClose }: { onClose: () => void }) {
-  const { chats, activeChatId, isWorking } = useKarton((s) => ({
-    chats: s.state.chats,
-    activeChatId: s.state.activeChatId,
-    isWorking: s.state.isWorking,
-  }));
+  const { chats, activeChatId, isWorking } = useKartonState(
+    useComparingSelector((s) => ({
+      chats: s.chats,
+      activeChatId: s.activeChatId,
+      isWorking: s.isWorking,
+    })),
+  );
 
   useEffect(() => {
     if (Object.keys(chats).length === 0 || isWorking) {
@@ -43,10 +49,8 @@ function ChatListEntry({
   isActive: boolean;
   onClose: () => void;
 }) {
-  const { deleteChat, switchChat } = useKarton((s) => ({
-    deleteChat: s.serverProcedures.deleteChat,
-    switchChat: s.serverProcedures.switchChat,
-  }));
+  const deleteChat = useKartonProcedure((p) => p.deleteChat);
+  const switchChat = useKartonProcedure((p) => p.switchChat);
 
   return (
     <div className="py-0.5">

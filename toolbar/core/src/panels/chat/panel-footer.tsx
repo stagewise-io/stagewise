@@ -7,7 +7,11 @@ import { cn } from '@/utils';
 import { Textarea } from '@headlessui/react';
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { useKarton } from '@/hooks/use-karton';
+import {
+  useKartonState,
+  useKartonProcedure,
+  useKartonConnected,
+} from '@/hooks/use-karton';
 import {
   Tooltip,
   TooltipContent,
@@ -25,15 +29,12 @@ export function ChatPanelFooter({
   inputRef: React.RefObject<HTMLTextAreaElement>;
 }) {
   const chatState = useChatState();
-  const { isWorking, activeChatId, stopAgent, canStop, chats, isConnected } =
-    useKarton((s) => ({
-      isWorking: s.state.isWorking,
-      activeChatId: s.state.activeChatId,
-      stopAgent: s.serverProcedures.abortAgentCall,
-      canStop: s.state.isWorking,
-      chats: s.state.chats,
-      isConnected: s.isConnected,
-    }));
+  const isWorking = useKartonState((s) => s.isWorking);
+  const activeChatId = useKartonState((s) => s.activeChatId);
+  const stopAgent = useKartonProcedure((p) => p.abortAgentCall);
+  const canStop = useKartonState((s) => s.isWorking);
+  const chats = useKartonState((s) => s.chats);
+  const isConnected = useKartonConnected();
 
   const abortAgent = useCallback(() => {
     stopAgent();

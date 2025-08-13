@@ -25,10 +25,12 @@ class KartonClientImpl<T> implements KartonClient<T> {
   private _isConnected = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectInterval = 500; // 500ms
+  private onStateChange: (() => void) | undefined;
 
   constructor(config: KartonClientConfig<T>) {
     this.config = config;
     this.clientProcedures = config.procedures;
+    this.onStateChange = config.onStateChange;
 
     // Initialize state manager with fallback state
     this.stateManager = new ClientStateManager(config.fallbackState);
@@ -75,7 +77,7 @@ class KartonClientImpl<T> implements KartonClient<T> {
       // Setup message handling
       this.connection.onMessage(async (message) => {
         // Handle state messages
-        this.stateManager.handleMessage(message);
+        this.stateManager.handleMessage(message, this.onStateChange);
 
         // Handle RPC messages
         if (this.rpcManager) {

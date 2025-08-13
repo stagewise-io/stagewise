@@ -8,7 +8,7 @@ import {
   collectUserMessageMetadata,
 } from '@/utils';
 import { usePanels } from './use-panels';
-import { useKarton } from './use-karton';
+import { useKartonProcedure, useKartonState } from './use-karton';
 import type { ChatMessage } from '@stagewise/karton-contract';
 
 interface ContextSnippet {
@@ -78,10 +78,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const { minimized } = useAppState();
   const { plugins } = usePlugins();
 
-  const { sendUserMessage: sendChatMessage, isWorking } = useKarton((s) => ({
-    sendUserMessage: s.serverProcedures.sendUserMessage,
-    isWorking: s.state.isWorking,
-  }));
+  const sendChatMessage = useKartonProcedure((p) => p.sendUserMessage);
+  const isWorking = useKartonState((s) => s.isWorking);
   const { isChatOpen } = usePanels();
 
   const startPromptCreation = useCallback(() => {

@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState, useEffect } from 'react';
 import { useAppState } from './use-app-state';
-import { useKarton } from './use-karton';
+import { useKartonConnected } from './use-karton';
 
 const STORAGE_KEY = 'stagewise_toolbar_open_panels';
 
@@ -122,7 +122,7 @@ export const PanelsProvider = ({
     persistedState.openPlugin ?? null,
   );
 
-  const isConnected = useKarton((s) => s.isConnected);
+  const isConnected = useKartonConnected();
 
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   useEffect(() => {

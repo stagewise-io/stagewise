@@ -15,7 +15,6 @@ import { SettingsPanel } from '@/panels/settings';
 import { ChatPanel } from '@/panels/chat';
 import { AgentConnectivityPanel } from '@/panels/agent-connectivity';
 import { usePlugins } from '@/hooks/use-plugins';
-import { useKarton } from '@/hooks/use-karton';
 
 const TOOLBAR_POSITION_KEY = 'stagewise_toolbar_toolbar_position';
 
@@ -180,7 +179,6 @@ function PanelsArea({
   } = usePanels();
 
   const plugins = usePlugins();
-  const _isConnected = useKarton((s) => s.isConnected);
 
   const pluginPanel = useMemo(() => {
     if (!openPluginName) {

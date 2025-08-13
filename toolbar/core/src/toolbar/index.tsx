@@ -9,7 +9,7 @@ import { DisconnectedContent } from './contents/disconnected';
 import { Button } from '@headlessui/react';
 import { Logo } from '@/components/ui/logo';
 import { AnimatedGradientBackground } from '@/components/ui/animated-gradient-background';
-import { useKarton } from '@/hooks/use-karton';
+import { useKartonConnected } from '@/hooks/use-karton';
 import { useEffect, useState } from 'react';
 
 export function Toolbar({
@@ -26,7 +26,7 @@ export function Toolbar({
 }) {
   const { minimized, minimize, expand } = useAppState();
 
-  const isConnected = useKarton((s) => s.isConnected);
+  const isConnected = useKartonConnected();
 
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 

@@ -282,11 +282,11 @@ const createKartonReactClient: CreateKartonReactClient<AppType>;
 #### React Hook
 
 ```ts
-const isKartonConnected = useKarton(({isConnected}) => isConnected);
+const isKartonConnected = useKartonCnnected;
 
-const dummyStateEntry = useKarton(({state}) => state.dummyStateEntry);
+const dummyStateEntry = useKartonState((state) => state.dummyStateEntry);
 
-const dummyServerProcedure = useKarton(({serverProcedures}) => serverProcedures.dummyServerProcedure);
+const dummyServerProcedure = useKartonProcedure((serverProcedures) => serverProcedures.dummyServerProcedure);
 ```
 
 The react hook should only trigger re-rendering when the value of the actually selected slice of the state changes in order to prevent unnecessary re-renders.

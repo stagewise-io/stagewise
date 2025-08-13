@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { XIcon, PlusIcon, AlignJustifyIcon } from 'lucide-react';
 import { useState } from 'react';
 import { ChatList } from './chat-list';
-import { useKarton } from '@/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import {
   Tooltip,
   TooltipContent,
@@ -14,12 +14,10 @@ import {
 export function ChatPanelHeader() {
   const [chatListOpen, setChatListOpen] = useState(false);
 
-  const { createChat, chats, activeChatId, isWorking } = useKarton((s) => ({
-    createChat: s.serverProcedures.createChat,
-    chats: s.state.chats,
-    activeChatId: s.state.activeChatId,
-    isWorking: s.state.isWorking,
-  }));
+  const createChat = useKartonProcedure((p) => p.createChat);
+  const chats = useKartonState((s) => s.chats);
+  const activeChatId = useKartonState((s) => s.activeChatId);
+  const isWorking = useKartonState((s) => s.isWorking);
 
   const showChatListButton = Object.keys(chats).length > 1;
   const showNewChatButton =

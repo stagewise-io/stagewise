@@ -136,8 +136,8 @@ function App() {
 
 // In your components
 function Counter() {
-  const counter = useKarton(s => s.state.counter);
-  const increment = useKarton(s => s.serverProcedures.increment);
+  const counter = useKartonState(s => s.counter);
+  const increment = useKartonProcedure(p => p.increment);
   
   return (
     <div>

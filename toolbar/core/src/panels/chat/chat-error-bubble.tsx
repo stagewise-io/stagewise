@@ -2,12 +2,12 @@ import { cn } from '@/utils';
 import { Button } from '@/components/ui/button';
 import type { AgentError } from '@stagewise/karton-contract';
 import { RefreshCcwIcon } from 'lucide-react';
-import { useKarton } from '@/hooks/use-karton';
+import { useKartonProcedure } from '@/hooks/use-karton';
 
 export function ChatErrorBubble({ error }: { error: AgentError }) {
-  const { retrySendingUserMessage } = useKarton((s) => ({
-    retrySendingUserMessage: s.serverProcedures.retrySendingUserMessage,
-  }));
+  const retrySendingUserMessage = useKartonProcedure(
+    (p) => p.retrySendingUserMessage,
+  );
 
   return (
     <div className="flex flex-col gap-1">

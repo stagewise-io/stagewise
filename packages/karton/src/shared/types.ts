@@ -327,6 +327,7 @@ export interface KartonClientConfig<T> {
   webSocketPath: string;
   procedures: KartonClientProcedureImplementations<T>;
   fallbackState: KartonState<T>;
+  onStateChange?: () => void;
 }
 
 export interface KartonClient<T> {

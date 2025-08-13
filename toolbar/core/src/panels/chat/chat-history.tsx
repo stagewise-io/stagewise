@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
 import { Loader2Icon, SparklesIcon } from 'lucide-react';
-import { useKarton } from '@/hooks/use-karton';
+import { useComparingSelector, useKartonState } from '@/hooks/use-karton';
 import { cn } from '@/utils';
 import { ChatErrorBubble } from './chat-error-bubble';
 
 export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
   const wasAtBottomRef = useRef(true);
 
-  const { activeChatId, isWorking, chats } = useKarton((s) => ({
-    activeChatId: s.state.activeChatId,
-    isWorking: s.state.isWorking,
-    chats: s.state.chats,
-  }));
+  const { activeChatId, isWorking, chats } = useKartonState(
+    useComparingSelector((s) => ({
+      activeChatId: s.activeChatId,
+      isWorking: s.isWorking,
+      chats: s.chats,
+    })),
+  );
 
   const activeChat = useMemo(() => {
     return activeChatId ? chats[activeChatId] : null;

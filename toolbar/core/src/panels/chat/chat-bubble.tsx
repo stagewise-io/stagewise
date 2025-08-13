@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import TimeAgo from 'react-timeago';
-import { useKarton } from '@/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import {
   Disclosure,
   DisclosureButton,
@@ -154,12 +154,11 @@ const FilePartItem = memo(({ filePart }: { filePart: FileUIPart }) => {
 });
 
 const ToolPartItem = memo(({ toolPart }: { toolPart: DynamicToolUIPart }) => {
-  const { approveToolCall, rejectToolCall, toolCallApprovalRequests } =
-    useKarton((s) => ({
-      approveToolCall: s.serverProcedures.approveToolCall,
-      rejectToolCall: s.serverProcedures.rejectToolCall,
-      toolCallApprovalRequests: s.state.toolCallApprovalRequests,
-    }));
+  const approveToolCall = useKartonProcedure((p) => p.approveToolCall);
+  const rejectToolCall = useKartonProcedure((p) => p.rejectToolCall);
+  const toolCallApprovalRequests = useKartonState(
+    (s) => s.toolCallApprovalRequests,
+  );
 
   const requiresApproval = useMemo(
     () =>

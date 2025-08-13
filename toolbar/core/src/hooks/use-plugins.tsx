@@ -8,7 +8,7 @@ import type {
 import { useConfig } from './use-config';
 import { collectUserMessageMetadata, getIFrameWindow } from '@/utils';
 import { usePanels } from './use-panels';
-import { useKarton } from './use-karton';
+import { useKartonProcedure } from './use-karton';
 
 export interface PluginContextType {
   plugins: ToolbarPlugin[];
@@ -26,9 +26,7 @@ const PluginContext = createContext<PluginContextType>({
 export function PluginProvider({ children }: { children?: ReactNode }) {
   const { config } = useConfig();
 
-  const { sendUserMessage } = useKarton((s) => ({
-    sendUserMessage: s.serverProcedures.sendUserMessage,
-  }));
+  const sendUserMessage = useKartonProcedure((s) => s.sendUserMessage);
 
   const { openChat } = usePanels();
 
