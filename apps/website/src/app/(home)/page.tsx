@@ -121,7 +121,7 @@ export default function Home() {
           <ScrollReveal>
             <div className="mb-12 px-4 text-center sm:px-0">
               {/* YC Banner */}
-              <div className="mb-6 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <div className="mb-4 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <a
                   href="https://www.ycombinator.com/companies/stagewise"
                   target="_blank"
@@ -150,6 +150,25 @@ export default function Home() {
                   <div className="rounded-full bg-zinc-500/10 px-1.5 py-0.5 font-medium text-xs text-zinc-500">
                     {formatStarCount(starCount)}
                   </div>
+                </a>
+              </div>
+
+              {/* Product Hunt Badge */}
+              <div className="mb-6 flex justify-center">
+                <a
+                  href="https://www.producthunt.com/products/stagewise-2?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-stagewise-3"
+                  onClick={() => posthog?.capture('hero_producthunt_click')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-transform hover:scale-105"
+                >
+                  <img
+                    src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1005396&theme=light&t=1755227737176"
+                    alt="stagewise - The frontend coding agent for existing codebases | Product Hunt"
+                    style={{ width: '200px', height: '43px' }}
+                    width="200"
+                    height="43"
+                  />
                 </a>
               </div>
               <h1 className="mb-6 font-bold text-3xl tracking-tight md:text-5xl">
