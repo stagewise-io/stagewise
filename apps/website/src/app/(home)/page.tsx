@@ -156,18 +156,13 @@ export default function Home() {
               {/* Product Hunt Badge */}
               <div className="mb-6 flex justify-center">
                 <a
-                  href="https://www.producthunt.com/products/stagewise-2?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-stagewise-3"
-                  onClick={() => posthog?.capture('hero_producthunt_click')}
+                  href="https://www.producthunt.com/products/stagewise-2?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-stagewise&#0045;3"
                   target="_blank"
-                  rel="noopener noreferrer"
-                  className="transition-transform hover:scale-105"
                 >
                   <img
-                    src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1005396&theme=light&t=1755227737176"
-                    alt="stagewise - The frontend coding agent for existing codebases | Product Hunt"
-                    style={{ width: '200px', height: '43px' }}
-                    width="200"
-                    height="43"
+                    src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1005396&theme=light&t=1755242644102"
+                    alt="stagewise - The&#0032;frontend&#0032;coding&#0032;agent&#0032;for&#0032;existing&#0032;codebases | Product Hunt"
+                    className="w-48"
                   />
                 </a>
               </div>
