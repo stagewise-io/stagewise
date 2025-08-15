@@ -1,5 +1,11 @@
 # stagewise
 
+## 0.5.3
+
+### Patch Changes
+
+- 5c0eb1a: Fix auth token refresh in the chat.
+
 ## 0.5.2
 
 ### Patch Changes
