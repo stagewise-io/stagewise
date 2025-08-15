@@ -186,11 +186,7 @@ export class Agent {
         } else {
           // Max retries exceeded
           this.authRetryCount = 0;
-          const errorDesc = ErrorDescriptions.authenticationFailed(
-            error,
-            this.maxAuthRetries,
-          );
-          throw new Error(errorDesc);
+          throw new Error('Authentication failed, please restart the cli.');
         }
       }
 
