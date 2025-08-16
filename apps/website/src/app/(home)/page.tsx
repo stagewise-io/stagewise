@@ -191,7 +191,7 @@ export default function Home() {
                     });
                   }}
                   type="button"
-                  className="group relative mx-auto mb-6 overflow-hidden rounded-xl bg-gradient-to-br from-zinc-800 via-zinc-900 to-black px-6 py-2.5 font-normal text-white shadow-[0_4px_20px_rgba(0,0,0,0.3),0_2px_10px_rgba(0,0,0,0.2)]"
+                  className="cursor-pointer group relative mx-auto mb-6 overflow-hidden rounded-xl bg-gradient-to-br from-zinc-800 via-zinc-900 to-black px-6 py-2.5 font-normal text-white shadow-[0_4px_20px_rgba(0,0,0,0.3),0_2px_10px_rgba(0,0,0,0.2)]"
                 >
                   <span className="relative z-10">Get Started</span>
                   {/* Plastic effect overlay - more subtle gradient */}
