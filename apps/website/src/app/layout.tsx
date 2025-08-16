@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { PostHogProvider } from '@/components/posthog-provider';
+import { CookieBanner } from '@/components/cookie-banner';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://stagewise.io'),
@@ -44,6 +45,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <PostHogProvider>
           <RootProvider>{children}</RootProvider>
         </PostHogProvider>
+        <CookieBanner />
       </body>
     </html>
   );
