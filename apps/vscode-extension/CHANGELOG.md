@@ -1,5 +1,11 @@
 # stagewise-vscode-extension
 
+## 0.11.0
+
+### Minor Changes
+
+- be87c2c: Remove support for old and deprecated toolbar versions
+
 ## 0.10.6
 
 ### Patch Changes

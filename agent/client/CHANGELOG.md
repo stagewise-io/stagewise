@@ -1,5 +1,11 @@
 # @stagewise-agent/client-sdk
 
+## 0.1.3
+
+### Patch Changes
+
+- 1f89825: Fix 'fetch failed' error on agent messages.
+
 ## 0.1.2
 
 ### Patch Changes

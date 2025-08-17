@@ -1,5 +1,11 @@
 # stagewise
 
+## 0.5.4
+
+### Patch Changes
+
+- 1f89825: Fix 'fetch failed' error on agent messages.
+
 ## 0.5.3
 
 ### Patch Changes
