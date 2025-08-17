@@ -50,7 +50,7 @@
     "commander": "^14.0.0",
     "dotenv-cli": "^9.0.0",
     "env-paths": "^3.0.0",
-    "esbuild": "^0.25.6",
+    "esbuild": "0.25.9",
     "express": "^4.18.2",
     "http-proxy-middleware": "^3.0.5",
     "ignore": "^6.0.2",

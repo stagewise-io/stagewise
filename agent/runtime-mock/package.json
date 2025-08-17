@@ -28,7 +28,7 @@
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@types/node": "^20.0.0",
-    "esbuild": "^0.20.1",
+    "esbuild": "0.25.9",
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0"
   }

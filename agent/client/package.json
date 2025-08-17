@@ -45,7 +45,7 @@
     "@stagewise/api-client": "1.2.0",
     "@stagewise/karton": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
-    "esbuild": "^0.20.2",
+    "esbuild": "0.25.9",
     "rimraf": "^5.0.0",
     "tsx": "^4.7.1",
     "typescript": "^5.0.0",
