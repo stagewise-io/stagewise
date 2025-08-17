@@ -9,7 +9,6 @@ import { EnvironmentInfo } from 'src/services/environment-info';
 import { WorkspaceService } from 'src/services/workspace-service';
 import { PackageJsonScanner } from 'src/services/package-json-scanner';
 import { AgentService as IDEChatAgentService } from 'src/services/agent-service';
-import { RetroAgentService } from 'src/services/agent-service/retro';
 import { AgentSelectorService } from 'src/services/agent-selector';
 import {
   createGettingStartedPanel,
@@ -77,10 +76,6 @@ export async function activate(context: vscode.ExtensionContext) {
         await initializeIDEAgent();
       }
     });
-
-    // Always initialize RetroAgent
-    const retroAgentService = RetroAgentService.getInstance();
-    await retroAgentService.initialize();
 
     const ide = getCurrentIDE();
     if (ide === 'UNKNOWN') {
@@ -168,10 +163,6 @@ export async function deactivate(_context: vscode.ExtensionContext) {
     if (ideAgentInitialized) {
       await shutdownIDEAgent();
     }
-
-    // Always shutdown RetroAgent
-    const retroAgentService = RetroAgentService.getInstance();
-    await retroAgentService.shutdown();
   } catch (error) {
     // Log error but don't throw during deactivation
     console.error(

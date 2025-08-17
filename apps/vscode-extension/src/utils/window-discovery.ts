@@ -1,10 +1,14 @@
 import * as vscode from 'vscode';
-import type { VSCodeContext } from '@stagewise/extension-toolbar-srpc-contract';
 /**
  * Get detailed information about the current IDE window
  * This is used by the getSessionInfo RPC method
  */
-export function getCurrentWindowInfo(port: number): VSCodeContext {
+export function getCurrentWindowInfo(port: number): {
+  sessionId: string;
+  appName: string;
+  displayName: string;
+  port: number;
+} {
   return {
     sessionId: vscode.env.sessionId,
     appName: vscode.env.appName,

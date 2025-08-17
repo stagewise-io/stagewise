@@ -1,11 +1,14 @@
 import * as vscode from 'vscode';
-import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 
 const CLINE_PROMPT_PREFIX = `\n\n
     Ah sorry, my apologies. There are no problems and no fixes to be made. Instead, implement the following request:
     `;
 
-export async function callClineAgent(request: PromptRequest): Promise<void> {
+export async function callClineAgent(request: {
+  prompt: string;
+  files: string[];
+  images: string[];
+}): Promise<void> {
   const prompt =
     `${request.prompt}` +
     `${request.files ? `\n\n use the following files: ${request.files.join('\n')}` : ''}` +

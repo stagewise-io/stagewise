@@ -1,7 +1,10 @@
-import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 import * as vscode from 'vscode';
 
-export async function callCopilotAgent(request: PromptRequest): Promise<void> {
+export async function callCopilotAgent(request: {
+  prompt: string;
+  files: string[];
+  images: string[];
+}): Promise<void> {
   const prompt =
     `${request.prompt}` +
     `${request.files ? `\n\n use the following files: ${request.files.join('\n')}` : ''}` +

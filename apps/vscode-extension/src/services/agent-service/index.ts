@@ -1,4 +1,3 @@
-import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 import { AnalyticsService, EventName } from 'src/services/analytics-service';
 import { dispatchAgentCall } from 'src/utils/dispatch-agent-call';
 import {
@@ -80,8 +79,10 @@ export class AgentService {
     // Create the nice prompt that we need
     this.analyticsService.trackEvent(EventName.AGENT_PROMPT_TRIGGERED);
 
-    const request: PromptRequest = {
+    const request = {
       prompt: createPrompt(userMessage),
+      files: [],
+      images: [],
     };
 
     await dispatchAgentCall(request);

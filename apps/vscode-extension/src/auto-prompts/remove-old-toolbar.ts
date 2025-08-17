@@ -1,6 +1,5 @@
 import { DEPRECATED_TOOLBAR_PACKAGES } from 'src/services/workspace-service';
 import { dispatchAgentCall } from 'src/utils/dispatch-agent-call';
-import * as vscode from 'vscode';
 
 export const removeOldToolbarPrompt = `
 <task>
@@ -23,6 +22,7 @@ Depending on the used framework in the project of the user, simply remove the ca
 export async function removeOldToolbar() {
   await dispatchAgentCall({
     prompt: removeOldToolbarPrompt,
-    sessionId: vscode.env.sessionId,
+    files: [],
+    images: [],
   });
 }

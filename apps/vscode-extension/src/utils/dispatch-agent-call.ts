@@ -9,11 +9,14 @@ import { callClineAgent } from './call-cline-agent';
 import { isKilocodeInstalled } from './is-kilocode-installed';
 import { callKilocodeAgent } from './call-kilocode-agent';
 import * as vscode from 'vscode';
-import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 import { isClineInstalled } from './is-cline-installed';
 import { callTraeAgent } from './call-trae-agent';
 
-export async function dispatchAgentCall(request: PromptRequest) {
+export async function dispatchAgentCall(request: {
+  prompt: string;
+  files: string[];
+  images: string[];
+}) {
   const ide = getCurrentIDE();
   switch (ide) {
     case 'TRAE':

@@ -1,4 +1,3 @@
-import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 import * as vscode from 'vscode';
 
 /**
@@ -11,7 +10,11 @@ import * as vscode from 'vscode';
  *
  * @param request The prompt request containing the core prompt and context files.
  */
-export async function callTraeAgent(request: PromptRequest): Promise<void> {
+export async function callTraeAgent(request: {
+  prompt: string;
+  files: string[];
+  images: string[];
+}): Promise<void> {
   await vscode.commands.executeCommand('workbench.action.chat.icube.open', {
     query: request.prompt,
     newChat: true,

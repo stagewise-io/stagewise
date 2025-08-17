@@ -1,7 +1,10 @@
 import * as vscode from 'vscode';
-import type { PromptRequest } from '@stagewise/extension-toolbar-srpc-contract';
 
-export async function callKilocodeAgent(request: PromptRequest): Promise<void> {
+export async function callKilocodeAgent(request: {
+  prompt: string;
+  files: string[];
+  images: string[];
+}): Promise<void> {
   const prompt =
     `${request.prompt}` +
     `${request.files ? `\n\n use the following files: ${request.files.join('\n')}` : ''}` +
