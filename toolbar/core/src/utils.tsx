@@ -326,10 +326,11 @@ const truncateAttributes = (
 };
 
 const truncateOwnProperties = (
-  properties: Record<string, unknown>,
+  _properties: Record<string, unknown>,
 ): Record<string, unknown> => {
   const result: Record<string, unknown> = {};
-  const entries = Object.entries(properties);
+  // const entries = Object.entries(properties);
+  const entries = []; // disable for now - the amount of data might have caused abort errors
 
   // Limit to 500 entries max
   const limitedEntries = entries.slice(0, 500);
