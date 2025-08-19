@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@stagewise/karton": "workspace:*",
-    "@inquirer/prompts": "^7.0.0",
+    "@inquirer/prompts": "^7.8.3",
     "@stagewise-plugins/angular": "workspace:*",
     "@stagewise-plugins/react": "workspace:*",
     "@stagewise-plugins/vue": "workspace:*",
