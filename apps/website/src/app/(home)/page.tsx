@@ -7,6 +7,34 @@ import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { CustomVideoPlayer } from '@/components/landing/custom-video-player';
 import { usePostHog } from 'posthog-js/react';
 import { useState, useEffect } from 'react';
+
+// OS-specific command component
+function OSSpecificCommand() {
+  const [isWindows, setIsWindows] = useState(false);
+
+  useEffect(() => {
+    // More reliable OS detection
+    const userAgent = navigator.userAgent.toLowerCase();
+    const platform = navigator.platform?.toLowerCase() || '';
+
+    setIsWindows(
+      userAgent.includes('win') ||
+        platform.includes('win') ||
+        userAgent.includes('windows'),
+    );
+  }, []);
+
+  return (
+    <span>
+      For example:{' '}
+      <code>
+        {isWindows
+          ? 'cd C:\\Users\\YourName\\projects\\my-website'
+          : 'cd ~/projects/my-website'}
+      </code>
+    </span>
+  );
+}
 import Image from 'next/image';
 import AdobeLogo from './_components/company_logos/adobe.png';
 import AirBnBLogo from './_components/company_logos/airbnb.png';
@@ -191,7 +219,7 @@ export default function Home() {
                     });
                   }}
                   type="button"
-                  className="cursor-pointer group relative mx-auto mb-6 overflow-hidden rounded-xl bg-gradient-to-br from-zinc-800 via-zinc-900 to-black px-6 py-2.5 font-normal text-white shadow-[0_4px_20px_rgba(0,0,0,0.3),0_2px_10px_rgba(0,0,0,0.2)]"
+                  className="group relative mx-auto mb-6 cursor-pointer overflow-hidden rounded-xl bg-gradient-to-br from-zinc-800 via-zinc-900 to-black px-6 py-2.5 font-normal text-white shadow-[0_4px_20px_rgba(0,0,0,0.3),0_2px_10px_rgba(0,0,0,0.2)]"
                 >
                   <span className="relative z-10">Get Started</span>
                   {/* Plastic effect overlay - more subtle gradient */}
@@ -252,7 +280,8 @@ export default function Home() {
                           Start your local app in dev mode
                         </h3>
                         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                          <code>pnpm dev</code> or <code>npm run dev</code>
+                          <code>pnpm dev</code>&nbsp; or &nbsp;
+                          <code>npm run dev</code>
                         </p>
                       </div>
                     </li>
@@ -272,7 +301,7 @@ export default function Home() {
                           Open a new terminal and navigate to your app directory
                         </h3>
                         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                          <code>cd Users/juliangoetze/projects/my-website</code>
+                          <OSSpecificCommand />
                         </p>
                       </div>
                     </li>
@@ -291,7 +320,6 @@ export default function Home() {
                         <h3 className="mb-1 font-semibold text-lg text-zinc-900 dark:text-zinc-100">
                           Run stagewise in the terminal
                         </h3>
-
                         <Clipboard
                           text="npx stagewise@latest"
                           className="justify-start"
