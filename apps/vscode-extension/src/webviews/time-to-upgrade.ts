@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 import { AnalyticsService, EventName } from 'src/services/analytics-service';
 import { removeOldToolbarPrompt } from 'src/auto-prompts/remove-old-toolbar';
+import type { StorageService } from 'src/services/storage-service';
 
 export function createTimeToUpgradePanel(
   context: vscode.ExtensionContext,
+  storage: StorageService,
   _onRemoveOldToolbar: () => Promise<void>,
 ): vscode.WebviewPanel {
   const panel = vscode.window.createWebviewPanel(
@@ -17,6 +19,9 @@ export function createTimeToUpgradePanel(
   );
   panel.webview.html = getWebviewContent(panel.webview, context);
 
+  // Immediately mark as seen
+  void storage.set('stagewise.hasSeenTimeToUpgrade', true);
+
   // Handle messages from the webview
   panel.webview.onDidReceiveMessage(
     async (message) => {
@@ -29,7 +34,7 @@ export function createTimeToUpgradePanel(
             cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
           });
           terminal.show();
-          terminal.sendText('npx stagewise@latest', false);
+          terminal.sendText('npx stagewise@latest -b', false);
           break;
         }
         case 'openDiscord':
@@ -118,4 +123,11 @@ function getWebviewContent(
 </script>
 </body>
 </html>`;
+}
+
+export async function shouldShowTimeToUpgrade(
+  storage: StorageService,
+): Promise<boolean> {
+  // Show time to upgrade panel if the user hasn't seen it before
+  return !(await storage.get('stagewise.hasSeenTimeToUpgrade', false));
 }

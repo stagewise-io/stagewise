@@ -2,7 +2,10 @@ import * as vscode from 'vscode';
 import { removeOldToolbar } from '../auto-prompts/remove-old-toolbar';
 import { getCurrentIDE } from 'src/utils/get-current-ide';
 import { AnalyticsService, EventName } from 'src/services/analytics-service';
-import { createTimeToUpgradePanel } from '../webviews/time-to-upgrade';
+import {
+  createTimeToUpgradePanel,
+  shouldShowTimeToUpgrade,
+} from '../webviews/time-to-upgrade';
 import { StorageService } from 'src/services/storage-service';
 import { VScodeContext } from 'src/services/vscode-context';
 import { EnvironmentInfo } from 'src/services/environment-info';
@@ -112,10 +115,12 @@ export async function activate(context: vscode.ExtensionContext) {
       createGettingStartedPanel(context, storage);
     }
 
-    // Function to show getting started panel if needed
+    // Function to show time to upgrade panel if needed
     const showTimeToUpgradePanel = async () => {
-      analyticsService.trackEvent(EventName.TIME_TO_UPGRADE_PANEL_SHOWN);
-      createTimeToUpgradePanel(context, removeOldToolbarHandler);
+      if (await shouldShowTimeToUpgrade(storage)) {
+        analyticsService.trackEvent(EventName.TIME_TO_UPGRADE_PANEL_SHOWN);
+        createTimeToUpgradePanel(context, storage, removeOldToolbarHandler);
+      }
     };
 
     if (vscode.workspace.workspaceFolders?.length) {
