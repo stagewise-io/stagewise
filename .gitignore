@@ -41,3 +41,5 @@ yarn-error.log*
 
 # VSCode
 .vscode-test
+*storybook.log
+storybook-static
