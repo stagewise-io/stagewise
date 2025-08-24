@@ -12,10 +12,78 @@ import { log, configureLogger } from '../utils/logger';
 import { tokenManager } from '../auth/token-manager';
 import { oauthManager } from '../auth/oauth';
 import { analyticsEvents, telemetryManager } from '../utils/telemetry';
+import { validateAppPort } from '../utils/port-validator';
 
 export class ConfigResolver {
   private config: Config | null = null;
   private authFlowInitiated = false;
+
+  private async promptAndValidatePort(): Promise<number> {
+    let validPort = false;
+    let attempts = 0;
+    const maxAttempts = 3;
+    let appPort: number | undefined;
+
+    while (!validPort && attempts < maxAttempts) {
+      appPort = await promptNumber({
+        message:
+          attempts === 0
+            ? 'What port is your development app running on?'
+            : 'Please enter the correct port number:',
+        default: '3000',
+      });
+
+      const validation = await validateAppPort(appPort);
+      if (validation.isRunning) {
+        validPort = true;
+      } else {
+        attempts++;
+        log.warn(`⚠️  No application detected on port ${appPort}`);
+        log.info(
+          'Please ensure your development server is running on the port you entered.',
+        );
+
+        if (attempts < maxAttempts) {
+          const retry = await promptConfirm({
+            message: 'Would you like to re-enter the port number?',
+            default: true,
+          });
+          if (!retry) {
+            const continueAnyway = await promptConfirm({
+              message:
+                'Continue without a running application? (You can start it later)',
+              default: false,
+            });
+            if (continueAnyway) {
+              validPort = true;
+              log.info(
+                `Continuing with port ${appPort} (application not currently running)`,
+              );
+            }
+          }
+        } else {
+          const continueAnyway = await promptConfirm({
+            message: 'Continue anyway? (You can start your application later)',
+            default: true,
+          });
+          if (continueAnyway) {
+            validPort = true;
+            log.info(
+              `Continuing with port ${appPort} (application not currently running)`,
+            );
+          } else {
+            throw new Error('Port configuration cancelled by user');
+          }
+        }
+      }
+    }
+
+    if (!appPort) {
+      throw new Error('Port configuration failed');
+    }
+
+    return appPort;
+  }
 
   async resolveConfig(): Promise<Config> {
     // Configure logger first based on verbose flag
@@ -50,15 +118,15 @@ export class ConfigResolver {
       // Check if we need to prompt for missing appPort
       if (!appPort && !args.silent) {
         log.info('Bridge mode requires app port configuration.');
-
-        appPort = await promptNumber({
-          message: 'What port is your development app running on?',
-          default: '3000',
-        });
+        appPort = await this.promptAndValidatePort();
       } else if (!appPort) {
         throw new Error(
           'App port is required in bridge mode. Use --app-port flag or run in interactive mode.',
         );
+      }
+
+      if (!appPort) {
+        throw new Error('App port configuration failed');
       }
 
       // Save config for next time or ask user if no config exists
@@ -125,14 +193,15 @@ export class ConfigResolver {
 
     // Check if we need to prompt for missing values
     if (!appPort && !args.silent) {
-      appPort = await promptNumber({
-        message: 'What port is your development app running on?',
-        default: '3000',
-      });
+      appPort = await this.promptAndValidatePort();
     } else if (!appPort) {
       throw new Error(
         'App port is required. Please provide it via --app-port argument or run without --silent flag.',
       );
+    }
+
+    if (!appPort) {
+      throw new Error('App port configuration failed');
     }
 
     // Validate port conflicts
