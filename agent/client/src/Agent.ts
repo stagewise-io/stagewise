@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isAbortError } from './utils/is-abort-error.js';
 import { tools as clientTools } from '@stagewise/agent-tools';
 import { AgentErrorType } from '@stagewise/karton-contract';
 import { convertCreditsToSubscriptionCredits } from './utils/convert-credits-to-subscription-credits.js';
@@ -19,7 +20,10 @@ import type {
 } from '@stagewise/api-client';
 
 import { TimeoutManager } from './utils/time-out-manager.js';
-import { processParallelToolCalls } from './utils/tool-call-utils.js';
+import {
+  processParallelToolCalls,
+  type ToolCallProcessingResult,
+} from './utils/tool-call-utils.js';
 import {
   createEventEmitter,
   EventFactories,
@@ -37,8 +41,8 @@ import {
   attachToolOutputToMessage,
   createAndActivateNewChat,
   appendToolInputToMessage,
+  findPendingToolCalls,
 } from './utils/karton-helpers.js';
-import { isAbortError } from './utils/is-abort-error.js';
 import { isInsufficientCreditsError } from './utils/is-insufficient-credits-error.js';
 
 type AsyncIterableItem<T> = T extends AsyncIterable<infer U> ? U : never;
@@ -99,6 +103,17 @@ export class Agent {
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
     this.timeoutManager = new TimeoutManager();
     this.abortController = new AbortController();
+    this.abortController.signal.addEventListener(
+      'abort',
+      () => {
+        this.cleanupPendingOperations(
+          'Agent call aborted',
+          false,
+          this.karton?.state.activeChatId || undefined,
+        );
+      },
+      { once: true },
+    );
   }
 
   public shutdown() {
@@ -221,11 +236,39 @@ export class Agent {
    * Cleans up any pending operations and resets the agent state
    * @param reason - Optional reason for the cleanup
    * @param resetRecursionDepth - Whether to reset recursion depth to 0 (default: true)
+   * @param chatId - Optional chat ID to clean up pending tool calls for
    */
   private cleanupPendingOperations(
     _reason?: string,
     resetRecursionDepth = true,
+    chatId?: string,
   ): void {
+    // Clean up any pending tool calls if chatId is provided
+    if (chatId && this.lastMessageId) {
+      const pendingToolCalls = findPendingToolCalls(this.karton!, chatId);
+      if (pendingToolCalls.length > 0) {
+        const abortedResults: ToolCallProcessingResult[] = pendingToolCalls.map(
+          ({ toolCallId, toolName }) => ({
+            success: false,
+            toolName,
+            toolCallId,
+            duration: 0,
+            error: {
+              type: 'error' as const,
+              message: 'Tool execution aborted by user',
+            },
+          }),
+        );
+
+        // Attach the aborted results to the message
+        attachToolOutputToMessage(
+          this.karton!,
+          abortedResults,
+          this.lastMessageId,
+        );
+      }
+    }
+
     // Clear all timeouts
     this.timeoutManager.clearAll();
 
@@ -326,6 +369,17 @@ export class Agent {
         abortAgentCall: async () => {
           this.abortController.abort();
           this.abortController = new AbortController();
+          this.abortController.signal.addEventListener(
+            'abort',
+            () => {
+              this.cleanupPendingOperations(
+                'Agent call aborted',
+                false,
+                this.karton?.state.activeChatId || undefined,
+              );
+            },
+            { once: true },
+          );
         },
         approveToolCall: async (_toolCallId, _callingClientId) => {},
         rejectToolCall: async (_toolCallId, _callingClientId) => {},
@@ -516,21 +570,15 @@ export class Agent {
       const agentResponse = await this.callAgentWithRetry(request);
 
       let lastResponse: LastResponse | undefined;
-
-      try {
-        await this.parseUiStream(
-          agentResponse,
-          (message) => {
-            lastResponse = message;
-          },
-          (messageId) => {
-            this.lastMessageId = messageId;
-          },
-        );
-      } catch (error) {
-        if (isAbortError(error)) return;
-        throw error;
-      }
+      await this.parseUiStream(
+        agentResponse,
+        (message) => {
+          lastResponse = message;
+        },
+        (messageId) => {
+          this.lastMessageId = messageId;
+        },
+      );
 
       if (!lastResponse) throw new Error('Unknown error, please try again');
 
@@ -579,9 +627,8 @@ export class Agent {
       this.cleanupPendingOperations('Agent task completed successfully', false);
       return;
     } catch (error) {
-      // If the user has aborted the agent, set the agent to idle
       if (isAbortError(error)) {
-        this.setAgentWorking(false);
+        console.log('abort error');
         return;
       }
 
@@ -612,6 +659,10 @@ export class Agent {
     } finally {
       // Ensure recursion depth is decremented
       this.recursionDepth = Math.max(0, this.recursionDepth - 1);
+      // Clear the message ID if we're back to the top level
+      if (this.recursionDepth === 0) {
+        this.lastMessageId = null;
+      }
     }
   }
 
