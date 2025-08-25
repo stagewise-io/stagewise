@@ -35,6 +35,7 @@ src/
 │   ├── config-path.ts      # Configuration path management
 │   ├── identifier.ts       # Machine identifier management
 │   ├── logger.ts           # Logging utilities
+│   ├── port-validator.ts   # Port validation utilities
 │   ├── telemetry.ts        # Telemetry utility functions
 │   └── user-input.ts       # User input handling
 └── index.ts                # Application entry point
@@ -130,6 +131,11 @@ src/
   3. Configuration file (stagewise.config.json)
   4. Default values
 - Handles authentication flow initialization and interactive setup
+- **Port Validation**: Validates user-specified port has a running application
+  - Makes HTTP HEAD request to verify app is reachable
+  - Provides retry mechanism (up to 3 attempts) for incorrect ports
+  - Allows users to continue without running app if needed
+  - Improves onboarding experience by catching common configuration errors
 - **Command Wrapping Support**: Provides minimal configuration for wrapped command execution
 - **Argument Parser**: Uses Commander.js with double-dash delimiter detection for command separation
 - **Cross-platform Validation**: Port conflict detection and path validation
@@ -175,6 +181,10 @@ src/
   - Automatic dev mode detection via NODE_ENV and tsx execution
 - **Identifier Manager**: Creates and manages persistent machine ID for analytics
 - **Telemetry Manager**: Centralized telemetry configuration and event tracking
+- **Port Validator**: Validates application ports during configuration
+  - HTTP HEAD request with 2-second timeout
+  - Handles various error conditions (ECONNREFUSED, timeout, network errors)
+  - Returns validation status and error messages for user feedback
 - **Command Executor**: Manages child process execution for command wrapping mode
   - Cross-platform command spawning with proper shell detection
   - Signal forwarding (SIGINT, SIGTERM) between parent and child processes
