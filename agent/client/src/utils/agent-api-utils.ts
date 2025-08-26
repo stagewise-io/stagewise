@@ -1,5 +1,7 @@
-import type { Tools } from '@stagewise/agent-types';
+import type { toolsAi } from '@stagewise/agent-tools';
 import { z } from 'zod';
+
+type Tools = ReturnType<typeof toolsAi>;
 
 /**
  * Maps Zod schema tools to JSON schema format for the API
@@ -11,13 +13,10 @@ export function mapZodToolsToJsonSchemaTools(
     (acc, [key, value]) => {
       acc[key] = {
         description: value.description ?? `Tool: ${key}`,
-        inputSchema: z.toJSONSchema(value.inputSchema as z.ZodType),
+        inputSchema: z.toJSONSchema(value.inputSchema as z.ZodType) as any,
       };
       return acc;
     },
-    {} as Record<
-      string,
-      { description: string; inputSchema: z.core.JSONSchema.BaseSchema }
-    >,
+    {} as Record<string, { description: string; inputSchema: any }>,
   );
 }

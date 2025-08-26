@@ -1,6 +1,7 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { ToolResult } from '@stagewise/agent-types';
+import type { ToolResult, FileDeleteDiff } from '@stagewise/agent-types';
 import { z } from 'zod';
+import { prepareDiffContent } from './file-utils';
 
 export const DESCRIPTION = 'Delete a file from the file system';
 
@@ -57,6 +58,13 @@ export async function deleteFileTool(
     // Store the original content for undo
     const fileContent = originalContent.content;
 
+    // Prepare content for diff (check for binary/large files)
+    const preparedContent = await prepareDiffContent(
+      fileContent,
+      absolutePath,
+      clientRuntime,
+    );
+
     // Delete the file
     const deleteResult =
       await clientRuntime.fileSystem.deleteFile(absolutePath);
@@ -85,10 +93,29 @@ export async function deleteFileTool(
       }
     };
 
+    // Create diff data based on discriminated union
+    const diff: FileDeleteDiff = preparedContent.omitted
+      ? {
+          path: relPath,
+          changeType: 'delete',
+          truncated: preparedContent.truncated,
+          omitted: true,
+          contentSize: preparedContent.contentSize,
+        }
+      : {
+          path: relPath,
+          changeType: 'delete',
+          before: preparedContent.content!,
+          truncated: preparedContent.truncated,
+          omitted: false,
+          contentSize: preparedContent.contentSize,
+        };
+
     return {
       success: true,
       message: `Successfully deleted file: ${relPath}`,
       undoExecute,
+      diff,
     };
   } catch (error) {
     return {

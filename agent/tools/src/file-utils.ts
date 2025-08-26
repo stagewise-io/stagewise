@@ -129,3 +129,71 @@ export class ContentSizeTracker {
     return `Processed ${this.fileCount} files, skipped ${skippedCount} large files`;
   }
 }
+
+/**
+ * Result of preparing content for diff
+ */
+export interface PreparedDiffContent {
+  content?: string;
+  truncated: boolean;
+  omitted: boolean;
+  contentSize: number;
+}
+
+/**
+ * Prepares file content for inclusion in diffs, handling binary and large files safely
+ * @param content The file content to prepare
+ * @param filePath The file path (for binary detection)
+ * @param clientRuntime The client runtime for file operations
+ * @returns Prepared content with metadata about how it was handled
+ */
+export async function prepareDiffContent(
+  content: string,
+  filePath: string,
+  clientRuntime: ClientRuntime,
+): Promise<PreparedDiffContent> {
+  const contentSize = Buffer.byteLength(content, 'utf-8');
+
+  // Check if file is binary
+  const isBinary = await clientRuntime.fileSystem.isBinary(filePath);
+  if (isBinary) {
+    return {
+      content: undefined,
+      truncated: false,
+      omitted: true,
+      contentSize,
+    };
+  }
+
+  // Check if content exceeds the max diff size
+  const maxDiffBytes = FILE_SIZE_LIMITS.MAX_DIFF_BYTES || 100 * 1024; // 100KB default
+  if (contentSize > maxDiffBytes) {
+    // Truncate the content to fit within the limit
+    const truncationIndicator = '\n... (content truncated)';
+    const truncateAt =
+      maxDiffBytes - Buffer.byteLength(truncationIndicator, 'utf-8');
+
+    // Find a reasonable truncation point (try to break at a newline)
+    let truncatedContent = content.substring(0, truncateAt);
+    const lastNewline = truncatedContent.lastIndexOf('\n');
+    if (lastNewline > truncateAt * 0.8) {
+      // If there's a newline in the last 20%, break there
+      truncatedContent = truncatedContent.substring(0, lastNewline);
+    }
+
+    return {
+      content: truncatedContent + truncationIndicator,
+      truncated: true,
+      omitted: false,
+      contentSize,
+    };
+  }
+
+  // Content is safe to include in full
+  return {
+    content,
+    truncated: false,
+    omitted: false,
+    contentSize,
+  };
+}

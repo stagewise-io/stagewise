@@ -65,12 +65,6 @@ export function appendTextDeltaToMessage(
 
       const textPart = message.parts[partIndex];
       if (!textPart || textPart.type !== 'text') {
-        console.error(
-          '\n\nText part not found or not a text part\n\n',
-          partIndex,
-          message.parts,
-          messageId,
-        );
         return;
       }
 
@@ -100,7 +94,7 @@ export function appendToolInputToMessage(
         id: messageId,
         parts: [
           {
-            type: 'dynamic-tool',
+            type: `tool-${chunk.toolName}` as any, // reconstruct the type from the tool name
             state: 'input-available',
             input: chunk.input,
             toolCallId: chunk.toolCallId,
@@ -116,7 +110,7 @@ export function appendToolInputToMessage(
     if (partIndex >= message.parts.length) {
       // If the current part index is greater than the number of parts, create a new one
       message.parts.push({
-        type: 'dynamic-tool',
+        type: `tool-${chunk.toolName}` as any,
         toolCallId: chunk.toolCallId,
         toolName: chunk.toolName,
         state: 'input-available',
@@ -125,17 +119,12 @@ export function appendToolInputToMessage(
     } else {
       // If the message has parts, append to the existing one
       const part = message.parts[partIndex];
-      if (!part || part.type !== 'dynamic-tool')
-        return console.error(
-          'Part is not a dynamic tool',
-          part,
-          'partIndex:',
-          partIndex,
-          'message:',
-          message.parts,
-          'messageId:',
-          messageId,
-        );
+      if (
+        !part ||
+        part.type !== 'dynamic-tool' ||
+        part.type !== `tool-${chunk.toolName}`
+      )
+        return;
 
       part.state = 'input-available';
       part.input = chunk.input;
@@ -157,15 +146,18 @@ export function attachToolOutputToMessage(
       const part = message.parts.find(
         (p) => 'toolCallId' in p && p.toolCallId === result.toolCallId,
       );
-      if (part?.type !== 'dynamic-tool') {
-        console.error(
-          'Part is not a dynamic tool',
-          part,
-          'message:',
-          message.parts,
-        );
-        return;
-      }
+      if (!part) continue;
+      if (
+        part.type !== 'dynamic-tool' &&
+        part.type !== 'tool-deleteFileTool' &&
+        part.type !== 'tool-overwriteFileTool' &&
+        part.type !== 'tool-globTool' &&
+        part.type !== 'tool-grepSearchTool' &&
+        part.type !== 'tool-listFilesTool' &&
+        part.type !== 'tool-multiEditTool' &&
+        part.type !== 'tool-readFileTool'
+      )
+        continue;
 
       if (result.success) {
         part.state = 'output-available';

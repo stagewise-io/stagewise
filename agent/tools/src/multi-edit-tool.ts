@@ -1,7 +1,7 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { ToolResult } from '@stagewise/agent-types';
+import type { ToolResult, FileModifyDiff } from '@stagewise/agent-types';
 import { z } from 'zod';
-import { checkFileSize } from './file-utils';
+import { checkFileSize, prepareDiffContent } from './file-utils';
 import { FILE_SIZE_LIMITS } from './constants';
 
 export const DESCRIPTION =
@@ -191,11 +191,65 @@ export async function multiEditTool(
         }
       };
 
+      // Prepare content for diff (check for binary/large files)
+      const beforePrepared = await prepareDiffContent(
+        originalContent,
+        absolutePath,
+        clientRuntime,
+      );
+      const afterPrepared = await prepareDiffContent(
+        content,
+        absolutePath,
+        clientRuntime,
+      );
+
+      // Create diff data based on discriminated union
+      const baseModifyDiff = {
+        path: file_path,
+        changeType: 'modify' as const,
+        beforeTruncated: beforePrepared.truncated,
+        afterTruncated: afterPrepared.truncated,
+        beforeContentSize: beforePrepared.contentSize,
+        afterContentSize: afterPrepared.contentSize,
+      };
+
+      let diff: FileModifyDiff;
+      if (!beforePrepared.omitted && !afterPrepared.omitted) {
+        diff = {
+          ...baseModifyDiff,
+          before: beforePrepared.content!,
+          after: afterPrepared.content!,
+          beforeOmitted: false,
+          afterOmitted: false,
+        };
+      } else if (!beforePrepared.omitted && afterPrepared.omitted) {
+        diff = {
+          ...baseModifyDiff,
+          before: beforePrepared.content!,
+          beforeOmitted: false,
+          afterOmitted: true,
+        };
+      } else if (beforePrepared.omitted && !afterPrepared.omitted) {
+        diff = {
+          ...baseModifyDiff,
+          after: afterPrepared.content!,
+          beforeOmitted: true,
+          afterOmitted: false,
+        };
+      } else {
+        diff = {
+          ...baseModifyDiff,
+          beforeOmitted: true,
+          afterOmitted: true,
+        };
+      }
+
       const result = {
         success: true,
         message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,
         result: { editsApplied: totalEditsApplied },
-        undoExecute: undoExecute,
+        undoExecute,
+        diff,
       };
 
       return result;

@@ -328,6 +328,13 @@ export interface IFileSystemProvider {
    * @returns True if the path should be ignored, false otherwise
    */
   isIgnored(path: string): Promise<boolean>;
+
+  /**
+   * Checks if a file contains binary content.
+   * @param path - The relative file path to check
+   * @returns True if the file is binary, false if it's text
+   */
+  isBinary(path: string): Promise<boolean>;
 }
 
 /**
@@ -425,6 +432,7 @@ export abstract class BaseFileSystemProvider implements IFileSystemProvider {
   ): Promise<FileOperationResult>;
   abstract getGitignorePatterns(): Promise<string[]>;
   abstract isIgnored(path: string): Promise<boolean>;
+  abstract isBinary(path: string): Promise<boolean>;
 
   // Default implementations for path operations that can be overridden if needed
   abstract resolvePath(path: string): string;

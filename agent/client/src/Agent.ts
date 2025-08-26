@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { tools as clientTools } from '@stagewise/agent-tools';
+import { toolsAi as clientTools } from '@stagewise/agent-tools';
 import { AgentErrorType } from '@stagewise/karton-contract';
 import { convertCreditsToSubscriptionCredits } from './utils/convert-credits-to-subscription-credits.js';
 import type { KartonContract, History } from '@stagewise/karton-contract';
@@ -9,7 +9,6 @@ import {
 } from '@stagewise/karton/server';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
-import type { Tools } from '@stagewise/agent-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client.js';
 import type {
   AppRouter,
@@ -40,7 +39,15 @@ import {
 } from './utils/karton-helpers.js';
 import { isAbortError } from './utils/is-abort-error.js';
 import { isInsufficientCreditsError } from './utils/is-insufficient-credits-error.js';
+import type { ToolUIPart } from 'ai';
 
+type ToolCallType = 'dynamic-tool' | `tool-${string}`;
+
+function isToolCallType(type: string): type is ToolCallType {
+  return type === 'dynamic-tool' || type.startsWith('tool-');
+}
+
+type Tools = ReturnType<typeof clientTools>;
 type AsyncIterableItem<T> = T extends AsyncIterable<infer U> ? U : never;
 type ReturnValue<T> = T extends AsyncGenerator<infer _U, infer V, infer _W>
   ? V
@@ -690,8 +697,8 @@ export class Agent {
     for (const message of messagesAfterUserMessage) {
       if (message.role !== 'assistant') continue;
       for (const content of message.parts)
-        if (content.type === 'dynamic-tool')
-          toolCallIdsAfterUserMessage.push(content.toolCallId);
+        if (isToolCallType(content.type))
+          toolCallIdsAfterUserMessage.push((content as ToolUIPart).toolCallId);
     }
 
     const idsAfter = new Set(toolCallIdsAfterUserMessage);

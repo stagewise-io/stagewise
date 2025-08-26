@@ -775,6 +775,28 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
     return this.shouldIgnorePattern(path, patterns);
   }
 
+  async isBinary(path: string): Promise<boolean> {
+    try {
+      const fullPath = this.resolvePath(path);
+      const content = this.volume.readFileSync(fullPath);
+
+      // Check if content is a Buffer
+      if (Buffer.isBuffer(content)) {
+        // Check first 1KB for NUL bytes
+        const bytesToCheck = Math.min(content.length, 1024);
+        const checkBuffer = content.slice(0, bytesToCheck);
+        return checkBuffer.includes(0x00);
+      }
+
+      // If it's a string, it's not binary
+      return false;
+    } catch (error) {
+      // If we can't read the file, assume it's not binary
+      console.warn(`[isBinary] Error checking file ${path}:`, error);
+      return false;
+    }
+  }
+
   // Helper methods
   private matchesPattern(text: string, pattern: string): boolean {
     // Simple pattern matching - for production, consider using minimatch

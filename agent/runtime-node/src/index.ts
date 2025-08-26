@@ -847,6 +847,38 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     return this.gitignore ? this.gitignore.ignores(path) : false;
   }
 
+  async isBinary(path: string): Promise<boolean> {
+    try {
+      const fullPath = this.resolvePath(path);
+      const stats = await fs.stat(fullPath);
+      const bytesToRead = Math.min(
+        stats.size,
+        BINARY_DETECTION.CHECK_BUFFER_SIZE,
+      );
+
+      if (bytesToRead === 0) {
+        // Empty files are not binary
+        return false;
+      }
+
+      const fileHandle = await fs.open(fullPath, 'r');
+      try {
+        const buffer = Buffer.alloc(bytesToRead);
+        await fileHandle.read(buffer, 0, bytesToRead, 0);
+
+        // Check for NUL bytes (0x00) which indicate binary content
+        return buffer.includes(0x00);
+      } finally {
+        await fileHandle.close();
+      }
+    } catch (_error) {
+      // If we can't read the file, assume it's not binary
+      // TODO: add client-side logging
+      // console.warn(`[isBinary] Error checking file ${path}:`, error);
+      return false;
+    }
+  }
+
   private async ensureGitignoreInitialized(): Promise<void> {
     if (this.gitignoreInitialized) {
       return;

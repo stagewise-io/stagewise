@@ -1,17 +1,23 @@
 import type { UserMessageMetadata, SelectedElement } from './metadata.js';
 import type { UIMessage } from 'ai';
-import type { Tool } from '@stagewise/agent-types';
+import type { UITools, ToolPart } from '@stagewise/agent-tools';
+import type { Tool, FileDiff, ToolResult } from '@stagewise/agent-types';
 import type { RouterOutputs } from '@stagewise/api-client';
 
-export type ChatMessage = UIMessage<UserMessageMetadata>;
+export type ChatMessage = UIMessage<UserMessageMetadata, any, UITools>;
 export type { UserMessageMetadata, SelectedElement };
+
+export type { FileDiff, ToolResult };
 
 export type {
   TextUIPart,
   FileUIPart,
   ReasoningUIPart,
   DynamicToolUIPart,
+  ToolUIPart,
 } from 'ai';
+
+export type { ToolPart };
 
 export type History = ChatMessage[];
 
