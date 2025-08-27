@@ -25,5 +25,8 @@
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0",
     "zod": "4.0.17"
+  },
+  "dependencies": {
+    "fuse.js": "^7.1.0"
   }
 }

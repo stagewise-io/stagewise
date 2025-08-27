@@ -146,6 +146,10 @@ importers:
         version: 4.0.17
 
   agent/runtime-interface:
+    dependencies:
+      fuse.js:
+        specifier: ^7.1.0
+        version: 7.1.0
     devDependencies:
       rimraf:
         specifier: ^5.0.0
@@ -159,6 +163,9 @@ importers:
 
   agent/runtime-mock:
     dependencies:
+      fuse.js:
+        specifier: ^7.1.0
+        version: 7.1.0
       memfs:
         specifier: ^4.17.2
         version: 4.17.2
@@ -181,6 +188,12 @@ importers:
 
   agent/runtime-node:
     dependencies:
+      fast-glob:
+        specifier: ^3.3.3
+        version: 3.3.3
+      fuse.js:
+        specifier: ^7.1.0
+        version: 7.1.0
       ignore:
         specifier: ^7.0.5
         version: 7.0.5
@@ -901,6 +914,9 @@ importers:
 
   packages/karton-contract:
     dependencies:
+      '@stagewise/agent-runtime-interface':
+        specifier: workspace:*
+        version: link:../../agent/runtime-interface
       '@stagewise/agent-tools':
         specifier: workspace:*
         version: link:../../agent/tools

@@ -23,6 +23,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "fuse.js": "^7.1.0",
     "memfs": "^4.17.2"
   },
   "devDependencies": {

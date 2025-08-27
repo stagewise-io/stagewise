@@ -12,6 +12,8 @@ export {
   type GlobResult,
   type SearchReplaceMatch,
   type SearchReplaceResult,
+  type FuzzyFileSearchResult,
+  type FileData,
 } from './file-operations.js';
 
 export interface ClientRuntime {

@@ -1,5 +1,6 @@
 import type { UserMessageMetadata, SelectedElement } from './metadata.js';
 import type { UIMessage, UIDataTypes } from 'ai';
+import type { FuzzyFileSearchResult } from '@stagewise/agent-runtime-interface';
 import type { UITools, ToolPart } from '@stagewise/agent-tools';
 import type { Tool, FileDiff, ToolResult } from '@stagewise/agent-types';
 import type { RouterOutputs } from '@stagewise/api-client';
@@ -68,5 +69,6 @@ export type KartonContract = {
       userMessageId: string,
       chatId: string,
     ) => Promise<void>;
+    fuzzyFileSearch: (searchString: string) => Promise<FuzzyFileSearchResult>;
   };
 };

@@ -1,5 +1,7 @@
 import { Volume } from 'memfs';
 import type { DirectoryJSON } from 'memfs';
+import { basename, dirname } from 'node:path';
+import Fuse, { type IFuseOptions } from 'fuse.js';
 import {
   BaseFileSystemProvider,
   type FileSystemProviderConfig,
@@ -12,6 +14,8 @@ import {
   type GlobResult,
   type SearchReplaceResult,
   type SearchReplaceMatch,
+  type FileData,
+  type FuzzyFileSearchResult,
 } from '@stagewise/agent-runtime-interface';
 
 export interface MockFileSystemConfig extends FileSystemProviderConfig {
@@ -27,6 +31,12 @@ export interface MockFileSystemConfig extends FileSystemProviderConfig {
   gitignorePatterns?: string[];
 }
 
+type FileSearchCache = {
+  files: FileData[];
+  fuse: Fuse<FileData>;
+  lastUpdated: number;
+};
+
 /**
  * Mock file system provider using memfs for testing
  * Implements all IFileSystemProvider methods for comprehensive testing
@@ -34,6 +44,11 @@ export interface MockFileSystemConfig extends FileSystemProviderConfig {
 export class MockFileSystemProvider extends BaseFileSystemProvider {
   private volume: Volume;
   private gitignorePatterns: string[] = [];
+
+  // Fuzzy search cache
+  private fileSearchCache: FileSearchCache | null = null;
+  private readonly CACHE_TTL = 30000; // 30 seconds cache TTL
+  private fileIndexPromise: Promise<void> | null = null;
 
   constructor(config: MockFileSystemConfig = { workingDirectory: '/test' }) {
     super(config);
@@ -462,6 +477,135 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
         success: false,
         message: 'Glob search failed',
         error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  async fuzzySearch(searchString: string): Promise<FuzzyFileSearchResult> {
+    // Build or refresh the file index if needed
+    await this.ensureFileIndexBuilt();
+
+    if (!this.fileSearchCache) {
+      // This shouldn't happen after ensureFileIndexBuilt, but handle it gracefully
+      return [];
+    }
+
+    // Perform the fuzzy search
+    const results = this.fileSearchCache.fuse.search(searchString);
+    return results;
+  }
+
+  private async ensureFileIndexBuilt(): Promise<void> {
+    const now = Date.now();
+
+    // Check if cache is valid
+    if (
+      this.fileSearchCache &&
+      now - this.fileSearchCache.lastUpdated < this.CACHE_TTL
+    ) {
+      return;
+    }
+
+    // If already building, wait for it
+    if (this.fileIndexPromise) {
+      await this.fileIndexPromise;
+      return;
+    }
+
+    // Build the index
+    this.fileIndexPromise = this.buildFileIndex();
+    try {
+      await this.fileIndexPromise;
+    } finally {
+      this.fileIndexPromise = null;
+    }
+  }
+
+  private async buildFileIndex(): Promise<void> {
+    try {
+      const fileDataList: FileData[] = [];
+
+      // Recursively traverse the volume to get all files
+      const traverseVolume = (currentPath: string): void => {
+        try {
+          const items = this.volume.readdirSync(currentPath) as string[];
+
+          for (const item of items) {
+            const itemPath = this.joinPaths(currentPath, item);
+            const relativePath = this.getRelativePath(
+              this.config.workingDirectory,
+              itemPath,
+            );
+
+            // Skip gitignored files
+            if (this.shouldIgnorePattern(relativePath)) {
+              continue;
+            }
+
+            try {
+              const stats = this.volume.statSync(itemPath);
+
+              if (stats.isFile()) {
+                // Add file to the list
+                fileDataList.push({
+                  filepath: relativePath,
+                  filename: basename(itemPath),
+                  dirname: dirname(relativePath),
+                  fullpath: itemPath,
+                });
+              } else if (stats.isDirectory()) {
+                // Recurse into subdirectory
+                traverseVolume(itemPath);
+              }
+            } catch {
+              // Skip items that can't be stat'd
+            }
+          }
+        } catch {
+          // Skip directories that can't be read
+        }
+      };
+
+      // Start traversal from working directory
+      traverseVolume(this.config.workingDirectory);
+
+      // Configure Fuse for optimal file search
+      const fuseOptions: IFuseOptions<FileData> = {
+        keys: [
+          { name: 'filename', weight: 2.0 }, // Filename has highest priority
+          { name: 'filepath', weight: 1.0 }, // Full path has secondary priority
+          { name: 'dirname', weight: 0.5 }, // Directory has lower priority
+        ],
+        threshold: 0.4, // Adjust for sensitivity (0 = exact, 1 = match anything)
+        includeScore: true,
+        includeMatches: true,
+        minMatchCharLength: 1,
+        shouldSort: true,
+        findAllMatches: false,
+        location: 0,
+        distance: 100,
+        useExtendedSearch: false,
+        ignoreLocation: false,
+        ignoreFieldNorm: false,
+        fieldNormWeight: 1,
+      };
+
+      // Create the Fuse instance
+      const fuse = new Fuse(fileDataList, fuseOptions);
+
+      // Update the cache
+      this.fileSearchCache = {
+        files: fileDataList,
+        fuse: fuse,
+        lastUpdated: Date.now(),
+      };
+    } catch (error) {
+      // Log error and create an empty cache to prevent repeated failures
+      console.error('[fuzzySearch] Error building file index:', error);
+      this.fileSearchCache = {
+        files: [],
+        fuse: new Fuse([], {}),
+        lastUpdated: Date.now(),
       };
     }
   }
