@@ -462,8 +462,37 @@ const ToolPartItem = memo(
       [toolPart],
     );
 
+    const handleContainerClick = useCallback(() => {
+      if (canShowDiff) {
+        setIsExpanded(!isExpanded);
+      }
+    }, [canShowDiff, isExpanded]);
+
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        if (canShowDiff && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          setIsExpanded(!isExpanded);
+        }
+      },
+      [canShowDiff, isExpanded],
+    );
+
+    const containerProps = {
+      className: cn(
+        '-mx-1 flex flex-col gap-2 rounded-xl bg-zinc-500/5 px-2 py-0.5',
+        canShowDiff && 'cursor-pointer',
+      ),
+      ...(canShowDiff && {
+        onClick: handleContainerClick,
+        onKeyDown: handleKeyDown,
+        role: 'button' as const,
+        tabIndex: 0,
+      }),
+    };
+
     return (
-      <div className="-mx-1 flex flex-col gap-2 rounded-xl bg-zinc-500/5 px-2 py-0.5">
+      <div {...containerProps}>
         <div className="flex w-full flex-row items-center justify-between gap-2 stroke-black/60">
           {getToolIcon(toolPart)}
           <div className="flex flex-1 flex-col items-start gap-0">
@@ -482,6 +511,7 @@ const ToolPartItem = memo(
           {requiresApproval && (
             <div className="flex flex-row items-center gap-1">
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 className="h-4 w-5"
@@ -493,6 +523,7 @@ const ToolPartItem = memo(
                 <XIcon className="size-4" />
               </Button>
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 className="h-4 w-5"
@@ -509,19 +540,14 @@ const ToolPartItem = memo(
             <>
               <CheckIcon className="size-3 text-green-600" />
               {canShowDiff && (
-                <button
-                  type="button"
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  className="transition-transform duration-150 hover:scale-110"
-                  aria-label="Toggle diff view"
-                >
+                <div className="transition-transform duration-150">
                   <ChevronRightIcon
                     className={cn(
                       'size-3 text-zinc-600 transition-transform',
                       isExpanded && 'rotate-90',
                     )}
                   />
-                </button>
+                </div>
               )}
             </>
           )}
