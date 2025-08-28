@@ -23,7 +23,6 @@ interface ToolCallContext {
 
 export interface ToolCallProcessingResult {
   success: boolean;
-  toolName: string;
   toolCallId: string;
   duration: number;
   error?: {
@@ -69,7 +68,6 @@ export async function processBrowserToolCall(
 
     const result: ToolCallProcessingResult = {
       success: true,
-      toolName,
       toolCallId,
       duration: 0, // Browser tools don't track duration currently
       result: toolCallResult.result,
@@ -85,7 +83,6 @@ export async function processBrowserToolCall(
 
     const result: ToolCallProcessingResult = {
       success: false,
-      toolName,
       toolCallId,
       duration: 0,
       error: {
@@ -158,7 +155,6 @@ export async function processClientSideToolCall(
 
     const processResult: ToolCallProcessingResult = {
       success: false,
-      toolName,
       toolCallId,
       duration,
       error: {
@@ -175,7 +171,6 @@ export async function processClientSideToolCall(
   } else if (result.userInteractionRequired) {
     const processResult: ToolCallProcessingResult = {
       success: false,
-      toolName,
       toolCallId,
       duration,
       error: {
@@ -193,7 +188,6 @@ export async function processClientSideToolCall(
     // Successful completion
     const processResult: ToolCallProcessingResult = {
       success: true,
-      toolName,
       toolCallId,
       duration,
       result: result.result,
