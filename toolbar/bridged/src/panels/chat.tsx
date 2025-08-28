@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/panel';
 import { useAgentState } from '@/hooks/agent/use-agent-state';
 import { useChatState } from '@/hooks/use-chat-state';
+import { usePlugins } from '@/hooks/use-plugins';
 import { cn } from '@/utils';
 import { Textarea } from '@headlessui/react';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import {
   CheckIcon,
   CogIcon,
   ArrowUpIcon,
+  CopyIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ContextElementsChips } from '@/components/context-elements-chips';
@@ -28,6 +30,8 @@ import {
 import { TextSlideshow } from '@/components/ui/text-slideshow';
 import { useAgentMessaging } from '@/hooks/agent/use-agent-messaging';
 import { useAgents } from '@/hooks/agent/use-agent-provider';
+import { createPrompt, type PluginContextSnippets } from '@/prompts';
+import { collectUserMessageMetadata, getSelectedElementInfo } from '@/utils';
 
 const agentStateToText: Record<AgentStateType, string> = {
   [AgentStateType.WAITING_FOR_USER_RESPONSE]: 'Waiting for user response',
@@ -62,7 +66,9 @@ export function ChatPanel() {
   const chatState = useChatState();
   const chatMessaging = useAgentMessaging();
   const [isComposing, setIsComposing] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const { connected } = useAgents();
+  const { plugins } = usePlugins();
 
   const enableInputField = useMemo(() => {
     // Disable input if agent is not connected
@@ -92,6 +98,106 @@ export function ChatPanel() {
     chatState.stopPromptCreation();
   }, [chatState]);
 
+  const buildFullPrompt = useCallback(async () => {
+    // Get metadata for selected elements
+    const metadata = collectUserMessageMetadata(
+      chatState.domContextElements.map((item) =>
+        getSelectedElementInfo(item.element),
+      ),
+    );
+
+    // Process plugin context snippets
+    const pluginProcessingPromises = plugins.map(async (plugin) => {
+      const baseUserMessage = {
+        id: '',
+        createdAt: new Date(),
+        contentItems: [{ type: 'text' as const, text: chatState.chatInput }],
+        metadata,
+        pluginContent: {},
+        sentByPlugin: false,
+      };
+
+      const handlerResult = await plugin.onPromptSend?.(baseUserMessage);
+
+      if (
+        !handlerResult ||
+        !handlerResult.contextSnippets ||
+        handlerResult.contextSnippets.length === 0
+      ) {
+        return null;
+      }
+
+      const snippetPromises = handlerResult.contextSnippets.map(
+        async (snippet) => {
+          const resolvedContent =
+            typeof snippet.content === 'string'
+              ? snippet.content
+              : await snippet.content();
+          return {
+            promptContextName: snippet.promptContextName,
+            content: resolvedContent,
+          };
+        },
+      );
+
+      const resolvedSnippets = await Promise.all(snippetPromises);
+
+      if (resolvedSnippets.length > 0) {
+        const pluginSnippets: PluginContextSnippets = {
+          pluginName: plugin.pluginName,
+          contextSnippets: resolvedSnippets,
+        };
+        return pluginSnippets;
+      }
+      return null;
+    });
+
+    const allPluginContexts = await Promise.all(pluginProcessingPromises);
+    const validPluginContexts = allPluginContexts.filter(
+      (context): context is PluginContextSnippets => context !== null,
+    );
+
+    // Create the full prompt using createPrompt
+    const fullPrompt = createPrompt(
+      chatState.domContextElements.map((item) => item.element),
+      chatState.chatInput,
+      metadata.currentUrl || '',
+      validPluginContexts,
+    );
+
+    return fullPrompt;
+  }, [chatState.chatInput, chatState.domContextElements, plugins]);
+
+  const handleCopyToClipboard = useCallback(async () => {
+    if (chatState.chatInput.trim()) {
+      try {
+        // Build the full prompt with metadata
+        const fullPrompt = await buildFullPrompt();
+        
+        // Copy the full prompt to clipboard
+        await navigator.clipboard.writeText(fullPrompt);
+        
+        // Clear input and selected elements
+        chatState.setChatInput('');
+        chatState.stopPromptCreation();
+
+        // Clear any existing timeout
+        if (copyTimeoutRef.current) {
+          clearTimeout(copyTimeoutRef.current);
+        }
+
+        // Show checkmark for 1 second
+        setIsCopied(true);
+        copyTimeoutRef.current = setTimeout(() => {
+          setIsCopied(false);
+          copyTimeoutRef.current = null;
+        }, 1000);
+      } catch (error) {
+        console.error('Failed to copy prompt to clipboard:', error);
+      }
+    }
+  }, [chatState, buildFullPrompt]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
@@ -113,6 +219,7 @@ export function ChatPanel() {
   /* If the user clicks on prompt creation mode, we force-focus the input field all the time. */
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isIntentionallyStoppingRef = useRef<boolean>(false);
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const blurHandler = () => {
@@ -264,6 +371,19 @@ export function ChatPanel() {
               />
             </div>
           </div>
+          <Button
+            disabled={!chatState.chatInput.trim() && !isCopied}
+            onClick={handleCopyToClipboard}
+            glassy
+            variant="secondary"
+            className="size-8 cursor-pointer rounded-full p-1"
+          >
+            {isCopied ? (
+              <CheckIcon className="size-4 stroke-green-600" />
+            ) : (
+              <CopyIcon className="size-4" />
+            )}
+          </Button>
           <Button
             disabled={!canSendMessage}
             onClick={handleSubmit}
