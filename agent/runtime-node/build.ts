@@ -10,7 +10,34 @@ const buildOptions: BuildOptions = {
   format: 'esm',
   platform: 'node',
   target: 'node16',
-  external: ['vscode'], // VSCode extension API should always be external
+  external: [
+    'vscode', // VSCode extension API should always be external
+    // Node.js built-in modules
+    'os',
+    'path',
+    'fs',
+    'util',
+    'stream',
+    'events',
+    'buffer',
+    'crypto',
+    'child_process',
+    'http',
+    'https',
+    'url',
+    'querystring',
+    'assert',
+    'zlib',
+    'tty',
+    'net',
+    'dns',
+    // Dependencies to prevent bundling issues
+    'fast-glob',
+    'fuse.js',
+    'ignore',
+    'minimatch',
+    '@stagewise/agent-runtime-interface',
+  ],
   sourcemap: false, // Disable source maps for security
   minify: true, // Always minify for published packages
   treeShaking: true,

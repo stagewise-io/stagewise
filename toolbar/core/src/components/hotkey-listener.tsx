@@ -15,6 +15,8 @@ export function HotkeyListener() {
     isContextSelectorActive,
     stopContextSelector,
     startContextSelector,
+    isMentionDropdownOpen,
+    setIsMentionDropdownOpen,
   } = useChatState();
   const { isChatOpen, closeChat } = usePanels();
 
@@ -33,7 +35,11 @@ export function HotkeyListener() {
           return false;
         },
         [HotkeyActions.ESC]: () => {
-          if (isContextSelectorActive) {
+          // First check if mention dropdown is open
+          if (isMentionDropdownOpen) {
+            setIsMentionDropdownOpen(false);
+            return true;
+          } else if (isContextSelectorActive) {
             stopContextSelector();
             return true;
           } else if (isPromptCreationActive) {
@@ -57,6 +63,8 @@ export function HotkeyListener() {
         startContextSelector,
         isChatOpen,
         closeChat,
+        isMentionDropdownOpen,
+        setIsMentionDropdownOpen,
       ],
     );
 

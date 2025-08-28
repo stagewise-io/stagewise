@@ -215,7 +215,7 @@ function PanelsArea({
       )}
     >
       <PanelWrapper position={position} isOpen={isChatOpen}>
-        <ChatPanel />
+        <ChatPanel position={position} />
       </PanelWrapper>
 
       <PanelWrapper position={position} isOpen={isEddyModeOpen}>

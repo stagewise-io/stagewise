@@ -1,5 +1,12 @@
 import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
 import { FileAttachmentChips } from '@/components/file-attachment-chips';
+import { FileMentionChip } from '@/components/file-mention-chip';
+import {
+  FileMentionDropdown,
+  type FileMentionDropdownRef,
+  type FileData,
+  type FuseResult,
+} from '@/components/file-mention-dropdown';
 import { TextSlideshow } from '@/components/ui/text-slideshow';
 import { Button } from '@/components/ui/button';
 import { PanelFooter } from '@/components/ui/panel';
@@ -7,7 +14,7 @@ import { useChatState } from '@/hooks/use-chat-state';
 import { cn, HotkeyActions } from '@/utils';
 import { Textarea } from '@headlessui/react';
 import { ArrowUpIcon, SquareIcon, MousePointerIcon } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import {
   useKartonState,
   useKartonProcedure,
@@ -26,11 +33,22 @@ const GlassyTextInputClassNames =
 export function ChatPanelFooter({
   ref,
   inputRef,
+  position,
 }: {
   ref: React.RefObject<HTMLDivElement>;
   inputRef: React.RefObject<HTMLTextAreaElement>;
+  position?: {
+    isTopHalf: boolean;
+    isLeftHalf: boolean;
+  };
 }) {
   const chatState = useChatState();
+  const {
+    isMentionDropdownOpen,
+    setIsMentionDropdownOpen,
+    selectedFiles,
+    setSelectedFiles,
+  } = chatState;
   const isWorking = useKartonState((s) => s.isWorking);
   const activeChatId = useKartonState((s) => s.activeChatId);
   const stopAgent = useKartonProcedure((p) => p.abortAgentCall);
@@ -47,6 +65,22 @@ export function ChatPanelFooter({
   }, [activeChatId, chats]);
 
   const [isComposing, setIsComposing] = useState(false);
+
+  // Mention state
+  const [_mentionSearch, setMentionSearch] = useState('');
+  const [mentionSearchResults, setMentionSearchResults] = useState<
+    FuseResult<FileData>[]
+  >([]);
+  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
+  const [isSearchingFiles, setIsSearchingFiles] = useState(false);
+  const [mentionTriggerPosition, setMentionTriggerPosition] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
+
+  const mentionDropdownRef = useRef<FileMentionDropdownRef>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fuzzyFileSearch = useKartonProcedure((p) => p.fuzzyFileSearch);
 
   const enableInputField = useMemo(() => {
     // Disable input if agent is not connected
@@ -71,14 +105,70 @@ export function ChatPanelFooter({
     }
   }, [chatState, canSendMessage]);
 
+  // Determine if toolbar is at bottom (dropdown will appear above)
+  const isToolbarAtBottom = useMemo(() => {
+    return position ? !position.isTopHalf : false;
+  }, [position]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Handle mention dropdown navigation
+      if (isMentionDropdownOpen) {
+        if (e.key === 'ArrowUp' || (e.ctrlKey && e.key === 'p')) {
+          e.preventDefault();
+          if (isToolbarAtBottom) {
+            // Dropdown is above - ArrowUp should go up visually (increment index in reversed array)
+            setMentionSelectedIndex((prev) =>
+              prev < mentionSearchResults.length - 1 ? prev + 1 : 0,
+            );
+          } else {
+            // Dropdown is below - ArrowUp should go up (decrement index)
+            setMentionSelectedIndex((prev) =>
+              prev > 0 ? prev - 1 : mentionSearchResults.length - 1,
+            );
+          }
+          return;
+        }
+        if (e.key === 'ArrowDown' || (e.ctrlKey && e.key === 'n')) {
+          e.preventDefault();
+          if (isToolbarAtBottom) {
+            // Dropdown is above - ArrowDown should go down visually (decrement index in reversed array)
+            setMentionSelectedIndex((prev) =>
+              prev > 0 ? prev - 1 : mentionSearchResults.length - 1,
+            );
+          } else {
+            // Dropdown is below - ArrowDown should go down (increment index)
+            setMentionSelectedIndex((prev) =>
+              prev < mentionSearchResults.length - 1 ? prev + 1 : 0,
+            );
+          }
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          if (mentionSearchResults[mentionSelectedIndex]) {
+            handleFileSelect(mentionSearchResults[mentionSelectedIndex]);
+          }
+          return;
+        }
+        // ESC is now handled by the global hotkey listener
+      }
+
+      // Regular enter handling
       if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
         e.preventDefault();
         handleSubmit();
       }
     },
-    [handleSubmit, isComposing],
+    [
+      handleSubmit,
+      isComposing,
+      isMentionDropdownOpen,
+      mentionSearchResults,
+      mentionSelectedIndex,
+      isToolbarAtBottom,
+      selectedFiles,
+    ],
   );
 
   const handlePaste = useCallback(
@@ -121,6 +211,201 @@ export function ChatPanelFooter({
     setIsComposing(false);
   }, []);
 
+  // Mention helper functions
+  const closeMentionDropdown = useCallback(() => {
+    setIsMentionDropdownOpen(false);
+    setMentionSearch('');
+    setMentionSearchResults([]);
+    setMentionSelectedIndex(0);
+    setMentionTriggerPosition(null);
+  }, [setIsMentionDropdownOpen]);
+
+  const handleFileSelect = useCallback(
+    (file: FuseResult<FileData>) => {
+      if (!mentionTriggerPosition || !inputRef.current) return;
+
+      const currentValue = chatState.chatInput;
+      const before = currentValue.slice(0, mentionTriggerPosition.start);
+      const after = currentValue.slice(mentionTriggerPosition.end);
+      // Use full filepath in mention for unambiguous mapping
+      const mentionText = `@${file.item.filepath}`;
+
+      // Check if this file is already selected
+      const alreadySelected = selectedFiles.some(
+        (f) =>
+          f.filepath === file.item.filepath &&
+          f.filename === file.item.filename,
+      );
+
+      if (!alreadySelected) {
+        // Update the input text
+        const newValue = `${before + mentionText} ${after}`;
+        chatState.setChatInput(newValue);
+
+        // Add to selected files
+        setSelectedFiles([
+          ...selectedFiles,
+          { filepath: file.item.filepath, filename: file.item.filename },
+        ]);
+
+        // Set cursor position after the mention
+        setTimeout(() => {
+          if (inputRef.current) {
+            const newCursorPos = before.length + mentionText.length + 1;
+            inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            inputRef.current.focus();
+          }
+        }, 0);
+      }
+
+      // Close dropdown
+      closeMentionDropdown();
+    },
+    [
+      chatState,
+      mentionTriggerPosition,
+      closeMentionDropdown,
+      selectedFiles,
+      setSelectedFiles,
+    ],
+  );
+
+  // Helper function to extract file mentions from input text
+  const extractFileMentions = useCallback((text: string): string[] => {
+    const mentionRegex = /@([^\s]+)/g;
+    const mentions: string[] = [];
+    let match: RegExpExecArray | null = mentionRegex.exec(text);
+
+    while (match !== null) {
+      mentions.push(match[1]); // Extract the filepath without the @
+      match = mentionRegex.exec(text);
+    }
+
+    return mentions;
+  }, []);
+
+  // Detect @ mentions and trigger search
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      const cursorPosition = e.target.selectionStart;
+
+      chatState.setChatInput(value);
+
+      // Sync selectedFiles with mentions in the input
+      const currentMentions = extractFileMentions(value);
+      const updatedSelectedFiles = selectedFiles.filter((file) =>
+        currentMentions.some((mention) => mention.startsWith(file.filepath)),
+      );
+
+      // Only update if there's a difference
+      if (updatedSelectedFiles.length !== selectedFiles.length) {
+        setSelectedFiles(updatedSelectedFiles);
+      }
+
+      // Check for @ mention for autocomplete
+      if (cursorPosition > 0) {
+        // Find the last @ before cursor
+        let atIndex = -1;
+        for (let i = cursorPosition - 1; i >= 0; i--) {
+          if (value[i] === '@') {
+            atIndex = i;
+            break;
+          }
+          // Stop if we hit whitespace or another special character
+          if (value[i] === ' ' || value[i] === '\n') {
+            break;
+          }
+        }
+
+        if (atIndex !== -1) {
+          const searchText = value.slice(atIndex + 1, cursorPosition);
+
+          // Check if there's no space between @ and the search text
+          const hasSpace = searchText.includes(' ');
+
+          if (!hasSpace) {
+            // Check if this mention matches any already selected file (using filepath now)
+            const isExistingMention = selectedFiles.some((file) => {
+              const mentionText = `@${file.filepath}`;
+              // Check if the @ position and text matches an existing file mention
+              return (
+                value.slice(atIndex, atIndex + mentionText.length) ===
+                mentionText
+              );
+            });
+
+            if (!isExistingMention) {
+              setMentionSearch(searchText);
+              setMentionTriggerPosition({
+                start: atIndex,
+                end: cursorPosition,
+              });
+              setIsMentionDropdownOpen(true);
+              setMentionSelectedIndex(0);
+
+              // Debounced search
+              if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+              }
+              searchTimeoutRef.current = setTimeout(() => {
+                performFuzzySearch(searchText);
+              }, 200);
+            } else {
+              closeMentionDropdown();
+            }
+          } else {
+            closeMentionDropdown();
+          }
+        } else {
+          closeMentionDropdown();
+        }
+      } else {
+        closeMentionDropdown();
+      }
+    },
+    [
+      chatState,
+      closeMentionDropdown,
+      selectedFiles,
+      setSelectedFiles,
+      extractFileMentions,
+      setIsMentionDropdownOpen,
+    ],
+  );
+
+  // Perform fuzzy file search
+  const performFuzzySearch = useCallback(
+    async (query: string) => {
+      if (!query || query.length === 0) {
+        setMentionSearchResults([]);
+        return;
+      }
+
+      setIsSearchingFiles(true);
+      try {
+        const results = await fuzzyFileSearch(query);
+        // Limit to top 10 results
+        setMentionSearchResults(results.slice(0, 10));
+      } catch (error) {
+        console.error('Failed to search files:', error);
+        setMentionSearchResults([]);
+      } finally {
+        setIsSearchingFiles(false);
+      }
+    },
+    [fuzzyFileSearch],
+  );
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const showMultiLineTextArea = useMemo(() => {
     // Show a large text area if we have a line break or more than 40 characters.
     return (
@@ -142,7 +427,8 @@ export function ChatPanelFooter({
       ref={ref}
     >
       {(chatState.fileAttachments.length > 0 ||
-        chatState.domContextElements.length > 0) && (
+        chatState.domContextElements.length > 0 ||
+        selectedFiles.length > 0) && (
         <div className="scrollbar-thin flex gap-2 overflow-x-auto pb-1">
           <FileAttachmentChips
             fileAttachments={chatState.fileAttachments}
@@ -152,6 +438,26 @@ export function ChatPanelFooter({
             domContextElements={chatState.domContextElements}
             removeChatDomContext={chatState.removeChatDomContext}
           />
+          {selectedFiles.map((file, index) => (
+            <FileMentionChip
+              key={`${file.filepath}-${index}`}
+              filename={file.filename}
+              filepath={file.filepath}
+              onRemove={() => {
+                // Remove the file from selectedFiles
+                setSelectedFiles(selectedFiles.filter((_, i) => i !== index));
+
+                // Also remove the mention from the input text (using full filepath now)
+                const mentionText = `@${file.filepath}`;
+                const currentValue = chatState.chatInput;
+                const newValue = currentValue
+                  .replace(mentionText, '')
+                  .replace(/\s+/g, ' ')
+                  .trim();
+                chatState.setChatInput(newValue);
+              }}
+            />
+          ))}
         </div>
       )}
       <div className="flex h-fit flex-1 flex-row items-end justify-between gap-1">
@@ -159,9 +465,7 @@ export function ChatPanelFooter({
           <Textarea
             ref={inputRef}
             value={chatState.chatInput}
-            onChange={(e) => {
-              chatState.setChatInput(e.target.value);
-            }}
+            onChange={handleInputChange}
             onFocus={() => {
               if (!chatState.isPromptCreationActive) {
                 chatState.startPromptCreation();
@@ -245,6 +549,17 @@ export function ChatPanelFooter({
               </Tooltip>
             </div>
           )}
+          {/* File Mention Dropdown */}
+          <FileMentionDropdown
+            ref={mentionDropdownRef}
+            searchResults={mentionSearchResults}
+            selectedIndex={mentionSelectedIndex}
+            onSelect={handleFileSelect}
+            isLoading={isSearchingFiles}
+            isOpen={isMentionDropdownOpen}
+            referenceEl={inputRef.current}
+            isToolbarAtBottom={isToolbarAtBottom}
+          />
         </div>
         {canStop && (
           <Tooltip>

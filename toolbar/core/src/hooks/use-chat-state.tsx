@@ -50,6 +50,12 @@ interface ChatContext {
   removeFileAttachment: (id: string) => void;
   clearFileAttachments: () => void;
 
+  // Selected files (from @ mentions)
+  selectedFiles: Array<{ filepath: string; filename: string }>;
+  setSelectedFiles: (
+    files: Array<{ filepath: string; filename: string }>,
+  ) => void;
+
   // UI state
   isPromptCreationActive: boolean;
   startPromptCreation: () => void;
@@ -58,6 +64,8 @@ interface ChatContext {
   startContextSelector: () => void;
   stopContextSelector: () => void;
   isSending: boolean;
+  isMentionDropdownOpen: boolean;
+  setIsMentionDropdownOpen: (value: boolean) => void;
 }
 
 const ChatHistoryContext = createContext<ChatContext>({
@@ -71,6 +79,8 @@ const ChatHistoryContext = createContext<ChatContext>({
   addFileAttachment: () => {},
   removeFileAttachment: () => {},
   clearFileAttachments: () => {},
+  selectedFiles: [],
+  setSelectedFiles: () => {},
   isPromptCreationActive: false,
   startPromptCreation: () => {},
   stopPromptCreation: () => {},
@@ -78,6 +88,8 @@ const ChatHistoryContext = createContext<ChatContext>({
   startContextSelector: () => {},
   stopContextSelector: () => {},
   isSending: false,
+  isMentionDropdownOpen: false,
+  setIsMentionDropdownOpen: () => {},
 });
 
 interface ChatStateProviderProps {
@@ -101,6 +113,11 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     }[]
   >([]);
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<
+    Array<{ filepath: string; filename: string }>
+  >([]);
+  const [isMentionDropdownOpen, setIsMentionDropdownOpen] =
+    useState<boolean>(false);
 
   const { minimized } = useAppState();
   const { plugins } = usePlugins();
@@ -152,6 +169,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     // Always stop context selector when stopping prompt creation
     setIsContextSelectorMode(false);
     setDomContextElements([]);
+    setSelectedFiles([]);
     plugins.forEach((plugin) => {
       plugin.onPromptingAbort?.();
     });
@@ -237,6 +255,11 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         false,
       );
 
+      // Add selected files to metadata
+      if (selectedFiles.length > 0) {
+        metadata.selectedFiles = selectedFiles;
+      }
+
       const message: ChatMessage = {
         id: generateId(),
         parts: [...fileParts, { type: 'text' as const, text: chatInput }],
@@ -308,6 +331,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       setChatInput('');
       setDomContextElements([]);
       clearFileAttachments();
+      setSelectedFiles([]);
       stopPromptCreation(); // This also stops context selector
 
       // Send the message using the chat capability
@@ -319,6 +343,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     chatInput,
     domContextElements,
     fileAttachments,
+    selectedFiles,
     plugins,
     sendChatMessage,
     clearFileAttachments,
@@ -336,6 +361,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     addFileAttachment,
     removeFileAttachment,
     clearFileAttachments,
+    selectedFiles,
+    setSelectedFiles,
     isPromptCreationActive: isPromptCreationMode,
     startPromptCreation,
     stopPromptCreation,
@@ -343,6 +370,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     startContextSelector,
     stopContextSelector,
     isSending,
+    isMentionDropdownOpen,
+    setIsMentionDropdownOpen,
   };
 
   return (

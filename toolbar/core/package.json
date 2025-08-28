@@ -84,5 +84,9 @@
     "vite-plugin-css-injected-by-js": "^3.5.2",
     "vite-plugin-dts": "^4.5.4",
     "zod": "3.25.76"
+  },
+  "dependencies": {
+    "@floating-ui/react": "^0.27.16",
+    "react-icons": "^5.5.0"
   }
 }
