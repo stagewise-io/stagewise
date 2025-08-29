@@ -1,7 +1,9 @@
-import { dirname, resolve, join, relative, extname } from 'node:path';
+import { dirname, resolve, join, relative, extname, basename } from 'node:path';
 import { promises as fs } from 'node:fs';
 import { minimatch } from 'minimatch';
 import ignore from 'ignore';
+import fg from 'fast-glob';
+import Fuse, { type IFuseOptions } from 'fuse.js';
 import {
   BaseFileSystemProvider,
   type ClientRuntime,
@@ -10,6 +12,8 @@ import {
   type GlobResult,
   type SearchReplaceMatch,
   type SearchReplaceResult,
+  type FileData,
+  type FuzzyFileSearchResult,
 } from '@stagewise/agent-runtime-interface';
 
 /**
@@ -31,10 +35,21 @@ const BINARY_DETECTION = {
  * IMPORTANT: All path parameters are expected to be relative paths.
  * The resolvePath method converts them to absolute paths using the working directory.
  */
+type FileSearchCache = {
+  files: FileData[];
+  fuse: Fuse<FileData>;
+  lastUpdated: number;
+};
+
 export class NodeFileSystemProvider extends BaseFileSystemProvider {
   private gitignore: ReturnType<typeof ignore> | null = null;
   private gitignorePatterns: string[] = [];
   private gitignoreInitialized = false;
+
+  // Fuzzy search cache
+  private fileSearchCache: FileSearchCache | null = null;
+  private readonly CACHE_TTL = 30000; // 30 seconds cache TTL
+  private fileIndexPromise: Promise<void> | null = null;
 
   getCurrentWorkingDirectory(): string {
     return this.config.workingDirectory;
@@ -690,6 +705,126 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
         success: false,
         message: `Failed to search and replace: ${error instanceof Error ? error.message : 'Unknown error'}`,
         error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  async fuzzySearch(searchString: string): Promise<FuzzyFileSearchResult> {
+    // Build or refresh the file index if needed
+    await this.ensureFileIndexBuilt();
+
+    if (!this.fileSearchCache) {
+      // This shouldn't happen after ensureFileIndexBuilt, but handle it gracefully
+      return [];
+    }
+
+    // Perform the fuzzy search
+    const results = this.fileSearchCache.fuse.search(searchString);
+    return results;
+  }
+
+  private async ensureFileIndexBuilt(): Promise<void> {
+    const now = Date.now();
+
+    // Check if cache is valid
+    if (
+      this.fileSearchCache &&
+      now - this.fileSearchCache.lastUpdated < this.CACHE_TTL
+    ) {
+      return;
+    }
+
+    // If already building, wait for it
+    if (this.fileIndexPromise) {
+      await this.fileIndexPromise;
+      return;
+    }
+
+    // Build the index
+    this.fileIndexPromise = this.buildFileIndex();
+    try {
+      await this.fileIndexPromise;
+    } finally {
+      this.fileIndexPromise = null;
+    }
+  }
+
+  private async buildFileIndex(): Promise<void> {
+    try {
+      // Ensure gitignore is initialized
+      await this.ensureGitignoreInitialized();
+
+      // Get all gitignore patterns including defaults
+      const ignorePatterns = [
+        ...this.gitignorePatterns,
+        // Add patterns that fast-glob should always ignore
+        '**/.git/**',
+        '**/node_modules/**',
+        '**/.DS_Store',
+        '**/Thumbs.db',
+      ];
+
+      // Use fast-glob to get all files, respecting gitignore patterns
+      const files = await fg('**/*', {
+        cwd: this.config.workingDirectory,
+        onlyFiles: true,
+        ignore: ignorePatterns,
+        dot: false, // Don't include dotfiles by default
+        followSymbolicLinks: false,
+        suppressErrors: true,
+        // Set a reasonable limit to prevent memory issues on huge codebases
+        // This can be adjusted based on requirements
+        stats: false, // We don't need file stats for fuzzy search
+      });
+
+      // Transform file paths into the FileData structure
+      const fileDataList: FileData[] = files.map((filepath) => {
+        const fullpath = resolve(this.config.workingDirectory, filepath);
+        return {
+          filepath: filepath,
+          filename: basename(filepath),
+          dirname: dirname(filepath),
+          fullpath: fullpath,
+        };
+      });
+
+      // Configure Fuse for optimal file search
+      const fuseOptions: IFuseOptions<FileData> = {
+        keys: [
+          { name: 'filename', weight: 2.0 }, // Filename has highest priority
+          { name: 'filepath', weight: 1.0 }, // Full path has secondary priority
+          { name: 'dirname', weight: 0.5 }, // Directory has lower priority
+        ],
+        threshold: 0.4, // Adjust for sensitivity (0 = exact, 1 = match anything)
+        includeScore: true,
+        includeMatches: true,
+        minMatchCharLength: 1,
+        shouldSort: true,
+        findAllMatches: false,
+        location: 0,
+        distance: 100,
+        useExtendedSearch: false,
+        ignoreLocation: false,
+        ignoreFieldNorm: false,
+        fieldNormWeight: 1,
+      };
+
+      // Create the Fuse instance
+      const fuse = new Fuse(fileDataList, fuseOptions);
+
+      // Update the cache
+      this.fileSearchCache = {
+        files: fileDataList,
+        fuse: fuse,
+        lastUpdated: Date.now(),
+      };
+    } catch (error) {
+      // Log error and create an empty cache to prevent repeated failures
+      console.error('[fuzzySearch] Error building file index:', error);
+      this.fileSearchCache = {
+        files: [],
+        fuse: new Fuse([], {}),
+        lastUpdated: Date.now(),
       };
     }
   }

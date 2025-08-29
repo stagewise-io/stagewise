@@ -1,4 +1,17 @@
 import { z } from 'zod';
+import type { FuseResult } from 'fuse.js';
+
+export type FileData = {
+  filepath: string;
+  filename: string;
+  dirname: string;
+  fullpath: string;
+};
+
+export const FuzzyFileSearchInputSchema = z.object({
+  searchString: z.string(),
+});
+export type FuzzyFileSearchResult = FuseResult<FileData>[];
 
 /**
  * Core file system operation results
@@ -122,6 +135,13 @@ export interface IFileSystemProvider {
    * @returns Operation result
    */
   writeFile(path: string, content: string): Promise<FileOperationResult>;
+
+  /**
+   * Fuzzy searches for files in the file system.
+   * @param searchString - The string to search for
+   * @returns Fuzzy search results
+   */
+  fuzzySearch(searchString: string): Promise<FuzzyFileSearchResult>;
 
   /**
    * Edits a file by replacing content between specified lines.
@@ -416,6 +436,7 @@ export abstract class BaseFileSystemProvider implements IFileSystemProvider {
       dryRun?: boolean;
     },
   ): Promise<SearchReplaceResult>;
+  abstract fuzzySearch(searchString: string): Promise<FuzzyFileSearchResult>;
   abstract fileExists(path: string): Promise<boolean>;
   abstract isDirectory(path: string): Promise<boolean>;
   abstract getFileStats(

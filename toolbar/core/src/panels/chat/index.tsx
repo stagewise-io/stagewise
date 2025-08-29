@@ -11,7 +11,14 @@ import {
   useKartonState,
 } from '@/hooks/use-karton';
 
-export function ChatPanel() {
+export function ChatPanel({
+  position,
+}: {
+  position?: {
+    isTopHalf: boolean;
+    isLeftHalf: boolean;
+  };
+}) {
   const chatState = useChatState();
   const [isDragging, setIsDragging] = useState(false);
   const { activeChatId, isWorking, chats } = useKartonState(
@@ -242,7 +249,11 @@ export function ChatPanel() {
           {/* This are renders the output of the agent as markdown and makes it scrollable if necessary. */}
           <ChatHistory ref={chatHistoryRef} />
         </PanelContent>
-        <ChatPanelFooter ref={footerRef} inputRef={inputRef} />
+        <ChatPanelFooter
+          ref={footerRef}
+          inputRef={inputRef}
+          position={position}
+        />
         {isDragging && (
           <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-3xl bg-blue-500/10 backdrop-blur-[1px]" />
         )}

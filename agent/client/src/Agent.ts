@@ -292,6 +292,9 @@ export class Agent {
   }> {
     this.karton = await createKartonServer<KartonContract>({
       procedures: {
+        fuzzyFileSearch: async (searchString) => {
+          return this.clientRuntime.fileSystem.fuzzySearch(searchString);
+        },
         undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
           await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
         },

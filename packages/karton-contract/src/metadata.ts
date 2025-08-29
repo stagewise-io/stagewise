@@ -165,6 +165,17 @@ export const userMessageMetadataSchema = z.object({
     .date()
     .optional()
     .describe('The date and time the message was created'),
+  selectedFiles: z
+    .array(
+      z.object({
+        filepath: z.string().describe('The filepath of the file'),
+        filename: z.string().describe('The filename of the file'),
+      }),
+    )
+    .optional()
+    .describe(
+      'The files that were selected by the user. This is used to display the files in the mention dropdown.',
+    ),
 });
 
 export type UserMessageMetadata = z.infer<typeof userMessageMetadataSchema>;
