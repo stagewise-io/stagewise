@@ -69,6 +69,18 @@ const agents: Agent[] = [
   },
 ];
 
+function getAgentExtensionUrl(agent: Agent) {
+  switch (agent.id) {
+    case 'cline':
+    case 'roocode':
+    case 'copilot':
+    case 'kilocode':
+      return 'vscode:extension/stagewise.stagewise-vscode-extension';
+    default:
+      return `${agent.id}:extension/stagewise.stagewise-vscode-extension`;
+  }
+}
+
 export function InfoPanel() {
   const { availableAgents, connected } = useAgents();
 
@@ -122,10 +134,7 @@ export function InfoPanel() {
               {!isInstalled(agent.id) ? (
                 <Button
                   onClick={() => {
-                    window.open(
-                      `${agent.id}:extension/stagewise.stagewise-vscode-extension`,
-                      '_blank',
-                    );
+                    window.open(getAgentExtensionUrl(agent), '_blank');
                   }}
                   variant="secondary"
                   size="sm"
@@ -153,11 +162,12 @@ export function InfoPanel() {
         <div className="flex w-full items-center justify-center gap-2 py-2">
           <DiscordLogo className="size-4" />
           <a
+            rel="noreferrer noopener"
             className="text-xs text-zinc-600 underline hover:text-zinc-900"
             href="https://discord.gg/gkdGsDYaKA"
             target="_blank"
           >
-            Join our Discord!
+            Join the stagewise Discord!
           </a>
         </div>
       </PanelFooter>
