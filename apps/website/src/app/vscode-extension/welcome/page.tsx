@@ -36,37 +36,92 @@ export default function MigrateToCLI() {
                 </span>
               </h1>
               <div className="flex flex-col items-center gap-8">
-                <p className="mb-3 text-center text-zinc-600 dark:text-zinc-400">
-                  To get started, simply start your app in dev mode and run the
-                  following command in the terminal:
+                <p className="mb-8 text-center text-zinc-600 dark:text-zinc-400">
+                  Follow these simple steps to get started:
                 </p>
-                <button
-                  type="button"
-                  className={cn(
-                    'mb-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-zinc-100 p-4 pr-6 transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-200 active:scale-95 sm:w-auto dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 dark:hover:bg-zinc-800',
-                  )}
-                  onClick={() => {
-                    window.parent.postMessage({ command: 'openTerminal' }, '*');
-                    posthog?.capture('open_terminal_in_getting_started');
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 4000);
-                  }}
-                  aria-label="Copy to clipboard"
-                >
-                  <span className="select-all pr-6 font-mono">
-                    npx stagewise@latest
-                  </span>
-                  {copied ? (
-                    <CheckIcon className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <CopyIcon className="h-4 w-4" />
-                  )}
-                </button>
 
-                <p className="text-center text-zinc-600 dark:text-zinc-400">
+                <div className="w-full max-w-2xl text-left">
+                  <ol className="space-y-6">
+                    <li className="flex gap-4">
+                      <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black font-semibold text-white dark:from-zinc-100 dark:via-zinc-300 dark:to-white dark:text-black">
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent via-white/8 to-white/15" />
+                        <div className="absolute inset-0 rounded-full shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.4),inset_0_0_2px_0.5px_rgba(255,255,255,0.25),inset_0_0_4px_1px_rgba(255,255,255,0.15),inset_0_0_8px_2px_rgba(255,255,255,0.08),0_0_0_0.5px_rgba(255,255,255,0.05)]" />
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-b from-white/5 to-transparent" />
+                        <span className="relative z-10">1</span>
+                      </div>
+                      <div>
+                        <h3 className="mb-1 font-semibold text-lg text-zinc-900 dark:text-zinc-100">
+                          Start your local app in dev mode
+                        </h3>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                          <code>pnpm dev</code>&nbsp; or &nbsp;
+                          <code>npm run dev</code>
+                        </p>
+                      </div>
+                    </li>
+                    <li className="flex gap-4">
+                      <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black font-semibold text-white dark:from-zinc-100 dark:via-zinc-300 dark:to-white dark:text-black">
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent via-white/8 to-white/15" />
+                        <div className="absolute inset-0 rounded-full shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.4),inset_0_0_2px_0.5px_rgba(255,255,255,0.25),inset_0_0_4px_1px_rgba(255,255,255,0.15),inset_0_0_8px_2px_rgba(255,255,255,0.08),0_0_0_0.5px_rgba(255,255,255,0.05)]" />
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-b from-white/5 to-transparent" />
+                        <span className="relative z-10">2</span>
+                      </div>
+                      <div>
+                        <h3 className="mb-1 font-semibold text-lg text-zinc-900 dark:text-zinc-100">
+                          Open a new terminal and navigate to your app directory
+                        </h3>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                          For example: <code>cd ~/projects/my-website</code>
+                        </p>
+                      </div>
+                    </li>
+                    <li className="flex gap-4">
+                      <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black font-semibold text-white dark:from-zinc-100 dark:via-zinc-300 dark:to-white dark:text-black">
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent via-white/8 to-white/15" />
+                        <div className="absolute inset-0 rounded-full shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.4),inset_0_0_2px_0.5px_rgba(255,255,255,0.25),inset_0_0_4px_1px_rgba(255,255,255,0.15),inset_0_0_8px_2px_rgba(255,255,255,0.08),0_0_0_0.5px_rgba(255,255,255,0.05)]" />
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-b from-white/5 to-transparent" />
+                        <span className="relative z-10">3</span>
+                      </div>
+                      <div>
+                        <h3 className="mb-2 font-semibold text-lg text-zinc-900 dark:text-zinc-100">
+                          Run stagewise in the terminal
+                        </h3>
+                        <button
+                          type="button"
+                          className={cn(
+                            'flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-zinc-100 p-3 pr-4 transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-200 active:scale-95 sm:w-auto dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 dark:hover:bg-zinc-800',
+                          )}
+                          onClick={() => {
+                            window.parent.postMessage(
+                              { command: 'openTerminal' },
+                              '*',
+                            );
+                            posthog?.capture(
+                              'open_terminal_in_getting_started',
+                            );
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 4000);
+                          }}
+                          aria-label="Copy to clipboard"
+                        >
+                          <span className="select-all pr-4 font-mono text-sm">
+                            npx stagewise@latest -b
+                          </span>
+                          {copied ? (
+                            <CheckIcon className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <CopyIcon className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    </li>
+                  </ol>
+                </div>
+
+                <p className="mt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">
                   If you're using pnpm, run{' '}
                   <code className="px-1 font-semibold">
-                    pnpm dlx stagewise@latest
+                    pnpm dlx stagewise@latest -b
                   </code>{' '}
                   instead.
                 </p>
