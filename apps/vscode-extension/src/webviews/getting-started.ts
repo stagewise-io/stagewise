@@ -30,7 +30,7 @@ export function createGettingStartedPanel(
             cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
           });
           terminal.show();
-          terminal.sendText('npx stagewise@latest', false);
+          terminal.sendText('npx stagewise@latest -b', false);
           break;
         }
         case 'openDiscord':
