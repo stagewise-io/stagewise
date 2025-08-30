@@ -5,6 +5,7 @@ import {
   PanelHeader,
 } from '@/components/ui/panel';
 import {
+  StagewiseLogoImg,
   DiscordLogo,
   CursorLogoImg,
   TraeLogoImg,
@@ -167,7 +168,21 @@ export function InfoPanel() {
             href="https://discord.gg/gkdGsDYaKA"
             target="_blank"
           >
-            Join the stagewise Discord!
+            Join the Discord!
+          </a>
+          <div className="w-2" />
+          <img
+            src={StagewiseLogoImg}
+            alt="Stagewise logo"
+            className="size-4 object-contain"
+          />
+          <a
+            rel="noreferrer noopener"
+            className="text-xs text-zinc-600 underline hover:text-zinc-900"
+            href="https://stagewise.io/docs"
+            target="_blank"
+          >
+            Read the docs
           </a>
         </div>
       </PanelFooter>

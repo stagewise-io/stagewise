@@ -12,6 +12,7 @@ import * as React from 'react';
 
 // Import PNG logos
 import CursorLogoImg from './cursor.png';
+import StagewiseLogoImg from './stagewise.png';
 import WindsurfLogoImg from './windsurf.png';
 import ClineLogoImg from './cline.png';
 import RooCodeLogoImg from './roo_code.png';
@@ -23,6 +24,7 @@ import KilocodeLogoImg from './kilocode.png';
 export {
   KilocodeLogoImg,
   CursorLogoImg,
+  StagewiseLogoImg,
   WindsurfLogoImg,
   ClineLogoImg,
   RooCodeLogoImg,
