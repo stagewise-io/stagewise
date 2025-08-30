@@ -75,8 +75,9 @@ interface AgentProviderInterface {
 
   /**
    * Disconnect from the currently connected agent.
+   * @param forClipboardMode - If true, persists clipboard mode selection
    */
-  disconnectAgent: () => void;
+  disconnectAgent: (forClipboardMode?: boolean) => void;
 
   /**
    * Refresh the list of available agents.
@@ -154,6 +155,45 @@ function findPersistedAgent(availableAgents: AgentInfo[]): AgentInfo | null {
   }
 
   return matchingAgent || null;
+}
+
+/**
+ * Persists clipboard mode selection to sessionStorage.
+ */
+function persistClipboardMode(): void {
+  try {
+    sessionStorage.setItem('stagewise_toolbar_selected_agent', 'clipboard');
+    console.debug('[AgentProvider] Persisted clipboard mode selection');
+  } catch (error) {
+    console.warn('[AgentProvider] Failed to persist clipboard mode:', error);
+  }
+}
+
+/**
+ * Checks if clipboard mode is persisted.
+ */
+function isClipboardModePersisted(): boolean {
+  try {
+    const persisted = sessionStorage.getItem(
+      'stagewise_toolbar_selected_agent',
+    );
+    return persisted === 'clipboard';
+  } catch (error) {
+    console.warn('[AgentProvider] Failed to check clipboard mode:', error);
+    return false;
+  }
+}
+
+/**
+ * Clears the persisted agent selection.
+ */
+function clearPersistedSelection(): void {
+  try {
+    sessionStorage.removeItem('stagewise_toolbar_selected_agent');
+    console.debug('[AgentProvider] Cleared persisted selection');
+  } catch (error) {
+    console.warn('[AgentProvider] Failed to clear persisted selection:', error);
+  }
 }
 
 /**
@@ -422,8 +462,8 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
       // Reset retry counter for new retry session
       retryCountRef.current = 0;
 
-      // Only start retry if this is not a manual selection change
-      if (!isManualSelectionRef.current) {
+      // Only start retry if this is not a manual selection change and clipboard mode is not active
+      if (!isManualSelectionRef.current && !isClipboardModePersisted()) {
         const agentInfo = availableAgents.find((a) => a.port === port);
         const isAppHosted = agentInfo?.isAppHosted || false;
 
@@ -526,18 +566,25 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
 
       // Check for persisted agent first when initially scanning and no agent is connected
       if (!finishedInitialScan && !connected.current && agents.length > 0) {
-        const persistedAgent = findPersistedAgent(agents);
-        if (persistedAgent) {
+        // Skip auto-connection if clipboard mode is persisted
+        if (isClipboardModePersisted()) {
           console.debug(
-            `[AgentProvider] Auto-connecting to persisted agent: ${persistedAgent.name} (port ${persistedAgent.port})`,
+            '[AgentProvider] Skipping auto-connection - clipboard mode is active',
           );
-          connectAgentInternal(persistedAgent.port, false); // false = not manual selection
-        } else if (agents.length === 1) {
-          // Auto-connect if exactly one agent is found and no persisted agent
-          console.debug(
-            `[AgentProvider] Auto-connecting to single available agent: ${agents[0].name} (port ${agents[0].port})`,
-          );
-          connectAgentInternal(agents[0].port, false); // false = not manual selection
+        } else {
+          const persistedAgent = findPersistedAgent(agents);
+          if (persistedAgent) {
+            console.debug(
+              `[AgentProvider] Auto-connecting to persisted agent: ${persistedAgent.name} (port ${persistedAgent.port})`,
+            );
+            connectAgentInternal(persistedAgent.port, false); // false = not manual selection
+          } else if (agents.length === 1) {
+            // Auto-connect if exactly one agent is found and no persisted agent
+            console.debug(
+              `[AgentProvider] Auto-connecting to single available agent: ${agents[0].name} (port ${agents[0].port})`,
+            );
+            connectAgentInternal(agents[0].port, false); // false = not manual selection
+          }
         }
       }
 
@@ -545,7 +592,8 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
       if (
         !connected &&
         previouslySelectedPortRef.current &&
-        !isManualSelectionRef.current
+        !isManualSelectionRef.current &&
+        !isClipboardModePersisted() // Don't reconnect if clipboard mode is active
       ) {
         const previousAgent = agents.find(
           (agent) => agent.port === previouslySelectedPortRef.current,
@@ -660,8 +708,8 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
             connectedWsClient.current = null;
             setConnectedPort(null);
 
-            // Start retry attempts if this wasn't a manual disconnection
-            if (!isManualSelectionRef.current) {
+            // Start retry attempts if this wasn't a manual disconnection and clipboard mode is not active
+            if (!isManualSelectionRef.current && !isClipboardModePersisted()) {
               console.debug(
                 `[AgentProvider] Starting retry attempts for port ${port}...`,
               );
@@ -791,44 +839,55 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
 
   /**
    * Disconnects from the currently connected agent and stops all retry attempts.
+   * @param forClipboardMode - If true, persists clipboard mode selection
    */
-  const disconnectAgent = useCallback(() => {
-    console.debug(
-      `[AgentProvider] Manual disconnect requested (current port: ${connectedPort})...`,
-    );
-    // Stop any retry attempts
-    stopRetryConnection();
+  const disconnectAgent = useCallback(
+    (forClipboardMode = false) => {
+      console.debug(
+        `[AgentProvider] Manual disconnect requested (current port: ${connectedPort}, clipboard mode: ${forClipboardMode})...`,
+      );
+      // Stop any retry attempts
+      stopRetryConnection();
 
-    // Clear any pending connection stability timeout
-    if (connectionStabilityTimeoutRef.current) {
-      clearTimeout(connectionStabilityTimeoutRef.current);
-      connectionStabilityTimeoutRef.current = null;
-    }
-
-    // Explicitly clean up WebSocket connection to prevent memory leaks
-    const wsClient = connectedWsClient.current;
-    if (wsClient) {
-      try {
-        console.debug(
-          `[AgentProvider] Explicitly closing WebSocket for manual disconnect`,
-        );
-        wsClient.close();
-      } catch (error) {
-        console.debug(
-          '[AgentProvider] Error closing WebSocket during manual disconnect:',
-          error,
-        );
+      // Clear any pending connection stability timeout
+      if (connectionStabilityTimeoutRef.current) {
+        clearTimeout(connectionStabilityTimeoutRef.current);
+        connectionStabilityTimeoutRef.current = null;
       }
-    }
 
-    connected.current = null;
-    connectedWsClient.current = null;
-    setConnectedPort(null);
-    setConnectedUnavailable(false); // Reset unavailable state on manual disconnect
-    previouslySelectedPortRef.current = null;
-    isManualSelectionRef.current = true; // Mark as manual action
-    console.debug(`[AgentProvider] Successfully disconnected from agent`);
-  }, [connectedPort, stopRetryConnection]);
+      // Explicitly clean up WebSocket connection to prevent memory leaks
+      const wsClient = connectedWsClient.current;
+      if (wsClient) {
+        try {
+          console.debug(
+            `[AgentProvider] Explicitly closing WebSocket for manual disconnect`,
+          );
+          wsClient.close();
+        } catch (error) {
+          console.debug(
+            '[AgentProvider] Error closing WebSocket during manual disconnect:',
+            error,
+          );
+        }
+      }
+
+      connected.current = null;
+      connectedWsClient.current = null;
+      setConnectedPort(null);
+      setConnectedUnavailable(false); // Reset unavailable state on manual disconnect
+      previouslySelectedPortRef.current = null;
+      isManualSelectionRef.current = true; // Mark as manual action
+
+      // Persist clipboard mode if requested
+      if (forClipboardMode) {
+        persistClipboardMode();
+        console.debug(`[AgentProvider] Clipboard mode persisted`);
+      }
+
+      console.debug(`[AgentProvider] Successfully disconnected from agent`);
+    },
+    [connectedPort, stopRetryConnection],
+  );
 
   /**
    * Connects to an agent on the specified port (considered a manual user action).
@@ -838,6 +897,12 @@ export function AgentProvider({ children }: { children?: ReactNode }) {
       console.debug(
         `[AgentProvider] Manual connection requested to port ${port}...`,
       );
+
+      // Clear clipboard mode when connecting to a real agent
+      if (isClipboardModePersisted()) {
+        clearPersistedSelection();
+        console.debug('[AgentProvider] Cleared clipboard mode persistence');
+      }
 
       // Find the agent to persist its selection
       const agentToPersist = availableAgents.find(

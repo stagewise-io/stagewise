@@ -11,9 +11,8 @@ import {
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { Toolbar } from '@/toolbar';
 import { usePanels } from '@/hooks/use-panels';
-import { SettingsPanel } from '@/panels/settings';
 import { ChatPanel } from '@/panels/chat';
-import { AgentConnectivityPanel } from '@/panels/agent-connectivity';
+import { InfoPanel } from '@/panels/info';
 import { usePlugins } from '@/hooks/use-plugins';
 
 const TOOLBAR_POSITION_KEY = 'stagewise_toolbar_toolbar_position';
@@ -169,12 +168,7 @@ function PanelsArea({
   };
   isToolbarDragged: boolean;
 }) {
-  const {
-    isChatOpen,
-    isSettingsOpen,
-    isAgentConnectivityOpen,
-    openPluginName,
-  } = usePanels();
+  const { isChatOpen, isInfoOpen, openPluginName } = usePanels();
 
   const plugins = usePlugins();
 
@@ -214,12 +208,8 @@ function PanelsArea({
         <ChatPanel />
       </PanelWrapper>
 
-      <PanelWrapper position={position} isOpen={isSettingsOpen}>
-        <SettingsPanel />
-      </PanelWrapper>
-
-      <PanelWrapper position={position} isOpen={isAgentConnectivityOpen}>
-        <AgentConnectivityPanel />
+      <PanelWrapper position={position} isOpen={isInfoOpen}>
+        <InfoPanel />
       </PanelWrapper>
 
       <PanelWrapper position={position} isOpen={!!pluginPanel}>
@@ -245,45 +235,19 @@ function PanelWrapper({
   const [shouldRender, setShouldRender] = useState(isOpen);
   const stopRenderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Debug logging for AgentConnectivityPanel specifically
-  const isAgentPanel =
-    children &&
-    typeof children === 'object' &&
-    'type' in children &&
-    typeof children.type === 'function' &&
-    children.type.name === 'AgentConnectivityPanel';
-
   useEffect(() => {
-    if (isAgentPanel) {
-      console.debug('[PanelWrapper] AgentConnectivityPanel isOpen changed:', {
-        isOpen,
-        shouldRender,
-        hasTimeout: !!stopRenderTimeoutRef.current,
-      });
-    }
-
     if (!isOpen) {
       stopRenderTimeoutRef.current = setTimeout(() => {
-        if (isAgentPanel) {
-          console.debug(
-            '[PanelWrapper] AgentConnectivityPanel setting shouldRender to false after timeout',
-          );
-        }
         setShouldRender(false);
       }, 500);
     } else {
-      if (isAgentPanel) {
-        console.debug(
-          '[PanelWrapper] AgentConnectivityPanel setting shouldRender to true immediately',
-        );
-      }
       setShouldRender(true);
       if (stopRenderTimeoutRef.current) {
         clearTimeout(stopRenderTimeoutRef.current);
         stopRenderTimeoutRef.current = null;
       }
     }
-  }, [isOpen, isAgentPanel]);
+  }, [isOpen]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

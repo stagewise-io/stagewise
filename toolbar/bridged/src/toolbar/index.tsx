@@ -1,20 +1,13 @@
 import { ToolbarButton } from './components/button.js';
 import { ToolbarSection } from './components/section.js';
 import { Glassy } from '@/components/ui/glassy';
-import { useAgents } from '@/hooks/agent/use-agent-provider';
 import { useAppState } from '@/hooks/use-app-state';
+import { useAgents } from '@/hooks/agent/use-agent-provider';
 import { cn } from '@/utils';
-import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-  TriangleAlertIcon,
-  WifiOffIcon,
-} from 'lucide-react';
+import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { RegularContent } from './contents/regular.js';
-import { DisconnectedContent } from './contents/disconnected.js';
 import { Button } from '@headlessui/react';
 import { Logo } from '@/components/ui/logo';
-import { useAgentAvailability } from '@/hooks/agent/use-agent-availability';
 import { AnimatedGradientBackground } from '@/components/ui/animated-gradient-background';
 
 export function Toolbar({
@@ -30,9 +23,7 @@ export function Toolbar({
   isDragged: boolean;
 }) {
   const { minimized, minimize, expand } = useAppState();
-
-  const { requiresUserAttention, isInitialLoad } = useAgents();
-  const { isAvailable } = useAgentAvailability();
+  const { isInitialLoad } = useAgents();
 
   return (
     <Glassy
@@ -42,9 +33,7 @@ export function Toolbar({
         minimized || isInitialLoad ? 'size-10 bg-blue-950/80' : 'size-auto',
         isDragged &&
           'scale-110 bg-sky-100/60 shadow-lg shadow-sky-500/10 blur-[0.2px]',
-        !requiresUserAttention && isAvailable
-          ? '[--active-secondary:var(--color-blue-100)] [--active:var(--color-blue-600)] [--primary:var(--color-zinc-950)] [--secondary:var(--color-zinc-400)]'
-          : 'bg-orange-200/50 [--active-secondary:var(--color-orange-100)] [--active:var(--color-orange-600)] [--primary:var(--color-orange-900)] [--secondary:var(--color-orange-100)]',
+        '[--active-secondary:var(--color-blue-100)] [--active:var(--color-blue-600)] [--primary:var(--color-zinc-950)] [--secondary:var(--color-zinc-400)]',
         'stroke-[var(--primary)] text-[var(--primary)]',
       )}
       ref={draggableHandleRef}
@@ -58,21 +47,10 @@ export function Toolbar({
             ? 'pointer-events-auto scale-100 opacity-100 blur-none'
             : 'pointer-events-none scale-25 opacity-0 blur-md',
           position.isTopHalf ? 'top-0' : 'bottom-0',
-          (requiresUserAttention || !isAvailable) && 'bg-orange-500',
         )}
       >
-        {!requiresUserAttention && isAvailable && (
-          <>
-            <AnimatedGradientBackground className="-z-10 absolute inset-0 size-full" />
-            <Logo color="white" className="mr-px mb-px size-1/2 shadow-2xs" />
-          </>
-        )}
-        {requiresUserAttention && (
-          <WifiOffIcon className="size-5 stroke-white" />
-        )}
-        {!requiresUserAttention && !isAvailable && (
-          <TriangleAlertIcon className="size-5 stroke-white" />
-        )}
+        <AnimatedGradientBackground className="-z-10 absolute inset-0 size-full" />
+        <Logo color="white" className="mr-px mb-px size-1/2 shadow-2xs" />
       </Button>
 
       <div
@@ -85,11 +63,7 @@ export function Toolbar({
             'pointer-events-none h-0 scale-50 opacity-0 blur-md',
         )}
       >
-        {!requiresUserAttention && isAvailable ? (
-          <RegularContent />
-        ) : (
-          <DisconnectedContent />
-        )}
+        <RegularContent />
 
         {/* Minimize button - always present */}
         <ToolbarSection>

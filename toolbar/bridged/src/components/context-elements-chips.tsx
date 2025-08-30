@@ -1,6 +1,6 @@
 import { useChatState } from '@/hooks/use-chat-state';
 import { useContextChipHover } from '@/hooks/use-context-chip-hover';
-import { XIcon } from 'lucide-react';
+import { XIcon, SquareDashedMousePointer } from 'lucide-react';
 import { useMemo } from 'react';
 import { cn } from '@/utils';
 
@@ -14,7 +14,7 @@ export function ContextElementsChips() {
 
   return (
     <div className="mb-1.5">
-      <div className="scrollbar-thin flex gap-2 overflow-x-auto pb-1">
+      <div className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent flex gap-2 overflow-x-auto pb-1">
         {domContextElements.map((contextElement, index) => (
           <ContextElementChip
             key={`${contextElement.element.tagName}-${index}`}
@@ -69,11 +69,12 @@ function ContextElementChip({
       type="button"
       tabIndex={-1}
       className={cn(
-        'flex min-w-fit shrink-0 items-center gap-1 rounded-lg border border-border/20 bg-white/10 px-2 py-1 text-xs transition-all hover:border-border/40 hover:bg-white/20',
+        'flex min-w-fit shrink-0 items-center gap-1 rounded-lg border border-border/20 bg-white/30 px-2 py-1 text-xs shadow-sm backdrop-blur-lg transition-all hover:border-border/40 hover:bg-white/80',
       )}
       onMouseEnter={() => onHover(element)}
       onMouseLeave={() => onUnhover()}
     >
+      <SquareDashedMousePointer className="size-3 text-foreground/60" />
       <span className="max-w-24 truncate font-medium text-foreground/80">
         {chipLabel}
       </span>

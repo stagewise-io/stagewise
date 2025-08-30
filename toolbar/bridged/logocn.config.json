@@ -1,0 +1,10 @@
+{
+  "framework": "react",
+  "logoDirectory": "src/components/logos",
+  "importStyle": "static",
+  "typescript": true,
+  "exportFile": "src/lib/logos.ts",
+  "generateComponent": false,
+  "version": "1.0.0",
+  "keepOriginalSvgs": false
+}
