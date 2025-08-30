@@ -8,9 +8,15 @@ type StopPreventPropagation = boolean;
 
 // This listener is responsible for listening to hotkeys and triggering the appropriate actions in the global app state.
 export function HotkeyListener() {
-  const { startPromptCreation, stopPromptCreation, isPromptCreationActive } =
-    useChatState();
-  const { isChatOpen, closeChat } = usePanels();
+  const {
+    startPromptCreation,
+    stopPromptCreation,
+    isPromptCreationActive,
+    startContextSelector,
+    stopContextSelector,
+    isContextSelectorActive,
+  } = useChatState();
+  const { isChatOpen, closeChat, openChat } = usePanels();
 
   const hotKeyHandlerMap: Record<HotkeyActions, () => StopPreventPropagation> =
     useMemo(
@@ -23,8 +29,30 @@ export function HotkeyListener() {
           }
           return false;
         },
-        [HotkeyActions.ESC]: () => {
+        [HotkeyActions.CTRL_ALT_PERIOD]: () => {
           if (isPromptCreationActive) {
+            // Toggle context selector when prompt creation is active
+            if (isContextSelectorActive) {
+              stopContextSelector();
+            } else {
+              startContextSelector();
+            }
+            return true;
+          } else if (!isChatOpen) {
+            // If chat is closed, open it and start both modes
+            openChat();
+            startPromptCreation();
+            startContextSelector();
+            return true;
+          }
+          return false;
+        },
+        [HotkeyActions.ESC]: () => {
+          if (isContextSelectorActive) {
+            // If context selector is active, stop it first
+            stopContextSelector();
+            return true;
+          } else if (isPromptCreationActive) {
             // If prompting mode is active, stop it
             stopPromptCreation();
             return true;
@@ -40,8 +68,12 @@ export function HotkeyListener() {
         startPromptCreation,
         stopPromptCreation,
         isPromptCreationActive,
+        startContextSelector,
+        stopContextSelector,
+        isContextSelectorActive,
         isChatOpen,
         closeChat,
+        openChat,
       ],
     );
 

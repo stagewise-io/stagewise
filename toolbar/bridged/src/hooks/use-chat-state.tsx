@@ -44,6 +44,9 @@ interface ChatContext {
   isPromptCreationActive: boolean;
   startPromptCreation: () => void;
   stopPromptCreation: () => void;
+  isContextSelectorActive: boolean;
+  startContextSelector: () => void;
+  stopContextSelector: () => void;
   isSending: boolean;
 }
 
@@ -57,6 +60,9 @@ const ChatContext = createContext<ChatContext>({
   isPromptCreationActive: false,
   startPromptCreation: () => {},
   stopPromptCreation: () => {},
+  isContextSelectorActive: false,
+  startContextSelector: () => {},
+  stopContextSelector: () => {},
   isSending: false,
 });
 
@@ -67,6 +73,8 @@ interface ChatStateProviderProps {
 export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const [chatInput, setChatInput] = useState<string>('');
   const [isPromptCreationMode, setIsPromptCreationMode] =
+    useState<boolean>(false);
+  const [isContextSelectorMode, setIsContextSelectorMode] =
     useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [domContextElements, setDomContextElements] = useState<
@@ -94,11 +102,21 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const stopPromptCreation = useCallback(() => {
     setIsPromptCreationMode(false);
+    // Always stop context selector when stopping prompt creation
+    setIsContextSelectorMode(false);
     setDomContextElements([]);
     plugins.forEach((plugin) => {
       plugin.onPromptingAbort?.();
     });
   }, [plugins]);
+
+  const startContextSelector = useCallback(() => {
+    setIsContextSelectorMode(true);
+  }, []);
+
+  const stopContextSelector = useCallback(() => {
+    setIsContextSelectorMode(false);
+  }, []);
 
   useEffect(() => {
     if (!isChatOpen) {
@@ -260,6 +278,9 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     isPromptCreationActive: isPromptCreationMode,
     startPromptCreation,
     stopPromptCreation,
+    isContextSelectorActive: isContextSelectorMode,
+    startContextSelector,
+    stopContextSelector,
     isSending,
   };
 

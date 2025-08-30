@@ -88,7 +88,7 @@ function PanelFooter({
   return (
     <footer
       className={cn(
-        'flex flex-row items-end justify-end gap-2 rounded-b-[inherit] border-zinc-500/15 border-t bg-white/5 pt-2 pr-3 pb-3 pl-4 text-foreground/80 text-sm',
+        'flex flex-row items-end justify-end gap-2 rounded-b-[inherit] border-zinc-500/15 border-t bg-white/5 pt-2 pr-3 pb-3 pl-3 text-foreground/80 text-sm',
         className,
       )}
     >

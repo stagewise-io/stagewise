@@ -4,9 +4,12 @@ import {
   PanelHeader,
   PanelFooter,
 } from '@/components/ui/panel';
+import { CircleQuestionMark } from 'lucide-react';
+import { Select } from '@/components/ui/select';
 import { useAgentState } from '@/hooks/agent/use-agent-state';
 import { useChatState } from '@/hooks/use-chat-state';
 import { usePlugins } from '@/hooks/use-plugins';
+import { usePanels } from '@/hooks/use-panels';
 import { cn } from '@/utils';
 import { Textarea } from '@headlessui/react';
 import { Button } from '@/components/ui/button';
@@ -19,10 +22,18 @@ import {
   CogIcon,
   ArrowUpIcon,
   CopyIcon,
+  MousePointerIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ContextElementsChips } from '@/components/context-elements-chips';
 import { AgentMessageDisplay } from '@/components/agent-message-display';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { HotkeyComboText } from '@/components/hotkey-combo-text';
+import { HotkeyActions } from '@/utils';
 import {
   GradientBackgroundChat,
   type GradientBackgroundVariant,
@@ -32,6 +43,15 @@ import { useAgentMessaging } from '@/hooks/agent/use-agent-messaging';
 import { useAgents } from '@/hooks/agent/use-agent-provider';
 import { createPrompt, type PluginContextSnippets } from '@/prompts';
 import { collectUserMessageMetadata, getSelectedElementInfo } from '@/utils';
+import {
+  CursorLogoImg,
+  TraeLogoImg,
+  WindsurfLogoImg,
+  ClineLogoImg,
+  RooCodeLogoImg,
+  GithubCopilotLogoImg,
+  KilocodeLogoImg,
+} from '@/components/logos';
 
 const agentStateToText: Record<AgentStateType, string> = {
   [AgentStateType.WAITING_FOR_USER_RESPONSE]: 'Waiting for user response',
@@ -61,19 +81,38 @@ const agentStateToIcon: Record<AgentStateType, React.ReactNode> = {
   ),
 };
 
+const getAgentLogo = (name: string, description: string): string | null => {
+  const searchText = `${name} ${description}`.toLowerCase();
+
+  if (searchText.includes('cursor')) return CursorLogoImg;
+  if (searchText.includes('windsurf')) return WindsurfLogoImg;
+  if (searchText.includes('cline')) return ClineLogoImg;
+  if (searchText.includes('roo') && searchText.includes('code'))
+    return RooCodeLogoImg;
+  if (searchText.includes('trae')) return TraeLogoImg;
+  if (searchText.includes('kilocode') || searchText.includes('kilo-code'))
+    return KilocodeLogoImg;
+  if (searchText.includes('github') || searchText.includes('copilot'))
+    return GithubCopilotLogoImg;
+
+  return null;
+};
+
 export function ChatPanel() {
   const agentState = useAgentState();
   const chatState = useChatState();
   const chatMessaging = useAgentMessaging();
   const [isComposing, setIsComposing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const { connected } = useAgents();
+  const { connected, availableAgents, connectAgent, disconnectAgent } =
+    useAgents();
   const { plugins } = usePlugins();
+  const { isInfoOpen, openInfo, closeInfo } = usePanels();
 
   const enableInputField = useMemo(() => {
-    // Disable input if agent is not connected
+    // Always enable input for clipboard mode or when agent is connected and ready
     if (!connected) {
-      return false;
+      return true; // Enable for clipboard mode
     }
     return (
       agentState.state === AgentStateType.WAITING_FOR_USER_RESPONSE ||
@@ -87,7 +126,7 @@ export function ChatPanel() {
       chatState.chatInput.trim().length > 2 &&
       chatState.isPromptCreationActive
     );
-  }, [enableInputField, chatState]);
+  }, [enableInputField, chatState.chatInput, chatState.isPromptCreationActive]);
 
   const anyMessageInChat = useMemo(() => {
     return chatMessaging.agentMessage?.contentItems?.length > 0;
@@ -173,10 +212,10 @@ export function ChatPanel() {
       try {
         // Build the full prompt with metadata
         const fullPrompt = await buildFullPrompt();
-        
+
         // Copy the full prompt to clipboard
         await navigator.clipboard.writeText(fullPrompt);
-        
+
         // Clear input and selected elements
         chatState.setChatInput('');
         chatState.stopPromptCreation();
@@ -202,10 +241,16 @@ export function ChatPanel() {
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
         e.preventDefault();
-        handleSubmit();
+        if (!connected) {
+          // In clipboard mode, trigger copy to clipboard
+          handleCopyToClipboard();
+        } else {
+          // Connected to agent, send message
+          handleSubmit();
+        }
       }
     },
-    [handleSubmit, isComposing],
+    [handleSubmit, handleCopyToClipboard, isComposing, connected],
   );
 
   const handleCompositionStart = useCallback(() => {
@@ -321,7 +366,7 @@ export function ChatPanel() {
           agentState.state === AgentStateType.IDLE
             ? 'rounded-t-[inherit]'
             : 'rounded-t-none',
-          'mask-alpha mask-[linear-gradient(to_bottom,transparent_0%,black_5%,black_95%,transparent_100%)]',
+          'mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_48px,black_calc(95%_-_16px),transparent_calc(100%_-_16px))]',
           'overflow-hidden',
         )}
       >
@@ -330,18 +375,17 @@ export function ChatPanel() {
       </PanelContent>
       <PanelFooter
         className={cn(
-          'mt-0 flex origin-top flex-col items-stretch gap-0 px-2 pt-1 pb-2 duration-150 ease-out',
+          'mt-0 flex origin-top flex-col items-stretch gap-1 px-2 pt-1 pb-2 duration-150 ease-out',
           !enableInputField && 'pointer-events-none opacity-80 brightness-75',
           chatState.isPromptCreationActive && 'bg-blue-400/10',
-          anyMessageInChat ? 'h-24' : 'h-36',
           !anyMessageInChat &&
             agentState.state === AgentStateType.IDLE &&
-            'rounded-t-[inherit] border-transparent border-t-none pt-3 pl-3',
+            'rounded-t-[inherit] border-transparent border-t-none pt-3',
         )}
       >
         <ContextElementsChips />
-        <div className="flex flex-1 flex-row items-end justify-between gap-2">
-          <div className="h-full flex-1">
+        <div className="flex flex-col gap-2">
+          <div className="relative w-full">
             <Textarea
               ref={inputRef}
               value={chatState.chatInput}
@@ -349,13 +393,16 @@ export function ChatPanel() {
                 chatState.setChatInput(e.target.value);
               }}
               onFocus={() => {
-                chatState.startPromptCreation();
+                if (!chatState.isPromptCreationActive) {
+                  chatState.startPromptCreation();
+                  chatState.startContextSelector();
+                }
               }}
               onKeyDown={handleKeyDown}
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
               disabled={!enableInputField}
-              className="m-1 h-full w-full resize-none focus:outline-none"
+              className="m-1 h-16 w-full resize-none focus:outline-none"
             />
             <div className="pointer-events-none absolute inset-0 z-10 p-1">
               <TextSlideshow
@@ -371,28 +418,144 @@ export function ChatPanel() {
               />
             </div>
           </div>
-          <Button
-            disabled={!chatState.chatInput.trim() && !isCopied}
-            onClick={handleCopyToClipboard}
-            glassy
-            variant="secondary"
-            className="size-8 cursor-pointer rounded-full p-1"
-          >
-            {isCopied ? (
-              <CheckIcon className="size-4 stroke-green-600" />
-            ) : (
-              <CopyIcon className="size-4" />
-            )}
-          </Button>
-          <Button
-            disabled={!canSendMessage}
-            onClick={handleSubmit}
-            glassy
-            variant="primary"
-            className="size-8 cursor-pointer rounded-full p-1"
-          >
-            <ArrowUpIcon className="size-4 stroke-3" />
-          </Button>
+          <div className="flex flex-row items-center justify-end gap-4">
+            <div className="mr-auto flex h-8 flex-row items-center pl-2">
+              <div
+                className="cursor-pointer"
+                onClick={() => {
+                  if (isInfoOpen) {
+                    closeInfo();
+                  } else {
+                    openInfo();
+                  }
+                }}
+                role="button"
+              >
+                <CircleQuestionMark className="!text-foreground/60 size-4" />
+              </div>
+            </div>
+            {/* Agent selector */}
+            <Select
+              onChange={(value) => {
+                if (value === 'clipboard') {
+                  // Disconnect from any connected agent when clipboard is selected
+                  disconnectAgent(true); // Pass true to indicate clipboard mode
+                  return;
+                }
+                const port =
+                  typeof value === 'number'
+                    ? value
+                    : Number.parseInt(String(value));
+                if (port && !Number.isNaN(port)) {
+                  connectAgent(port);
+                }
+              }}
+              items={[
+                {
+                  label: 'Clipboard',
+                  value: 'clipboard',
+                  icon: <CopyIcon className="size-4" />,
+                },
+                ...availableAgents.map((agent) => {
+                  const logo = getAgentLogo(agent.name, agent.description);
+                  return {
+                    label: `${agent.name} - ${agent.description} - Port ${agent.port}`,
+                    value: agent.port,
+                    icon: logo ? (
+                      <img
+                        src={logo}
+                        alt={`${agent.name} logo`}
+                        className="size-4 object-contain"
+                      />
+                    ) : null,
+                  };
+                }),
+              ]}
+              value={connected?.port || 'clipboard'}
+              placeholder="Select destination..."
+              className="h-8 w-max max-w-48 gap-4 border-none bg-transparent shadow-none hover:bg-blue-400/10 hover:shadow-none"
+            />
+
+            {/* Buttons grouped on the right */}
+            <div className="flex shrink-0 flex-row gap-2">
+              {/* Context selector button - shown when prompt creation is active */}
+              {chatState.isPromptCreationActive && (
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Button
+                      onMouseDown={(e) => {
+                        // Prevent default to avoid losing focus from input
+                        e.preventDefault();
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (chatState.isContextSelectorActive) {
+                          chatState.stopContextSelector();
+                        } else {
+                          chatState.startContextSelector();
+                        }
+                        // Keep input focused
+                        inputRef.current?.focus();
+                      }}
+                      aria-label="Select context elements"
+                      variant="ghost"
+                      className={cn(
+                        'size-8 cursor-pointer rounded-full border-none bg-transparent p-1 backdrop-blur-lg',
+                        chatState.isContextSelectorActive
+                          ? 'bg-blue-600/10 text-blue-600'
+                          : 'text-zinc-500 opacity-70',
+                      )}
+                    >
+                      <MousePointerIcon className={'size-4'} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {chatState.isContextSelectorActive ? (
+                      <>
+                        Stop selecting elements (
+                        <HotkeyComboText action={HotkeyActions.ESC} />)
+                      </>
+                    ) : (
+                      <>
+                        Add reference elements (
+                        <HotkeyComboText
+                          action={HotkeyActions.CTRL_ALT_PERIOD}
+                        />
+                        )
+                      </>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {!connected && (
+                <Button
+                  disabled={!chatState.chatInput.trim() && !isCopied}
+                  onClick={handleCopyToClipboard}
+                  glassy
+                  variant="primary"
+                  className="size-8 cursor-pointer rounded-full p-1"
+                >
+                  {isCopied ? (
+                    <CheckIcon className="size-4 stroke-green-600" />
+                  ) : (
+                    <CopyIcon className="size-4" />
+                  )}
+                </Button>
+              )}
+              {connected && (
+                <Button
+                  disabled={!canSendMessage}
+                  onClick={handleSubmit}
+                  glassy
+                  variant="primary"
+                  className="size-8 cursor-pointer rounded-full p-1"
+                >
+                  <ArrowUpIcon className="size-4 stroke-3" />
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </PanelFooter>
     </Panel>

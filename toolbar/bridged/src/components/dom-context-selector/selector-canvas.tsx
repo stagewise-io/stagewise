@@ -16,11 +16,11 @@ export function DOMContextSelector() {
   const {
     domContextElements,
     addChatDomContext,
-    isPromptCreationActive,
+    isContextSelectorActive,
     removeChatDomContext,
   } = useChatState();
 
-  const shouldShow = isPromptCreationActive;
+  const shouldShow = isContextSelectorActive;
 
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(
     null,
