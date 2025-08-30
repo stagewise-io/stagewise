@@ -1,5 +1,11 @@
 # @stagewise/toolbar
 
+## 0.12.1
+
+### Patch Changes
+
+- d7d74ed: Add a default icon to the selected-element chip.
+
 ## 0.12.0
 
 ### Minor Changes

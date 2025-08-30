@@ -1,5 +1,11 @@
 # stagewise
 
+## 0.8.1
+
+### Patch Changes
+
+- d7d74ed: Add a default icon to the selected-element chip.
+
 ## 0.8.0
 
 ### Minor Changes

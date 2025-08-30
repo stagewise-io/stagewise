@@ -1,5 +1,11 @@
 # stagewise-vscode-extension
 
+## 0.11.2
+
+### Patch Changes
+
+- c879789: Fixing wrong stagewise command - added missing -b for bridgemode.
+
 ## 0.11.1
 
 ### Patch Changes
