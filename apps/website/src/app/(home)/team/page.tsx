@@ -7,7 +7,7 @@ export default function TeamPage() {
     <div className="relative min-h-screen overflow-hidden bg-zinc-50 text-zinc-900 dark:bg-black dark:text-white">
       {/* Hero Section */}
       <section className="container relative z-10 mx-auto px-4 pt-40 pb-12 sm:pt-28 md:pb-16">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-2xl">
           <ScrollReveal>
             <div className="mb-12 text-center">
               <h1 className="mb-6 font-bold text-3xl tracking-tight md:text-5xl">

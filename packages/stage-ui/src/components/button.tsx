@@ -1,18 +1,16 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '@/lib/utils';
+import { cn } from '../lib/utils';
 
-const buttonVariants = cva(
-  cn(
-    'relative flex flex-row items-center justify-center gap-2 font-normal disabled:opacity-50',
-  ),
+export const buttonVariants = cva(
+  'relative flex flex-row items-center justify-center gap-2 font-normal disabled:opacity-50',
   {
     variants: {
       variant: {
         primary:
-          'glass-body glass-body-motion enabled:glass-body-motion-interactive bg-primary text-primary-foreground',
+          'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive bg-primary text-primary-foreground',
         secondary:
-          'glass-body glass-body-motion enabled:glass-body-motion-interactive bg-muted text-foreground',
-        ghost: 'bg-transparent text-foreground',
+          'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive text-foreground',
+        ghost: 'bg-transparent font-medium text-foreground hover:bg-zinc-500/5',
       },
       size: {
         sm: 'h-8 rounded-xl px-2 py-1 text-sm',
@@ -34,5 +32,10 @@ export function Button({
   size = 'md',
   ...props
 }: ButtonProps) {
-  return <button className={buttonVariants({ variant, size })} {...props} />;
+  return (
+    <button
+      {...props}
+      className={cn(buttonVariants({ variant, size }), props.className)}
+    />
+  );
 }

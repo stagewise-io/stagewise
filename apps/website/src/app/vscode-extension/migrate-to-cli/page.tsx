@@ -7,7 +7,7 @@ import {
   TerminalIcon,
   ChevronDownIcon,
 } from 'lucide-react';
-import { Button } from '@stagewise/ui/components/button';
+import { Button } from '@stagewise/stage-ui/components/button';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { usePostHog } from 'posthog-js/react';
 import { Logo } from '@/components/landing/logo';
@@ -27,7 +27,7 @@ export default function MigrateToCLI() {
     <div className="relative min-h-screen overflow-hidden bg-zinc-50 text-zinc-900 dark:bg-black dark:text-white">
       {/* Hero Section */}
       <section className="container relative z-10 mx-auto px-4 pt-20 pb-12">
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-2xl">
           <ScrollReveal>
             <div className="mb-12 text-center">
               <div className="relative inline-block size-16 scale-95 overflow-hidden rounded-full shadow-lg ring-1 ring-black/20 ring-inset">
@@ -191,7 +191,7 @@ export default function MigrateToCLI() {
       {/* Troubleshooting */}
       <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-16 dark:border-zinc-800">
         <ScrollReveal delay={1}>
-          <div className="mx-auto max-w-4xl text-center">
+          <div className="mx-auto max-w-2xl text-center">
             <h2 className="mb-6 font-bold text-2xl md:text-3xl">
               Got feedback?
             </h2>

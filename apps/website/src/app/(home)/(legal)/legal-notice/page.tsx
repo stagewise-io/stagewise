@@ -9,7 +9,7 @@ export default async function LegalNoticePage() {
   const MDXContent = page.data.body;
 
   return (
-    <main className="prose mx-auto min-h-screen max-w-5xl bg-muted p-4 md:p-10">
+    <main className="prose mx-auto min-h-screen max-w-2xl bg-muted p-4 md:p-10">
       <MDXContent components={getMDXComponents({})} />
     </main>
   );

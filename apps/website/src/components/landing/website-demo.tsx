@@ -70,7 +70,7 @@ export function WebsiteDemo() {
   }, [messageIndex, status]);
 
   return (
-    <div className="w-full max-w-4xl rounded-lg border border-indigo-300/40 bg-zinc-50 shadow-lg transition-transform duration-500 dark:border-indigo-800/40 dark:bg-zinc-900 dark:shadow-[0_0_30px_rgba(128,90,213,0.2)]">
+    <div className="w-full max-w-2xl rounded-lg border border-indigo-300/40 bg-zinc-50 shadow-lg transition-transform duration-500 dark:border-indigo-800/40 dark:bg-zinc-900 dark:shadow-[0_0_30px_rgba(128,90,213,0.2)]">
       {/* Browser Top Bar */}
       <div className="flex items-center justify-between border-zinc-200 border-b px-6 py-4 dark:border-zinc-800">
         <div className="flex items-center gap-2">

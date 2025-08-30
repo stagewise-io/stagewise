@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react';
-import { HomeLayout } from 'fumadocs-ui/layouts/home';
-import { baseOptions } from '@/app/layout.config';
+import { Navbar } from './navbar';
 import { Footer } from './_components/footer';
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <HomeLayout {...baseOptions}>
+    <div className="flex min-h-screen flex-col items-center gap-12 bg-zinc-50 pt-32 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+      <Navbar />
       {children}
       <Footer />
-    </HomeLayout>
+    </div>
   );
 }

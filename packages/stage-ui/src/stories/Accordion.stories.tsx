@@ -2,12 +2,21 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { fn } from 'storybook/test';
 
-import { Switch } from '../components/switch.js';
+import { Accordion, AccordionItem } from '../components/accordion.js';
+import { CogIcon } from 'lucide-react';
 
 // More on how to set up stories at: https://storybook.js.org/docs/writing-stories#default-export
 const meta = {
-  title: 'Example/Switch',
-  component: Switch,
+  title: 'Example/Accordion',
+  component: () => (
+    <Accordion>
+      <AccordionItem title="item1" icon={<CogIcon className="size-5" />}>
+        This is content for Item 1.
+      </AccordionItem>
+      <AccordionItem title="item2">This is content for Item 2.</AccordionItem>
+      <AccordionItem title="item3">This is content for Item 3.</AccordionItem>
+    </Accordion>
+  ),
   parameters: {},
   // This component will have an automatically generated Autodocs entry: https://storybook.js.org/docs/writing-docs/autodocs
   tags: ['autodocs'],
@@ -17,7 +26,7 @@ const meta = {
   },
   // Use `fn` to spy on the onClick arg, which will appear in the actions panel once invoked: https://storybook.js.org/docs/essentials/actions#action-args
   args: { onClick: fn() },
-} satisfies Meta<typeof Switch>;
+} satisfies Meta<typeof Accordion>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

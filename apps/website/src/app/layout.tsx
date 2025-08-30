@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { PostHogProvider } from '@/components/posthog-provider';
 import { CookieBanner } from '@/components/cookie-banner';
+import { SystemThemeProvider } from '@/components/theme-switcher';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://stagewise.io'),
@@ -41,9 +42,24 @@ export default function Layout({ children }: { children: ReactNode }) {
       className={`${GeistSans.className}`}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                  document.documentElement.classList.add('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
+      </head>
       <body className="flex min-h-screen flex-col">
         <PostHogProvider>
-          <RootProvider>{children}</RootProvider>
+          <SystemThemeProvider>
+            <RootProvider>{children}</RootProvider>
+          </SystemThemeProvider>
         </PostHogProvider>
         <CookieBanner />
       </body>

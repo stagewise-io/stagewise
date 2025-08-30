@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@stagewise/ui/components/card';
-import { Button } from '@stagewise/ui/components/button';
+import { Button } from '@stagewise/stage-ui/components/button';
 import { getCookieConsent, setCookieConsent } from '@/lib/cookie-consent-utils';
 
 export function CookieBanner() {

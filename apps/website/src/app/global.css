@@ -3,6 +3,8 @@
 @import 'fumadocs-ui/css/preset.css';
 /* Additional watch source for tailwind */
 @source "../../node_modules/@stagewise/ui";
+@import "../../node_modules/@stagewise/stage-ui/src/style.css";
+@source "../../node_modules/@stagewise/stage-ui";
 
 
 @theme {
@@ -79,7 +81,107 @@
   }
 }
 
+@keyframes subtle-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes spring-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(20px) rotate(-5deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1) translateY(-5px) rotate(2deg);
+  }
+  70% {
+    transform: scale(0.95) translateY(2px) rotate(-1deg);
+  }
+  85% {
+    transform: scale(1.02) translateY(-1px) rotate(0.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(0deg);
+  }
+}
+
+@keyframes spring-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(0deg);
+  }
+  30% {
+    opacity: 0.7;
+    transform: scale(1.05) translateY(-3px) rotate(1deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.3) translateY(15px) rotate(-3deg);
+  }
+}
+
+/* Slot Machine Animations */
+@keyframes slot-spin-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-100%) rotateX(90deg) scale(0.8);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-20%) rotateX(45deg) scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0%) rotateX(0deg) scale(1);
+  }
+}
+
+@keyframes slot-spin-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0%) rotateX(0deg) scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(20%) rotateX(-45deg) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100%) rotateX(-90deg) scale(0.8);
+  }
+}
+
+@keyframes slot-machine-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.3), 0 0 40px rgba(255, 215, 0, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.5), 0 0 60px rgba(255, 215, 0, 0.2);
+  }
+}
+
+@keyframes slot-lever-pull {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(45deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
 
 #nd-nav nav {
-  @apply max-w-7xl mx-auto;
+  @apply max-w-2xl mx-auto;
 }

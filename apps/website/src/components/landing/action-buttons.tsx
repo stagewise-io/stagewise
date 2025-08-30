@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 
 import { cn } from '@stagewise/ui/lib/utils';
-import { Button, buttonVariants } from '@stagewise/ui/components/button';
+import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import {
   Tooltip,
   TooltipContent,

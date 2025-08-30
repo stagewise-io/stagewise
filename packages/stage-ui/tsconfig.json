@@ -1,11 +1,13 @@
 {
   "extends": "@stagewise/typescript-config/react-library.json",
   "compilerOptions": {
-    "baseUrl": ".",
-    "module": "ESNext",
+    "incremental": true,
+    "module": "preserve",
     "moduleResolution": "bundler",
+    "composite": true,
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@stagewise/stage-ui/*": ["./src/*"]
     }
   },
   "include": ["."],

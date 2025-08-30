@@ -15,7 +15,7 @@ export const baseOptions: BaseLayoutProps = {
     enabled: false,
   },
   themeSwitch: {
-    enabled: false,
+    enabled: true,
   },
   nav: {
     title: (

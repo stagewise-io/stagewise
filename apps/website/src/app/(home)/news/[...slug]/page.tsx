@@ -54,7 +54,7 @@ export default async function PostPage(props: {
             )}`}
             target="_blank"
             aria-label="Share this post on LinkedIn"
-            className="flex h-8 items-center justify-center rounded-sm bg-[#0b66c2] px-4 text-sm text-white ring-1 ring-zinc-500/30 hover:opacity-80"
+            className="glass-body glass-body-motion glass-body-interactive glass-body-motion-interactive flex h-8 items-center justify-center rounded-sm bg-[#0b66c2] px-4 text-sm text-white"
           >
             Share on <span className="ml-2 font-bold">in</span>
           </Link>
@@ -64,7 +64,7 @@ export default async function PostPage(props: {
             )}&url=${encodeURIComponent(`https://stagewise.io${post.url}`)}`}
             target="_blank"
             aria-label="Share this post on X"
-            className="flex h-8 items-center justify-center rounded-sm bg-black px-4 text-sm text-white ring-1 ring-zinc-500/30 hover:opacity-80"
+            className="glass-body glass-body-motion glass-body-interactive glass-body-motion-interactive flex h-8 items-center justify-center rounded-sm bg-black px-4 text-sm text-white dark:bg-zinc-800"
           >
             Share on <span className="ml-2 font-bold">𝕏</span>
           </Link>

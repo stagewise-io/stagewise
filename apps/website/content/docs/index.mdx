@@ -28,11 +28,25 @@ Welcome to **stagewise** —  The frontend coding agent for production codebases
 The first thing you should do is to start your app in regular development mode
 
 
-### 2. Start stagewise
+### 2. Navigate to your app's root directory
+
+**Important**: stagewise must be run from your app's root directory (where your `package.json` file is located) to work properly. 
+
+Open a new terminal window and navigate to your app's directory:
+
+```bash
+# Navigate to your app directory
+cd /path/to/your/app
+
+# Verify you're in the right place - you should see package.json
+ls package.json
+```
+
+### 3. Start stagewise
 
 stagewise can be integrated into your workflow without requiring you to install anything!
 
-Simply open another terminal window in the root of your app under development and enter the following:
+From your app's root directory, run:
 
 ```bash
 npx stagewise@latest

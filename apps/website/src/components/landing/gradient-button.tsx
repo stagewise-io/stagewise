@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@stagewise/ui/components/button';
+import { Button } from '@stagewise/stage-ui/components/button';
 import { cn } from '@stagewise/ui/lib/utils';
 import type React from 'react';
 

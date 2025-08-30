@@ -12,9 +12,15 @@ If you need further information, you can simply skip this information.
 
 ### Start stagewise in the current directory
 
+**⚠️ Important**: Always run stagewise from your app's root directory (where `package.json` is located). This ensures stagewise can properly read your project files and make changes in the correct locations.
+
 If you want to use stagewise in your dev app, and you have an open terminal right in the folder of said app, you can simply call:
 
 ```bash
+# First, make sure you're in your app's root directory
+cd /path/to/your/app
+ls package.json  # This should exist
+
 # If you're using npm as package manager
 npx stagewise@latest
 
@@ -227,9 +233,24 @@ If no `stagewise.json` exists, the user will be prompted to enter this at the st
 
 Use this argument to set a path in which stagewise should operate and make changes.
 
-**This should always be the root directory of the repository in which your app under development resides.**
+**⚠️ Critical**: This should always be the root directory of the repository in which your app under development resides (where `package.json` is located). stagewise needs to be able to:
+- Read your project's file structure
+- Understand your dependencies and configuration
+- Make changes to the correct source files
+- Access build tools and scripts
 
-If this argument is not provided, stagewise will simply use the current working directory of the terminal.
+If this argument is not provided, stagewise will use the current working directory of the terminal. **Make sure this directory contains your `package.json` file.**
+
+```bash
+# Example: Run stagewise for a project in a different directory
+npx stagewise@latest -w ~/projects/my-react-app
+
+# The workspace directory should contain:
+# ├── package.json          ← Required
+# ├── src/                  ← Your source files
+# ├── node_modules/         ← Dependencies
+# └── [other config files]  ← Framework configs, etc.
+```
 
 ### `-s`, `--silent`
 
