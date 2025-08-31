@@ -29,6 +29,7 @@ export function ScrollReveal({
           if (entry.isIntersecting) {
             setTimeout(() => {
               element.style.opacity = '1';
+              element.style.filter = 'blur(0)';
               element.style.transform = 'translate3d(0, 0, 0)';
             }, delay);
             observer.unobserve(element);
@@ -63,7 +64,7 @@ export function ScrollReveal({
   return (
     <div
       ref={elementRef}
-      className={`opacity-0 transition-all duration-700 ease-out ${className}`}
+      className={`opacity-0 blur-xs transition-all duration-700 ease-out ${className}`}
       style={{ transform: getTransform() }}
     >
       {children}

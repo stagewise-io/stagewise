@@ -33,7 +33,7 @@ function NavbarButton({
 
 export function Navbar() {
   return (
-    <div className="glass-body fixed top-4 z-50 flex h-14 w-fit max-w-2xl flex-row items-center justify-between gap-2 rounded-full bg-white/60 p-2 shadow-black/5 shadow-xl backdrop-blur-md dark:bg-zinc-900/60 dark:shadow-white/5">
+    <div className="glass-body -translate-x-1/2 fixed top-4 left-1/2 z-50 mx-4 flex h-14 w-fit max-w-2xl flex-row items-center justify-between gap-2 rounded-full bg-white/60 p-2 shadow-black/5 shadow-xl backdrop-blur-md dark:bg-zinc-900/60 dark:shadow-white/5">
       <div className="w-36">
         <div className="relative size-10 scale-100 overflow-hidden rounded-full shadow-lg ring-1 ring-black/20 ring-inset">
           <AnimatedGradientBackground className="absolute inset-0 size-full" />

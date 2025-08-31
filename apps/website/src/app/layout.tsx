@@ -55,13 +55,15 @@ export default function Layout({ children }: { children: ReactNode }) {
           }}
         />
       </head>
-      <body className="flex min-h-screen flex-col">
-        <PostHogProvider>
-          <SystemThemeProvider>
-            <RootProvider>{children}</RootProvider>
-          </SystemThemeProvider>
-        </PostHogProvider>
-        <CookieBanner />
+      <body className="relative flex min-h-screen flex-col">
+        <div className="root">
+          <PostHogProvider>
+            <SystemThemeProvider>
+              <RootProvider>{children}</RootProvider>
+            </SystemThemeProvider>
+          </PostHogProvider>
+          <CookieBanner />
+        </div>
       </body>
     </html>
   );

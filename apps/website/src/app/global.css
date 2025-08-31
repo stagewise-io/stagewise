@@ -47,6 +47,10 @@
   /* ... */
 }
 
+.root {
+  isolation: isolate;
+}
+
 @keyframes gradient {
   0% {
     opacity: 0.5;

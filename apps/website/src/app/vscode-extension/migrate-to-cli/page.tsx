@@ -114,7 +114,7 @@ export default function MigrateToCLI() {
                           ) from this project
                         </span>
                         <Button
-                          variant="default"
+                          variant="primary"
                           size="sm"
                           className="ml-3 flex-shrink-0 justify-center gap-2"
                           onClick={() => {
@@ -160,7 +160,7 @@ export default function MigrateToCLI() {
                           instead.)
                         </span>
                         <Button
-                          variant="default"
+                          variant="primary"
                           size="sm"
                           className="ml-3 flex-shrink-0 justify-center gap-2"
                           onClick={() => {

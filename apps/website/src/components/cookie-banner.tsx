@@ -55,7 +55,7 @@ export function CookieBanner() {
         <CardContent className="flex gap-2 pt-0">
           <Button
             size="sm"
-            variant="outline"
+            variant="secondary"
             onClick={handleDeny}
             className="flex-1"
           >

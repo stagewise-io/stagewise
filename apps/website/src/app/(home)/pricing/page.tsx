@@ -33,7 +33,7 @@ export default function PricingPage() {
       popular: false,
     },
     {
-      name: 'Full Access',
+      name: 'Pro',
       price: '€20',
       period: 'per month',
       description: 'Full access with monthly credits included',
@@ -109,7 +109,8 @@ export default function PricingPage() {
 
       <div className="mx-auto max-w-4xl">
         <ScrollReveal delay={200}>
-          <div className="glass-body glass-body-motion rounded-2xl bg-white/80 p-8 dark:bg-zinc-900/80">
+          <div>
+            <div className="mb-8 border-zinc-200 border-t dark:border-zinc-800" />
             <h2 className="mb-8 text-center font-bold text-2xl text-zinc-900 dark:text-white">
               Usage-Based Pricing
             </h2>

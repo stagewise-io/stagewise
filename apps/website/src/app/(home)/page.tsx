@@ -11,6 +11,7 @@ import {
   Rocket,
   Eye,
   Brain,
+  TerminalIcon,
 } from 'lucide-react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { PackageManagerClipboard } from '@/components/package-manager-clipboard';
@@ -37,19 +38,60 @@ import CSSLogo from './_components/techstack_logos/css.png';
 // Simplified Setup Guide Component
 function SimplifiedSetupGuide() {
   return (
-    <div className="mx-auto max-w-2xl text-center">
+    <div className="mx-auto max-w-3xl text-center">
       <h2 className="mb-6 font-bold text-3xl md:text-4xl">Start in seconds</h2>
       <p className="mb-8 text-lg text-zinc-600 dark:text-zinc-400">
-        Run stagewise in your project directory and start building
+        Get up and running with stagewise in just 3 simple steps
       </p>
 
-      <div className="mb-6">
-        <PackageManagerClipboard className="justify-center" />
+      {/* 3 Steps and Command Side by Side */}
+      <div className="mb-8 grid gap-8 lg:grid-cols-2 lg:items-center">
+        {/* Steps List */}
+        <div className="space-y-4 justify-self-center text-left lg:justify-self-start">
+          <div className="flex items-start gap-4">
+            <div className="glass-body flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/20 font-semibold text-blue-600 text-sm dark:bg-blue-400/20 dark:text-blue-400">
+              1
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Start the dev server</h3>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                Start the dev server of your local dev project
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-4">
+            <div className="glass-body flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 font-semibold text-indigo-600 text-sm dark:bg-indigo-400/20 dark:text-indigo-400">
+              2
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Open second terminal</h3>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                Open a second terminal window in the root of your dev project
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-4">
+            <div className="glass-body flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/20 font-semibold text-sm text-violet-600 dark:bg-violet-400/20 dark:text-violet-400">
+              3
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Invoke the command</h3>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                Run the stagewise command and start building
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Command */}
+        <div className="flex items-center justify-center lg:justify-start">
+          <div className="flex w-full justify-center lg:justify-start">
+            <PackageManagerClipboard />
+          </div>
+        </div>
       </div>
-
-      <p className="mb-8 text-sm text-zinc-500 dark:text-zinc-400">
-        Make sure your development server is running first
-      </p>
 
       {/* Integration with other agents banner */}
       <div className="mt-8">
@@ -60,7 +102,7 @@ function SimplifiedSetupGuide() {
             </p>
             <Button size="sm" variant="primary" className="shrink-0">
               <Link href="/docs/advanced-usage/use-different-agents">
-                Get started
+                Get Started
               </Link>
             </Button>
           </div>
@@ -133,7 +175,7 @@ function BentoGrid() {
   ];
 
   return (
-    <div className="mx-auto grid max-w-7xl grid-cols-2 gap-4 md:grid-cols-3">
+    <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {features.map((feature, index) => (
         <ScrollReveal key={feature.title} delay={index * 100}>
           <div
@@ -146,9 +188,9 @@ function BentoGrid() {
               </p>
             </div>
 
-            {/* Large icon positioned at bottom right, extending beyond bounds */}
-            <div className="-bottom-2 -right-2 group-hover:-translate-y-2 absolute opacity-30 transition-all duration-500 group-hover:opacity-40">
-              <div className="scale-[4] transform">{feature.icon}</div>
+            {/* Large icon positioned at bottom right, contained within bounds */}
+            <div className="-bottom-4 -right-4 group-hover:-translate-y-2 absolute opacity-30 transition-all duration-500 group-hover:opacity-40">
+              <div className="scale-[3] transform">{feature.icon}</div>
             </div>
           </div>
         </ScrollReveal>
@@ -310,7 +352,7 @@ function CompatibilitySection() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-16 text-center">
+      <div className="mb-20 text-center">
         <h2 className="mb-6 font-bold text-3xl md:text-4xl">
           Universal Tech Stack Support
         </h2>
@@ -321,11 +363,13 @@ function CompatibilitySection() {
       </div>
 
       {/* Tech Stack Display */}
-      <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-center gap-6">
+      <div className="mx-auto max-w-2xl">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
           <div
-            className={`glass-body aspect-square flex-1 rounded-2xl p-6 text-center transition-all duration-1000 ${
-              !isTransitioning && showGlow ? currentCombo.component1.glow : ''
+            className={`glass-body aspect-square w-full rounded-full p-6 text-center transition-all duration-1000 ${
+              !isTransitioning && showGlow
+                ? `shadow-xl ${currentCombo.component1.glow}`
+                : ''
             }`}
           >
             <div
@@ -334,15 +378,17 @@ function CompatibilitySection() {
               }`}
             >
               {currentCombo.component1.icon}
-              <div className="text-lg text-zinc-800/70 dark:text-zinc-200/70">
+              <div className="font-medium text-base text-zinc-800/90 dark:text-zinc-200/90">
                 {currentCombo.component1.name}
               </div>
             </div>
           </div>
 
           <div
-            className={`glass-body aspect-square flex-1 rounded-2xl p-6 text-center transition-all duration-1000 ${
-              !isTransitioning && showGlow ? currentCombo.component2.glow : ''
+            className={`glass-body aspect-square w-full rounded-full p-6 text-center transition-all duration-1000 ${
+              !isTransitioning && showGlow
+                ? `shadow-xl ${currentCombo.component2.glow}`
+                : ''
             }`}
           >
             <div
@@ -351,15 +397,17 @@ function CompatibilitySection() {
               }`}
             >
               {currentCombo.component2.icon}
-              <div className="text-lg text-zinc-800/70 dark:text-zinc-200/70">
+              <div className="font-medium text-base text-zinc-800/90 dark:text-zinc-200/90">
                 {currentCombo.component2.name}
               </div>
             </div>
           </div>
 
           <div
-            className={`glass-body aspect-square flex-1 rounded-2xl p-6 text-center transition-all duration-1000 ${
-              !isTransitioning && showGlow ? currentCombo.component3.glow : ''
+            className={`glass-body aspect-square flex-1 rounded-full p-6 text-center transition-all duration-1000 ${
+              !isTransitioning && showGlow
+                ? `shadow-xl ${currentCombo.component3.glow}`
+                : ''
             }`}
           >
             <div
@@ -368,15 +416,17 @@ function CompatibilitySection() {
               }`}
             >
               {currentCombo.component3.icon}
-              <div className="text-lg text-zinc-800/70 dark:text-zinc-200/70">
+              <div className="font-medium text-base text-zinc-800/90 dark:text-zinc-200/90">
                 {currentCombo.component3.name}
               </div>
             </div>
           </div>
 
           <div
-            className={`glass-body aspect-square flex-1 rounded-2xl p-6 text-center transition-all duration-1000 ${
-              !isTransitioning && showGlow ? currentCombo.component4.glow : ''
+            className={`glass-body aspect-square flex-1 rounded-full p-6 text-center transition-all duration-1000 ${
+              !isTransitioning && showGlow
+                ? `shadow-xl ${currentCombo.component4.glow}`
+                : ''
             }`}
           >
             <div
@@ -385,7 +435,7 @@ function CompatibilitySection() {
               }`}
             >
               {currentCombo.component4.icon}
-              <div className="text-lg text-zinc-800/70 dark:text-zinc-200/70">
+              <div className="font-medium text-base text-zinc-800/90 dark:text-zinc-200/90">
                 {currentCombo.component4.name}
               </div>
             </div>
@@ -503,7 +553,7 @@ function DevelopmentStepsSlideshow() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-16 text-center">
+      <div className="mb-20 text-center">
         <h2 className="mb-6 font-bold text-3xl md:text-4xl">
           From Start to Finish
         </h2>
@@ -548,8 +598,8 @@ function DevelopmentStepsSlideshow() {
             key={step.id}
             className={`absolute inset-0 transition-all duration-700 ${
               index === currentStep
-                ? 'pointer-events-auto translate-y-0 opacity-100'
-                : 'pointer-events-none translate-y-4 opacity-0'
+                ? 'pointer-events-auto translate-y-0 opacity-100 blur-0'
+                : 'pointer-events-none translate-y-4 opacity-0 blur-sm'
             }`}
           >
             <div
@@ -600,6 +650,127 @@ function DevelopmentStepsSlideshow() {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Customer Reviews Slideshow Component
+function CustomerReviewsSlideshow() {
+  const [currentReview, setCurrentReview] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const reviews = [
+    {
+      text: 'stagewise has completely transformed how we build frontends. The AI understands our codebase patterns and generates clean, production-ready code that fits perfectly with our existing architecture.',
+      author: 'Sarah Chen',
+      role: 'Senior Frontend Developer',
+      company: 'TechCorp',
+      avatar:
+        'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=64&h=64&fit=crop&crop=face&auto=format&q=80',
+    },
+    {
+      text: "The real-time collaboration features are incredible. Our entire team can work on the same interface simultaneously, and stagewise keeps everything in sync. It's like having a senior developer on every project.",
+      author: 'Marcus Rodriguez',
+      role: 'Lead UI/UX Designer',
+      company: 'DesignStudio',
+      avatar:
+        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop&crop=face&auto=format&q=80',
+    },
+    {
+      text: "We've reduced our frontend development time by 60% since adopting stagewise. The AI suggestions are spot-on, and the code quality is consistently high across all our projects.",
+      author: 'Emily Watson',
+      role: 'CTO',
+      company: 'StartupXYZ',
+      avatar:
+        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=64&h=64&fit=crop&crop=face&auto=format&q=80',
+    },
+  ];
+
+  // Auto-cycle every 6 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsTransitioning(true);
+
+      setTimeout(() => {
+        setCurrentReview((prev) => (prev + 1) % reviews.length);
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 50);
+      }, 300);
+    }, 6000);
+
+    return () => clearInterval(interval);
+  }, [reviews.length]);
+
+  const handleReviewClick = (index: number) => {
+    if (index === currentReview) return;
+
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentReview(index);
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 50);
+    }, 300);
+  };
+
+  return (
+    <div className="w-full">
+      {/* Review Content */}
+      <div className="mx-auto max-w-4xl">
+        <div className="glass-body rounded-2xl p-8 md:p-12">
+          <div className="relative flex min-h-[300px] items-center justify-center">
+            {reviews.map((review, index) => (
+              <div
+                key={review.text}
+                className={`absolute inset-0 transition-all duration-300 ${
+                  index === currentReview && !isTransitioning
+                    ? 'translate-y-0 opacity-100 blur-0'
+                    : 'pointer-events-none translate-y-4 opacity-0 blur-sm'
+                }`}
+              >
+                <div className="flex h-full flex-col items-center justify-center text-center">
+                  <blockquote className="mb-8 text-lg text-zinc-700 leading-relaxed md:text-xl dark:text-zinc-300">
+                    "{review.text}"
+                  </blockquote>
+
+                  <div className="flex flex-col items-center gap-4">
+                    <img
+                      src={review.avatar}
+                      alt={review.author}
+                      className="h-16 w-16 rounded-full object-cover"
+                    />
+                    <div>
+                      <div className="font-semibold text-zinc-900 dark:text-zinc-100">
+                        {review.author}
+                      </div>
+                      <div className="text-sm text-zinc-600 dark:text-zinc-400">
+                        {review.role} at {review.company}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Review Navigation Dots */}
+        <div className="mt-8 flex justify-center gap-2">
+          {reviews.map((review, index) => (
+            <Button
+              key={review.text}
+              onClick={() => handleReviewClick(index)}
+              variant={index === currentReview ? 'primary' : 'secondary'}
+              className={`size-3 rounded-full p-0 transition-all ${
+                index === currentReview
+                  ? 'w-6 shadow-blue-500/25'
+                  : 'w-3 bg-gray-500/20'
+              }`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -665,7 +836,7 @@ export default function Home() {
   return (
     <div className="relative mt-12 min-h-screen overflow-hidden">
       {/* Hero Section */}
-      <section className="container relative z-10 mx-auto px-4">
+      <section className="container relative z-10 mx-auto px-4 pb-16 md:pb-20">
         <div className="mx-auto max-w-3xl">
           <ScrollReveal>
             <div className="mb-12 px-4 text-center sm:px-0">
@@ -728,62 +899,80 @@ export default function Home() {
                   variant="primary"
                   className="mx-auto mb-6"
                 >
-                  Get Started
+                  <TerminalIcon className="size-4 stroke-3" />
+                  Install stagewise
                 </Button>
               </div>
             </div>
           </ScrollReveal>
 
           <ScrollReveal delay={300}>
-            <div className="mx-auto mt-8 max-w-3xl scale-[1.02] transform rounded-xl border border-zinc-900/50 shadow-[0_0_40px_rgba(0,0,0,0.25)] transition-transform duration-500 dark:border-zinc-100/50 dark:shadow-[0_0_40px_rgba(255,255,255,0.1)]">
+            <div className="group relative mx-auto mt-8 mb-16 max-w-3xl transform rounded-xl border border-zinc-900/50 shadow-[0_0_40px_rgba(0,0,0,0.25)] dark:border-zinc-100/50 dark:shadow-[0_0_40px_rgba(255,255,255,0.1)]">
               <video
-                src="https://github.com/stagewise-io/assets/raw/1aeae6c24e0aedc959ae3fb730ea569c984e3a13/edited/0-5-0-custom-agent/github-projects-demo.mp4"
+                src="https://github.com/stagewise-io/assets/raw/refs/heads/main/edited/0-6-0-undo/landing-demo-undo.mp4"
                 width={1200}
                 height={675}
-                className="w-full rounded-xl"
+                className="w-full rounded-xl transition-all duration-300 group-hover:blur-[2px]"
                 autoPlay
                 muted
                 loop
                 preload="auto"
                 playsInline
               />
-            </div>
-          </ScrollReveal>
-
-          <ScrollReveal delay={200}>
-            <div className="mt-32 mb-8 w-full">
-              <p className="mx-auto mb-16 text-center text-base text-zinc-600 dark:text-zinc-400">
-                embraced by engineers from leading companies
-              </p>
-              <div className="flex flex-row flex-wrap items-center justify-center gap-x-20 gap-y-12">
-                {/* Company logos would go here - using placeholders */}
-                <div className="h-8 w-20 rounded bg-zinc-200 opacity-60 dark:bg-zinc-700" />
-                <div className="h-8 w-20 rounded bg-zinc-200 opacity-60 dark:bg-zinc-700" />
-                <div className="h-8 w-24 rounded bg-zinc-200 opacity-60 dark:bg-zinc-700" />
-                <div className="h-8 w-24 rounded bg-zinc-200 opacity-60 dark:bg-zinc-700" />
-                <div className="h-8 w-24 rounded bg-zinc-200 opacity-60 dark:bg-zinc-700" />
-                <div className="h-8 w-24 rounded bg-zinc-200 opacity-60 dark:bg-zinc-700" />
-                <div className="h-8 w-16 rounded bg-zinc-200 opacity-60 dark:bg-zinc-700" />
+              {/* Overlay with button */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                <a
+                  href="https://www.youtube.com/watch?v=C1fWQl8r_zY"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive flex items-center gap-2 rounded-full bg-white/20 px-6 py-3 font-medium text-zinc-900 shadow-2xl backdrop-blur-md transition-all duration-200 hover:bg-white/30 hover:shadow-3xl dark:bg-black/20 dark:text-white dark:hover:bg-black/30"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Watch full demo
+                </a>
               </div>
             </div>
           </ScrollReveal>
         </div>
       </section>
 
+      {/* Customer Testimonials Section */}
+      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800">
+        <ScrollReveal>
+          <div className="mx-auto mb-20 max-w-3xl pt-8 text-center">
+            <h2 className="mb-6 font-bold text-3xl md:text-4xl">
+              Loved by developers worldwide
+            </h2>
+          </div>
+        </ScrollReveal>
+
+        <ScrollReveal delay={200}>
+          <CustomerReviewsSlideshow />
+        </ScrollReveal>
+      </section>
+
       {/* Simplified Setup Guide Section */}
       <section
         id="setup-guide"
-        className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800"
+        className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800"
       >
         <ScrollReveal>
-          <SimplifiedSetupGuide />
+          <div className="pt-8">
+            <SimplifiedSetupGuide />
+          </div>
         </ScrollReveal>
       </section>
 
       {/* Enhanced Bento Grid Features Section */}
-      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800">
+      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800">
         <ScrollReveal>
-          <div className="mx-auto mb-16 max-w-3xl text-center">
+          <div className="mx-auto mb-20 max-w-3xl pt-8 text-center">
             <h2 className="mb-6 font-bold text-3xl md:text-4xl">
               Why Choose stagewise
             </h2>
@@ -798,23 +987,27 @@ export default function Home() {
       </section>
 
       {/* Tech Stack Compatibility Section */}
-      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800">
+      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800">
         <ScrollReveal>
-          <CompatibilitySection />
+          <div className="pt-8">
+            <CompatibilitySection />
+          </div>
         </ScrollReveal>
       </section>
 
       {/* Development Steps Slideshow Section */}
-      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800">
+      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800">
         <ScrollReveal>
-          <DevelopmentStepsSlideshow />
+          <div className="pt-8">
+            <DevelopmentStepsSlideshow />
+          </div>
         </ScrollReveal>
       </section>
 
       {/* Second Get Started Section */}
-      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-16 md:py-24 dark:border-zinc-800">
+      <section className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800">
         <ScrollReveal>
-          <div className="mx-auto max-w-2xl text-center">
+          <div className="mx-auto max-w-2xl pt-8 text-center">
             <h2 className="mb-6 font-bold text-3xl md:text-4xl">
               Ready to get started?
             </h2>
@@ -835,7 +1028,8 @@ export default function Home() {
                 size="lg"
                 variant="primary"
               >
-                Get Started
+                <TerminalIcon className="size-4 stroke-3" />
+                Install stagewise
               </Button>
               <Button variant="secondary" size="lg">
                 <Link href="/docs">View Documentation</Link>

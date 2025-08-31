@@ -41,7 +41,7 @@ export default function MigrateToCLI() {
                   following command in the terminal:
                 </p>
                 <Button
-                  variant="outline"
+                  variant="primary"
                   size="lg"
                   className="mb-4 w-full gap-2 pr-6 sm:w-auto"
                   onClick={() => {
@@ -86,7 +86,7 @@ export default function MigrateToCLI() {
             </p>
             <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
               <Button
-                variant="link"
+                variant="ghost"
                 onClick={() => {
                   window.parent.postMessage(
                     {
