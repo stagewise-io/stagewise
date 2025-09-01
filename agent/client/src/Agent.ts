@@ -67,7 +67,7 @@ type ChatId = string;
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
-const MAX_RECURSION_DEPTH = 20;
+const _MAX_RECURSION_DEPTH = 20;
 
 export class Agent {
   private static instance: Agent;
@@ -444,22 +444,22 @@ export class Agent {
       this.undoToolCallStack.set(chatId, []);
 
     // Check recursion depth
-    if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
-      const errorDesc = ErrorDescriptions.recursionDepthExceeded(
-        this.recursionDepth,
-        MAX_RECURSION_DEPTH,
-      );
-      this.setAgentWorking(false);
-      this.karton?.setState((draft) => {
-        draft.chats[chatId]!.error = {
-          type: AgentErrorType.AGENT_ERROR,
-          error: new Error(errorDesc),
-        };
-      });
-      return;
-    }
+    // if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
+    //   const errorDesc = ErrorDescriptions.recursionDepthExceeded(
+    //     this.recursionDepth,
+    //     MAX_RECURSION_DEPTH,
+    //   );
+    //   this.setAgentWorking(false);
+    //   this.karton?.setState((draft) => {
+    //     draft.chats[chatId]!.error = {
+    //       type: AgentErrorType.AGENT_ERROR,
+    //       error: new Error(errorDesc),
+    //     };
+    //   });
+    //   return;
+    // }
 
-    this.recursionDepth++;
+    // this.recursionDepth++;
 
     try {
       const lastMessage = history?.at(-1);
