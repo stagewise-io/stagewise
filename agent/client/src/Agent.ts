@@ -118,10 +118,8 @@ export class Agent {
     this.refreshToken = config.refreshToken;
     this.eventEmitter = createEventEmitter(config.onEvent);
     this.client = createAuthenticatedClient(this.accessToken);
-    console.log('apiKey ', this.accessToken);
-    console.log('apiURL ', `${process.env.API_URL}/openai/v1`);
     this.anthropic = createAnthropic({
-      baseURL: `https://fxxsnmt2m6.eu-central-1.awsapprunner.com/anthropic/v1`,
+      baseURL: `${process.env.API_URL}/anthropic/v1`,
       headers: { 'stagewise-access-key': this.accessToken },
       apiKey: this.accessToken, // will be ignored
     });
@@ -611,7 +609,6 @@ export class Agent {
         // tools: mapZodToolsToJsonSchemaTools(this.tools),
         tools: cliToolsWithoutExecute(clientRuntime),
         onFinish: async (r) => {
-          console.log('streamtext finish reason ', r.finishReason);
           const toolResults = await processParallelToolCalls(
             r.toolCalls,
             this.tools,
