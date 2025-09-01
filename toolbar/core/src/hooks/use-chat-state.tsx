@@ -1,5 +1,5 @@
 import { type ReactNode, createContext } from 'react';
-import { useContext, useState, useCallback, useEffect } from 'react';
+import { useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useAppState } from './use-app-state';
 import { usePlugins } from './use-plugins';
 import {
@@ -10,8 +10,16 @@ import {
   isAnthropicSupportedFile,
 } from '@/utils';
 import { usePanels } from './use-panels';
-import { useKartonProcedure, useKartonState } from './use-karton';
-import type { ChatMessage, FileUIPart } from '@stagewise/karton-contract';
+import {
+  useKartonProcedure,
+  useKartonState,
+  useKartonConnected,
+} from './use-karton';
+import type {
+  ChatMessage,
+  FileUIPart,
+  UserInputUpdate,
+} from '@stagewise/karton-contract';
 
 interface ContextSnippet {
   promptContextName: string;
@@ -102,15 +110,24 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   >([]);
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
 
+  // Track if the component has finished initial mount to prevent updates during initialization
+  const hasInitializedRef = useRef<boolean>(false);
+  // Track if we've sent any content during the current prompt creation session
+  const hasSentContentRef = useRef<boolean>(false);
+
   const { minimized } = useAppState();
   const { plugins } = usePlugins();
 
   const sendChatMessage = useKartonProcedure((p) => p.sendUserMessage);
+  const sendUserInputUpdate = useKartonProcedure((p) => p.sendUserInputUpdate);
   const isWorking = useKartonState((s) => s.isWorking);
+  const isConnected = useKartonConnected();
   const { isChatOpen, openChat } = usePanels();
 
   const startPromptCreation = useCallback(() => {
     setIsPromptCreationMode(true);
+    // Reset the content sent flag when starting a new prompt creation session
+    hasSentContentRef.current = false;
 
     // open the chat panel if it's not open
     if (!isChatOpen) {
@@ -152,6 +169,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     // Always stop context selector when stopping prompt creation
     setIsContextSelectorMode(false);
     setDomContextElements([]);
+    // Reset the content sent flag when stopping prompt creation
+    hasSentContentRef.current = false;
     plugins.forEach((plugin) => {
       plugin.onPromptingAbort?.();
     });
@@ -183,6 +202,82 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       stopPromptCreation(); // This also stops context selector
     }
   }, [isWorking, isPromptCreationMode, stopPromptCreation]);
+
+  // Mark as initialized after first render
+  useEffect(() => {
+    hasInitializedRef.current = true;
+  }, []);
+
+  // Debounced update to send user input changes to the agent
+  const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    // Only send updates when in prompt creation mode, not working, and connected
+    if (!isPromptCreationMode || isWorking || !isConnected) {
+      return;
+    }
+
+    // Don't send updates during initialization
+    if (!hasInitializedRef.current) {
+      return;
+    }
+
+    // Check if we have content currently
+    const hasContent =
+      chatInput.trim().length > 0 || domContextElements.length > 0;
+
+    // Skip if no content and we haven't sent content before in this session
+    if (!hasContent && !hasSentContentRef.current) {
+      return;
+    }
+
+    // Clear existing timer
+    if (updateTimerRef.current) {
+      clearTimeout(updateTimerRef.current);
+    }
+
+    // Set new debounced update
+    updateTimerRef.current = setTimeout(() => {
+      // Transform domContextElements to SelectedElement[]
+      const selectedElements = domContextElements.map((item) =>
+        getSelectedElementInfo(item.element),
+      );
+
+      // Create metadata with browser data
+      const metadata = collectUserMessageMetadata(selectedElements, false);
+
+      // Prepare the update
+      const update: UserInputUpdate = {
+        chatInput,
+        browserData: metadata.browserData,
+        pluginContentItems: {}, // Start with empty, can be enhanced later
+      };
+
+      // Send the update
+      sendUserInputUpdate(update).catch((error) => {
+        console.error('Failed to send user input update:', error);
+      });
+
+      // Mark that we've sent content if we have any
+      if (hasContent) {
+        hasSentContentRef.current = true;
+      }
+    }, 300); // 300ms debounce delay
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current);
+      }
+    };
+  }, [
+    chatInput,
+    domContextElements,
+    isPromptCreationMode,
+    isWorking,
+    isConnected,
+    sendUserInputUpdate,
+  ]);
 
   const addChatDomContext = useCallback(
     (element: HTMLElement) => {

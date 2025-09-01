@@ -10,6 +10,8 @@ import {
   type AnthropicProviderOptions,
   createAnthropic,
 } from '@ai-sdk/anthropic';
+import { indexCodebase } from '@stagewise/agent-rag';
+import type { createOpenAI } from '@ai-sdk/openai';
 import {
   cliTools,
   cliToolsWithoutExecute,
@@ -44,7 +46,12 @@ import {
   findPendingToolCalls,
 } from './utils/karton-helpers.js';
 import { isInsufficientCreditsError } from './utils/is-insufficient-credits-error.js';
-import type { AsyncIterableStream, InferUIMessageChunk, ToolUIPart } from 'ai';
+import type {
+  AsyncIterableStream,
+  InferUIMessageChunk,
+  ToolUIPart,
+  TextUIPart,
+} from 'ai';
 import { uiMessagesToModelMessages } from './utils/ui-messages-to-model-messages.js';
 import {
   processParallelToolCalls,
@@ -55,6 +62,7 @@ import {
   isPlanLimitsExceededError,
   type PlanLimitsExceededError,
 } from './utils/is-plan-limit-error.js';
+import { getContextFilesFromUserInput } from './utils/get-context-files-from-user-input.js';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -87,6 +95,13 @@ export class Agent {
   private abortController: AbortController;
   private lastMessageId: string | null = null;
   private litellm!: ReturnType<typeof createAnthropic>;
+  private contextFilesInfo: {
+    contextFiles: TextUIPart[];
+    lastSelectedElementsCount: number;
+  } = {
+    contextFiles: [],
+    lastSelectedElementsCount: 0,
+  };
   // undo is only allowed for one chat at a time.
   // if the user switches to a new chat, the undo stack is cleared
   private undoToolCallStack: Map<
@@ -141,6 +156,18 @@ export class Agent {
       baseURL: `${LLM_PROXY_URL}/v1`, // will use the anthropic/v1/messages endpoint of the litellm proxy
       apiKey: this.accessToken, // stagewise access token
     });
+  }
+
+  private async indexCodebase(): Promise<void> {
+    const indexer = indexCodebase(this.accessToken, {
+      rootDir: '/Users/juliangoetze/Arbeit/agentic-work/saas-shadcn',
+      // baseUrl: `${process.env.API_URL}/google`,
+      baseUrl: `${process.env.API_URL}/google`,
+      headers: { 'stagewise-access-key': this.accessToken },
+    });
+    for await (const progress of indexer) {
+      console.log(progress);
+    }
   }
 
   /**
@@ -266,6 +293,25 @@ export class Agent {
   }> {
     this.karton = await createKartonServer<KartonContract>({
       procedures: {
+        sendUserInputUpdate: async (update) => {
+          // only trigger a new RAG if the selected elements have changed
+          if (
+            update.browserData?.selectedElements?.length ===
+            this.contextFilesInfo.lastSelectedElementsCount
+          )
+            return;
+
+          this.contextFilesInfo.lastSelectedElementsCount =
+            update.browserData?.selectedElements?.length || 0;
+
+          console.log(`
+            update:
+              userInput: ${update.chatInput}
+              selected elements amount: ${update.browserData?.selectedElements?.length}
+             `);
+          this.contextFilesInfo.contextFiles =
+            await getContextFilesFromUserInput(update, this.accessToken);
+        },
         undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
           await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
         },
@@ -360,6 +406,22 @@ export class Agent {
           });
         },
         sendUserMessage: async (message, _callingClientId) => {
+          // Retrieve the RAG here!!!!
+          // const results = await searchCodebase(
+          //   this.accessToken,
+          //   'A dashboard card that shows donations that are pending',
+          //   {
+          //     limit: 15,
+          //   },
+          // );
+          // for (const result of results) {
+          //   console.log(
+          //     'result: ',
+          //     result.filePath,
+          //     'distance: ',
+          //     result.distance,
+          //   );
+          // }
           this.setAgentWorking(true);
           const newstate = this.karton?.setState((draft) => {
             const chatId = this.karton!.state.activeChatId!;

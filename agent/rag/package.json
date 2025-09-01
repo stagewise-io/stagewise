@@ -1,6 +1,5 @@
 {
-  "name": "@stagewise/agent-client",
-  "version": "0.6.0",
+  "name": "@stagewise/agent-rag",
   "private": true,
   "type": "module",
   "main": "./dist/index.cjs",
@@ -24,37 +23,22 @@
     "build:bundle": "tsx build.ts",
     "dev": "tsx build.ts --watch",
     "clean": "rimraf dist",
-    "lint": "echo 'No linting for prompts package'",
+    "lint": "echo 'No linting for rag package'",
     "type-check": "tsc --noEmit",
     "test": "vitest"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "2.0.9",
-    "@ai-sdk/google": "^2.0.11",
-    "@ai-sdk/openai": "^2.0.23",
     "@google/genai": "^1.16.0",
     "@lancedb/lancedb": "^0.21.3",
-    "ai": "5.0.9",
     "chokidar": "^4.0.3",
-    "diff": "^8.0.2",
-    "ignore": "^6.0.2",
-    "node-fetch": "^3.3.2",
-    "zod": "4.0.17",
-    "@stagewise/api-client": "1.4.0",
-    "@stagewise/karton": "workspace:*"
+    "ignore": "^7.0.5"
   },
   "devDependencies": {
-    "@stagewise/agent-prompt-snippets": "workspace:*",
-    "@stagewise/agent-prompts": "workspace:*",
-    "@stagewise/agent-rag": "workspace:*",
-    "@stagewise/agent-tools": "workspace:*",
-    "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
     "esbuild": "0.25.9",
     "rimraf": "^5.0.0",
     "tsx": "^4.7.1",
-    "typescript": "^5.0.0",
-    "vitest": "^3.2.4"
+    "typescript": "^5.0.0"
   }
 }
