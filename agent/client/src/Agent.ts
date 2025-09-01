@@ -1,13 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import { isAbortError } from './utils/is-abort-error.js';
-import { cliTools, type UITools } from '@stagewise/agent-tools';
-import { AgentErrorType } from '@stagewise/karton-contract';
 import { convertCreditsToSubscriptionCredits } from './utils/convert-credits-to-subscription-credits.js';
-import type {
-  KartonContract,
-  History,
-  ChatMessage,
+import {
+  type KartonContract,
+  type History,
+  type ChatMessage,
+  AgentErrorType,
 } from '@stagewise/karton-contract';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import {
+  cliTools,
+  cliToolsWithoutExecute,
+  type UITools,
+} from '@stagewise/agent-tools';
+import { generateId, streamText } from 'ai';
+import { XMLPrompts } from '@stagewise/agent-prompts';
 import {
   createKartonServer,
   type KartonServer,
@@ -24,19 +32,12 @@ import type {
 
 import { TimeoutManager } from './utils/time-out-manager.js';
 import {
-  processParallelToolCalls,
-  type ToolCallProcessingResult,
-} from './utils/tool-call-utils.js';
-import {
   createEventEmitter,
   EventFactories,
   type AgentEventCallback,
 } from './utils/event-utils.js';
 import { mapZodToolsToJsonSchemaTools } from './utils/agent-api-utils.js';
-import {
-  ErrorDescriptions,
-  formatErrorDescription,
-} from './utils/error-utils.js';
+import { formatErrorDescription } from './utils/error-utils.js';
 import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
 import { getProjectPath } from '@stagewise/agent-prompt-snippets';
 import {
@@ -48,6 +49,11 @@ import {
 } from './utils/karton-helpers.js';
 import { isInsufficientCreditsError } from './utils/is-insufficient-credits-error.js';
 import type { ToolUIPart } from 'ai';
+import { uiMessagesToModelMessages } from './utils/ui-messages-to-model-messages.js';
+import {
+  processParallelToolCalls,
+  type ToolCallProcessingResult,
+} from './utils/tool-call-utils.js';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -67,7 +73,7 @@ type ChatId = string;
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
-const MAX_RECURSION_DEPTH = 20;
+const _MAX_RECURSION_DEPTH = 20;
 
 export class Agent {
   private static instance: Agent;
@@ -86,6 +92,8 @@ export class Agent {
   private maxAuthRetries = 2;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
+  private openai: ReturnType<typeof createOpenAI>;
+  private anthropic: ReturnType<typeof createAnthropic>;
   // undo is only allowed for one chat at a time.
   // if the user switches to a new chat, the undo stack is cleared
   private undoToolCallStack: Map<
@@ -110,6 +118,18 @@ export class Agent {
     this.refreshToken = config.refreshToken;
     this.eventEmitter = createEventEmitter(config.onEvent);
     this.client = createAuthenticatedClient(this.accessToken);
+    console.log('apiKey ', this.accessToken);
+    console.log('apiURL ', `${process.env.API_URL}/openai/v1`);
+    this.anthropic = createAnthropic({
+      baseURL: `https://fxxsnmt2m6.eu-central-1.awsapprunner.com/anthropic/v1`,
+      headers: { 'stagewise-access-key': this.accessToken },
+      apiKey: this.accessToken, // will be ignored
+    });
+    this.openai = createOpenAI({
+      baseURL: `${process.env.API_URL}/openai/v1`,
+      headers: { 'stagewise-access-key': this.accessToken },
+      apiKey: this.accessToken, // will be ignored
+    });
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
     this.timeoutManager = new TimeoutManager();
     this.abortController = new AbortController();
@@ -513,29 +533,26 @@ export class Agent {
     clientRuntime: ClientRuntime;
     promptSnippets?: PromptSnippet[];
   }): Promise<void> {
-    // Validate prerequisites
-    if (!this.client) throw new Error('TRPC API client not initialized');
-
     if (!this.undoToolCallStack.has(chatId))
       this.undoToolCallStack.set(chatId, []);
 
     // Check recursion depth
-    if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
-      const errorDesc = ErrorDescriptions.recursionDepthExceeded(
-        this.recursionDepth,
-        MAX_RECURSION_DEPTH,
-      );
-      this.setAgentWorking(false);
-      this.karton?.setState((draft) => {
-        draft.chats[chatId]!.error = {
-          type: AgentErrorType.AGENT_ERROR,
-          error: new Error(errorDesc),
-        };
-      });
-      return;
-    }
+    // if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
+    //   const errorDesc = ErrorDescriptions.recursionDepthExceeded(
+    //     this.recursionDepth,
+    //     MAX_RECURSION_DEPTH,
+    //   );
+    //   this.setAgentWorking(false);
+    //   this.karton?.setState((draft) => {
+    //     draft.chats[chatId]!.error = {
+    //       type: AgentErrorType.AGENT_ERROR,
+    //       error: new Error(errorDesc),
+    //     };
+    //   });
+    //   return;
+    // }
 
-    this.recursionDepth++;
+    // this.recursionDepth++;
 
     try {
       const lastMessage = history?.at(-1);
@@ -580,70 +597,73 @@ export class Agent {
           ),
         );
 
-      const request = {
-        messages: history ?? [],
-        tools: mapZodToolsToJsonSchemaTools(this.tools),
+      const prompts = new XMLPrompts();
+      const systemPrompt = prompts.getSystemPrompt({
+        usermessageMetdata: lastMessageMetadata.message?.metadata,
         promptSnippets,
-      };
-
-      const agentResponse = await this.callAgentWithRetry(request);
-
-      let lastResponse: LastResponse | undefined;
-      await this.parseUiStream(
-        agentResponse,
-        (message) => {
-          lastResponse = message;
-        },
-        (messageId) => {
-          this.lastMessageId = messageId;
-        },
-      );
-
-      if (!lastResponse) throw new Error('Unknown error, please try again');
-
-      const { toolCalls, credits } = lastResponse;
-
-      this.karton?.setState((draft) => {
-        if (draft.subscription)
-          draft.subscription = {
-            ...draft.subscription,
-            credits: convertCreditsToSubscriptionCredits(credits),
-          };
       });
 
-      const toolResults = await processParallelToolCalls(
-        toolCalls,
-        this.tools,
-        this.karton?.state.chats[chatId]!.messages ?? [],
-        this.timeoutManager,
-        (result) => {
-          if (result.result?.undoExecute) {
-            this.undoToolCallStack.get(chatId)?.push({
-              toolCallId: result.toolCallId,
-              undoExecute: result.result?.undoExecute,
+      const stream = streamText({
+        model: this.anthropic('claude-sonnet-4-20250514'),
+        temperature: 0.7,
+        maxOutputTokens: 64000,
+        messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
+        // tools: mapZodToolsToJsonSchemaTools(this.tools),
+        tools: cliToolsWithoutExecute(clientRuntime),
+        onFinish: async (r) => {
+          console.log('streamtext finish reason ', r.finishReason);
+          const toolResults = await processParallelToolCalls(
+            r.toolCalls,
+            this.tools,
+            this.karton?.state.chats[chatId]!.messages ?? [],
+            this.timeoutManager,
+            (result) => {
+              if (result.result?.undoExecute) {
+                this.undoToolCallStack.get(chatId)?.push({
+                  toolCallId: result.toolCallId,
+                  undoExecute: result.result?.undoExecute,
+                });
+              }
+              attachToolOutputToMessage(
+                this.karton!,
+                [result],
+                this.lastMessageId!,
+              );
+            },
+          );
+
+          if (toolResults.length > 0) {
+            return this.callAgent({
+              chatId,
+              history: this.karton?.state.chats[chatId]!.messages,
+              clientRuntime,
+              promptSnippets,
             });
           }
-          attachToolOutputToMessage(
-            this.karton!,
-            [result],
-            this.lastMessageId!,
+
+          this.cleanupPendingOperations(
+            'Agent task completed successfully',
+            false,
           );
         },
-      );
+      });
 
-      // Check if recursion is needed
-      if (toolResults.length > 0) {
-        return this.callAgent({
-          chatId,
-          history: this.karton?.state.chats[chatId]!.messages,
-          clientRuntime,
-          promptSnippets,
-        });
+      const uiMessages = stream.toUIMessageStream({
+        generateMessageId: generateId,
+      });
+
+      try {
+        await this.parseUiStream(
+          uiMessages,
+          (_message) => {},
+          (messageId) => {
+            this.lastMessageId = messageId;
+          },
+        );
+      } catch (error) {
+        if (isAbortError(error)) return;
+        throw error;
       }
-
-      // Clean up and finalize
-      this.cleanupPendingOperations('Agent task completed successfully', false);
-      return;
     } catch (error) {
       if (isAbortError(error)) {
         this.cleanupPendingOperations('Agent call aborted', false);

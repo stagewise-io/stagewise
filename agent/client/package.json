@@ -6,9 +6,6 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "engines": {
-    "vscode": "^1.85.0"
-  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -22,7 +19,7 @@
     "dist/**/*.d.ts"
   ],
   "scripts": {
-    "build": "npm run clean && npm run build:types && npm run build:bundle",
+    "build": "pnpm run clean && pnpm run build:types && pnpm run build:bundle",
     "build:types": "tsc --emitDeclarationOnly",
     "build:bundle": "tsx build.ts",
     "dev": "tsx build.ts --watch",
@@ -32,6 +29,8 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.23",
+    "@ai-sdk/anthropic": "2.0.9",
     "ai": "5.0.9",
     "diff": "^8.0.2",
     "node-fetch": "^3.3.2",
@@ -39,6 +38,7 @@
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
+    "@stagewise/agent-prompts": "workspace:*",
     "@stagewise/agent-prompt-snippets": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
