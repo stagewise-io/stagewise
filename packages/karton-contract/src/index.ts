@@ -9,6 +9,12 @@ export type { UserMessageMetadata, SelectedElement };
 
 export type { FileDiff, ToolResult };
 
+export type UserInputUpdate = {
+  chatInput: string;
+  browserData?: UserMessageMetadata['browserData'];
+  pluginContentItems?: UserMessageMetadata['pluginContentItems'];
+};
+
 export type {
   TextUIPart,
   FileUIPart,
@@ -78,6 +84,7 @@ export type KartonContract = {
     switchChat: (chatId: string) => Promise<void>;
     deleteChat: (chatId: string) => Promise<void>;
     sendUserMessage: (message: ChatMessage) => Promise<void>;
+    sendUserInputUpdate: (update: UserInputUpdate) => Promise<void>;
     retrySendingUserMessage: () => Promise<void>;
     abortAgentCall: () => Promise<void>;
     approveToolCall: (toolCallId: string) => Promise<void>;

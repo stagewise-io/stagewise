@@ -44,13 +44,6 @@ export function ChatPanel() {
   const focusIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const shouldMaintainFocusRef = useRef<boolean>(false);
 
-  // Start prompt creation mode when chat panel opens
-  useEffect(() => {
-    if (enableInputField) {
-      chatState.startPromptCreation();
-    }
-  }, []);
-
   // Focus management for prompt creation mode
   useEffect(() => {
     if (chatState.isPromptCreationActive && enableInputField) {
