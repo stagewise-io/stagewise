@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { isAbortError } from './utils/is-abort-error.js';
-import { convertCreditsToSubscriptionCredits } from './utils/convert-credits-to-subscription-credits.js';
 import {
   type KartonContract,
   type History,
@@ -14,7 +13,7 @@ import {
   cliToolsWithoutExecute,
   type UITools,
 } from '@stagewise/agent-tools';
-import { generateId, streamText } from 'ai';
+import { streamText, generateId } from 'ai';
 import { XMLPrompts } from '@stagewise/agent-prompts';
 import {
   createKartonServer,
@@ -37,7 +36,10 @@ import {
   type AgentEventCallback,
 } from './utils/event-utils.js';
 import { mapZodToolsToJsonSchemaTools } from './utils/agent-api-utils.js';
-import { formatErrorDescription } from './utils/error-utils.js';
+import {
+  ErrorDescriptions,
+  formatErrorDescription,
+} from './utils/error-utils.js';
 import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
 import { getProjectPath } from '@stagewise/agent-prompt-snippets';
 import {
@@ -48,7 +50,7 @@ import {
   findPendingToolCalls,
 } from './utils/karton-helpers.js';
 import { isInsufficientCreditsError } from './utils/is-insufficient-credits-error.js';
-import type { ToolUIPart } from 'ai';
+import type { InferUIMessageChunk, ToolUIPart, UIMessage } from 'ai';
 import { uiMessagesToModelMessages } from './utils/ui-messages-to-model-messages.js';
 import {
   processParallelToolCalls,
@@ -63,17 +65,11 @@ function isToolCallType(type: string): type is ToolCallType {
 
 type Tools = ReturnType<typeof cliTools>;
 type AsyncIterableItem<T> = T extends AsyncIterable<infer U> ? U : never;
-type ReturnValue<T> = T extends AsyncGenerator<infer _U, infer V, infer _W>
-  ? V
-  : never;
-
-type LastResponse = ReturnValue<RouterOutputs['chat']['streamAgentCall']>;
-
 type ChatId = string;
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
-const _MAX_RECURSION_DEPTH = 20;
+const MAX_RECURSION_DEPTH = 20;
 
 export class Agent {
   private static instance: Agent;
@@ -470,13 +466,11 @@ export class Agent {
           if (projectInfoPromptSnippet) {
             promptSnippets.push(projectInfoPromptSnippet);
           }
-          this.callAgent({
+          await this.callAgent({
             chatId: this.karton!.state.activeChatId!,
             history: messages,
             clientRuntime: this.clientRuntime,
             promptSnippets,
-          }).then(() => {
-            this.setAgentWorking(false);
           });
         },
         assistantMadeCodeChangesUntilLatestUserMessage: async (chatId) => {
@@ -535,22 +529,22 @@ export class Agent {
       this.undoToolCallStack.set(chatId, []);
 
     // Check recursion depth
-    // if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
-    //   const errorDesc = ErrorDescriptions.recursionDepthExceeded(
-    //     this.recursionDepth,
-    //     MAX_RECURSION_DEPTH,
-    //   );
-    //   this.setAgentWorking(false);
-    //   this.karton?.setState((draft) => {
-    //     draft.chats[chatId]!.error = {
-    //       type: AgentErrorType.AGENT_ERROR,
-    //       error: new Error(errorDesc),
-    //     };
-    //   });
-    //   return;
-    // }
+    if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
+      const errorDesc = ErrorDescriptions.recursionDepthExceeded(
+        this.recursionDepth,
+        MAX_RECURSION_DEPTH,
+      );
+      this.setAgentWorking(false);
+      this.karton?.setState((draft) => {
+        draft.chats[chatId]!.error = {
+          type: AgentErrorType.AGENT_ERROR,
+          error: new Error(errorDesc),
+        };
+      });
+      return;
+    }
 
-    // this.recursionDepth++;
+    this.recursionDepth++;
 
     try {
       const lastMessage = history?.at(-1);
@@ -603,11 +597,35 @@ export class Agent {
 
       const stream = streamText({
         model: this.anthropic('claude-sonnet-4-20250514'),
+        abortSignal: this.abortController.signal,
         temperature: 0.7,
         maxOutputTokens: 64000,
         messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
+        onError: async (error) => {
+          if (isAbortError(error.error))
+            this.cleanupPendingOperations('Agent call aborted');
+          else if (this.isAuthenticationError(error.error)) {
+            // refresh token and call agent again
+            const { accessToken, refreshToken } =
+              await this.client.session.refreshToken.mutate({
+                refreshToken: this.refreshToken!,
+              });
+            this.accessToken = accessToken;
+            this.refreshToken = refreshToken;
+            this.client = createAuthenticatedClient(this.accessToken);
+            this.callAgent({
+              chatId,
+              history: this.karton?.state.chats[chatId]!.messages,
+              clientRuntime,
+              promptSnippets,
+            });
+          } else throw error.error;
+        },
         // tools: mapZodToolsToJsonSchemaTools(this.tools),
         tools: cliToolsWithoutExecute(clientRuntime),
+        onAbort: () => {
+          this.cleanupPendingOperations('Agent call aborted');
+        },
         onFinish: async (r) => {
           const toolResults = await processParallelToolCalls(
             r.toolCalls,
@@ -649,18 +667,9 @@ export class Agent {
         generateMessageId: generateId,
       });
 
-      try {
-        await this.parseUiStream(
-          uiMessages,
-          (_message) => {},
-          (messageId) => {
-            this.lastMessageId = messageId;
-          },
-        );
-      } catch (error) {
-        if (isAbortError(error)) return;
-        throw error;
-      }
+      await this.parseUiStream(uiMessages, (messageId) => {
+        this.lastMessageId = messageId;
+      });
     } catch (error) {
       if (isAbortError(error)) {
         this.cleanupPendingOperations('Agent call aborted', false);
@@ -703,50 +712,41 @@ export class Agent {
 
   private async parseUiStream(
     uiStream: AsyncIterable<
-      AsyncIterableItem<RouterOutputs['chat']['streamAgentCall']>
+      InferUIMessageChunk<UIMessage<unknown, any, UITools>>
     >,
-    onLastMessage: (message: LastResponse) => void,
     onNewMessage?: (messageId: string) => void,
   ) {
     let messageId = '';
     let partIndex = -1;
-    const iterator = uiStream[Symbol.asyncIterator]();
-
-    while (true) {
-      const { done, value } = await iterator.next();
-      if (done) {
-        onLastMessage(value);
-        break;
-      } else {
-        switch (value.type) {
-          case 'start':
-            messageId = value.messageId ?? randomUUID();
-            partIndex++;
-            onNewMessage?.(messageId);
-            continue;
-          case 'text-start':
-            continue;
-          case 'text-delta':
-            appendTextDeltaToMessage(
-              this.karton!,
-              messageId,
-              value.delta,
-              partIndex,
-            );
-            continue;
-          case 'tool-input-start':
-            partIndex++;
-            continue;
-          case 'tool-input-delta':
-          case 'tool-input-error':
-            break; // Skipped for now
-          case 'tool-input-available':
-            appendToolInputToMessage(this.karton!, messageId, value, partIndex);
-            continue;
-          case 'tool-output-available':
-            // Should not happen - we append the output and this message
-            continue;
-        }
+    for await (const value of uiStream) {
+      switch (value.type) {
+        case 'start':
+          messageId = value.messageId ?? randomUUID();
+          partIndex++;
+          onNewMessage?.(messageId);
+          continue;
+        case 'text-start':
+          continue;
+        case 'text-delta':
+          appendTextDeltaToMessage(
+            this.karton!,
+            messageId,
+            value.delta,
+            partIndex,
+          );
+          continue;
+        case 'tool-input-start':
+          partIndex++;
+          continue;
+        case 'tool-input-delta':
+        case 'tool-input-error':
+          break; // Skipped for now
+        case 'tool-input-available':
+          appendToolInputToMessage(this.karton!, messageId, value, partIndex);
+          continue;
+        case 'tool-output-available':
+          // Should not happen - we append the output and this message
+          continue;
       }
     }
   }
