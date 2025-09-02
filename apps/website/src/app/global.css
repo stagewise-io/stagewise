@@ -1,13 +1,15 @@
 @import 'tailwindcss';
-@import 'fumadocs-ui/css/neutral.css';
-@import 'fumadocs-ui/css/preset.css';
+
 /* Additional watch source for tailwind */
 @source "../../node_modules/@stagewise/ui";
 @import "../../node_modules/@stagewise/stage-ui/src/style.css";
 @source "../../node_modules/@stagewise/stage-ui";
 
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
 
-@theme {
+
+@theme default {
   --animate-shine: shine 3s ease-in-out infinite;
   --animate-button-shine: button-shine 2s ease-in-out infinite;
 }
@@ -20,12 +22,13 @@
   --secondary: var(--color-zinc-200);
   --accent: var(--color-zinc-950);
   --muted: var(--color-zinc-100);
-  --border: var(--color-zinc-500);
+  --border: var(--color-zinc-200);
   --input: var(--color-zinc-200);
   --card: var(--color-zinc-50);
   --color-fd-background: var(--color-zinc-50);
   --color-fd-foreground: var(--color-zinc-950);
   --color-fd-primary: var(--color-zinc-950);
+  --color-fd-border: var(--color-zinc-200);
   /* --color-fd-secondary: #ec4899; */
   /* Add more as needed */
 }
@@ -38,12 +41,13 @@
   --secondary: var(--color-zinc-800);
   --accent: var(--color-zinc-50);
   --muted: var(--color-zinc-900);
-  --border: var(--color-zinc-700);
+  --border: var(--color-zinc-800);
   --input: var(--color-zinc-800);
   --card: var(--color-zinc-900);
   --color-fd-background: #09090b;
   --color-fd-foreground: #fff;
   --color-fd-primary: #fff;
+  --color-fd-border: var(--color-zinc-800);
   /* ... */
 }
 

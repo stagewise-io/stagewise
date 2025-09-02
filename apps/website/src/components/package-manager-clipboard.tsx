@@ -26,7 +26,7 @@ const packageManagerLabels: Record<PackageManager, string> = {
   yarn: 'Yarn',
 };
 
-export function PackageManagerClipboard({ className }: { className?: string }) {
+export function PackageManagerClipboard() {
   const [copied, setCopied] = useState(false);
   const [selectedPM, setSelectedPM] = useState<PackageManager>('npm');
   const posthog = usePostHog();
@@ -50,56 +50,53 @@ export function PackageManagerClipboard({ className }: { className?: string }) {
   };
 
   return (
-    <div className={cn('mb-4 flex w-full sm:w-auto', className)}>
-      {/* Combined container with fully rounded corners */}
-      <div className="glass-body relative flex w-fit items-center rounded-full bg-white/60 p-2 transition-all duration-200 dark:bg-zinc-900/60">
-        {/* Dropdown for package manager selection */}
-        <div className="relative">
-          <Menu>
-            <MenuTrigger>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label="Select package manager"
+    <div className="glass-body relative flex w-fit items-center rounded-full bg-white/60 p-2 transition-all duration-200 dark:bg-zinc-900/60">
+      {/* Dropdown for package manager selection */}
+      <div className="relative">
+        <Menu>
+          <MenuTrigger>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Select package manager"
+            >
+              {packageManagerLabels[selectedPM]}
+              <ChevronDownIcon className="size-3" />
+            </Button>
+          </MenuTrigger>
+          <MenuContent>
+            {Object.entries(packageManagerLabels).map(([pm, label]) => (
+              <MenuItem
+                key={pm}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handlePackageManagerSelect(pm as PackageManager);
+                }}
               >
-                {packageManagerLabels[selectedPM]}
-                <ChevronDownIcon className="size-3" />
-              </Button>
-            </MenuTrigger>
-            <MenuContent>
-              {Object.entries(packageManagerLabels).map(([pm, label]) => (
-                <MenuItem
-                  key={pm}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handlePackageManagerSelect(pm as PackageManager);
-                  }}
-                >
-                  {label}
-                </MenuItem>
-              ))}
-            </MenuContent>
-          </Menu>
-        </div>
-
-        {/* Code sample in inner glass-inset box */}
-        <button
-          type="button"
-          className="glass-inset glass-body-motion glass-body-motion-interactive !shadow-none flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-4 py-2 transition-all duration-200"
-          onClick={handleCopy}
-          aria-label="Copy to clipboard"
-        >
-          <span className="select-all font-mono text-sm">
-            {packageManagerCommands[selectedPM]}
-          </span>
-          {copied ? (
-            <CheckIcon className="h-4 w-4 text-green-500" />
-          ) : (
-            <CopyIcon className="h-4 w-4" />
-          )}
-        </button>
+                {label}
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </Menu>
       </div>
+
+      {/* Code sample in inner glass-inset box */}
+      <button
+        type="button"
+        className="glass-inset glass-body-motion glass-body-motion-interactive !shadow-none flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-4 py-2 transition-all duration-200"
+        onClick={handleCopy}
+        aria-label="Copy to clipboard"
+      >
+        <span className="select-all font-mono text-sm">
+          {packageManagerCommands[selectedPM]}
+        </span>
+        {copied ? (
+          <CheckIcon className="h-4 w-4 text-green-500" />
+        ) : (
+          <CopyIcon className="h-4 w-4" />
+        )}
+      </button>
     </div>
   );
 }
