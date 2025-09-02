@@ -729,8 +729,8 @@ function CustomerReviewsSlideshow() {
       {/* Review Content */}
       <div className="flex justify-center">
         <div className="w-full max-w-6xl">
-          <div className="glass-body rounded-2xl p-8 md:p-16">
-            <div className="relative flex min-h-[350px] items-center justify-center">
+          <div className="glass-body rounded-2xl p-2 md:p-4">
+            <div className="relative min-h-[300px] py-8">
               {reviews.map((review, index) => (
                 <div
                   key={review.text}

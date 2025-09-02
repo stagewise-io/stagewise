@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { CopyIcon, CheckIcon, ChevronDownIcon } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
-import { cn } from '@stagewise/ui/lib/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Menu,
