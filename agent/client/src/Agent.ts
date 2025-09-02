@@ -602,31 +602,66 @@ export class Agent {
         maxOutputTokens: 64000,
         messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
         onError: async (error) => {
-          if (isAbortError(error.error))
+          if (isAbortError(error.error)) {
+            this.authRetryCount = 0;
             this.cleanupPendingOperations('Agent call aborted');
-          else if (this.isAuthenticationError(error.error)) {
-            // refresh token and call agent again
-            const { accessToken, refreshToken } =
-              await this.client.session.refreshToken.mutate({
-                refreshToken: this.refreshToken!,
+          } else if (this.isAuthenticationError(error.error)) {
+            // refresh token and call agent again with retry limit
+            if (this.authRetryCount < this.maxAuthRetries) {
+              this.authRetryCount++;
+              const { accessToken, refreshToken } =
+                await this.client.session.refreshToken.mutate({
+                  refreshToken: this.refreshToken!,
+                });
+              this.accessToken = accessToken;
+              this.refreshToken = refreshToken;
+              this.client = createAuthenticatedClient(this.accessToken);
+              await this.callAgent({
+                chatId,
+                history: this.karton?.state.chats[chatId]!.messages,
+                clientRuntime,
+                promptSnippets,
               });
-            this.accessToken = accessToken;
-            this.refreshToken = refreshToken;
-            this.client = createAuthenticatedClient(this.accessToken);
-            this.callAgent({
-              chatId,
-              history: this.karton?.state.chats[chatId]!.messages,
-              clientRuntime,
-              promptSnippets,
+              return;
+            } else {
+              // Max retries exceeded
+              this.authRetryCount = 0;
+              this.setAgentWorking(false);
+              this.karton?.setState((draft) => {
+                draft.chats[chatId]!.error = {
+                  type: AgentErrorType.AGENT_ERROR,
+                  error: new Error(
+                    'Authentication failed, please restart the cli.',
+                  ),
+                };
+              });
+              return;
+            }
+          } else if (isInsufficientCreditsError(error.error)) {
+            this.authRetryCount = 0;
+            this.eventEmitter.emit(
+              EventFactories.creditsInsufficient(
+                this.karton?.state.subscription,
+              ),
+            );
+            this.setAgentWorking(false);
+            this.karton?.setState((draft) => {
+              draft.chats[chatId]!.error = {
+                type: AgentErrorType.INSUFFICIENT_CREDITS,
+                error: new Error('Insufficient credits'),
+              };
             });
+            return;
           } else throw error.error;
         },
         // tools: mapZodToolsToJsonSchemaTools(this.tools),
         tools: cliToolsWithoutExecute(clientRuntime),
         onAbort: () => {
+          this.authRetryCount = 0;
           this.cleanupPendingOperations('Agent call aborted');
         },
         onFinish: async (r) => {
+          this.authRetryCount = 0;
           const toolResults = await processParallelToolCalls(
             r.toolCalls,
             this.tools,
@@ -671,25 +706,6 @@ export class Agent {
         this.lastMessageId = messageId;
       });
     } catch (error) {
-      if (isAbortError(error)) {
-        this.cleanupPendingOperations('Agent call aborted', false);
-        return;
-      }
-
-      if (isInsufficientCreditsError(error)) {
-        this.eventEmitter.emit(
-          EventFactories.creditsInsufficient(this.karton?.state.subscription),
-        );
-        this.setAgentWorking(false);
-        this.karton?.setState((draft) => {
-          draft.chats[chatId]!.error = {
-            type: AgentErrorType.INSUFFICIENT_CREDITS,
-            error: new Error('Insufficient credits'),
-          };
-        });
-        return;
-      }
-
       const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
       this.karton?.setState((draft) => {
@@ -723,6 +739,7 @@ export class Agent {
         case 'start':
           messageId = value.messageId ?? randomUUID();
           partIndex++;
+          // Reset auth retry count on successful message stream start
           onNewMessage?.(messageId);
           continue;
         case 'text-start':
