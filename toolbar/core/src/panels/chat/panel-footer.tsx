@@ -6,7 +6,11 @@ import { PanelFooter } from '@/components/ui/panel';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn, HotkeyActions } from '@/utils';
 import { Textarea } from '@headlessui/react';
-import { ArrowUpIcon, SquareIcon, MousePointerIcon } from 'lucide-react';
+import {
+  ArrowUpIcon,
+  SquareIcon,
+  SquareDashedMousePointer,
+} from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import {
   useKartonState,
@@ -225,7 +229,7 @@ export function ChatPanelFooter({
                         : 'text-zinc-500 opacity-70',
                     )}
                   >
-                    <MousePointerIcon className={'size-4'} />
+                    <SquareDashedMousePointer className={'size-4'} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
