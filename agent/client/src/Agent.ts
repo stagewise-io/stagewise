@@ -544,6 +544,11 @@ export class Agent {
               this.accessToken = accessToken;
               this.refreshToken = refreshToken;
               this.client = createAuthenticatedClient(this.accessToken);
+              this.litellm = createAnthropic({
+                baseURL: `${process.env.LLM_PROXY_URL}/v1`, // will use the anthropic/v1/messages endpoint of the litellm proxy
+                headers: { 'stagewise-access-key': this.accessToken },
+                apiKey: this.accessToken, // will be ignored
+              });
               await this.callAgent({
                 chatId,
                 history: this.karton?.state.chats[chatId]!.messages,

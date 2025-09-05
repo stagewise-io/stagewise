@@ -32,42 +32,41 @@ export async function generateChatTitle(
   history: History,
   model: LanguageModel,
 ): Promise<string> {
-  const { text } = await generateText({
-    model,
-    messages: [
-      {
-        role: 'system',
-        content: generateChatTitleSystemPrompt,
-      },
-      ...uiMessagesToModelMessages(history ?? []),
-    ],
-  });
-
-  const startTime = new Date();
-  const fallbackTitle = `New Chat - ${startTime.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })}`;
-
-  const titleSchema = z
-    .string()
-    .min(1)
-    .max(50)
-    .describe('The title of the chat');
-
-  let cleanTitle = text
-    .trim()
-    .replace(/^["']|["']$/g, '')
-    .trim();
-
   try {
-    titleSchema.parse(cleanTitle);
-  } catch (_) {
-    cleanTitle = fallbackTitle;
-  }
+    const { text } = await generateText({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: generateChatTitleSystemPrompt,
+        },
+        ...uiMessagesToModelMessages(history ?? []),
+      ],
+    });
 
-  return cleanTitle;
+    const titleSchema = z
+      .string()
+      .min(1)
+      .max(50)
+      .describe('The title of the chat');
+
+    const cleanTitle = text
+      .trim()
+      .replace(/^["']|["']$/g, '')
+      .trim();
+
+    titleSchema.parse(cleanTitle);
+    return cleanTitle;
+  } catch (_) {
+    const startTime = new Date();
+
+    const fallbackTitle = `New Chat - ${startTime.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })}`;
+    return fallbackTitle;
+  }
 }
