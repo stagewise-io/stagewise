@@ -6,7 +6,6 @@ import {
   type ChatMessage,
   AgentErrorType,
 } from '@stagewise/karton-contract';
-import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import {
   cliTools,
@@ -22,12 +21,7 @@ import {
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client.js';
-import type {
-  AppRouter,
-  TRPCClient,
-  RouterInputs,
-  RouterOutputs,
-} from '@stagewise/api-client';
+import type { AppRouter, TRPCClient } from '@stagewise/api-client';
 
 import { TimeoutManager } from './utils/time-out-manager.js';
 import {
@@ -35,7 +29,6 @@ import {
   EventFactories,
   type AgentEventCallback,
 } from './utils/event-utils.js';
-import { mapZodToolsToJsonSchemaTools } from './utils/agent-api-utils.js';
 import {
   ErrorDescriptions,
   formatErrorDescription,
@@ -56,6 +49,7 @@ import {
   processParallelToolCalls,
   type ToolCallProcessingResult,
 } from './utils/tool-call-utils.js';
+import { generateChatTitle } from './utils/generate-chat-title.js';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -64,7 +58,6 @@ function isToolCallType(type: string): type is ToolCallType {
 }
 
 type Tools = ReturnType<typeof cliTools>;
-type AsyncIterableItem<T> = T extends AsyncIterable<infer U> ? U : never;
 type ChatId = string;
 
 // Configuration constants
@@ -88,8 +81,7 @@ export class Agent {
   private maxAuthRetries = 2;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
-  private openai: ReturnType<typeof createOpenAI>;
-  private anthropic: ReturnType<typeof createAnthropic>;
+  private litellm: ReturnType<typeof createAnthropic>;
   // undo is only allowed for one chat at a time.
   // if the user switches to a new chat, the undo stack is cleared
   private undoToolCallStack: Map<
@@ -114,13 +106,8 @@ export class Agent {
     this.refreshToken = config.refreshToken;
     this.eventEmitter = createEventEmitter(config.onEvent);
     this.client = createAuthenticatedClient(this.accessToken);
-    this.anthropic = createAnthropic({
-      baseURL: `${process.env.API_URL}/anthropic/v1`,
-      headers: { 'stagewise-access-key': this.accessToken },
-      apiKey: this.accessToken, // will be ignored
-    });
-    this.openai = createOpenAI({
-      baseURL: `${process.env.API_URL}/openai/v1`,
+    this.litellm = createAnthropic({
+      baseURL: `${process.env.LLM_PROXY_URL}/v1`, // will use the anthropic/v1/messages endpoint of the litellm proxy
       headers: { 'stagewise-access-key': this.accessToken },
       apiKey: this.accessToken, // will be ignored
     });
@@ -171,58 +158,6 @@ export class Agent {
     this.eventEmitter.emit(
       EventFactories.agentStateChanged(this.isWorking, !this.isWorking),
     );
-  }
-
-  /**
-   * Calls the agent API with automatic retry on authentication failures
-   * @param request - The request to call the agent API with
-   * @returns The result of the agent API call
-   */
-  private async callAgentWithRetry(
-    request: RouterInputs['chat']['streamAgentCall'],
-  ): Promise<
-    AsyncIterable<AsyncIterableItem<RouterOutputs['chat']['streamAgentCall']>>
-  > {
-    try {
-      const result = await this.client.chat.streamAgentCall.mutate(
-        {
-          messages: request.messages,
-          tools: mapZodToolsToJsonSchemaTools(this.tools),
-          promptSnippets: request.promptSnippets,
-        },
-        {
-          signal: this.abortController.signal,
-        },
-      );
-      this.authRetryCount = 0;
-      return result;
-    } catch (error) {
-      // Check if it's an authentication error
-      if (this.isAuthenticationError(error)) {
-        if (this.authRetryCount < this.maxAuthRetries) {
-          this.authRetryCount++;
-          const { accessToken, refreshToken } =
-            await this.client.session.refreshToken.mutate({
-              refreshToken: this.refreshToken!,
-            });
-          this.refreshToken = refreshToken;
-          this.accessToken = accessToken;
-          this.client = createAuthenticatedClient(this.accessToken);
-
-          return this.callAgentWithRetry(request);
-        } else if (error instanceof Error && error.name === 'AbortError') {
-          // Abort error is not an auth error
-          throw error;
-        } else {
-          // Max retries exceeded
-          this.authRetryCount = 0;
-          throw new Error('Authentication failed, please restart the cli.');
-        }
-      }
-
-      // Not an auth error, rethrow
-      throw error;
-    }
   }
 
   /**
@@ -560,19 +495,16 @@ export class Agent {
 
       // Prepare update to the chat title
       if (isFirstUserMessage && lastMessageMetadata.isUserMessage) {
-        this.client.chat.generateChatTitle
-          .mutate({
-            messages: history ?? [],
-          })
-          .then((result) => {
-            this.karton?.setState((draft) => {
-              // chat could've been deleted in the meantime
-              const chatExists = draft.chats[chatId] !== undefined;
-              if (chatExists) draft.chats[chatId]!.title = result.title;
-            });
-          })
-          // ignore errors here, there's a default chat title
-          .catch((_) => {});
+        const title = await generateChatTitle(
+          history,
+          this.litellm('gemini-2.5-flash'),
+        );
+
+        this.karton?.setState((draft) => {
+          // chat could've been deleted in the meantime
+          const chatExists = draft.chats[chatId] !== undefined;
+          if (chatExists) draft.chats[chatId]!.title = title;
+        });
       }
 
       // Emit prompt triggered event
@@ -592,7 +524,7 @@ export class Agent {
       });
 
       const stream = streamText({
-        model: this.anthropic('claude-sonnet-4-20250514'),
+        model: this.litellm('claude-sonnet-4-20250514'),
         abortSignal: this.abortController.signal,
         temperature: 0.7,
         maxOutputTokens: 64000,
@@ -650,7 +582,6 @@ export class Agent {
             return;
           } else throw error.error;
         },
-        // tools: mapZodToolsToJsonSchemaTools(this.tools),
         tools: cliToolsWithoutExecute(clientRuntime),
         onAbort: () => {
           this.authRetryCount = 0;
