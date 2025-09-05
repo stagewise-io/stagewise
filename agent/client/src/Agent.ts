@@ -232,14 +232,10 @@ export class Agent {
    */
   private isAuthenticationError(error: any): boolean {
     // Check for TRPC error with UNAUTHORIZED code
-    if (error?.data?.code === 'UNAUTHORIZED') {
-      return true;
-    }
+    if (error?.data?.code === 'UNAUTHORIZED') return true;
 
     // Check for HTTP 401 status
-    if (error?.data?.httpStatus === 401) {
-      return true;
-    }
+    if (error?.data?.httpStatus === 401) return true;
 
     // Check error message for auth-related keywords
     const errorMessage = error?.message || '';
