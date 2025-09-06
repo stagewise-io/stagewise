@@ -76,6 +76,14 @@ type CliToolsReturn = {
   deleteFileTool: ToolWithMetadata<Tool<DeleteFileParams, ToolResult>>;
 };
 
+// Place near CliToolsReturn
+export type CliToolsWithoutExecute = {
+  [K in keyof CliToolsReturn]: Pick<
+    CliToolsReturn[K],
+    'description' | 'inputSchema'
+  >;
+};
+
 export function cliTools(clientRuntime: ClientRuntime): CliToolsReturn {
   return {
     overwriteFileTool: clientSideTool(
@@ -149,6 +157,19 @@ export function cliTools(clientRuntime: ClientRuntime): CliToolsReturn {
       }),
     ),
   } satisfies CliToolsReturn;
+}
+
+export function cliToolsWithoutExecute(
+  clientRuntime: ClientRuntime,
+): CliToolsWithoutExecute {
+  const base = cliTools(clientRuntime);
+  const out = {} as CliToolsWithoutExecute;
+  for (const key in base) {
+    const k = key as keyof CliToolsReturn;
+    const { description, inputSchema } = base[k];
+    (out as any)[k] = { description, inputSchema };
+  }
+  return out;
 }
 
 export type CliTools = CliToolsReturn;

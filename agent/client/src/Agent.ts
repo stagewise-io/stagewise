@@ -1,13 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { isAbortError } from './utils/is-abort-error.js';
-import { cliTools, type UITools } from '@stagewise/agent-tools';
-import { AgentErrorType } from '@stagewise/karton-contract';
-import { convertCreditsToSubscriptionCredits } from './utils/convert-credits-to-subscription-credits.js';
-import type {
-  KartonContract,
-  History,
-  ChatMessage,
+import {
+  type KartonContract,
+  type History,
+  type ChatMessage,
+  AgentErrorType,
 } from '@stagewise/karton-contract';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import {
+  cliTools,
+  cliToolsWithoutExecute,
+  type UITools,
+} from '@stagewise/agent-tools';
+import { streamText, generateId } from 'ai';
+import { XMLPrompts } from '@stagewise/agent-prompts';
 import {
   createKartonServer,
   type KartonServer,
@@ -15,24 +21,14 @@ import {
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client.js';
-import type {
-  AppRouter,
-  TRPCClient,
-  RouterInputs,
-  RouterOutputs,
-} from '@stagewise/api-client';
+import type { AppRouter, TRPCClient } from '@stagewise/api-client';
 
 import { TimeoutManager } from './utils/time-out-manager.js';
-import {
-  processParallelToolCalls,
-  type ToolCallProcessingResult,
-} from './utils/tool-call-utils.js';
 import {
   createEventEmitter,
   EventFactories,
   type AgentEventCallback,
 } from './utils/event-utils.js';
-import { mapZodToolsToJsonSchemaTools } from './utils/agent-api-utils.js';
 import {
   ErrorDescriptions,
   formatErrorDescription,
@@ -47,7 +43,13 @@ import {
   findPendingToolCalls,
 } from './utils/karton-helpers.js';
 import { isInsufficientCreditsError } from './utils/is-insufficient-credits-error.js';
-import type { ToolUIPart } from 'ai';
+import type { InferUIMessageChunk, ToolUIPart, UIMessage } from 'ai';
+import { uiMessagesToModelMessages } from './utils/ui-messages-to-model-messages.js';
+import {
+  processParallelToolCalls,
+  type ToolCallProcessingResult,
+} from './utils/tool-call-utils.js';
+import { generateChatTitle } from './utils/generate-chat-title.js';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -56,14 +58,9 @@ function isToolCallType(type: string): type is ToolCallType {
 }
 
 type Tools = ReturnType<typeof cliTools>;
-type AsyncIterableItem<T> = T extends AsyncIterable<infer U> ? U : never;
-type ReturnValue<T> = T extends AsyncGenerator<infer _U, infer V, infer _W>
-  ? V
-  : never;
-
-type LastResponse = ReturnValue<RouterOutputs['chat']['streamAgentCall']>;
-
 type ChatId = string;
+
+const LLM_PROXY_URL = process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
@@ -86,6 +83,7 @@ export class Agent {
   private maxAuthRetries = 2;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
+  private litellm!: ReturnType<typeof createAnthropic>;
   // undo is only allowed for one chat at a time.
   // if the user switches to a new chat, the undo stack is cleared
   private undoToolCallStack: Map<
@@ -110,6 +108,7 @@ export class Agent {
     this.refreshToken = config.refreshToken;
     this.eventEmitter = createEventEmitter(config.onEvent);
     this.client = createAuthenticatedClient(this.accessToken);
+    this.initializeLitellm();
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
     this.timeoutManager = new TimeoutManager();
     this.abortController = new AbortController();
@@ -129,6 +128,13 @@ export class Agent {
   public shutdown() {
     // Clean up all pending operations
     this.cleanupPendingOperations('Agent shutdown');
+  }
+
+  private initializeLitellm() {
+    this.litellm = createAnthropic({
+      baseURL: `${LLM_PROXY_URL}/v1`, // will use the anthropic/v1/messages endpoint of the litellm proxy
+      apiKey: this.accessToken, // stagewise access token
+    });
   }
 
   /**
@@ -160,72 +166,16 @@ export class Agent {
   }
 
   /**
-   * Calls the agent API with automatic retry on authentication failures
-   * @param request - The request to call the agent API with
-   * @returns The result of the agent API call
-   */
-  private async callAgentWithRetry(
-    request: RouterInputs['chat']['streamAgentCall'],
-  ): Promise<
-    AsyncIterable<AsyncIterableItem<RouterOutputs['chat']['streamAgentCall']>>
-  > {
-    try {
-      const result = await this.client.chat.streamAgentCall.mutate(
-        {
-          messages: request.messages,
-          tools: mapZodToolsToJsonSchemaTools(this.tools),
-          promptSnippets: request.promptSnippets,
-        },
-        {
-          signal: this.abortController.signal,
-        },
-      );
-      this.authRetryCount = 0;
-      return result;
-    } catch (error) {
-      // Check if it's an authentication error
-      if (this.isAuthenticationError(error)) {
-        if (this.authRetryCount < this.maxAuthRetries) {
-          this.authRetryCount++;
-          const { accessToken, refreshToken } =
-            await this.client.session.refreshToken.mutate({
-              refreshToken: this.refreshToken!,
-            });
-          this.refreshToken = refreshToken;
-          this.accessToken = accessToken;
-          this.client = createAuthenticatedClient(this.accessToken);
-
-          return this.callAgentWithRetry(request);
-        } else if (error instanceof Error && error.name === 'AbortError') {
-          // Abort error is not an auth error
-          throw error;
-        } else {
-          // Max retries exceeded
-          this.authRetryCount = 0;
-          throw new Error('Authentication failed, please restart the cli.');
-        }
-      }
-
-      // Not an auth error, rethrow
-      throw error;
-    }
-  }
-
-  /**
    * Checks if an error is an authentication error
    * @param error - The error to check
    * @returns True if the error is an authentication error, false otherwise
    */
   private isAuthenticationError(error: any): boolean {
     // Check for TRPC error with UNAUTHORIZED code
-    if (error?.data?.code === 'UNAUTHORIZED') {
-      return true;
-    }
+    if (error?.data?.code === 'UNAUTHORIZED') return true;
 
     // Check for HTTP 401 status
-    if (error?.data?.httpStatus === 401) {
-      return true;
-    }
+    if (error?.data?.httpStatus === 401) return true;
 
     // Check error message for auth-related keywords
     const errorMessage = error?.message || '';
@@ -452,13 +402,11 @@ export class Agent {
           if (projectInfoPromptSnippet) {
             promptSnippets.push(projectInfoPromptSnippet);
           }
-          this.callAgent({
+          await this.callAgent({
             chatId: this.karton!.state.activeChatId!,
             history: messages,
             clientRuntime: this.clientRuntime,
             promptSnippets,
-          }).then(() => {
-            this.setAgentWorking(false);
           });
         },
         assistantMadeCodeChangesUntilLatestUserMessage: async (chatId) => {
@@ -513,9 +461,6 @@ export class Agent {
     clientRuntime: ClientRuntime;
     promptSnippets?: PromptSnippet[];
   }): Promise<void> {
-    // Validate prerequisites
-    if (!this.client) throw new Error('TRPC API client not initialized');
-
     if (!this.undoToolCallStack.has(chatId))
       this.undoToolCallStack.set(chatId, []);
 
@@ -555,19 +500,16 @@ export class Agent {
 
       // Prepare update to the chat title
       if (isFirstUserMessage && lastMessageMetadata.isUserMessage) {
-        this.client.chat.generateChatTitle
-          .mutate({
-            messages: history ?? [],
-          })
-          .then((result) => {
-            this.karton?.setState((draft) => {
-              // chat could've been deleted in the meantime
-              const chatExists = draft.chats[chatId] !== undefined;
-              if (chatExists) draft.chats[chatId]!.title = result.title;
-            });
-          })
-          // ignore errors here, there's a default chat title
-          .catch((_) => {});
+        const title = await generateChatTitle(
+          history,
+          this.litellm('gemini-2.5-flash'),
+        );
+
+        this.karton?.setState((draft) => {
+          // chat could've been deleted in the meantime
+          const chatExists = draft.chats[chatId] !== undefined;
+          if (chatExists) draft.chats[chatId]!.title = title;
+        });
       }
 
       // Emit prompt triggered event
@@ -580,90 +522,123 @@ export class Agent {
           ),
         );
 
-      const request = {
-        messages: history ?? [],
-        tools: mapZodToolsToJsonSchemaTools(this.tools),
+      const prompts = new XMLPrompts();
+      const systemPrompt = prompts.getSystemPrompt({
+        userMessageMetadata: lastMessageMetadata.message?.metadata,
         promptSnippets,
-      };
-
-      const agentResponse = await this.callAgentWithRetry(request);
-
-      let lastResponse: LastResponse | undefined;
-      await this.parseUiStream(
-        agentResponse,
-        (message) => {
-          lastResponse = message;
-        },
-        (messageId) => {
-          this.lastMessageId = messageId;
-        },
-      );
-
-      if (!lastResponse) throw new Error('Unknown error, please try again');
-
-      const { toolCalls, credits } = lastResponse;
-
-      this.karton?.setState((draft) => {
-        if (draft.subscription)
-          draft.subscription = {
-            ...draft.subscription,
-            credits: convertCreditsToSubscriptionCredits(credits),
-          };
       });
 
-      const toolResults = await processParallelToolCalls(
-        toolCalls,
-        this.tools,
-        this.karton?.state.chats[chatId]!.messages ?? [],
-        this.timeoutManager,
-        (result) => {
-          if (result.result?.undoExecute) {
-            this.undoToolCallStack.get(chatId)?.push({
-              toolCallId: result.toolCallId,
-              undoExecute: result.result?.undoExecute,
+      const stream = streamText({
+        model: this.litellm('claude-sonnet-4-20250514'),
+        abortSignal: this.abortController.signal,
+        temperature: 0.7,
+        maxOutputTokens: 64000,
+        messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
+        onError: async (error) => {
+          if (isAbortError(error.error)) {
+            this.authRetryCount = 0;
+            this.cleanupPendingOperations('Agent call aborted');
+          } else if (this.isAuthenticationError(error.error)) {
+            // refresh token and call agent again with retry limit
+            if (this.authRetryCount < this.maxAuthRetries) {
+              this.authRetryCount++;
+              const { accessToken, refreshToken } =
+                await this.client.session.refreshToken.mutate({
+                  refreshToken: this.refreshToken!,
+                });
+              this.accessToken = accessToken;
+              this.refreshToken = refreshToken;
+              this.client = createAuthenticatedClient(this.accessToken);
+              this.initializeLitellm();
+              await this.callAgent({
+                chatId,
+                history: this.karton?.state.chats[chatId]!.messages,
+                clientRuntime,
+                promptSnippets,
+              });
+              return;
+            } else {
+              // Max retries exceeded
+              this.authRetryCount = 0;
+              this.setAgentWorking(false);
+              this.karton?.setState((draft) => {
+                draft.chats[chatId]!.error = {
+                  type: AgentErrorType.AGENT_ERROR,
+                  error: new Error(
+                    'Authentication failed, please restart the cli.',
+                  ),
+                };
+              });
+              return;
+            }
+          } else if (isInsufficientCreditsError(error.error)) {
+            this.authRetryCount = 0;
+            this.eventEmitter.emit(
+              EventFactories.creditsInsufficient(
+                this.karton?.state.subscription,
+              ),
+            );
+            this.setAgentWorking(false);
+            this.karton?.setState((draft) => {
+              draft.chats[chatId]!.error = {
+                type: AgentErrorType.INSUFFICIENT_CREDITS,
+                error: new Error('Insufficient credits'),
+              };
+            });
+            return;
+          } else throw error.error;
+        },
+        tools: cliToolsWithoutExecute(clientRuntime),
+        onAbort: () => {
+          this.authRetryCount = 0;
+          this.cleanupPendingOperations('Agent call aborted');
+        },
+        onFinish: async (r) => {
+          this.authRetryCount = 0;
+          const toolResults = await processParallelToolCalls(
+            r.toolCalls,
+            this.tools,
+            this.karton?.state.chats[chatId]!.messages ?? [],
+            this.timeoutManager,
+            (result) => {
+              if (result.result?.undoExecute) {
+                this.undoToolCallStack.get(chatId)?.push({
+                  toolCallId: result.toolCallId,
+                  undoExecute: result.result?.undoExecute,
+                });
+              }
+              attachToolOutputToMessage(
+                this.karton!,
+                [result],
+                this.lastMessageId!,
+              );
+            },
+          );
+
+          if (toolResults.length > 0) {
+            return this.callAgent({
+              chatId,
+              history: this.karton?.state.chats[chatId]!.messages,
+              clientRuntime,
+              promptSnippets,
             });
           }
-          attachToolOutputToMessage(
-            this.karton!,
-            [result],
-            this.lastMessageId!,
+
+          this.cleanupPendingOperations(
+            'Agent task completed successfully',
+            false,
           );
         },
-      );
+      });
 
-      // Check if recursion is needed
-      if (toolResults.length > 0) {
-        return this.callAgent({
-          chatId,
-          history: this.karton?.state.chats[chatId]!.messages,
-          clientRuntime,
-          promptSnippets,
-        });
-      }
+      const uiMessages = stream.toUIMessageStream({
+        generateMessageId: generateId,
+      });
 
-      // Clean up and finalize
-      this.cleanupPendingOperations('Agent task completed successfully', false);
-      return;
+      await this.parseUiStream(uiMessages, (messageId) => {
+        this.lastMessageId = messageId;
+      });
     } catch (error) {
-      if (isAbortError(error)) {
-        this.cleanupPendingOperations('Agent call aborted', false);
-        return;
-      }
-
-      if (isInsufficientCreditsError(error)) {
-        this.eventEmitter.emit(
-          EventFactories.creditsInsufficient(this.karton?.state.subscription),
-        );
-        this.setAgentWorking(false);
-        this.karton?.setState((draft) => {
-          draft.chats[chatId]!.error = {
-            type: AgentErrorType.INSUFFICIENT_CREDITS,
-            error: new Error('Insufficient credits'),
-          };
-        });
-        return;
-      }
-
       const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
       this.karton?.setState((draft) => {
@@ -686,50 +661,42 @@ export class Agent {
 
   private async parseUiStream(
     uiStream: AsyncIterable<
-      AsyncIterableItem<RouterOutputs['chat']['streamAgentCall']>
+      InferUIMessageChunk<UIMessage<unknown, any, UITools>>
     >,
-    onLastMessage: (message: LastResponse) => void,
     onNewMessage?: (messageId: string) => void,
   ) {
     let messageId = '';
     let partIndex = -1;
-    const iterator = uiStream[Symbol.asyncIterator]();
-
-    while (true) {
-      const { done, value } = await iterator.next();
-      if (done) {
-        onLastMessage(value);
-        break;
-      } else {
-        switch (value.type) {
-          case 'start':
-            messageId = value.messageId ?? randomUUID();
-            partIndex++;
-            onNewMessage?.(messageId);
-            continue;
-          case 'text-start':
-            continue;
-          case 'text-delta':
-            appendTextDeltaToMessage(
-              this.karton!,
-              messageId,
-              value.delta,
-              partIndex,
-            );
-            continue;
-          case 'tool-input-start':
-            partIndex++;
-            continue;
-          case 'tool-input-delta':
-          case 'tool-input-error':
-            break; // Skipped for now
-          case 'tool-input-available':
-            appendToolInputToMessage(this.karton!, messageId, value, partIndex);
-            continue;
-          case 'tool-output-available':
-            // Should not happen - we append the output and this message
-            continue;
-        }
+    for await (const value of uiStream) {
+      switch (value.type) {
+        case 'start':
+          messageId = value.messageId ?? randomUUID();
+          partIndex++;
+          // Reset auth retry count on successful message stream start
+          onNewMessage?.(messageId);
+          continue;
+        case 'text-start':
+          continue;
+        case 'text-delta':
+          appendTextDeltaToMessage(
+            this.karton!,
+            messageId,
+            value.delta,
+            partIndex,
+          );
+          continue;
+        case 'tool-input-start':
+          partIndex++;
+          continue;
+        case 'tool-input-delta':
+        case 'tool-input-error':
+          break; // Skipped for now
+        case 'tool-input-available':
+          appendToolInputToMessage(this.karton!, messageId, value, partIndex);
+          continue;
+        case 'tool-output-available':
+          // Should not happen - we append the output and this message
+          continue;
       }
     }
   }
