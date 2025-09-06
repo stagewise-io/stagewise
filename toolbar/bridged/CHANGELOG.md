@@ -1,5 +1,11 @@
 # @stagewise/toolbar
 
+## 0.8.0
+
+### Minor Changes
+
+- 57a553d: Add clipboard agent to toolbar.
+
 ## 0.7.2
 
 ### Patch Changes

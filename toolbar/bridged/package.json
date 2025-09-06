@@ -1,7 +1,7 @@
 {
   "name": "@stagewise/toolbar-bridged",
   "private": true,
-  "version": "0.7.2",
+  "version": "0.8.0",
   "type": "module",
   "description": "stagewise toolbar SDK for AI Agent interaction.",
   "keywords": [
