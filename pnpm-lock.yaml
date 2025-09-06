@@ -51,6 +51,21 @@ importers:
       '@ai-sdk/openai':
         specifier: ^2.0.23
         version: 2.0.23(zod@4.0.17)
+      '@stagewise/agent-prompt-snippets':
+        specifier: workspace:*
+        version: link:../prompt-snippets
+      '@stagewise/agent-prompts':
+        specifier: workspace:*
+        version: link:../prompts
+      '@stagewise/agent-tools':
+        specifier: workspace:*
+        version: link:../tools
+      '@stagewise/api-client':
+        specifier: 1.4.0
+        version: 1.4.0(typescript@5.9.2)
+      '@stagewise/karton':
+        specifier: workspace:*
+        version: link:../../packages/karton
       ai:
         specifier: 5.0.9
         version: 5.0.9(zod@4.0.17)
@@ -67,27 +82,12 @@ importers:
         specifier: ^3.24.5
         version: 3.24.5(zod@4.0.17)
     devDependencies:
-      '@stagewise/agent-prompt-snippets':
-        specifier: workspace:*
-        version: link:../prompt-snippets
-      '@stagewise/agent-prompts':
-        specifier: workspace:*
-        version: link:../prompts
       '@stagewise/agent-runtime-interface':
         specifier: workspace:*
         version: link:../runtime-interface
-      '@stagewise/agent-tools':
-        specifier: workspace:*
-        version: link:../tools
       '@stagewise/agent-types':
         specifier: workspace:*
         version: link:../types
-      '@stagewise/api-client':
-        specifier: 1.4.0
-        version: 1.4.0(typescript@5.9.2)
-      '@stagewise/karton':
-        specifier: workspace:*
-        version: link:../../packages/karton
       '@stagewise/karton-contract':
         specifier: workspace:*
         version: link:../../packages/karton-contract
