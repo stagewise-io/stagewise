@@ -3,7 +3,7 @@ import type { PromptSnippet } from '@stagewise/agent-types';
 import type { ChatMessage } from '@stagewise/karton-contract';
 
 export type SystemPromptConfig = {
-  usermessageMetdata?: ChatMessage['metadata'];
+  userMessageMetadata?: ChatMessage['metadata'];
   promptSnippets?: PromptSnippet[];
 };
 

@@ -95,6 +95,9 @@ const import_meta_url = require('url').pathToFileURL(__filename).href;
         'process.env.API_URL': JSON.stringify(
           process.env.API_URL ?? 'https://v1.api.stagewise.io',
         ),
+        'process.env.LLM_PROXY_URL': JSON.stringify(
+          process.env.LLM_PROXY_URL ?? 'https://llm.stagewise.io',
+        ),
       },
       sourcemap: true,
       minify: process.env.NODE_ENV === 'production',

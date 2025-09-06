@@ -9,6 +9,33 @@ export function getUserMessagePrompt(
   // convert file parts and text to model messages (without metadata) to ensure correct mapping of ui parts to model content
   const convertedMessage = convertToModelMessages([config.userMessage]);
 
+  const content: UserModelMessage['content'] = [];
+
+  // exactly 1 message is the expected case, the latter is for unexpected conversion behavior of the ai library
+  if (convertedMessage.length === 1) {
+    const message = convertedMessage[0]! as UserModelMessage;
+    if (typeof message.content === 'string') {
+      content.push({
+        type: 'text',
+        text: message.content,
+      });
+    } else {
+      for (const part of message.content) content.push(part);
+    }
+  } else {
+    // add content of all messages to the content array and pass it to user message
+    for (const message of convertedMessage) {
+      for (const c of (message as UserModelMessage).content) {
+        if (typeof c === 'string')
+          content.push({
+            type: 'text',
+            text: c,
+          });
+        else content.push(c);
+      }
+    }
+  }
+
   const metadataSnippet = config.userMessage.metadata?.browserData
     ? browserMetadataToContextSnippet(config.userMessage.metadata?.browserData)
     : null;
@@ -19,8 +46,6 @@ export function getUserMessagePrompt(
           config.userMessage.metadata?.browserData?.selectedElements ?? [],
         )
       : undefined;
-
-  const content: UserModelMessage['content'] = [];
 
   if (metadataSnippet) {
     content.push({
@@ -34,33 +59,6 @@ export function getUserMessagePrompt(
       type: 'text',
       text: selectedElementsSnippet,
     });
-  }
-
-  // exactly 1 message is the expected case, the latter is for unexpected conversion behavior of the ai library
-  if (convertedMessage.length === 1) {
-    const message = convertedMessage[0]! as UserModelMessage;
-    if (typeof message.content === 'string') {
-      content.unshift({
-        type: 'text',
-        text: message.content,
-      });
-    } else {
-      for (const part of message.content) {
-        content.unshift(part);
-      }
-    }
-  } else {
-    // add content of all messages to the content array and pass it to user message
-    for (const message of convertedMessage) {
-      for (const c of (message as UserModelMessage).content) {
-        if (typeof c === 'string')
-          content.unshift({
-            type: 'text',
-            text: c,
-          });
-        else content.unshift(c);
-      }
-    }
   }
 
   return {

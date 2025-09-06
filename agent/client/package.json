@@ -35,16 +35,16 @@
     "diff": "^8.0.2",
     "node-fetch": "^3.3.2",
     "zod": "4.0.17",
-    "zod-to-json-schema": "^3.24.5"
-  },
-  "devDependencies": {
+    "zod-to-json-schema": "^3.24.5",
     "@stagewise/agent-prompts": "workspace:*",
     "@stagewise/agent-prompt-snippets": "workspace:*",
-    "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
-    "@stagewise/agent-types": "workspace:*",
     "@stagewise/api-client": "1.4.0",
-    "@stagewise/karton": "workspace:*",
+    "@stagewise/karton": "workspace:*"
+  },
+  "devDependencies": {
+    "@stagewise/agent-runtime-interface": "workspace:*",
+    "@stagewise/agent-types": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
     "esbuild": "0.25.9",
     "rimraf": "^5.0.0",

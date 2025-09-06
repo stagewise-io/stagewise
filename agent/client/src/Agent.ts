@@ -60,6 +60,8 @@ function isToolCallType(type: string): type is ToolCallType {
 type Tools = ReturnType<typeof cliTools>;
 type ChatId = string;
 
+const LLM_PROXY_URL = process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
+
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
 const MAX_RECURSION_DEPTH = 20;
@@ -81,7 +83,7 @@ export class Agent {
   private maxAuthRetries = 2;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
-  private litellm: ReturnType<typeof createAnthropic>;
+  private litellm!: ReturnType<typeof createAnthropic>;
   // undo is only allowed for one chat at a time.
   // if the user switches to a new chat, the undo stack is cleared
   private undoToolCallStack: Map<
@@ -106,11 +108,7 @@ export class Agent {
     this.refreshToken = config.refreshToken;
     this.eventEmitter = createEventEmitter(config.onEvent);
     this.client = createAuthenticatedClient(this.accessToken);
-    this.litellm = createAnthropic({
-      baseURL: `${process.env.LLM_PROXY_URL}/v1`, // will use the anthropic/v1/messages endpoint of the litellm proxy
-      headers: { 'stagewise-access-key': this.accessToken },
-      apiKey: this.accessToken, // will be ignored
-    });
+    this.initializeLitellm();
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
     this.timeoutManager = new TimeoutManager();
     this.abortController = new AbortController();
@@ -130,6 +128,13 @@ export class Agent {
   public shutdown() {
     // Clean up all pending operations
     this.cleanupPendingOperations('Agent shutdown');
+  }
+
+  private initializeLitellm() {
+    this.litellm = createAnthropic({
+      baseURL: `${LLM_PROXY_URL}/v1`, // will use the anthropic/v1/messages endpoint of the litellm proxy
+      apiKey: this.accessToken, // stagewise access token
+    });
   }
 
   /**
@@ -519,7 +524,7 @@ export class Agent {
 
       const prompts = new XMLPrompts();
       const systemPrompt = prompts.getSystemPrompt({
-        usermessageMetdata: lastMessageMetadata.message?.metadata,
+        userMessageMetadata: lastMessageMetadata.message?.metadata,
         promptSnippets,
       });
 
@@ -544,11 +549,7 @@ export class Agent {
               this.accessToken = accessToken;
               this.refreshToken = refreshToken;
               this.client = createAuthenticatedClient(this.accessToken);
-              this.litellm = createAnthropic({
-                baseURL: `${process.env.LLM_PROXY_URL}/v1`, // will use the anthropic/v1/messages endpoint of the litellm proxy
-                headers: { 'stagewise-access-key': this.accessToken },
-                apiKey: this.accessToken, // will be ignored
-              });
+              this.initializeLitellm();
               await this.callAgent({
                 chatId,
                 history: this.karton?.state.chats[chatId]!.messages,

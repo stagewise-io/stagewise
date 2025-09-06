@@ -11,6 +11,7 @@ env:
   POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
   STAGEWISE_CONSOLE_URL: ${{ vars.STAGEWISE_CONSOLE_URL }}
   API_URL: ${{ vars.API_URL }}
+  LLM_PROXY_URL: ${{ vars.LLM_PROXY_URL }}
 
 jobs:
   release:
