@@ -1,113 +1,53 @@
-import { createContext, useContext, useMemo, useState, useEffect } from 'react';
-import { useAppState } from './use-app-state';
-import { useKartonConnected, useKartonState } from './use-karton';
-import { useConfig } from './use-config';
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+} from 'react';
 
-const STORAGE_KEY = 'stagewise_toolbar_open_panels';
-
-interface PersistedState {
-  isSettingsOpen: boolean;
-  isChatOpen: boolean;
-  openPlugin: string | null;
-}
-
-const loadPersistedState = (): Partial<PersistedState> => {
-  try {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : {};
-  } catch (error) {
-    console.warn('[PanelsProvider] Failed to load persisted state:', error);
-    return {};
-  }
-};
-
-const savePersistedState = (state: PersistedState) => {
-  try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.warn('[PanelsProvider] Failed to save persisted state:', error);
-  }
-};
+// Simple, in-memory panel state. No persistence or timing logic.
 
 interface PanelsContext {
   /**
-   * Whether the settings panel is open
+   * The content of the left panel
    */
-  isSettingsOpen: boolean;
-
-  /**
-   * Open the settings panel
-   *
-   * *Under certain circumstances, the settings panel may not be shown*
-   */
-  openSettings: () => void;
-
-  /**
-   * Close the settings panel
-   */
-  closeSettings: () => void;
-
-  /**
-   * Whether the chat panel is open
-   */
-  isChatOpen: boolean;
-
-  /**
-   * Open the chat panel
-   *
-   * *Under certain circumstances, the chat panel may not be shown*
-   */
-  openChat: () => void;
-
-  /**
-   * Close the chat panel
-   */
-  closeChat: () => void;
+  leftPanelContent: 'chat' | 'settings' | 'plugin' | null;
 
   /**
    * The name of the plugin that is open
    */
-  openPluginName: string | null;
+  leftPanelPluginName: string | null;
 
   /**
-   * Open a plugin
-   *
-   * *Under certain circumstances, the plugin may not be shown*
+   * Open the left panel to the given content
    */
-  openPlugin: (pluginName: string) => void;
+  openLeftPanel: (
+    content: 'chat' | 'settings' | 'plugin',
+    pluginName?: string,
+  ) => void;
 
   /**
-   * Close the plugin
+   * Close the left panel
    */
-  closePlugin: () => void;
+  closeLeftPanel: () => void;
 
   /**
-   * Whether the agent connectivity panel is open
+   * Toggle the left panel to the given content and close if already open
    */
-  isAgentConnectivityOpen: boolean;
-
-  /**
-   * Whether the eddy mode panel is open
-   */
-  isEddyModeOpen: boolean;
+  toggleLeftPanel: (
+    content: 'chat' | 'settings' | 'plugin',
+    pluginName?: string,
+  ) => void;
 }
 
 const PanelsContext = createContext<PanelsContext>({
-  isSettingsOpen: false,
-  openSettings: () => null,
-  closeSettings: () => null,
-
-  isChatOpen: false,
-  openChat: () => null,
-  closeChat: () => null,
-
-  openPluginName: null,
-  openPlugin: () => null,
-  closePlugin: () => null,
-
-  isAgentConnectivityOpen: false,
-
-  isEddyModeOpen: false,
+  leftPanelContent: null,
+  leftPanelPluginName: null,
+  openLeftPanel: () => null,
+  closeLeftPanel: () => null,
+  toggleLeftPanel: () => null,
 });
 
 export const PanelsProvider = ({
@@ -115,115 +55,57 @@ export const PanelsProvider = ({
 }: {
   children?: React.ReactNode;
 }) => {
-  const { minimized } = useAppState();
+  const [leftPanelContent, setLeftPanelContent] =
+    useState<PanelsContext['leftPanelContent']>(null);
+  const currentPluginNameRef = useRef<string | null>(null);
 
-  const config = useConfig();
-  const isWorking = useKartonState((s) => s.isWorking);
-
-  // Load persisted state on initialization
-  const persistedState = useMemo(() => loadPersistedState(), []);
-
-  const [isSettingsOpenInternal, setIsSettingsOpen] = useState(
-    persistedState.isSettingsOpen ?? false,
+  const openLeftPanel = useCallback(
+    (content: 'chat' | 'settings' | 'plugin', pluginName?: string) => {
+      if (content === 'plugin') {
+        currentPluginNameRef.current = pluginName ?? null;
+      } else {
+        currentPluginNameRef.current = null;
+      }
+      setLeftPanelContent(content);
+      currentPluginNameRef.current = pluginName ?? null;
+    },
+    [],
   );
-  const [isChatOpenInternal, setIsChatOpen] = useState(
-    persistedState.isChatOpen ?? true,
-  );
-  const [openPluginInternal, setOpenPlugin] = useState<string | null>(
-    persistedState.openPlugin ?? null,
-  );
 
-  const isConnected = useKartonConnected();
-
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsInitialLoad(false);
-    }, 200);
-    return () => clearTimeout(timer);
+  const closeLeftPanel = useCallback(() => {
+    currentPluginNameRef.current = null;
+    setLeftPanelContent(null);
   }, []);
 
-  // Persist state changes to sessionStorage
-  useEffect(() => {
-    const currentState: PersistedState = {
-      isSettingsOpen: isSettingsOpenInternal,
-      isChatOpen: isChatOpenInternal,
-      openPlugin: openPluginInternal,
-    };
-    savePersistedState(currentState);
-  }, [isSettingsOpenInternal, isChatOpenInternal, openPluginInternal]);
-
-  const isAgentConnectivityOpen = useMemo(
-    () => !isConnected && !isInitialLoad,
-    [isConnected, isInitialLoad],
+  const toggleLeftPanel = useCallback(
+    (content: 'chat' | 'settings' | 'plugin', pluginName?: string) => {
+      const isSameContent = leftPanelContent === content;
+      const isSamePlugin =
+        content === 'plugin'
+          ? currentPluginNameRef.current === (pluginName ?? null)
+          : true;
+      if (isSameContent && isSamePlugin) {
+        closeLeftPanel();
+      } else {
+        openLeftPanel(content, pluginName);
+      }
+    },
+    [leftPanelContent, openLeftPanel, closeLeftPanel],
   );
 
-  const isSettingsOpen = useMemo(() => {
-    return (
-      !isAgentConnectivityOpen &&
-      isSettingsOpenInternal &&
-      !minimized &&
-      !isInitialLoad
-    );
-  }, [
-    isAgentConnectivityOpen,
-    isSettingsOpenInternal,
-    minimized,
-    isInitialLoad,
-  ]);
-
-  const isChatOpen = useMemo(() => {
-    return (
-      !isAgentConnectivityOpen &&
-      isChatOpenInternal &&
-      !minimized &&
-      !isInitialLoad
-    );
-  }, [isAgentConnectivityOpen, isChatOpenInternal, minimized, isInitialLoad]);
-
-  const isEddyModeOpen = useMemo(() => {
-    return (
-      !isAgentConnectivityOpen &&
-      !isInitialLoad &&
-      !minimized &&
-      ['flappy'].includes(config.config.eddyMode) &&
-      isWorking
-    );
-  }, [
-    isAgentConnectivityOpen,
-    isInitialLoad,
-    minimized,
-    config.config.eddyMode,
-    isWorking,
-  ]);
-
-  const openPluginName = useMemo(() => {
-    return !isAgentConnectivityOpen && !isInitialLoad && !minimized
-      ? openPluginInternal
-      : null;
-  }, [isAgentConnectivityOpen, openPluginInternal, minimized, isInitialLoad]);
+  const value = useMemo(
+    () => ({
+      leftPanelContent,
+      leftPanelPluginName: currentPluginNameRef.current,
+      openLeftPanel,
+      closeLeftPanel,
+      toggleLeftPanel,
+    }),
+    [leftPanelContent, openLeftPanel, closeLeftPanel, toggleLeftPanel],
+  );
 
   return (
-    <PanelsContext.Provider
-      value={{
-        isSettingsOpen,
-        openSettings: () => setIsSettingsOpen(true),
-        closeSettings: () => setIsSettingsOpen(false),
-
-        isChatOpen,
-        openChat: () => setIsChatOpen(true),
-        closeChat: () => setIsChatOpen(false),
-
-        openPluginName,
-        openPlugin: (pluginName: string) => setOpenPlugin(pluginName),
-        closePlugin: () => setOpenPlugin(null),
-
-        isAgentConnectivityOpen,
-        isEddyModeOpen,
-      }}
-    >
-      {children}
-    </PanelsContext.Provider>
+    <PanelsContext.Provider value={value}>{children}</PanelsContext.Provider>
   );
 };
 

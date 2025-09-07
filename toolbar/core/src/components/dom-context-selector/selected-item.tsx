@@ -1,7 +1,7 @@
 import { useWindowSize } from '@/hooks/use-window-size';
 import { useCyclicUpdate } from '@/hooks/use-cyclic-update';
 import { useCallback, useRef, type HTMLAttributes } from 'react';
-import { cn } from '@/utils';
+import { cn, getIFrame } from '@/utils';
 
 export interface SelectedItemProps extends HTMLAttributes<HTMLButtonElement> {
   refElement: HTMLElement;
@@ -16,6 +16,8 @@ export function SelectedItem({
 }: SelectedItemProps) {
   const boxRef = useRef<HTMLButtonElement>(null);
 
+  const iframeRef = useRef<HTMLIFrameElement>(getIFrame());
+
   const windowSize = useWindowSize();
 
   const updateBoxPosition = useCallback(() => {
@@ -23,8 +25,10 @@ export function SelectedItem({
       if (refElement) {
         const referenceRect = refElement.getBoundingClientRect();
 
-        boxRef.current.style.top = `${referenceRect.top - 2}px`;
-        boxRef.current.style.left = `${referenceRect.left - 2}px`;
+        const iframeRect = iframeRef.current?.getBoundingClientRect();
+
+        boxRef.current.style.top = `${referenceRect.top - 2 + iframeRect?.top}px`;
+        boxRef.current.style.left = `${referenceRect.left - 2 + iframeRect?.left}px`;
         boxRef.current.style.width = `${referenceRect.width + 4}px`;
         boxRef.current.style.height = `${referenceRect.height + 4}px`;
         boxRef.current.style.display = undefined;

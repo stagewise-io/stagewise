@@ -35,7 +35,7 @@ export function ChatPanel() {
     return !isWorking;
   }, [isWorking, isConnected]);
 
-  const anyMessageInChat = useMemo(() => {
+  const _anyMessageInChat = useMemo(() => {
     return activeChat?.messages?.length > 0;
   }, [activeChat?.messages]);
 
@@ -214,12 +214,7 @@ export function ChatPanel() {
   return (
     <Panel
       ref={panelRef}
-      className={cn(
-        anyMessageInChat
-          ? 'h-[35vh] max-h-[50vh] min-h-[20vh]'
-          : '!h-auto min-h-0',
-        isDragging && 'ring-1 ring-blue-500/50',
-      )}
+      className={cn('glass-body', isDragging && 'ring-1 ring-blue-500/50')}
     >
       <div
         className="relative flex size-full flex-col"
@@ -233,8 +228,8 @@ export function ChatPanel() {
         <ChatPanelHeader />
         <PanelContent
           className={cn(
-            'block px-1 py-0',
-            'h-full max-h-96 min-h-64',
+            'block px-0 py-0',
+            'h-full min-h-64',
             'mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_48px,black_calc(95%_-_16px),transparent_calc(100%_-_16px))]',
             'overflow-hidden rounded-[inherit]',
           )}

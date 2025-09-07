@@ -1,6 +1,5 @@
 import { cn } from '@/utils';
 import type { ReactNode } from 'react';
-import { Glassy } from './glassy';
 
 const Panel = ({
   children,
@@ -14,17 +13,16 @@ const Panel = ({
   ref?: React.RefObject<HTMLDivElement>;
 }) => {
   return (
-    <Glassy
-      as="section"
+    <section
       ref={ref}
       className={cn(
-        'pointer-events-auto flex max-h-full min-h-48 flex-col items-stretch justify-start rounded-3xl',
+        'glass-body pointer-events-auto flex size-full flex-col items-stretch justify-start overflow-hidden rounded-3xl bg-white/20',
         alwaysFullHeight && 'h-full',
         className,
       )}
     >
       {children}
-    </Glassy>
+    </section>
   );
 };
 

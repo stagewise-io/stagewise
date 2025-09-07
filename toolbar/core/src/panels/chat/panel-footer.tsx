@@ -1,7 +1,7 @@
 import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
 import { FileAttachmentChips } from '@/components/file-attachment-chips';
 import { TextSlideshow } from '@/components/ui/text-slideshow';
-import { Button } from '@/components/ui/button';
+import { Button } from '@stagewise/stage-ui/components/button';
 import { PanelFooter } from '@/components/ui/panel';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn, HotkeyActions } from '@/utils';
@@ -121,7 +121,7 @@ export function ChatPanelFooter({
     setIsComposing(false);
   }, []);
 
-  const showMultiLineTextArea = useMemo(() => {
+  const _showMultiLineTextArea = useMemo(() => {
     // Show a large text area if we have a line break or more than 40 characters.
     return (
       chatState.chatInput.includes('\n') || chatState.chatInput.length > 40
@@ -175,9 +175,7 @@ export function ChatPanelFooter({
             disabled={!enableInputField}
             className={cn(
               GlassyTextInputClassNames,
-              'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent z-10 w-full resize-none rounded-2xl bg-zinc-500/5 px-2 py-1 text-zinc-950 shadow-md backdrop-blur-lg transition-all duration-300 ease-out placeholder:text-foreground/40 focus:bg-blue-200/20 focus:shadow-blue-400/10 focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
-              showMultiLineTextArea && !isWorking ? 'h-26' : 'h-8',
-              chatState.isPromptCreationActive && 'pr-8', // Add padding for context button
+              'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent z-10 h-28 w-full resize-none rounded-2xl bg-zinc-500/5 px-2 py-1 pr-8 text-zinc-950 shadow-md backdrop-blur-lg transition-all duration-300 ease-out placeholder:text-foreground/40 focus:bg-blue-200/20 focus:shadow-blue-400/10 focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
             )}
             placeholder={!showTextSlideshow && 'Type a message...'}
           />
@@ -246,37 +244,37 @@ export function ChatPanelFooter({
             </div>
           )}
         </div>
-        {canStop && (
+        <div className="flex flex-col justify-end gap-2">
+          {canStop && (
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  onClick={abortAgent}
+                  aria-label="Stop agent"
+                  variant="secondary"
+                  className="!opacity-100 group z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg !disabled:*:opacity-10 hover:bg-rose-600/20"
+                >
+                  <SquareIcon className="size-3 fill-zinc-500 stroke-zinc-500 group-hover:fill-zinc-800 group-hover:stroke-zinc-800" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Stop agent</TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger>
               <Button
-                onClick={abortAgent}
-                aria-label="Stop agent"
-                glassy
-                variant="secondary"
-                className="!opacity-100 group z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg !disabled:*:opacity-10 hover:bg-rose-600/20"
+                disabled={!canSendMessage}
+                onClick={handleSubmit}
+                aria-label="Send message"
+                variant="primary"
+                className="!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg"
               >
-                <SquareIcon className="size-3 fill-zinc-500 stroke-zinc-500 group-hover:fill-zinc-800 group-hover:stroke-zinc-800" />
+                <ArrowUpIcon className="size-4 stroke-3" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Stop agent</TooltipContent>
+            <TooltipContent>Send message</TooltipContent>
           </Tooltip>
-        )}
-        <Tooltip>
-          <TooltipTrigger>
-            <Button
-              disabled={!canSendMessage}
-              onClick={handleSubmit}
-              aria-label="Send message"
-              glassy
-              variant="primary"
-              className="!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg disabled:bg-transparent disabled:shadow-none disabled:*:stroke-zinc-500/50"
-            >
-              <ArrowUpIcon className="size-4 stroke-3" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Send message</TooltipContent>
-        </Tooltip>
+        </div>
       </div>
     </PanelFooter>
   );

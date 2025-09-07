@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import type { HTMLAttributes } from 'react';
 import { usePlugins } from '@/hooks/use-plugins';
 import { cn } from '@/utils';
+import { getIFrame } from '@/utils';
 
 export interface HoveredItemProps extends HTMLAttributes<HTMLDivElement> {
   refElement: HTMLElement;
@@ -11,6 +12,8 @@ export interface HoveredItemProps extends HTMLAttributes<HTMLDivElement> {
 
 export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
   const boxRef = useRef<HTMLDivElement>(null);
+
+  const iframeRef = useRef<HTMLIFrameElement>(getIFrame());
 
   const windowSize = useWindowSize();
 
@@ -30,10 +33,11 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
 
   const updateBoxPosition = useCallback(() => {
     if (boxRef.current && refElement) {
+      const iframeRect = iframeRef.current?.getBoundingClientRect();
       const referenceRect = refElement.getBoundingClientRect();
 
-      boxRef.current.style.top = `${referenceRect.top - 2}px`;
-      boxRef.current.style.left = `${referenceRect.left - 2}px`;
+      boxRef.current.style.top = `${referenceRect.top - 2 + iframeRect?.top}px`;
+      boxRef.current.style.left = `${referenceRect.left - 2 + iframeRect?.left}px`;
       boxRef.current.style.width = `${referenceRect.width + 4}px`;
       boxRef.current.style.height = `${referenceRect.height + 4}px`;
       boxRef.current.style.display = undefined;

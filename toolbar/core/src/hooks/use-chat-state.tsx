@@ -1,6 +1,5 @@
 import { type ReactNode, createContext } from 'react';
 import { useContext, useState, useCallback, useEffect } from 'react';
-import { useAppState } from './use-app-state';
 import { usePlugins } from './use-plugins';
 import {
   generateId,
@@ -102,25 +101,24 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   >([]);
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
 
-  const { minimized } = useAppState();
   const { plugins } = usePlugins();
 
   const sendChatMessage = useKartonProcedure((p) => p.sendUserMessage);
   const isWorking = useKartonState((s) => s.isWorking);
-  const { isChatOpen, openChat } = usePanels();
+  const { openLeftPanel, leftPanelContent } = usePanels();
 
   const startPromptCreation = useCallback(() => {
     setIsPromptCreationMode(true);
 
     // open the chat panel if it's not open
-    if (!isChatOpen) {
-      openChat();
+    if (leftPanelContent !== 'chat') {
+      openLeftPanel('chat');
     }
 
     plugins.forEach((plugin) => {
       plugin.onPromptingStart?.();
     });
-  }, [plugins, isChatOpen, openChat]);
+  }, [plugins, leftPanelContent, openLeftPanel]);
 
   const addFileAttachment = useCallback((file: File) => {
     const id = generateId();
@@ -166,16 +164,10 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   }, []);
 
   useEffect(() => {
-    if (!isChatOpen) {
+    if (leftPanelContent !== 'chat') {
       stopPromptCreation(); // This also stops context selector
     }
-  }, [isChatOpen, stopPromptCreation]);
-
-  useEffect(() => {
-    if (minimized) {
-      stopPromptCreation(); // This also stops context selector
-    }
-  }, [minimized, stopPromptCreation]);
+  }, [leftPanelContent, stopPromptCreation]);
 
   // Auto-stop prompt creation when agent is busy
   useEffect(() => {
