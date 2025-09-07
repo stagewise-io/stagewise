@@ -44,7 +44,7 @@ export function SelectedItem({
     <button
       {...props}
       className={cn(
-        'pointer-events-auto fixed flex cursor-not-allowed items-center justify-center rounded-sm border-2 border-zinc-600/70 border-dotted transition-all duration-100 hover:border-rose-600/70 hover:bg-rose-600/5',
+        'pointer-events-auto absolute flex cursor-not-allowed items-center justify-center rounded-sm border-2 border-zinc-600/70 border-dotted transition-all duration-100 hover:border-rose-600/70 hover:bg-rose-600/5',
         isChipHovered && 'border-blue-600/70 bg-blue-600/5',
       )}
       onClick={props.onRemoveClick}

@@ -4,13 +4,7 @@
 // Components can use this information to hide themselves or show additional information.
 
 import { createRef, type RefObject, createContext } from 'react';
-import {
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  type ReactNode,
-} from 'react';
+import { useContext, useState, useCallback, type ReactNode } from 'react';
 
 export interface AppState {
   requestMainAppBlock: () => number;
@@ -23,10 +17,6 @@ export interface AppState {
   toolbarBoxRef: RefObject<HTMLElement | null>; // used to place popovers in case the reference is not available
   setToolbarBoxRef: (ref: RefObject<HTMLElement | null>) => void;
   unsetToolbarBoxRef: () => void;
-
-  minimized: boolean;
-  minimize: () => void;
-  expand: () => void;
 }
 
 interface InternalAppState extends AppState {
@@ -40,7 +30,7 @@ const AppContext = createContext<AppState | null>(null);
 
 const STORAGE_KEY = 'stgws:companion';
 
-function loadStateFromStorage(): Partial<InternalAppState> {
+function _loadStateFromStorage(): Partial<InternalAppState> {
   try {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (!stored) return {};
@@ -51,7 +41,7 @@ function loadStateFromStorage(): Partial<InternalAppState> {
   }
 }
 
-function saveStateToStorage(state: Partial<InternalAppState>) {
+function _saveStateToStorage(state: Partial<InternalAppState>) {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
@@ -61,7 +51,6 @@ function saveStateToStorage(state: Partial<InternalAppState>) {
 
 export function AppStateProvider({ children }: { children?: ReactNode }) {
   const [state, setState] = useState<InternalAppState>(() => {
-    const storedState = loadStateFromStorage();
     return {
       appBlockRequestList: [],
       appUnblockRequestList: [],
@@ -69,24 +58,14 @@ export function AppStateProvider({ children }: { children?: ReactNode }) {
       lastUnblockRequestNumber: 0,
       isMainAppBlocked: false,
       toolbarBoxRef: createRef(),
-      minimized: storedState.minimized ?? false,
       requestMainAppBlock: () => 0, // These will be replaced by the actual implementations
       requestMainAppUnblock: () => 0,
       discardMainAppBlock: () => {},
       discardMainAppUnblock: () => {},
       setToolbarBoxRef: () => {},
       unsetToolbarBoxRef: () => {},
-      minimize: () => {},
-      expand: () => {},
     };
   });
-
-  // Save state changes to storage
-  useEffect(() => {
-    saveStateToStorage({
-      minimized: state.minimized,
-    });
-  }, [state.minimized]);
 
   const requestMainAppBlock = useCallback(() => {
     let newHandleValue = 0;
@@ -154,14 +133,6 @@ export function AppStateProvider({ children }: { children?: ReactNode }) {
     setState((prev) => ({ ...prev, toolbarBoxRef: createRef() }));
   }, []);
 
-  const minimize = useCallback(() => {
-    setState((prev) => ({ ...prev, minimized: true }));
-  }, []);
-
-  const expand = useCallback(() => {
-    setState((prev) => ({ ...prev, minimized: false }));
-  }, []);
-
   const value: AppState = {
     requestMainAppBlock,
     requestMainAppUnblock,
@@ -171,9 +142,6 @@ export function AppStateProvider({ children }: { children?: ReactNode }) {
     toolbarBoxRef: state.toolbarBoxRef,
     setToolbarBoxRef,
     unsetToolbarBoxRef,
-    minimized: state.minimized,
-    minimize,
-    expand,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

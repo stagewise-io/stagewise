@@ -1,6 +1,10 @@
 @import "tailwindcss";
+@import "../node_modules/@stagewise/stage-ui/src/style.css";
+
+@source "../node_modules/@stagewise/stage-ui";
 
 @plugin 'tailwind-scrollbar';
+
 
 :root {
   background-color: transparent;

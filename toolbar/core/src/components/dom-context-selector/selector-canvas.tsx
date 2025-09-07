@@ -150,7 +150,7 @@ export function DOMContextSelector() {
   return (
     <div
       className={cn(
-        'pointer-events-auto fixed inset-0 h-screen w-screen',
+        'pointer-events-auto absolute inset-0 size-full overflow-hidden',
         hoversAddable ? 'cursor-copy' : 'cursor-default',
       )}
       id="element-selector"

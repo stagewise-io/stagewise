@@ -2,12 +2,11 @@ import './app.css';
 
 import { ContextProviders } from './components/context-providers';
 import { HotkeyListener } from './components/hotkey-listener';
-import { DefaultLayout } from './layouts/default';
 import { AppStateProvider } from './hooks/use-app-state';
 import type { InternalToolbarConfig } from './config';
-import { MainAppBlocker } from './components/main-app-blocker';
 import { UrlSynchronizer } from './components/url-synchronizer';
 import { MetaSynchronizer } from './components/meta-synchronizer';
+import { DefaultLayout } from './layouts/default';
 
 export function App(config?: InternalToolbarConfig) {
   // Get the initial URL from the parent window
@@ -19,24 +18,26 @@ export function App(config?: InternalToolbarConfig) {
 
   return (
     <>
-      <iframe
-        src={initialUrl}
-        title="Main user app"
-        className="fixed inset-0 m-0 size-full p-0"
-        id="user-app-iframe"
-      />
       <UrlSynchronizer
         appPort={config?.appPort}
         urlSyncConfig={config?.urlSync}
       />
       <MetaSynchronizer />
       <AppStateProvider>
-        <MainAppBlocker />
         <ContextProviders config={config}>
           <HotkeyListener />
           {/* Depending on the screen size, load either the mobile or the desktop companion layout */}
           {/* Until the mobile layout is ready, we will always load the desktop layout */}
-          <DefaultLayout />
+          <DefaultLayout
+            mainApp={
+              <iframe
+                src={initialUrl}
+                title="Main user app"
+                className="size-full p-0"
+                id="user-app-iframe"
+              />
+            }
+          />
         </ContextProviders>
       </AppStateProvider>
     </>

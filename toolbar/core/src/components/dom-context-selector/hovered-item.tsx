@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import type { HTMLAttributes } from 'react';
 import { usePlugins } from '@/hooks/use-plugins';
 import { cn } from '@/utils';
+import { getIFrame } from '@/utils';
 
 export interface HoveredItemProps extends HTMLAttributes<HTMLDivElement> {
   refElement: HTMLElement;
@@ -11,6 +12,8 @@ export interface HoveredItemProps extends HTMLAttributes<HTMLDivElement> {
 
 export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
   const boxRef = useRef<HTMLDivElement>(null);
+
+  const _iframeRef = useRef<HTMLIFrameElement>(getIFrame());
 
   const windowSize = useWindowSize();
 
@@ -52,7 +55,7 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
     <div
       {...props}
       className={cn(
-        'fixed z-10 flex items-center justify-center rounded-sm border-2 border-blue-600/70 border-dotted bg-blue-600/5 text-white transition-all duration-100',
+        'absolute z-10 flex items-center justify-center rounded-sm border-2 border-blue-600/70 border-dotted bg-blue-600/5 text-white transition-all duration-100',
       )}
       ref={boxRef}
     >

@@ -16,7 +16,7 @@ export function HotkeyListener() {
     stopContextSelector,
     startContextSelector,
   } = useChatState();
-  const { isChatOpen, closeChat } = usePanels();
+  const { leftPanelContent, closeLeftPanel } = usePanels();
 
   const hotKeyHandlerMap: Record<HotkeyActions, () => StopPreventPropagation> =
     useMemo(
@@ -40,9 +40,9 @@ export function HotkeyListener() {
             // If prompting mode is active, stop it
             stopPromptCreation();
             return true;
-          } else if (isChatOpen) {
+          } else if (leftPanelContent === 'chat') {
             // If prompting is not active but chat is open, close the chat
-            closeChat();
+            closeLeftPanel();
             return true;
           }
           return false;
@@ -55,8 +55,8 @@ export function HotkeyListener() {
         isContextSelectorActive,
         stopContextSelector,
         startContextSelector,
-        isChatOpen,
-        closeChat,
+        leftPanelContent,
+        closeLeftPanel,
       ],
     );
 

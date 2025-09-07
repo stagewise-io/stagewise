@@ -28,7 +28,7 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
 
   const sendUserMessage = useKartonProcedure((s) => s.sendUserMessage);
 
-  const { openChat } = usePanels();
+  const { openLeftPanel } = usePanels();
 
   const plugins = config?.plugins || [];
 
@@ -41,7 +41,7 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
           metadata: collectUserMessageMetadata([], true),
           role: 'user',
         });
-        openChat();
+        openLeftPanel('chat');
       },
       mainAppWindow: getIFrameWindow(),
     };

@@ -5,7 +5,7 @@ import type {
 
 export const companionAnchorTagName = 'stagewise-companion-anchor';
 
-const getIFrame = () => {
+export const getIFrame = () => {
   const iframe = document.getElementById('user-app-iframe');
   return iframe as HTMLIFrameElement | null;
 };
@@ -20,9 +20,11 @@ export function getElementAtPoint(x: number, y: number) {
     return getIFrameWindow()?.document.body;
   }
 
+  const iframeRect = getIFrame()?.getBoundingClientRect();
+
   const elementsBelowAnnotation = getIFrameWindow()?.document.elementsFromPoint(
-    x,
-    y,
+    x - iframeRect?.left,
+    y - iframeRect?.top,
   );
 
   const refElement =
@@ -30,7 +32,11 @@ export function getElementAtPoint(x: number, y: number) {
       (element) =>
         !element.closest('svg') &&
         !element.closest('STAGEWISE-TOOLBAR') &&
-        isElementAtPoint(element as HTMLElement, x, y),
+        isElementAtPoint(
+          element as HTMLElement,
+          x - iframeRect?.left,
+          y - iframeRect?.top,
+        ),
     ) as HTMLElement) || getIFrameWindow()?.document.body;
 
   return refElement;

@@ -6,6 +6,7 @@ import { ConfigProvider } from '@/hooks/use-config';
 import { PanelsProvider } from '@/hooks/use-panels';
 import { KartonProvider } from '@/hooks/use-karton';
 import { Tooltip } from '@base-ui-components/react/tooltip';
+import { ContextChipHoverProvider } from '@/hooks/use-context-chip-hover';
 
 export function ContextProviders({
   children,
@@ -20,7 +21,9 @@ export function ContextProviders({
         <KartonProvider>
           <PanelsProvider>
             <PluginProvider>
-              <ChatStateProvider>{children}</ChatStateProvider>
+              <ContextChipHoverProvider>
+                <ChatStateProvider>{children}</ChatStateProvider>
+              </ContextChipHoverProvider>
             </PluginProvider>
           </PanelsProvider>
         </KartonProvider>
