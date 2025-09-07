@@ -13,7 +13,7 @@ export interface HoveredItemProps extends HTMLAttributes<HTMLDivElement> {
 export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
   const boxRef = useRef<HTMLDivElement>(null);
 
-  const iframeRef = useRef<HTMLIFrameElement>(getIFrame());
+  const _iframeRef = useRef<HTMLIFrameElement>(getIFrame());
 
   const windowSize = useWindowSize();
 
@@ -33,11 +33,10 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
 
   const updateBoxPosition = useCallback(() => {
     if (boxRef.current && refElement) {
-      const iframeRect = iframeRef.current?.getBoundingClientRect();
       const referenceRect = refElement.getBoundingClientRect();
 
-      boxRef.current.style.top = `${referenceRect.top - 2 + iframeRect?.top}px`;
-      boxRef.current.style.left = `${referenceRect.left - 2 + iframeRect?.left}px`;
+      boxRef.current.style.top = `${referenceRect.top - 2}px`;
+      boxRef.current.style.left = `${referenceRect.left - 2}px`;
       boxRef.current.style.width = `${referenceRect.width + 4}px`;
       boxRef.current.style.height = `${referenceRect.height + 4}px`;
       boxRef.current.style.display = undefined;
@@ -56,7 +55,7 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
     <div
       {...props}
       className={cn(
-        'fixed z-10 flex items-center justify-center rounded-sm border-2 border-blue-600/70 border-dotted bg-blue-600/5 text-white transition-all duration-100',
+        'absolute z-10 flex items-center justify-center rounded-sm border-2 border-blue-600/70 border-dotted bg-blue-600/5 text-white transition-all duration-100',
       )}
       ref={boxRef}
     >

@@ -2,7 +2,6 @@
 
 import { cn } from '@/utils';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
-import { ContextChipHoverProvider } from '@/hooks/use-context-chip-hover';
 import { useMemo } from 'react';
 import { usePanels } from '@/hooks/use-panels';
 import { SettingsPanel } from '@/panels/settings';
@@ -16,7 +15,7 @@ import {
   ResizableHandle,
 } from '@stagewise/stage-ui/components/resizable';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { MessageCircleIcon } from 'lucide-react';
+import { CogIcon, MessageCircleIcon } from 'lucide-react';
 
 export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
   const { leftPanelContent, toggleLeftPanel } = usePanels();
@@ -51,13 +50,20 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
       <div className={cn('flex flex-1 flex-row items-stretch justify-between')}>
         {/* Left sidebar area */}
 
-        <div className="flex w-fit flex-none flex-col items-center justify-center pr-2">
+        <div className="flex w-fit flex-none flex-col items-center justify-center gap-2 pr-2">
           <Button
             variant={leftPanelContent === 'chat' ? 'primary' : 'secondary'}
             size="icon-md"
             onClick={() => toggleLeftPanel('chat')}
           >
             <MessageCircleIcon className="mb-0.5 ml-px size-5 stroke-2" />
+          </Button>
+          <Button
+            variant={leftPanelContent === 'settings' ? 'primary' : 'secondary'}
+            size="icon-md"
+            onClick={() => toggleLeftPanel('settings')}
+          >
+            <CogIcon className="mb-0.5 ml-px size-5 stroke-2" />
           </Button>
         </div>
 
@@ -85,11 +91,9 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
 
             {/* Web app area */}
             <ResizablePanel id="main-app-panel" order={2} defaultSize={70}>
-              <div className="glass-body relative size-full overflow-hidden rounded-lg">
-                <ContextChipHoverProvider>
-                  {mainApp}
-                  <DOMContextSelector />
-                </ContextChipHoverProvider>
+              <div className="relative size-full overflow-hidden rounded-xl border border-zinc-500/10">
+                {mainApp}
+                <DOMContextSelector />
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
