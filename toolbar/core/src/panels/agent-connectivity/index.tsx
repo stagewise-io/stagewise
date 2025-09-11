@@ -7,11 +7,11 @@ import {
 import { MessageCircleQuestionMarkIcon, WifiOffIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuButton,
-  DropdownMenuContent,
-  DropdownMenuLinkItem,
-} from '@/components/ui/dropdown-menu';
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuTrigger,
+} from '@stagewise/stage-ui/components/menu';
 import { useKartonConnected } from '@/hooks/use-karton';
 
 export function AgentConnectivityPanel() {
@@ -46,28 +46,22 @@ export function AgentConnectivityPanel() {
         </div>
       </PanelContent>
       <PanelFooter>
-        <DropdownMenu>
-          <DropdownMenuButton>
+        <Menu>
+          <MenuTrigger>
             <Button glassy size="sm" variant="secondary">
               <MessageCircleQuestionMarkIcon className="mr-2 size-4" />
               Need help?
             </Button>
-          </DropdownMenuButton>
-          <DropdownMenuContent>
-            <DropdownMenuLinkItem
-              href="https://stagewise.io/docs"
-              target="_blank"
-            >
-              Read the docs
-            </DropdownMenuLinkItem>
-            <DropdownMenuLinkItem
-              href="https://discord.gg/gkdGsDYaKA"
-              target="_blank"
-            >
-              Ask the community
-            </DropdownMenuLinkItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </MenuTrigger>
+          <MenuContent>
+            <a href="https://stagewise.io/docs" target="_blank">
+              <MenuItem>Read the docs</MenuItem>
+            </a>
+            <a href="https://discord.gg/gkdGsDYaKA" target="_blank">
+              <MenuItem>Ask the community</MenuItem>
+            </a>
+          </MenuContent>
+        </Menu>
       </PanelFooter>
     </Panel>
   );

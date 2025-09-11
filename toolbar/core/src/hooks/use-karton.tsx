@@ -11,6 +11,7 @@ const [KartonProvider, useKartonState, useKartonProcedure, useKartonConnected] =
       getAvailableTools: async () => [],
     },
     fallbackState: {
+      workspaceInfo: null,
       chats: {},
       activeChatId: '',
       isWorking: false,

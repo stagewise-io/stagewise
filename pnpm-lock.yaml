@@ -317,6 +317,9 @@ importers:
       '@stagewise/karton':
         specifier: workspace:*
         version: link:../../packages/karton
+      '@stagewise/karton-contract':
+        specifier: workspace:*
+        version: link:../../packages/karton-contract
       '@stagewise/toolbar':
         specifier: workspace:*
         version: link:../../toolbar/core

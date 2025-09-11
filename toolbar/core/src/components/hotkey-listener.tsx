@@ -8,23 +8,17 @@ type StopPreventPropagation = boolean;
 
 // This listener is responsible for listening to hotkeys and triggering the appropriate actions in the global app state.
 export function HotkeyListener() {
-  const {
-    startPromptCreation,
-    stopPromptCreation,
-    isPromptCreationActive,
-    isContextSelectorActive,
-    stopContextSelector,
-    startContextSelector,
-  } = useChatState();
-  const { leftPanelContent, closeLeftPanel } = usePanels();
+  const { isContextSelectorActive, stopContextSelector, startContextSelector } =
+    useChatState();
+  const { leftPanelContent, closeLeftPanel, openLeftPanel } = usePanels();
 
   const hotKeyHandlerMap: Record<HotkeyActions, () => StopPreventPropagation> =
     useMemo(
       () => ({
         // Functions that return true will prevent further propagation of the event.
         [HotkeyActions.CTRL_ALT_PERIOD]: () => {
-          if (!isPromptCreationActive) {
-            startPromptCreation();
+          if (leftPanelContent !== 'chat') {
+            openLeftPanel('chat');
             return true;
           } else if (!isContextSelectorActive) {
             startContextSelector();
@@ -36,10 +30,6 @@ export function HotkeyListener() {
           if (isContextSelectorActive) {
             stopContextSelector();
             return true;
-          } else if (isPromptCreationActive) {
-            // If prompting mode is active, stop it
-            stopPromptCreation();
-            return true;
           } else if (leftPanelContent === 'chat') {
             // If prompting is not active but chat is open, close the chat
             closeLeftPanel();
@@ -49,9 +39,6 @@ export function HotkeyListener() {
         },
       }),
       [
-        startPromptCreation,
-        stopPromptCreation,
-        isPromptCreationActive,
         isContextSelectorActive,
         stopContextSelector,
         startContextSelector,

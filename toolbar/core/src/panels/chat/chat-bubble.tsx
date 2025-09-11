@@ -178,10 +178,10 @@ export function ChatBubble({
         <div className="flex max-w-full flex-col items-end gap-2">
           <div
             className={cn(
-              'group relative min-h-8 max-w-full animate-chat-bubble-appear space-y-3 break-words rounded-2xl bg-white/5 px-2.5 py-1.5 font-normal text-sm shadow-lg shadow-zinc-950/10 ring-1 ring-inset last:mb-0.5',
+              'glass-body group relative min-h-8 max-w-full animate-chat-bubble-appear space-y-3 break-words rounded-2xl bg-white/5 px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
               msg.role === 'assistant'
-                ? 'min-w-48 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-zinc-950 ring-zinc-950/5'
-                : 'origin-bottom-right rounded-br-xs bg-blue-600/90 text-white ring-white/5',
+                ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-zinc-950'
+                : 'origin-bottom-right rounded-br-xs bg-blue-600/90 text-white',
             )}
           >
             <div

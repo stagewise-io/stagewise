@@ -1,6 +1,6 @@
 import { PanelHeader } from '@/components/ui/panel';
 import { cn } from '@/utils';
-import { Button } from '@/components/ui/button';
+import { Button } from '@stagewise/stage-ui/components/button';
 import { XIcon, PlusIcon, AlignJustifyIcon } from 'lucide-react';
 import { useState, useMemo, useCallback } from 'react';
 import { ChatList } from './chat-list';
@@ -10,7 +10,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useChatState } from '@/hooks/use-chat-state';
 
 export function ChatPanelHeader() {
   const [chatListOpen, setChatListOpen] = useState(false);
@@ -20,14 +19,11 @@ export function ChatPanelHeader() {
   const activeChatId = useKartonState((s) => s.activeChatId);
   const isWorking = useKartonState((s) => s.isWorking);
 
-  const { startPromptCreation } = useChatState();
-
   const createChat = useCallback(() => {
     createChatProcedure().then(() => {
       setChatListOpen(false);
-      startPromptCreation();
     });
-  }, [createChatProcedure, setChatListOpen, startPromptCreation]);
+  }, [createChatProcedure, setChatListOpen]);
 
   const emptyChatExists = useMemo(
     () =>
@@ -61,7 +57,6 @@ export function ChatPanelHeader() {
                         chatListOpen ? 'Close chat list' : 'Open chat list'
                       }
                       variant="secondary"
-                      glassy
                       className="!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg hover:bg-white/60 active:bg-zinc-50/60 disabled:bg-transparent disabled:shadow-none disabled:*:stroke-zinc-500/50"
                       onClick={() => setChatListOpen(!chatListOpen)}
                       disabled={isWorking}
@@ -84,7 +79,6 @@ export function ChatPanelHeader() {
                     <Button
                       aria-label="New chat"
                       variant="secondary"
-                      glassy
                       className={cn(
                         '!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg transition-all duration-150 ease-out hover:bg-white/60 active:bg-zinc-50/60 disabled:bg-transparent disabled:shadow-none disabled:*:stroke-zinc-500/50',
                         chatListOpen && 'w-fit px-2.5',
@@ -92,7 +86,7 @@ export function ChatPanelHeader() {
                       disabled={isWorking}
                       onClick={createChat}
                     >
-                      {chatListOpen && <span className="mr-1">New chat</span>}
+                      {chatListOpen && <span>New chat</span>}
                       <PlusIcon className="size-4 stroke-2" />
                     </Button>
                   </TooltipTrigger>

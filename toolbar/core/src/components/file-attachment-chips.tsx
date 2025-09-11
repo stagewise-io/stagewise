@@ -7,6 +7,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip';
+import { buttonVariants } from '@stagewise/stage-ui/components/button';
 
 interface FileAttachmentChipsProps {
   fileAttachments: FileAttachment[];
@@ -66,7 +67,7 @@ function FileAttachmentChip({ attachment, onDelete }: FileAttachmentChipProps) {
   const chipContent = (
     <div
       className={cn(
-        'flex min-w-fit shrink-0 items-center gap-1 rounded-lg border border-border/20 bg-white/30 px-2 py-1 shadow-sm backdrop-blur-lg transition-all',
+        buttonVariants({ variant: 'secondary', size: 'xs' }),
         validation.supported
           ? 'hover:border-border/40 hover:bg-white/80'
           : 'opacity-50 hover:opacity-70',

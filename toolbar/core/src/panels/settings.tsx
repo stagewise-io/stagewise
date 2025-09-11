@@ -5,13 +5,13 @@ import {
   PanelHeader,
 } from '@/components/ui/panel';
 import {
-  DropdownMenu,
-  DropdownMenuButton,
-  DropdownMenuContent,
-  DropdownMenuLinkItem,
-} from '@/components/ui/dropdown-menu';
+  Menu,
+  MenuTrigger,
+  MenuContent,
+  MenuItem,
+} from '@stagewise/stage-ui/components/menu';
 import { MessageCircleQuestionMarkIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@stagewise/stage-ui/components/button';
 
 // FYI: We don't show this panel at all in agent hosted mode right now
 export function SettingsPanel() {
@@ -20,28 +20,21 @@ export function SettingsPanel() {
       <PanelHeader title="Settings" />
       <PanelContent>Nothing to see :o</PanelContent>
       <PanelFooter>
-        <DropdownMenu>
-          <DropdownMenuButton>
-            <Button glassy size="sm" variant="secondary">
-              <MessageCircleQuestionMarkIcon className="mr-2 size-4" />
-              Need help?
+        <Menu>
+          <MenuTrigger>
+            <Button size="icon-sm" variant="secondary">
+              <MessageCircleQuestionMarkIcon className="size-4" />
             </Button>
-          </DropdownMenuButton>
-          <DropdownMenuContent>
-            <DropdownMenuLinkItem
-              href="https://stagewise.io/docs"
-              target="_blank"
-            >
-              Read the docs
-            </DropdownMenuLinkItem>
-            <DropdownMenuLinkItem
-              href="https://discord.gg/gkdGsDYaKA"
-              target="_blank"
-            >
-              Join the community
-            </DropdownMenuLinkItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </MenuTrigger>
+          <MenuContent>
+            <a href="https://stagewise.io/docs" target="_blank">
+              <MenuItem>Read the docs</MenuItem>
+            </a>
+            <a href="https://discord.gg/gkdGsDYaKA" target="_blank">
+              <MenuItem>Join the community</MenuItem>
+            </a>
+          </MenuContent>
+        </Menu>
       </PanelFooter>
     </Panel>
   );

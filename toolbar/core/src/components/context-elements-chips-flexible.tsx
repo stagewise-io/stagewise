@@ -1,7 +1,7 @@
 import { useContextChipHover } from '@/hooks/use-context-chip-hover';
 import { XIcon, SquareDashedMousePointer } from 'lucide-react';
 import { useMemo } from 'react';
-import { cn } from '@/utils';
+import { buttonVariants } from '@stagewise/stage-ui/components/button';
 
 interface ContextElementsChipsProps {
   domContextElements: {
@@ -75,12 +75,8 @@ function ContextElementChip({
   }, [element, pluginContext]);
 
   return (
-    <button
-      type="button"
-      tabIndex={-1}
-      className={cn(
-        'flex min-w-fit shrink-0 items-center gap-1 rounded-lg border border-border/20 bg-white/30 px-2 py-1 text-xs shadow-sm backdrop-blur-lg transition-all hover:border-border/40 hover:bg-white/80',
-      )}
+    <div
+      className={buttonVariants({ variant: 'secondary', size: 'xs' })}
       onMouseEnter={() => onHover(element)}
       onMouseLeave={() => onUnhover()}
     >
@@ -98,6 +94,6 @@ function ContextElementChip({
       >
         <XIcon className="size-3" />
       </button>
-    </button>
+    </div>
   );
 }

@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 
 /**
  * Creates a new chat with a timestamped title and sets it as the active chat
- * @param karton - The Karton server instance to modify
+ * @param callbacks - The agent callbacks for state modification
  * @returns The unique ID of the newly created chat
  */
 export function createAndActivateNewChat(karton: KartonServer<KartonContract>) {
@@ -18,7 +18,7 @@ export function createAndActivateNewChat(karton: KartonServer<KartonContract>) {
     minute: '2-digit',
     hour12: true,
   })}`;
-  karton.setState((draft) => {
+  callbacks.setState((draft) => {
     draft.chats[chatId] = {
       title,
       createdAt: new Date(),
@@ -32,23 +32,24 @@ export function createAndActivateNewChat(karton: KartonServer<KartonContract>) {
 /**
  * Attaches tool execution results to the corresponding tool parts in a message
  * Updates the tool part state to reflect success or error outcomes
- * @param karton - The Karton server instance to modify
+ * @param callbacks - The agent callbacks for state modification
  * @param toolResults - Array of tool execution results to attach
  * @param messageId - The unique identifier of the message containing the tool parts
  */
 export function attachToolOutputToMessage(
-  karton: KartonServer<KartonContract>,
+  callbacks: AgentCallbacks,
   toolResults: ToolCallProcessingResult[],
   messageId: string,
 ) {
-  karton.setState((draft) => {
-    const message = draft.chats[karton.state.activeChatId!]!.messages.find(
-      (m) => m.id === messageId,
+  callbacks.setState((draft) => {
+    const state = callbacks.getState();
+    const message = draft.chats[state.activeChatId!]!.messages.find(
+      (m: ChatMessage) => m.id === messageId,
     );
     if (!message) return;
     for (const result of toolResults) {
       const part = message.parts.find(
-        (p) => 'toolCallId' in p && p.toolCallId === result.toolCallId,
+        (p: any) => 'toolCallId' in p && p.toolCallId === result.toolCallId,
       );
       if (!part) continue;
       if (part.type !== 'dynamic-tool' && !part.type.startsWith('tool-'))
@@ -71,14 +72,16 @@ export function attachToolOutputToMessage(
 
 /**
  * Finds tool calls in the last assistant message that don't have corresponding results
+ * @param callbacks - The agent callbacks for state access
  * @param chatId - The chat ID to check
  * @returns Array of pending tool call IDs and their names
  */
 export function findPendingToolCalls(
-  karton: KartonServer<KartonContract>,
+  callbacks: AgentCallbacks,
   chatId: string,
 ): Array<{ toolCallId: string }> {
-  const chat = karton.state.chats[chatId];
+  const state = callbacks.getState();
+  const chat = state.chats[chatId];
   if (!chat) return [];
 
   const messages = chat.messages;

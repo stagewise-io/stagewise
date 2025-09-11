@@ -1,11 +1,17 @@
 import { printInfoMessages } from '@/utils/print-info-messages.js';
 import { log } from '../utils/logger.js';
 import configResolver from '@/config/index.js';
-import { Agent } from '@stagewise/agent-client';
+import { Agent, type AgentCallbacks } from '@stagewise/agent-client';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { analyticsEvents } from '@/utils/telemetry.js';
+import {
+  createKartonServer,
+  type KartonServer,
+} from '@stagewise/karton/server';
+import type { KartonContract } from '@stagewise/karton-contract';
 
 let agentInstance: Agent | null = null;
+let kartonServer: KartonServer<KartonContract> | null = null;
 
 /**
  * Loads and initializes the agent server
@@ -31,7 +37,23 @@ export async function loadAndInitializeAgent(
       workingDirectory: config.dir,
     });
 
-    // Create agent instance
+    // Create a placeholder for the karton server
+    let tempKartonServer: KartonServer<KartonContract> | null = null;
+
+    // Create callbacks that will use the karton server (will be set later)
+    const callbacks: AgentCallbacks = {
+      getState: () => {
+        if (!tempKartonServer) throw new Error('Karton server not initialized');
+        return tempKartonServer.state;
+      },
+      setState: (recipe) => {
+        if (!tempKartonServer) throw new Error('Karton server not initialized');
+        // @ts-ignore we'll fix this whole temp instantiation shit later
+        return tempKartonServer.setState(recipe);
+      },
+    };
+
+    // Create agent instance with callbacks
     agentInstance = Agent.getInstance({
       clientRuntime,
       accessToken,
@@ -60,17 +82,36 @@ export async function loadAndInitializeAgent(
             break;
         }
       },
+      callbacks,
     });
 
-    // Initialize agent with Express integration
-    // This will automatically set up the Karton endpoint
-    const agentServer = await agentInstance.initialize();
+    // Now create the karton server with agent procedures
+    kartonServer = await createKartonServer<KartonContract>({
+      procedures: agentInstance.getAgentProcedures() as any,
+      initialState: {
+        workspaceInfo: {
+          path: clientRuntime.fileSystem.getCurrentWorkingDirectory(),
+          devAppPort: 0,
+          loadedPlugins: [],
+        },
+        activeChatId: null,
+        chats: {},
+        isWorking: false,
+        toolCallApprovalRequests: [],
+        subscription: undefined,
+      },
+    });
 
-    // Return the WebSocket server instance if available
-    // The agent SDK may not return the WebSocket server in current versions
+    // Set the karton server reference in callbacks
+    tempKartonServer = kartonServer;
+
+    // Initialize the agent
+    await agentInstance.initialize();
+
+    // Return the WebSocket server instance from karton server
     return {
       success: true,
-      wss: agentServer.wss,
+      wss: kartonServer.wss,
     };
   } catch (error) {
     log.error(
@@ -87,15 +128,31 @@ export function shutdownAgent(): void {
   if (agentInstance?.shutdown) {
     try {
       agentInstance.shutdown();
-      log.debug('Agent server shut down successfully');
+      log.debug('Agent shut down successfully');
     } catch (error) {
       log.error(
         `Error shutting down agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
-  // Clear the instance reference
+
+  if (kartonServer) {
+    try {
+      // Close WebSocket server
+      if (kartonServer.wss) {
+        kartonServer.wss.close();
+      }
+      log.debug('Karton server shut down successfully');
+    } catch (error) {
+      log.error(
+        `Error shutting down karton server: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  // Clear the instance references
   agentInstance = null;
+  kartonServer = null;
 }
 
 export function getAgentInstance(): any {
