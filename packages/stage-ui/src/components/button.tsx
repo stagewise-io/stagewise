@@ -13,10 +13,12 @@ export const buttonVariants = cva(
         ghost: 'bg-transparent font-medium text-foreground hover:bg-zinc-500/5',
       },
       size: {
+        xs: 'h-6 rounded-xl px-2 py-1 text-xs',
         sm: 'h-8 rounded-xl px-2 py-1 text-sm',
         md: 'h-10 rounded-xl px-4 py-2 text-sm',
         lg: 'h-12 rounded-xl px-6 py-3 text-base',
         xl: 'h-14 rounded-xl px-8 py-4 text-lg',
+        'icon-xs': 'size-6 rounded-full',
         'icon-sm': 'size-8 rounded-full',
         'icon-md': 'size-10 rounded-full',
       },

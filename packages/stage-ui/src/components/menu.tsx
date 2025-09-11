@@ -67,7 +67,7 @@ export function MenuItem({ children, className, ...props }: MenuItemProps) {
     <MenuBase.Item
       {...props}
       className={cn(
-        'flex w-full min-w-24 cursor-default flex-row items-center justify-start gap-2 rounded-md py-1.5 pr-6 pl-2 text-sm transition-all duration-150 ease-out hover:bg-black/5 hover:pl-2.25 dark:hover:bg-white/5',
+        'flex w-full min-w-24 cursor-default flex-row items-center justify-start gap-2 rounded-md py-1.5 pr-6 pl-2 text-sm transition-all duration-150 ease-out hover:bg-black/5 hover:pr-5.75 hover:pl-2.25 dark:hover:bg-white/5',
         className,
       )}
     >
@@ -96,7 +96,7 @@ export function MenuSubmenuTrigger({
     <MenuBase.SubmenuTrigger
       {...props}
       className={cn(
-        'group flex w-full min-w-24 cursor-default flex-row items-center justify-start gap-2 rounded-md px-2 py-1.5 text-sm transition-all duration-150 ease-out hover:bg-black/5 hover:pl-2.25 dark:hover:bg-white/5',
+        'group flex w-full min-w-24 cursor-default flex-row items-center justify-start gap-2 rounded-md px-2 py-1.5 text-sm transition-all duration-150 ease-out hover:bg-black/5 hover:pr-1.75 hover:pl-2.25 dark:hover:bg-white/5',
         className,
       )}
     >

@@ -2,7 +2,6 @@
 
 import { cn } from '@/utils';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
-import { ContextChipHoverProvider } from '@/hooks/use-context-chip-hover';
 import { useMemo } from 'react';
 import { usePanels } from '@/hooks/use-panels';
 import { SettingsPanel } from '@/panels/settings';
@@ -16,13 +15,32 @@ import {
   ResizableHandle,
 } from '@stagewise/stage-ui/components/resizable';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { MessageCircleIcon } from 'lucide-react';
+import { CogIcon, MessageCircleIcon } from 'lucide-react';
+import { useKartonState } from '@/hooks/use-karton';
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverTitle,
+} from '@stagewise/stage-ui/components/popover';
 
 export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
   const { leftPanelContent, toggleLeftPanel } = usePanels();
 
+  const workspaceInfo = useKartonState((s) => s.workspaceInfo);
+
+  const workspaceDir = useMemo(() => {
+    return workspaceInfo
+      ? workspaceInfo.path
+          .replace('\\', '/')
+          .split('/')
+          .filter((p) => p !== '')
+          .pop()
+      : null;
+  }, [workspaceInfo]);
+
   return (
-    <div className="root fixed inset-0 flex size-full flex-col items-stretch justify-between bg-zinc-100 p-2 child:pb-2 dark:bg-zinc-950">
+    <div className="root fixed inset-0 flex size-full flex-col items-stretch justify-between bg-zinc-100 p-2 child:pb-2 dark:bg-zinc-900">
       {/* Top info bar */}
       <div className="mb-2 flex h-fit min-h-8 w-full flex-row items-stretch justify-between gap-12">
         {/* Upper left control area */}
@@ -30,9 +48,37 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
 
         {/* Upper center info area */}
         <div className="flex flex-1 basis-1/3 flex-row items-center justify-center">
-          <span className="font-medium text-foreground/70 text-sm">
-            Dummy workspace name
-          </span>
+          <Popover>
+            <PopoverTrigger>
+              <Button size="sm" variant="ghost" className="rounded-full">
+                {workspaceDir ?? 'No workspace loaded'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent>
+              <PopoverTitle>Workspace Info</PopoverTitle>
+
+              <div className="flex flex-col gap-1">
+                <h3 className="font-medium text-sm">Path</h3>
+                <p className="text-foreground/70 text-sm">
+                  {workspaceInfo?.path}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <h3 className="font-medium text-sm">Dev App Port</h3>
+                <p className="font-mono text-foreground/70 text-sm">
+                  {workspaceInfo?.devAppPort}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <h3 className="font-medium text-sm">Loaded Plugins</h3>
+                <p className="text-foreground/70 text-sm">
+                  {workspaceInfo?.loadedPlugins.join(', ')}
+                </p>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Upper right control area */}
@@ -51,13 +97,20 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
       <div className={cn('flex flex-1 flex-row items-stretch justify-between')}>
         {/* Left sidebar area */}
 
-        <div className="flex w-fit flex-none flex-col items-center justify-center pr-2">
+        <div className="flex w-fit flex-none flex-col items-center justify-center gap-2 pr-2">
           <Button
             variant={leftPanelContent === 'chat' ? 'primary' : 'secondary'}
             size="icon-md"
             onClick={() => toggleLeftPanel('chat')}
           >
             <MessageCircleIcon className="mb-0.5 ml-px size-5 stroke-2" />
+          </Button>
+          <Button
+            variant={leftPanelContent === 'settings' ? 'primary' : 'secondary'}
+            size="icon-md"
+            onClick={() => toggleLeftPanel('settings')}
+          >
+            <CogIcon className="mb-0.5 ml-px size-5 stroke-2" />
           </Button>
         </div>
 
@@ -85,11 +138,9 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
 
             {/* Web app area */}
             <ResizablePanel id="main-app-panel" order={2} defaultSize={70}>
-              <div className="glass-body relative size-full overflow-hidden rounded-lg">
-                <ContextChipHoverProvider>
-                  {mainApp}
-                  <DOMContextSelector />
-                </ContextChipHoverProvider>
+              <div className="relative size-full overflow-hidden rounded-xl border border-zinc-500/10">
+                {mainApp}
+                <DOMContextSelector />
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>

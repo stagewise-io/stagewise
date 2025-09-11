@@ -43,6 +43,7 @@ export type AgentError = {
 
 type AppState = {
   activeChatId: ChatId | null;
+  workspacePath: string | null;
   chats: Record<ChatId, Chat>;
   toolCallApprovalRequests: string[];
   isWorking: boolean;

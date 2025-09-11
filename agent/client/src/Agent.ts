@@ -3,15 +3,11 @@ import { isAbortError } from './utils/is-abort-error.js';
 import { cliTools, type UITools } from '@stagewise/agent-tools';
 import { AgentErrorType } from '@stagewise/karton-contract';
 import { convertCreditsToSubscriptionCredits } from './utils/convert-credits-to-subscription-credits.js';
+import type { History, ChatMessage } from '@stagewise/karton-contract';
 import type {
-  KartonContract,
-  History,
-  ChatMessage,
-} from '@stagewise/karton-contract';
-import {
-  createKartonServer,
-  type KartonServer,
-} from '@stagewise/karton/server';
+  AgentCallbacks,
+  AgentProcedures,
+} from './types/agent-callbacks.js';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { PromptSnippet } from '@stagewise/agent-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client.js';
@@ -71,7 +67,7 @@ const MAX_RECURSION_DEPTH = 20;
 
 export class Agent {
   private static instance: Agent;
-  private karton: KartonServer<KartonContract> | null = null;
+  private callbacks: AgentCallbacks;
   private clientRuntime: ClientRuntime;
   private tools: Tools;
   private client: TRPCClient<AppRouter>;
@@ -103,6 +99,7 @@ export class Agent {
     refreshToken: string;
     onEvent?: AgentEventCallback;
     agentTimeout?: number;
+    callbacks: AgentCallbacks;
   }) {
     this.clientRuntime = config.clientRuntime;
     this.tools = config.tools;
@@ -112,6 +109,7 @@ export class Agent {
     this.client = createAuthenticatedClient(this.accessToken);
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
     this.timeoutManager = new TimeoutManager();
+    this.callbacks = config.callbacks;
     this.abortController = new AbortController();
     this.abortController.signal.addEventListener(
       'abort',
@@ -119,7 +117,7 @@ export class Agent {
         this.cleanupPendingOperations(
           'Agent call aborted',
           false,
-          this.karton?.state.activeChatId || undefined,
+          this.callbacks.getState().activeChatId || undefined,
         );
       },
       { once: true },
@@ -136,7 +134,6 @@ export class Agent {
    * @param isWorking - The new state to set
    */
   private setAgentWorking(isWorking: boolean): void {
-    if (!this.karton) return;
     this.timeoutManager.clear('is-working');
     this.isWorking = isWorking;
 
@@ -151,7 +148,7 @@ export class Agent {
       );
     }
 
-    this.karton.setState((draft) => {
+    this.callbacks.setState((draft) => {
       draft.isWorking = isWorking;
     });
     this.eventEmitter.emit(
@@ -255,7 +252,7 @@ export class Agent {
   ): void {
     // Clean up any pending tool calls if chatId is provided
     if (chatId && this.lastMessageId) {
-      const pendingToolCalls = findPendingToolCalls(this.karton!, chatId);
+      const pendingToolCalls = findPendingToolCalls(this.callbacks, chatId);
       if (pendingToolCalls.length > 0) {
         const abortedResults: ToolCallProcessingResult[] = pendingToolCalls.map(
           ({ toolCallId }) => ({
@@ -271,7 +268,7 @@ export class Agent {
 
         // Attach the aborted results to the message
         attachToolOutputToMessage(
-          this.karton!,
+          this.callbacks,
           abortedResults,
           this.lastMessageId,
         );
@@ -306,6 +303,7 @@ export class Agent {
     refreshToken: string;
     onEvent?: AgentEventCallback;
     agentTimeout?: number;
+    callbacks: AgentCallbacks;
   }) {
     const {
       clientRuntime,
@@ -314,6 +312,7 @@ export class Agent {
       refreshToken,
       onEvent,
       agentTimeout,
+      callbacks,
     } = config;
     if (!Agent.instance) {
       Agent.instance = new Agent({
@@ -323,163 +322,160 @@ export class Agent {
         refreshToken,
         onEvent,
         agentTimeout,
+        callbacks,
       });
     }
     return Agent.instance;
   }
 
   /**
-   * Initialize the agent
-   * @returns The WebSocket server instance
+   * Returns the agent procedures for the karton server
+   * @returns The procedures to be used by the karton server
    */
-  public async initialize(): Promise<{
-    wss: Awaited<ReturnType<typeof createKartonServer<KartonContract>>>['wss'];
-  }> {
-    this.karton = await createKartonServer<KartonContract>({
-      procedures: {
-        undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
-          await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
-        },
-        undoToolCallsUntilLatestUserMessage: async (
-          chatId,
-        ): Promise<ChatMessage | null> => {
-          return await this.undoToolCallsUntilLatestUserMessage(chatId);
-        },
-        retrySendingUserMessage: async () => {
-          this.setAgentWorking(true);
-          this.karton?.setState((draft) => {
-            // remove any errors
-            draft.chats[draft.activeChatId!]!.error = undefined;
-          });
-          const promptSnippets: PromptSnippet[] = [];
-          const projectPathPromptSnippet = await getProjectPath(
-            this.clientRuntime,
-          );
-          if (projectPathPromptSnippet) {
-            promptSnippets.push(projectPathPromptSnippet);
-          }
-          await this.callAgent({
-            chatId: this.karton!.state.activeChatId!,
-            history:
-              this.karton!.state.chats[this.karton!.state.activeChatId!]!
-                .messages,
-            clientRuntime: this.clientRuntime,
-            promptSnippets,
-          });
-          this.setAgentWorking(false);
-        },
-        refreshSubscription: async () => {
-          this.client?.subscription.getSubscription
-            .query()
-            .then((subscription) => {
-              this.karton?.setState((draft) => {
-                draft.subscription = subscription;
-              });
-            })
-            .catch((_) => {
-              // ignore errors here, there's a default credit amount
+  public getAgentProcedures(): AgentProcedures {
+    return {
+      undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
+        await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
+      },
+      undoToolCallsUntilLatestUserMessage: async (
+        chatId,
+      ): Promise<ChatMessage | null> => {
+        return await this.undoToolCallsUntilLatestUserMessage(chatId);
+      },
+      retrySendingUserMessage: async () => {
+        this.setAgentWorking(true);
+        this.callbacks.setState((draft) => {
+          // remove any errors
+          draft.chats[draft.activeChatId!]!.error = undefined;
+        });
+        const promptSnippets: PromptSnippet[] = [];
+        const projectPathPromptSnippet = await getProjectPath(
+          this.clientRuntime,
+        );
+        if (projectPathPromptSnippet) {
+          promptSnippets.push(projectPathPromptSnippet);
+        }
+        const state = this.callbacks.getState();
+        await this.callAgent({
+          chatId: state.activeChatId!,
+          history: state.chats[state.activeChatId!]!.messages,
+          clientRuntime: this.clientRuntime,
+          promptSnippets,
+        });
+        this.setAgentWorking(false);
+      },
+      refreshSubscription: async () => {
+        this.client?.subscription.getSubscription
+          .query()
+          .then((subscription) => {
+            this.callbacks.setState((draft) => {
+              draft.subscription = subscription;
             });
-        },
-        abortAgentCall: async () => {
-          this.abortController.abort();
-          this.abortController = new AbortController();
-          this.abortController.signal.addEventListener(
-            'abort',
-            () => {
-              this.cleanupPendingOperations(
-                'Agent call aborted',
-                false,
-                this.karton?.state.activeChatId || undefined,
-              );
-            },
-            { once: true },
-          );
-        },
-        approveToolCall: async (_toolCallId, _callingClientId) => {},
-        rejectToolCall: async (_toolCallId, _callingClientId) => {},
-        createChat: async () => {
-          return createAndActivateNewChat(this.karton!);
-        },
-        switchChat: async (chatId, _callingClientId) => {
-          this.karton?.setState((draft) => {
-            draft.activeChatId = chatId;
+          })
+          .catch((_) => {
+            // ignore errors here, there's a default credit amount
           });
-          Object.entries(this.karton!.state.chats).forEach(([id, chat]) => {
-            if (chat.messages.length === 0 && id !== chatId)
-              this.karton?.setState((draft) => {
-                delete draft.chats[id];
-              });
-          });
-        },
-        deleteChat: async (chatId, _callingClientId) => {
-          // if the active chat is being deleted, figure out which chat to switch to
-          if (this.karton!.state.activeChatId === chatId) {
-            const nextChatId = Object.keys(this.karton!.state.chats).find(
-              (id) => id !== chatId,
+      },
+      abortAgentCall: async () => {
+        this.abortController.abort();
+        this.abortController = new AbortController();
+        this.abortController.signal.addEventListener(
+          'abort',
+          () => {
+            this.cleanupPendingOperations(
+              'Agent call aborted',
+              false,
+              this.callbacks.getState().activeChatId || undefined,
             );
-            // if there are no other chats, create a new one
-            if (!nextChatId) createAndActivateNewChat(this.karton!);
-            // if there are other chats, switch to the next one
-            else
-              this.karton?.setState((draft) => {
-                draft.activeChatId = nextChatId;
-              });
-          }
-          // finally delete the chat
-          this.karton?.setState((draft) => {
-            delete draft.chats[chatId];
-          });
-        },
-        sendUserMessage: async (message, _callingClientId) => {
-          this.setAgentWorking(true);
-          const newstate = this.karton?.setState((draft) => {
-            const chatId = this.karton!.state.activeChatId!;
-            draft.chats[chatId]!.messages.push(message as any); // TODO: fix the type issue here
-            draft.chats[chatId]!.error = undefined;
-          });
-          const messages =
-            newstate?.chats[this.karton!.state.activeChatId!]!.messages;
-          const promptSnippets: PromptSnippet[] = [];
-          const projectPathPromptSnippet = await getProjectPath(
-            this.clientRuntime,
-          );
-          if (projectPathPromptSnippet) {
-            promptSnippets.push(projectPathPromptSnippet);
-          }
-          const projectInfoPromptSnippet = await getProjectInfo(
-            this.clientRuntime,
-          );
-          if (projectInfoPromptSnippet) {
-            promptSnippets.push(projectInfoPromptSnippet);
-          }
-          this.callAgent({
-            chatId: this.karton!.state.activeChatId!,
-            history: messages,
-            clientRuntime: this.clientRuntime,
-            promptSnippets,
-          }).then(() => {
-            this.setAgentWorking(false);
-          });
-        },
-        assistantMadeCodeChangesUntilLatestUserMessage: async (chatId) => {
-          return await this.assistantMadeCodeChangesUntilLatestUserMessage(
-            chatId,
-          );
-        },
+          },
+          { once: true },
+        );
       },
-      initialState: {
-        activeChatId: null,
-        chats: {},
-        isWorking: false,
-        toolCallApprovalRequests: [],
-        subscription: undefined,
+      approveToolCall: async (_toolCallId, _callingClientId) => {},
+      rejectToolCall: async (_toolCallId, _callingClientId) => {},
+      createChat: async () => {
+        return createAndActivateNewChat(this.callbacks);
       },
-    });
+      switchChat: async (chatId, _callingClientId) => {
+        this.callbacks.setState((draft) => {
+          draft.activeChatId = chatId;
+        });
+        const state = this.callbacks.getState();
+        Object.entries(state.chats).forEach(([id, chat]) => {
+          if (chat && chat.messages.length === 0 && id !== chatId)
+            this.callbacks.setState((draft) => {
+              delete draft.chats[id];
+            });
+        });
+      },
+      deleteChat: async (chatId, _callingClientId) => {
+        const state = this.callbacks.getState();
+        // if the active chat is being deleted, figure out which chat to switch to
+        if (state.activeChatId === chatId) {
+          const nextChatId = Object.keys(state.chats).find(
+            (id) => id !== chatId,
+          );
+          // if there are no other chats, create a new one
+          if (!nextChatId) createAndActivateNewChat(this.callbacks);
+          // if there are other chats, switch to the next one
+          else
+            this.callbacks.setState((draft) => {
+              draft.activeChatId = nextChatId;
+            });
+        }
+        // finally delete the chat
+        this.callbacks.setState((draft) => {
+          delete draft.chats[chatId];
+        });
+      },
+      sendUserMessage: async (message, _callingClientId) => {
+        this.setAgentWorking(true);
+        const newstate = this.callbacks.setState((draft) => {
+          const state = this.callbacks.getState();
+          const chatId = state.activeChatId!;
+          draft.chats[chatId]!.messages.push(message as any); // TODO: fix the type issue here
+          draft.chats[chatId]!.error = undefined;
+        });
+        const messages = newstate?.chats[newstate.activeChatId!]!.messages;
+        const promptSnippets: PromptSnippet[] = [];
+        const projectPathPromptSnippet = await getProjectPath(
+          this.clientRuntime,
+        );
+        if (projectPathPromptSnippet) {
+          promptSnippets.push(projectPathPromptSnippet);
+        }
+        const projectInfoPromptSnippet = await getProjectInfo(
+          this.clientRuntime,
+        );
+        if (projectInfoPromptSnippet) {
+          promptSnippets.push(projectInfoPromptSnippet);
+        }
+        const state = this.callbacks.getState();
+        this.callAgent({
+          chatId: state.activeChatId!,
+          history: messages,
+          clientRuntime: this.clientRuntime,
+          promptSnippets,
+        }).then(() => {
+          this.setAgentWorking(false);
+        });
+      },
+      assistantMadeCodeChangesUntilLatestUserMessage: async (chatId) => {
+        return await this.assistantMadeCodeChangesUntilLatestUserMessage(
+          chatId,
+        );
+      },
+    };
+  }
 
+  /**
+   * Initialize the agent
+   */
+  public async initialize(): Promise<void> {
     this.client?.subscription.getSubscription
       .query()
       .then((subscription) => {
-        this.karton?.setState((draft) => {
+        this.callbacks.setState((draft) => {
           draft.subscription = subscription;
         });
       })
@@ -488,11 +484,7 @@ export class Agent {
       });
 
     this.setAgentWorking(false);
-    createAndActivateNewChat(this.karton);
-
-    return {
-      wss: this.karton.wss,
-    };
+    createAndActivateNewChat(this.callbacks);
   }
 
   /**
@@ -526,7 +518,7 @@ export class Agent {
         MAX_RECURSION_DEPTH,
       );
       this.setAgentWorking(false);
-      this.karton?.setState((draft) => {
+      this.callbacks.setState((draft) => {
         draft.chats[chatId]!.error = {
           type: AgentErrorType.AGENT_ERROR,
           error: new Error(errorDesc),
@@ -560,7 +552,7 @@ export class Agent {
             messages: history ?? [],
           })
           .then((result) => {
-            this.karton?.setState((draft) => {
+            this.callbacks.setState((draft) => {
               // chat could've been deleted in the meantime
               const chatExists = draft.chats[chatId] !== undefined;
               if (chatExists) draft.chats[chatId]!.title = result.title;
@@ -603,7 +595,7 @@ export class Agent {
 
       const { toolCalls, credits } = lastResponse;
 
-      this.karton?.setState((draft) => {
+      this.callbacks.setState((draft) => {
         if (draft.subscription)
           draft.subscription = {
             ...draft.subscription,
@@ -611,10 +603,11 @@ export class Agent {
           };
       });
 
+      const state = this.callbacks.getState();
       const toolResults = await processParallelToolCalls(
         toolCalls,
         this.tools,
-        this.karton?.state.chats[chatId]!.messages ?? [],
+        state.chats[chatId]!.messages ?? [],
         this.timeoutManager,
         (result) => {
           if (result.result?.undoExecute) {
@@ -624,7 +617,7 @@ export class Agent {
             });
           }
           attachToolOutputToMessage(
-            this.karton!,
+            this.callbacks,
             [result],
             this.lastMessageId!,
           );
@@ -633,9 +626,10 @@ export class Agent {
 
       // Check if recursion is needed
       if (toolResults.length > 0) {
+        const state = this.callbacks.getState();
         return this.callAgent({
           chatId,
-          history: this.karton?.state.chats[chatId]!.messages,
+          history: state.chats[chatId]!.messages,
           clientRuntime,
           promptSnippets,
         });
@@ -651,11 +645,12 @@ export class Agent {
       }
 
       if (isInsufficientCreditsError(error)) {
+        const state = this.callbacks.getState();
         this.eventEmitter.emit(
-          EventFactories.creditsInsufficient(this.karton?.state.subscription),
+          EventFactories.creditsInsufficient(state.subscription),
         );
         this.setAgentWorking(false);
-        this.karton?.setState((draft) => {
+        this.callbacks.setState((draft) => {
           draft.chats[chatId]!.error = {
             type: AgentErrorType.INSUFFICIENT_CREDITS,
             error: new Error('Insufficient credits'),
@@ -666,7 +661,7 @@ export class Agent {
 
       const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
-      this.karton?.setState((draft) => {
+      this.callbacks.setState((draft) => {
         draft.chats[chatId]!.error = {
           type: AgentErrorType.AGENT_ERROR,
           error: new Error(errorDesc),
@@ -711,7 +706,7 @@ export class Agent {
             continue;
           case 'text-delta':
             appendTextDeltaToMessage(
-              this.karton!,
+              this.callbacks,
               messageId,
               value.delta,
               partIndex,
@@ -724,7 +719,12 @@ export class Agent {
           case 'tool-input-error':
             break; // Skipped for now
           case 'tool-input-available':
-            appendToolInputToMessage(this.karton!, messageId, value, partIndex);
+            appendToolInputToMessage(
+              this.callbacks,
+              messageId,
+              value,
+              partIndex,
+            );
             continue;
           case 'tool-output-available':
             // Should not happen - we append the output and this message
@@ -742,7 +742,8 @@ export class Agent {
   private async assistantMadeCodeChangesUntilLatestUserMessage(
     chatId: string,
   ): Promise<boolean> {
-    const chat = this.karton?.state.chats[chatId];
+    const state = this.callbacks.getState();
+    const chat = state.chats[chatId];
     const history = chat?.messages ?? [];
     const reversedHistory = [...history].reverse();
     const userMessageIndex = reversedHistory.findIndex(
@@ -772,7 +773,8 @@ export class Agent {
     chatId: string,
   ): Promise<ChatMessage | null> {
     if (!this.undoToolCallStack.has(chatId)) return null;
-    const chat = this.karton?.state.chats[chatId];
+    const state = this.callbacks.getState();
+    const chat = state.chats[chatId];
     const history = chat?.messages ?? [];
     const reversedHistory = [...history].reverse();
     const userMessageIndex = reversedHistory.findIndex(
@@ -797,11 +799,13 @@ export class Agent {
     chatId: string,
   ): Promise<void> {
     if (!this.undoToolCallStack.has(chatId)) return;
-    const chat = this.karton?.state.chats[chatId];
+    const state = this.callbacks.getState();
+    const chat = state.chats[chatId];
 
     const history = chat?.messages ?? [];
     const userMessageIndex = history.findIndex(
-      (m) => m.role === 'user' && 'id' in m && m.id === userMessageId,
+      (m: ChatMessage) =>
+        m.role === 'user' && 'id' in m && m.id === userMessageId,
     );
 
     // Get all messages that come after the user message
@@ -828,7 +832,7 @@ export class Agent {
     }
 
     // Keep messages up to user message
-    this.karton?.setState((draft) => {
+    this.callbacks.setState((draft) => {
       if (userMessageIndex !== -1) {
         draft.chats[chatId]!.messages = history.slice(
           0,

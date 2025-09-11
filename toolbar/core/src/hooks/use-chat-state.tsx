@@ -1,5 +1,5 @@
 import { type ReactNode, createContext } from 'react';
-import { useContext, useState, useCallback, useEffect } from 'react';
+import { useContext, useState, useCallback } from 'react';
 import { usePlugins } from './use-plugins';
 import {
   generateId,
@@ -50,9 +50,6 @@ interface ChatContext {
   clearFileAttachments: () => void;
 
   // UI state
-  isPromptCreationActive: boolean;
-  startPromptCreation: () => void;
-  stopPromptCreation: () => void;
   isContextSelectorActive: boolean;
   startContextSelector: () => void;
   stopContextSelector: () => void;
@@ -70,9 +67,6 @@ const ChatHistoryContext = createContext<ChatContext>({
   addFileAttachment: () => {},
   removeFileAttachment: () => {},
   clearFileAttachments: () => {},
-  isPromptCreationActive: false,
-  startPromptCreation: () => {},
-  stopPromptCreation: () => {},
   isContextSelectorActive: false,
   startContextSelector: () => {},
   stopContextSelector: () => {},
@@ -85,7 +79,7 @@ interface ChatStateProviderProps {
 
 export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const [chatInput, setChatInput] = useState<string>('');
-  const [isPromptCreationMode, setIsPromptCreationMode] =
+  const [_isPromptCreationMode, _setIsPromptCreationMode] =
     useState<boolean>(false);
   const [isContextSelectorMode, setIsContextSelectorMode] =
     useState<boolean>(false);
@@ -104,21 +98,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const { plugins } = usePlugins();
 
   const sendChatMessage = useKartonProcedure((p) => p.sendUserMessage);
-  const isWorking = useKartonState((s) => s.isWorking);
-  const { openLeftPanel, leftPanelContent } = usePanels();
-
-  const startPromptCreation = useCallback(() => {
-    setIsPromptCreationMode(true);
-
-    // open the chat panel if it's not open
-    if (leftPanelContent !== 'chat') {
-      openLeftPanel('chat');
-    }
-
-    plugins.forEach((plugin) => {
-      plugin.onPromptingStart?.();
-    });
-  }, [plugins, leftPanelContent, openLeftPanel]);
+  const _isWorking = useKartonState((s) => s.isWorking);
+  const { leftPanelContent } = usePanels();
 
   const addFileAttachment = useCallback((file: File) => {
     const id = generateId();
@@ -145,16 +126,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     });
   }, []);
 
-  const stopPromptCreation = useCallback(() => {
-    setIsPromptCreationMode(false);
-    // Always stop context selector when stopping prompt creation
-    setIsContextSelectorMode(false);
-    setDomContextElements([]);
-    plugins.forEach((plugin) => {
-      plugin.onPromptingAbort?.();
-    });
-  }, [plugins]);
-
   const startContextSelector = useCallback(() => {
     setIsContextSelectorMode(true);
   }, []);
@@ -162,19 +133,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const stopContextSelector = useCallback(() => {
     setIsContextSelectorMode(false);
   }, []);
-
-  useEffect(() => {
-    if (leftPanelContent !== 'chat') {
-      stopPromptCreation(); // This also stops context selector
-    }
-  }, [leftPanelContent, stopPromptCreation]);
-
-  // Auto-stop prompt creation when agent is busy
-  useEffect(() => {
-    if (isWorking && isPromptCreationMode) {
-      stopPromptCreation(); // This also stops context selector
-    }
-  }, [isWorking, isPromptCreationMode, stopPromptCreation]);
 
   const addChatDomContext = useCallback(
     (element: HTMLElement) => {
@@ -300,7 +258,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       setChatInput('');
       setDomContextElements([]);
       clearFileAttachments();
-      stopPromptCreation(); // This also stops context selector
 
       // Send the message using the chat capability
       await sendChatMessage(message);
@@ -314,7 +271,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     plugins,
     sendChatMessage,
     clearFileAttachments,
-    stopPromptCreation,
   ]);
 
   const value: ChatContext = {
@@ -328,9 +284,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     addFileAttachment,
     removeFileAttachment,
     clearFileAttachments,
-    isPromptCreationActive: isPromptCreationMode,
-    startPromptCreation,
-    stopPromptCreation,
     isContextSelectorActive: isContextSelectorMode,
     startContextSelector,
     stopContextSelector,
