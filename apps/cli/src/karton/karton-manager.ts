@@ -85,39 +85,23 @@ export class KartonManager {
 
       authenticate: async () => {
         try {
-          // Use existing OAuth flow through the main server
+          // Check if already authenticated
           const authState = await oauthManager.getAuthState();
           if (authState?.isAuthenticated) {
             return { success: true };
           }
 
-          // Initiate OAuth flow
-          const tokenData = await oauthManager.initiateOAuthFlow(
-            this.serverPort,
-            undefined,
-            false,
-          );
+          // Build the authentication URL
+          const redirectUri = `http://localhost:${this.serverPort}/auth/callback`;
+          const STAGEWISE_CONSOLE_URL = process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
+          const authUrl = `${STAGEWISE_CONSOLE_URL}/authenticate-ide?ide=cli&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-          // Update auth tokens in workspace manager
-          if (tokenData.accessToken && tokenData.refreshToken) {
-            this.workspaceManager.setAuthTokens(
-              tokenData.accessToken,
-              tokenData.refreshToken,
-            );
-          }
-
-          // Update Karton state
-          if (this.kartonServer) {
-            this.kartonServer.setState((draft) => {
-              draft.authStatus = {
-                isAuthenticated: true,
-                userEmail: tokenData.userEmail,
-                userId: tokenData.userId,
-              };
-            });
-          }
-
-          return { success: true };
+          // Return the URL for the UI to handle
+          // The UI can either redirect in the same window or open a popup
+          return { 
+            success: true, 
+            authUrl 
+          };
         } catch (error) {
           log.error(
             `Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
