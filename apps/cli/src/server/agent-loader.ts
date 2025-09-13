@@ -91,8 +91,10 @@ export async function loadAndInitializeAgent(
       initialState: {
         workspaceInfo: {
           path: clientRuntime.fileSystem.getCurrentWorkingDirectory(),
-          devAppPort: 0,
-          loadedPlugins: [],
+          devAppPort: config.appPort,
+          loadedPlugins: config.plugins.map((plugin) =>
+            typeof plugin === 'string' ? plugin : plugin.name,
+          ),
         },
         activeChatId: null,
         chats: {},

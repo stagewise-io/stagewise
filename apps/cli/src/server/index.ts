@@ -10,6 +10,7 @@ import { resolve, dirname } from 'node:path';
 import { oauthManager } from '../auth/oauth.js';
 import { log } from '../utils/logger.js';
 import { loadAndInitializeAgent, getAgentInstance } from './agent-loader.js';
+import type { Config } from '../config/types.js';
 import {
   loadPlugins,
   generatePluginImportMapEntries,
@@ -32,8 +33,7 @@ type KartonContract = {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const getImportMap = async (plugins: Plugin[]) => {
-  const config = configResolver.getConfig();
+const getImportMap = async (plugins: Plugin[], config: Config) => {
   const manifestPath = config.bridgeMode
     ? process.env.NODE_ENV === 'production'
       ? resolve(__dirname, 'toolbar-bridged/.vite/manifest.json')
@@ -146,9 +146,9 @@ export default config;
   };
 
 const createToolbarHtmlHandler =
-  (plugins: Plugin[]) => async (_req: Request, res: Response) => {
+  (plugins: Plugin[], config: Config) => async (_req: Request, res: Response) => {
     try {
-      const importMap = await getImportMap(plugins);
+      const importMap = await getImportMap(plugins, config);
 
       const html = `<!DOCTYPE html>
   <html lang="en">
@@ -185,6 +185,7 @@ export const getServer = async () => {
 
     // Load plugins based on configuration and dependencies
     const plugins = await loadPlugins(config);
+    
     const unavailablePlugins = plugins.filter((p) => p.available === false);
 
     if (unavailablePlugins.length > 0) {
@@ -288,7 +289,7 @@ export const getServer = async () => {
     // Add wildcard route LAST, after all other routes including agent routes
     app.get(
       /^(?!\/stagewise-toolbar-app).*$/,
-      createToolbarHtmlHandler(plugins),
+      createToolbarHtmlHandler(plugins, config),
     );
 
     // Set up WebSocket upgrade handling

@@ -57,21 +57,21 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
             <PopoverContent>
               <PopoverTitle>Workspace Info</PopoverTitle>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-0">
                 <h3 className="font-medium text-sm">Path</h3>
                 <p className="text-foreground/70 text-sm">
                   {workspaceInfo?.path}
                 </p>
               </div>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-0">
                 <h3 className="font-medium text-sm">Dev App Port</h3>
                 <p className="font-mono text-foreground/70 text-sm">
                   {workspaceInfo?.devAppPort}
                 </p>
               </div>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-0">
                 <h3 className="font-medium text-sm">Loaded Plugins</h3>
                 <p className="text-foreground/70 text-sm">
                   {workspaceInfo?.loadedPlugins.join(', ')}
