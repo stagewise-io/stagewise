@@ -70,8 +70,8 @@ export class UnifiedOAuthManager {
       await tokenManager.clearToken();
     }
 
-    // Build redirect URI using the main server port
-    const redirectUri = `http://localhost:${serverPort}/auth/callback`;
+    // Build redirect URI using the main server port - under stagewise-toolbar-app to avoid conflicts
+    const redirectUri = `http://localhost:${serverPort}/stagewise-toolbar-app/auth/callback`;
 
     // Track auth initiated event
     await analyticsEvents.cliAuthInitiated(initiatedAutomatically);

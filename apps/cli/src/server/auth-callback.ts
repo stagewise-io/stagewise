@@ -9,14 +9,14 @@ import { log } from '../utils/logger.js';
 export async function handleAuthCallback(req: Request, res: Response) {
   try {
     const { code, state } = req.query;
-    
+
     if (!code || typeof code !== 'string') {
       throw new Error('No authorization code provided');
     }
 
     // Exchange code for tokens
     const token = await oauthManager.getToken();
-    
+
     if (!token) {
       // Need to exchange the code
       // This would require refactoring the OAuth manager
@@ -90,8 +90,10 @@ export async function handleAuthCallback(req: Request, res: Response) {
       </html>
     `);
   } catch (error) {
-    log.error(`OAuth callback error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    
+    log.error(
+      `OAuth callback error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+
     res.send(`
       <!DOCTYPE html>
       <html>

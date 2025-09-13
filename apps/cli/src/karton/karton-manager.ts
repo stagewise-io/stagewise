@@ -92,15 +92,16 @@ export class KartonManager {
           }
 
           // Build the authentication URL
-          const redirectUri = `http://localhost:${this.serverPort}/auth/callback`;
-          const STAGEWISE_CONSOLE_URL = process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
+          const redirectUri = `http://localhost:${this.serverPort}/stagewise-toolbar-app/auth/callback`;
+          const STAGEWISE_CONSOLE_URL =
+            process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
           const authUrl = `${STAGEWISE_CONSOLE_URL}/authenticate-ide?ide=cli&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
           // Return the URL for the UI to handle
           // The UI can either redirect in the same window or open a popup
-          return { 
-            success: true, 
-            authUrl 
+          return {
+            success: true,
+            authUrl,
           };
         } catch (error) {
           log.error(

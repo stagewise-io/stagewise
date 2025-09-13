@@ -77,8 +77,8 @@ export class OAuthManager {
       await tokenManager.clearToken();
     }
 
-    // Build redirect URI
-    const redirectUri = `http://localhost:${port}/auth/callback`;
+    // Build redirect URI - under stagewise-toolbar-app to avoid conflicts with proxied app
+    const redirectUri = `http://localhost:${port}/stagewise-toolbar-app/auth/callback`;
 
     // Track auth initiated event
     await analyticsEvents.cliAuthInitiated(initiatedAutomatically);
@@ -240,7 +240,7 @@ export class OAuthManager {
           return;
         }
 
-        if (url.pathname === '/auth/callback') {
+        if (url.pathname === '/stagewise-toolbar-app/auth/callback') {
           const authCode = url.searchParams.get('authCode');
           const expiresAt = url.searchParams.get('expiresAt');
           const error = url.searchParams.get('error');

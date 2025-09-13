@@ -65,8 +65,8 @@ export class UnifiedServer {
   }
 
   private setupAuthRoutes(): void {
-    // OAuth callback route
-    this.app.get('/auth/callback', async (req: Request, res: Response) => {
+    // OAuth callback route - under stagewise-toolbar-app to avoid conflicts
+    this.app.get('/stagewise-toolbar-app/auth/callback', async (req: Request, res: Response) => {
       try {
         const { code, state } = req.query;
 
@@ -78,17 +78,17 @@ export class UnifiedServer {
         await oauthManager.handleCallback(code as string, state as string);
 
         // Redirect to success page
-        res.redirect('/auth/success');
+        res.redirect('/stagewise-toolbar-app/auth/success');
       } catch (error) {
         log.error(
           `OAuth callback error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
-        res.redirect('/auth/error');
+        res.redirect('/stagewise-toolbar-app/auth/error');
       }
     });
 
     // Success page
-    this.app.get('/auth/success', (_req: Request, res: Response) => {
+    this.app.get('/stagewise-toolbar-app/auth/success', (_req: Request, res: Response) => {
       res.send(`
         <!DOCTYPE html>
         <html>
@@ -111,7 +111,7 @@ export class UnifiedServer {
     });
 
     // Error page
-    this.app.get('/auth/error', (_req: Request, res: Response) => {
+    this.app.get('/stagewise-toolbar-app/auth/error', (_req: Request, res: Response) => {
       res.send(`
         <!DOCTYPE html>
         <html>

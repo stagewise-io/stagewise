@@ -113,9 +113,9 @@ export type KartonContract = {
       chatId: string,
     ) => Promise<boolean>;
     // Authentication procedures
-    authenticate: () => Promise<{ 
-      success: boolean; 
-      authUrl?: string;  // URL for the UI to redirect to
+    authenticate: () => Promise<{
+      success: boolean;
+      authUrl?: string; // URL for the UI to redirect to
       error?: string;
     }>;
     logout: () => Promise<{ success: boolean }>;
