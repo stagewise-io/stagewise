@@ -4,7 +4,6 @@ import { Agent, type AgentCallbacks } from '@stagewise/agent-client';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { log } from '../utils/logger.js';
 import { loadPlugins } from '../server/plugin-loader.js';
-import configResolver from '../config/index.js';
 import { analyticsEvents } from '../utils/telemetry.js';
 import { printInfoMessages } from '../utils/print-info-messages.js';
 
@@ -43,8 +42,10 @@ export class Workspace {
 
       // Load plugins based on configuration
       this.plugins = await loadPlugins(this.config);
-      
-      const unavailablePlugins = this.plugins.filter(p => p.available === false);
+
+      const unavailablePlugins = this.plugins.filter(
+        (p) => p.available === false,
+      );
       if (unavailablePlugins.length > 0) {
         log.warn('The following plugins are not available:');
         unavailablePlugins.forEach((p) => {
@@ -60,7 +61,9 @@ export class Workspace {
       this.initialized = true;
       log.info('Workspace initialized successfully');
     } catch (error) {
-      log.error(`Failed to initialize workspace: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      log.error(
+        `Failed to initialize workspace: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       throw error;
     }
   }
@@ -114,7 +117,7 @@ export class Workspace {
 
       // Initialize the agent
       await this.agent.initialize();
-      
+
       log.info('Agent initialized successfully');
     } catch (error) {
       log.error(
@@ -135,7 +138,9 @@ export class Workspace {
       try {
         await callback();
       } catch (error) {
-        log.error(`Error in teardown callback: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        log.error(
+          `Error in teardown callback: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
     }
 
@@ -156,7 +161,7 @@ export class Workspace {
     this.clientRuntime = null;
     this.plugins = [];
     this.initialized = false;
-    
+
     log.info('Workspace teardown complete');
   }
 
@@ -174,11 +179,11 @@ export class Workspace {
   }
 
   getAvailablePlugins(): Plugin[] {
-    return this.plugins.filter(p => p.available !== false);
+    return this.plugins.filter((p) => p.available !== false);
   }
 
   getUnavailablePlugins(): Plugin[] {
-    return this.plugins.filter(p => p.available === false);
+    return this.plugins.filter((p) => p.available === false);
   }
 
   getAgent(): Agent | null {

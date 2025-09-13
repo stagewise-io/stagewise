@@ -60,8 +60,12 @@ async function main() {
           return;
         }
         case 'login': {
-          log.info('Please use the UI to authenticate. The auth flow is now integrated into the main server.');
-          log.info('Start the server and authenticate through the browser interface.');
+          log.info(
+            'Please use the UI to authenticate. The auth flow is now integrated into the main server.',
+          );
+          log.info(
+            'Start the server and authenticate through the browser interface.',
+          );
           return;
         }
       }
@@ -78,7 +82,9 @@ async function main() {
       switch (telemetrySubcommand) {
         case 'opt-in':
           await telemetryManager.optIn();
-          log.info('Telemetry enabled. Thank you for helping improve Stagewise!');
+          log.info(
+            'Telemetry enabled. Thank you for helping improve Stagewise!',
+          );
           break;
         case 'opt-out':
           await telemetryManager.optOut();
@@ -180,7 +186,7 @@ async function main() {
     // Display startup banner if authenticated
     const workspaceManager = WorkspaceManager.getInstance();
     const workspace = workspaceManager.getCurrentWorkspace();
-    
+
     if (!config.bridgeMode && authState?.isAuthenticated && workspace) {
       try {
         const subscription = await oauthManager.getSubscription();
@@ -215,7 +221,7 @@ async function main() {
       if (exitCode !== 0) {
         log.error(`Command exited with code ${exitCode}`);
       }
-      
+
       // Shutdown server after command completes
       await server.shutdown();
       process.exit(exitCode);
@@ -232,9 +238,10 @@ async function main() {
 
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
-
   } catch (error) {
-    log.error(`Fatal error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    log.error(
+      `Fatal error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
     if (error instanceof Error && error.stack) {
       log.debug(error.stack);
     }

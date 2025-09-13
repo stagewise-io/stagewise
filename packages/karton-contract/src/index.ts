@@ -67,6 +67,24 @@ type AppState = {
   toolCallApprovalRequests: string[];
   isWorking: boolean;
   subscription?: RouterOutputs['subscription']['getSubscription'];
+  // Authentication state
+  authStatus: {
+    isAuthenticated: boolean;
+    userEmail?: string;
+    userId?: string;
+  };
+  // Server information
+  serverInfo: {
+    port: number;
+    url: string;
+  };
+  // Workspace information
+  workspaceInfo: {
+    path: string;
+    devAppPort: number;
+    loadedPlugins: string[];
+  };
+  currentWorkspacePath: string | null;
 };
 
 export type KartonContract = {
@@ -94,5 +112,16 @@ export type KartonContract = {
     assistantMadeCodeChangesUntilLatestUserMessage: (
       chatId: string,
     ) => Promise<boolean>;
+    // Authentication procedures
+    getAuthStatus: () => Promise<{
+      isAuthenticated: boolean;
+      userEmail?: string;
+    }>;
+    authenticate: () => Promise<{ success: boolean; error?: string }>;
+    logout: () => Promise<{ success: boolean }>;
+    // Workspace management procedures
+    switchWorkspace: (
+      workspacePath: string,
+    ) => Promise<{ success: boolean; error?: string }>;
   };
 };

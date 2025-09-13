@@ -47,7 +47,7 @@ export class UnifiedOAuthManager {
 
   async initiateOAuthFlow(
     serverPort: number,
-    successRedirectUrl?: string,
+    _successRedirectUrl?: string,
     initiatedAutomatically = false,
   ): Promise<TokenData> {
     this.authInitiatedAutomatically = initiatedAutomatically;
@@ -56,9 +56,14 @@ export class UnifiedOAuthManager {
     const existingToken = await tokenManager.getStoredToken();
     if (existingToken) {
       try {
-        await this.revokeToken(existingToken.accessToken, existingToken.refreshToken);
+        await this.revokeToken(
+          existingToken.accessToken,
+          existingToken.refreshToken,
+        );
       } catch (error) {
-        log.warn(`Failed to revoke old tokens: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        log.warn(
+          `Failed to revoke old tokens: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
       this.cachedAccessToken = null;
       this.cachedRefreshToken = null;
@@ -77,13 +82,16 @@ export class UnifiedOAuthManager {
       this.pendingAuthReject = reject;
 
       // Set timeout for auth flow
-      setTimeout(() => {
-        if (this.pendingAuthReject) {
-          this.pendingAuthReject(new Error('Authentication timeout'));
-          this.pendingAuthResolve = null;
-          this.pendingAuthReject = null;
-        }
-      }, 5 * 60 * 1000); // 5 minute timeout
+      setTimeout(
+        () => {
+          if (this.pendingAuthReject) {
+            this.pendingAuthReject(new Error('Authentication timeout'));
+            this.pendingAuthResolve = null;
+            this.pendingAuthReject = null;
+          }
+        },
+        5 * 60 * 1000,
+      ); // 5 minute timeout
     });
 
     // Open authentication URL in browser
@@ -94,7 +102,9 @@ export class UnifiedOAuthManager {
       try {
         await open(authUrl);
       } catch (error) {
-        log.error(`Failed to open browser: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        log.error(
+          `Failed to open browser: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
         log.info(`Please open this URL manually: ${authUrl}`);
       }
     } else {
@@ -104,7 +114,7 @@ export class UnifiedOAuthManager {
     return authPromise;
   }
 
-  async handleCallback(code: string, state?: string): Promise<void> {
+  async handleCallback(code: string, _state?: string): Promise<void> {
     try {
       // Exchange code for tokens
       const tokenData = await this.exchangeCodeForToken(code);
@@ -126,14 +136,18 @@ export class UnifiedOAuthManager {
         this.pendingAuthReject = null;
       }
     } catch (error) {
-      log.error(`Authentication callback failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      
+      log.error(
+        `Authentication callback failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+
       if (this.pendingAuthReject) {
-        this.pendingAuthReject(error instanceof Error ? error : new Error('Authentication failed'));
+        this.pendingAuthReject(
+          error instanceof Error ? error : new Error('Authentication failed'),
+        );
         this.pendingAuthResolve = null;
         this.pendingAuthReject = null;
       }
-      
+
       throw error;
     }
   }
@@ -202,7 +216,9 @@ export class UnifiedOAuthManager {
           };
         }
       } catch (error) {
-        log.error(`Failed to refresh tokens: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        log.error(
+          `Failed to refresh tokens: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
         await this.logout();
         return null;
       }
@@ -282,7 +298,9 @@ export class UnifiedOAuthManager {
       try {
         await this.revokeToken(tokenData.accessToken, tokenData.refreshToken);
       } catch (error) {
-        log.warn(`Failed to revoke tokens on logout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        log.warn(
+          `Failed to revoke tokens on logout: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
     }
 
@@ -291,7 +309,10 @@ export class UnifiedOAuthManager {
     await tokenManager.clearToken();
   }
 
-  private async revokeToken(accessToken: string, refreshToken: string): Promise<void> {
+  private async revokeToken(
+    accessToken: string,
+    refreshToken: string,
+  ): Promise<void> {
     try {
       await axios.post(`${API_URL}/auth/revoke`, {
         accessToken,
@@ -307,7 +328,10 @@ export class UnifiedOAuthManager {
     }
   }
 
-  async getToken(): Promise<{ accessToken: string; refreshToken: string } | null> {
+  async getToken(): Promise<{
+    accessToken: string;
+    refreshToken: string;
+  } | null> {
     const authState = await this.getAuthState();
     if (!authState?.isAuthenticated) {
       return null;
@@ -338,7 +362,9 @@ export class UnifiedOAuthManager {
       const subscription = await apiClient.subscription.get();
       return subscription;
     } catch (error) {
-      log.error(`Failed to get subscription: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      log.error(
+        `Failed to get subscription: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       return null;
     }
   }

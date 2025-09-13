@@ -9,33 +9,12 @@ import { log } from '../utils/logger.js';
 import { oauthManager } from '../auth/oauth.js';
 import type { Workspace } from '../workspace/workspace.js';
 
-export interface ExtendedKartonContract extends KartonContract {
-  procedures: KartonContract['procedures'] & {
-    switchWorkspace: (workspacePath: string) => Promise<{ success: boolean; error?: string }>;
-    getAuthStatus: () => Promise<{ isAuthenticated: boolean; userEmail?: string }>;
-    authenticate: () => Promise<{ success: boolean; error?: string }>;
-    logout: () => Promise<{ success: boolean }>;
-  };
-  state: KartonContract['state'] & {
-    authStatus: {
-      isAuthenticated: boolean;
-      userEmail?: string;
-      userId?: string;
-    };
-    serverInfo: {
-      port: number;
-      url: string;
-    };
-    currentWorkspacePath: string | null;
-  };
-}
-
 export class KartonManager {
-  private kartonServer: KartonServer<ExtendedKartonContract> | null = null;
+  private kartonServer: KartonServer<KartonContract> | null = null;
   private workspaceManager: WorkspaceManager;
   private static instance: KartonManager | null = null;
-  private serverPort: number = 0;
-  private serverUrl: string = '';
+  private serverPort = 0;
+  private serverUrl = '';
 
   private constructor() {
     this.workspaceManager = WorkspaceManager.getInstance();
@@ -48,7 +27,9 @@ export class KartonManager {
     return KartonManager.instance;
   }
 
-  async initialize(port: number): Promise<KartonServer<ExtendedKartonContract>> {
+  async initialize(
+    port: number,
+  ): Promise<KartonServer<KartonContract>> {
     this.serverPort = port;
     this.serverUrl = `http://localhost:${port}`;
 
@@ -58,11 +39,13 @@ export class KartonManager {
     // Create callbacks that will be used by agent
     const callbacks: AgentCallbacks = {
       getState: () => {
-        if (!this.kartonServer) throw new Error('Karton server not initialized');
+        if (!this.kartonServer)
+          throw new Error('Karton server not initialized');
         return this.kartonServer.state;
       },
       setState: (recipe) => {
-        if (!this.kartonServer) throw new Error('Karton server not initialized');
+        if (!this.kartonServer)
+          throw new Error('Karton server not initialized');
         // @ts-ignore we'll fix this type issue
         return this.kartonServer.setState(recipe);
       },
@@ -75,8 +58,9 @@ export class KartonManager {
     const baseProcedures = {
       switchWorkspace: async (workspacePath: string) => {
         try {
-          const workspace = await this.workspaceManager.switchWorkspace(workspacePath);
-          
+          const workspace =
+            await this.workspaceManager.switchWorkspace(workspacePath);
+
           // Update Karton state
           if (this.kartonServer) {
             this.kartonServer.setState((draft) => {
@@ -84,21 +68,23 @@ export class KartonManager {
               draft.workspaceInfo = {
                 path: workspace.getPath(),
                 devAppPort: workspace.getConfig().appPort,
-                loadedPlugins: workspace.getPlugins().map(p => p.name),
+                loadedPlugins: workspace.getPlugins().map((p) => p.name),
               };
             });
           }
-          
+
           return { success: true };
         } catch (error) {
-          log.error(`Failed to switch workspace: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Unknown error'
+          log.error(
+            `Failed to switch workspace: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
           };
         }
       },
-      
+
       getAuthStatus: async () => {
         const authState = await oauthManager.getAuthState();
         return {
@@ -106,7 +92,7 @@ export class KartonManager {
           userEmail: authState?.userEmail,
         };
       },
-      
+
       authenticate: async () => {
         try {
           // Use existing OAuth flow through the main server
@@ -114,14 +100,14 @@ export class KartonManager {
           if (authState?.isAuthenticated) {
             return { success: true };
           }
-          
+
           // Initiate OAuth flow
           const tokenData = await oauthManager.initiateOAuthFlow(
             this.serverPort,
             undefined,
             false,
           );
-          
+
           // Update auth tokens in workspace manager
           if (tokenData.accessToken && tokenData.refreshToken) {
             this.workspaceManager.setAuthTokens(
@@ -129,7 +115,7 @@ export class KartonManager {
               tokenData.refreshToken,
             );
           }
-          
+
           // Update Karton state
           if (this.kartonServer) {
             this.kartonServer.setState((draft) => {
@@ -140,20 +126,22 @@ export class KartonManager {
               };
             });
           }
-          
+
           return { success: true };
         } catch (error) {
-          log.error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Unknown error'
+          log.error(
+            `Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
           };
         }
       },
-      
+
       logout: async () => {
         await oauthManager.logout();
-        
+
         // Update Karton state
         if (this.kartonServer) {
           this.kartonServer.setState((draft) => {
@@ -162,31 +150,41 @@ export class KartonManager {
             };
           });
         }
-        
+
         return { success: true };
       },
     };
 
     // Get current workspace procedures if available
     const currentWorkspace = this.workspaceManager.getCurrentWorkspace();
-    const agentProcedures = currentWorkspace ? currentWorkspace.getAgentProcedures() : {};
+    const agentProcedures = currentWorkspace
+      ? currentWorkspace.getAgentProcedures()
+      : {};
 
     // Create Karton server with combined procedures
-    this.kartonServer = await createKartonServer<ExtendedKartonContract>({
-      procedures: {
+    this.kartonServer = await createKartonServer<KartonContract>({
+      serverProcedures: {
         ...agentProcedures,
         ...baseProcedures,
-      } as any,
-      initialState: {
-        workspaceInfo: currentWorkspace ? {
-          path: currentWorkspace.getPath(),
-          devAppPort: currentWorkspace.getConfig().appPort,
-          loadedPlugins: currentWorkspace.getPlugins().map(p => p.name),
-        } : {
-          path: '',
-          devAppPort: 0,
-          loadedPlugins: [],
+      },
+      clientProcedures: {
+        getAvailableTools: async () => {
+          // TODO: Implement when agent has getAvailableTools method
+          return [];
         },
+      },
+      initialState: {
+        workspaceInfo: currentWorkspace
+          ? {
+              path: currentWorkspace.getPath(),
+              devAppPort: currentWorkspace.getConfig().appPort,
+              loadedPlugins: currentWorkspace.getPlugins().map((p) => p.name),
+            }
+          : {
+              path: '',
+              devAppPort: 0,
+              loadedPlugins: [],
+            },
         activeChatId: null,
         chats: {},
         isWorking: false,
@@ -202,6 +200,7 @@ export class KartonManager {
           url: this.serverUrl,
         },
         currentWorkspacePath: currentWorkspace?.getPath() || null,
+        workspacePath: currentWorkspace?.getPath() || null,
       },
     });
 
@@ -221,19 +220,19 @@ export class KartonManager {
   private updateAgentProcedures(workspace: Workspace): void {
     if (!this.kartonServer) return;
 
-    const agentProcedures = workspace.getAgentProcedures();
-    
-    // Note: This is a simplified approach. In reality, we'd need to 
+    const _agentProcedures = workspace.getAgentProcedures();
+
+    // Note: This is a simplified approach. In reality, we'd need to
     // properly merge procedures or recreate the Karton server
     // For now, we'll just log that procedures should be updated
     log.debug('Agent procedures updated for new workspace');
   }
 
-  getKartonServer(): KartonServer<ExtendedKartonContract> | null {
+  getKartonServer(): KartonServer<KartonContract> | null {
     return this.kartonServer;
   }
 
-  async shutdown(): void {
+  async shutdown(): Promise<void> {
     if (this.kartonServer) {
       try {
         // Close WebSocket server

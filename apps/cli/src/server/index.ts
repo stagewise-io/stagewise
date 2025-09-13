@@ -146,7 +146,8 @@ export default config;
   };
 
 const createToolbarHtmlHandler =
-  (plugins: Plugin[], config: Config) => async (_req: Request, res: Response) => {
+  (plugins: Plugin[], config: Config) =>
+  async (_req: Request, res: Response) => {
     try {
       const importMap = await getImportMap(plugins, config);
 
@@ -185,7 +186,7 @@ export const getServer = async () => {
 
     // Load plugins based on configuration and dependencies
     const plugins = await loadPlugins(config);
-    
+
     const unavailablePlugins = plugins.filter((p) => p.available === false);
 
     if (unavailablePlugins.length > 0) {

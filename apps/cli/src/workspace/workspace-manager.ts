@@ -3,7 +3,7 @@ import type { Config } from '../config/types.js';
 import { log } from '../utils/logger.js';
 import configResolver from '../config/index.js';
 import type { AgentCallbacks } from '@stagewise/agent-client';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 
 export class WorkspaceManager extends EventEmitter {
   private currentWorkspace: Workspace | null = null;
@@ -47,7 +47,7 @@ export class WorkspaceManager extends EventEmitter {
 
     // Create and initialize new workspace
     const newWorkspace = new Workspace(newConfig);
-    
+
     if (this.accessToken && this.refreshToken && this.kartonCallbacks) {
       await newWorkspace.initialize(
         this.accessToken,
@@ -57,10 +57,10 @@ export class WorkspaceManager extends EventEmitter {
     }
 
     this.currentWorkspace = newWorkspace;
-    
+
     // Emit workspace changed event
     this.emit('workspaceChanged', newWorkspace);
-    
+
     log.info(`Workspace switched successfully to: ${workspacePath}`);
     return newWorkspace;
   }
@@ -72,7 +72,7 @@ export class WorkspaceManager extends EventEmitter {
     }
 
     const workspace = new Workspace(config);
-    
+
     if (this.accessToken && this.refreshToken && this.kartonCallbacks) {
       await workspace.initialize(
         this.accessToken,
@@ -82,10 +82,10 @@ export class WorkspaceManager extends EventEmitter {
     }
 
     this.currentWorkspace = workspace;
-    
+
     // Emit workspace initialized event
     this.emit('workspaceInitialized', workspace);
-    
+
     return workspace;
   }
 
@@ -95,10 +95,10 @@ export class WorkspaceManager extends EventEmitter {
     }
 
     log.info('Tearing down current workspace');
-    
+
     // Emit workspace teardown event
     this.emit('workspaceTeardown', this.currentWorkspace);
-    
+
     await this.currentWorkspace.teardown();
     this.currentWorkspace = null;
   }

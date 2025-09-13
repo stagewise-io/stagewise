@@ -5,12 +5,15 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { log } from '../utils/logger.js';
-import { generatePluginImportMapEntries, type Plugin } from './plugin-loader.js';
+import {
+  generatePluginImportMapEntries,
+  type Plugin,
+} from './plugin-loader.js';
 import { KartonManager } from '../karton/karton-manager.js';
 import { WorkspaceManager } from '../workspace/workspace-manager.js';
 import { oauthManager } from '../auth/oauth.js';
 import type { Config } from '../config/types.js';
-import type { Server } from 'http';
+import type { Server } from 'node:http';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -66,18 +69,20 @@ export class UnifiedServer {
     this.app.get('/auth/callback', async (req: Request, res: Response) => {
       try {
         const { code, state } = req.query;
-        
+
         if (!code || typeof code !== 'string') {
           throw new Error('No authorization code provided');
         }
 
         // Handle OAuth callback
         await oauthManager.handleCallback(code as string, state as string);
-        
+
         // Redirect to success page
         res.redirect('/auth/success');
       } catch (error) {
-        log.error(`OAuth callback error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        log.error(
+          `OAuth callback error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
         res.redirect('/auth/error');
       }
     });
@@ -131,7 +136,7 @@ export class UnifiedServer {
 
   private setupToolbarRoutes(): void {
     const workspace = this.workspaceManager.getCurrentWorkspace();
-    
+
     // Serve toolbar static files
     const toolbarPath = this.config.bridgeMode
       ? process.env.NODE_ENV === 'production'
@@ -140,7 +145,7 @@ export class UnifiedServer {
       : process.env.NODE_ENV === 'production'
         ? resolve(__dirname, 'toolbar-app')
         : resolve('node_modules/@stagewise/toolbar/dist/toolbar-main');
-    
+
     this.app.use('/stagewise-toolbar-app', express.static(toolbarPath));
 
     // Serve plugin directories if workspace is initialized
@@ -179,7 +184,9 @@ export class UnifiedServer {
         });
       } else if (!url.startsWith('/stagewise-toolbar-app')) {
         // Proxy non-toolbar WebSocket requests
-        log.debug(`Proxying WebSocket request to app port ${this.config.appPort}`);
+        log.debug(
+          `Proxying WebSocket request to app port ${this.config.appPort}`,
+        );
         proxy.upgrade?.(request, socket as any, head);
       } else {
         log.debug(`Unknown WebSocket path: ${url}`);
@@ -191,8 +198,12 @@ export class UnifiedServer {
   private async initializeWorkspace(): Promise<void> {
     try {
       const authState = await oauthManager.getAuthState();
-      
-      if (authState?.isAuthenticated && authState.accessToken && authState.refreshToken) {
+
+      if (
+        authState?.isAuthenticated &&
+        authState.accessToken &&
+        authState.refreshToken
+      ) {
         // Set auth tokens in workspace manager
         this.workspaceManager.setAuthTokens(
           authState.accessToken,
@@ -200,14 +211,18 @@ export class UnifiedServer {
         );
 
         // Initialize default workspace
-        const workspace = await this.workspaceManager.initializeWorkspace(this.config);
+        const workspace = await this.workspaceManager.initializeWorkspace(
+          this.config,
+        );
         log.info(`Workspace initialized at: ${workspace.getPath()}`);
       } else {
         log.info('No authentication found - workspace features disabled');
         log.info('Authenticate through the UI to enable workspace features');
       }
     } catch (error) {
-      log.error(`Failed to initialize workspace: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      log.error(
+        `Failed to initialize workspace: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -217,7 +232,7 @@ export class UnifiedServer {
         const workspace = this.workspaceManager.getCurrentWorkspace();
         const plugins = workspace ? workspace.getPlugins() : [];
         const availablePlugins = plugins.filter((p) => p.available !== false);
-        
+
         const pluginImports: string[] = [];
         const pluginExports: string[] = [];
         const errorHandlers: string[] = [];
@@ -309,22 +324,30 @@ export default config;
     const manifestPath = this.config.bridgeMode
       ? process.env.NODE_ENV === 'production'
         ? resolve(__dirname, 'toolbar-bridged/.vite/manifest.json')
-        : resolve('node_modules/@stagewise/toolbar-bridged/dist/toolbar-main/.vite/manifest.json')
+        : resolve(
+            'node_modules/@stagewise/toolbar-bridged/dist/toolbar-main/.vite/manifest.json',
+          )
       : process.env.NODE_ENV === 'production'
         ? resolve(__dirname, 'toolbar-app/.vite/manifest.json')
-        : resolve('node_modules/@stagewise/toolbar/dist/toolbar-main/.vite/manifest.json');
+        : resolve(
+            'node_modules/@stagewise/toolbar/dist/toolbar-main/.vite/manifest.json',
+          );
 
     const mainAppManifest = JSON.parse(await readFile(manifestPath, 'utf-8'));
     const mainAppEntries: Record<string, string> = {};
-    
-    for (const [_, entry] of Object.entries(mainAppManifest) as [string, { file: string }][]) {
+
+    for (const [_, entry] of Object.entries(mainAppManifest) as [
+      string,
+      { file: string },
+    ][]) {
       if (entry.file.endsWith('.js')) {
         mainAppEntries[entry.file] = `/stagewise-toolbar-app/${entry.file}`;
       }
     }
 
-    const reactDepsDevSuffix = process.env.NODE_ENV === 'development' ? '?dev' : '';
-    
+    const reactDepsDevSuffix =
+      process.env.NODE_ENV === 'development' ? '?dev' : '';
+
     return {
       imports: {
         react: `https://esm.sh/react@19.1.0${reactDepsDevSuffix}`,
@@ -350,13 +373,13 @@ export default config;
 
   async shutdown(): Promise<void> {
     log.info('Shutting down server');
-    
+
     // Shutdown workspace manager
     await this.workspaceManager.shutdown();
-    
+
     // Shutdown Karton
     await this.kartonManager.shutdown();
-    
+
     // Close HTTP server
     return new Promise((resolve) => {
       this.server.close(() => {
