@@ -27,9 +27,7 @@ export class KartonManager {
     return KartonManager.instance;
   }
 
-  async initialize(
-    port: number,
-  ): Promise<KartonServer<KartonContract>> {
+  async initialize(port: number): Promise<KartonServer<KartonContract>> {
     this.serverPort = port;
     this.serverUrl = `http://localhost:${port}`;
 
@@ -83,14 +81,6 @@ export class KartonManager {
             error: error instanceof Error ? error.message : 'Unknown error',
           };
         }
-      },
-
-      getAuthStatus: async () => {
-        const authState = await oauthManager.getAuthState();
-        return {
-          isAuthenticated: authState?.isAuthenticated || false,
-          userEmail: authState?.userEmail,
-        };
       },
 
       authenticate: async () => {

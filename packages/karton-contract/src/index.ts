@@ -113,10 +113,6 @@ export type KartonContract = {
       chatId: string,
     ) => Promise<boolean>;
     // Authentication procedures
-    getAuthStatus: () => Promise<{
-      isAuthenticated: boolean;
-      userEmail?: string;
-    }>;
     authenticate: () => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<{ success: boolean }>;
     // Workspace management procedures
