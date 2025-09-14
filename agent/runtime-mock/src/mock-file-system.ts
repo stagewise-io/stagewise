@@ -12,6 +12,7 @@ import {
   type GlobResult,
   type SearchReplaceResult,
   type SearchReplaceMatch,
+  type FileChangeEvent,
 } from '@stagewise/agent-runtime-interface';
 
 export interface MockFileSystemConfig extends FileSystemProviderConfig {
@@ -673,6 +674,13 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
 
   getCurrentWorkingDirectory(): string {
     return this.config.workingDirectory;
+  }
+
+  async watchFiles(
+    _path: string,
+    _onFileChange: (event: FileChangeEvent) => void,
+  ): Promise<() => Promise<void>> {
+    return async () => {};
   }
 
   async deleteFile(path: string): Promise<FileOperationResult> {
