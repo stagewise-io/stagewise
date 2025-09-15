@@ -12,7 +12,7 @@
     "agent",
     "interaction"
   ],
-  "author": "tiq UG (haftungsbeschränkt)",
+  "author": "stagewise GmbH",
   "license": "MIT",
   "scripts": {
     "dev": "tsx build.ts",

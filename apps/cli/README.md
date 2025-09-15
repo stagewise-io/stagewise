@@ -65,7 +65,7 @@ And simply follow the short guide of the CLI app to setup your stagewise account
 
 ## 📜 License
 
-stagewise is developed by tiq UG (haftungsbeschränkt) and offered under the AGPLv3 license.
+stagewise is developed by stagewise GmbH and offered under the AGPLv3 license.
 
 For more information on the license model, visit the [FAQ about the GNU Licenses](https://www.gnu.org/licenses/gpl-faq.html).
 

@@ -26,7 +26,7 @@ export function Footer() {
             className="hidden dark:block"
           />
           <span className="ml-8 text-sm text-zinc-600 dark:text-zinc-500">
-            © 2025 tiq UG (haftungsbeschränkt)
+            © 2025 stagewise GmbH
           </span>
         </div>
         <div className="flex gap-8">
@@ -74,7 +74,7 @@ export function Footer() {
       </div>
       <div className="mt-8 flex flex-col items-center justify-between pt-8 md:flex-row dark:border-zinc-800">
         <p className="max-w-lg text-xs text-zinc-500 dark:text-zinc-400">
-          stagewise® is a registered trademark of tiq UG (haftungsbeschränkt)
+          stagewise® is a registered trademark of stagewise GmbH
           and protected in the EU by the European Union Intellectual Property
           Office (EUIPO).
           <br />

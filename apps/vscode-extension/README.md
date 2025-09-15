@@ -54,7 +54,7 @@ Installing this extension will make the agent inside the IDE available in the st
 
 ## 📜 License
 
-stagewise is developed by tiq UG (haftungsbeschränkt) and offered under the AGPLv3 license.
+stagewise is developed by stagewise GmbH and offered under the AGPLv3 license.
 
 For more information on the license model, visit the [FAQ about the GNU Licenses](https://www.gnu.org/licenses/gpl-faq.html).
 

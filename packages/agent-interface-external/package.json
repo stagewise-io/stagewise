@@ -1,6 +1,6 @@
 {
   "name": "@stagewise/agent-interface",
-  "author": "tiq UG (haftungsbeschränkt)",
+  "author": "stagewise GmbH",
   "version": "0.3.2",
   "license": "AGPL-3.0-only",
   "type": "module",
