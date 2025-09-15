@@ -7,8 +7,6 @@ import {
   type ChatMessage,
   AgentErrorType,
 } from '@stagewise/karton-contract';
-import { indexCodebase } from '@stagewise/agent-rag';
-import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import {
   cliTools,
@@ -32,10 +30,7 @@ import {
   EventFactories,
   type AgentEventCallback,
 } from './utils/event-utils.js';
-import {
-  ErrorDescriptions,
-  formatErrorDescription,
-} from './utils/error-utils.js';
+import { formatErrorDescription } from './utils/error-utils.js';
 import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
 import { getProjectPath } from '@stagewise/agent-prompt-snippets';
 import {
@@ -141,6 +136,8 @@ export class Agent {
       },
       { once: true },
     );
+
+    this.clientRuntime.fileSystem.watchFiles('.', (_event) => {});
   }
 
   public shutdown() {
@@ -156,18 +153,6 @@ export class Agent {
       baseURL: `${LLM_PROXY_URL}/v1`, // will use the anthropic/v1/messages endpoint of the litellm proxy
       apiKey: this.accessToken, // stagewise access token
     });
-  }
-
-  private async indexCodebase(): Promise<void> {
-    const indexer = indexCodebase(this.accessToken, {
-      rootDir: '/Users/juliangoetze/Arbeit/agentic-work/saas-shadcn',
-      // baseUrl: `${process.env.API_URL}/google`,
-      baseUrl: `${process.env.API_URL}/google`,
-      headers: { 'stagewise-access-key': this.accessToken },
-    });
-    for await (const progress of indexer) {
-      console.log(progress);
-    }
   }
 
   /**
@@ -304,13 +289,12 @@ export class Agent {
           this.contextFilesInfo.lastSelectedElementsCount =
             update.browserData?.selectedElements?.length || 0;
 
-          console.log(`
-            update:
-              userInput: ${update.chatInput}
-              selected elements amount: ${update.browserData?.selectedElements?.length}
-             `);
           this.contextFilesInfo.contextFiles =
-            await getContextFilesFromUserInput(update, this.accessToken);
+            await getContextFilesFromUserInput(
+              update,
+              this.accessToken,
+              this.clientRuntime,
+            );
         },
         undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
           await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
@@ -406,22 +390,6 @@ export class Agent {
           });
         },
         sendUserMessage: async (message, _callingClientId) => {
-          // Retrieve the RAG here!!!!
-          // const results = await searchCodebase(
-          //   this.accessToken,
-          //   'A dashboard card that shows donations that are pending',
-          //   {
-          //     limit: 15,
-          //   },
-          // );
-          // for (const result of results) {
-          //   console.log(
-          //     'result: ',
-          //     result.filePath,
-          //     'distance: ',
-          //     result.distance,
-          //   );
-          // }
           this.setAgentWorking(true);
           const newstate = this.karton?.setState((draft) => {
             const chatId = this.karton!.state.activeChatId!;

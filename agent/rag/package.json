@@ -25,13 +25,18 @@
     "clean": "rimraf dist",
     "lint": "echo 'No linting for rag package'",
     "type-check": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "test-lance": "tsx src/test-lance.ts"
   },
   "dependencies": {
     "@google/genai": "^1.16.0",
     "@lancedb/lancedb": "^0.21.3",
+    "@stagewise/agent-runtime-interface": "workspace:*",
+    "@stagewise/agent-runtime-node": "workspace:*",
     "chokidar": "^4.0.3",
-    "ignore": "^7.0.5"
+    "ignore": "^7.0.5",
+    "level": "^10.0.0",
+    "openai": "^5.20.2"
   },
   "devDependencies": {
     "@stagewise/agent-types": "workspace:*",
