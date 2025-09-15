@@ -59,6 +59,8 @@ async function buildCLI() {
       '@google/genai',
       'chokidar',
       'ignore',
+      'openai',
+      'level',
     ];
 
     // Build the CLI bundling most dependencies

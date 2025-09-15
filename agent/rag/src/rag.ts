@@ -17,6 +17,7 @@ import {
   searchSimilarFiles,
   upsertFileRecord,
 } from './utils/database.js';
+import { RerankClient } from './utils/rerank.js';
 
 export type RagUpdate = {
   progress: number;
@@ -86,7 +87,47 @@ export async function updateRag(
   }
 }
 
+/**
+ * Query the RAG and rerank the results
+ * @param query - The query to search the RAG for
+ * @param clientRuntime - The client runtime
+ * @param apiKey - The API key to use for the RAG
+ * @param limit - The number of results to return
+ * @returns The reranked results
+ */
 export async function queryRag(
+  query: string,
+  clientRuntime: ClientRuntime,
+  apiKey: string,
+  limit = 5,
+) {
+  const ragResults = await queryRagWithoutRerank(
+    query,
+    clientRuntime,
+    apiKey,
+    35,
+  );
+
+  console.log('ragResults', ragResults);
+
+  const rerankClient = new RerankClient({
+    baseUrl: process.env.LLM_PROXY_URL || 'http://localhost:3002',
+    apiKey,
+  });
+
+  const results = await rerankClient.rerank({
+    query,
+    documents: ragResults.map((r) => r.content),
+    top_n: limit,
+  });
+
+  return results.results.map((r) => ({
+    relativePath: r.document?.metadata?.relativePath,
+    distance: r.relevance_score,
+  }));
+}
+
+export async function queryRagWithoutRerank(
   query: string,
   clientRuntime: ClientRuntime,
   apiKey: string,
@@ -94,7 +135,7 @@ export async function queryRag(
 ) {
   const openai = new OpenAI({
     apiKey,
-    baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
+    baseURL: process.env.LLM_PROXY_URL || 'http://localhost:3002',
   });
   const embeddings = await generateEmbedding(
     openai,
@@ -129,7 +170,7 @@ async function* embedFiles(
   const embeddings = generateFileEmbeddings(
     {
       apiKey,
-      baseUrl: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
+      baseUrl: process.env.LLM_PROXY_URL || 'http://localhost:3002',
     },
     relativePaths,
     clientRuntime,
