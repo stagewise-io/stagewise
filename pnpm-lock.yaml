@@ -211,9 +211,6 @@ importers:
       '@stagewise/agent-runtime-interface':
         specifier: workspace:*
         version: link:../runtime-interface
-      '@stagewise/agent-runtime-node':
-        specifier: workspace:*
-        version: link:../runtime-node
       chokidar:
         specifier: ^4.0.3
         version: 4.0.3
@@ -359,6 +356,16 @@ importers:
         version: 4.0.17
 
   apps/cli:
+    dependencies:
+      '@lancedb/lancedb':
+        specifier: ^0.21.3
+        version: 0.21.3(apache-arrow@18.1.0)
+      chokidar:
+        specifier: ^4.0.3
+        version: 4.0.3
+      level:
+        specifier: ^10.0.0
+        version: 10.0.0
     devDependencies:
       '@google/genai':
         specifier: ^1.16.0
@@ -366,9 +373,6 @@ importers:
       '@inquirer/prompts':
         specifier: ^7.0.0
         version: 7.3.2(@types/node@24.0.3)
-      '@lancedb/lancedb':
-        specifier: ^0.21.3
-        version: 0.21.3(apache-arrow@18.1.0)
       '@stagewise-plugins/angular':
         specifier: workspace:*
         version: link:../../plugins/angular
@@ -414,9 +418,6 @@ importers:
       chalk:
         specifier: ^5.3.0
         version: 5.4.1
-      chokidar:
-        specifier: ^4.0.3
-        version: 4.0.3
       cli-table3:
         specifier: ^0.6.5
         version: 0.6.5
@@ -447,6 +448,9 @@ importers:
       open:
         specifier: ^10.0.0
         version: 10.1.2
+      openai:
+        specifier: ^5.20.2
+        version: 5.20.2(ws@8.18.3)(zod@3.25.76)
       posthog-node:
         specifier: ^4.18.0
         version: 4.18.0

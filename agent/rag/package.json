@@ -32,7 +32,6 @@
     "@google/genai": "^1.16.0",
     "@lancedb/lancedb": "^0.21.3",
     "@stagewise/agent-runtime-interface": "workspace:*",
-    "@stagewise/agent-runtime-node": "workspace:*",
     "chokidar": "^4.0.3",
     "ignore": "^7.0.5",
     "level": "^10.0.0",

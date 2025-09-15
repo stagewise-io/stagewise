@@ -54,13 +54,11 @@ async function buildCLI() {
     await mkdir('dist', { recursive: true });
 
     // Only keep external the packages that have issues with bundling
+    // These are now runtime dependencies and will be available when the CLI is installed
     const externalPackages: string[] = [
-      '@lancedb/lancedb',
-      '@google/genai',
-      'chokidar',
-      'ignore',
-      'openai',
-      'level',
+      '@lancedb/lancedb', // Has native bindings
+      'level', // Has native bindings
+      'chokidar', // Has native bindings
     ];
 
     // Build the CLI bundling most dependencies

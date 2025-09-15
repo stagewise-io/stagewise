@@ -11,12 +11,9 @@ const baseOptions: BuildOptions = {
   target: 'es2020',
   external: [
     '@stagewise/karton',
-    '@lancedb/lancedb',
-    '@google/genai',
-    'chokidar',
-    'ignore',
-    'openai',
-    'level',
+    '@lancedb/lancedb', // Has native bindings, must be external
+    'level', // Has native bindings, must be external
+    'chokidar', // Has native bindings, must be external
   ],
   sourcemap: false,
   minify: true,
