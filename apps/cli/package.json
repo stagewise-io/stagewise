@@ -22,7 +22,7 @@
   },
   "scripts": {
     "build": "dotenv -e ../../.env -- tsx build.ts",
-    "dev": "NODE_ENV=development dotenv -e ../../.env -- tsx src/index.ts",
+    "dev": "dotenv -e ../../.env -- node dist/index.cjs",
     "run": "dotenv -e ../../.env -- rsx dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -30,6 +30,11 @@
     "test:ui": "vitest run --ui",
     "test:coverage": "vitest run --coverage",
     "reset-data": "tsx reset.ts"
+  },
+  "dependencies": {
+    "@lancedb/lancedb": "^0.21.3",
+    "level": "^10.0.0",
+    "chokidar": "^4.0.3"
   },
   "devDependencies": {
     "@inquirer/prompts": "^7.0.0",
@@ -56,9 +61,8 @@
     "express": "^4.18.2",
     "http-proxy-middleware": "^3.0.5",
     "ignore": "^6.0.2",
-    "@lancedb/lancedb": "^0.21.3",
+    "openai": "^5.20.2",
     "@google/genai": "^1.16.0",
-    "chokidar": "^4.0.3",
     "license-checker": "^25.0.1",
     "open": "^10.0.0",
     "posthog-node": "^4.18.0",
