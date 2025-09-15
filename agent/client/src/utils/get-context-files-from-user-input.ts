@@ -2,7 +2,7 @@ import type { UserInputUpdate } from '@stagewise/karton-contract';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { TextUIPart } from '@stagewise/karton-contract';
 import { generateText, type ModelMessage } from 'ai';
-import { queryRag } from '@stagewise/agent-rag';
+import { queryRagWithoutRerank } from '@stagewise/agent-rag';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 
 const system = `You are a helpful assistant that describes the semantic of elements in a web application by looking at the DOM structure and selected elements.
@@ -17,7 +17,9 @@ Example:
   A white search input with blue text with a search button with a blue background and white text that triggers a search action.
 `;
 
-function getFileSnippet(file: Awaited<ReturnType<typeof queryRag>>[number]) {
+function getFileSnippet(
+  file: Awaited<ReturnType<typeof queryRagWithoutRerank>>[number],
+) {
   return `
   <file_path>
     ${file.filePath}
@@ -60,7 +62,7 @@ export async function getContextFilesFromUserInput(
       messages: [{ role: 'system', content: system }, prompt],
     });
 
-    const retrievedFiles = await queryRag(
+    const retrievedFiles = await queryRagWithoutRerank(
       response.text,
       clientRuntime,
       apiKey,

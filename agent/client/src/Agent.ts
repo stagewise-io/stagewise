@@ -121,6 +121,7 @@ export class Agent {
     this.accessToken = config.accessToken;
     this.refreshToken = config.refreshToken;
     this.eventEmitter = createEventEmitter(config.onEvent);
+    console.log('accessToken', this.accessToken);
     this.client = createAuthenticatedClient(this.accessToken);
     this.initializeLitellm();
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
@@ -290,6 +291,11 @@ export class Agent {
           this.contextFilesInfo.lastSelectedElementsCount =
             update.browserData?.selectedElements?.length || 0;
 
+          console.log(`
+            update:
+              userInput: ${update.chatInput}
+              selected elements amount: ${update.browserData?.selectedElements?.length}
+             `);
           this.contextFilesInfo.contextFiles =
             await getContextFilesFromUserInput(
               update,

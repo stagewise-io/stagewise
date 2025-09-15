@@ -15,6 +15,8 @@ const baseOptions: BuildOptions = {
     '@google/genai',
     'chokidar',
     'ignore',
+    'openai',
+    'level',
   ],
   sourcemap: false,
   minify: true,
