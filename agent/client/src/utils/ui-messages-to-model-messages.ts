@@ -39,10 +39,6 @@ export function uiMessagesToModelMessages(
         modelMessages.push(
           prompts.getUserMessagePrompt({ userMessage: message }),
         );
-        console.log(
-          'userMessage ',
-          JSON.stringify(modelMessages[modelMessages.length - 1]),
-        );
         break;
       case 'assistant': {
         // Create a new message with cleaned tool outputs

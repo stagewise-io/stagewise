@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { EXPECTED_EMBEDDING_DIM } from '../index.js';
+import path from 'node:path';
 
 export interface EmbeddingConfig {
   apiKey: string;
@@ -32,15 +33,61 @@ export const createEmbeddingClient = (config: EmbeddingConfig): OpenAI => {
   });
 };
 
+export function getFileChunkContent(
+  filePath: string,
+  _clientRuntime: ClientRuntime,
+  content: string,
+) {
+  const description = (filePath: string) => {
+    const fileName = path.basename(filePath);
+    const extension = path.extname(filePath);
+    const defaultDescription = `A ${extension} file with the name ${fileName} from the file ${filePath}.`;
+    switch (extension) {
+      case '.tsx':
+      case '.jsx':
+      case '.vue':
+      case '.svelte':
+      case '.astro':
+      case '.html':
+      case '.htm':
+        return `FRONTEND FILE \n${defaultDescription}`;
+      case '.css':
+      case '.scss':
+      case '.sass':
+      case '.less':
+      case '.styl':
+        return `STYLING FILE \n${defaultDescription}`;
+      case '.md':
+      case '.mdx':
+        return `DOCUMENTATION FILE \n${defaultDescription}`;
+      default:
+        return defaultDescription;
+    }
+  };
+  const codeBlock = (code: string) => `\n\nCode:\n---\n${code}\n---`;
+  return description(filePath) + codeBlock(content);
+}
+
 /**
  * Chunks text into smaller pieces while preserving line boundaries
  */
-export const chunkText = (
-  text: string,
+export const getFileChunks = async (
+  filePath: string,
+  clientRuntime: ClientRuntime,
   maxChunkSize = 8000,
-): { text: string; startLine: number; endLine: number }[] => {
+): Promise<{ text: string; startLine: number; endLine: number }[]> => {
+  const content = await clientRuntime.fileSystem.readFile(filePath);
+  if (!content.success) return [];
+  const text = content.content || '';
+
   if (text.length <= maxChunkSize) {
-    return [{ text, startLine: 0, endLine: text.length }];
+    return [
+      {
+        text: getFileChunkContent(filePath, clientRuntime, text),
+        startLine: 0,
+        endLine: text.length,
+      },
+    ];
   }
 
   const chunks: { text: string; startLine: number; endLine: number }[] = [];
@@ -51,7 +98,7 @@ export const chunkText = (
     if (currentChunk.length + line.length + 1 > maxChunkSize) {
       if (currentChunk) {
         chunks.push({
-          text: currentChunk,
+          text: getFileChunkContent(filePath, clientRuntime, currentChunk),
           startLine: 0,
           endLine: currentChunk.length,
         });
@@ -61,7 +108,11 @@ export const chunkText = (
       if (line.length > maxChunkSize) {
         for (let i = 0; i < line.length; i += maxChunkSize) {
           chunks.push({
-            text: line.substring(i, i + maxChunkSize),
+            text: getFileChunkContent(
+              filePath,
+              clientRuntime,
+              line.substring(i, i + maxChunkSize),
+            ),
             startLine: 0,
             endLine: line.length,
           });
@@ -76,7 +127,7 @@ export const chunkText = (
 
   if (currentChunk) {
     chunks.push({
-      text: currentChunk,
+      text: getFileChunkContent(filePath, clientRuntime, currentChunk),
       startLine: 0,
       endLine: currentChunk.length,
     });
@@ -95,12 +146,10 @@ export const generateEmbedding = async <T extends string | string[]>(
 ): Promise<number[][]> => {
   try {
     const result = await client.embeddings.create({
-      // dimensions: EXPECTED_EMBEDDING_DIM,
       model: `${model}`,
       input: text, // Wrap text in array as per API spec
       encoding_format: 'float',
     });
-    // Check if embedding has actual values or is all zeros
     const embedding = result.data?.map((d) => d.embedding || []) || [];
 
     if (embedding.some((e) => e.length !== EXPECTED_EMBEDDING_DIM)) {
@@ -144,8 +193,12 @@ export async function* generateFileEmbeddings(
           console.error(`Failed to read file: ${filePath}`);
           continue;
         }
-        const chunks = chunkText(content.content || '');
-        fileChunksData.push({ filePath, chunks });
+        const allChunks = await getFileChunks(filePath, clientRuntime);
+        // Filter out empty or whitespace-only chunks
+        const nonEmptyChunks = allChunks.filter(
+          (chunk) => chunk.text.trim().length > 0,
+        );
+        fileChunksData.push({ filePath, chunks: nonEmptyChunks });
       } catch (error) {
         console.error(`Error processing file ${filePath}:`, error);
       }
@@ -172,6 +225,12 @@ export async function* generateFileEmbeddings(
 
     // Process chunks in embedding batches
     const embeddingBatchSize = 100; // Max number of texts to embed at once
+
+    // Skip embedding generation if there are no chunks to process
+    if (chunkInfoList.length === 0) {
+      continue;
+    }
+
     for (let j = 0; j < chunkInfoList.length; j += embeddingBatchSize) {
       const chunkBatch = chunkInfoList.slice(j, j + embeddingBatchSize);
       const texts = chunkBatch.map((info) => info.chunk.text);
@@ -235,9 +294,7 @@ export const generateSingleEmbedding = async (
   const client = createEmbeddingClient(config);
   const model = config.model || 'gemini-embedding-001';
 
-  const content = await clientRuntime.fileSystem.readFile(filePath);
-  if (!content.success) throw new Error('Failed to read file');
-  const chunks = chunkText(content.content || '');
+  const chunks = await getFileChunks(filePath, clientRuntime);
   const firstChunk = chunks[0] || { text: '', startLine: 0, endLine: 0 };
   const embeddings = await generateEmbedding(client, firstChunk.text, model);
 

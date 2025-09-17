@@ -1,24 +1,14 @@
-export interface RerankDocument {
-  text: string;
-  metadata?: Record<string, any>;
-}
-
 export interface RerankRequest {
   model: string;
   query: string;
-  documents: string[] | RerankDocument[];
+  documents: string[];
   top_n?: number;
-  return_documents?: boolean;
   max_chunks_per_doc?: number;
 }
 
 export interface RerankResult {
   index: number;
   relevance_score: number;
-  document?: {
-    text: string;
-    metadata?: Record<string, any>;
-  };
 }
 
 export interface RerankResponse {
@@ -58,9 +48,6 @@ export class RerankClient {
       query: params.query,
       documents: params.documents,
       ...(params.top_n !== undefined && { top_n: params.top_n }),
-      ...(params.return_documents !== undefined && {
-        return_documents: params.return_documents,
-      }),
       ...(params.max_chunks_per_doc !== undefined && {
         max_chunks_per_doc: params.max_chunks_per_doc,
       }),

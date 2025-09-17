@@ -290,11 +290,6 @@ export class Agent {
           this.contextFilesInfo.lastSelectedElementsCount =
             update.browserData?.selectedElements?.length || 0;
 
-          console.log(`
-            update:
-              userInput: ${update.chatInput}
-              selected elements amount: ${update.browserData?.selectedElements?.length}
-             `);
           this.contextFilesInfo.contextFiles =
             await getContextFilesFromUserInput(
               update,
@@ -549,7 +544,13 @@ export class Agent {
         temperature: 0.7,
         maxOutputTokens: 64000,
         maxRetries: 0,
-        messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
+        messages: [
+          systemPrompt,
+          ...uiMessagesToModelMessages(
+            history ?? [],
+            this.contextFilesInfo.contextFiles,
+          ),
+        ],
         onError: async (error) => {
           if (isAbortError(error.error)) {
             this.authRetryCount = 0;

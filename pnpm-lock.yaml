@@ -224,6 +224,9 @@ importers:
         specifier: ^5.20.2
         version: 5.20.2(ws@8.18.3)(zod@3.25.76)
     devDependencies:
+      '@stagewise/agent-runtime-node':
+        specifier: workspace:*
+        version: link:../runtime-node
       '@stagewise/agent-types':
         specifier: workspace:*
         version: link:../types

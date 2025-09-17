@@ -1,9 +1,9 @@
 import type { UserInputUpdate } from '@stagewise/karton-contract';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { TextUIPart } from '@stagewise/karton-contract';
 import { generateText, type ModelMessage } from 'ai';
 import { queryRagWithoutRerank } from '@stagewise/agent-rag';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import { createAnthropic } from '@ai-sdk/anthropic';
 
 const system = `You are a helpful assistant that describes the semantic of elements in a web application by looking at the DOM structure and selected elements.
 
@@ -17,20 +17,21 @@ Example:
   A white search input with blue text with a search button with a blue background and white text that triggers a search action.
 `;
 
-function getFileSnippet(
+async function getFileSnippet(
   file: Awaited<ReturnType<typeof queryRagWithoutRerank>>[number],
+  _clientRuntime: ClientRuntime,
 ) {
   return `
-  <file_path>
-    ${file.filePath}
-  </file_path>
-  <relevance>
-    ${file.distance.toFixed(2)}
-  </relevance>
-  <content>
-    ${file.content}
-  </content>
-  `;
+    <file_path>
+      ${file.relativePath}
+    </file_path>
+    <relevance>
+      ${(1 - file.distance).toFixed(2)}
+    </relevance>
+    <content>
+      ${file.content}
+    </content>
+    `;
 }
 
 export async function getContextFilesFromUserInput(
@@ -39,10 +40,9 @@ export async function getContextFilesFromUserInput(
   clientRuntime: ClientRuntime,
 ): Promise<TextUIPart[]> {
   try {
-    const google = createGoogleGenerativeAI({
+    const litellm = createAnthropic({
       apiKey: apiKey,
-      baseURL: `${process.env.API_URL}/google/v1beta`,
-      headers: { 'stagewise-access-key': apiKey },
+      baseURL: `${process.env.LLM_PROXY_URL}/v1`,
     });
 
     const selectedElements = userInput.browserData?.selectedElements;
@@ -58,7 +58,7 @@ export async function getContextFilesFromUserInput(
     } satisfies ModelMessage;
 
     const response = await generateText({
-      model: google('gemini-2.5-flash'),
+      model: litellm('gemini-2.5-flash'),
       messages: [{ role: 'system', content: system }, prompt],
     });
 
@@ -66,17 +66,24 @@ export async function getContextFilesFromUserInput(
       response.text,
       clientRuntime,
       apiKey,
-      15,
+      8,
     );
+    // Filter out duplicate files by relativePath, keeping only the first occurrence
+    // const uniqueRetrievedFiles = retrievedFiles.filter(
+    //   (file, index, arr) =>
+    //     arr.findIndex((f) => f.relativePath === file.relativePath) === index,
+    // );
 
-    for (const file of retrievedFiles) {
-      console.log('\nfile distance', file.distance);
-      console.log('file path', file.filePath);
-    }
+    // const fileSnippets = await Promise.all(
+    //   uniqueRetrievedFiles.map((file) => getFileSnippet(file, clientRuntime)),
+    // );
+    const fileSnippets = await Promise.all(
+      retrievedFiles.map((file) => getFileSnippet(file, clientRuntime)),
+    );
 
     const part: TextUIPart = {
       type: 'text',
-      text: `These are the relevant files for the user's request: \n\n${retrievedFiles.map((file) => getFileSnippet(file)).join('\n')}`,
+      text: `These are the relevant files for the user's request: \n\n${fileSnippets.join('\n')}`,
     };
 
     return [part];
