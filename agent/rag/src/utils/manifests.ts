@@ -1,5 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import { ALLOWED_EXTENSIONS } from './allowed-extensions.js';
+import { ALLOWED_EXTENSIONS, ALLOWED_FILENAMES } from './allowed-extensions.js';
 import { createHash } from 'node:crypto';
 import { Level } from 'level';
 import path from 'node:path';
@@ -23,20 +23,55 @@ export type FileManifest = {
 async function getLocalFilesManifests(
   clientRuntime: ClientRuntime,
 ): Promise<FileManifest[]> {
-  const globalPattern = `**/*{${Array.from(ALLOWED_EXTENSIONS).join(',')}}`;
+  const allFiles = new Set<string>();
 
-  const files = await clientRuntime.fileSystem.glob(globalPattern, {});
+  // Pattern for extensions: **/*.{js,ts,json,...}
+  if (ALLOWED_EXTENSIONS.size > 0) {
+    const extensionPattern = `**/*.{${Array.from(ALLOWED_EXTENSIONS).join(',')}}`;
+    const extensionFiles = await clientRuntime.fileSystem.glob(
+      extensionPattern,
+      {},
+    );
 
-  if (!files.success) {
-    throw new Error(`Failed to get files manifest: ${files.message}`);
+    if (!extensionFiles.success) {
+      throw new Error(
+        `Failed to get files with extensions: ${extensionFiles.message}`,
+      );
+    }
+
+    for (const file of extensionFiles.paths ?? []) {
+      allFiles.add(file);
+    }
+  }
+
+  // Pattern for specific filenames: we need to glob each one
+  // Using a pattern like **/{.eslintrc,package.json,...}
+  if (ALLOWED_FILENAMES.size > 0) {
+    const filenamePattern = `**/{${Array.from(ALLOWED_FILENAMES).join(',')}}`;
+    const filenameFiles = await clientRuntime.fileSystem.glob(
+      filenamePattern,
+      {},
+    );
+
+    if (!filenameFiles.success) {
+      // Log warning but don't fail - some projects might not have these files
+      console.warn(
+        `Warning: Failed to get specific filenames: ${filenameFiles.message}`,
+      );
+    } else {
+      for (const file of filenameFiles.paths ?? []) {
+        allFiles.add(file);
+      }
+    }
   }
 
   const manifests: FileManifest[] = [];
 
-  for (const file of files.paths ?? []) {
+  for (const file of allFiles) {
     const manifest = await getFileManifest(clientRuntime, file);
     if (!manifest) {
-      throw new Error(`Failed to get file manifest: ${file}`);
+      console.warn(`Failed to get file manifest for: ${file}`);
+      continue;
     }
     manifests.push(manifest);
   }

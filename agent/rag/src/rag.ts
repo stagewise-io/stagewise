@@ -34,20 +34,44 @@ export async function* initializeRag(
   const filesToAdd = toAdd.map((file) => file.path);
   const filesToUpdate = toUpdate.map((file) => file.path);
   const filesToRemove = toRemove.map((file) => file.path);
+
+  // Process files to add - batch processing with file-based progress tracking
+  const processedFiles = new Set<string>();
   for await (const result of embedFiles(filesToAdd, clientRuntime, apiKey)) {
     await createStoredFileManifest(clientRuntime, result.relativePath);
-    yield { progress: progress + 1, total };
-    progress++;
+    if (!processedFiles.has(result.relativePath)) {
+      processedFiles.add(result.relativePath);
+      progress++;
+      yield { progress, total };
+    }
   }
+
+  // Process files to update - batch processing with file-based progress tracking
+  processedFiles.clear();
   for await (const result of embedFiles(filesToUpdate, clientRuntime, apiKey)) {
     await createStoredFileManifest(clientRuntime, result.relativePath);
-    yield { progress: progress + 1, total };
-    progress++;
+    if (!processedFiles.has(result.relativePath)) {
+      processedFiles.add(result.relativePath);
+      progress++;
+      yield { progress, total };
+    }
   }
-  for await (const result of embedFiles(filesToRemove, clientRuntime, apiKey)) {
-    await deleteStoredFileManifest(result.relativePath, clientRuntime);
-    yield { progress: progress + 1, total };
-    progress++;
+
+  // Process files to remove - no embedding needed, just deletion
+  if (filesToRemove.length > 0) {
+    const dbConnection = await connectToDatabase(
+      clientRuntime.fileSystem.getCurrentWorkingDirectory() || '',
+    );
+    await createOrUpdateTable(dbConnection);
+    const table = dbConnection.table;
+    if (!table) throw new Error('Table not initialized');
+
+    for (const filePath of filesToRemove) {
+      await deleteFileRecords(table, filePath);
+      await deleteStoredFileManifest(filePath, clientRuntime);
+      progress++;
+      yield { progress, total };
+    }
   }
 }
 
@@ -108,8 +132,6 @@ export async function queryRag(
     35,
   );
 
-  console.log('ragResults', ragResults);
-
   const rerankClient = new RerankClient({
     baseUrl: process.env.LLM_PROXY_URL || 'http://localhost:3002',
     apiKey,
@@ -122,8 +144,8 @@ export async function queryRag(
   });
 
   return results.results.map((r) => ({
-    relativePath: r.document?.metadata?.relativePath,
-    distance: r.relevance_score,
+    ...ragResults[r.index],
+    relevance: r.relevance_score,
   }));
 }
 
