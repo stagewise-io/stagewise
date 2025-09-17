@@ -1,5 +1,8 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import { ALLOWED_EXTENSIONS, ALLOWED_FILENAMES } from './allowed-extensions.js';
+import {
+  ALLOWED_EXTENSIONS,
+  ALLOWED_FILENAMES,
+} from './allowed-rag-extensions.js';
 import { createHash } from 'node:crypto';
 import { Level } from 'level';
 import path from 'node:path';

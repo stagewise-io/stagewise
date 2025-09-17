@@ -1,10 +1,13 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { isAbortError } from './utils/is-abort-error.js';
 import { isAuthenticationError } from './utils/is-authentication-error.js';
+import { initializeRag } from '@stagewise/agent-rag';
 import {
   type KartonContract,
   type History,
   type ChatMessage,
   AgentErrorType,
+  type UserInputUpdate,
 } from '@stagewise/karton-contract';
 import {
   type AnthropicProviderOptions,
@@ -83,6 +86,7 @@ export class Agent {
   private refreshToken: string;
   private eventEmitter: ReturnType<typeof createEventEmitter>;
   private isWorking = false;
+  private isRagWorking = false;
   private timeoutManager: TimeoutManager;
   private recursionDepth = 0;
   private agentTimeout: number = DEFAULT_AGENT_TIMEOUT;
@@ -91,12 +95,13 @@ export class Agent {
   private abortController: AbortController;
   private lastMessageId: string | null = null;
   private litellm!: ReturnType<typeof createAnthropic>;
+  private ragIntervalId: NodeJS.Timeout | null = null;
   private contextFilesInfo: {
     contextFiles: TextUIPart[];
-    lastSelectedElementsCount: number;
+    lastSelectedElementsHash: string | null;
   } = {
     contextFiles: [],
-    lastSelectedElementsCount: 0,
+    lastSelectedElementsHash: null,
   };
   // undo is only allowed for one chat at a time.
   // if the user switches to a new chat, the undo stack is cleared
@@ -121,7 +126,6 @@ export class Agent {
     this.accessToken = config.accessToken;
     this.refreshToken = config.refreshToken;
     this.eventEmitter = createEventEmitter(config.onEvent);
-    console.log('accessToken', this.accessToken);
     this.client = createAuthenticatedClient(this.accessToken);
     this.initializeLitellm();
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
@@ -224,6 +228,12 @@ export class Agent {
     // Clear all timeouts
     this.timeoutManager.clearAll();
 
+    // Clear RAG interval
+    if (this.ragIntervalId) {
+      clearInterval(this.ragIntervalId);
+      this.ragIntervalId = null;
+    }
+
     // Reset recursion depth if requested
     if (resetRecursionDepth) {
       this.recursionDepth = 0;
@@ -281,15 +291,30 @@ export class Agent {
     this.karton = await createKartonServer<KartonContract>({
       procedures: {
         sendUserInputUpdate: async (update) => {
+          const hashUpdate = (update: UserInputUpdate) => {
+            if (
+              !update.browserData?.selectedElements ||
+              update.browserData?.selectedElements.length === 0
+            )
+              return null;
+
+            return createHash('sha256')
+              .update(JSON.stringify(update.browserData?.selectedElements))
+              .digest('hex');
+          };
           // only trigger a new RAG if the selected elements have changed
           if (
-            update.browserData?.selectedElements?.length ===
-            this.contextFilesInfo.lastSelectedElementsCount
+            hashUpdate(update) ===
+            this.contextFilesInfo.lastSelectedElementsHash
           )
             return;
 
-          this.contextFilesInfo.lastSelectedElementsCount =
-            update.browserData?.selectedElements?.length || 0;
+          this.contextFilesInfo.lastSelectedElementsHash = hashUpdate(update);
+
+          if (this.contextFilesInfo.lastSelectedElementsHash === null) {
+            this.contextFilesInfo.contextFiles = [];
+            return;
+          }
 
           this.contextFilesInfo.contextFiles =
             await getContextFilesFromUserInput(
@@ -449,9 +474,30 @@ export class Agent {
     this.setAgentWorking(false);
     createAndActivateNewChat(this.karton);
 
+    // Initialize RAG immediately and then every 5 minutes
+    this.updateRag();
+    this.ragIntervalId = setInterval(
+      () => {
+        this.updateRag();
+      },
+      3 * 60 * 1000,
+    ); // 3 minutes in milliseconds
+
     return {
       wss: this.karton.wss,
     };
+  }
+
+  private async updateRag() {
+    if (this.isRagWorking) return;
+    this.isRagWorking = true;
+    for await (const _update of initializeRag(
+      this.clientRuntime,
+      this.accessToken,
+    )) {
+      // TODO: send rag updates and progress to the UI
+    }
+    this.isRagWorking = false;
   }
 
   /**

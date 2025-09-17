@@ -11,27 +11,21 @@ Example:
 - user:
   These are the selected elements:
   - <input type="text" id="search-input" placeholder="Search..." classNames="w-full text-blue-500 bg-white">
-  - <button id="search-button" classNames="bg-blue-500 text-white">Search</button>
+  - <button id="search-button" classNames="bg-red-500 text-white">Search</button>
 
 - assistant:
-  A white search input with blue text with a search button with a blue background and white text that triggers a search action.
+  A white search input with blue text with a search button with a red background and white text that triggers a search action.
 `;
 
 async function getFileSnippet(
   file: Awaited<ReturnType<typeof queryRagWithoutRerank>>[number],
   _clientRuntime: ClientRuntime,
 ) {
-  return `
-    <file_path>
-      ${file.relativePath}
-    </file_path>
-    <relevance>
-      ${(1 - file.distance).toFixed(2)}
-    </relevance>
-    <content>
-      ${file.content}
-    </content>
-    `;
+  return JSON.stringify({
+    relativePath: file.relativePath,
+    distance: (1 - file.distance).toFixed(2),
+    content: file.content,
+  });
 }
 
 export async function getContextFilesFromUserInput(
@@ -77,18 +71,24 @@ export async function getContextFilesFromUserInput(
     // const fileSnippets = await Promise.all(
     //   uniqueRetrievedFiles.map((file) => getFileSnippet(file, clientRuntime)),
     // );
-    const fileSnippets = await Promise.all(
-      retrievedFiles.map((file) => getFileSnippet(file, clientRuntime)),
-    );
 
-    const part: TextUIPart = {
+    const explanationPart: TextUIPart = {
       type: 'text',
-      text: `These are the relevant files for the user's request: \n\n${fileSnippets.join('\n')}`,
+      text: `These are the relevant file snippets for the user's request. Read the files by using their file path if you need more information.`,
     };
 
-    return [part];
-  } catch (error) {
-    console.error('\n\nerror', error, '\n\n');
+    const fileParts: TextUIPart[] = [explanationPart];
+
+    for (const file of retrievedFiles) {
+      const fileSnippet = await getFileSnippet(file, clientRuntime);
+      fileParts.push({
+        type: 'text',
+        text: fileSnippet,
+      });
+    }
+
+    return fileParts;
+  } catch (_error) {
     return [];
   }
 }
