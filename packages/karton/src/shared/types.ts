@@ -228,32 +228,31 @@ export type KartonClientProceduresWithClientId<T> = AddClientIdToCalls<
   KartonClientProcedures<T>
 >;
 
-// Extract all valid procedure paths (handles both functions and nested objects)
+// Extract only the full paths to procedures (not intermediate objects)
 type ProcedurePaths<T, D extends number = 4> = D extends 0
   ? never
   : T extends AsyncFunction
-    ? never  // Functions at this level are already handled by parent
+    ? never // Functions at this level are already handled by parent
     : T extends ProcedureTree
       ? {
           [K in keyof T]: K extends string
             ? T[K] extends AsyncFunction
-              ? K  // This is a procedure endpoint
+              ? K // This is a procedure endpoint (leaf node)
               : T[K] extends ProcedureTree
-                ? K | `${K}.${ProcedurePaths<T[K], DecDepth<D>>}`  // This has sub-procedures
+                ? `${K}.${ProcedurePaths<T[K], DecDepth<D>>}` // Prepend parent path to children
                 : never
-            : never
+            : never;
         }[keyof T]
       : never;
 
 // Get handler type for a path
-type GetHandlerForPath<T, Path> = 
-  Path extends keyof T
-    ? T[Path]
-    : Path extends `${infer First}.${infer Rest}`
-      ? First extends keyof T
-        ? GetHandlerForPath<T[First], Rest>
-        : never
-      : never;
+type GetHandlerForPath<T, Path> = Path extends keyof T
+  ? T[Path]
+  : Path extends `${infer First}.${infer Rest}`
+    ? First extends keyof T
+      ? GetHandlerForPath<T[First], Rest>
+      : never
+    : never;
 
 export enum KartonRPCErrorReason {
   CONNECTION_LOST = 'CONNECTION_LOST',
@@ -356,10 +355,12 @@ export interface KartonServer<T> {
   connectedClients: ReadonlyArray<string>;
   wss: WebSocketServer;
   registerServerProcedureHandler: <
-    Path extends ProcedurePaths<KartonServerProcedures<T>>
+    Path extends ProcedurePaths<KartonServerProcedures<T>>,
   >(
     path: Path,
-    handler: AddClientIdToFunction<GetHandlerForPath<KartonServerProcedures<T>, Path>>
+    handler: AddClientIdToFunction<
+      GetHandlerForPath<KartonServerProcedures<T>, Path>
+    >,
   ) => void;
   removeServerProcedureHandler: (path: string[]) => void;
 }
