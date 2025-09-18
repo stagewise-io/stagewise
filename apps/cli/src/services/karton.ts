@@ -82,79 +82,12 @@ export class KartonService {
     return this.kartonServer.setState;
   }
 
-  // --- Typed callback registration API ---
-  public onServerProcedureCall<
-    P extends DotPathToAsyncFunctions<KartonContract['serverProcedures']>,
-  >(
-    path: P,
-    callback: (
-      ...args: Parameters<
-        FunctionAtDotPath<KartonContract['serverProcedures'], P>
-      >
-    ) => void,
-  ): () => void {
-    const key = String(path);
-    let set = this.serverProcedureCallbacks.get(key);
-    if (!set) {
-      set = new Set();
-      this.serverProcedureCallbacks.set(key, set);
-    }
-    set.add(callback as any);
-    return () => this.offServerProcedureCall(path, callback as any);
+  get registerServerProcedureHandler() {
+    return this.kartonServer.registerServerProcedureHandler;
   }
 
-  public offServerProcedureCall<
-    P extends DotPathToAsyncFunctions<KartonContract['serverProcedures']>,
-  >(
-    path: P,
-    callback: (
-      ...args: Parameters<
-        FunctionAtDotPath<KartonContract['serverProcedures'], P>
-      >
-    ) => void,
-  ): void {
-    const key = String(path);
-    const set = this.serverProcedureCallbacks.get(key);
-    if (!set) return;
-    set.delete(callback as any);
-    if (set.size === 0) {
-      this.serverProcedureCallbacks.delete(key);
-    }
-  }
-
-  // --- Internal helpers ---
-  private invokeCallbacks(pathKey: string, args: any[]): void {
-    const set = this.serverProcedureCallbacks.get(pathKey);
-    if (!set || set.size === 0) return;
-    for (const cb of set) {
-      try {
-        cb(...args);
-      } catch {}
-    }
-  }
-
-  private wrapServerProcedures(
-    procedures: KartonServerProcedureImplementations<KartonContract>,
-  ): KartonServerProcedureImplementations<KartonContract> {
-    const wrapTree = (obj: any, prefix: string[] = []): any => {
-      const out: any = {};
-      for (const [key, value] of Object.entries(obj ?? {})) {
-        const path = [...prefix, key];
-        if (typeof value === 'function') {
-          out[key] = async (...args: any[]) => {
-            const callingClientId = args[args.length - 1];
-            const originalArgs = args.slice(0, -1);
-            this.invokeCallbacks(path.join('.'), originalArgs);
-            return await (value as any)(...originalArgs, callingClientId);
-          };
-        } else if (value && typeof value === 'object') {
-          out[key] = wrapTree(value, path);
-        }
-      }
-      return out;
-    };
-
-    return wrapTree(procedures);
+  get removeServerProcedureHandler() {
+    return this.kartonServer.removeServerProcedureHandler;
   }
 
   private createDefaultInitialState(): KartonContract['state'] {

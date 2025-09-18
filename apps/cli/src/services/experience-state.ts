@@ -6,8 +6,4 @@
  * @warning The state of worksapce-specific experiences is to be managed by the workspace manager etc.
  */
 
-export class ExperienceStateService {
-  public constructor() {
-    //
-  }
-}
+export class ExperienceStateService {}

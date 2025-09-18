@@ -6,7 +6,6 @@ import type {
   KartonServerConfig,
   WebSocketMessage,
   KartonState,
-  KartonServerProcedureImplementations,
   KartonClientProceduresWithClientId,
 } from '../shared/types.js';
 import { WebSocketConnection } from '../shared/websocket-connection.js';
@@ -17,7 +16,11 @@ import {
   extractProceduresFromTree,
 } from '../shared/procedure-proxy.js';
 import { serializeMessage } from '../shared/websocket-messages.js';
-import { KartonRPCException, KartonRPCErrorReason, KartonProcedureError } from '../shared/types.js';
+import {
+  KartonRPCException,
+  KartonRPCErrorReason,
+  KartonProcedureError,
+} from '../shared/types.js';
 
 interface ClientConnection {
   id: string;
@@ -170,12 +173,12 @@ class KartonServerImpl<T> implements KartonServer<T> {
 
   public registerServerProcedureHandler<Path extends string>(
     path: Path,
-    handler: any
+    handler: any,
   ): void {
     // Check if already registered
     if (this.serverProcedures.has(path)) {
       throw new KartonProcedureError(
-        `Server procedure '${path}' is already registered. Remove it first before registering a new handler.`
+        `Server procedure '${path}' is already registered. Remove it first before registering a new handler.`,
       );
     }
 
@@ -194,7 +197,7 @@ class KartonServerImpl<T> implements KartonServer<T> {
 
   public removeServerProcedureHandler(path: string[]): void {
     const pathStr = path.join('.');
-    
+
     // Remove from stored procedures
     this.serverProcedures.delete(pathStr);
 

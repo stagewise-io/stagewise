@@ -35,7 +35,7 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
 
   const workspaceInfo = useKartonState((s) => s.workspaceInfo);
 
-  const isAuthenticated = useKartonState((s) => s.authStatus.isAuthenticated);
+  const _isAuthenticated = useKartonState((s) => s.authStatus.isAuthenticated);
 
   const workspaceDir = useMemo(() => {
     return workspaceInfo

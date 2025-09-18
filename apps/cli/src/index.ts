@@ -28,13 +28,13 @@ const globalConfigService = await GlobalConfigService.create(
   globalDataPathService,
   logger,
 );
-const telemetryService = new TelemetryService(
+const _telemetryService = new TelemetryService(
   identifierService,
   globalConfigService,
   logger,
 );
-const authService = await AuthService.create(globalDataPathService, logger);
-const experienceStateService = new ExperienceStateService();
+const _authService = await AuthService.create(globalDataPathService, logger);
+const _experienceStateService = new ExperienceStateService();
 
 function myParseInt(value: string) {
   const parsedValue = Number.parseInt(value, 10);
@@ -70,7 +70,7 @@ program
     'Bridge mode (deprecated) - use stagewise without the built-in agent',
   )
   .action(
-    (options: {
+    (_options: {
       port: number;
       appPort: number;
       workspace: string;

@@ -91,7 +91,7 @@ export class AuthService {
     try {
       // Check if credentials file exists
       const storedToken = await this.getStoredToken();
-      
+
       if (!storedToken?.accessToken) {
         this.currentAuthState = { status: 'unauthenticated' };
         return;
@@ -109,7 +109,10 @@ export class AuthService {
       }
 
       // Check if access token needs refresh
-      if (storedToken.expiresAt && this.isAccessTokenExpired(storedToken.expiresAt)) {
+      if (
+        storedToken.expiresAt &&
+        this.isAccessTokenExpired(storedToken.expiresAt)
+      ) {
         try {
           await this.refreshTokens();
           // Re-fetch the updated token after refresh
@@ -125,7 +128,9 @@ export class AuthService {
       } else {
         // Validate the current token with the server
         try {
-          const sessionData = await this.validateTokenWithServer(storedToken.accessToken);
+          const sessionData = await this.validateTokenWithServer(
+            storedToken.accessToken,
+          );
           if (sessionData?.valid) {
             await this.updateAuthStateFromSession(storedToken, sessionData);
             // Try to fetch subscription info
@@ -135,14 +140,17 @@ export class AuthService {
           }
         } catch (_error) {
           // Server is not reachable
-          this.currentAuthState = { 
+          this.currentAuthState = {
             status: 'server_unreachable',
-            user: storedToken.userId && storedToken.userEmail ? {
-              id: storedToken.userId,
-              email: storedToken.userEmail
-            } : undefined,
+            user:
+              storedToken.userId && storedToken.userEmail
+                ? {
+                    id: storedToken.userId,
+                    email: storedToken.userEmail,
+                  }
+                : undefined,
             tokenExpiresAt: storedToken.expiresAt,
-            refreshTokenExpiresAt: storedToken.refreshExpiresAt
+            refreshTokenExpiresAt: storedToken.refreshExpiresAt,
           };
         }
       }
@@ -205,8 +213,10 @@ export class AuthService {
       const tokenPair: TokenPair = response.data;
 
       // Validate session to get user info
-      const sessionData = await this.validateTokenWithServer(tokenPair.accessToken);
-      
+      const sessionData = await this.validateTokenWithServer(
+        tokenPair.accessToken,
+      );
+
       if (!sessionData?.valid) {
         throw new Error('Token validation failed');
       }
@@ -229,7 +239,7 @@ export class AuthService {
 
       // Update auth state
       await this.updateAuthStateFromSession(tokenData, sessionData);
-      
+
       // Try to fetch subscription info
       await this.updateSubscriptionInfo(tokenPair.accessToken);
 
@@ -283,7 +293,7 @@ export class AuthService {
 
   private async doRefreshAuthData(): Promise<void> {
     const storedToken = await this.getStoredToken();
-    
+
     if (!storedToken?.accessToken) {
       this.currentAuthState = { status: 'unauthenticated' };
       return;
@@ -291,7 +301,10 @@ export class AuthService {
 
     try {
       // Check if we need to refresh the access token
-      if (storedToken.expiresAt && this.isAccessTokenExpired(storedToken.expiresAt)) {
+      if (
+        storedToken.expiresAt &&
+        this.isAccessTokenExpired(storedToken.expiresAt)
+      ) {
         await this.refreshTokens();
         // Re-fetch the updated token
         const updatedToken = await this.getStoredToken();
@@ -303,8 +316,10 @@ export class AuthService {
       }
 
       // Validate current session
-      const sessionData = await this.validateTokenWithServer(storedToken.accessToken);
-      
+      const sessionData = await this.validateTokenWithServer(
+        storedToken.accessToken,
+      );
+
       if (!sessionData?.valid) {
         this.currentAuthState = { status: 'authentication_invalid' };
         await this.clearToken();
@@ -313,7 +328,7 @@ export class AuthService {
 
       // Update auth state with fresh data
       await this.updateAuthStateFromSession(storedToken, sessionData);
-      
+
       // Update subscription info
       await this.updateSubscriptionInfo(storedToken.accessToken);
     } catch (error) {
@@ -350,9 +365,12 @@ export class AuthService {
     }
 
     // Check if access token is expired or expiring soon
-    if (storedToken.expiresAt && this.isAccessTokenExpired(storedToken.expiresAt)) {
+    if (
+      storedToken.expiresAt &&
+      this.isAccessTokenExpired(storedToken.expiresAt)
+    ) {
       await this.refreshTokens();
-      
+
       const updatedToken = await this.getStoredToken();
       if (!updatedToken?.accessToken) {
         throw new Error('Failed to refresh access token');
@@ -372,7 +390,10 @@ export class AuthService {
     // Try to revoke tokens on server side first
     if (storedToken?.refreshToken || storedToken?.accessToken) {
       try {
-        await this.revokeToken(storedToken.accessToken, storedToken.refreshToken);
+        await this.revokeToken(
+          storedToken.accessToken,
+          storedToken.refreshToken,
+        );
       } catch (error) {
         // Don't fail logout if revoke fails (network issues, etc.)
         this.logger.warn(
@@ -449,7 +470,9 @@ export class AuthService {
 
   // Private helper methods
 
-  private async validateTokenWithServer(accessToken: string): Promise<SessionValidationResponse | null> {
+  private async validateTokenWithServer(
+    accessToken: string,
+  ): Promise<SessionValidationResponse | null> {
     // Allow test tokens in test environment
     if (process.env.NODE_ENV === 'test' && accessToken === 'test-token') {
       return {
@@ -516,16 +539,20 @@ export class AuthService {
           Authorization: `Bearer ${accessToken}`,
         },
       });
-      const subscriptionData = await client.subscription.getSubscription.query();
-      
-      if (subscriptionData && subscriptionData.subscription) {
+      const subscriptionData =
+        await client.subscription.getSubscription.query();
+
+      if (subscriptionData?.subscription) {
         this.currentAuthState = {
           ...this.currentAuthState,
           subscription: {
-            active: subscriptionData.hasSubscription && 
-                   subscriptionData.subscription.status === 'active',
+            active:
+              subscriptionData.hasSubscription &&
+              subscriptionData.subscription.status === 'active',
             plan: subscriptionData.subscription.priceId || undefined,
-            expiresAt: subscriptionData.subscription.currentPeriodEnd?.toISOString() || undefined,
+            expiresAt:
+              subscriptionData.subscription.currentPeriodEnd?.toISOString() ||
+              undefined,
           },
         };
       }
@@ -579,8 +606,10 @@ export class AuthService {
       const tokenPair: TokenPair = response.data;
 
       // Validate session
-      const sessionData = await this.validateTokenWithServer(tokenPair.accessToken);
-      
+      const sessionData = await this.validateTokenWithServer(
+        tokenPair.accessToken,
+      );
+
       if (!sessionData?.valid) {
         throw new Error('Failed to validate refreshed token');
       }
@@ -624,7 +653,10 @@ export class AuthService {
     }
   }
 
-  private async revokeToken(token?: string, refreshToken?: string): Promise<void> {
+  private async revokeToken(
+    token?: string,
+    refreshToken?: string,
+  ): Promise<void> {
     if (!token && !refreshToken) {
       return;
     }
@@ -685,7 +717,9 @@ export class AuthService {
     _port: number,
     _successRedirectUrl?: string,
   ): Promise<TokenData> {
-    throw new Error('initiateOAuthFlow is deprecated. Use getAuthUrl() and storeAuthToken() instead.');
+    throw new Error(
+      'initiateOAuthFlow is deprecated. Use getAuthUrl() and storeAuthToken() instead.',
+    );
   }
 
   /**
