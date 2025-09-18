@@ -65,11 +65,15 @@
 #### Server side setup
 
 - The user sets up Karton by calling the type generic function `createKartonServer`
-  - The function receives the following configuration as a config objct argument:
-    - The express app and the http server that will host the WebSocket
-    - The path on which the WebSocket will be made available
-    - All function implementations for server-side procedures that clients can call later on
-- Said function receives a reference to the express app into which it registers the websocket route handler
+  - The function receives the following configuration as a config object argument:
+    - The initial state for the application
+    - Optionally: All function implementations for server-side procedures that clients can call later on
+- The function returns a KartonServer instance with methods to:
+  - Register server procedure handlers lazily via `registerServerProcedureHandler`
+  - Remove server procedure handlers via `removeServerProcedureHandler`
+  - Access and modify state
+  - Call client procedures
+- Server procedures can be registered either during initialization or lazily after server creation
 
 #### Client side setup
 
@@ -172,10 +176,7 @@ interface AppType {
 ```ts
 // Make sure that the AppType that's passed in get's statically checked for the correct base struture.
 interface KartonServerConfig<AppType> {
-  expressApp: App; // Express App type
-  httpServer: HttpServer; // Node.js built-in http server type
-  webSocketPath: string; // Path under which the websocket for Karton will be made available in the express app
-  procedures: KartonServerProcedureImplementations<AppType>; // All the implementations for the server procedures. Every defined procedure must be implemented. The helper type extracts the required procedures from the AppType and add's a trailing argument to every procedure called "callingClientId" which is a string with the client ID that made the call to the procedure.
+  procedures?: KartonServerProcedureImplementations<AppType>; // Optional: All the implementations for the server procedures. Can be registered lazily instead. The helper type extracts the required procedures from the AppType and add's a trailing argument to every procedure called "callingClientId" which is a string with the client ID that made the call to the procedure.
   initialState: KartonState<AppType>; // The initial state of the Karton server
 }
 
@@ -184,6 +185,9 @@ interface KartonServer<AppType> {
   setState: ((recipe: (draft: KartonState<AppType>) => void) => KartonState<AppType>) // Function that updates the state. This looks just like the "produce" function that Immer provides, although the user doesn't have to provide the base state as there is only one base state that get's modified. The return value is the updated state that will also be made available as state in the KartonServer itself.
   clientProcedures: KartonClientProcedures<AppType>; // Client-side procedures that the server might call
   connectedClients: string[]; // A read-only list of clients IDs that are connected
+  wss: WebSocketServer; // The WebSocket server instance
+  registerServerProcedureHandler: <Path extends string>(path: Path, handler: Handler) => void; // Register a server procedure handler lazily
+  removeServerProcedureHandler: (path: string[]) => void; // Remove a server procedure handler
 }
 
 type CreateKartonServer = <AppType>(config: KartonServerConfig<AppType>): Promise<KartonServer<AppType>>; // Can be async if necessary in implementation
@@ -208,6 +212,41 @@ const newState = kartonServer.setState((state) => {
   state.dummyStateEntry++;
   }); // The new state will also be immediately available through kartonServer.state
 ```
+
+#### Lazy Procedure Registration
+
+Server procedures can be registered after the server is created:
+
+```ts
+const kartonServer = await createKartonServer({
+  initialState: { ... }
+  // procedures are optional during initialization
+});
+
+// Register handlers lazily - type-safe with dot-notation paths
+kartonServer.registerServerProcedureHandler('increment', async (amount: number, callingClientId: string) => {
+  return kartonServer.state.counter + amount;
+});
+
+// Register nested procedures
+kartonServer.registerServerProcedureHandler('math.add', async (a: number, b: number, callingClientId: string) => {
+  return a + b;
+});
+
+// Remove a handler if needed
+kartonServer.removeServerProcedureHandler(['increment']);
+
+// Register a new handler for the same procedure
+kartonServer.registerServerProcedureHandler('increment', async (amount: number, callingClientId: string) => {
+  return amount * 2;
+});
+```
+
+**Important notes about lazy registration:**
+- Attempting to register a handler for an already registered procedure will throw a `KartonProcedureError`
+- You must first remove the existing handler before registering a new one
+- Handlers are immediately available to all connected clients
+- If a client calls a procedure without a registered handler, it will receive a `KartonProcedureError`
 
 #### Remote Procedure Calls
 
@@ -296,6 +335,21 @@ When the users selects a procedure, the hook should never trigger a re-render.
 When the user selected the `isConnected` entry, it should only re-render when the connection state actually changes.
 
 ## Error definitions
+
+### KartonProcedureError
+
+The `KartonProcedureError` is thrown for procedure-related errors:
+- When attempting to call a server procedure that has no registered handler
+- When attempting to register a handler for a procedure that already has a handler
+
+```ts
+class KartonProcedureError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'KartonProcedureError';
+  }
+}
+```
 
 ### KartonRPCException
 

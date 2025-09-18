@@ -228,10 +228,30 @@ export type KartonClientProceduresWithClientId<T> = AddClientIdToCalls<
   KartonClientProcedures<T>
 >;
 
+type ExtractProcedureHandler<T, Path extends string> = 
+  Path extends `${infer First}.${infer Rest}`
+    ? First extends keyof T
+      ? T[First] extends ProcedureTree
+        ? ExtractProcedureHandler<T[First], Rest>
+        : never
+      : never
+    : Path extends keyof T
+      ? T[Path] extends AsyncFunction
+        ? T[Path]
+        : never
+      : never;
+
 export enum KartonRPCErrorReason {
   CONNECTION_LOST = 'CONNECTION_LOST',
   CLIENT_NOT_FOUND = 'CLIENT_NOT_FOUND',
   SERVER_UNAVAILABLE = 'SERVER_UNAVAILABLE',
+}
+
+export class KartonProcedureError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'KartonProcedureError';
+  }
 }
 
 export class KartonRPCException extends Error {
@@ -311,7 +331,7 @@ export interface WebSocketMessage {
 }
 
 export interface KartonServerConfig<T> {
-  procedures: KartonServerProcedureImplementations<T>;
+  procedures?: KartonServerProcedureImplementations<T>;
   initialState: KartonState<T>;
 }
 
@@ -321,6 +341,11 @@ export interface KartonServer<T> {
   clientProcedures: KartonClientProceduresWithClientId<T>;
   connectedClients: ReadonlyArray<string>;
   wss: WebSocketServer;
+  registerServerProcedureHandler: <Path extends string>(
+    path: Path,
+    handler: ExtractProcedureHandler<KartonServerProcedureImplementations<T>, Path>
+  ) => void;
+  removeServerProcedureHandler: (path: string[]) => void;
 }
 
 export interface KartonClientConfig<T> {

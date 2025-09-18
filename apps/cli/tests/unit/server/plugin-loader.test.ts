@@ -10,7 +10,7 @@ import type { Config } from '../../../src/config/types.js';
 import {
   discoverDependencies,
   getDependencyList,
-} from '../../../src/dependency-parser/index.js';
+} from '../../../src/utils/dependency-parser/index.js';
 
 vi.mock('node:fs');
 vi.mock('../../../src/dependency-parser/index.js');

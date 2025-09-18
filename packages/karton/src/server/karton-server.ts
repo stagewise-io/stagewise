@@ -17,7 +17,7 @@ import {
   extractProceduresFromTree,
 } from '../shared/procedure-proxy.js';
 import { serializeMessage } from '../shared/websocket-messages.js';
-import { KartonRPCException, KartonRPCErrorReason } from '../shared/types.js';
+import { KartonRPCException, KartonRPCErrorReason, KartonProcedureError } from '../shared/types.js';
 
 interface ClientConnection {
   id: string;
@@ -30,12 +30,19 @@ class KartonServerImpl<T> implements KartonServer<T> {
   private internalWss: WebSocketServer;
   private clients: Map<string, ClientConnection> = new Map();
   private stateManager: StateManager<KartonState<T>>;
-  private serverProcedures: KartonServerProcedureImplementations<T>;
+  private serverProcedures: Map<string, any> = new Map();
   private _clientProcedures: KartonClientProceduresWithClientId<T>;
 
   constructor(config: KartonServerConfig<T>, wss: WebSocketServer) {
     this.internalWss = wss;
-    this.serverProcedures = config.procedures;
+
+    // Initialize procedures from config if provided
+    if (config.procedures) {
+      const procedures = extractProceduresFromTree(config.procedures as any);
+      for (const [pathStr, handler] of procedures) {
+        this.serverProcedures.set(pathStr, handler);
+      }
+    }
 
     // Initialize state manager with broadcast function
     this.stateManager = new StateManager(config.initialState, (message) =>
@@ -97,9 +104,9 @@ class KartonServerImpl<T> implements KartonServer<T> {
     });
 
     // Register server procedures with clientId injection
-    const procedures = extractProceduresFromTree(this.serverProcedures as any);
-    for (const [path, handler] of procedures) {
-      rpcManager.registerProcedure(path.split('.'), async (...args: any[]) => {
+    for (const [pathStr, handler] of this.serverProcedures) {
+      const path = pathStr.split('.');
+      rpcManager.registerProcedure(path, async (...args: any[]) => {
         // Add clientId as last argument
         return handler(...args, clientId);
       });
@@ -159,6 +166,42 @@ class KartonServerImpl<T> implements KartonServer<T> {
 
   public get connectedClients(): ReadonlyArray<string> {
     return Array.from(this.clients.keys());
+  }
+
+  public registerServerProcedureHandler<Path extends string>(
+    path: Path,
+    handler: any
+  ): void {
+    // Check if already registered
+    if (this.serverProcedures.has(path)) {
+      throw new KartonProcedureError(
+        `Server procedure '${path}' is already registered. Remove it first before registering a new handler.`
+      );
+    }
+
+    // Store the handler
+    this.serverProcedures.set(path, handler);
+
+    // Register with all existing client connections
+    const pathArray = path.split('.');
+    for (const client of this.clients.values()) {
+      client.rpcManager.registerProcedure(pathArray, async (...args: any[]) => {
+        // Add clientId as last argument
+        return handler(...args, client.id);
+      });
+    }
+  }
+
+  public removeServerProcedureHandler(path: string[]): void {
+    const pathStr = path.join('.');
+    
+    // Remove from stored procedures
+    this.serverProcedures.delete(pathStr);
+
+    // Unregister from all existing client connections
+    for (const client of this.clients.values()) {
+      client.rpcManager.unregisterProcedure(path);
+    }
   }
 
   public async close(): Promise<void> {

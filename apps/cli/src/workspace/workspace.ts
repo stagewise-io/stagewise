@@ -2,34 +2,29 @@ import type { Config } from '../config/types.js';
 import type { Plugin } from '../server/plugin-loader.js';
 import { Agent, type AgentCallbacks } from '@stagewise/agent-client';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
-import { log } from '../utils/logger.js';
 import { loadPlugins } from '../server/plugin-loader.js';
-import { analyticsEvents } from '../utils/telemetry.js';
-import { printInfoMessages } from '../utils/print-info-messages.js';
 
-export interface WorkspaceInfo {
-  path: string;
-  config: Config;
-  plugins: Plugin[];
-  agent: Agent | null;
-  initialized: boolean;
-  startTime: Date;
+/**
+ * The workspace config respresent everything that can be manipulated by the user within the workspace.
+ */
+export interface WorkspaceConfig {
+  appPort: number;
+  manualPlugins: Plugin[];
+  eddyMode?: 'flappy';
 }
 
 export class Workspace {
-  private config: Config;
-  private plugins: Plugin[] = [];
+  private _config: WorkspaceConfig;
+  private loadedPlugins: Plugin[] = [];
   private agent: Agent | null = null;
   private clientRuntime: ClientRuntimeNode | null = null;
   private initialized = false;
-  private startTime: Date;
   private path: string;
   private teardownCallbacks: Array<() => Promise<void>> = [];
 
-  constructor(config: Config) {
-    this.config = config;
-    this.path = config.dir;
-    this.startTime = new Date();
+  constructor(config: WorkspaceConfig, path: string) {
+    this._config = config;
+    this.path = path;
   }
 
   async initialize(
@@ -198,15 +193,8 @@ export class Workspace {
     return this.initialized;
   }
 
-  getInfo(): WorkspaceInfo {
-    return {
-      path: this.path,
-      config: this.config,
-      plugins: this.plugins,
-      agent: this.agent,
-      initialized: this.initialized,
-      startTime: this.startTime,
-    };
+  get config(): WorkspaceConfig {
+    return this.config;
   }
 
   // Get agent procedures for Karton

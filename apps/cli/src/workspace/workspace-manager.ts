@@ -103,7 +103,7 @@ export class WorkspaceManager extends EventEmitter {
     this.currentWorkspace = null;
   }
 
-  getCurrentWorkspace(): Workspace | null {
+  get workspace(): Workspace | null {
     return this.currentWorkspace;
   }
 

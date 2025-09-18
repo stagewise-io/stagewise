@@ -79,7 +79,7 @@ export const PopoverDescription = ({
   return (
     <PopoverBase.Description
       {...props}
-      className={cn('text-foreground/80 text-sm', className)}
+      className={cn('text-muted-foreground text-sm', className)}
     >
       {children}
     </PopoverBase.Description>

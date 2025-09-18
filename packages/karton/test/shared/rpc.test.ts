@@ -177,7 +177,7 @@ describe('RPC Manager', () => {
       
       const sentMessage = mockSend.mock.calls[0][0] as WebSocketMessage;
       expect(sentMessage.type).toBe('rpc_exception');
-      expect((sentMessage.data as any).error.message).toContain('Procedure not found');
+      expect((sentMessage.data as any).error.message).toContain('not registered');
     });
 
     it('should ignore non-RPC messages', async () => {

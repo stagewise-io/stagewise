@@ -292,6 +292,19 @@ importers:
         version: 4.0.17
 
   apps/cli:
+    dependencies:
+      '@types/prompts':
+        specifier: ^2.4.9
+        version: 2.4.9
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      prompts:
+        specifier: ^2.4.2
+        version: 2.4.2
+      ws:
+        specifier: ^8.18.3
+        version: 8.18.3
     devDependencies:
       '@inquirer/prompts':
         specifier: ^7.0.0
@@ -6825,6 +6838,9 @@ packages:
 
   '@types/prismjs@1.26.5':
     resolution: {integrity: sha512-AUZTa7hQ2KY5L7AmtSiqxlhWxb4ina0yd8hNbl4TWuqnv/pFP0nDMb3YrfSBf4hJVGLh2YEIBfKaBW/9UEl6IQ==}
+
+  '@types/prompts@2.4.9':
+    resolution: {integrity: sha512-qTxFi6Buiu8+50/+3DGIWLHM6QuWsEKugJnnP6iv2Mc4ncxE4A/OJkjuVOA+5X0X1S/nq5VJRa8Lu+nwcvbrKA==}
 
   '@types/qs@6.14.0':
     resolution: {integrity: sha512-eOunJqu0K1923aExK6y8p6fsihYEn/BYuQ4g0CxAAgFc4b/ZLN4CrsRZ55srTdqoiLzU2B2evC+apEIxprEzkQ==}
@@ -21120,6 +21136,11 @@ snapshots:
       parse-path: 7.1.0
 
   '@types/prismjs@1.26.5': {}
+
+  '@types/prompts@2.4.9':
+    dependencies:
+      '@types/node': 22.15.2
+      kleur: 3.0.3
 
   '@types/qs@6.14.0': {}
 

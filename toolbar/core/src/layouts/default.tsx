@@ -23,11 +23,19 @@ import {
   PopoverContent,
   PopoverTitle,
 } from '@stagewise/stage-ui/components/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from '@stagewise/stage-ui/components/dialog';
 
 export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
   const { leftPanelContent, toggleLeftPanel } = usePanels();
 
   const workspaceInfo = useKartonState((s) => s.workspaceInfo);
+
+  const isAuthenticated = useKartonState((s) => s.authStatus.isAuthenticated);
 
   const workspaceDir = useMemo(() => {
     return workspaceInfo
@@ -155,6 +163,15 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
         {/* Lower right status area */}
         <div className="flex flex-1 basis-1/3 flex-row items-center justify-end gap-2" />
       </div>
+
+      {/* Auth dialog */}
+      <Dialog open={true} dismissible={false}>
+        <DialogContent>
+          <DialogTitle>Login</DialogTitle>
+          <DialogDescription>Please login to continue</DialogDescription>
+          <Button>Login</Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

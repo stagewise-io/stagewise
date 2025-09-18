@@ -1,0 +1,166 @@
+import { PostHog } from 'posthog-node';
+import type { IdentifierService } from './identifier';
+import type { GlobalConfig, GlobalConfigService } from './global-config';
+import type { Logger } from './logger';
+
+export interface EventProperties {
+  'cli-start': {
+    mode: 'bridge' | 'regular';
+    port?: number;
+    portInArg?: boolean;
+    executedCommand: string;
+    workspace_path_in_arg: boolean; // Whether the workspace path was defined as an argument. Will only be true, if the user defined the path.
+    auto_plugins_enabled: boolean; // Whether the auto plugins feature is enabled.
+    manual_plugins_count: number; // The number of manually added plugins.
+    has_wrapped_command: boolean; // Whether the wrapped command feature is enabled.
+  };
+  'workspace-opened': {
+    config_file_exists: boolean; // Whether the config file exists.
+    auto_plugins_enabled: boolean; // Whether the auto plugins feature is enabled.
+    manual_plugins_count: number; // The number of manually added plugins.
+    loaded_plugins: string[]; // The plugins that were loaded.
+    has_wrapped_command: boolean; // Whether the wrapped command feature is enabled.
+    codebase_line_count?: number; // The number of lines of code in the workspace.
+    dependency_count?: number; // The number of dependencies in the workspace.
+    loading_method:
+      | 'on_start'
+      | 'on_start_with_arg'
+      | 'at_runtime_by_user_action';
+  };
+  'cli-stored-config-json': undefined;
+  'cli-found-config-json': undefined;
+  'cli-send-prompt': undefined;
+  'cli-credits-insufficient': {
+    subscription_status: string;
+    subscription_credits: number;
+    subscription_credits_used: number;
+    subscription_credits_remaining: number;
+  };
+  'cli-auth-initiated': {
+    initiated_automatically: boolean;
+  };
+  'cli-auth-completed': {
+    initiated_automatically: boolean;
+  };
+  'cli-telemetry-config-set': {
+    configured_level: 'off' | 'anonymous' | 'full';
+  };
+}
+
+export interface UserProperties {
+  user_id?: string;
+  user_email?: string;
+}
+
+export class TelemetryService {
+  private identifierService: IdentifierService;
+  private globalConfigService: GlobalConfigService;
+  private logger: Logger;
+  private posthogClient: PostHog;
+  private userProperties: UserProperties = {};
+
+  public constructor(
+    identifierService: IdentifierService,
+    globalConfigService: GlobalConfigService,
+    logger: Logger,
+  ) {
+    this.identifierService = identifierService;
+    this.globalConfigService = globalConfigService;
+    this.logger = logger;
+    const apiKey = process.env.POSTHOG_API_KEY ?? '';
+    this.posthogClient = new PostHog(apiKey, {
+      host: process.env.POSTHOG_HOST || 'https://eu.i.posthog.com',
+      flushAt: 1,
+      flushInterval: 0,
+      disabled:
+        this.globalConfigService.get().telemetryLevel === 'off' ||
+        process.env.POSTHOG_API_KEY === undefined,
+    });
+
+    this.identifyUser();
+
+    logger.debug('[TelemetryService] Telemetry initialized');
+  }
+
+  setUserProperties(properties: UserProperties): void {
+    this.userProperties = { ...this.userProperties, ...properties };
+  }
+
+  identifyUser() {
+    if (
+      this.userProperties.user_id &&
+      this.userProperties.user_email &&
+      this.globalConfigService.get().telemetryLevel === 'full'
+    ) {
+      this.posthogClient.identify({
+        distinctId: this.userProperties.user_id,
+        properties: {
+          email: this.userProperties.user_email,
+        },
+      });
+      this.posthogClient.alias({
+        distinctId: this.userProperties.user_id,
+        alias: this.identifierService.getMachineId(),
+      });
+    }
+  }
+
+  private capture<T extends keyof EventProperties>(
+    eventName: T,
+    properties?: EventProperties[T],
+  ): void {
+    try {
+      const telemetryLevel = this.globalConfigService.get().telemetryLevel;
+
+      // Special case: always send telemetry config events even when turning off
+      const isLevelConfigEvent = eventName === 'cli-telemetry-config-set';
+
+      // Skip non-config events when telemetry is off or PostHog client is not available
+      if (
+        (!isLevelConfigEvent && telemetryLevel === 'off') ||
+        !this.posthogClient
+      ) {
+        return;
+      }
+
+      const machineId = this.identifierService.getMachineId();
+
+      const finalProperties = {
+        ...properties,
+        telemetry_level: telemetryLevel,
+        cli_version: process.env.CLI_VERSION,
+      };
+
+      this.posthogClient.capture({
+        distinctId: machineId, // Consistently use machineId as distinctId
+        event: eventName as string,
+        properties: finalProperties,
+      });
+    } catch (error) {
+      this.logger.debug(
+        `[TELEMETRY] Failed to capture analytics event: ${error}`,
+      );
+    }
+  }
+
+  async shutdown(): Promise<void> {
+    if (this.posthogClient) {
+      try {
+        await this.posthogClient.shutdown();
+      } catch (error) {
+        this.logger.debug(`Failed to shutdown PostHog: ${error}`);
+      }
+    }
+  }
+
+  async onConfigUpdate(newConfig: GlobalConfig) {
+    // If the new telemetry level is different from the current one, capture an event.
+    if (
+      newConfig.telemetryLevel !== this.globalConfigService.get().telemetryLevel
+    ) {
+      this.capture('cli-telemetry-config-set', {
+        configured_level: newConfig.telemetryLevel,
+      });
+    }
+  }
+}

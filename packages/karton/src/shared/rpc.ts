@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { WebSocketMessage } from './types.js';
-import { KartonRPCException, KartonRPCErrorReason } from './types.js';
+import { KartonRPCException, KartonRPCErrorReason, KartonProcedureError } from './types.js';
 import {
   createRPCCallMessage,
   createRPCReturnMessage,
@@ -77,6 +77,16 @@ export class RPCManager {
     this.procedures.set(key, handler);
   }
 
+  public unregisterProcedure(path: string[]): void {
+    const key = path.join('.');
+    this.procedures.delete(key);
+  }
+
+  public hasProcedure(path: string[]): boolean {
+    const key = path.join('.');
+    return this.procedures.has(key);
+  }
+
   public async handleMessage(message: WebSocketMessage): Promise<void> {
     if (isRPCCallMessage(message)) {
       await this.handleRPCCall(message);
@@ -95,7 +105,7 @@ export class RPCManager {
     const handler = this.procedures.get(key);
 
     if (!handler) {
-      const error = new Error(`Procedure not found: ${key}`);
+      const error = new KartonProcedureError(`Server procedure '${key}' is not registered`);
       const exceptionMessage = createRPCExceptionMessage(rpcCallId, error);
       this.sendMessage(exceptionMessage);
       return;
