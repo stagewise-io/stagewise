@@ -66,12 +66,14 @@ async function _getRouteFileSnippets(
   if (!relativePath) return [];
   const filePaths = [];
   for await (const [_key, value] of db.routing.iterator()) {
-    const storedMappedRoute = value.browserRoute;
-    const isValid = isCurrentRoute(relativePath, storedMappedRoute);
-    if (!isValid) continue;
-    filePaths.push(value.sourceFile);
-    for (const layoutFile of value.layoutFiles ?? [])
-      filePaths.push(layoutFile);
+    for (const route of value.routes) {
+      const storedMappedRoute = route.browserRoute;
+      const isValid = isCurrentRoute(relativePath, storedMappedRoute);
+      if (!isValid) continue;
+      filePaths.push(route.sourceFile);
+      for (const layoutFile of route.layoutFiles ?? [])
+        filePaths.push(layoutFile);
+    }
   }
   await db.close();
   const fileSnippets: string[] = [];
