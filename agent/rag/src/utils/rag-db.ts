@@ -1,9 +1,10 @@
 import { connect, type Connection, type Table } from '@lancedb/lancedb';
-import { EXPECTED_EMBEDDING_DIM } from '../index.js';
+import { EXPECTED_EMBEDDING_DIM, RAG_VERSION } from '../index.js';
+import { LevelDb } from '../index.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import type { FileEmbedding } from './embeddings.js';
-import { RAG_VERSION } from '../index.js';
+import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 
 export type FileInfo = {
   absolutePath: string;
@@ -41,9 +42,15 @@ export interface TableStats {
 /**
  * Creates database configuration with defaults
  */
-export function createDatabaseConfig(cwd: string): Required<DatabaseConfig> {
+export function createDatabaseConfig(
+  clientRuntime: ClientRuntime,
+): Required<DatabaseConfig> {
   return {
-    dbPath: path.join(cwd, '.stagewise', 'index-db'),
+    dbPath: path.join(
+      clientRuntime.fileSystem.getCurrentWorkingDirectory(),
+      '.stagewise',
+      'index-db',
+    ),
     tableName: 'codebase_embeddings',
   };
 }
@@ -64,9 +71,9 @@ async function ensureDbDirectory(dbPath: string): Promise<void> {
  * Connects to the database and optionally opens an existing table
  */
 export async function connectToDatabase(
-  cwd: string,
+  clientRuntime: ClientRuntime,
 ): Promise<DatabaseConnection> {
-  const fullConfig = createDatabaseConfig(cwd);
+  const fullConfig = createDatabaseConfig(clientRuntime);
 
   await ensureDbDirectory(fullConfig.dbPath);
   const connection = await connect(fullConfig.dbPath);
@@ -89,20 +96,24 @@ export async function connectToDatabase(
 /**
  * Validates that the table schema matches expected embedding dimensions
  */
-async function validateTableSchema(table: Table | null): Promise<boolean> {
+async function validateTableSchema(
+  table: Table | null,
+  clientRuntime: ClientRuntime,
+): Promise<boolean> {
   if (!table) return true; // No table, so no schema issues
 
   try {
     // Try to get the first record to check embedding dimensions
     const sample = await table.query().limit(1).toArray();
-    if (sample.length === 0) {
-      return true; // Empty table, no schema issues
-    }
+    if (sample.length === 0) return true; // Empty table, no schema issues
 
-    const ragVersion = sample[0].ragVersion;
-    if (ragVersion !== RAG_VERSION) {
+    const db = LevelDb.getInstance(clientRuntime);
+    await db.open();
+
+    const metadata = await db.meta.get('schema');
+    if (metadata!.ragVersion !== RAG_VERSION) {
       console.log(
-        `Schema mismatch detected: Table has ragVersion ${ragVersion}, ` +
+        `Schema mismatch detected: Table has ragVersion ${metadata!.ragVersion}, ` +
           `but ${RAG_VERSION} is required. Re-indexing needed.`,
       );
       return false;
@@ -145,6 +156,7 @@ function createEmptyRecord(): FileEmbeddingRecord {
  */
 export async function createOrUpdateTable(
   dbConnection: DatabaseConnection,
+  clientRuntime: ClientRuntime,
 ): Promise<DatabaseConnection> {
   const { connection, config } = dbConnection;
   const tables = await connection.tableNames();
@@ -164,7 +176,7 @@ export async function createOrUpdateTable(
     let table = await connection.openTable(config.tableName);
 
     // Check if schema is valid
-    const isValid = await validateTableSchema(table);
+    const isValid = await validateTableSchema(table, clientRuntime);
     if (!isValid) {
       // Drop the existing table
       await connection.dropTable(config.tableName);

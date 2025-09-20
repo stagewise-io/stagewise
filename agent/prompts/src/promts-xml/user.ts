@@ -61,6 +61,13 @@ export function getUserMessagePrompt(
     });
   }
 
+  for (const fileSnippet of config.userMessage.metadata?.fileSnippets ?? []) {
+    content.push({
+      type: 'text',
+      text: fileSnippet,
+    });
+  }
+
   return {
     role: 'user',
     content,

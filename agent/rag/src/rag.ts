@@ -16,7 +16,7 @@ import {
   deleteFileRecords,
   searchSimilarFiles,
   upsertFileRecord,
-} from './utils/database.js';
+} from './utils/rag-db.js';
 import { RerankClient } from './utils/rerank.js';
 
 export type RagUpdate = {
@@ -59,10 +59,8 @@ export async function* initializeRag(
 
   // Process files to remove - no embedding needed, just deletion
   if (filesToRemove.length > 0) {
-    const dbConnection = await connectToDatabase(
-      clientRuntime.fileSystem.getCurrentWorkingDirectory() || '',
-    );
-    await createOrUpdateTable(dbConnection);
+    const dbConnection = await connectToDatabase(clientRuntime);
+    await createOrUpdateTable(dbConnection, clientRuntime);
     const table = dbConnection.table;
     if (!table) throw new Error('Table not initialized');
 
@@ -81,10 +79,8 @@ export async function updateRag(
   clientRuntime: ClientRuntime,
   apiKey: string,
 ) {
-  const dbConnection = await connectToDatabase(
-    clientRuntime.fileSystem.getCurrentWorkingDirectory() || '',
-  );
-  await createOrUpdateTable(dbConnection);
+  const dbConnection = await connectToDatabase(clientRuntime);
+  await createOrUpdateTable(dbConnection, clientRuntime);
   const table = dbConnection.table;
   if (!table) throw new Error('Table not initialized');
 
@@ -169,10 +165,8 @@ export async function queryRagWithoutRerank(
   if (!queryEmbedding) {
     throw new Error('Failed to generate embedding for query');
   }
-  const dbConnection = await connectToDatabase(
-    clientRuntime.fileSystem.getCurrentWorkingDirectory() || '',
-  );
-  await createOrUpdateTable(dbConnection);
+  const dbConnection = await connectToDatabase(clientRuntime);
+  await createOrUpdateTable(dbConnection, clientRuntime);
   const table = dbConnection.table;
   if (!table) throw new Error('Table not initialized');
   const results = await searchSimilarFiles(table, queryEmbedding, limit);
@@ -184,10 +178,8 @@ async function* embedFiles(
   clientRuntime: ClientRuntime,
   apiKey: string,
 ): AsyncGenerator<FileEmbedding> {
-  const dbConnection = await connectToDatabase(
-    clientRuntime.fileSystem.getCurrentWorkingDirectory() || '',
-  );
-  const { table } = await createOrUpdateTable(dbConnection);
+  const dbConnection = await connectToDatabase(clientRuntime);
+  const { table } = await createOrUpdateTable(dbConnection, clientRuntime);
   if (!table) throw new Error('Table not initialized');
   const embeddings = generateFileEmbeddings(
     {

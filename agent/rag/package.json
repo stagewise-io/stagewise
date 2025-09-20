@@ -32,18 +32,20 @@
     "@google/genai": "^1.16.0",
     "@lancedb/lancedb": "^0.21.3",
     "@stagewise/agent-runtime-interface": "workspace:*",
+    "abstract-level": "^3.1.0",
     "chokidar": "^4.0.3",
     "ignore": "^7.0.5",
     "level": "^10.0.0",
     "openai": "^5.20.2"
   },
   "devDependencies": {
+    "@stagewise/agent-runtime-node": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
-    "@stagewise/agent-runtime-node": "workspace:*",
     "esbuild": "0.25.9",
     "rimraf": "^5.0.0",
     "tsx": "^4.7.1",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
   }
 }

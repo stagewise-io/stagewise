@@ -45,3 +45,5 @@ yarn-error.log*
 storybook-static
 
 .stagewise
+
+debug

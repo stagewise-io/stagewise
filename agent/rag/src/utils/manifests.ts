@@ -4,17 +4,8 @@ import {
   ALLOWED_FILENAMES,
 } from './allowed-rag-extensions.js';
 import { createHash } from 'node:crypto';
-import { Level } from 'level';
-import path from 'node:path';
+import { LevelDb } from './typed-db.js';
 import { RAG_VERSION } from '../index.js';
-
-function getDatabasePath(clientRuntime: ClientRuntime): string {
-  return path.join(
-    clientRuntime.fileSystem.getCurrentWorkingDirectory(),
-    '.stagewise',
-    'local-files-manifests.db',
-  );
-}
 
 export type FileManifest = {
   path: string;
@@ -85,13 +76,11 @@ async function getLocalFilesManifests(
 async function getStoredFilesManifests(
   clientRuntime: ClientRuntime,
 ): Promise<FileManifest[] | { error: 'table_not_found' | 'unknown_error' }> {
-  const databasePath = getDatabasePath(clientRuntime);
-  const db = new Level<string, FileManifest>(databasePath, {
-    valueEncoding: 'json',
-  });
+  const db = LevelDb.getInstance(clientRuntime);
   const manifests: FileManifest[] = [];
   try {
-    for await (const [_, value] of db.iterator()) {
+    await db.open();
+    for await (const [_, value] of db.manifests.iterator()) {
       manifests.push(value as FileManifest);
     }
     await db.close();
@@ -163,10 +152,9 @@ export async function createStoredFileManifest(
   if (!manifest) {
     throw new Error(`Failed to get file manifest: ${filepath}`);
   }
-  const db = new Level<string, FileManifest>(getDatabasePath(clientRuntime), {
-    valueEncoding: 'json',
-  });
-  await db.put(filepath, manifest);
+  const db = LevelDb.getInstance(clientRuntime);
+  await db.open();
+  await db.manifests.put(filepath, manifest);
   await db.close();
 }
 
@@ -174,10 +162,9 @@ export async function deleteStoredFileManifest(
   filepath: string,
   clientRuntime: ClientRuntime,
 ): Promise<void> {
-  const db = new Level<string, FileManifest>(getDatabasePath(clientRuntime), {
-    valueEncoding: 'json',
-  });
-  await db.del(filepath);
+  const db = LevelDb.getInstance(clientRuntime);
+  await db.open();
+  await db.manifests.del(filepath);
   await db.close();
 }
 

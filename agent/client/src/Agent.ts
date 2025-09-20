@@ -13,7 +13,7 @@ import {
   type AnthropicProviderOptions,
   createAnthropic,
 } from '@ai-sdk/anthropic';
-import type { createOpenAI } from '@ai-sdk/openai';
+import { createOpenAI } from '@ai-sdk/openai';
 import {
   cliTools,
   cliToolsWithoutExecute,
@@ -94,7 +94,8 @@ export class Agent {
   private maxAuthRetries = 2;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
-  private litellm!: ReturnType<typeof createAnthropic>;
+  private litellm!: ReturnType<typeof createOpenAI>;
+  // private litellm!: ReturnType<typeof createAnthropic>;
   private ragIntervalId: NodeJS.Timeout | null = null;
   private contextFilesInfo: {
     contextFiles: TextUIPart[];
@@ -155,8 +156,8 @@ export class Agent {
     const LLM_PROXY_URL =
       process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
-    this.litellm = createAnthropic({
-      baseURL: `${LLM_PROXY_URL}/v1`, // will use the anthropic/v1/messages endpoint of the litellm proxy
+    this.litellm = createOpenAI({
+      baseURL: `${LLM_PROXY_URL}/v1`, // will use the openai/v1/messages endpoint of the litellm proxy
       apiKey: this.accessToken, // stagewise access token
     });
   }
@@ -312,7 +313,7 @@ export class Agent {
           this.contextFilesInfo.lastSelectedElementsHash = hashUpdate(update);
 
           if (this.contextFilesInfo.lastSelectedElementsHash === null) {
-            this.contextFilesInfo.contextFiles = [];
+            // this.contextFilesInfo.contextFiles = [];
             return;
           }
 
@@ -418,9 +419,18 @@ export class Agent {
         },
         sendUserMessage: async (message, _callingClientId) => {
           this.setAgentWorking(true);
+          const messageWithContextFiles: ChatMessage = {
+            ...message,
+            metadata: {
+              ...message.metadata,
+              fileSnippets: this.contextFilesInfo.contextFiles.map(
+                (file) => file.text,
+              ),
+            },
+          };
           const newstate = this.karton?.setState((draft) => {
             const chatId = this.karton!.state.activeChatId!;
-            draft.chats[chatId]!.messages.push(message as any); // TODO: fix the type issue here
+            draft.chats[chatId]!.messages.push(messageWithContextFiles as any); // TODO: fix the type issue here
             draft.chats[chatId]!.error = undefined;
           });
           const messages =
@@ -480,8 +490,8 @@ export class Agent {
       () => {
         this.updateRag();
       },
-      3 * 60 * 1000,
-    ); // 3 minutes in milliseconds
+      1 * 60 * 1000,
+    ); // 1 minute in milliseconds
 
     return {
       wss: this.karton.wss,
@@ -520,24 +530,6 @@ export class Agent {
   }): Promise<void> {
     if (!this.undoToolCallStack.has(chatId))
       this.undoToolCallStack.set(chatId, []);
-
-    // Check recursion depth
-    // if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
-    //   const errorDesc = ErrorDescriptions.recursionDepthExceeded(
-    //     this.recursionDepth,
-    //     MAX_RECURSION_DEPTH,
-    //   );
-    //   this.setAgentWorking(false);
-    //   this.karton?.setState((draft) => {
-    //     draft.chats[chatId]!.error = {
-    //       type: AgentErrorType.AGENT_ERROR,
-    //       error: new Error(errorDesc),
-    //     };
-    //   });
-    //   return;
-    // }
-
-    // this.recursionDepth++;
 
     try {
       const lastMessage = history?.at(-1);
@@ -585,19 +577,26 @@ export class Agent {
         promptSnippets,
       });
 
+      const messages = [
+        systemPrompt,
+        ...uiMessagesToModelMessages(history ?? []),
+      ];
+
       const stream = streamText({
-        model: this.litellm('claude-sonnet-4-20250514'),
+        // model: this.litellm('claude-sonnet-4-20250514'),
+        model: this.litellm('gpt-5'),
+        providerOptions: {
+          openai: {
+            reasoningSummary: 'detailed',
+            reasoningEffort: 'low',
+            textVerbosity: 'low',
+          },
+        },
         abortSignal: this.abortController.signal,
         temperature: 0.7,
         maxOutputTokens: 10000,
         maxRetries: 0,
-        messages: [
-          systemPrompt,
-          ...uiMessagesToModelMessages(
-            history ?? [],
-            this.contextFilesInfo.contextFiles,
-          ),
-        ],
+        messages,
         onError: async (error) => {
           if (isAbortError(error.error)) {
             this.authRetryCount = 0;
@@ -685,6 +684,7 @@ export class Agent {
         },
         onFinish: async (r) => {
           this.authRetryCount = 0;
+
           const toolResults = await processParallelToolCalls(
             r.toolCalls,
             this.tools,
