@@ -1,15 +1,19 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { isAbortError } from './utils/is-abort-error.js';
 import { isAuthenticationError } from './utils/is-authentication-error.js';
+import { initializeRag } from '@stagewise/agent-rag';
 import {
   type KartonContract,
   type History,
   type ChatMessage,
   AgentErrorType,
+  type UserInputUpdate,
 } from '@stagewise/karton-contract';
 import {
   type AnthropicProviderOptions,
   createAnthropic,
 } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
 import {
   cliTools,
   cliToolsWithoutExecute,
@@ -32,10 +36,7 @@ import {
   EventFactories,
   type AgentEventCallback,
 } from './utils/event-utils.js';
-import {
-  ErrorDescriptions,
-  formatErrorDescription,
-} from './utils/error-utils.js';
+import { formatErrorDescription } from './utils/error-utils.js';
 import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
 import { getProjectPath } from '@stagewise/agent-prompt-snippets';
 import {
@@ -44,7 +45,12 @@ import {
   findPendingToolCalls,
 } from './utils/karton-helpers.js';
 import { isInsufficientCreditsError } from './utils/is-insufficient-credits-error.js';
-import type { AsyncIterableStream, InferUIMessageChunk, ToolUIPart } from 'ai';
+import type {
+  AsyncIterableStream,
+  InferUIMessageChunk,
+  ToolUIPart,
+  TextUIPart,
+} from 'ai';
 import { uiMessagesToModelMessages } from './utils/ui-messages-to-model-messages.js';
 import {
   processParallelToolCalls,
@@ -55,6 +61,7 @@ import {
   isPlanLimitsExceededError,
   type PlanLimitsExceededError,
 } from './utils/is-plan-limit-error.js';
+import { getContextFilesFromUserInput } from './utils/get-context-files-from-user-input.js';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -67,7 +74,7 @@ type ChatId = string;
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
-const MAX_RECURSION_DEPTH = 20;
+const _MAX_RECURSION_DEPTH = 20;
 
 export class Agent {
   private static instance: Agent;
@@ -79,6 +86,7 @@ export class Agent {
   private refreshToken: string;
   private eventEmitter: ReturnType<typeof createEventEmitter>;
   private isWorking = false;
+  private isRagWorking = false;
   private timeoutManager: TimeoutManager;
   private recursionDepth = 0;
   private agentTimeout: number = DEFAULT_AGENT_TIMEOUT;
@@ -86,7 +94,16 @@ export class Agent {
   private maxAuthRetries = 2;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
-  private litellm!: ReturnType<typeof createAnthropic>;
+  private litellm!: ReturnType<typeof createOpenAI>;
+  // private litellm!: ReturnType<typeof createAnthropic>;
+  private ragIntervalId: NodeJS.Timeout | null = null;
+  private contextFilesInfo: {
+    contextFiles: TextUIPart[];
+    lastSelectedElementsHash: string | null;
+  } = {
+    contextFiles: [],
+    lastSelectedElementsHash: null,
+  };
   // undo is only allowed for one chat at a time.
   // if the user switches to a new chat, the undo stack is cleared
   private undoToolCallStack: Map<
@@ -126,6 +143,8 @@ export class Agent {
       },
       { once: true },
     );
+
+    this.clientRuntime.fileSystem.watchFiles('.', (_event) => {});
   }
 
   public shutdown() {
@@ -137,8 +156,8 @@ export class Agent {
     const LLM_PROXY_URL =
       process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
-    this.litellm = createAnthropic({
-      baseURL: `${LLM_PROXY_URL}/v1`, // will use the anthropic/v1/messages endpoint of the litellm proxy
+    this.litellm = createOpenAI({
+      baseURL: `${LLM_PROXY_URL}/v1`, // will use the openai/v1/messages endpoint of the litellm proxy
       apiKey: this.accessToken, // stagewise access token
     });
   }
@@ -210,6 +229,12 @@ export class Agent {
     // Clear all timeouts
     this.timeoutManager.clearAll();
 
+    // Clear RAG interval
+    if (this.ragIntervalId) {
+      clearInterval(this.ragIntervalId);
+      this.ragIntervalId = null;
+    }
+
     // Reset recursion depth if requested
     if (resetRecursionDepth) {
       this.recursionDepth = 0;
@@ -266,6 +291,39 @@ export class Agent {
   }> {
     this.karton = await createKartonServer<KartonContract>({
       procedures: {
+        sendUserInputUpdate: async (update) => {
+          const hashUpdate = (update: UserInputUpdate) => {
+            if (
+              !update.browserData?.selectedElements ||
+              update.browserData?.selectedElements.length === 0
+            )
+              return null;
+
+            return createHash('sha256')
+              .update(JSON.stringify(update.browserData?.selectedElements))
+              .digest('hex');
+          };
+          // only trigger a new RAG if the selected elements have changed
+          if (
+            hashUpdate(update) ===
+            this.contextFilesInfo.lastSelectedElementsHash
+          )
+            return;
+
+          this.contextFilesInfo.lastSelectedElementsHash = hashUpdate(update);
+
+          if (this.contextFilesInfo.lastSelectedElementsHash === null) {
+            // this.contextFilesInfo.contextFiles = [];
+            return;
+          }
+
+          this.contextFilesInfo.contextFiles =
+            await getContextFilesFromUserInput(
+              update,
+              this.accessToken,
+              this.clientRuntime,
+            );
+        },
         undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
           await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
         },
@@ -361,9 +419,18 @@ export class Agent {
         },
         sendUserMessage: async (message, _callingClientId) => {
           this.setAgentWorking(true);
+          const messageWithContextFiles: ChatMessage = {
+            ...message,
+            metadata: {
+              ...message.metadata,
+              fileSnippets: this.contextFilesInfo.contextFiles.map(
+                (file) => file.text,
+              ),
+            },
+          };
           const newstate = this.karton?.setState((draft) => {
             const chatId = this.karton!.state.activeChatId!;
-            draft.chats[chatId]!.messages.push(message as any); // TODO: fix the type issue here
+            draft.chats[chatId]!.messages.push(messageWithContextFiles as any); // TODO: fix the type issue here
             draft.chats[chatId]!.error = undefined;
           });
           const messages =
@@ -417,9 +484,30 @@ export class Agent {
     this.setAgentWorking(false);
     createAndActivateNewChat(this.karton);
 
+    // Initialize RAG immediately and then every 5 minutes
+    this.updateRag();
+    this.ragIntervalId = setInterval(
+      () => {
+        this.updateRag();
+      },
+      1 * 60 * 1000,
+    ); // 1 minute in milliseconds
+
     return {
       wss: this.karton.wss,
     };
+  }
+
+  private async updateRag() {
+    if (this.isRagWorking) return;
+    this.isRagWorking = true;
+    for await (const _update of initializeRag(
+      this.clientRuntime,
+      this.accessToken,
+    )) {
+      // TODO: send rag updates and progress to the UI
+    }
+    this.isRagWorking = false;
   }
 
   /**
@@ -442,24 +530,6 @@ export class Agent {
   }): Promise<void> {
     if (!this.undoToolCallStack.has(chatId))
       this.undoToolCallStack.set(chatId, []);
-
-    // Check recursion depth
-    if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
-      const errorDesc = ErrorDescriptions.recursionDepthExceeded(
-        this.recursionDepth,
-        MAX_RECURSION_DEPTH,
-      );
-      this.setAgentWorking(false);
-      this.karton?.setState((draft) => {
-        draft.chats[chatId]!.error = {
-          type: AgentErrorType.AGENT_ERROR,
-          error: new Error(errorDesc),
-        };
-      });
-      return;
-    }
-
-    this.recursionDepth++;
 
     try {
       const lastMessage = history?.at(-1);
@@ -507,18 +577,26 @@ export class Agent {
         promptSnippets,
       });
 
+      const messages = [
+        systemPrompt,
+        ...uiMessagesToModelMessages(history ?? []),
+      ];
+
       const stream = streamText({
-        model: this.litellm('claude-sonnet-4-20250514'),
+        // model: this.litellm('claude-sonnet-4-20250514'),
+        model: this.litellm('gpt-5'),
+        providerOptions: {
+          openai: {
+            reasoningSummary: 'detailed',
+            reasoningEffort: 'low',
+            textVerbosity: 'low',
+          },
+        },
         abortSignal: this.abortController.signal,
         temperature: 0.7,
         maxOutputTokens: 10000,
         maxRetries: 0,
-        providerOptions: {
-          anthropic: {
-            thinking: { type: 'enabled', budgetTokens: 10000 },
-          } satisfies AnthropicProviderOptions,
-        },
-        messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
+        messages,
         onError: async (error) => {
           if (isAbortError(error.error)) {
             this.authRetryCount = 0;
@@ -606,6 +684,7 @@ export class Agent {
         },
         onFinish: async (r) => {
           this.authRetryCount = 0;
+
           const toolResults = await processParallelToolCalls(
             r.toolCalls,
             this.tools,

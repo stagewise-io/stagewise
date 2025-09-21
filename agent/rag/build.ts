@@ -11,6 +11,7 @@ const baseOptions: BuildOptions = {
   target: 'es2020',
   external: [
     '@stagewise/karton',
+    '@stagewise/agent-runtime-interface',
     '@lancedb/lancedb', // Has native bindings, must be external
     'level', // Has native bindings, must be external
     'chokidar', // Has native bindings, must be external

@@ -60,5 +60,6 @@ export function uiMessagesToModelMessages(
       }
     }
   }
+
   return modelMessages;
 }

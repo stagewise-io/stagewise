@@ -165,6 +165,10 @@ export const userMessageMetadataSchema = z.object({
     .date()
     .optional()
     .describe('The date and time the message was created'),
+  fileSnippets: z
+    .array(z.string())
+    .optional()
+    .describe('File snippets for the user message'),
 });
 
 export type UserMessageMetadata = z.infer<typeof userMessageMetadataSchema>;
