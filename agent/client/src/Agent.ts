@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbortError } from './utils/is-abort-error.js';
+import { LevelDb } from '@stagewise/agent-rag';
 import { isAuthenticationError } from './utils/is-authentication-error.js';
 import { initializeRag } from '@stagewise/agent-rag';
 import {
@@ -8,10 +9,11 @@ import {
   type ChatMessage,
   AgentErrorType,
   type UserInputUpdate,
+  type SelectedElement,
 } from '@stagewise/karton-contract';
 import {
-  type AnthropicProviderOptions,
-  createAnthropic,
+  AnthropicProviderOptions,
+  type createAnthropic,
 } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import {
@@ -61,7 +63,7 @@ import {
   isPlanLimitsExceededError,
   type PlanLimitsExceededError,
 } from './utils/is-plan-limit-error.js';
-import { getContextFilesFromUserInput } from './utils/get-context-files-from-user-input.js';
+import { getFileSnippetsFromSelectedElement } from './utils/get-context-files-from-user-input.js';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -94,15 +96,17 @@ export class Agent {
   private maxAuthRetries = 2;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
-  private litellm!: ReturnType<typeof createOpenAI>;
+  private litellm!:
+    | ReturnType<typeof createOpenAI>
+    | ReturnType<typeof createAnthropic>;
   // private litellm!: ReturnType<typeof createAnthropic>;
   private ragIntervalId: NodeJS.Timeout | null = null;
   private contextFilesInfo: {
     contextFiles: TextUIPart[];
-    lastSelectedElementsHash: string | null;
+    lastSelectedElementsHashes: string[];
   } = {
     contextFiles: [],
-    lastSelectedElementsHash: null,
+    lastSelectedElementsHashes: [],
   };
   // undo is only allowed for one chat at a time.
   // if the user switches to a new chat, the undo stack is cleared
@@ -156,6 +160,10 @@ export class Agent {
     const LLM_PROXY_URL =
       process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
+    // this.litellm = createAnthropic({
+    //   apiKey: this.accessToken,
+    //   baseURL: `${LLM_PROXY_URL}/v1`,
+    // });
     this.litellm = createOpenAI({
       baseURL: `${LLM_PROXY_URL}/v1`, // will use the openai/v1/messages endpoint of the litellm proxy
       apiKey: this.accessToken, // stagewise access token
@@ -292,37 +300,46 @@ export class Agent {
     this.karton = await createKartonServer<KartonContract>({
       procedures: {
         sendUserInputUpdate: async (update) => {
-          const hashUpdate = (update: UserInputUpdate) => {
-            if (
-              !update.browserData?.selectedElements ||
-              update.browserData?.selectedElements.length === 0
-            )
-              return null;
-
+          const hashElement = (element: SelectedElement) => {
             return createHash('sha256')
-              .update(JSON.stringify(update.browserData?.selectedElements))
+              .update(JSON.stringify(element))
               .digest('hex');
           };
-          // only trigger a new RAG if the selected elements have changed
-          if (
-            hashUpdate(update) ===
-            this.contextFilesInfo.lastSelectedElementsHash
-          )
-            return;
 
-          this.contextFilesInfo.lastSelectedElementsHash = hashUpdate(update);
-
-          if (this.contextFilesInfo.lastSelectedElementsHash === null) {
-            // this.contextFilesInfo.contextFiles = [];
-            return;
+          const hashesOfSelectedElements = (
+            update.browserData?.selectedElements || []
+          ).map((e) => hashElement(e));
+          for (const hash of this.contextFilesInfo.lastSelectedElementsHashes ||
+            []) {
+            if (!hashesOfSelectedElements.includes(hash)) {
+              this.contextFilesInfo.lastSelectedElementsHashes =
+                this.contextFilesInfo.lastSelectedElementsHashes?.filter(
+                  (h) => h !== hash,
+                ) || null;
+              console.log('element was unselected', hash);
+            }
           }
 
-          this.contextFilesInfo.contextFiles =
-            await getContextFilesFromUserInput(
-              update,
-              this.accessToken,
-              this.clientRuntime,
-            );
+          for (const element of update.browserData?.selectedElements || []) {
+            if (
+              !this.contextFilesInfo.lastSelectedElementsHashes?.includes(
+                hashElement(element),
+              )
+            ) {
+              console.log('newly selected element', element.xpath);
+              const files = await getFileSnippetsFromSelectedElement(
+                element,
+                this.accessToken,
+                this.clientRuntime,
+              );
+
+              this.contextFilesInfo.lastSelectedElementsHashes?.push(
+                hashElement(element),
+              );
+
+              // this.contextFilesInfo.contextFiles.push(...files); // TODO: adapt to new type
+            }
+          }
         },
         undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
           await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
