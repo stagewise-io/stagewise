@@ -12,29 +12,7 @@ import {
   setTelemetryLevelCmdHandler,
 } from './subcommands/telemetry';
 import type { GlobalConfig } from '@/services/global-config';
-import { Logger } from './services/logger';
-import { GlobalDataPathService } from './services/global-data-path';
-import { GlobalConfigService } from './services/global-config';
-import { IdentifierService } from './services/identifier';
-import { TelemetryService } from './services/telemetry';
-import { AuthService } from '@/services/auth';
-import { ExperienceStateService } from './services/experience-state';
-
-// On start, we initialize a variety of basic services that will be used across all kinds of operational modes of the CLI.
-const logger = new Logger(false);
-const globalDataPathService = await GlobalDataPathService.create(logger);
-const identifierService = await IdentifierService.create(globalDataPathService);
-const globalConfigService = await GlobalConfigService.create(
-  globalDataPathService,
-  logger,
-);
-const _telemetryService = new TelemetryService(
-  identifierService,
-  globalConfigService,
-  logger,
-);
-const _authService = await AuthService.create(globalDataPathService, logger);
-const _experienceStateService = new ExperienceStateService();
+import { main } from './main';
 
 function myParseInt(value: string) {
   const parsedValue = Number.parseInt(value, 10);
@@ -64,20 +42,31 @@ program
     '-w, --workspace <workspace>',
     'The path to the workspace that should be loaded on start. If empty, the current working directory will be loaded as a workspace.',
   )
+  .option('--no-workspace-on-start', 'Do not load a workspace on start.')
   .option('-v, --verbose', 'Output debug information to the CLI')
   .option(
     '-b, --bridge',
     'Bridge mode (deprecated) - use stagewise without the built-in agent',
   )
   .action(
-    (_options: {
+    async (options: {
       port: number;
       appPort: number;
       workspace: string;
       verbose: boolean;
       bridge: boolean;
+      workspaceOnStart: boolean;
     }) => {
-      // TODO: Call the handler for the main command
+      await main({
+        launchOptions: {
+          port: options.port,
+          appPort: options.appPort,
+          workspacePath: options.workspace,
+          verbose: options.verbose,
+          bridgeMode: options.bridge,
+          workspaceOnStart: options.workspaceOnStart,
+        },
+      });
     },
   );
 
@@ -85,9 +74,7 @@ const telemetryCommand = program
   .command('telemetry')
   .description('Configure the telemetry level of stagewise.');
 
-telemetryCommand
-  .command('get')
-  .action(getTelemetryLevelCmdHandler(globalConfigService));
+telemetryCommand.command('get').action(getTelemetryLevelCmdHandler);
 telemetryCommand
   .command('set')
   .argument<GlobalConfig['telemetryLevel']>(
@@ -104,12 +91,7 @@ telemetryCommand
       return val as GlobalConfig['telemetryLevel'];
     },
   )
-  .action(setTelemetryLevelCmdHandler(globalConfigService));
-
-// Default action for main program
-program.action(() => {
-  // TODO: Call the hander for the main app start
-});
+  .action(setTelemetryLevelCmdHandler);
 
 // Parse arguments
 program.parse(process.argv);

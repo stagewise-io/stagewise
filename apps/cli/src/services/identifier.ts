@@ -26,7 +26,7 @@ export class IdentifierService {
     // Check if a machine ID exists. If not, create a new one.
     const identifierFilePath = path.resolve(
       this.globalDataPathService.globalDataPath,
-      'identifier.json',
+      'identity.json',
     );
     await fs
       .readFile(identifierFilePath, 'utf-8')
@@ -53,6 +53,9 @@ export class IdentifierService {
 
   public getMachineId(): string {
     if (!this.machineId) {
+      this.logger.error(
+        "[IdentifierService] Machine ID not found. This shouldn't happen.",
+      );
       throw new Error("Machine ID not found. This shouldn't happen.");
     }
     return this.machineId;

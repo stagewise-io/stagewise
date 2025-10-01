@@ -2,7 +2,7 @@ import envPaths, { type Paths } from 'env-paths';
 import path from 'node:path';
 import { getEnvMode } from '@/utils/env';
 import { createHash } from 'node:crypto';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import type { Logger } from './logger';
 
 /**
@@ -20,7 +20,17 @@ export class GlobalDataPathService {
 
   public static async create(logger: Logger): Promise<GlobalDataPathService> {
     const instance = new GlobalDataPathService(logger);
+    await instance.initialize();
+    logger.debug('[GlobalDataPathService] Created service');
     return instance;
+  }
+
+  private async initialize(): Promise<void> {
+    // Create all paths that are needed (if they don't exist already)
+    await fs.mkdir(this.paths.config, { recursive: true });
+    await fs.mkdir(this.paths.data, { recursive: true });
+    await fs.mkdir(this.paths.cache, { recursive: true });
+    await fs.mkdir(this.paths.temp, { recursive: true });
   }
 
   get configFilePath(): string {
@@ -54,14 +64,13 @@ export class GlobalDataPathService {
    * @param workspacePath Path to the workspace
    * @returns Path to the data folder for the workspace
    */
-  public getWorkspaceDataPath(workspacePath: string): string {
+  public async getWorkspaceDataPath(workspacePath: string): Promise<string> {
     try {
       // Fetch folder form the path and get it's creation time
       const workspaceFolder = path.dirname(workspacePath);
-      const workspaceFolderCreationTimeSalt = fs
-        .statSync(workspaceFolder)
-        .ctime.getTime()
-        .toFixed(0);
+      const workspaceFolderCreationTimeSalt = await fs
+        .stat(workspaceFolder)
+        .then((stats) => stats.ctime.getTime().toFixed(0));
       const workspacePathHash = createHash('sha256')
         .update(workspacePath + workspaceFolderCreationTimeSalt)
         .digest('hex');

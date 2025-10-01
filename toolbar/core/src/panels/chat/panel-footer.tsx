@@ -35,11 +35,13 @@ export function ChatPanelFooter({
   inputRef: React.RefObject<HTMLTextAreaElement>;
 }) {
   const chatState = useChatState();
-  const isWorking = useKartonState((s) => s.isWorking);
-  const activeChatId = useKartonState((s) => s.activeChatId);
-  const stopAgent = useKartonProcedure((p) => p.abortAgentCall);
-  const canStop = useKartonState((s) => s.isWorking);
-  const chats = useKartonState((s) => s.chats);
+  const isWorking = useKartonState((s) => s.workspace.agentChat.isWorking);
+  const activeChatId = useKartonState(
+    (s) => s.workspace.agentChat.activeChatId,
+  );
+  const stopAgent = useKartonProcedure((p) => p.agentChat.abortAgentCall);
+  const canStop = useKartonState((s) => s.workspace.agentChat.isWorking);
+  const chats = useKartonState((s) => s.workspace.agentChat.chats);
   const isConnected = useKartonConnected();
 
   const abortAgent = useCallback(() => {

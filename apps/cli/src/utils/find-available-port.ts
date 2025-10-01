@@ -30,18 +30,26 @@ export async function findAvailablePort(
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const server = createServer();
-    // Do not keep the event loop alive if we happen to hang here
-    server.unref();
 
+    // Set up error handler
     server.once('error', () => {
+      server.close();
       resolve(false);
     });
 
+    // Set up listening handler
     server.once('listening', () => {
-      server.close(() => resolve(true));
+      server.close();
+      resolve(true);
     });
 
-    server.listen(port, '127.0.0.1');
+    // Attempt to listen
+    try {
+      server.listen(port);
+    } catch {
+      server.close();
+      resolve(false);
+    }
   });
 }
 

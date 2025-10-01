@@ -12,6 +12,16 @@
       "outFiles": ["${workspaceFolder}/apps/vscode-extension/out/**/*.js"],
       "preLaunchTask": "Build Extension: vscode-extension",
       "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch pnpm dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}/apps/cli"
     }
   ]
 }

@@ -12,9 +12,9 @@ import { cn } from '@/utils';
 export function ChatList({ onClose }: { onClose: () => void }) {
   const { chats, activeChatId, isWorking } = useKartonState(
     useComparingSelector((s) => ({
-      chats: s.chats,
-      activeChatId: s.activeChatId,
-      isWorking: s.isWorking,
+      chats: s.workspace.agentChat.chats,
+      activeChatId: s.workspace.agentChat.activeChatId,
+      isWorking: s.workspace.agentChat.isWorking,
     })),
   );
 
@@ -53,8 +53,8 @@ function ChatListEntry({
   onClose: () => void;
   isOnly: boolean;
 }) {
-  const deleteChat = useKartonProcedure((p) => p.deleteChat);
-  const switchChat = useKartonProcedure((p) => p.switchChat);
+  const deleteChat = useKartonProcedure((p) => p.agentChat.delete);
+  const switchChat = useKartonProcedure((p) => p.agentChat.switch);
 
   return (
     <div className="py-0.5">

@@ -1,0 +1,57 @@
+import { IdentifierService } from './services/identifier';
+import { KartonService } from './services/karton';
+import { GlobalDataPathService } from './services/global-data-path';
+import { Logger } from './services/logger';
+import { TelemetryService } from './services/telemetry';
+import { GlobalConfigService } from './services/global-config';
+import { NotificationService } from './services/notification';
+
+export type GlobalServicesBootstrapParameters = {
+  verbose?: boolean;
+};
+
+export type GlobalServices = {
+  logger: Logger;
+  kartonService: KartonService;
+  notificationService: NotificationService;
+  globalDataPathService: GlobalDataPathService;
+  identifierService: IdentifierService;
+  globalConfigService: GlobalConfigService;
+  telemetryService: TelemetryService;
+};
+
+export async function bootstrapGlobalServices({
+  verbose = false,
+}: GlobalServicesBootstrapParameters): Promise<GlobalServices> {
+  const logger = new Logger(verbose);
+  const kartonService = await KartonService.create(logger);
+  const notificationService = await NotificationService.create(
+    logger,
+    kartonService,
+  );
+  const globalDataPathService = await GlobalDataPathService.create(logger);
+  const identifierService = await IdentifierService.create(
+    globalDataPathService,
+    logger,
+  );
+  const globalConfigService = await GlobalConfigService.create(
+    globalDataPathService,
+    logger,
+    kartonService,
+  );
+  const telemetryService = new TelemetryService(
+    identifierService,
+    globalConfigService,
+    logger,
+  );
+
+  return {
+    logger,
+    kartonService,
+    notificationService,
+    globalDataPathService,
+    identifierService,
+    globalConfigService,
+    telemetryService,
+  };
+}

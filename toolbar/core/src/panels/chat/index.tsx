@@ -14,7 +14,9 @@ import {
 export function ChatPanel() {
   const chatState = useChatState();
   const [isDragging, setIsDragging] = useState(false);
-  const isWorking = useKartonState(useComparingSelector((s) => s.isWorking));
+  const isWorking = useKartonState(
+    useComparingSelector((s) => s.workspace.agentChat.isWorking),
+  );
   const isConnected = useKartonConnected();
 
   const enableInputField = useMemo(() => {

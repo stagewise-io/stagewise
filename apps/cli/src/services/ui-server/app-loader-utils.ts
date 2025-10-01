@@ -5,13 +5,13 @@
 import express, { type Request, type Response } from 'express';
 import { stagewiseAppPrefix } from './shared';
 import { resolve } from 'node:path';
-import type { Plugin } from './plugin-loader';
 import { readFile } from 'node:fs/promises';
-import type { WorkspaceManager } from '@/workspace/workspace-manager';
+import type { WorkspaceManagerService } from '@/services/workspace-manager';
+import type { WorkspacePlugin } from '@/shared/plugins';
 
 export async function setupAppLoaderRoutes(
   app: express.Application,
-  workspaceManager: WorkspaceManager,
+  workspaceManager: WorkspaceManagerService,
 ) {
   // First, we serve the UI app in the defined path
   const toolbarPath =
@@ -31,7 +31,8 @@ export async function setupAppLoaderRoutes(
 
   // Last, we register the doc handler for the bootstrap HTML document which should be loaded from the root path
   app.get('*', async (_, res) => {
-    const plugins = workspaceManager.workspace?.getPlugins() || [];
+    const plugins =
+      workspaceManager.workspace?.pluginService.loadedPlugins || [];
     const html = await getBootstrapHtmlDocument(plugins);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -41,7 +42,7 @@ export async function setupAppLoaderRoutes(
   });
 }
 
-async function getBootstrapHtmlDocument(plugins: Plugin[]) {
+async function getBootstrapHtmlDocument(plugins: WorkspacePlugin[]) {
   const importMap = await getImportMap(plugins);
 
   const html = `<!DOCTYPE html>
@@ -64,7 +65,7 @@ async function getBootstrapHtmlDocument(plugins: Plugin[]) {
   return html;
 }
 
-const getImportMap = async (plugins: Plugin[]) => {
+const getImportMap = async (plugins: WorkspacePlugin[]) => {
   const manifestPath =
     process.env.NODE_ENV === 'production'
       ? resolve(__dirname, 'toolbar-app/.vite/manifest.json')
@@ -100,7 +101,7 @@ const getImportMap = async (plugins: Plugin[]) => {
 };
 
 function generatePluginImportMapEntries(
-  plugins: Plugin[],
+  plugins: WorkspacePlugin[],
 ): Record<string, string> {
   const entries: Record<string, string> = {};
 
@@ -110,10 +111,10 @@ function generatePluginImportMapEntries(
   availablePlugins.forEach((plugin, index) => {
     const entryName = `plugin-entry-${index}`;
 
-    if (plugin.url) {
+    if ('url' in plugin) {
       // External URL (including esm.sh)
       entries[entryName] = plugin.url;
-    } else if (plugin.path) {
+    } else if ('path' in plugin) {
       // Local path - served by dev server
       const pluginName = plugin.name.replace(/[@/]/g, '-');
       entries[entryName] =
@@ -124,10 +125,11 @@ function generatePluginImportMapEntries(
   return entries;
 }
 
-function createToolbarConfigHandler(workspaceManager: WorkspaceManager) {
+function createToolbarConfigHandler(workspaceManager: WorkspaceManagerService) {
   return async (_req: Request, res: Response) => {
     try {
-      const plugins = workspaceManager.workspace?.getPlugins() || [];
+      const plugins =
+        workspaceManager.workspace?.pluginService.loadedPlugins || [];
       const availablePlugins = plugins.filter((p) => p.available !== false);
       const pluginImports: string[] = [];
       const pluginExports: string[] = [];
@@ -143,7 +145,7 @@ try {
   console.debug('[stagewise] Successfully loaded plugin: ${plugin.name}');
 } catch (error) {
   console.error('[stagewise] Failed to load plugin ${plugin.name}:', error.message);
-  console.error('[stagewise] Plugin path: ${JSON.stringify(plugin.path || plugin.url)}');
+  console.error('[stagewise] Plugin path: "${'path' in plugin ? plugin.path : plugin.url}"');
 }`);
         pluginExports.push(`plugin${index}`);
       });
@@ -162,12 +164,15 @@ try {
 
       const convertedConfig: Record<string, any> = {
         plugins: '__PLUGIN_PLACEHOLDER__',
-        devAppPort: workspaceManager.workspace?.config.appPort,
+        devAppPort: workspaceManager.workspace?.configService.get().appPort,
       };
 
       // Add eddyMode if it exists
-      if (workspaceManager.workspace?.config.eddyMode !== undefined) {
-        convertedConfig.eddyMode = workspaceManager.workspace?.config.eddyMode;
+      if (
+        workspaceManager.workspace?.configService.get().eddyMode !== undefined
+      ) {
+        convertedConfig.eddyMode =
+          workspaceManager.workspace?.configService.get().eddyMode;
       }
 
       let configString = JSON.stringify(convertedConfig);

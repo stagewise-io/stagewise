@@ -50,10 +50,10 @@ const paidPlanLimitExceededMessage = (minutes?: number) =>
 
 export function ChatErrorBubble({ error }: { error: AgentError }) {
   const retrySendingUserMessage = useKartonProcedure(
-    (p) => p.retrySendingUserMessage,
+    (p) => p.agentChat.retrySendingUserMessage,
   );
 
-  const subscription = useKartonState((s) => s.subscription);
+  const subscription = useKartonState((s) => s.userAccount.subscription);
 
   const errorMessage = useMemo(() => {
     switch (error.type) {

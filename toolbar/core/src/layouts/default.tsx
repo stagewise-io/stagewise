@@ -2,7 +2,7 @@
 
 import { cn } from '@/utils';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { usePanels } from '@/hooks/use-panels';
 import { SettingsPanel } from '@/panels/settings';
 import { ChatPanel } from '@/panels/chat';
@@ -15,37 +15,78 @@ import {
   ResizableHandle,
 } from '@stagewise/stage-ui/components/resizable';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { CogIcon, MessageCircleIcon } from 'lucide-react';
-import { useKartonState } from '@/hooks/use-karton';
+import {
+  AlertTriangleIcon,
+  ArrowRight,
+  CogIcon,
+  Loader2Icon,
+  MessageCircleIcon,
+  UserIcon,
+} from 'lucide-react';
+import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import {
   Popover,
   PopoverTrigger,
   PopoverContent,
   PopoverTitle,
 } from '@stagewise/stage-ui/components/popover';
+import { AuthDialog } from './dialogs/auth';
+import { FilePickerDialog } from './dialogs/file-picker';
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from '@stagewise/stage-ui/components/dialog';
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { NotificationToaster } from './notification-toaster';
 
 export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
   const { leftPanelContent, toggleLeftPanel } = usePanels();
 
-  const workspaceInfo = useKartonState((s) => s.workspaceInfo);
-
-  const _isAuthenticated = useKartonState((s) => s.authStatus.isAuthenticated);
+  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
+  const workspace = useKartonState((s) => s.workspace);
 
   const workspaceDir = useMemo(() => {
-    return workspaceInfo
-      ? workspaceInfo.path
+    return workspace
+      ? workspace.path
           .replace('\\', '/')
           .split('/')
           .filter((p) => p !== '')
           .pop()
       : null;
-  }, [workspaceInfo]);
+  }, [workspace]);
+
+  const openWorkspace = useKartonProcedure((p) => p.workspace.open);
+  const closeWorkspace = useKartonProcedure((p) => p.workspace.close);
+
+  const createFilePickerRequest = useKartonProcedure(
+    (p) => p.filePicker.createRequest,
+  );
+
+  const selectAndOpenWorkspace = useCallback(() => {
+    void createFilePickerRequest({
+      title: 'Select a workspace',
+      description: 'Select a workspace to load',
+      type: 'directory',
+      multiple: true,
+    })
+      .then(async (path) => {
+        console.log('Selected path:', path);
+        if (workspace) {
+          await closeWorkspace();
+        }
+        await openWorkspace(path[0]);
+      })
+      .catch((error) => {
+        console.error('Error selecting workspace:', error);
+      });
+  }, [createFilePickerRequest, openWorkspace, workspace, closeWorkspace]);
+
+  const reloadWorkspace = useCallback(() => {
+    const workspacePath = workspace!.path;
+    void closeWorkspace().then(() => {
+      void openWorkspace(workspacePath);
+    });
+  }, [closeWorkspace, openWorkspace, workspace]);
 
   return (
     <div className="root fixed inset-0 flex size-full flex-col items-stretch justify-between bg-zinc-100 p-2 child:pb-2 dark:bg-zinc-900">
@@ -56,37 +97,75 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
 
         {/* Upper center info area */}
         <div className="flex flex-1 basis-1/3 flex-row items-center justify-center">
-          <Popover>
-            <PopoverTrigger>
-              <Button size="sm" variant="ghost" className="rounded-full">
-                {workspaceDir ?? 'No workspace loaded'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent>
-              <PopoverTitle>Workspace Info</PopoverTitle>
+          {workspace && (
+            <Popover>
+              <PopoverTrigger>
+                <Button size="sm" variant="ghost" className="rounded-full">
+                  {workspaceDir ?? 'No workspace loaded'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent>
+                <PopoverTitle>Workspace Info</PopoverTitle>
 
-              <div className="flex flex-col gap-0">
-                <h3 className="font-medium text-sm">Path</h3>
-                <p className="text-foreground/70 text-sm">
-                  {workspaceInfo?.path}
-                </p>
-              </div>
+                <div className="flex flex-col gap-0">
+                  <h3 className="font-medium text-sm">Path</h3>
+                  <p className="text-foreground/70 text-sm">
+                    {workspace?.path}
+                  </p>
+                </div>
 
-              <div className="flex flex-col gap-0">
-                <h3 className="font-medium text-sm">Dev App Port</h3>
-                <p className="font-mono text-foreground/70 text-sm">
-                  {workspaceInfo?.devAppPort}
-                </p>
-              </div>
+                <div className="flex flex-col gap-0">
+                  <h3 className="font-medium text-sm">Dev App Port</h3>
+                  <p className="font-mono text-foreground/70 text-sm">
+                    {workspace?.config?.appPort ?? 'unknown'}
+                  </p>
+                </div>
 
-              <div className="flex flex-col gap-0">
-                <h3 className="font-medium text-sm">Loaded Plugins</h3>
-                <p className="text-foreground/70 text-sm">
-                  {workspaceInfo?.loadedPlugins.join(', ')}
-                </p>
-              </div>
-            </PopoverContent>
-          </Popover>
+                <div className="flex flex-col gap-0">
+                  <h3 className="font-medium text-sm">
+                    Loaded Plugins{' '}
+                    <span className="inline-body glass-body rounded-full bg-black/60 px-1 py-px text-white text-xs">
+                      {workspace?.plugins?.length ?? 0}
+                    </span>
+                  </h3>
+                  <p className="text-foreground/70 text-sm">
+                    {workspace?.plugins
+                      ?.map((plugin) => plugin.name)
+                      .join(', ')}
+                    {workspace?.plugins?.length === 0 && 'No plugins loaded'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                        onClick={reloadWorkspace}
+                      >
+                        Reload
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Reload workspace</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="w-full"
+                        onClick={selectAndOpenWorkspace}
+                      >
+                        Switch
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Switch workspace</TooltipContent>
+                  </Tooltip>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         {/* Upper right control area */}
@@ -106,13 +185,15 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
         {/* Left sidebar area */}
 
         <div className="flex w-fit flex-none flex-col items-center justify-center gap-2 pr-2">
-          <Button
-            variant={leftPanelContent === 'chat' ? 'primary' : 'secondary'}
-            size="icon-md"
-            onClick={() => toggleLeftPanel('chat')}
-          >
-            <MessageCircleIcon className="mb-0.5 ml-px size-5 stroke-2" />
-          </Button>
+          {workspace && (
+            <Button
+              variant={leftPanelContent === 'chat' ? 'primary' : 'secondary'}
+              size="icon-md"
+              onClick={() => toggleLeftPanel('chat')}
+            >
+              <MessageCircleIcon className="mb-0.5 ml-px size-5 stroke-2" />
+            </Button>
+          )}
           <Button
             variant={leftPanelContent === 'settings' ? 'primary' : 'secondary'}
             size="icon-md"
@@ -146,12 +227,37 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
 
             {/* Web app area */}
             <ResizablePanel id="main-app-panel" order={2} defaultSize={70}>
-              <div className="relative size-full overflow-hidden rounded-xl border border-zinc-500/10">
-                {mainApp}
-                <DOMContextSelector />
-              </div>
+              {!workspace && (
+                <div className="relative flex size-full flex-col items-center justify-center gap-4 p-4">
+                  <p className="text-foreground/70 text-sm">
+                    No workspace loaded.
+                  </p>
+                  <Button
+                    size="md"
+                    variant="primary"
+                    onClick={selectAndOpenWorkspace}
+                  >
+                    Select Workspace
+                  </Button>
+                </div>
+              )}
+              {workspace?.config && workspaceStatus === 'open' && (
+                <div className="relative size-full overflow-hidden rounded-xl border border-zinc-500/10">
+                  {mainApp}
+                  <DOMContextSelector />
+                </div>
+              )}
+              {workspace &&
+                !workspace.config === null &&
+                (workspaceStatus === 'loading' ||
+                  workspaceStatus === 'closing') && (
+                  <div className="relative flex size-full flex-col items-center justify-center gap-4 p-4">
+                    <Loader2Icon className="size-6 animate-spin text-blue-600" />
+                  </div>
+                )}
             </ResizablePanel>
           </ResizablePanelGroup>
+          <NotificationToaster />
         </div>
       </div>
 
@@ -161,17 +267,13 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
         <div className="flex flex-1 basis-1/3 flex-row items-center justify-start" />
 
         {/* Lower right status area */}
-        <div className="flex flex-1 basis-1/3 flex-row items-center justify-end gap-2" />
+        <div className="flex flex-1 basis-1/3 flex-row items-center justify-end gap-2">
+          <UserStatusArea />
+        </div>
       </div>
 
-      {/* Auth dialog */}
-      <Dialog open={true} dismissible={false}>
-        <DialogContent>
-          <DialogTitle>Login</DialogTitle>
-          <DialogDescription>Please login to continue</DialogDescription>
-          <Button>Login</Button>
-        </DialogContent>
-      </Dialog>
+      <AuthDialog />
+      <FilePickerDialog />
     </div>
   );
 }
@@ -207,4 +309,69 @@ function OpenPanel() {
   }, [leftPanelContent, leftPanelPluginName, plugins]);
 
   return panelContent;
+}
+
+function UserStatusArea() {
+  const userAccount = useKartonState((s) => s.userAccount);
+  const startLogin = useKartonProcedure((p) => p.userAccount.startLogin);
+  const logout = useKartonProcedure((p) => p.userAccount.logout);
+
+  // If the user isn't authenticated, we show a primary button that leads to a login session.
+  // If the user is already logged in, we show a small button that simply reports the user's email.
+  // Additionally, a warning should be shown, if the user's subscription is expired etc.
+  // When a user is signed in but is under free access and reached the limits,
+  // show a button that leads to the billing page where users can pay for the subscription
+  // to get more access
+
+  if (userAccount.status === 'unauthenticated') {
+    return (
+      <Button
+        variant="primary"
+        size="xs"
+        className="rounded-full"
+        onClick={() => void startLogin()}
+      >
+        <span className="-ml-1.5 mr-1 rounded-full bg-white/80 px-1 text-primary">
+          Free
+        </span>{' '}
+        Sign in <ArrowRight className="size-3" />
+      </Button>
+    );
+  }
+
+  if (userAccount.status === 'authenticated') {
+    // Clicking this should show a bit more information on the user's account.
+    return (
+      <Button
+        variant="secondary"
+        size="xs"
+        className="rounded-full"
+        onClick={() => void logout()}
+      >
+        <UserIcon className="size-3" />
+        {userAccount.user?.email ?? 'Unknown email'}
+      </Button>
+    );
+  }
+
+  if (userAccount.status === 'authentication_invalid') {
+    // Cicking this should show a dialog with information on this.
+    // From the dialog, a re-authentication should be triggerable.
+    return (
+      <Button variant="warning" size="xs" className="rounded-full">
+        <AlertTriangleIcon className="size-3" />
+        Authentication invalid
+      </Button>
+    );
+  }
+
+  if (userAccount.status === 'server_unreachable') {
+    // Clicking this should show a dialog with information on this.
+    return (
+      <Button variant="warning" size="xs" className="rounded-full">
+        <AlertTriangleIcon className="size-3" />
+        Server unreachable
+      </Button>
+    );
+  }
 }

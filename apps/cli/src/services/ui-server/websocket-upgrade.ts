@@ -22,7 +22,7 @@ export const configureWebSocketUpgrade = (
       const targetPort = workspaceManager.workspace?.config.appPort;
       if (!targetPort) {
         throw new Error(
-          "[WebSocketUpgrade] Proxy request recevied while no app port is configured. This shouldn't happen...",
+          "[WebSocketUpgrade] Proxy request received while no app port is configured. This shouldn't happen...",
         );
       }
       logger.debug(

@@ -18,11 +18,11 @@ export const DialogContent = ({
 }: DialogContentProps) => {
   return (
     <BaseDialog.Portal>
-      <BaseDialog.Backdrop className="fixed inset-0 bg-white/30 opacity-20 backdrop-blur-sm transition-all duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:backdrop-blur-none data-[starting-style]:backdrop-blur-none dark:bg-black/30" />
+      <BaseDialog.Backdrop className="fixed inset-0 size-full bg-white/10 backdrop-blur-xs transition-all duration-150 ease-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:backdrop-blur-none data-[starting-style]:backdrop-blur-none dark:bg-black/30" />
       <BaseDialog.Popup
         {...props}
         className={cn(
-          'glass-body h-full w-full rounded-2xl bg-white/60 shadow-xl backdrop-blur-lg sm:h-fit sm:w-fit sm:min-w-lg md:min-w-xl',
+          '-translate-x-1/2 -translate-y-1/2 glass-body fixed top-1/2 left-1/2 flex h-full w-full flex-col items-stretch gap-2 rounded-2xl bg-white/60 p-4 shadow-xl backdrop-blur-lg duration-300 ease-out sm:h-fit sm:w-fit sm:min-w-lg md:min-w-xl',
           className,
         )}
       >
@@ -74,13 +74,43 @@ export const DialogClose = ({
       render={() => (
         <Button
           variant="ghost"
-          size="icon-xs"
+          size="icon-sm"
           {...props}
-          className={cn('absolute top-2 right-2', className)}
+          className={cn('absolute top-2 right-2 z-10', className)}
         >
-          <XIcon />
+          <XIcon className="size-4" />
         </Button>
       )}
     />
+  );
+};
+
+export const DialogHeader = ({
+  children,
+  className,
+  ...props
+}: ComponentProps<'div'>) => {
+  return (
+    <div className={cn('mb-1 flex flex-col gap-2', className)} {...props}>
+      {children}
+    </div>
+  );
+};
+
+export const DialogFooter = ({
+  children,
+  className,
+  ...props
+}: ComponentProps<'div'>) => {
+  return (
+    <div
+      className={cn(
+        'mt-1 flex flex-row items-center justify-end gap-2',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </div>
   );
 };

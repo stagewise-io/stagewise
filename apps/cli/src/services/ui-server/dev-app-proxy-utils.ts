@@ -2,11 +2,11 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@/services/logger';
 import { stagewiseAppPrefix } from './shared';
-import type { WorkspaceManager } from '@/workspace/workspace-manager';
+import type { WorkspaceManagerService } from '@/services/workspace-manager';
 
 export const getProxyMiddleware = (
   logger: Logger,
-  workspaceManager: WorkspaceManager,
+  workspaceManager: WorkspaceManagerService,
 ) => {
   const proxy = createProxyMiddleware({
     changeOrigin: true,
@@ -14,12 +14,14 @@ export const getProxyMiddleware = (
       // Don't proxy if:
       // - path starts with "stagewise-toolbar-app" (including agent server routes)
       // - sec-fetch-dest header equals "document"
+      // - no workspace is active
       const isToolbarPath = pathname.startsWith(stagewiseAppPrefix);
       const isDocument = req.headers['sec-fetch-dest'] === 'document';
+      const isWorkspaceActive = workspaceManager.workspace !== null;
 
-      if (isToolbarPath || isDocument) {
+      if (isToolbarPath || isDocument || !isWorkspaceActive) {
         logger.debug(
-          `[DevAppProxy] Not proxying ${pathname} - toolbar: ${isToolbarPath}, document: ${isDocument}`,
+          `[DevAppProxy] Not proxying ${pathname} - toolbar: ${isToolbarPath}, document: ${isDocument}, workspace loaded: ${isWorkspaceActive ? 'yes' : 'no'}`,
         );
         return false;
       }
@@ -30,10 +32,11 @@ export const getProxyMiddleware = (
     },
     followRedirects: false, // Don't automatically follow redirects to prevent loops
     router: () => {
-      const targetPort = workspaceManager.workspace?.config.appPort;
+      const targetPort =
+        workspaceManager.workspace?.configService.get().appPort;
       if (!targetPort) {
         throw new Error(
-          "[DevAppProxy] Proxy request recevied while no app port is configured. This shouldn't happen...",
+          "[DevAppProxy] Proxy request received while no app port is configured. This shouldn't happen...",
         );
       }
       return `http://localhost:${targetPort}`;
@@ -48,7 +51,8 @@ export const getProxyMiddleware = (
     on: {
       // @ts-expect-error
       error: (err, _req, res: ServerResponse<IncomingMessage>) => {
-        const targetPort = workspaceManager.workspace?.config.appPort;
+        const targetPort =
+          workspaceManager.workspace?.configService.get().appPort;
         logger.error(`[DevAppProxy] Proxy error: ${err}`);
         res.writeHead(503, { 'Content-Type': 'text/html' });
         res.end(errorPage(targetPort ?? 0));

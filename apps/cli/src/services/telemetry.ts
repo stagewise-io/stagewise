@@ -15,7 +15,7 @@ export interface EventProperties {
     has_wrapped_command: boolean; // Whether the wrapped command feature is enabled.
   };
   'workspace-opened': {
-    config_file_exists: boolean; // Whether the config file exists.
+    initial_setup: boolean; // Whether the workspace was opened for the first time.
     auto_plugins_enabled: boolean; // Whether the auto plugins feature is enabled.
     manual_plugins_count: number; // The number of manually added plugins.
     loaded_plugins: string[]; // The plugins that were loaded.
@@ -79,6 +79,12 @@ export class TelemetryService {
 
     this.identifyUser();
 
+    this.globalConfigService.addConfigUpdatedListener(
+      (newConfig, oldConfig) => {
+        this.onConfigUpdate(newConfig, oldConfig);
+      },
+    );
+
     logger.debug('[TelemetryService] Telemetry initialized');
   }
 
@@ -87,6 +93,7 @@ export class TelemetryService {
   }
 
   identifyUser() {
+    this.logger.debug('[TelemetryService] Identifying user...');
     if (
       this.userProperties.user_id &&
       this.userProperties.user_email &&
@@ -103,13 +110,17 @@ export class TelemetryService {
         alias: this.identifierService.getMachineId(),
       });
     }
+    this.logger.debug('[TelemetryService] User identified');
   }
 
-  private capture<T extends keyof EventProperties>(
+  public capture<T extends keyof EventProperties>(
     eventName: T,
     properties?: EventProperties[T],
   ): void {
     try {
+      this.logger.debug(
+        `[TelemetryService] Capturing event: ${eventName} with properties: ${JSON.stringify(properties)}`,
+      );
       const telemetryLevel = this.globalConfigService.get().telemetryLevel;
 
       // Special case: always send telemetry config events even when turning off
@@ -137,13 +148,14 @@ export class TelemetryService {
         properties: finalProperties,
       });
     } catch (error) {
-      this.logger.debug(
+      this.logger.error(
         `[TELEMETRY] Failed to capture analytics event: ${error}`,
       );
     }
   }
 
   async shutdown(): Promise<void> {
+    this.logger.debug('[TelemetryService] Shutting down...');
     if (this.posthogClient) {
       try {
         await this.posthogClient.shutdown();
@@ -151,13 +163,18 @@ export class TelemetryService {
         this.logger.debug(`Failed to shutdown PostHog: ${error}`);
       }
     }
+    this.logger.debug('[TelemetryService] Shutdown complete');
   }
 
-  async onConfigUpdate(newConfig: GlobalConfig) {
+  async onConfigUpdate(
+    newConfig: GlobalConfig,
+    oldConfig: GlobalConfig | null,
+  ) {
     // If the new telemetry level is different from the current one, capture an event.
-    if (
-      newConfig.telemetryLevel !== this.globalConfigService.get().telemetryLevel
-    ) {
+    if (newConfig.telemetryLevel !== oldConfig?.telemetryLevel) {
+      this.logger.debug(
+        `[TelemetryService] Detected change to telemetry level.`,
+      );
       this.capture('cli-telemetry-config-set', {
         configured_level: newConfig.telemetryLevel,
       });

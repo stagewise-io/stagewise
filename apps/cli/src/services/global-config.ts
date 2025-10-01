@@ -2,6 +2,7 @@ import type { GlobalDataPathService } from './global-data-path';
 import { z } from 'zod';
 import fs from 'node:fs/promises';
 import type { Logger } from './logger';
+import type { KartonService } from './karton';
 
 const globalConfigSchema = z
   .object({
@@ -18,21 +19,32 @@ export type GlobalConfig = z.infer<typeof globalConfigSchema>;
 export class GlobalConfigService {
   private globalDataPathService: GlobalDataPathService;
   private config: GlobalConfig | null = null;
-  private configUpdatedListeners: ((config: GlobalConfig) => void)[] = [];
+  private configUpdatedListeners: ((
+    newConfig: GlobalConfig,
+    oldConfig: GlobalConfig | null,
+  ) => void)[] = [];
   private logger: Logger;
+  private kartonService: KartonService;
 
   private constructor(
     globalDataPathService: GlobalDataPathService,
     logger: Logger,
+    kartonService: KartonService,
   ) {
     this.globalDataPathService = globalDataPathService;
     this.logger = logger;
+    this.kartonService = kartonService;
   }
 
   private async initialize(): Promise<void> {
-    // TODO: Load the global config file (if it exists), validate it and set it as the current config in this service.
+    this.logger.debug('[GlobalConfigService] Initializing...');
     const configPath = this.globalDataPathService.configFilePath;
-    const configFile = await fs.readFile(configPath, 'utf-8');
+    const configFile = await fs.readFile(configPath, 'utf-8').catch(() => {
+      this.logger.debug(
+        '[GlobalConfigService] No config file found. Creating a new one...',
+      );
+      return '{}';
+    });
     const storedConfig = globalConfigSchema.parse(JSON.parse(configFile));
 
     // Now, we validate the loaded config and set that as the current config in this service.
@@ -47,21 +59,37 @@ export class GlobalConfigService {
     }
     this.config = parsedConfig.data;
 
+    this.kartonService.setState((draft) => {
+      draft.globalConfig = parsedConfig.data;
+    });
+
     // We also store the config once it's validated. We do that to make sure that the stored config is always aligned with the schema.
+    this.logger.debug(
+      '[GlobalConfigService] Saving config file after validation...',
+    );
     await this.saveConfigFile();
+    this.logger.debug('[GlobalConfigService] Initialized');
   }
 
   public static async create(
     globalDataPathService: GlobalDataPathService,
     logger: Logger,
+    kartonService: KartonService,
   ): Promise<GlobalConfigService> {
-    const instance = new GlobalConfigService(globalDataPathService, logger);
+    const instance = new GlobalConfigService(
+      globalDataPathService,
+      logger,
+      kartonService,
+    );
     await instance.initialize();
     return instance;
   }
 
   public get(): GlobalConfig {
     if (!this.config) {
+      this.logger.error(
+        '[GlobalConfigService] Requested global config, but it is not initialized',
+      );
       throw new Error('Global config not initialized');
     }
     return structuredClone(this.config);
@@ -69,33 +97,42 @@ export class GlobalConfigService {
 
   /**
    * Set the global config and notify all listeners.
-   *
-   * The config in the servcie will not be updated till all listeners have been notified.
-   * This is done to allow the listeners to compare both old and new config.
    * @param newConfig
    */
   public async set(newConfig: GlobalConfig): Promise<void> {
-    this.configUpdatedListeners.forEach((listener) => listener(newConfig));
+    this.logger.debug('[GlobalConfigService] Setting global config...');
+    const oldConfig = structuredClone(this.config);
     await this.saveConfigFile();
     this.config = newConfig;
+    this.configUpdatedListeners.forEach((listener) =>
+      listener(newConfig, oldConfig),
+    );
+    this.logger.debug('[GlobalConfigService] Global config set');
   }
 
   private async saveConfigFile(): Promise<void> {
-    // TODO: Store the config file in the global data path if it doesn't exist
+    this.logger.debug('[GlobalConfigService] Saving config file...');
     const configPath = this.globalDataPathService.configFilePath;
     const config = globalConfigSchema.parse(this.config);
     await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    this.logger.debug('[GlobalConfigService] Config file saved');
   }
 
   public addConfigUpdatedListener(
-    listener: (config: GlobalConfig) => void,
+    listener: (config: GlobalConfig, oldConfig: GlobalConfig | null) => void,
   ): void {
+    this.logger.debug(
+      '[GlobalConfigService] Adding config updated listener...',
+    );
     this.configUpdatedListeners.push(listener);
   }
 
   public removeConfigUpdatedListener(
-    listener: (config: GlobalConfig) => void,
+    listener: (config: GlobalConfig, oldConfig: GlobalConfig | null) => void,
   ): void {
+    this.logger.debug(
+      '[GlobalConfigService] Removing config updated listener...',
+    );
     this.configUpdatedListeners = this.configUpdatedListeners.filter(
       (l) => l !== listener,
     );

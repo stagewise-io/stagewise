@@ -58,19 +58,21 @@ export function ChatBubble({
   isLastMessage: boolean;
 }) {
   const retrySendingUserMessage = useKartonProcedure(
-    (p) => p.retrySendingUserMessage,
+    (p) => p.agentChat.retrySendingUserMessage,
   );
   const undoToolCallsUntilUserMessage = useKartonProcedure(
-    (p) => p.undoToolCallsUntilUserMessage,
+    (p) => p.agentChat.undoToolCallsUntilUserMessage,
   );
   const undoToolCallsUntilLatestUserMessage = useKartonProcedure(
-    (p) => p.undoToolCallsUntilLatestUserMessage,
+    (p) => p.agentChat.undoToolCallsUntilLatestUserMessage,
   );
   const assistantMadeCodeChangesUntilLatestUserMessage = useKartonProcedure(
-    (p) => p.assistantMadeCodeChangesUntilLatestUserMessage,
+    (p) => p.agentChat.assistantMadeCodeChangesUntilLatestUserMessage,
   );
-  const activeChatId = useKartonState((s) => s.activeChatId);
-  const isWorking = useKartonState((s) => s.isWorking);
+  const activeChatId = useKartonState(
+    (s) => s.workspace.agentChat.activeChatId,
+  );
+  const isWorking = useKartonState((s) => s.workspace.agentChat.isWorking);
   const { setChatInput } = useChatState();
   const [hasCodeChanges, setHasCodeChanges] = useState(false);
   const isEmptyMessage = useMemo(() => {
@@ -564,10 +566,14 @@ const DiffDisplay = memo(
 
 const ToolPartItem = memo(
   ({ toolPart }: { toolPart: ToolPart | DynamicToolUIPart }) => {
-    const approveToolCall = useKartonProcedure((p) => p.approveToolCall);
-    const rejectToolCall = useKartonProcedure((p) => p.rejectToolCall);
+    const approveToolCall = useKartonProcedure(
+      (p) => p.agentChat.approveToolCall,
+    );
+    const rejectToolCall = useKartonProcedure(
+      (p) => p.agentChat.rejectToolCall,
+    );
     const toolCallApprovalRequests = useKartonState(
-      (s) => s.toolCallApprovalRequests,
+      (s) => s.workspace.agentChat.toolCallApprovalRequests,
     );
     const [isExpanded, setIsExpanded] = useState(false);
 

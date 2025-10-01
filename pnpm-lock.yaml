@@ -336,15 +336,9 @@ importers:
       '@stagewise/toolbar':
         specifier: workspace:*
         version: link:../../toolbar/core
-      '@stagewise/toolbar-bridged':
-        specifier: workspace:*
-        version: link:../../toolbar/bridged
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.23
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
       '@vitest/coverage-v8':
         specifier: ^2.0.0
         version: 2.1.9(vitest@2.1.9)
@@ -1071,6 +1065,9 @@ importers:
       react-dom:
         specifier: ^19.1.0
         version: 19.1.1(react@19.1.1)
+      sonner:
+        specifier: ^2.0.7
+        version: 2.0.7(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       storybook:
         specifier: ^9.1.3
         version: 9.1.3(@testing-library/dom@10.4.1)(prettier@2.8.8)(vite@7.1.3(@types/node@22.15.2)(jiti@2.5.1)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0))
@@ -1350,108 +1347,6 @@ importers:
       vite:
         specifier: 7.0.6
         version: 7.0.6(@types/node@24.0.3)(jiti@2.5.1)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
-
-  toolbar/bridged:
-    devDependencies:
-      '@base-ui-components/react':
-        specifier: 1.0.0-beta.2
-        version: 1.0.0-beta.2(@types/react@19.1.10)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      '@headlessui/react':
-        specifier: 2.2.2
-        version: 2.2.2(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      '@microsoft/api-extractor':
-        specifier: ^7.52.8
-        version: 7.52.10(@types/node@22.15.2)
-      '@stagewise/agent-interface':
-        specifier: workspace:*
-        version: link:../../packages/agent-interface-external
-      '@stagewise/karton':
-        specifier: workspace:*
-        version: link:../../packages/karton
-      '@stagewise/karton-contract-bridged':
-        specifier: workspace:*
-        version: link:../../packages/karton-contract-bridged
-      '@stagewise/plugin-sdk':
-        specifier: workspace:*
-        version: link:../plugin-sdk
-      '@tailwindcss/postcss':
-        specifier: ^4.1.5
-        version: 4.1.11
-      '@trpc/client':
-        specifier: 11.4.3
-        version: 11.4.3(@trpc/server@11.4.4(typescript@5.9.2))(typescript@5.9.2)
-      '@types/node':
-        specifier: 22.15.2
-        version: 22.15.2
-      '@types/react':
-        specifier: ^19.1.8
-        version: 19.1.10
-      '@vitejs/plugin-react':
-        specifier: ^4.6.0
-        version: 4.6.0(vite@6.3.5(@types/node@22.15.2)(jiti@2.5.1)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0))
-      autoprefixer:
-        specifier: ^10.4.21
-        version: 10.4.21(postcss@8.5.6)
-      bowser:
-        specifier: ^2.11.0
-        version: 2.11.0
-      class-variance-authority:
-        specifier: ^0.7.1
-        version: 0.7.1
-      clsx:
-        specifier: ^2.1.1
-        version: 2.1.1
-      lucide-react:
-        specifier: ^0.523.0
-        version: 0.523.0(react@19.1.1)
-      postcss:
-        specifier: ^8.5.3
-        version: 8.5.6
-      postcss-prefix-selector:
-        specifier: ^2.1.1
-        version: 2.1.1(postcss@8.5.6)
-      react:
-        specifier: ^19.1.0
-        version: 19.1.1
-      react-dom:
-        specifier: ^19.1.0
-        version: 19.1.1(react@19.1.1)
-      rollup:
-        specifier: ^4.44.2
-        version: 4.45.0
-      rollup-plugin-dts:
-        specifier: ^6.2.1
-        version: 6.2.1(rollup@4.45.0)(typescript@5.9.2)
-      serialize-javascript:
-        specifier: ^6.0.2
-        version: 6.0.2
-      tailwind-merge:
-        specifier: ^3.2.0
-        version: 3.3.1
-      tailwind-scrollbar:
-        specifier: ^4.0.2
-        version: 4.0.2(react@19.1.1)(tailwindcss@4.1.12)
-      tailwindcss:
-        specifier: ^4.1.5
-        version: 4.1.12
-      tsup:
-        specifier: ^8.4.0
-        version: 8.5.0(@microsoft/api-extractor@7.52.10(@types/node@22.15.2))(@swc/core@1.12.5(@swc/helpers@0.5.17))(jiti@2.5.1)(postcss@8.5.6)(tsx@4.20.3)(typescript@5.9.2)(yaml@2.8.0)
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.2
-      vite:
-        specifier: ^6.3.5
-        version: 6.3.5(@types/node@22.15.2)(jiti@2.5.1)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
-      vite-plugin-css-injected-by-js:
-        specifier: ^3.5.2
-        version: 3.5.2(vite@6.3.5(@types/node@22.15.2)(jiti@2.5.1)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0))
-      vite-plugin-dts:
-        specifier: ^4.5.4
-        version: 4.5.4(@types/node@22.15.2)(rollup@4.45.0)(typescript@5.9.2)(vite@6.3.5(@types/node@22.15.2)(jiti@2.5.1)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0))
-      zod:
-        specifier: 3.25.76
-        version: 3.25.76
 
   toolbar/core:
     devDependencies:

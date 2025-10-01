@@ -93,9 +93,12 @@ export function createKartonReactClient<T>(
     );
   };
 
-  const useKartonState = <R = KartonState<T>>(
+  // Overloaded function signatures for better type inference
+  function useKartonState(): KartonState<T>;
+  function useKartonState<R>(selector: StateSelector<T, R>): R;
+  function useKartonState<R = KartonState<T>>(
     selector: StateSelector<T, R> = fullStateSelector as any,
-  ): R => {
+  ): R {
     const context = useContext(KartonContext);
 
     if (!context) {
@@ -115,7 +118,7 @@ export function createKartonReactClient<T>(
     );
 
     return selectedValue;
-  };
+  }
 
   const useKartonProcedure = <R = KartonServerProcedures<T>>(
     selector: ProcedureSelector<T, R> = fullProcedureSelector as any,

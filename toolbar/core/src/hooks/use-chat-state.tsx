@@ -8,8 +8,7 @@ import {
   fileToDataUrl,
   isAnthropicSupportedFile,
 } from '@/utils';
-import { usePanels } from './use-panels';
-import { useKartonProcedure, useKartonState } from './use-karton';
+import { useKartonProcedure } from './use-karton';
 import type { ChatMessage, FileUIPart } from '@stagewise/karton-contract';
 
 interface ContextSnippet {
@@ -97,9 +96,9 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const { plugins } = usePlugins();
 
-  const sendChatMessage = useKartonProcedure((p) => p.sendUserMessage);
-  const _isWorking = useKartonState((s) => s.isWorking);
-  const { leftPanelContent } = usePanels();
+  const sendChatMessage = useKartonProcedure(
+    (p) => p.agentChat.sendUserMessage,
+  );
 
   const addFileAttachment = useCallback((file: File) => {
     const id = generateId();

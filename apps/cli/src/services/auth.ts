@@ -4,6 +4,10 @@ import path from 'node:path';
 import { createNodeApiClient } from '@stagewise/api-client';
 import type { Logger } from './logger';
 import type { GlobalDataPathService } from './global-data-path';
+import type { KartonService } from './karton';
+import type { NotificationService } from './notification';
+import type { KartonContract } from '@stagewise/karton-contract';
+import { stagewiseAppPrefix } from './ui-server/shared';
 
 // Configuration
 const STAGEWISE_CONSOLE_URL =
@@ -38,26 +42,7 @@ export interface TokenData {
   userEmail?: string;
 }
 
-export type AuthStatus =
-  | 'authenticated'
-  | 'unauthenticated'
-  | 'authentication_invalid'
-  | 'server_unreachable';
-
-export interface AuthState {
-  status: AuthStatus;
-  user?: {
-    id: string;
-    email: string;
-  };
-  subscription?: {
-    active: boolean;
-    plan?: string;
-    expiresAt?: string;
-  };
-  tokenExpiresAt?: string;
-  refreshTokenExpiresAt?: string;
-}
+type AuthState = KartonContract['state']['userAccount'];
 
 /**
  * AuthService
@@ -73,10 +58,14 @@ export class AuthService {
   private readonly globalDataPathService: GlobalDataPathService;
   private readonly credentialsFilePath: string;
   private currentAuthState: AuthState;
+  private kartonService: KartonService;
+  private notificationService: NotificationService;
 
   private constructor(
     globalDataPathService: GlobalDataPathService,
     logger: Logger,
+    kartonService: KartonService,
+    notificationService: NotificationService,
   ) {
     this.globalDataPathService = globalDataPathService;
     this.logger = logger;
@@ -84,16 +73,64 @@ export class AuthService {
       this.globalDataPathService.globalDataPath,
       CREDENTIALS_FILENAME,
     );
-    this.currentAuthState = { status: 'unauthenticated' };
+    this.currentAuthState = { status: 'unauthenticated', loginDialog: null };
+    this.kartonService = kartonService;
+    this.notificationService = notificationService;
   }
 
   private async initialize(): Promise<void> {
     try {
+      // Register all karton procedure handlers
+      this.kartonService.registerServerProcedureHandler(
+        'userAccount.startLogin',
+        async () => {
+          await this.openLoginDialog();
+        },
+      );
+      this.kartonService.registerServerProcedureHandler(
+        'userAccount.abortLogin',
+        async () => {
+          await this.abortLogin();
+        },
+      );
+
+      this.kartonService.registerServerProcedureHandler(
+        'userAccount.logout',
+        async () => {
+          await this.logout();
+        },
+      );
+
       // Check if credentials file exists
       const storedToken = await this.getStoredToken();
 
       if (!storedToken?.accessToken) {
-        this.currentAuthState = { status: 'unauthenticated' };
+        this.currentAuthState = {
+          status: 'unauthenticated',
+          loginDialog: null,
+        };
+        this.kartonService.setState((draft) => {
+          draft.userAccount = this.currentAuthState;
+        });
+
+        // TODO: Redirect this to the experience service instead of always triggering it
+        this.notificationService.showNotification({
+          title: 'Unleash stagewise superpowers',
+          message:
+            "Sign in to get access to all features of stagewise. It's free!",
+          type: 'info',
+          duration: 6000,
+          actions: [
+            {
+              label: 'Sign in',
+              type: 'primary',
+              onClick: () => {
+                void this.openLoginDialog();
+              },
+            },
+          ],
+        });
+
         return;
       }
 
@@ -104,7 +141,28 @@ export class AuthService {
       ) {
         // Refresh token is expired, clear credentials
         await this.clearToken();
-        this.currentAuthState = { status: 'authentication_invalid' };
+        this.currentAuthState = {
+          status: 'authentication_invalid',
+          loginDialog: null,
+        };
+        this.kartonService.setState((draft) => {
+          draft.userAccount = this.currentAuthState;
+        });
+        this.notificationService.showNotification({
+          title: 'Authentication data invalid',
+          message: 'The refresh token has expired. Please sign in again.',
+          type: 'error',
+          duration: 20000, // 20 seconds
+          actions: [
+            {
+              label: 'Sign in again',
+              type: 'primary',
+              onClick: () => {
+                void this.openLoginDialog();
+              },
+            },
+          ],
+        });
         return;
       }
 
@@ -122,7 +180,28 @@ export class AuthService {
           }
         } catch (_error) {
           this.logger.warn('Failed to refresh token during initialization');
-          this.currentAuthState = { status: 'authentication_invalid' };
+          this.currentAuthState = {
+            status: 'authentication_invalid',
+            loginDialog: null,
+          };
+          this.kartonService.setState((draft) => {
+            draft.userAccount = this.currentAuthState;
+          });
+          this.notificationService.showNotification({
+            title: 'Authentication data invalid',
+            message: 'Failed to validate the stored authentication data.',
+            type: 'error',
+            duration: 20000, // 20 seconds
+            actions: [
+              {
+                label: 'Sign in again',
+                type: 'primary',
+                onClick: () => {
+                  void this.openLoginDialog();
+                },
+              },
+            ],
+          });
           return;
         }
       } else {
@@ -136,11 +215,33 @@ export class AuthService {
             // Try to fetch subscription info
             await this.updateSubscriptionInfo(storedToken.accessToken);
           } else {
-            this.currentAuthState = { status: 'authentication_invalid' };
+            this.currentAuthState = {
+              status: 'authentication_invalid',
+              loginDialog: null,
+            };
+            this.kartonService.setState((draft) => {
+              draft.userAccount = this.currentAuthState;
+            });
+            this.notificationService.showNotification({
+              title: 'Authentication data invalid',
+              message: 'Failed to validate the stored authentication data.',
+              type: 'error',
+              duration: 20000, // 20 seconds
+              actions: [
+                {
+                  label: 'Sign in again',
+                  type: 'primary',
+                  onClick: () => {
+                    void this.openLoginDialog();
+                  },
+                },
+              ],
+            });
           }
         } catch (_error) {
           // Server is not reachable
           this.currentAuthState = {
+            loginDialog: null,
             status: 'server_unreachable',
             user:
               storedToken.userId && storedToken.userEmail
@@ -152,6 +253,25 @@ export class AuthService {
             tokenExpiresAt: storedToken.expiresAt,
             refreshTokenExpiresAt: storedToken.refreshExpiresAt,
           };
+          this.kartonService.setState((draft) => {
+            draft.userAccount = this.currentAuthState;
+          });
+          this.notificationService.showNotification({
+            title: 'Service not reachable',
+            message:
+              'Seems like the stagewise authentication service is not reachable.',
+            type: 'error',
+            duration: 20000, // 20 seconds
+            actions: [
+              {
+                label: 'Try again',
+                type: 'primary',
+                onClick: () => {
+                  this.doRefreshAuthData();
+                },
+              },
+            ],
+          });
         }
       }
 
@@ -162,16 +282,43 @@ export class AuthService {
       }
     } catch (error) {
       this.logger.error(`Failed to initialize auth service: ${error}`);
-      this.currentAuthState = { status: 'unauthenticated' };
+      this.currentAuthState = { status: 'unauthenticated', loginDialog: null };
+      this.kartonService.setState((draft) => {
+        draft.userAccount = this.currentAuthState;
+      });
+      this.notificationService.showNotification({
+        title: 'Authentication service error',
+        message: 'Failed to initialize authentication service.',
+        type: 'error',
+        duration: 20000, // 20 seconds
+        actions: [
+          {
+            label: 'Try again',
+            type: 'primary',
+            onClick: () => {
+              this.initialize();
+            },
+          },
+        ],
+      });
     }
   }
 
   public static async create(
     globalDataPathService: GlobalDataPathService,
     logger: Logger,
+    kartonService: KartonService,
+    notificationService: NotificationService,
   ): Promise<AuthService> {
-    const instance = new AuthService(globalDataPathService, logger);
+    logger.debug('[AuthService] Creating service...');
+    const instance = new AuthService(
+      globalDataPathService,
+      logger,
+      kartonService,
+      notificationService,
+    );
     await instance.initialize();
+    logger.debug('[AuthService] Service created');
     return instance;
   }
 
@@ -187,6 +334,90 @@ export class AuthService {
    */
   public getAuthUrl(callbackUrl: string): string {
     return `${STAGEWISE_CONSOLE_URL}/authenticate-ide?ide=cli&redirect_uri=${encodeURIComponent(callbackUrl)}`;
+  }
+
+  public async handleAuthCallback(
+    authCode?: string,
+    error?: string,
+  ): Promise<void> {
+    this.logger.debug(`[AuthService] Handling auth callback...`);
+
+    this.currentAuthState = {
+      ...this.currentAuthState,
+      loginDialog: null,
+    };
+    this.kartonService.setState((draft) => {
+      draft.userAccount = this.currentAuthState;
+    });
+
+    if (error) {
+      await this.clearToken();
+      this.cachedAccessToken = null;
+      this.cachedRefreshToken = null;
+      this.notificationService.showNotification({
+        title: 'Authentication failed',
+        message: error,
+        type: 'error',
+        duration: 20000, // 20 seconds
+        actions: [],
+      });
+      return;
+    }
+
+    if (!authCode) {
+      this.notificationService.showNotification({
+        title: 'Authentication failed',
+        message: 'No auth code provided',
+        type: 'error',
+        duration: 20000, // 20 seconds
+        actions: [],
+      });
+      return;
+    }
+
+    await new Promise((resolve, reject) => {
+      this.notificationService.showNotification({
+        title: 'New user authentication',
+        message: 'Please confirm that you just signed up into stagewise.',
+        type: 'info',
+        actions: [
+          {
+            label: 'Confirm',
+            onClick: () => {
+              resolve(true);
+            },
+            type: 'primary',
+          },
+          {
+            label: 'Cancel',
+            onClick: () => {
+              reject(new Error('Authentication cancelled'));
+            },
+            type: 'secondary',
+          },
+        ],
+      });
+    });
+
+    await this.storeAuthToken(authCode as string)
+      .then(() => {
+        this.notificationService.showNotification({
+          title: 'Authentication successful',
+          message: 'You are now authenticated',
+          type: 'info',
+          duration: 6000,
+          actions: [],
+        });
+      })
+      .catch((error) => {
+        this.notificationService.showNotification({
+          title: 'Authentication failed',
+          message: error.message,
+          type: 'error',
+          duration: 6000,
+          actions: [],
+        });
+      });
   }
 
   /**
@@ -251,7 +482,10 @@ export class AuthService {
       await this.clearToken();
       this.cachedAccessToken = null;
       this.cachedRefreshToken = null;
-      this.currentAuthState = { status: 'unauthenticated' };
+      this.currentAuthState = { status: 'unauthenticated', loginDialog: null };
+      this.kartonService.setState((draft) => {
+        draft.userAccount = this.currentAuthState;
+      });
 
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 400) {
@@ -295,7 +529,10 @@ export class AuthService {
     const storedToken = await this.getStoredToken();
 
     if (!storedToken?.accessToken) {
-      this.currentAuthState = { status: 'unauthenticated' };
+      this.currentAuthState = { status: 'unauthenticated', loginDialog: null };
+      this.kartonService.setState((draft) => {
+        draft.userAccount = this.currentAuthState;
+      });
       return;
     }
 
@@ -309,7 +546,13 @@ export class AuthService {
         // Re-fetch the updated token
         const updatedToken = await this.getStoredToken();
         if (!updatedToken) {
-          this.currentAuthState = { status: 'authentication_invalid' };
+          this.currentAuthState = {
+            status: 'authentication_invalid',
+            loginDialog: null,
+          };
+          this.kartonService.setState((draft) => {
+            draft.userAccount = this.currentAuthState;
+          });
           return;
         }
         storedToken.accessToken = updatedToken.accessToken;
@@ -321,7 +564,13 @@ export class AuthService {
       );
 
       if (!sessionData?.valid) {
-        this.currentAuthState = { status: 'authentication_invalid' };
+        this.currentAuthState = {
+          status: 'authentication_invalid',
+          loginDialog: null,
+        };
+        this.kartonService.setState((draft) => {
+          draft.userAccount = this.currentAuthState;
+        });
         await this.clearToken();
         return;
       }
@@ -338,18 +587,30 @@ export class AuthService {
           ...this.currentAuthState,
           status: 'server_unreachable',
         };
+        this.kartonService.setState((draft) => {
+          draft.userAccount = this.currentAuthState;
+        });
       } else if (
         error instanceof Error &&
         (error.message.includes('authenticate again') ||
           error.message.includes('Refresh token'))
       ) {
-        this.currentAuthState = { status: 'authentication_invalid' };
+        this.currentAuthState = {
+          status: 'authentication_invalid',
+          loginDialog: null,
+        };
+        this.kartonService.setState((draft) => {
+          draft.userAccount = this.currentAuthState;
+        });
       } else {
         // Other errors - keep existing state but mark as potentially unreachable
         this.currentAuthState = {
           ...this.currentAuthState,
           status: 'server_unreachable',
         };
+        this.kartonService.setState((draft) => {
+          draft.userAccount = this.currentAuthState;
+        });
       }
     }
   }
@@ -410,7 +671,10 @@ export class AuthService {
     this.cachedRefreshToken = null;
 
     // Reset auth state
-    this.currentAuthState = { status: 'unauthenticated' };
+    this.currentAuthState = { status: 'unauthenticated', loginDialog: null };
+    this.kartonService.setState((draft) => {
+      draft.userAccount = this.currentAuthState;
+    });
   }
 
   /**
@@ -507,6 +771,7 @@ export class AuthService {
     sessionData: SessionValidationResponse,
   ): Promise<void> {
     this.currentAuthState = {
+      loginDialog: null,
       status: 'authenticated',
       user: {
         id: sessionData.userId,
@@ -515,11 +780,15 @@ export class AuthService {
       tokenExpiresAt: tokenData.expiresAt,
       refreshTokenExpiresAt: tokenData.refreshExpiresAt,
     };
+    this.kartonService.setState((draft) => {
+      draft.userAccount = this.currentAuthState;
+    });
   }
 
   private async updateAuthStateFromToken(tokenData: TokenData): Promise<void> {
     if (tokenData.userId && tokenData.userEmail) {
       this.currentAuthState = {
+        loginDialog: null,
         status: 'authenticated',
         user: {
           id: tokenData.userId,
@@ -528,6 +797,9 @@ export class AuthService {
         tokenExpiresAt: tokenData.expiresAt,
         refreshTokenExpiresAt: tokenData.refreshExpiresAt,
       };
+      this.kartonService.setState((draft) => {
+        draft.userAccount = this.currentAuthState;
+      });
     }
   }
 
@@ -555,6 +827,9 @@ export class AuthService {
               undefined,
           },
         };
+        this.kartonService.setState((draft) => {
+          draft.userAccount = this.currentAuthState;
+        });
       }
     } catch (_error) {
       // Don't fail auth if subscription fetch fails
@@ -568,6 +843,43 @@ export class AuthService {
     // Consider token expired if it expires within 2 minutes (buffer)
     const bufferTime = 2 * 60 * 1000; // 2 minutes in milliseconds
     return expiryTime.getTime() - now.getTime() <= bufferTime;
+  }
+
+  /**
+   * Compute the redirect callback URL for the OAuth flow based on the running UI server port.
+   */
+  private getRedirectCallbackUrl(): string {
+    const runningPort = this.kartonService.state.appInfo.runningOnPort;
+    return `http://localhost:${runningPort}${stagewiseAppPrefix}/auth/callback`;
+  }
+
+  /**
+   * Open the login dialog by fetching the start URL and setting it into state.
+   */
+  private async openLoginDialog(): Promise<void> {
+    const callbackUrl = this.getRedirectCallbackUrl();
+    const startUrl = this.getAuthUrl(callbackUrl);
+
+    this.currentAuthState = {
+      ...this.currentAuthState,
+      loginDialog: {
+        startUrl,
+      },
+    };
+
+    this.kartonService.setState((draft) => {
+      draft.userAccount = this.currentAuthState;
+    });
+  }
+
+  private async abortLogin(): Promise<void> {
+    this.currentAuthState = {
+      ...this.currentAuthState,
+      loginDialog: null,
+    };
+    this.kartonService.setState((draft) => {
+      draft.userAccount = this.currentAuthState;
+    });
   }
 
   private async refreshTokens(): Promise<void> {
@@ -705,85 +1017,6 @@ export class AuthService {
     } catch (error) {
       this.logger.error(`[AuthService] Failed to delete token: ${error}`);
       throw error as Error;
-    }
-  }
-
-  // Legacy methods for backward compatibility
-
-  /**
-   * @deprecated Use getAuthUrl and OAuth callback server instead
-   */
-  public async initiateOAuthFlow(
-    _port: number,
-    _successRedirectUrl?: string,
-  ): Promise<TokenData> {
-    throw new Error(
-      'initiateOAuthFlow is deprecated. Use getAuthUrl() and storeAuthToken() instead.',
-    );
-  }
-
-  /**
-   * @deprecated Use checkAuthStatus or getAuthState instead
-   */
-  public async checkAuthStatus(): Promise<any> {
-    const state = this.getAuthState();
-    return {
-      isAuthenticated: state.status === 'authenticated',
-      userId: state.user?.id,
-      userEmail: state.user?.email,
-      expiresAt: state.tokenExpiresAt,
-      refreshExpiresAt: state.refreshTokenExpiresAt,
-    };
-  }
-
-  /**
-   * @deprecated Use getAuthState instead
-   */
-  public async getAuthState_deprecated(): Promise<any> {
-    const storedToken = await this.getStoredToken();
-
-    if (!storedToken) {
-      return null;
-    }
-
-    return {
-      isAuthenticated: true,
-      accessToken: storedToken.accessToken,
-      refreshToken: storedToken.refreshToken,
-      userId: storedToken.userId,
-      userEmail: storedToken.userEmail,
-      expiresAt: storedToken.expiresAt,
-      refreshExpiresAt: storedToken.refreshExpiresAt,
-    };
-  }
-
-  /**
-   * @deprecated Not needed anymore, tokens are refreshed automatically
-   */
-  public async refreshToken(_refreshToken: string): Promise<TokenData> {
-    const storedToken = await this.getStoredToken();
-    if (!storedToken) {
-      throw new Error('No stored token found');
-    }
-
-    await this.refreshTokens();
-    const updatedToken = await this.getStoredToken();
-    if (!updatedToken) {
-      throw new Error('Failed to refresh token');
-    }
-
-    return updatedToken;
-  }
-
-  /**
-   * @deprecated Use ensureValidAccessToken instead
-   */
-  public async validateToken(accessToken: string): Promise<boolean> {
-    try {
-      const sessionData = await this.validateTokenWithServer(accessToken);
-      return sessionData?.valid || false;
-    } catch (_error) {
-      return false;
     }
   }
 }

@@ -11,12 +11,25 @@ const [KartonProvider, useKartonState, useKartonProcedure, useKartonConnected] =
       getAvailableTools: async () => [],
     },
     fallbackState: {
-      workspaceInfo: null,
-      chats: {},
-      activeChatId: '',
-      isWorking: false,
-      toolCallApprovalRequests: [],
-      subscription: undefined,
+      workspace: null,
+      workspaceStatus: 'closed',
+      userAccount: {
+        status: 'unauthenticated',
+        loginDialog: null,
+      },
+      appInfo: {
+        bridgeMode: false,
+        envMode: 'production',
+        verbose: false,
+        version: 'UNKNOWN',
+        runningOnPort: 0,
+      },
+      globalConfig: {
+        telemetryLevel: 'off',
+      },
+      userExperience: {},
+      filePicker: null,
+      notifications: [],
     },
   });
 

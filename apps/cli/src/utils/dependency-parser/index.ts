@@ -2,7 +2,6 @@ import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import type { DependencyMap } from './types.js';
-import { log } from '../utils/logger.js';
 import ignore from 'ignore';
 
 async function loadGitignore(dir: string): Promise<ReturnType<typeof ignore>> {
@@ -10,12 +9,8 @@ async function loadGitignore(dir: string): Promise<ReturnType<typeof ignore>> {
   const gitignorePath = join(dir, '.gitignore');
 
   if (existsSync(gitignorePath)) {
-    try {
-      const content = await readFile(gitignorePath, 'utf-8');
-      ig.add(content);
-    } catch (error) {
-      log.debug(`Failed to read .gitignore at ${gitignorePath}: ${error}`);
-    }
+    const content = await readFile(gitignorePath, 'utf-8');
+    ig.add(content);
   }
 
   // Always ignore node_modules and common non-source directories
@@ -44,27 +39,23 @@ async function findPackageJsonFiles(
     packageJsonFiles.push(packageJsonPath);
   }
 
-  try {
-    const entries = await readdir(dir);
+  const entries = await readdir(dir);
 
-    for (const entry of entries) {
-      const fullPath = join(dir, entry);
-      const relativePath = entry;
+  for (const entry of entries) {
+    const fullPath = join(dir, entry);
+    const relativePath = entry;
 
-      // Skip if ignored
-      if (ig?.ignores(relativePath)) {
-        continue;
-      }
-
-      const stats = await stat(fullPath);
-      if (stats.isDirectory()) {
-        // Recursively search subdirectories
-        const subDirFiles = await findPackageJsonFiles(fullPath, ig);
-        packageJsonFiles.push(...subDirFiles);
-      }
+    // Skip if ignored
+    if (ig?.ignores(relativePath)) {
+      continue;
     }
-  } catch (error) {
-    log.debug(`Error reading directory ${dir}: ${error}`);
+
+    const stats = await stat(fullPath);
+    if (stats.isDirectory()) {
+      // Recursively search subdirectories
+      const subDirFiles = await findPackageJsonFiles(fullPath, ig);
+      packageJsonFiles.push(...subDirFiles);
+    }
   }
 
   return packageJsonFiles;
@@ -73,27 +64,23 @@ async function findPackageJsonFiles(
 async function parsePackageJson(filePath: string): Promise<Set<string>> {
   const dependencies = new Set<string>();
 
-  try {
-    const content = await readFile(filePath, 'utf-8');
-    const packageData = JSON.parse(content);
+  const content = await readFile(filePath, 'utf-8');
+  const packageData = JSON.parse(content);
 
-    // Collect all types of dependencies
-    const depFields = [
-      'dependencies',
-      'devDependencies',
-      'peerDependencies',
-      'optionalDependencies',
-    ];
+  // Collect all types of dependencies
+  const depFields = [
+    'dependencies',
+    'devDependencies',
+    'peerDependencies',
+    'optionalDependencies',
+  ];
 
-    for (const field of depFields) {
-      if (packageData[field] && typeof packageData[field] === 'object') {
-        for (const depName of Object.keys(packageData[field])) {
-          dependencies.add(depName);
-        }
+  for (const field of depFields) {
+    if (packageData[field] && typeof packageData[field] === 'object') {
+      for (const depName of Object.keys(packageData[field])) {
+        dependencies.add(depName);
       }
     }
-  } catch (error) {
-    log.debug(`Failed to parse package.json at ${filePath}: ${error}`);
   }
 
   return dependencies;
@@ -102,16 +89,11 @@ async function parsePackageJson(filePath: string): Promise<Set<string>> {
 export async function discoverDependencies(
   workingDirectory: string = process.cwd(),
 ): Promise<DependencyMap> {
-  log.debug(
-    `Discovering dependencies from package.json files in: ${workingDirectory}`,
-  );
-
   // Load gitignore rules
   const ig = await loadGitignore(workingDirectory);
 
   // Find all package.json files
   const packageJsonFiles = await findPackageJsonFiles(workingDirectory, ig);
-  log.debug(`Found ${packageJsonFiles.length} package.json files`);
 
   // Parse all package.json files and collect unique dependencies
   const allDependencies = new Set<string>();
@@ -133,10 +115,6 @@ export async function discoverDependencies(
       patch: 0,
     };
   }
-
-  log.debug(
-    `Successfully discovered ${allDependencies.size} unique dependencies`,
-  );
 
   return dependencyMap;
 }

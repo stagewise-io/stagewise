@@ -1,38 +1,9 @@
 import {
   createKartonServer,
   type KartonServer,
-  type KartonServerProcedureImplementations,
 } from '@stagewise/karton/server';
 import type { KartonContract } from '@stagewise/karton-contract';
-
-// --- Utility types to build typed dot-paths to async functions in server procedures ---
-type StringKeyOf<T> = Extract<keyof T, string>;
-
-type DotPathToAsyncFunctions<T> = T extends object
-  ? {
-      [K in StringKeyOf<T>]: T[K] extends (...args: any[]) => Promise<any>
-        ? `${K}`
-        : T[K] extends object
-          ? `${K}.${DotPathToAsyncFunctions<T[K]>}`
-          : never;
-    }[StringKeyOf<T>]
-  : never;
-
-type Split<
-  S extends string,
-  D extends string,
-> = S extends `${infer T}${D}${infer U}` ? [T, ...Split<U, D>] : [S];
-
-type GetAtPath<T, Segments extends readonly string[]> = Segments extends [
-  infer H,
-  ...infer R,
-]
-  ? H extends keyof T
-    ? GetAtPath<T[H], Extract<R, readonly string[]>>
-    : never
-  : T;
-
-type FunctionAtDotPath<T, P extends string> = GetAtPath<T, Split<P, '.'>>;
+import type { Logger } from './logger';
 
 /**
  * The Karton service is responsible for managing the connection to the UI (web app).
@@ -40,29 +11,22 @@ type FunctionAtDotPath<T, P extends string> = GetAtPath<T, Split<P, '.'>>;
 export class KartonService {
   // @ts-expect-error - We initialize the karton server in the initialize method.
   private kartonServer: KartonServer<KartonContract>;
-  private serverProcedureCallbacks: Map<string, Set<(...args: any[]) => void>> =
-    new Map();
+  private logger: Logger;
 
-  private constructor() {}
-
-  private async initialize(
-    procedures: KartonServerProcedureImplementations<KartonContract>,
-    initialState?: KartonContract['state'],
-  ) {
-    const wrappedProcedures = this.wrapServerProcedures(procedures);
-
-    this.kartonServer = await createKartonServer<KartonContract>({
-      procedures: wrappedProcedures,
-      initialState: initialState ?? this.createDefaultInitialState(),
-    });
+  private constructor(logger: Logger) {
+    this.logger = logger;
   }
 
-  public static async create(
-    procedures: KartonServerProcedureImplementations<KartonContract>,
-    initialState?: KartonContract['state'],
-  ): Promise<KartonService> {
-    const instance = new KartonService();
-    await instance.initialize(procedures, initialState);
+  private async initialize() {
+    this.kartonServer = await createKartonServer<KartonContract>({
+      initialState: this.initialState,
+    });
+    this.logger.debug('[KartonService] Karton server initialized');
+  }
+
+  public static async create(logger: Logger): Promise<KartonService> {
+    const instance = new KartonService(logger);
+    await instance.initialize();
     return instance;
   }
 
@@ -79,38 +43,40 @@ export class KartonService {
   }
 
   get setState() {
-    return this.kartonServer.setState;
+    return this.kartonServer.setState.bind(this.kartonServer);
   }
 
   get registerServerProcedureHandler() {
-    return this.kartonServer.registerServerProcedureHandler;
+    return this.kartonServer.registerServerProcedureHandler.bind(
+      this.kartonServer,
+    );
   }
 
   get removeServerProcedureHandler() {
-    return this.kartonServer.removeServerProcedureHandler;
+    return this.kartonServer.removeServerProcedureHandler.bind(
+      this.kartonServer,
+    );
   }
 
-  private createDefaultInitialState(): KartonContract['state'] {
-    return {
-      activeChatId: null,
-      workspacePath: null,
-      chats: {},
-      toolCallApprovalRequests: [],
-      isWorking: false,
-      subscription: undefined,
-      authStatus: {
-        isAuthenticated: false,
-      },
-      serverInfo: {
-        port: 0,
-        url: '',
-      },
-      workspaceInfo: {
-        path: '',
-        devAppPort: 0,
-        loadedPlugins: [],
-      },
-      currentWorkspacePath: null,
-    };
-  }
+  private initialState: KartonContract['state'] = {
+    workspace: null,
+    workspaceStatus: 'closed',
+    userAccount: {
+      status: 'unauthenticated',
+      loginDialog: null,
+    },
+    appInfo: {
+      bridgeMode: false,
+      envMode: 'production',
+      verbose: false,
+      version: 'UNKNOWN',
+      runningOnPort: 0,
+    },
+    globalConfig: {
+      telemetryLevel: 'off',
+    },
+    userExperience: {},
+    filePicker: null,
+    notifications: [],
+  };
 }

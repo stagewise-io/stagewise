@@ -14,10 +14,12 @@ import {
 export function ChatPanelHeader() {
   const [chatListOpen, setChatListOpen] = useState(false);
 
-  const createChatProcedure = useKartonProcedure((p) => p.createChat);
-  const chats = useKartonState((s) => s.chats);
-  const activeChatId = useKartonState((s) => s.activeChatId);
-  const isWorking = useKartonState((s) => s.isWorking);
+  const createChatProcedure = useKartonProcedure((p) => p.agentChat.create);
+  const chats = useKartonState((s) => s.workspace.agentChat.chats);
+  const activeChatId = useKartonState(
+    (s) => s.workspace.agentChat.activeChatId,
+  );
+  const isWorking = useKartonState((s) => s.workspace.agentChat.isWorking);
 
   const createChat = useCallback(() => {
     createChatProcedure().then(() => {

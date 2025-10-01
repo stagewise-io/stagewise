@@ -26,7 +26,9 @@ const PluginContext = createContext<PluginContextType>({
 export function PluginProvider({ children }: { children?: ReactNode }) {
   const { config } = useConfig();
 
-  const sendUserMessage = useKartonProcedure((s) => s.sendUserMessage);
+  const sendUserMessage = useKartonProcedure(
+    (s) => s.agentChat.sendUserMessage,
+  );
 
   const { openLeftPanel } = usePanels();
 
