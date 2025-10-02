@@ -18,13 +18,13 @@ export function createAndActivateNewChat(karton: KartonServer<KartonContract>) {
     minute: '2-digit',
     hour12: true,
   })}`;
-  callbacks.setState((draft) => {
-    draft.chats[chatId] = {
+  karton.setState((draft) => {
+    draft.workspace!.agentChat!.chats[chatId] = {
       title,
       createdAt: new Date(),
       messages: [],
     };
-    draft.activeChatId = chatId;
+    draft.workspace!.agentChat!.activeChatId = chatId;
   });
   return chatId;
 }
@@ -37,15 +37,15 @@ export function createAndActivateNewChat(karton: KartonServer<KartonContract>) {
  * @param messageId - The unique identifier of the message containing the tool parts
  */
 export function attachToolOutputToMessage(
-  callbacks: AgentCallbacks,
+  karton: KartonServer<KartonContract>,
   toolResults: ToolCallProcessingResult[],
   messageId: string,
 ) {
-  callbacks.setState((draft) => {
-    const state = callbacks.getState();
-    const message = draft.chats[state.activeChatId!]!.messages.find(
-      (m: ChatMessage) => m.id === messageId,
-    );
+  karton.setState((draft) => {
+    const state = karton.state;
+    const message = draft.workspace!.agentChat!.chats[
+      state.workspace!.agentChat!.activeChatId!
+    ]!.messages.find((m) => m.id === messageId);
     if (!message) return;
     for (const result of toolResults) {
       const part = message.parts.find(
@@ -77,11 +77,11 @@ export function attachToolOutputToMessage(
  * @returns Array of pending tool call IDs and their names
  */
 export function findPendingToolCalls(
-  callbacks: AgentCallbacks,
+  karton: KartonServer<KartonContract>,
   chatId: string,
 ): Array<{ toolCallId: string }> {
-  const state = callbacks.getState();
-  const chat = state.chats[chatId];
+  const state = karton.state;
+  const chat = state.workspace!.agentChat!.chats[chatId];
   if (!chat) return [];
 
   const messages = chat.messages;

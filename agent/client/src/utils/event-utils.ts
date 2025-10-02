@@ -20,14 +20,14 @@ interface BaseAgentEvent {
 export interface CreditsInsufficientEvent extends BaseAgentEvent {
   type: 'credits_insufficient';
   data: {
-    subscription: KartonContract['state']['subscription'];
+    subscription: KartonContract['state']['userAccount']['subscription'];
   };
 }
 
 export interface PlanLimitsExceededEvent extends BaseAgentEvent {
   type: 'plan_limits_exceeded';
   data: {
-    subscription: KartonContract['state']['subscription'];
+    subscription: KartonContract['state']['userAccount']['subscription'];
   };
 }
 
@@ -116,7 +116,7 @@ export function createEventEmitter(callback?: AgentEventCallback) {
  */
 export const EventFactories = {
   creditsInsufficient: (
-    subscription: KartonContract['state']['subscription'],
+    subscription: KartonContract['state']['userAccount']['subscription'],
   ): CreditsInsufficientEvent => ({
     type: 'credits_insufficient',
     timestamp: new Date(),
@@ -126,7 +126,7 @@ export const EventFactories = {
   }),
 
   planLimitsExceeded: (
-    subscription: KartonContract['state']['subscription'],
+    subscription: KartonContract['state']['userAccount']['subscription'],
   ): PlanLimitsExceededEvent => ({
     type: 'plan_limits_exceeded',
     timestamp: new Date(),

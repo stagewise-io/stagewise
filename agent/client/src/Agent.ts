@@ -121,7 +121,7 @@ export class Agent {
         this.cleanupPendingOperations(
           'Agent call aborted',
           false,
-          this.karton?.state.activeChatId || undefined,
+          this.karton?.state.workspace!.agentChat!.activeChatId || undefined,
         );
       },
       { once: true },
@@ -164,7 +164,7 @@ export class Agent {
     }
 
     this.karton.setState((draft) => {
-      draft.isWorking = isWorking;
+      draft.workspace!.agentChat!.isWorking = isWorking;
     });
     this.eventEmitter.emit(
       EventFactories.agentStateChanged(this.isWorking, !this.isWorking),
@@ -266,140 +266,352 @@ export class Agent {
   }> {
     this.karton = await createKartonServer<KartonContract>({
       procedures: {
-        undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
-          await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
+        workspace: {
+          close: async () => {},
+          open: async (_path) => {},
         },
-        undoToolCallsUntilLatestUserMessage: async (
-          chatId,
-        ): Promise<ChatMessage | null> => {
-          return await this.undoToolCallsUntilLatestUserMessage(chatId);
+        filePicker: {
+          createRequest: async (_request) => [],
+          changeDirectory: async (_path) => {},
+          dismiss: async () => {},
+          createFolder: async (_path) => {},
+          select: async (_paths) => {},
         },
-        retrySendingUserMessage: async () => {
-          this.setAgentWorking(true);
-          this.karton?.setState((draft) => {
-            // remove any errors
-            draft.chats[draft.activeChatId!]!.error = undefined;
-          });
-          const promptSnippets: PromptSnippet[] = [];
-          const projectPathPromptSnippet = await getProjectPath(
-            this.clientRuntime,
-          );
-          if (projectPathPromptSnippet) {
-            promptSnippets.push(projectPathPromptSnippet);
-          }
-          await this.callAgent({
-            chatId: this.karton!.state.activeChatId!,
-            history:
-              this.karton!.state.chats[this.karton!.state.activeChatId!]!
-                .messages,
-            clientRuntime: this.clientRuntime,
-            promptSnippets,
-          });
-          this.setAgentWorking(false);
+        notifications: {
+          triggerAction: async (_id, _actionIndex) => {},
+          dismiss: async (_id) => {},
         },
-        refreshSubscription: async () => {
-          this.client?.subscription.getSubscription
-            .query()
-            .then((subscription) => {
-              this.karton?.setState((draft) => {
-                draft.subscription = subscription;
-              });
-            })
-            .catch((_) => {
-              // ignore errors here, there's a default credit amount
-            });
-        },
-        abortAgentCall: async () => {
-          this.abortController.abort();
-          this.abortController = new AbortController();
-          this.abortController.signal.addEventListener(
-            'abort',
-            () => {
-              this.cleanupPendingOperations(
-                'Agent call aborted',
-                false,
-                this.karton?.state.activeChatId || undefined,
-              );
-            },
-            { once: true },
-          );
-        },
-        approveToolCall: async (_toolCallId, _callingClientId) => {},
-        rejectToolCall: async (_toolCallId, _callingClientId) => {},
-        createChat: async () => {
-          return createAndActivateNewChat(this.karton!);
-        },
-        switchChat: async (chatId, _callingClientId) => {
-          this.karton?.setState((draft) => {
-            draft.activeChatId = chatId;
-          });
-          Object.entries(this.karton!.state.chats).forEach(([id, chat]) => {
-            if (chat.messages.length === 0 && id !== chatId)
-              this.karton?.setState((draft) => {
-                delete draft.chats[id];
-              });
-          });
-        },
-        deleteChat: async (chatId, _callingClientId) => {
-          // if the active chat is being deleted, figure out which chat to switch to
-          if (this.karton!.state.activeChatId === chatId) {
-            const nextChatId = Object.keys(this.karton!.state.chats).find(
-              (id) => id !== chatId,
-            );
-            // if there are no other chats, create a new one
-            if (!nextChatId) createAndActivateNewChat(this.karton!);
-            // if there are other chats, switch to the next one
-            else
-              this.karton?.setState((draft) => {
-                draft.activeChatId = nextChatId;
-              });
-          }
-          // finally delete the chat
-          this.karton?.setState((draft) => {
-            delete draft.chats[chatId];
-          });
-        },
-        sendUserMessage: async (message, _callingClientId) => {
-          this.setAgentWorking(true);
-          const newstate = this.karton?.setState((draft) => {
-            const chatId = this.karton!.state.activeChatId!;
-            draft.chats[chatId]!.messages.push(message as any); // TODO: fix the type issue here
-            draft.chats[chatId]!.error = undefined;
-          });
-          const messages =
-            newstate?.chats[this.karton!.state.activeChatId!]!.messages;
-          const promptSnippets: PromptSnippet[] = [];
-          const projectPathPromptSnippet = await getProjectPath(
-            this.clientRuntime,
-          );
-          if (projectPathPromptSnippet) {
-            promptSnippets.push(projectPathPromptSnippet);
-          }
-          const projectInfoPromptSnippet = await getProjectInfo(
-            this.clientRuntime,
-          );
-          if (projectInfoPromptSnippet) {
-            promptSnippets.push(projectInfoPromptSnippet);
-          }
-          await this.callAgent({
-            chatId: this.karton!.state.activeChatId!,
-            history: messages,
-            clientRuntime: this.clientRuntime,
-            promptSnippets,
-          });
-        },
-        assistantMadeCodeChangesUntilLatestUserMessage: async (chatId) => {
-          return await this.assistantMadeCodeChangesUntilLatestUserMessage(
+        agentChat: {
+          undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
+            await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
+          },
+          undoToolCallsUntilLatestUserMessage: async (
             chatId,
-          );
+          ): Promise<ChatMessage | null> => {
+            return await this.undoToolCallsUntilLatestUserMessage(chatId);
+          },
+          retrySendingUserMessage: async () => {
+            this.setAgentWorking(true);
+            this.karton?.setState((draft) => {
+              if (
+                !draft.workspace!.agentChat!.chats[
+                  draft.workspace!.agentChat!.activeChatId!
+                ]
+              )
+                return;
+              // remove any errors
+              draft.workspace!.agentChat!.chats[
+                draft.workspace!.agentChat!.activeChatId!
+              ]!.error = undefined;
+            });
+            const promptSnippets: PromptSnippet[] = [];
+            const projectPathPromptSnippet = await getProjectPath(
+              this.clientRuntime,
+            );
+            if (projectPathPromptSnippet) {
+              promptSnippets.push(projectPathPromptSnippet);
+            }
+            await this.callAgent({
+              chatId: this.karton!.state.workspace!.agentChat!.activeChatId!,
+              history:
+                this.karton!.state.workspace!.agentChat!.chats[
+                  this.karton!.state.workspace!.agentChat!.activeChatId!
+                ]!.messages,
+              clientRuntime: this.clientRuntime,
+              promptSnippets,
+            });
+            this.setAgentWorking(false);
+          },
+          // refreshSubscription: async () => { // TODO: move to userAccount
+          //   this.client?.subscription.getSubscription
+          //     .query()
+          //     .then((subscription) => {
+          //       this.karton?.setState((draft) => {
+          //         draft.subscription = subscription;
+          //       });
+          //     })
+          //     .catch((_) => {
+          //       // ignore errors here, there's a default credit amount
+          //     });
+          // },
+          abortAgentCall: async () => {
+            this.abortController.abort();
+            this.abortController = new AbortController();
+            this.abortController.signal.addEventListener(
+              'abort',
+              () => {
+                this.cleanupPendingOperations(
+                  'Agent call aborted',
+                  false,
+                  this.karton?.state.workspace!.agentChat!.activeChatId ||
+                    undefined,
+                );
+              },
+              { once: true },
+            );
+          },
+          approveToolCall: async (_toolCallId, _callingClientId) => {},
+          rejectToolCall: async (_toolCallId, _callingClientId) => {},
+          create: async () => {
+            return createAndActivateNewChat(this.karton!);
+          },
+          switch: async (chatId, _callingClientId) => {
+            this.karton?.setState((draft) => {
+              draft.workspace!.agentChat!.activeChatId = chatId;
+            });
+            Object.entries(
+              this.karton!.state.workspace!.agentChat!.chats,
+            ).forEach(([id, chat]) => {
+              if (chat.messages.length === 0 && id !== chatId)
+                this.karton?.setState((draft) => {
+                  delete draft.workspace!.agentChat!.chats[id];
+                });
+            });
+          },
+          delete: async (chatId, _callingClientId) => {
+            // if the active chat is being deleted, figure out which chat to switch to
+            if (
+              this.karton!.state.workspace!.agentChat!.activeChatId === chatId
+            ) {
+              const nextChatId = Object.keys(
+                this.karton!.state.workspace!.agentChat!.chats,
+              ).find((id) => id !== chatId);
+              // if there are no other chats, create a new one
+              if (!nextChatId) createAndActivateNewChat(this.karton!);
+              // if there are other chats, switch to the next one
+              else
+                this.karton?.setState((draft) => {
+                  draft.workspace!.agentChat!.activeChatId = nextChatId;
+                });
+            }
+            // finally delete the chat
+            this.karton?.setState((draft) => {
+              delete draft.workspace!.agentChat!.chats[chatId];
+            });
+          },
+          sendUserMessage: async (message, _callingClientId) => {
+            this.setAgentWorking(true);
+            const newstate = this.karton?.setState((draft) => {
+              const chatId =
+                this.karton!.state.workspace!.agentChat!.activeChatId!;
+              draft.workspace!.agentChat!.chats[chatId]!.messages.push(
+                message as any,
+              ); // TODO: fix the type issue here
+              draft.workspace!.agentChat!.chats[chatId]!.error = undefined;
+            });
+            const messages =
+              newstate?.workspace!.agentChat!.chats[
+                this.karton!.state.workspace!.agentChat!.activeChatId!
+              ]!.messages;
+            const promptSnippets: PromptSnippet[] = [];
+            const projectPathPromptSnippet = await getProjectPath(
+              this.clientRuntime,
+            );
+            if (projectPathPromptSnippet) {
+              promptSnippets.push(projectPathPromptSnippet);
+            }
+            const projectInfoPromptSnippet = await getProjectInfo(
+              this.clientRuntime,
+            );
+            if (projectInfoPromptSnippet) {
+              promptSnippets.push(projectInfoPromptSnippet);
+            }
+            await this.callAgent({
+              chatId: this.karton!.state.workspace!.agentChat!.activeChatId!,
+              history: messages,
+              clientRuntime: this.clientRuntime,
+              promptSnippets,
+            });
+          },
+          assistantMadeCodeChangesUntilLatestUserMessage: async (chatId) => {
+            return await this.assistantMadeCodeChangesUntilLatestUserMessage(
+              chatId,
+            );
+          },
         },
+        userAccount: {
+          refreshStatus: async () => {},
+          abortLogin: async () => {},
+          startLogin: async () => {},
+          logout: async () => {},
+          refreshSubscription: async () => {
+            this.client?.subscription.getSubscription
+              .query()
+              .then((subscription) => {
+                this.karton?.setState((draft) => {
+                  draft.userAccount.subscription = {
+                    ...subscription,
+                    active: subscription.hasSubscription,
+                  };
+                });
+              })
+              .catch((_) => {
+                // ignore errors here, there's a default credit amount
+              });
+          },
+        },
+        // undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
+        //   await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
+        // },
+        // undoToolCallsUntilLatestUserMessage: async (
+        //   chatId,
+        // ): Promise<ChatMessage | null> => {
+        //   return await this.undoToolCallsUntilLatestUserMessage(chatId);
+        // },
+        // retrySendingUserMessage: async () => {
+        //   this.setAgentWorking(true);
+        //   this.karton?.setState((draft) => {
+        //     // remove any errors
+        //     draft.chats[draft.activeChatId!]!.error = undefined;
+        //   });
+        //   const promptSnippets: PromptSnippet[] = [];
+        //   const projectPathPromptSnippet = await getProjectPath(
+        //     this.clientRuntime,
+        //   );
+        //   if (projectPathPromptSnippet) {
+        //     promptSnippets.push(projectPathPromptSnippet);
+        //   }
+        //   await this.callAgent({
+        //     chatId: this.karton!.state.activeChatId!,
+        //     history:
+        //       this.karton!.state.chats[this.karton!.state.activeChatId!]!
+        //         .messages,
+        //     clientRuntime: this.clientRuntime,
+        //     promptSnippets,
+        //   });
+        //   this.setAgentWorking(false);
+        // },
+        // refreshSubscription: async () => {
+        //   this.client?.subscription.getSubscription
+        //     .query()
+        //     .then((subscription) => {
+        //       this.karton?.setState((draft) => {
+        //         draft.subscription = subscription;
+        //       });
+        //     })
+        //     .catch((_) => {
+        //       // ignore errors here, there's a default credit amount
+        //     });
+        // },
+        // abortAgentCall: async () => {
+        //   this.abortController.abort();
+        //   this.abortController = new AbortController();
+        //   this.abortController.signal.addEventListener(
+        //     'abort',
+        //     () => {
+        //       this.cleanupPendingOperations(
+        //         'Agent call aborted',
+        //         false,
+        //         this.karton?.state.activeChatId || undefined,
+        //       );
+        //     },
+        //     { once: true },
+        //   );
+        // },
+        // approveToolCall: async (_toolCallId, _callingClientId) => {},
+        // rejectToolCall: async (_toolCallId, _callingClientId) => {},
+        // createChat: async () => {
+        //   return createAndActivateNewChat(this.karton!);
+        // },
+        // switchChat: async (chatId, _callingClientId) => {
+        //   this.karton?.setState((draft) => {
+        //     draft.activeChatId = chatId;
+        //   });
+        //   Object.entries(this.karton!.state.chats).forEach(([id, chat]) => {
+        //     if (chat.messages.length === 0 && id !== chatId)
+        //       this.karton?.setState((draft) => {
+        //         delete draft.chats[id];
+        //       });
+        //   });
+        // },
+        // deleteChat: async (chatId, _callingClientId) => {
+        //   // if the active chat is being deleted, figure out which chat to switch to
+        //   if (this.karton!.state.activeChatId === chatId) {
+        //     const nextChatId = Object.keys(this.karton!.state.chats).find(
+        //       (id) => id !== chatId,
+        //     );
+        //     // if there are no other chats, create a new one
+        //     if (!nextChatId) createAndActivateNewChat(this.karton!);
+        //     // if there are other chats, switch to the next one
+        //     else
+        //       this.karton?.setState((draft) => {
+        //         draft.activeChatId = nextChatId;
+        //       });
+        //   }
+        //   // finally delete the chat
+        //   this.karton?.setState((draft) => {
+        //     delete draft.chats[chatId];
+        //   });
+        // },
+        // sendUserMessage: async (message, _callingClientId) => {
+        //   this.setAgentWorking(true);
+        //   const newstate = this.karton?.setState((draft) => {
+        //     const chatId = this.karton!.state.activeChatId!;
+        //     draft.chats[chatId]!.messages.push(message as any); // TODO: fix the type issue here
+        //     draft.chats[chatId]!.error = undefined;
+        //   });
+        //   const messages =
+        //     newstate?.chats[this.karton!.state.activeChatId!]!.messages;
+        //   const promptSnippets: PromptSnippet[] = [];
+        //   const projectPathPromptSnippet = await getProjectPath(
+        //     this.clientRuntime,
+        //   );
+        //   if (projectPathPromptSnippet) {
+        //     promptSnippets.push(projectPathPromptSnippet);
+        //   }
+        //   const projectInfoPromptSnippet = await getProjectInfo(
+        //     this.clientRuntime,
+        //   );
+        //   if (projectInfoPromptSnippet) {
+        //     promptSnippets.push(projectInfoPromptSnippet);
+        //   }
+        //   await this.callAgent({
+        //     chatId: this.karton!.state.activeChatId!,
+        //     history: messages,
+        //     clientRuntime: this.clientRuntime,
+        //     promptSnippets,
+        //   });
+        // },
+        // assistantMadeCodeChangesUntilLatestUserMessage: async (chatId) => {
+        //   return await this.assistantMadeCodeChangesUntilLatestUserMessage(
+        //     chatId,
+        //   );
+        // },
       },
       initialState: {
-        activeChatId: null,
-        chats: {},
-        isWorking: false,
-        toolCallApprovalRequests: [],
-        subscription: undefined,
+        workspaceStatus: 'closed',
+        workspace: {
+          agentChat: {
+            activeChatId: null,
+            chats: {},
+            toolCallApprovalRequests: [],
+            isWorking: false,
+          },
+          path: null,
+          devAppStatus: null,
+          config: null,
+          plugins: null,
+        },
+        userAccount: {
+          status: 'unauthenticated',
+          subscription: undefined,
+          loginDialog: null,
+          tokenExpiresAt: undefined,
+          refreshTokenExpiresAt: undefined,
+        },
+        appInfo: {
+          bridgeMode: false,
+          envMode: 'production',
+          verbose: false,
+          version: 'UNKNOWN',
+          runningOnPort: 0,
+        },
+        globalConfig: {
+          telemetryLevel: 'off',
+        },
+        userExperience: {},
+        filePicker: null,
+        notifications: [],
       },
     });
 
@@ -407,7 +619,10 @@ export class Agent {
       .query()
       .then((subscription) => {
         this.karton?.setState((draft) => {
-          draft.subscription = subscription;
+          draft.userAccount.subscription = {
+            ...subscription,
+            active: subscription.hasSubscription,
+          };
         });
       })
       .catch((_) => {
@@ -451,7 +666,7 @@ export class Agent {
       );
       this.setAgentWorking(false);
       this.karton?.setState((draft) => {
-        draft.chats[chatId]!.error = {
+        draft.workspace!.agentChat!.chats[chatId]!.error = {
           type: AgentErrorType.AGENT_ERROR,
           error: new Error(errorDesc),
         };
@@ -486,8 +701,10 @@ export class Agent {
 
         this.karton?.setState((draft) => {
           // chat could've been deleted in the meantime
-          const chatExists = draft.chats[chatId] !== undefined;
-          if (chatExists) draft.chats[chatId]!.title = title;
+          const chatExists =
+            draft.workspace!.agentChat!.chats[chatId] !== undefined;
+          if (chatExists)
+            draft.workspace!.agentChat!.chats[chatId]!.title = title;
         });
       }
 
@@ -530,11 +747,12 @@ export class Agent {
             this.authRetryCount = 0;
             this.eventEmitter.emit(
               EventFactories.planLimitsExceeded(
-                this.karton?.state.subscription,
+                this.karton?.state.userAccount.subscription,
               ),
             );
             this.karton?.setState((draft) => {
-              draft.chats[chatId]!.error = {
+              if (!draft.workspace!.agentChat!.chats[chatId]) return;
+              draft.workspace!.agentChat!.chats[chatId]!.error = {
                 type: AgentErrorType.PLAN_LIMITS_EXCEEDED,
                 error: {
                   name: 'Plan limit exceeded',
@@ -560,7 +778,9 @@ export class Agent {
               this.initializeLitellm();
               await this.callAgent({
                 chatId,
-                history: this.karton?.state.chats[chatId]!.messages,
+                history:
+                  this.karton?.state.workspace!.agentChat!.chats[chatId]!
+                    .messages,
                 clientRuntime,
                 promptSnippets,
               });
@@ -570,7 +790,7 @@ export class Agent {
               this.authRetryCount = 0;
               this.setAgentWorking(false);
               this.karton?.setState((draft) => {
-                draft.chats[chatId]!.error = {
+                draft.workspace!.agentChat!.chats[chatId]!.error = {
                   type: AgentErrorType.AGENT_ERROR,
                   error: new Error(
                     'Authentication failed, please restart the cli.',
@@ -583,12 +803,12 @@ export class Agent {
             this.authRetryCount = 0;
             this.eventEmitter.emit(
               EventFactories.creditsInsufficient(
-                this.karton?.state.subscription,
+                this.karton?.state.userAccount.subscription,
               ),
             );
             this.setAgentWorking(false);
             this.karton?.setState((draft) => {
-              draft.chats[chatId]!.error = {
+              draft.workspace!.agentChat!.chats[chatId]!.error = {
                 type: AgentErrorType.INSUFFICIENT_CREDITS,
                 error: {
                   name: 'Insufficient credits',
@@ -609,7 +829,8 @@ export class Agent {
           const toolResults = await processParallelToolCalls(
             r.toolCalls,
             this.tools,
-            this.karton?.state.chats[chatId]!.messages ?? [],
+            this.karton?.state.workspace!.agentChat!.chats[chatId]!.messages ??
+              [],
             this.timeoutManager,
             (result) => {
               if (result.result?.undoExecute) {
@@ -629,7 +850,9 @@ export class Agent {
           if (toolResults.length > 0) {
             return this.callAgent({
               chatId,
-              history: this.karton?.state.chats[chatId]!.messages,
+              history:
+                this.karton?.state.workspace!.agentChat!.chats[chatId]!
+                  .messages,
               clientRuntime,
               promptSnippets,
             });
@@ -653,7 +876,7 @@ export class Agent {
       const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
       this.karton?.setState((draft) => {
-        draft.chats[chatId]!.error = {
+        draft.workspace!.agentChat!.chats[chatId]!.error = {
           type: AgentErrorType.AGENT_ERROR,
           error: new Error(errorDesc),
         };
@@ -678,10 +901,10 @@ export class Agent {
       stream: uiStream,
     })) {
       const messageExists =
-        this.karton?.state.activeChatId &&
-        this.karton.state.chats[this.karton.state.activeChatId]?.messages.find(
-          (m) => m.id === uiMessage.id,
-        );
+        this.karton?.state.workspace!.agentChat!.activeChatId &&
+        this.karton.state.workspace!.agentChat!.chats[
+          this.karton.state.workspace!.agentChat!.activeChatId
+        ]?.messages.find((m) => m.id === uiMessage.id);
       const uiMessageWithMetadata: ChatMessage = {
         ...uiMessage,
         metadata: { ...(uiMessage.metadata ?? {}), createdAt: new Date() },
@@ -689,8 +912,10 @@ export class Agent {
 
       if (messageExists) {
         this.karton!.setState((draft) => {
-          draft.chats[draft.activeChatId!]!.messages = draft.chats[
-            draft.activeChatId!
+          draft.workspace!.agentChat!.chats[
+            draft.workspace!.agentChat!.activeChatId!
+          ]!.messages = draft.workspace!.agentChat!.chats[
+            draft.workspace!.agentChat!.activeChatId!
           ]!.messages.map((m) =>
             m.id === uiMessage.id
               ? (uiMessageWithMetadata as ChatMessage)
@@ -700,9 +925,9 @@ export class Agent {
       } else {
         onNewMessage?.(uiMessage.id);
         this.karton!.setState((draft) => {
-          draft.chats[draft.activeChatId!]!.messages.push(
-            uiMessageWithMetadata as any,
-          );
+          draft.workspace!.agentChat!.chats[
+            draft.workspace!.agentChat!.activeChatId!
+          ]!.messages.push(uiMessageWithMetadata as any);
         });
       }
     }
@@ -716,7 +941,7 @@ export class Agent {
   private async assistantMadeCodeChangesUntilLatestUserMessage(
     chatId: string,
   ): Promise<boolean> {
-    const chat = this.karton?.state.chats[chatId];
+    const chat = this.karton?.state.workspace!.agentChat!.chats[chatId];
     const history = chat?.messages ?? [];
     const reversedHistory = [...history].reverse();
     const userMessageIndex = reversedHistory.findIndex(
@@ -746,7 +971,7 @@ export class Agent {
     chatId: string,
   ): Promise<ChatMessage | null> {
     if (!this.undoToolCallStack.has(chatId)) return null;
-    const chat = this.karton?.state.chats[chatId];
+    const chat = this.karton?.state.workspace!.agentChat!.chats[chatId];
     const history = chat?.messages ?? [];
     const reversedHistory = [...history].reverse();
     const userMessageIndex = reversedHistory.findIndex(
@@ -771,7 +996,7 @@ export class Agent {
     chatId: string,
   ): Promise<void> {
     if (!this.undoToolCallStack.has(chatId)) return;
-    const chat = this.karton?.state.chats[chatId];
+    const chat = this.karton?.state.workspace!.agentChat!.chats[chatId];
 
     const history = chat?.messages ?? [];
     const userMessageIndex = history.findIndex(
@@ -804,7 +1029,7 @@ export class Agent {
     // Keep messages up to user message
     this.karton?.setState((draft) => {
       if (userMessageIndex !== -1) {
-        draft.chats[chatId]!.messages = history.slice(
+        draft.workspace!.agentChat!.chats[chatId]!.messages = history.slice(
           0,
           userMessageIndex,
         ) as any;
