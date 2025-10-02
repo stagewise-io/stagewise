@@ -16,6 +16,7 @@ import {
   useKartonState,
   useKartonProcedure,
   useKartonConnected,
+  useComparingSelector,
 } from '@/hooks/use-karton';
 import {
   Tooltip,
@@ -35,13 +36,15 @@ export function ChatPanelFooter({
   inputRef: React.RefObject<HTMLTextAreaElement>;
 }) {
   const chatState = useChatState();
-  const isWorking = useKartonState((s) => s.workspace.agentChat.isWorking);
-  const activeChatId = useKartonState(
-    (s) => s.workspace.agentChat.activeChatId,
+  const { isWorking, activeChatId, chats } = useKartonState(
+    useComparingSelector((s) => ({
+      isWorking: s.workspace.agentChat?.isWorking || false,
+      activeChatId: s.workspace.agentChat?.activeChatId || null,
+      chats: s.workspace.agentChat?.chats || {},
+    })),
   );
   const stopAgent = useKartonProcedure((p) => p.agentChat.abortAgentCall);
-  const canStop = useKartonState((s) => s.workspace.agentChat.isWorking);
-  const chats = useKartonState((s) => s.workspace.agentChat.chats);
+  const canStop = isWorking;
   const isConnected = useKartonConnected();
 
   const abortAgent = useCallback(() => {
@@ -152,7 +155,7 @@ export function ChatPanelFooter({
                 GlassyTextInputClassNames,
                 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent z-10 h-28 w-full resize-none rounded-2xl border-none bg-transparent px-2 py-1 text-zinc-950 outline-none transition-all duration-300 ease-out placeholder:text-foreground/40 focus:outline-none',
               )}
-              placeholder={!showTextSlideshow && 'Type a message...'}
+              placeholder={!showTextSlideshow ? 'Type a message...' : undefined}
             />
             <div className="pointer-events-none absolute inset-0 z-20 size-full px-[9px] py-[5px]">
               {/* TODO: Only render this if there is no chat history yet. */}

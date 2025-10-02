@@ -4,7 +4,11 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { XIcon, PlusIcon, AlignJustifyIcon } from 'lucide-react';
 import { useState, useMemo, useCallback } from 'react';
 import { ChatList } from './chat-list';
-import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
+import {
+  useKartonProcedure,
+  useKartonState,
+  useComparingSelector,
+} from '@/hooks/use-karton';
 import {
   Tooltip,
   TooltipContent,
@@ -15,11 +19,15 @@ export function ChatPanelHeader() {
   const [chatListOpen, setChatListOpen] = useState(false);
 
   const createChatProcedure = useKartonProcedure((p) => p.agentChat.create);
-  const chats = useKartonState((s) => s.workspace.agentChat.chats);
-  const activeChatId = useKartonState(
-    (s) => s.workspace.agentChat.activeChatId,
+  const chats = useKartonState(
+    useComparingSelector((s) => s.workspace.agentChat?.chats || {}),
   );
-  const isWorking = useKartonState((s) => s.workspace.agentChat.isWorking);
+  const activeChatId = useKartonState(
+    (s) => s.workspace.agentChat?.activeChatId || null,
+  );
+  const isWorking = useKartonState(
+    (s) => s.workspace.agentChat?.isWorking || false,
+  );
 
   const createChat = useCallback(() => {
     createChatProcedure().then(() => {

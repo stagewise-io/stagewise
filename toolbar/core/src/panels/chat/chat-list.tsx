@@ -12,9 +12,9 @@ import { cn } from '@/utils';
 export function ChatList({ onClose }: { onClose: () => void }) {
   const { chats, activeChatId, isWorking } = useKartonState(
     useComparingSelector((s) => ({
-      chats: s.workspace.agentChat.chats,
-      activeChatId: s.workspace.agentChat.activeChatId,
-      isWorking: s.workspace.agentChat.isWorking,
+      chats: s.workspace.agentChat?.chats || {},
+      activeChatId: s.workspace.agentChat?.activeChatId || null,
+      isWorking: s.workspace.agentChat?.isWorking || false,
     })),
   );
 

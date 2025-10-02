@@ -15,7 +15,7 @@ export function ChatPanel() {
   const chatState = useChatState();
   const [isDragging, setIsDragging] = useState(false);
   const isWorking = useKartonState(
-    useComparingSelector((s) => s.workspace.agentChat.isWorking),
+    useComparingSelector((s) => s.workspace.agentChat?.isWorking || false),
   );
   const isConnected = useKartonConnected();
 
@@ -79,7 +79,7 @@ export function ChatPanel() {
       // Focus the input field
       inputRef.current?.focus();
     },
-    [chatState, enableInputField],
+    [chatState],
   );
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export function ChatPanel() {
         resizeObserver.disconnect();
       };
     }
-  }, [chatHistoryRef.current]);
+  }, []);
 
   return (
     <Panel

@@ -10,9 +10,9 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
 
   const { activeChatId, isWorking, chats } = useKartonState(
     useComparingSelector((s) => ({
-      activeChatId: s.workspace.agentChat.activeChatId,
-      isWorking: s.workspace.agentChat.isWorking,
-      chats: s.workspace.agentChat.chats,
+      activeChatId: s.workspace?.agentChat?.activeChatId || null,
+      isWorking: s.workspace?.agentChat?.isWorking || false,
+      chats: s.workspace?.agentChat?.chats || {},
     })),
   );
 

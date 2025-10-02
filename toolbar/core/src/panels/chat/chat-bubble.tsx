@@ -70,9 +70,11 @@ export function ChatBubble({
     (p) => p.agentChat.assistantMadeCodeChangesUntilLatestUserMessage,
   );
   const activeChatId = useKartonState(
-    (s) => s.workspace.agentChat.activeChatId,
+    (s) => s.workspace.agentChat?.activeChatId || null,
   );
-  const isWorking = useKartonState((s) => s.workspace.agentChat.isWorking);
+  const isWorking = useKartonState(
+    (s) => s.workspace.agentChat?.isWorking || false,
+  );
   const { setChatInput } = useChatState();
   const [hasCodeChanges, setHasCodeChanges] = useState(false);
   const isEmptyMessage = useMemo(() => {

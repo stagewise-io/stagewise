@@ -11,11 +11,30 @@ const [KartonProvider, useKartonState, useKartonProcedure, useKartonConnected] =
       getAvailableTools: async () => [],
     },
     fallbackState: {
-      workspace: null,
+      workspace: {
+        path: '',
+        devAppStatus: null,
+        agentChat: {
+          activeChatId: null,
+          chats: {},
+          toolCallApprovalRequests: [],
+          isWorking: false,
+        },
+        config: {
+          appPort: 0,
+          eddyMode: undefined,
+          autoPlugins: false,
+          plugins: [],
+        },
+        plugins: [],
+      },
       workspaceStatus: 'closed',
       userAccount: {
         status: 'unauthenticated',
         loginDialog: null,
+        subscription: undefined,
+        tokenExpiresAt: undefined,
+        refreshTokenExpiresAt: undefined,
       },
       appInfo: {
         bridgeMode: false,
@@ -28,7 +47,15 @@ const [KartonProvider, useKartonState, useKartonProcedure, useKartonConnected] =
         telemetryLevel: 'off',
       },
       userExperience: {},
-      filePicker: null,
+      filePicker: {
+        title: '',
+        description: '',
+        mode: 'file',
+        multiple: false,
+        currentPath: '',
+        parentSiblings: [],
+        children: [],
+      },
       notifications: [],
     },
   });

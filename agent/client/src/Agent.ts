@@ -118,6 +118,8 @@ export class Agent {
     this.abortController.signal.addEventListener(
       'abort',
       () => {
+        if (!this.karton?.state.workspace?.agentChat?.activeChatId) return;
+
         this.cleanupPendingOperations(
           'Agent call aborted',
           false,
@@ -292,6 +294,7 @@ export class Agent {
           },
           retrySendingUserMessage: async () => {
             this.setAgentWorking(true);
+            if (!this.karton?.state.workspace?.agentChat?.activeChatId) return;
             this.karton?.setState((draft) => {
               if (
                 !draft.workspace!.agentChat!.chats[
@@ -335,6 +338,8 @@ export class Agent {
           //     });
           // },
           abortAgentCall: async () => {
+            if (!this.karton?.state.workspace?.agentChat?.activeChatId) return;
+
             this.abortController.abort();
             this.abortController = new AbortController();
             this.abortController.signal.addEventListener(
@@ -369,6 +374,8 @@ export class Agent {
             });
           },
           delete: async (chatId, _callingClientId) => {
+            if (!this.karton?.state.workspace?.agentChat?.activeChatId) return;
+
             // if the active chat is being deleted, figure out which chat to switch to
             if (
               this.karton!.state.workspace!.agentChat!.activeChatId === chatId
@@ -390,6 +397,8 @@ export class Agent {
             });
           },
           sendUserMessage: async (message, _callingClientId) => {
+            if (!this.karton?.state.workspace?.agentChat?.activeChatId) return;
+
             this.setAgentWorking(true);
             const newstate = this.karton?.setState((draft) => {
               const chatId =
@@ -450,133 +459,6 @@ export class Agent {
               });
           },
         },
-        // undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
-        //   await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
-        // },
-        // undoToolCallsUntilLatestUserMessage: async (
-        //   chatId,
-        // ): Promise<ChatMessage | null> => {
-        //   return await this.undoToolCallsUntilLatestUserMessage(chatId);
-        // },
-        // retrySendingUserMessage: async () => {
-        //   this.setAgentWorking(true);
-        //   this.karton?.setState((draft) => {
-        //     // remove any errors
-        //     draft.chats[draft.activeChatId!]!.error = undefined;
-        //   });
-        //   const promptSnippets: PromptSnippet[] = [];
-        //   const projectPathPromptSnippet = await getProjectPath(
-        //     this.clientRuntime,
-        //   );
-        //   if (projectPathPromptSnippet) {
-        //     promptSnippets.push(projectPathPromptSnippet);
-        //   }
-        //   await this.callAgent({
-        //     chatId: this.karton!.state.activeChatId!,
-        //     history:
-        //       this.karton!.state.chats[this.karton!.state.activeChatId!]!
-        //         .messages,
-        //     clientRuntime: this.clientRuntime,
-        //     promptSnippets,
-        //   });
-        //   this.setAgentWorking(false);
-        // },
-        // refreshSubscription: async () => {
-        //   this.client?.subscription.getSubscription
-        //     .query()
-        //     .then((subscription) => {
-        //       this.karton?.setState((draft) => {
-        //         draft.subscription = subscription;
-        //       });
-        //     })
-        //     .catch((_) => {
-        //       // ignore errors here, there's a default credit amount
-        //     });
-        // },
-        // abortAgentCall: async () => {
-        //   this.abortController.abort();
-        //   this.abortController = new AbortController();
-        //   this.abortController.signal.addEventListener(
-        //     'abort',
-        //     () => {
-        //       this.cleanupPendingOperations(
-        //         'Agent call aborted',
-        //         false,
-        //         this.karton?.state.activeChatId || undefined,
-        //       );
-        //     },
-        //     { once: true },
-        //   );
-        // },
-        // approveToolCall: async (_toolCallId, _callingClientId) => {},
-        // rejectToolCall: async (_toolCallId, _callingClientId) => {},
-        // createChat: async () => {
-        //   return createAndActivateNewChat(this.karton!);
-        // },
-        // switchChat: async (chatId, _callingClientId) => {
-        //   this.karton?.setState((draft) => {
-        //     draft.activeChatId = chatId;
-        //   });
-        //   Object.entries(this.karton!.state.chats).forEach(([id, chat]) => {
-        //     if (chat.messages.length === 0 && id !== chatId)
-        //       this.karton?.setState((draft) => {
-        //         delete draft.chats[id];
-        //       });
-        //   });
-        // },
-        // deleteChat: async (chatId, _callingClientId) => {
-        //   // if the active chat is being deleted, figure out which chat to switch to
-        //   if (this.karton!.state.activeChatId === chatId) {
-        //     const nextChatId = Object.keys(this.karton!.state.chats).find(
-        //       (id) => id !== chatId,
-        //     );
-        //     // if there are no other chats, create a new one
-        //     if (!nextChatId) createAndActivateNewChat(this.karton!);
-        //     // if there are other chats, switch to the next one
-        //     else
-        //       this.karton?.setState((draft) => {
-        //         draft.activeChatId = nextChatId;
-        //       });
-        //   }
-        //   // finally delete the chat
-        //   this.karton?.setState((draft) => {
-        //     delete draft.chats[chatId];
-        //   });
-        // },
-        // sendUserMessage: async (message, _callingClientId) => {
-        //   this.setAgentWorking(true);
-        //   const newstate = this.karton?.setState((draft) => {
-        //     const chatId = this.karton!.state.activeChatId!;
-        //     draft.chats[chatId]!.messages.push(message as any); // TODO: fix the type issue here
-        //     draft.chats[chatId]!.error = undefined;
-        //   });
-        //   const messages =
-        //     newstate?.chats[this.karton!.state.activeChatId!]!.messages;
-        //   const promptSnippets: PromptSnippet[] = [];
-        //   const projectPathPromptSnippet = await getProjectPath(
-        //     this.clientRuntime,
-        //   );
-        //   if (projectPathPromptSnippet) {
-        //     promptSnippets.push(projectPathPromptSnippet);
-        //   }
-        //   const projectInfoPromptSnippet = await getProjectInfo(
-        //     this.clientRuntime,
-        //   );
-        //   if (projectInfoPromptSnippet) {
-        //     promptSnippets.push(projectInfoPromptSnippet);
-        //   }
-        //   await this.callAgent({
-        //     chatId: this.karton!.state.activeChatId!,
-        //     history: messages,
-        //     clientRuntime: this.clientRuntime,
-        //     promptSnippets,
-        //   });
-        // },
-        // assistantMadeCodeChangesUntilLatestUserMessage: async (chatId) => {
-        //   return await this.assistantMadeCodeChangesUntilLatestUserMessage(
-        //     chatId,
-        //   );
-        // },
       },
       initialState: {
         workspaceStatus: 'closed',
@@ -897,6 +779,8 @@ export class Agent {
     uiStream: ReadableStream<InferUIMessageChunk<ChatMessage>>,
     onNewMessage?: (messageId: string) => void,
   ) {
+    if (!this.karton?.state.workspace?.agentChat?.activeChatId) return;
+
     for await (const uiMessage of readUIMessageStream<ChatMessage>({
       stream: uiStream,
     })) {
