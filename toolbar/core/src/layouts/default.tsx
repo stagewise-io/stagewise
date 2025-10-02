@@ -15,14 +15,7 @@ import {
   ResizableHandle,
 } from '@stagewise/stage-ui/components/resizable';
 import { Button } from '@stagewise/stage-ui/components/button';
-import {
-  AlertTriangleIcon,
-  ArrowRight,
-  CogIcon,
-  Loader2Icon,
-  MessageCircleIcon,
-  UserIcon,
-} from 'lucide-react';
+import { CogIcon, Loader2Icon, MessageCircleIcon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import {
   Popover,
@@ -38,6 +31,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { NotificationToaster } from './notification-toaster';
+import { FooterBar } from './sections/footer-bar';
 
 export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
   const { leftPanelContent, toggleLeftPanel } = usePanels();
@@ -67,10 +61,9 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
       title: 'Select a workspace',
       description: 'Select a workspace to load',
       type: 'directory',
-      multiple: true,
+      multiple: false,
     })
       .then(async (path) => {
-        console.log('Selected path:', path);
         if (workspace) {
           await closeWorkspace();
         }
@@ -262,15 +255,7 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
       </div>
 
       {/* Bottom footer area */}
-      <div className="flex min-h-0 flex-row items-stretch justify-between pt-2">
-        {/* Lower left control area */}
-        <div className="flex flex-1 basis-1/3 flex-row items-center justify-start" />
-
-        {/* Lower right status area */}
-        <div className="flex flex-1 basis-1/3 flex-row items-center justify-end gap-2">
-          <UserStatusArea />
-        </div>
-      </div>
+      <FooterBar />
 
       <AuthDialog />
       <FilePickerDialog />
@@ -309,69 +294,4 @@ function OpenPanel() {
   }, [leftPanelContent, leftPanelPluginName, plugins]);
 
   return panelContent;
-}
-
-function UserStatusArea() {
-  const userAccount = useKartonState((s) => s.userAccount);
-  const startLogin = useKartonProcedure((p) => p.userAccount.startLogin);
-  const logout = useKartonProcedure((p) => p.userAccount.logout);
-
-  // If the user isn't authenticated, we show a primary button that leads to a login session.
-  // If the user is already logged in, we show a small button that simply reports the user's email.
-  // Additionally, a warning should be shown, if the user's subscription is expired etc.
-  // When a user is signed in but is under free access and reached the limits,
-  // show a button that leads to the billing page where users can pay for the subscription
-  // to get more access
-
-  if (userAccount.status === 'unauthenticated') {
-    return (
-      <Button
-        variant="primary"
-        size="xs"
-        className="rounded-full"
-        onClick={() => void startLogin()}
-      >
-        <span className="-ml-1.5 mr-1 rounded-full bg-white/80 px-1 text-primary">
-          Free
-        </span>{' '}
-        Sign in <ArrowRight className="size-3" />
-      </Button>
-    );
-  }
-
-  if (userAccount.status === 'authenticated') {
-    // Clicking this should show a bit more information on the user's account.
-    return (
-      <Button
-        variant="secondary"
-        size="xs"
-        className="rounded-full"
-        onClick={() => void logout()}
-      >
-        <UserIcon className="size-3" />
-        {userAccount.user?.email ?? 'Unknown email'}
-      </Button>
-    );
-  }
-
-  if (userAccount.status === 'authentication_invalid') {
-    // Cicking this should show a dialog with information on this.
-    // From the dialog, a re-authentication should be triggerable.
-    return (
-      <Button variant="warning" size="xs" className="rounded-full">
-        <AlertTriangleIcon className="size-3" />
-        Authentication invalid
-      </Button>
-    );
-  }
-
-  if (userAccount.status === 'server_unreachable') {
-    // Clicking this should show a dialog with information on this.
-    return (
-      <Button variant="warning" size="xs" className="rounded-full">
-        <AlertTriangleIcon className="size-3" />
-        Server unreachable
-      </Button>
-    );
-  }
 }

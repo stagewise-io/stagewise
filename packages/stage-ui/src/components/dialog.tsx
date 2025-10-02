@@ -1,13 +1,15 @@
 import { Dialog as BaseDialog } from '@base-ui-components/react/dialog';
 import { cn } from '../lib/utils';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactElement } from 'react';
 import { Button } from './button';
 import { XIcon } from 'lucide-react';
 
 export const Dialog = BaseDialog.Root;
 
 export const DialogTrigger = ({ children }: { children: React.ReactNode }) => {
-  return <BaseDialog.Trigger render={() => <>{children}</>} />;
+  return (
+    <BaseDialog.Trigger render={children as unknown as () => ReactElement} />
+  );
 };
 
 export type DialogContentProps = ComponentProps<typeof BaseDialog.Popup>;
@@ -22,7 +24,7 @@ export const DialogContent = ({
       <BaseDialog.Popup
         {...props}
         className={cn(
-          '-translate-x-1/2 -translate-y-1/2 glass-body fixed top-1/2 left-1/2 flex h-full w-full flex-col items-stretch gap-2 rounded-2xl bg-white/60 p-4 shadow-xl backdrop-blur-lg duration-300 ease-out sm:h-fit sm:w-fit sm:min-w-lg md:min-w-xl',
+          '-translate-x-1/2 -translate-y-1/2 glass-body fixed top-1/2 left-1/2 flex h-full w-full flex-col items-stretch gap-2 rounded-2xl bg-white/60 p-4 shadow-xl backdrop-blur-lg duration-150 ease-out data-[ending-style]:origin-top data-[starting-style]:origin-bottom data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm sm:h-fit sm:w-fit sm:min-w-lg md:min-w-xl',
           className,
         )}
       >
@@ -105,7 +107,7 @@ export const DialogFooter = ({
   return (
     <div
       className={cn(
-        'mt-1 flex flex-row items-center justify-end gap-2',
+        'mt-1 flex flex-row-reverse items-center justify-start gap-2',
         className,
       )}
       {...props}

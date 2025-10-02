@@ -71,7 +71,7 @@ const MAX_RECURSION_DEPTH = 20;
 
 export class Agent {
   private static instance: Agent;
-  private callbacks: AgentCallbacks;
+  private karton: KartonServer<KartonContract> | null = null;
   private clientRuntime: ClientRuntime;
   private tools: Tools;
   private client: TRPCClient<AppRouter>;
@@ -104,7 +104,6 @@ export class Agent {
     refreshToken: string;
     onEvent?: AgentEventCallback;
     agentTimeout?: number;
-    callbacks: AgentCallbacks;
   }) {
     this.clientRuntime = config.clientRuntime;
     this.tools = config.tools;
@@ -115,7 +114,6 @@ export class Agent {
     this.initializeLitellm();
     this.agentTimeout = config.agentTimeout || DEFAULT_AGENT_TIMEOUT;
     this.timeoutManager = new TimeoutManager();
-    this.callbacks = config.callbacks;
     this.abortController = new AbortController();
     this.abortController.signal.addEventListener(
       'abort',
@@ -123,7 +121,7 @@ export class Agent {
         this.cleanupPendingOperations(
           'Agent call aborted',
           false,
-          this.callbacks.getState().activeChatId || undefined,
+          this.karton?.state.activeChatId || undefined,
         );
       },
       { once: true },
@@ -150,6 +148,7 @@ export class Agent {
    * @param isWorking - The new state to set
    */
   private setAgentWorking(isWorking: boolean): void {
+    if (!this.karton) return;
     this.timeoutManager.clear('is-working');
     this.isWorking = isWorking;
 
@@ -164,7 +163,7 @@ export class Agent {
       );
     }
 
-    this.callbacks.setState((draft) => {
+    this.karton.setState((draft) => {
       draft.isWorking = isWorking;
     });
     this.eventEmitter.emit(
@@ -185,7 +184,7 @@ export class Agent {
   ): void {
     // Clean up any pending tool calls if chatId is provided
     if (chatId && this.lastMessageId) {
-      const pendingToolCalls = findPendingToolCalls(this.callbacks, chatId);
+      const pendingToolCalls = findPendingToolCalls(this.karton!, chatId);
       if (pendingToolCalls.length > 0) {
         const abortedResults: ToolCallProcessingResult[] = pendingToolCalls.map(
           ({ toolCallId }) => ({
@@ -201,7 +200,7 @@ export class Agent {
 
         // Attach the aborted results to the message
         attachToolOutputToMessage(
-          this.callbacks,
+          this.karton!,
           abortedResults,
           this.lastMessageId,
         );
@@ -236,7 +235,6 @@ export class Agent {
     refreshToken: string;
     onEvent?: AgentEventCallback;
     agentTimeout?: number;
-    callbacks: AgentCallbacks;
   }) {
     const {
       clientRuntime,
@@ -245,7 +243,6 @@ export class Agent {
       refreshToken,
       onEvent,
       agentTimeout,
-      callbacks,
     } = config;
     if (!Agent.instance) {
       Agent.instance = new Agent({
@@ -255,19 +252,20 @@ export class Agent {
         refreshToken,
         onEvent,
         agentTimeout,
-        callbacks,
       });
     }
     return Agent.instance;
   }
 
   /**
-   * Returns the agent procedures for the karton server
-   * @returns The procedures to be used by the karton server
+   * Initialize the agent
+   * @returns The WebSocket server instance
    */
-  public getAgentProcedures(): AgentProcedures {
-    return (
-      {
+  public async initialize(): Promise<{
+    wss: Awaited<ReturnType<typeof createKartonServer<KartonContract>>>['wss'];
+  }> {
+    this.karton = await createKartonServer<KartonContract>({
+      procedures: {
         undoToolCallsUntilUserMessage: async (userMessageId, chatId) => {
           await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
         },
@@ -278,7 +276,7 @@ export class Agent {
         },
         retrySendingUserMessage: async () => {
           this.setAgentWorking(true);
-          this.callbacks.setState((draft) => {
+          this.karton?.setState((draft) => {
             // remove any errors
             draft.chats[draft.activeChatId!]!.error = undefined;
           });
@@ -289,10 +287,11 @@ export class Agent {
           if (projectPathPromptSnippet) {
             promptSnippets.push(projectPathPromptSnippet);
           }
-          const state = this.callbacks.getState();
           await this.callAgent({
-            chatId: state.activeChatId!,
-            history: state.chats[state.activeChatId!]!.messages,
+            chatId: this.karton!.state.activeChatId!,
+            history:
+              this.karton!.state.chats[this.karton!.state.activeChatId!]!
+                .messages,
             clientRuntime: this.clientRuntime,
             promptSnippets,
           });
@@ -302,7 +301,7 @@ export class Agent {
           this.client?.subscription.getSubscription
             .query()
             .then((subscription) => {
-              this.callbacks.setState((draft) => {
+              this.karton?.setState((draft) => {
                 draft.subscription = subscription;
               });
             })
@@ -314,12 +313,38 @@ export class Agent {
           this.abortController.abort();
           this.abortController = new AbortController();
           this.abortController.signal.addEventListener(
-          'abort',
-          () => {
-            this.cleanupPendingOperations(
-              'Agent call aborted',
-              false,
-              this.callbacks.getState().activeChatId || undefined,
+            'abort',
+            () => {
+              this.cleanupPendingOperations(
+                'Agent call aborted',
+                false,
+                this.karton?.state.activeChatId || undefined,
+              );
+            },
+            { once: true },
+          );
+        },
+        approveToolCall: async (_toolCallId, _callingClientId) => {},
+        rejectToolCall: async (_toolCallId, _callingClientId) => {},
+        createChat: async () => {
+          return createAndActivateNewChat(this.karton!);
+        },
+        switchChat: async (chatId, _callingClientId) => {
+          this.karton?.setState((draft) => {
+            draft.activeChatId = chatId;
+          });
+          Object.entries(this.karton!.state.chats).forEach(([id, chat]) => {
+            if (chat.messages.length === 0 && id !== chatId)
+              this.karton?.setState((draft) => {
+                delete draft.chats[id];
+              });
+          });
+        },
+        deleteChat: async (chatId, _callingClientId) => {
+          // if the active chat is being deleted, figure out which chat to switch to
+          if (this.karton!.state.activeChatId === chatId) {
+            const nextChatId = Object.keys(this.karton!.state.chats).find(
+              (id) => id !== chatId,
             );
             // if there are no other chats, create a new one
             if (!nextChatId) createAndActivateNewChat(this.karton!);
@@ -369,516 +394,421 @@ export class Agent {
           );
         },
       },
-      approveToolCall
-    );
-    : async (_toolCallId, _callingClientId) =>
-    ,
-      rejectToolCall: async (_toolCallId, _callingClientId) =>
-    ,
-      createChat: async () =>
-    return createAndActivateNewChat(this.callbacks);
-    ,
-      switchChat: async (chatId, _callingClientId) =>
-    {
-      this.callbacks.setState((draft) => {
-        draft.activeChatId = chatId;
-      });
-      const state = this.callbacks.getState();
-      Object.entries(state.chats).forEach(([id, chat]) => {
-        if (chat && chat.messages.length === 0 && id !== chatId)
-          this.callbacks.setState((draft) => {
-            delete draft.chats[id];
-          });
-      });
-    }
-    ,
-      deleteChat: async (chatId, _callingClientId) =>
-    {
-      const state = this.callbacks.getState();
-      // if the active chat is being deleted, figure out which chat to switch to
-      if (state.activeChatId === chatId) {
-        const nextChatId = Object.keys(state.chats).find((id) => id !== chatId);
-        // if there are no other chats, create a new one
-        if (!nextChatId) createAndActivateNewChat(this.callbacks);
-        // if there are other chats, switch to the next one
-        else
-          this.callbacks.setState((draft) => {
-            draft.activeChatId = nextChatId;
-          });
-      }
-      // finally delete the chat
-      this.callbacks.setState((draft) => {
-        delete draft.chats[chatId];
-      });
-    }
-    ,
-      sendUserMessage: async (message, _callingClientId) =>
-    {
-      this.setAgentWorking(true);
-      const newstate = this.callbacks.setState((draft) => {
-        const state = this.callbacks.getState();
-        const chatId = state.activeChatId!;
-        draft.chats[chatId]!.messages.push(message as any); // TODO: fix the type issue here
-        draft.chats[chatId]!.error = undefined;
-      });
-      const messages = newstate?.chats[newstate.activeChatId!]!.messages;
-      const promptSnippets: PromptSnippet[] = [];
-      const projectPathPromptSnippet = await getProjectPath(
-          this.clientRuntime,
-        );
-      if (projectPathPromptSnippet) {
-        promptSnippets.push(projectPathPromptSnippet);
-      }
-      const projectInfoPromptSnippet = await getProjectInfo(
-          this.clientRuntime,
-        );
-      if (projectInfoPromptSnippet) {
-        promptSnippets.push(projectInfoPromptSnippet);
-      }
-      const state = this.callbacks.getState();
-      this.callAgent({
-        chatId: state.activeChatId!,
-        history: messages,
-        clientRuntime: this.clientRuntime,
-        promptSnippets,
-      }).then(() => {
-        this.setAgentWorking(false);
-      });
-    }
-    ,
-      assistantMadeCodeChangesUntilLatestUserMessage: async (chatId) =>
-    return await this.assistantMadeCodeChangesUntilLatestUserMessage(
-          chatId,
-        );
-    ,
-  }
-}
-
-/**
- * Initialize the agent
- */
-public
-async;
-initialize();
-: Promise<void>
-{
-  this.client?.subscription.getSubscription
-    .query()
-    .then((subscription) => {
-      this.callbacks.setState((draft) => {
-        draft.subscription = subscription;
-      });
-    })
-    .catch((_) => {
-      // ignore errors here, there's a default credit amount
+      initialState: {
+        activeChatId: null,
+        chats: {},
+        isWorking: false,
+        toolCallApprovalRequests: [],
+        subscription: undefined,
+      },
     });
 
-  this.setAgentWorking(false);
-  createAndActivateNewChat(this.callbacks);
-}
+    this.client?.subscription.getSubscription
+      .query()
+      .then((subscription) => {
+        this.karton?.setState((draft) => {
+          draft.subscription = subscription;
+        });
+      })
+      .catch((_) => {
+        // ignore errors here, there's a default credit amount
+      });
 
-/**
- * Calls the agent API
- * @param userMessage - The user message to send to the agent
- * @param history - The history of messages so far (NOT including the current user message - past user messages are included)
- * @param clientRuntime - The file-system client runtime to use (e.g. VSCode, CLI)
- * @param promptSnippets - Prompt snippets to append
- */
-private
-async;
-callAgent({
+    this.setAgentWorking(false);
+    createAndActivateNewChat(this.karton);
+
+    return {
+      wss: this.karton.wss,
+    };
+  }
+
+  /**
+   * Calls the agent API
+   * @param userMessage - The user message to send to the agent
+   * @param history - The history of messages so far (NOT including the current user message - past user messages are included)
+   * @param clientRuntime - The file-system client runtime to use (e.g. VSCode, CLI)
+   * @param promptSnippets - Prompt snippets to append
+   */
+  private async callAgent({
     chatId,
     history,
     clientRuntime,
     promptSnippets,
   }: {
     chatId: string;
-history?: History;
-clientRuntime: ClientRuntime;
-promptSnippets?: PromptSnippet[];
-}): Promise<void>
-{
-  if (!this.undoToolCallStack.has(chatId))
-    this.undoToolCallStack.set(chatId, []);
+    history?: History;
+    clientRuntime: ClientRuntime;
+    promptSnippets?: PromptSnippet[];
+  }): Promise<void> {
+    if (!this.undoToolCallStack.has(chatId))
+      this.undoToolCallStack.set(chatId, []);
 
-  // Check recursion depth
-  if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
-    const errorDesc = ErrorDescriptions.recursionDepthExceeded(
-      this.recursionDepth,
-      MAX_RECURSION_DEPTH,
-    );
-    this.setAgentWorking(false);
-    this.callbacks.setState((draft) => {
-      draft.chats[chatId]!.error = {
-        type: AgentErrorType.AGENT_ERROR,
-        error: new Error(errorDesc),
-      };
-    });
-    return;
-  }
-
-  this.recursionDepth++;
-
-  try {
-    const lastMessage = history?.at(-1);
-    const isUserMessage = lastMessage?.metadata?.browserData !== undefined;
-    const isFirstUserMessage =
-      history?.filter((m) => m.metadata?.browserData !== undefined).length ===
-      1;
-    const lastMessageMetadata = isUserMessage
-      ? {
-          isUserMessage: true as const,
-          message: lastMessage,
-        }
-      : {
-          isUserMessage: false as const,
-          message: lastMessage,
-        };
-
-    // Prepare update to the chat title
-    if (isFirstUserMessage && lastMessageMetadata.isUserMessage) {
-      const title = await generateChatTitle(
-        history,
-        this.litellm('gemini-2.5-flash'),
+    // Check recursion depth
+    if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
+      const errorDesc = ErrorDescriptions.recursionDepthExceeded(
+        this.recursionDepth,
+        MAX_RECURSION_DEPTH,
       );
-
+      this.setAgentWorking(false);
       this.karton?.setState((draft) => {
-        // chat could've been deleted in the meantime
-        const chatExists = draft.chats[chatId] !== undefined;
-        if (chatExists) draft.chats[chatId]!.title = title;
+        draft.chats[chatId]!.error = {
+          type: AgentErrorType.AGENT_ERROR,
+          error: new Error(errorDesc),
+        };
       });
+      return;
     }
 
-    // Emit prompt triggered event
+    this.recursionDepth++;
 
-    if (lastMessageMetadata.isUserMessage)
-      this.eventEmitter.emit(
-        EventFactories.agentPromptTriggered(
-          lastMessageMetadata.message,
-          promptSnippets?.length || 0,
-        ),
-      );
+    try {
+      const lastMessage = history?.at(-1);
+      const isUserMessage = lastMessage?.metadata?.browserData !== undefined;
+      const isFirstUserMessage =
+        history?.filter((m) => m.metadata?.browserData !== undefined).length ===
+        1;
+      const lastMessageMetadata = isUserMessage
+        ? {
+            isUserMessage: true as const,
+            message: lastMessage,
+          }
+        : {
+            isUserMessage: false as const,
+            message: lastMessage,
+          };
 
-    const prompts = new XMLPrompts();
-    const systemPrompt = prompts.getSystemPrompt({
-      userMessageMetadata: lastMessageMetadata.message?.metadata,
-      promptSnippets,
-    });
+      // Prepare update to the chat title
+      if (isFirstUserMessage && lastMessageMetadata.isUserMessage) {
+        const title = await generateChatTitle(
+          history,
+          this.litellm('gemini-2.5-flash'),
+        );
 
-    const stream = streamText({
-      model: this.litellm('claude-sonnet-4-20250514'),
-      abortSignal: this.abortController.signal,
-      temperature: 0.7,
-      maxOutputTokens: 10000,
-      maxRetries: 0,
-      providerOptions: {
-        anthropic: {
-          thinking: { type: 'enabled', budgetTokens: 10000 },
-        } satisfies AnthropicProviderOptions,
-      },
-      messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
-      onError: async (error) => {
-        if (isAbortError(error.error)) {
+        this.karton?.setState((draft) => {
+          // chat could've been deleted in the meantime
+          const chatExists = draft.chats[chatId] !== undefined;
+          if (chatExists) draft.chats[chatId]!.title = title;
+        });
+      }
+
+      // Emit prompt triggered event
+
+      if (lastMessageMetadata.isUserMessage)
+        this.eventEmitter.emit(
+          EventFactories.agentPromptTriggered(
+            lastMessageMetadata.message,
+            promptSnippets?.length || 0,
+          ),
+        );
+
+      const prompts = new XMLPrompts();
+      const systemPrompt = prompts.getSystemPrompt({
+        userMessageMetadata: lastMessageMetadata.message?.metadata,
+        promptSnippets,
+      });
+
+      const stream = streamText({
+        model: this.litellm('claude-sonnet-4-20250514'),
+        abortSignal: this.abortController.signal,
+        temperature: 0.7,
+        maxOutputTokens: 10000,
+        maxRetries: 0,
+        providerOptions: {
+          anthropic: {
+            thinking: { type: 'enabled', budgetTokens: 10000 },
+          } satisfies AnthropicProviderOptions,
+        },
+        messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
+        onError: async (error) => {
+          if (isAbortError(error.error)) {
+            this.authRetryCount = 0;
+            this.cleanupPendingOperations('Agent call aborted');
+          } else if (isPlanLimitsExceededError(error.error)) {
+            const planLimitsExceededError = isPlanLimitsExceededError(
+              error.error,
+            ) as PlanLimitsExceededError;
+            this.authRetryCount = 0;
+            this.eventEmitter.emit(
+              EventFactories.planLimitsExceeded(
+                this.karton?.state.subscription,
+              ),
+            );
+            this.karton?.setState((draft) => {
+              draft.chats[chatId]!.error = {
+                type: AgentErrorType.PLAN_LIMITS_EXCEEDED,
+                error: {
+                  name: 'Plan limit exceeded',
+                  message: `Plan limit exceeded, please wait ${planLimitsExceededError.data.cooldownMinutes} minutes before your next request.`,
+                  isPaidPlan: planLimitsExceededError.data.isPaidPlan || false,
+                  cooldownMinutes: planLimitsExceededError.data.cooldownMinutes,
+                },
+              };
+            });
+            this.cleanupPendingOperations('Plan limits exceeded');
+            return;
+          } else if (isAuthenticationError(error.error)) {
+            // refresh token and call agent again with retry limit
+            if (this.authRetryCount < this.maxAuthRetries) {
+              this.authRetryCount++;
+              const { accessToken, refreshToken } =
+                await this.client.session.refreshToken.mutate({
+                  refreshToken: this.refreshToken!,
+                });
+              this.accessToken = accessToken;
+              this.refreshToken = refreshToken;
+              this.client = createAuthenticatedClient(this.accessToken);
+              this.initializeLitellm();
+              await this.callAgent({
+                chatId,
+                history: this.karton?.state.chats[chatId]!.messages,
+                clientRuntime,
+                promptSnippets,
+              });
+              return;
+            } else {
+              // Max retries exceeded
+              this.authRetryCount = 0;
+              this.setAgentWorking(false);
+              this.karton?.setState((draft) => {
+                draft.chats[chatId]!.error = {
+                  type: AgentErrorType.AGENT_ERROR,
+                  error: new Error(
+                    'Authentication failed, please restart the cli.',
+                  ),
+                };
+              });
+              return;
+            }
+          } else if (isInsufficientCreditsError(error.error)) {
+            this.authRetryCount = 0;
+            this.eventEmitter.emit(
+              EventFactories.creditsInsufficient(
+                this.karton?.state.subscription,
+              ),
+            );
+            this.setAgentWorking(false);
+            this.karton?.setState((draft) => {
+              draft.chats[chatId]!.error = {
+                type: AgentErrorType.INSUFFICIENT_CREDITS,
+                error: {
+                  name: 'Insufficient credits',
+                  message: 'Insufficient credits',
+                },
+              };
+            });
+            return;
+          } else throw error.error;
+        },
+        tools: cliToolsWithoutExecute(clientRuntime),
+        onAbort: () => {
           this.authRetryCount = 0;
           this.cleanupPendingOperations('Agent call aborted');
-        } else if (isPlanLimitsExceededError(error.error)) {
-          const planLimitsExceededError = isPlanLimitsExceededError(
-            error.error,
-          ) as PlanLimitsExceededError;
+        },
+        onFinish: async (r) => {
           this.authRetryCount = 0;
-          this.eventEmitter.emit(
-            EventFactories.planLimitsExceeded(this.karton?.state.subscription),
+          const toolResults = await processParallelToolCalls(
+            r.toolCalls,
+            this.tools,
+            this.karton?.state.chats[chatId]!.messages ?? [],
+            this.timeoutManager,
+            (result) => {
+              if (result.result?.undoExecute) {
+                this.undoToolCallStack.get(chatId)?.push({
+                  toolCallId: result.toolCallId,
+                  undoExecute: result.result?.undoExecute,
+                });
+              }
+              attachToolOutputToMessage(
+                this.karton!,
+                [result],
+                this.lastMessageId!,
+              );
+            },
           );
-          this.karton?.setState((draft) => {
-            draft.chats[chatId]!.error = {
-              type: AgentErrorType.PLAN_LIMITS_EXCEEDED,
-              error: {
-                name: 'Plan limit exceeded',
-                message: `Plan limit exceeded, please wait ${planLimitsExceededError.data.cooldownMinutes} minutes before your next request.`,
-                isPaidPlan: planLimitsExceededError.data.isPaidPlan || false,
-                cooldownMinutes: planLimitsExceededError.data.cooldownMinutes,
-              },
-            };
-          });
-          this.cleanupPendingOperations('Plan limits exceeded');
-          return;
-        } else if (isAuthenticationError(error.error)) {
-          // refresh token and call agent again with retry limit
-          if (this.authRetryCount < this.maxAuthRetries) {
-            this.authRetryCount++;
-            const { accessToken, refreshToken } =
-              await this.client.session.refreshToken.mutate({
-                refreshToken: this.refreshToken!,
-              });
-            this.accessToken = accessToken;
-            this.refreshToken = refreshToken;
-            this.client = createAuthenticatedClient(this.accessToken);
-            this.initializeLitellm();
-            await this.callAgent({
+
+          if (toolResults.length > 0) {
+            return this.callAgent({
               chatId,
               history: this.karton?.state.chats[chatId]!.messages,
               clientRuntime,
               promptSnippets,
             });
-            return;
-          } else {
-            // Max retries exceeded
-            this.authRetryCount = 0;
-            this.setAgentWorking(false);
-            this.karton?.setState((draft) => {
-              draft.chats[chatId]!.error = {
-                type: AgentErrorType.AGENT_ERROR,
-                error: new Error(
-                  'Authentication failed, please restart the cli.',
-                ),
-              };
-            });
-            return;
           }
-        } else if (isInsufficientCreditsError(error.error)) {
-          this.authRetryCount = 0;
-          this.eventEmitter.emit(
-            EventFactories.creditsInsufficient(this.karton?.state.subscription),
+
+          this.cleanupPendingOperations(
+            'Agent task completed successfully',
+            false,
           );
-          this.setAgentWorking(false);
-          this.karton?.setState((draft) => {
-            draft.chats[chatId]!.error = {
-              type: AgentErrorType.INSUFFICIENT_CREDITS,
-              error: {
-                name: 'Insufficient credits',
-                message: 'Insufficient credits',
-              },
-            };
-          });
-          return;
-        } else throw error.error;
-      },
-      tools: cliToolsWithoutExecute(clientRuntime),
-      onAbort: () => {
-        this.authRetryCount = 0;
-        this.cleanupPendingOperations('Agent call aborted');
-      },
-      onFinish: async (r) => {
-        this.authRetryCount = 0;
-        const toolResults = await processParallelToolCalls(
-          r.toolCalls,
-          this.tools,
-          this.karton?.state.chats[chatId]!.messages ?? [],
-          this.timeoutManager,
-          (result) => {
-            if (result.result?.undoExecute) {
-              this.undoToolCallStack.get(chatId)?.push({
-                toolCallId: result.toolCallId,
-                undoExecute: result.result?.undoExecute,
-              });
-            }
-            attachToolOutputToMessage(
-              this.karton!,
-              [result],
-              this.lastMessageId!,
-            );
-          },
-        );
-
-        if (toolResults.length > 0) {
-          return this.callAgent({
-            chatId,
-            history: this.karton?.state.chats[chatId]!.messages,
-            clientRuntime,
-            promptSnippets,
-          });
-        }
-
-        this.cleanupPendingOperations(
-          'Agent task completed successfully',
-          false,
-        );
-      },
-    });
-
-    const uiMessages = stream.toUIMessageStream({
-      generateMessageId: generateId,
-    }) as AsyncIterableStream<InferUIMessageChunk<ChatMessage>>;
-
-    await this.parseUiStream(uiMessages, (messageId) => {
-      this.lastMessageId = messageId;
-    });
-  } catch (error) {
-    const errorDesc = formatErrorDescription('Agent failed', error);
-    this.setAgentWorking(false);
-    this.callbacks.setState((draft) => {
-      draft.chats[chatId]!.error = {
-        type: AgentErrorType.AGENT_ERROR,
-        error: new Error(errorDesc),
-      };
-    });
-
-    return;
-  } finally {
-    // Ensure recursion depth is decremented
-    this.recursionDepth = Math.max(0, this.recursionDepth - 1);
-    // Clear the message ID if we're back to the top level
-    if (this.recursionDepth === 0) {
-      this.lastMessageId = null;
-    }
-  }
-}
-
-private
-async;
-parseUiStream(
-    uiStream: ReadableStream<InferUIMessageChunk<ChatMessage>>,
-    onNewMessage?: (messageId: string) => void,
-  )
-{
-  for await (const uiMessage of readUIMessageStream<ChatMessage>({
-    stream: uiStream,
-  })) {
-    const messageExists =
-      this.karton?.state.activeChatId &&
-      this.karton.state.chats[this.karton.state.activeChatId]?.messages.find(
-        (m) => m.id === uiMessage.id,
-      );
-    const uiMessageWithMetadata: ChatMessage = {
-      ...uiMessage,
-      metadata: { ...(uiMessage.metadata ?? {}), createdAt: new Date() },
-    };
-
-    if (messageExists) {
-      this.karton!.setState((draft) => {
-        draft.chats[draft.activeChatId!]!.messages = draft.chats[
-          draft.activeChatId!
-        ]!.messages.map((m) =>
-          m.id === uiMessage.id
-            ? (uiMessageWithMetadata as ChatMessage)
-            : (m as any),
-        );
+        },
       });
-    } else {
-      onNewMessage?.(uiMessage.id);
-      this.karton!.setState((draft) => {
-        draft.chats[draft.activeChatId!]!.messages.push(
-          uiMessageWithMetadata as any,
-        );
-      });
-    }
-  }
-}
 
-/**
- * Checks if the chat has code changes
- * @param chatId - The id of the chat
- * @returns True if the chat has code changes, false otherwise
- */
-private
-async;
-assistantMadeCodeChangesUntilLatestUserMessage(
-    chatId: string,
-  )
-: Promise<boolean>
-{
-  const state = this.callbacks.getState();
-  const chat = state.chats[chatId];
-  const history = chat?.messages ?? [];
-  const reversedHistory = [...history].reverse();
-  const userMessageIndex = reversedHistory.findIndex(
-    (m) => m.role === 'user' && 'id' in m,
-  );
-  let hasMadeCodeChanges = false;
-  for (let i = 0; i < userMessageIndex; i++) {
-    const message = reversedHistory[i]!;
-    for (const part of message.parts) {
-      if (isToolCallType(part.type)) {
-        const toolCall = part as ToolUIPart<UITools>;
-        if (toolCall.output?.diff) {
-          hasMadeCodeChanges = true;
-          break;
-        }
+      const uiMessages = stream.toUIMessageStream({
+        generateMessageId: generateId,
+      }) as AsyncIterableStream<InferUIMessageChunk<ChatMessage>>;
+
+      await this.parseUiStream(uiMessages, (messageId) => {
+        this.lastMessageId = messageId;
+      });
+    } catch (error) {
+      const errorDesc = formatErrorDescription('Agent failed', error);
+      this.setAgentWorking(false);
+      this.karton?.setState((draft) => {
+        draft.chats[chatId]!.error = {
+          type: AgentErrorType.AGENT_ERROR,
+          error: new Error(errorDesc),
+        };
+      });
+
+      return;
+    } finally {
+      // Ensure recursion depth is decremented
+      this.recursionDepth = Math.max(0, this.recursionDepth - 1);
+      // Clear the message ID if we're back to the top level
+      if (this.recursionDepth === 0) {
+        this.lastMessageId = null;
       }
     }
   }
-  return hasMadeCodeChanges;
-}
 
-/**
- * Undoes all tool calls until the latest user message is reached
- * @param chatId - The id of the chat
- */
-private
-async;
-undoToolCallsUntilLatestUserMessage(
+  private async parseUiStream(
+    uiStream: ReadableStream<InferUIMessageChunk<ChatMessage>>,
+    onNewMessage?: (messageId: string) => void,
+  ) {
+    for await (const uiMessage of readUIMessageStream<ChatMessage>({
+      stream: uiStream,
+    })) {
+      const messageExists =
+        this.karton?.state.activeChatId &&
+        this.karton.state.chats[this.karton.state.activeChatId]?.messages.find(
+          (m) => m.id === uiMessage.id,
+        );
+      const uiMessageWithMetadata: ChatMessage = {
+        ...uiMessage,
+        metadata: { ...(uiMessage.metadata ?? {}), createdAt: new Date() },
+      };
+
+      if (messageExists) {
+        this.karton!.setState((draft) => {
+          draft.chats[draft.activeChatId!]!.messages = draft.chats[
+            draft.activeChatId!
+          ]!.messages.map((m) =>
+            m.id === uiMessage.id
+              ? (uiMessageWithMetadata as ChatMessage)
+              : (m as any),
+          );
+        });
+      } else {
+        onNewMessage?.(uiMessage.id);
+        this.karton!.setState((draft) => {
+          draft.chats[draft.activeChatId!]!.messages.push(
+            uiMessageWithMetadata as any,
+          );
+        });
+      }
+    }
+  }
+
+  /**
+   * Checks if the chat has code changes
+   * @param chatId - The id of the chat
+   * @returns True if the chat has code changes, false otherwise
+   */
+  private async assistantMadeCodeChangesUntilLatestUserMessage(
     chatId: string,
-  )
-: Promise<ChatMessage | null>
-{
-  if (!this.undoToolCallStack.has(chatId)) return null;
-  const state = this.callbacks.getState();
-  const chat = state.chats[chatId];
-  const history = chat?.messages ?? [];
-  const reversedHistory = [...history].reverse();
-  const userMessageIndex = reversedHistory.findIndex(
-    (m) => m.role === 'user' && 'id' in m,
-  );
-  if (userMessageIndex === -1) return null;
-  const latestUserMessage = reversedHistory[userMessageIndex]!;
-  await this.undoToolCallsUntilUserMessage(
-    reversedHistory[userMessageIndex]!.id,
-    chatId,
-  );
-  return latestUserMessage;
-}
+  ): Promise<boolean> {
+    const chat = this.karton?.state.chats[chatId];
+    const history = chat?.messages ?? [];
+    const reversedHistory = [...history].reverse();
+    const userMessageIndex = reversedHistory.findIndex(
+      (m) => m.role === 'user' && 'id' in m,
+    );
+    let hasMadeCodeChanges = false;
+    for (let i = 0; i < userMessageIndex; i++) {
+      const message = reversedHistory[i]!;
+      for (const part of message.parts) {
+        if (isToolCallType(part.type)) {
+          const toolCall = part as ToolUIPart<UITools>;
+          if (toolCall.output?.diff) {
+            hasMadeCodeChanges = true;
+            break;
+          }
+        }
+      }
+    }
+    return hasMadeCodeChanges;
+  }
 
-/**
- * Undoes all tool calls until the user message is reached
- * @param userMessageId - The id of the user message
- * @param chatId - The id of the chat
- */
-private
-async;
-undoToolCallsUntilUserMessage(
+  /**
+   * Undoes all tool calls until the latest user message is reached
+   * @param chatId - The id of the chat
+   */
+  private async undoToolCallsUntilLatestUserMessage(
+    chatId: string,
+  ): Promise<ChatMessage | null> {
+    if (!this.undoToolCallStack.has(chatId)) return null;
+    const chat = this.karton?.state.chats[chatId];
+    const history = chat?.messages ?? [];
+    const reversedHistory = [...history].reverse();
+    const userMessageIndex = reversedHistory.findIndex(
+      (m) => m.role === 'user' && 'id' in m,
+    );
+    if (userMessageIndex === -1) return null;
+    const latestUserMessage = reversedHistory[userMessageIndex]!;
+    await this.undoToolCallsUntilUserMessage(
+      reversedHistory[userMessageIndex]!.id,
+      chatId,
+    );
+    return latestUserMessage;
+  }
+
+  /**
+   * Undoes all tool calls until the user message is reached
+   * @param userMessageId - The id of the user message
+   * @param chatId - The id of the chat
+   */
+  private async undoToolCallsUntilUserMessage(
     userMessageId: string,
     chatId: string,
-  )
-: Promise<void>
-{
-  if (!this.undoToolCallStack.has(chatId)) return;
-  const state = this.callbacks.getState();
-  const chat = state.chats[chatId];
+  ): Promise<void> {
+    if (!this.undoToolCallStack.has(chatId)) return;
+    const chat = this.karton?.state.chats[chatId];
 
-  const history = chat?.messages ?? [];
-  const userMessageIndex = history.findIndex(
-    (m: ChatMessage) =>
-      m.role === 'user' && 'id' in m && m.id === userMessageId,
-  );
+    const history = chat?.messages ?? [];
+    const userMessageIndex = history.findIndex(
+      (m) => m.role === 'user' && 'id' in m && m.id === userMessageId,
+    );
 
-  // Get all messages that come after the user message
-  const messagesAfterUserMessage =
-    userMessageIndex !== -1 ? history.slice(userMessageIndex + 1) : [];
+    // Get all messages that come after the user message
+    const messagesAfterUserMessage =
+      userMessageIndex !== -1 ? history.slice(userMessageIndex + 1) : [];
 
-  const toolCallIdsAfterUserMessage: string[] = [];
-  for (const message of messagesAfterUserMessage) {
-    if (message.role !== 'assistant') continue;
-    for (const content of message.parts)
-      if (isToolCallType(content.type))
-        toolCallIdsAfterUserMessage.push((content as ToolUIPart).toolCallId);
-  }
-
-  const idsAfter = new Set(toolCallIdsAfterUserMessage);
-
-  while (
-    this.undoToolCallStack.get(chatId)?.at(-1)?.toolCallId &&
-    idsAfter.has(this.undoToolCallStack.get(chatId)?.at(-1)?.toolCallId!)
-  ) {
-    const undo = this.undoToolCallStack.get(chatId)?.pop();
-    if (!undo) break;
-    await undo.undoExecute?.();
-  }
-
-  // Keep messages up to user message
-  this.callbacks.setState((draft) => {
-    if (userMessageIndex !== -1) {
-      draft.chats[chatId]!.messages = history.slice(0, userMessageIndex) as any;
+    const toolCallIdsAfterUserMessage: string[] = [];
+    for (const message of messagesAfterUserMessage) {
+      if (message.role !== 'assistant') continue;
+      for (const content of message.parts)
+        if (isToolCallType(content.type))
+          toolCallIdsAfterUserMessage.push((content as ToolUIPart).toolCallId);
     }
-  });
-}
+
+    const idsAfter = new Set(toolCallIdsAfterUserMessage);
+
+    while (
+      this.undoToolCallStack.get(chatId)?.at(-1)?.toolCallId &&
+      idsAfter.has(this.undoToolCallStack.get(chatId)?.at(-1)?.toolCallId!)
+    ) {
+      const undo = this.undoToolCallStack.get(chatId)?.pop();
+      if (!undo) break;
+      await undo.undoExecute?.();
+    }
+
+    // Keep messages up to user message
+    this.karton?.setState((draft) => {
+      if (userMessageIndex !== -1) {
+        draft.chats[chatId]!.messages = history.slice(
+          0,
+          userMessageIndex,
+        ) as any;
+      }
+    });
+  }
 }

@@ -58,17 +58,17 @@ export function ChatErrorBubble({ error }: { error: AgentError }) {
   const errorMessage = useMemo(() => {
     switch (error.type) {
       case AgentErrorType.INSUFFICIENT_CREDITS:
-        return subscription?.hasSubscription
+        return subscription?.active
           ? needsExtraCreditsMessage
           : needsSubscriptionMessage;
       case AgentErrorType.PLAN_LIMITS_EXCEEDED:
-        return subscription?.hasSubscription
+        return subscription?.active
           ? paidPlanLimitExceededMessage(error.error.cooldownMinutes)
           : freeTrialPlanLimitExceededMessage(error.error.cooldownMinutes);
       default:
         return error.error.message;
     }
-  }, [error, subscription?.hasSubscription]);
+  }, [error, subscription?.active]);
 
   const isHandledError = useMemo(() => {
     return (

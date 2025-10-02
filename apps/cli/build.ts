@@ -128,9 +128,6 @@ const import_meta_url = require('url').pathToFileURL(__filename).href;
       // Copy toolbar dist to CLI dist
       copyToolbarDist(),
 
-      // Copy toolbar-bridged dist to CLI dist
-      copyToolbarBridgedDist(),
-
       // Copy bundled plugins to CLI dist
       copyBundledPlugins(),
     ]);
@@ -163,29 +160,6 @@ async function copyToolbarDist() {
   await cp(toolbarDistPath, targetPath, { recursive: true });
 
   console.log('Copied toolbar dist to dist/toolbar-app');
-}
-
-async function copyToolbarBridgedDist() {
-  const toolbarDistPath = resolve(
-    __dirname,
-    '../../toolbar/bridged/dist/toolbar-main',
-  );
-  const targetPath = resolve(__dirname, 'dist/toolbar-bridged');
-
-  // Check if toolbar dist exists
-  if (!existsSync(toolbarDistPath)) {
-    throw new Error(
-      'Toolbar bridged dist not found. Make sure to build @stagewise/toolbar-bridged first.',
-    );
-  }
-
-  // Create target directory
-  await mkdir(targetPath, { recursive: true });
-
-  // Copy toolbar dist contents
-  await cp(toolbarDistPath, targetPath, { recursive: true });
-
-  console.log('Copied toolbar dist to dist/toolbar-bridged');
 }
 
 async function copyBundledPlugins() {

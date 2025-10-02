@@ -44,7 +44,7 @@ export const PopoverContent = ({ children, ...props }: PopoverContentProps) => {
       <PopoverBase.Positioner sideOffset={4}>
         <PopoverBase.Popup
           {...props}
-          className="glass-body flex flex-col gap-2 rounded-2xl bg-white/40 p-3 shadow-lg backdrop-blur-sm transition-all duration-200 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm dark:bg-black/40"
+          className="glass-body flex flex-col gap-2 rounded-2xl bg-white/40 p-3 shadow-lg backdrop-blur-sm transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm dark:bg-black/40"
         >
           {children}
         </PopoverBase.Popup>
