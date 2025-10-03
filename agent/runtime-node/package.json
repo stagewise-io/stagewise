@@ -23,6 +23,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "chokidar": "^4.0.3",
     "ignore": "^7.0.5",
     "minimatch": "^9.0.5"
   },

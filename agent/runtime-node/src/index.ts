@@ -2,9 +2,11 @@ import { dirname, resolve, join, relative, extname } from 'node:path';
 import { promises as fs } from 'node:fs';
 import { minimatch } from 'minimatch';
 import ignore from 'ignore';
+import chokidar from 'chokidar';
 import {
   BaseFileSystemProvider,
   type ClientRuntime,
+  type FileChangeEvent,
   type GrepMatch,
   type GrepResult,
   type GlobResult,
@@ -31,9 +33,14 @@ const BINARY_DETECTION = {
  * IMPORTANT: All path parameters are expected to be relative paths.
  * The resolvePath method converts them to absolute paths using the working directory.
  */
+interface GitignoreInfo {
+  ignore: ReturnType<typeof ignore>;
+  directory: string;
+  patterns: string[];
+}
+
 export class NodeFileSystemProvider extends BaseFileSystemProvider {
-  private gitignore: ReturnType<typeof ignore> | null = null;
-  private gitignorePatterns: string[] = [];
+  private gitignoreMap: Map<string, GitignoreInfo> = new Map();
   private gitignoreInitialized = false;
 
   getCurrentWorkingDirectory(): string {
@@ -212,11 +219,6 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
         for (const entry of entries) {
           const entryPath = join(dirPath, entry.name);
           const relativePath = relative(fullPath, entryPath);
-          // For gitignore, paths must be relative to the repository root
-          const gitignoreRelativePath = relative(
-            this.config.workingDirectory,
-            entryPath,
-          );
 
           // Apply pattern filter if specified
           if (options?.pattern && !minimatch(relativePath, options.pattern)) {
@@ -225,8 +227,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
 
           // Check gitignore if enabled (default true)
           if (options?.respectGitignore !== false) {
-            await this.ensureGitignoreInitialized();
-            if (this.gitignore?.ignores(gitignoreRelativePath)) {
+            if (await this.isIgnored(entryPath)) {
               continue;
             }
           }
@@ -397,11 +398,6 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
         for (const entry of entries) {
           const fullPath = join(dirPath, entry.name);
           const relativePath = relative(basePath, fullPath);
-          // For gitignore, paths must be relative to the repository root
-          const gitignoreRelativePath = relative(
-            this.config.workingDirectory,
-            fullPath,
-          );
 
           // Check exclude patterns
           if (
@@ -412,8 +408,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
 
           // Check gitignore if enabled (default true)
           if (options?.respectGitignore !== false) {
-            await this.ensureGitignoreInitialized();
-            if (this.gitignore?.ignores(gitignoreRelativePath)) {
+            if (await this.isIgnored(fullPath)) {
               continue;
             }
           }
@@ -489,11 +484,6 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
         for (const entry of entries) {
           const fullPath = join(dirPath, entry.name);
           const relativePath = relative(basePath, fullPath);
-          // For gitignore, paths must be relative to the repository root
-          const gitignoreRelativePath = relative(
-            this.config.workingDirectory,
-            fullPath,
-          );
 
           // Check exclude patterns
           if (
@@ -504,8 +494,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
 
           // Check gitignore if enabled (default true)
           if (options?.respectGitignore !== false) {
-            await this.ensureGitignoreInitialized();
-            if (this.gitignore?.ignores(gitignoreRelativePath)) {
+            if (await this.isIgnored(fullPath)) {
               continue;
             }
           }
@@ -839,12 +828,77 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
 
   async getGitignorePatterns(): Promise<string[]> {
     await this.ensureGitignoreInitialized();
-    return this.gitignorePatterns;
+    // Return all patterns from all gitignore files
+    const allPatterns: string[] = [];
+    for (const info of this.gitignoreMap.values()) {
+      allPatterns.push(...info.patterns);
+    }
+    return allPatterns;
   }
 
   async isIgnored(path: string): Promise<boolean> {
     await this.ensureGitignoreInitialized();
-    return this.gitignore ? this.gitignore.ignores(path) : false;
+
+    return this.isIgnoredSync(path);
+  }
+
+  /**
+   * Synchronous version of isIgnored for use with chokidar and other sync APIs
+   * Note: This assumes gitignore has already been initialized
+   */
+  isIgnoredSync(path: string): boolean {
+    // Handle empty or undefined paths
+    if (!path || path === '') {
+      return false;
+    }
+
+    // Skip glob patterns - these are not actual paths
+    // Chokidar passes patterns like "**/*.ts", "**", etc.
+    if (
+      path.includes('*') ||
+      path.includes('?') ||
+      path.includes('[') ||
+      path.includes(']')
+    ) {
+      return false;
+    }
+
+    // Handle special paths - don't ignore current and parent directory references
+    if (path === '.' || path === '..') {
+      return false;
+    }
+
+    // If gitignore is not initialized, we can't check synchronously
+    // so we conservatively return false to avoid blocking
+    if (!this.gitignoreInitialized) {
+      return false;
+    }
+
+    // Convert path to absolute if it isn't already
+    const absolutePath = this.resolvePath(path);
+
+    // Check each gitignore file from most specific (deepest) to least specific
+    const sortedGitignores = Array.from(this.gitignoreMap.values()).sort(
+      (a, b) => b.directory.length - a.directory.length,
+    );
+
+    for (const gitignoreInfo of sortedGitignores) {
+      // Check if this gitignore applies to the path
+      if (absolutePath.startsWith(gitignoreInfo.directory)) {
+        // Get path relative to the gitignore's directory
+        const relativePath = relative(gitignoreInfo.directory, absolutePath);
+        // Skip if path equals the gitignore directory itself
+        // (a directory shouldn't be ignored by its own gitignore)
+        if (relativePath === '') {
+          continue;
+        }
+        if (gitignoreInfo.ignore.ignores(relativePath)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   async isBinary(path: string): Promise<boolean> {
@@ -884,62 +938,176 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       return;
     }
 
+    // Default ignores that apply everywhere
+    const defaultIgnores = [
+      '.git',
+      'node_modules',
+      'dist',
+      'build',
+      '.next',
+      'out',
+      'coverage',
+      '.cache',
+      '.turbo',
+      '.vscode',
+      '.idea',
+      '*.log',
+      '.DS_Store',
+      'Thumbs.db',
+    ];
+
+    // Recursively find all .gitignore files
+    await this.findAndLoadGitignoreFiles(
+      this.config.workingDirectory,
+      defaultIgnores,
+    );
+
+    // If no .gitignore files were found, add default ignores at root level
+    if (this.gitignoreMap.size === 0) {
+      const rootIgnore = ignore().add(defaultIgnores);
+      this.gitignoreMap.set(this.config.workingDirectory, {
+        ignore: rootIgnore,
+        directory: this.config.workingDirectory,
+        patterns: defaultIgnores,
+      });
+    }
+
+    // Only set the flag after all patterns are actually loaded
     this.gitignoreInitialized = true;
+  }
+
+  private async findAndLoadGitignoreFiles(
+    directory: string,
+    defaultIgnores: string[],
+    depth = 0,
+    maxDepth = 50, // Prevent infinite recursion
+  ): Promise<void> {
+    if (depth > maxDepth) {
+      return;
+    }
 
     try {
-      // Read .gitignore file from workspace root
-      const gitignorePath = join(this.config.workingDirectory, '.gitignore');
-      const content = await fs.readFile(gitignorePath, 'utf-8');
-      const patterns = content
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith('#'));
+      // Check if .gitignore exists in this directory
+      const gitignorePath = join(directory, '.gitignore');
+      let patterns: string[] = [];
+      let hasGitignore = false;
 
-      this.gitignorePatterns = patterns;
-      this.gitignore = ignore().add(patterns);
+      try {
+        const content = await fs.readFile(gitignorePath, 'utf-8');
+        const filePatterns = content
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line && !line.startsWith('#'));
+        patterns = filePatterns;
+        hasGitignore = true;
+      } catch (_error) {
+        // No .gitignore in this directory, that's fine
+      }
 
-      // Always ignore .git directory and common build/dependency directories
-      const defaultIgnores = [
-        '.git',
-        'node_modules',
-        'dist',
-        'build',
-        '.next',
-        'out',
-        'coverage',
-        '.cache',
-        '.turbo',
-        '.vscode',
-        '.idea',
-        '*.log',
-        '.DS_Store',
-        'Thumbs.db',
-      ];
+      // If we found a .gitignore or we're at the root, create an ignore instance
+      if (hasGitignore || directory === this.config.workingDirectory) {
+        const allPatterns = [...patterns];
+        // Add default ignores to root directory's gitignore
+        if (directory === this.config.workingDirectory) {
+          allPatterns.push(...defaultIgnores);
+        }
 
-      this.gitignore.add(defaultIgnores);
-      this.gitignorePatterns.push(...defaultIgnores);
+        if (allPatterns.length > 0) {
+          const ignoreInstance = ignore().add(allPatterns);
+          this.gitignoreMap.set(directory, {
+            ignore: ignoreInstance,
+            directory,
+            patterns: allPatterns,
+          });
+        }
+      }
+
+      // Recursively search subdirectories
+      const entries = await fs.readdir(directory, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const subdirPath = join(directory, entry.name);
+
+          // Skip directories that should always be ignored
+          if (
+            defaultIgnores.includes(entry.name) ||
+            entry.name === '.git' ||
+            entry.name === 'node_modules'
+          ) {
+            continue;
+          }
+
+          // Check if this directory is ignored by parent gitignores
+          const shouldSkip = await this.isDirectoryIgnoredByParent(
+            subdirPath,
+            directory,
+          );
+          if (!shouldSkip) {
+            await this.findAndLoadGitignoreFiles(
+              subdirPath,
+              defaultIgnores,
+              depth + 1,
+              maxDepth,
+            );
+          }
+        }
+      }
     } catch (_error) {
-      // If .gitignore doesn't exist or can't be read, use default ignores
-      const defaultIgnores = [
-        '.git',
-        'node_modules',
-        'dist',
-        'build',
-        '.next',
-        'out',
-        'coverage',
-        '.cache',
-        '.turbo',
-        '.vscode',
-        '.idea',
-        '*.log',
-        '.DS_Store',
-        'Thumbs.db',
-      ];
-
-      this.gitignore = ignore().add(defaultIgnores);
-      this.gitignorePatterns = defaultIgnores;
+      // Error reading directory, skip it
     }
+  }
+
+  private async isDirectoryIgnoredByParent(
+    dirPath: string,
+    parentDir: string,
+  ): Promise<boolean> {
+    // Check if parent directories have gitignore rules that would exclude this directory
+    for (const [gitDir, gitInfo] of this.gitignoreMap.entries()) {
+      if (gitDir === parentDir || dirPath.startsWith(gitDir)) {
+        const relativePath = relative(gitDir, dirPath);
+        if (gitInfo.ignore.ignores(relativePath)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  async watchFiles(
+    path: string,
+    onFileChange: (event: FileChangeEvent) => void,
+  ): Promise<() => Promise<void>> {
+    // Ensure gitignore is fully initialized before creating the watcher
+    await this.ensureGitignoreInitialized();
+
+    const watcher = chokidar.watch(this.resolvePath(path), {
+      persistent: true,
+      ignored: (path: string) => this.isIgnoredSync(path),
+    });
+
+    watcher.on('add', (path) => {
+      onFileChange({
+        type: 'create',
+        file: { absolutePath: path, relativePath: path },
+      });
+    });
+
+    watcher.on('change', (path) => {
+      onFileChange({
+        type: 'update',
+        file: { absolutePath: path, relativePath: path },
+      });
+    });
+
+    watcher.on('unlink', (path) => {
+      onFileChange({
+        type: 'delete',
+        file: { absolutePath: path, relativePath: path },
+      });
+    });
+
+    return watcher.close;
   }
 }
 

@@ -209,6 +209,9 @@ importers:
 
   agent/runtime-node:
     dependencies:
+      chokidar:
+        specifier: ^4.0.3
+        version: 4.0.3
       ignore:
         specifier: ^7.0.5
         version: 7.0.5

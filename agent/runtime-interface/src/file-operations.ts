@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+export interface FileChangeEvent {
+  type: 'create' | 'update' | 'delete';
+  file: {
+    absolutePath: string;
+    relativePath: string;
+  };
+}
+
 /**
  * Core file system operation results
  */
@@ -294,6 +302,17 @@ export interface IFileSystemProvider {
   getCurrentWorkingDirectory(): string;
 
   /**
+   * Watches files for changes.
+   * @param path - The relative path to watch (chokidar pattern, e.g. "**\/*.ts" or ".")
+   * @param onFileChange - The callback to call when a file changes
+   * @returns A promise that resolves to a function to stop the watcher
+   */
+  watchFiles(
+    path: string,
+    onFileChange: (event: FileChangeEvent) => void,
+  ): Promise<() => Promise<void>>;
+
+  /**
    * Deletes a file.
    * @param path - The relative file path to delete
    * @returns Operation result
@@ -442,4 +461,15 @@ export abstract class BaseFileSystemProvider implements IFileSystemProvider {
   abstract getFileExtension(path: string): string;
 
   abstract getCurrentWorkingDirectory(): string;
+
+  /**
+   * Watches files for changes.
+   * @param path - The relative path to watch (chokidar pattern, e.g. "**\/*.ts" or ".")
+   * @param onFileChange - The callback to call when a file changes
+   * @returns A function to stop the watcher
+   */
+  abstract watchFiles(
+    path: string,
+    onFileChange: (event: FileChangeEvent) => void,
+  ): Promise<() => Promise<void>>;
 }

@@ -1,5 +1,6 @@
 import type { BaseFileSystemProvider } from './file-operations.js';
 export {
+  type FileChangeEvent,
   BaseFileSystemProvider,
   type IFileSystemProvider,
   type FileSystemProviderConfig,

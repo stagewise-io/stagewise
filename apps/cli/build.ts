@@ -57,6 +57,7 @@ async function buildCLI() {
     const externalPackages: string[] = [
       '@lancedb/lancedb', // Native bindings
       'level', // Native bindings
+      'chokidar', // Native bindings
     ];
 
     // Build the CLI bundling most dependencies
