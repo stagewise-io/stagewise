@@ -76,19 +76,16 @@ export class RPCManager {
     });
   }
 
-  public registerProcedure(path: string[], handler: ProcedureHandler): void {
-    const key = path.join('.');
-    this.procedures.set(key, handler);
+  public registerProcedure(path: string, handler: ProcedureHandler): void {
+    this.procedures.set(path, handler);
   }
 
-  public unregisterProcedure(path: string[]): void {
-    const key = path.join('.');
-    this.procedures.delete(key);
+  public unregisterProcedure(path: string): void {
+    this.procedures.delete(path);
   }
 
-  public hasProcedure(path: string[]): boolean {
-    const key = path.join('.');
-    return this.procedures.has(key);
+  public hasProcedure(path: string): boolean {
+    return this.procedures.has(path);
   }
 
   public async handleMessage(message: WebSocketMessage): Promise<void> {
@@ -105,12 +102,11 @@ export class RPCManager {
     message: WebSocketMessage & { data: any },
   ): Promise<void> {
     const { rpcCallId, procedurePath, parameters } = message.data;
-    const key = procedurePath.join('.');
-    const handler = this.procedures.get(key);
+    const handler = this.procedures.get(procedurePath);
 
     if (!handler) {
       const error = new KartonProcedureError(
-        `Server procedure '${key}' is not registered`,
+        `Server procedure '${procedurePath}' is not registered`,
       );
       const exceptionMessage = createRPCExceptionMessage(rpcCallId, error);
       this.sendMessage(exceptionMessage);

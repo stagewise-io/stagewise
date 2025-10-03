@@ -362,7 +362,11 @@ export interface KartonServer<T> {
       GetHandlerForPath<KartonServerProcedures<T>, Path>
     >,
   ) => void;
-  removeServerProcedureHandler: (path: string[]) => void;
+  removeServerProcedureHandler: <
+    Path extends ProcedurePaths<KartonServerProcedures<T>>,
+  >(
+    path: Path,
+  ) => void;
 }
 
 export interface KartonClientConfig<T> {

@@ -71,7 +71,7 @@ class KartonClientImpl<T> implements KartonClient<T> {
         this.clientProcedures as any,
       );
       for (const [path, handler] of procedures) {
-        this.rpcManager.registerProcedure(path.split('.'), handler);
+        this.rpcManager.registerProcedure(path, handler);
       }
 
       // Setup message handling

@@ -107,8 +107,7 @@ class KartonServerImpl<T> implements KartonServer<T> {
     });
 
     // Register server procedures with clientId injection
-    for (const [pathStr, handler] of this.serverProcedures) {
-      const path = pathStr.split('.');
+    for (const [path, handler] of this.serverProcedures) {
       rpcManager.registerProcedure(path, async (...args: any[]) => {
         // Add clientId as last argument
         return handler(...args, clientId);
@@ -186,20 +185,17 @@ class KartonServerImpl<T> implements KartonServer<T> {
     this.serverProcedures.set(path, handler);
 
     // Register with all existing client connections
-    const pathArray = path.split('.');
     for (const client of this.clients.values()) {
-      client.rpcManager.registerProcedure(pathArray, async (...args: any[]) => {
+      client.rpcManager.registerProcedure(path, async (...args: any[]) => {
         // Add clientId as last argument
         return handler(...args, client.id);
       });
     }
   }
 
-  public removeServerProcedureHandler(path: string[]): void {
-    const pathStr = path.join('.');
-
+  public removeServerProcedureHandler(path: string): void {
     // Remove from stored procedures
-    this.serverProcedures.delete(pathStr);
+    this.serverProcedures.delete(path);
 
     // Unregister from all existing client connections
     for (const client of this.clients.values()) {

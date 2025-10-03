@@ -41,7 +41,7 @@ describe('KartonServer Lazy Registration', () => {
       client.cleanup?.();
     }
     if (server) {
-      await server.close();
+      await server.wss.close();
     }
     if (httpServer) {
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
@@ -229,7 +229,7 @@ describe('KartonServer Lazy Registration', () => {
       server.registerServerProcedureHandler('increment', handler);
 
       // Remove the handler
-      server.removeServerProcedureHandler(['increment']);
+      server.removeServerProcedureHandler('increment');
 
       // Should be able to register new handler now
       const newHandler = vi.fn(async (amount: number, clientId: string) => amount * 3);
@@ -294,24 +294,10 @@ describe('KartonServer Lazy Registration', () => {
       expect(result1).toBe(10);
 
       // Remove handler
-      server.removeServerProcedureHandler(['increment']);
+      server.removeServerProcedureHandler('increment');
 
       // Should throw error when calling removed procedure
       await expect(client.serverProcedures.increment(5)).rejects.toThrow();
-    });
-
-    it('should handle removing non-existent handler gracefully', async () => {
-      server = await createKartonServer<TestAppType>({
-        initialState: {
-          counter: 0,
-          message: 'initial',
-        },
-      });
-
-      // Should not throw when removing non-existent handler
-      expect(() => {
-        server.removeServerProcedureHandler(['nonExistent']);
-      }).not.toThrow();
     });
   });
 
@@ -470,7 +456,7 @@ describe('KartonServer Lazy Registration', () => {
       expect(result1).toBe(5);
 
       // Remove and replace
-      server.removeServerProcedureHandler(['increment']);
+      server.removeServerProcedureHandler('increment');
       const newHandler = vi.fn(async (amount: number, clientId: string) => amount * 10);
       server.registerServerProcedureHandler('increment', newHandler);
 
