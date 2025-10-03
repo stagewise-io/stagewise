@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type {
   AppType,
-  KartonState,
-  KartonServerProcedures,
-  KartonClientProcedures,
-  KartonServerProcedureImplementations,
-  KartonClientProcedureImplementations,
   WebSocketMessage,
   RPCCallData,
   RPCReturnData,
@@ -123,15 +118,6 @@ describe('Core Types', () => {
       expect(error.procedurePath).toEqual(['serverProcedure', 'nested']);
       expect(error.message).toContain('Server unavailable');
     });
-
-    it('should properly format nested procedure paths', () => {
-      const error = new KartonRPCException(
-        KartonRPCErrorReason.CONNECTION_LOST,
-        ['api', 'v1', 'users', 'create']
-      );
-
-      expect(error.message).toContain('api.v1.users.create');
-    });
   });
 
   describe('WebSocket Messages', () => {
@@ -140,7 +126,7 @@ describe('Core Types', () => {
         type: 'rpc_call',
         data: {
           rpcCallId: 'uuid-123',
-          procedurePath: ['math', 'add'],
+          procedurePath: 'math.add',
           parameters: [1, 2]
         } as RPCCallData
       };

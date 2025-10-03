@@ -28,18 +28,18 @@ describe('RPC Manager', () => {
 
   describe('Making RPC Calls', () => {
     it('should generate unique call ID and send RPC call message', async () => {
-      const callPromise = rpcManager.call(['math', 'add'], [1, 2]);
+      const callPromise = rpcManager.call('math.add', [1, 2]);
       
       expect(mockSend).toHaveBeenCalledTimes(1);
       const sentMessage = mockSend.mock.calls[0][0] as WebSocketMessage;
       expect(sentMessage.type).toBe('rpc_call');
       expect((sentMessage.data as any).rpcCallId).toBe('test-uuid-123');
-      expect((sentMessage.data as any).procedurePath).toEqual(['math', 'add']);
+      expect((sentMessage.data as any).procedurePath).toEqual('math.add');
       expect((sentMessage.data as any).parameters).toEqual([1, 2]);
     });
 
     it('should resolve promise when return message is received', async () => {
-      const callPromise = rpcManager.call(['test'], []);
+      const callPromise = rpcManager.call('test', []);
       
       const returnMessage = createRPCReturnMessage('test-uuid-123', 42);
       rpcManager.handleMessage(returnMessage);
@@ -49,7 +49,7 @@ describe('RPC Manager', () => {
     });
 
     it('should reject promise when exception message is received', async () => {
-      const callPromise = rpcManager.call(['test'], []);
+      const callPromise = rpcManager.call('test', []);
       
       const error = new Error('Test error');
       const exceptionMessage = createRPCExceptionMessage('test-uuid-123', error);
@@ -64,9 +64,9 @@ describe('RPC Manager', () => {
         .mockReturnValueOnce('call-2')
         .mockReturnValueOnce('call-3');
       
-      const call1 = rpcManager.call(['proc1'], []);
-      const call2 = rpcManager.call(['proc2'], []);
-      const call3 = rpcManager.call(['proc3'], []);
+      const call1 = rpcManager.call('proc1', []);
+      const call2 = rpcManager.call('proc2', []);
+      const call3 = rpcManager.call('proc3', []);
       
       rpcManager.handleMessage(createRPCReturnMessage('call-2', 'result-2'));
       rpcManager.handleMessage(createRPCReturnMessage('call-1', 'result-1'));
@@ -78,7 +78,7 @@ describe('RPC Manager', () => {
     });
 
     it('should timeout RPC calls after specified duration', async () => {
-      const callPromise = rpcManager.call(['test'], [], { timeout: 100 });
+      const callPromise = rpcManager.call('test', [], { timeout: 100 });
       
       await expect(callPromise).rejects.toThrow(KartonRPCException);
       
@@ -87,12 +87,12 @@ describe('RPC Manager', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(KartonRPCException);
         expect((error as KartonRPCException).reason).toBe(KartonRPCErrorReason.CONNECTION_LOST);
-        expect((error as KartonRPCException).procedurePath).toEqual(['test']);
+        expect((error as KartonRPCException).procedurePath).toEqual('test');
       }
     });
 
     it('should clean up pending call after timeout', async () => {
-      const callPromise = rpcManager.call(['test'], [], { timeout: 100 });
+      const callPromise = rpcManager.call('test', [], { timeout: 100 });
       
       try {
         await callPromise;
@@ -109,7 +109,7 @@ describe('RPC Manager', () => {
 
     it('should use custom clientId in error when provided', async () => {
       const callPromise = rpcManager.call(
-        ['test'], 
+        'test', 
         [], 
         { timeout: 100, clientId: 'client-456' }
       );
@@ -125,9 +125,9 @@ describe('RPC Manager', () => {
   describe('Handling RPC Calls', () => {
     it('should execute procedure and send return message', async () => {
       const testProcedure = vi.fn().mockResolvedValue('test-result');
-      rpcManager.registerProcedure(['test', 'procedure'], testProcedure);
+      rpcManager.registerProcedure('test.procedure', testProcedure);
       
-      const callMessage = createRPCCallMessage('call-123', ['test', 'procedure'], ['arg1', 'arg2']);
+      const callMessage = createRPCCallMessage('call-123', 'test.procedure', ['arg1', 'arg2']);
       await rpcManager.handleMessage(callMessage);
       
       expect(testProcedure).toHaveBeenCalledWith('arg1', 'arg2');
@@ -142,9 +142,9 @@ describe('RPC Manager', () => {
     it('should send exception message when procedure throws', async () => {
       const error = new Error('Procedure failed');
       const testProcedure = vi.fn().mockRejectedValue(error);
-      rpcManager.registerProcedure(['failing'], testProcedure);
+      rpcManager.registerProcedure('failing', testProcedure);
       
-      const callMessage = createRPCCallMessage('call-123', ['failing'], []);
+      const callMessage = createRPCCallMessage('call-123', 'failing', []);
       await rpcManager.handleMessage(callMessage);
       
       expect(mockSend).toHaveBeenCalledTimes(1);
@@ -157,11 +157,11 @@ describe('RPC Manager', () => {
 
     it('should handle nested procedure paths', async () => {
       const nestedProcedure = vi.fn().mockResolvedValue('nested-result');
-      rpcManager.registerProcedure(['api', 'v1', 'users', 'create'], nestedProcedure);
+      rpcManager.registerProcedure('api.v1.users.create', nestedProcedure);
       
       const callMessage = createRPCCallMessage(
         'call-123', 
-        ['api', 'v1', 'users', 'create'], 
+        'api.v1.users.create', 
         [{ name: 'Alice' }]
       );
       await rpcManager.handleMessage(callMessage);
@@ -170,7 +170,7 @@ describe('RPC Manager', () => {
     });
 
     it('should send exception when procedure not found', async () => {
-      const callMessage = createRPCCallMessage('call-123', ['unknown', 'procedure'], []);
+      const callMessage = createRPCCallMessage('call-123', 'unknown.procedure', []);
       await rpcManager.handleMessage(callMessage);
       
       expect(mockSend).toHaveBeenCalledTimes(1);
@@ -194,8 +194,8 @@ describe('RPC Manager', () => {
         .mockReturnValueOnce('call-1')
         .mockReturnValueOnce('call-2');
       
-      const call1 = rpcManager.call(['proc1'], []);
-      const call2 = rpcManager.call(['proc2'], []);
+      const call1 = rpcManager.call('proc1', []);
+      const call2 = rpcManager.call('proc2', []);
       
       rpcManager.cleanup();
       
@@ -205,11 +205,11 @@ describe('RPC Manager', () => {
 
     it('should clear all registered procedures on cleanup', async () => {
       const procedure = vi.fn().mockResolvedValue('result');
-      rpcManager.registerProcedure(['test'], procedure);
+      rpcManager.registerProcedure('test', procedure);
       
       rpcManager.cleanup();
       
-      const callMessage = createRPCCallMessage('call-123', ['test'], []);
+      const callMessage = createRPCCallMessage('call-123', 'test', []);
       await rpcManager.handleMessage(callMessage);
       
       expect(procedure).not.toHaveBeenCalled();

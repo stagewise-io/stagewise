@@ -35,7 +35,7 @@ export function UserStatusArea() {
   // show a button that leads to the billing page where users can pay for the subscription
   // to get more access
 
-  if (userAccount.status === 'unauthenticated') {
+  if (userAccount?.status === 'unauthenticated') {
     return (
       <Button
         variant="primary"
@@ -51,7 +51,7 @@ export function UserStatusArea() {
     );
   }
 
-  if (userAccount.status === 'authenticated') {
+  if (userAccount?.status === 'authenticated') {
     // Clicking this should show a bit more information on the user's account.
     return (
       <Dialog>
@@ -107,7 +107,7 @@ export function UserStatusArea() {
     );
   }
 
-  if (userAccount.status === 'authentication_invalid') {
+  if (userAccount?.status === 'authentication_invalid') {
     // Cicking this should show a dialog with information on this.
     // From the dialog, a re-authentication should be triggerable.
     return (
@@ -131,7 +131,7 @@ export function UserStatusArea() {
     );
   }
 
-  if (userAccount.status === 'server_unreachable') {
+  if (userAccount?.status === 'server_unreachable') {
     // Clicking this should show a dialog with information on this.
     return (
       <Popover>
@@ -147,4 +147,7 @@ export function UserStatusArea() {
       </Popover>
     );
   }
+
+  // If the userAccount info in unavailable, we simply render nothing until it's loaded.
+  return null;
 }

@@ -269,26 +269,25 @@ export class KartonProcedureError extends Error {
 
 export class KartonRPCException extends Error {
   public readonly reason: KartonRPCErrorReason;
-  public readonly procedurePath: string[];
+  public readonly procedurePath: string;
   public readonly clientId?: string;
 
   constructor(
     reason: KartonRPCErrorReason,
-    procedurePath: string[],
+    procedurePath: string,
     clientId?: string,
   ) {
-    const procedureName = procedurePath.join('.');
     let message: string;
 
     switch (reason) {
       case KartonRPCErrorReason.CONNECTION_LOST:
-        message = `RPC call to '${procedureName}' failed: Connection lost`;
+        message = `RPC call to '${procedurePath}' failed: Connection lost`;
         break;
       case KartonRPCErrorReason.CLIENT_NOT_FOUND:
-        message = `RPC call to '${procedureName}' failed: Client '${clientId}' not found`;
+        message = `RPC call to '${procedurePath}' failed: Client '${clientId}' not found`;
         break;
       case KartonRPCErrorReason.SERVER_UNAVAILABLE:
-        message = `RPC call to '${procedureName}' failed: Server unavailable`;
+        message = `RPC call to '${procedurePath}' failed: Server unavailable`;
         break;
     }
 
@@ -302,7 +301,7 @@ export class KartonRPCException extends Error {
 
 export interface RPCCallData {
   rpcCallId: string;
-  procedurePath: string[];
+  procedurePath: string;
   parameters: any[];
 }
 

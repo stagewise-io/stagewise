@@ -12,11 +12,11 @@ import { Loader2Icon } from 'lucide-react';
  * Is only rendered if the user is not authenticated.
  */
 export const AuthDialog = () => {
-  const loginDialogData = useKartonState((s) => s.userAccount.loginDialog);
+  const loginDialogData = useKartonState((s) => s.userAccount?.loginDialog);
   const abortLogin = useKartonProcedure((p) => p.userAccount.abortLogin);
 
   return (
-    <Dialog open={loginDialogData !== null} dismissible={false}>
+    <Dialog open={!!loginDialogData} dismissible={false}>
       <DialogContent className="h-[80vh] max-h-[80vh] min-h-[80vh] w-[80vw] min-w-[80vw] max-w-[80vw]">
         <DialogClose
           onClick={() => {

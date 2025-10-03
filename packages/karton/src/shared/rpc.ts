@@ -23,7 +23,7 @@ interface PendingCall {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   timeout: NodeJS.Timeout | number;
-  procedurePath: string[];
+  procedurePath: string;
   clientId?: string;
 }
 
@@ -40,7 +40,7 @@ export class RPCManager {
   }
 
   public async call(
-    procedurePath: string[],
+    procedurePath: string,
     parameters: any[],
     options: RPCCallOptions = {},
   ): Promise<unknown> {

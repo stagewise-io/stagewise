@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   createProcedureProxy,
-  extractProceduresFromTree,
-  resolveProcedurePath
+  extractProceduresFromTree
 } from '../../src/shared/procedure-proxy.js';
 
 describe('Procedure Proxy', () => {
@@ -13,7 +12,7 @@ describe('Procedure Proxy', () => {
       const proxy = createProcedureProxy(mockCall);
       const result = await proxy.testProcedure('arg1', 'arg2');
       
-      expect(mockCall).toHaveBeenCalledWith(['testProcedure'], ['arg1', 'arg2'], undefined);
+      expect(mockCall).toHaveBeenCalledWith('testProcedure', ['arg1', 'arg2'], undefined);
       expect(result).toBe('result');
     });
 
@@ -24,7 +23,7 @@ describe('Procedure Proxy', () => {
       const result = await proxy.api.v1.users.create({ name: 'Alice' });
       
       expect(mockCall).toHaveBeenCalledWith(
-        ['api', 'v1', 'users', 'create'],
+        'api.v1.users.create',
         [{ name: 'Alice' }],
         undefined
       );
@@ -35,10 +34,10 @@ describe('Procedure Proxy', () => {
       const mockCall = vi.fn().mockResolvedValue('result');
       const options = { timeout: 5000, clientId: 'client-123' };
       
-      const proxy = createProcedureProxy(mockCall, options);
+      const proxy = createProcedureProxy(mockCall, undefined,options);
       await proxy.test();
       
-      expect(mockCall).toHaveBeenCalledWith(['test'], [], options);
+      expect(mockCall).toHaveBeenCalledWith('test', [], options);
     });
 
     it('should handle multiple levels of nesting', async () => {
@@ -48,7 +47,7 @@ describe('Procedure Proxy', () => {
       const result = await proxy.level1.level2.level3.level4.level5.procedure();
       
       expect(mockCall).toHaveBeenCalledWith(
-        ['level1', 'level2', 'level3', 'level4', 'level5', 'procedure'],
+        'level1.level2.level3.level4.level5.procedure',
         [],
         undefined
       );
@@ -62,7 +61,7 @@ describe('Procedure Proxy', () => {
       const procedure = proxy.test;
       const result = await procedure('arg');
       
-      expect(mockCall).toHaveBeenCalledWith(['test'], ['arg'], undefined);
+      expect(mockCall).toHaveBeenCalledWith('test', ['arg'], undefined);
       expect(result).toBe('result');
     });
 
@@ -177,62 +176,6 @@ describe('Procedure Proxy', () => {
     it('should handle undefined input', () => {
       const extracted = extractProceduresFromTree(undefined as any);
       expect(extracted.size).toBe(0);
-    });
-  });
-
-  describe('resolveProcedurePath', () => {
-    it('should resolve simple path', () => {
-      const handler = vi.fn();
-      const tree = { test: handler };
-      
-      const resolved = resolveProcedurePath(tree, ['test']);
-      expect(resolved).toBe(handler);
-    });
-
-    it('should resolve nested path', () => {
-      const handler = vi.fn();
-      const tree = {
-        api: {
-          v1: {
-            users: {
-              create: handler
-            }
-          }
-        }
-      };
-      
-      const resolved = resolveProcedurePath(tree, ['api', 'v1', 'users', 'create']);
-      expect(resolved).toBe(handler);
-    });
-
-    it('should return undefined for non-existent path', () => {
-      const tree = {
-        api: {
-          v1: {
-            users: vi.fn()
-          }
-        }
-      };
-      
-      const resolved = resolveProcedurePath(tree, ['api', 'v2', 'users']);
-      expect(resolved).toBeUndefined();
-    });
-
-    it('should return undefined for path to non-function', () => {
-      const tree = {
-        api: {
-          v1: 'not a function'
-        }
-      };
-      
-      const resolved = resolveProcedurePath(tree as any, ['api', 'v1']);
-      expect(resolved).toBeUndefined();
-    });
-
-    it('should handle empty path', () => {
-      const tree = { test: vi.fn() };
-      const resolved = resolveProcedurePath(tree, []);
-      expect(resolved).toBeUndefined();
     });
   });
 });

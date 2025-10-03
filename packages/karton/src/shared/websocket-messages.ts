@@ -29,7 +29,7 @@ export function deserializeMessage(data: string): WebSocketMessage {
 
 export function createRPCCallMessage(
   rpcCallId: string,
-  procedurePath: string[],
+  procedurePath: string,
   parameters: any[],
 ): WebSocketMessage {
   return {
