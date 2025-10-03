@@ -2,7 +2,7 @@ import type { UserMessageMetadata, SelectedElement } from './metadata.js';
 import type { UIMessage, UIDataTypes } from 'ai';
 import type { UITools, ToolPart } from '@stagewise/agent-tools';
 import type { Tool, FileDiff, ToolResult } from '@stagewise/agent-types';
-import type { WorkspaceConfig, FilePickerRequest } from './shared-types';
+import type { WorkspaceConfig, FilePickerRequest } from './shared-types.js';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
 export type { UserMessageMetadata, SelectedElement };
