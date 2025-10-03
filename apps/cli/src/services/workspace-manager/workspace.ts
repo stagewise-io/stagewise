@@ -3,6 +3,8 @@
  */
 
 import { discoverDependencies } from '@/utils/dependency-parser';
+import { AgentService } from '@/services/agent';
+import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
@@ -10,11 +12,13 @@ import type { WorkspaceLoadingOverrides } from './loading-overrides';
 import { WorkspaceConfigService } from './workspace-services/config';
 import { WorkspacePluginService } from './workspace-services/plugin';
 import type { WorkspaceSetupService } from './workspace-services/setup';
+import type { AuthService } from '../auth';
 
 export class WorkspaceService {
   private logger: Logger;
   private telemetryService: TelemetryService;
   private kartonService: KartonService;
+  private authService: AuthService;
   private workspacePath: string;
   private workspaceLoadingOverrides: WorkspaceLoadingOverrides | null = null;
   private loadedOnStart = false;
@@ -23,11 +27,13 @@ export class WorkspaceService {
   private workspaceConfigService: WorkspaceConfigService | null = null;
   private workspacePluginService: WorkspacePluginService | null = null;
   private workspaceSetupService: WorkspaceSetupService | null = null;
+  private agentService: AgentService | null = null;
 
   private constructor(
     logger: Logger,
     telemetryService: TelemetryService,
     kartonService: KartonService,
+    authService: AuthService,
     workspacePath: string,
     workspaceLoadingOverrides: WorkspaceLoadingOverrides | null,
     loadedOnStart: boolean,
@@ -36,6 +42,7 @@ export class WorkspaceService {
     this.logger = logger;
     this.telemetryService = telemetryService;
     this.kartonService = kartonService;
+    this.authService = authService;
     this.workspacePath = workspacePath;
     this.workspaceLoadingOverrides = workspaceLoadingOverrides;
     this.loadedOnStart = loadedOnStart;
@@ -71,6 +78,18 @@ export class WorkspaceService {
       this.workspacePath,
     );
 
+    const clientRuntime = new ClientRuntimeNode({
+      workingDirectory: this.workspacePath,
+    });
+
+    this.agentService = await AgentService.create(
+      this.logger,
+      this.telemetryService,
+      this.kartonService,
+      this.authService,
+      clientRuntime,
+    );
+
     this.telemetryService.capture('workspace-opened', {
       auto_plugins_enabled:
         this.workspaceConfigService.get().autoPlugins ?? true,
@@ -98,6 +117,7 @@ export class WorkspaceService {
     logger: Logger,
     telemetryService: TelemetryService,
     kartonService: KartonService,
+    authService: AuthService,
     workspacePath: string,
     workspaceLoadingOverrides: WorkspaceLoadingOverrides | null,
     loadedOnStart: boolean,
@@ -107,6 +127,7 @@ export class WorkspaceService {
       logger,
       telemetryService,
       kartonService,
+      authService,
       workspacePath,
       workspaceLoadingOverrides,
       loadedOnStart,
@@ -123,6 +144,10 @@ export class WorkspaceService {
     // TODO: Teardown all the child services hosted within this workspace.
     await this.workspaceConfigService?.teardown();
     await this.workspacePluginService?.teardown();
+    await this.agentService?.teardown();
+    await this.workspaceSetupService?.teardown();
+    await this.workspacePluginService?.teardown();
+    await this.workspaceConfigService?.teardown();
 
     this.kartonService.setState((draft) => {
       draft.workspace = null;

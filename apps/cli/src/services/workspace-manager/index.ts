@@ -10,6 +10,7 @@ import type { FilePickerService } from '../file-picker';
 import type { TelemetryService } from '../telemetry';
 import type { KartonService } from '../karton';
 import type { WorkspaceLoadingOverrides } from './loading-overrides';
+import type { AuthService } from '../auth';
 
 export class WorkspaceManagerService {
   private currentWorkspace: WorkspaceService | null = null;
@@ -17,17 +18,20 @@ export class WorkspaceManagerService {
   private filePickerService: FilePickerService;
   private telemetryService: TelemetryService;
   private kartonService: KartonService;
+  private authService: AuthService;
 
   private constructor(
     logger: Logger,
     filePickerService: FilePickerService,
     telemetryService: TelemetryService,
     kartonService: KartonService,
+    authService: AuthService,
   ) {
     this.logger = logger;
     this.filePickerService = filePickerService;
     this.telemetryService = telemetryService;
     this.kartonService = kartonService;
+    this.authService = authService;
   }
 
   private async initialize() {
@@ -56,12 +60,14 @@ export class WorkspaceManagerService {
     filePickerService: FilePickerService,
     telemetryService: TelemetryService,
     kartonService: KartonService,
+    authService: AuthService,
   ) {
     const instance = new WorkspaceManagerService(
       logger,
       filePickerService,
       telemetryService,
       kartonService,
+      authService,
     );
     await instance.initialize();
     logger.debug('[WorkspaceManagerService] Created service');
@@ -118,6 +124,7 @@ export class WorkspaceManagerService {
       this.logger,
       this.telemetryService,
       this.kartonService,
+      this.authService,
       selectedPath!,
       workspaceLoadingOverrides ?? null,
       loadedOnStart,

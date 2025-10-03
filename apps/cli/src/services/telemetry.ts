@@ -45,6 +45,22 @@ export interface EventProperties {
   'cli-telemetry-config-set': {
     configured_level: 'off' | 'anonymous' | 'full';
   };
+  'agent-state-changed': {
+    isWorking: boolean;
+    wasWorking: boolean;
+  };
+  'agent-prompt-triggered': {
+    snippetCount: number;
+  };
+  'agent-plan-limits-exceeded': {
+    hasSubscription?: boolean;
+    isPaidPlan?: boolean;
+    cooldownMinutes?: number;
+  };
+  'agent-credits-insufficient': {
+    hasSubscription?: boolean;
+    creditsRemaining?: number;
+  };
 }
 
 export interface UserProperties {

@@ -63,6 +63,7 @@ export async function main({
     filePickerService,
     telemetryService,
     kartonService,
+    authService,
   );
   const uiServerService = await UIServerService.create(
     logger,

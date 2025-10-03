@@ -1,6 +1,6 @@
 {
-  "name": "@stagewise/agent-client",
-  "version": "0.6.0",
+  "name": "@stagewise/agent-utils",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.cjs",
@@ -24,25 +24,17 @@
     "build:bundle": "tsx build.ts",
     "dev": "tsx build.ts --watch",
     "clean": "rimraf dist",
-    "lint": "echo 'No linting for prompts package'",
+    "lint": "echo 'No linting for agent utils package'",
     "type-check": "tsc --noEmit",
     "test": "vitest"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^2.0.23",
-    "@ai-sdk/anthropic": "2.0.9",
     "ai": "5.0.9",
-    "diff": "^8.0.2",
-    "node-fetch": "^3.3.2",
     "zod": "4.0.17",
-    "@stagewise/api-client": "1.4.0",
-    "@stagewise/karton": "workspace:*"
+    "@stagewise/api-client": "1.4.0"
   },
   "devDependencies": {
     "@stagewise/agent-prompts": "workspace:*",
-    "@stagewise/agent-prompt-snippets": "workspace:*",
-    "@stagewise/agent-tools": "workspace:*",
-    "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
     "esbuild": "0.25.9",

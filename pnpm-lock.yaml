@@ -43,67 +43,6 @@ importers:
         specifier: ^5.8.3
         version: 5.9.2
 
-  agent/client:
-    dependencies:
-      '@ai-sdk/anthropic':
-        specifier: 2.0.9
-        version: 2.0.9(zod@4.0.17)
-      '@ai-sdk/openai':
-        specifier: ^2.0.23
-        version: 2.0.23(zod@4.0.17)
-      '@stagewise/api-client':
-        specifier: 1.4.0
-        version: 1.4.0(typescript@5.9.2)
-      '@stagewise/karton':
-        specifier: workspace:*
-        version: link:../../packages/karton
-      ai:
-        specifier: 5.0.9
-        version: 5.0.9(zod@4.0.17)
-      diff:
-        specifier: ^8.0.2
-        version: 8.0.2
-      node-fetch:
-        specifier: ^3.3.2
-        version: 3.3.2
-      zod:
-        specifier: 4.0.17
-        version: 4.0.17
-    devDependencies:
-      '@stagewise/agent-prompt-snippets':
-        specifier: workspace:*
-        version: link:../prompt-snippets
-      '@stagewise/agent-prompts':
-        specifier: workspace:*
-        version: link:../prompts
-      '@stagewise/agent-runtime-interface':
-        specifier: workspace:*
-        version: link:../runtime-interface
-      '@stagewise/agent-tools':
-        specifier: workspace:*
-        version: link:../tools
-      '@stagewise/agent-types':
-        specifier: workspace:*
-        version: link:../types
-      '@stagewise/karton-contract':
-        specifier: workspace:*
-        version: link:../../packages/karton-contract
-      esbuild:
-        specifier: 0.25.9
-        version: 0.25.9
-      rimraf:
-        specifier: ^5.0.0
-        version: 5.0.10
-      tsx:
-        specifier: ^4.7.1
-        version: 4.20.3
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.2
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.3)(jiti@2.5.1)(jsdom@26.1.0)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
-
   agent/project-information:
     dependencies:
       '@stagewise/agent-runtime-interface':
@@ -291,14 +230,60 @@ importers:
         specifier: 4.0.17
         version: 4.0.17
 
+  agent/utils:
+    dependencies:
+      '@stagewise/api-client':
+        specifier: 1.4.0
+        version: 1.4.0(typescript@5.9.2)
+      ai:
+        specifier: 5.0.9
+        version: 5.0.9(zod@4.0.17)
+      zod:
+        specifier: 4.0.17
+        version: 4.0.17
+    devDependencies:
+      '@stagewise/agent-prompts':
+        specifier: workspace:*
+        version: link:../prompts
+      '@stagewise/agent-types':
+        specifier: workspace:*
+        version: link:../types
+      '@stagewise/karton-contract':
+        specifier: workspace:*
+        version: link:../../packages/karton-contract
+      esbuild:
+        specifier: 0.25.9
+        version: 0.25.9
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      tsx:
+        specifier: ^4.7.1
+        version: 4.20.3
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.3)(jiti@2.5.1)(jsdom@26.1.0)(less@4.2.2)(lightningcss@1.30.1)(sass@1.85.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.0)
+
   apps/cli:
     dependencies:
-      '@types/prompts':
-        specifier: ^2.4.9
-        version: 2.4.9
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
+      '@ai-sdk/anthropic':
+        specifier: 2.0.9
+        version: 2.0.9(zod@4.0.17)
+      '@ai-sdk/openai':
+        specifier: ^2.0.23
+        version: 2.0.23(zod@4.0.17)
+      ai:
+        specifier: 5.0.9
+        version: 5.0.9(zod@4.0.17)
+      diff:
+        specifier: ^8.0.2
+        version: 8.0.2
+      node-fetch:
+        specifier: ^3.3.2
+        version: 3.3.2
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
@@ -318,12 +303,27 @@ importers:
       '@stagewise-plugins/vue':
         specifier: workspace:*
         version: link:../../plugins/vue
-      '@stagewise/agent-client':
+      '@stagewise/agent-prompt-snippets':
         specifier: workspace:*
-        version: link:../../agent/client
+        version: link:../../agent/prompt-snippets
+      '@stagewise/agent-prompts':
+        specifier: workspace:*
+        version: link:../../agent/prompts
+      '@stagewise/agent-runtime-interface':
+        specifier: workspace:*
+        version: link:../../agent/runtime-interface
       '@stagewise/agent-runtime-node':
         specifier: workspace:*
         version: link:../../agent/runtime-node
+      '@stagewise/agent-tools':
+        specifier: workspace:*
+        version: link:../../agent/tools
+      '@stagewise/agent-types':
+        specifier: workspace:*
+        version: link:../../agent/types
+      '@stagewise/agent-utils':
+        specifier: workspace:*
+        version: link:../../agent/utils
       '@stagewise/api-client':
         specifier: 1.4.0
         version: 1.4.0(typescript@5.9.2)
@@ -339,6 +339,12 @@ importers:
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.23
+      '@types/prompts':
+        specifier: ^2.4.9
+        version: 2.4.9
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       '@vitest/coverage-v8':
         specifier: ^2.0.0
         version: 2.1.9(vitest@2.1.9)
@@ -394,8 +400,8 @@ importers:
         specifier: ^3.17.0
         version: 3.17.0
       zod:
-        specifier: ^3.24.0
-        version: 3.25.76
+        specifier: 4.0.17
+        version: 4.0.17
 
   apps/vscode-extension:
     dependencies:

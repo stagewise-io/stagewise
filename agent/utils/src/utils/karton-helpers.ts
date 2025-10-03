@@ -1,15 +1,24 @@
 import type { KartonContract } from '@stagewise/karton-contract';
-import type { KartonServer } from '@stagewise/karton/server';
 import type { ToolCallProcessingResult } from './tool-call-utils.js';
 import type { ToolUIPart } from 'ai';
 import { randomUUID } from 'node:crypto';
 
 /**
+ * Interface for objects that provide karton state access and modification
+ */
+export interface KartonStateProvider<TState = KartonContract['state']> {
+  readonly state: TState;
+  setState(recipe: (draft: TState) => void): TState | undefined;
+}
+
+/**
  * Creates a new chat with a timestamped title and sets it as the active chat
- * @param callbacks - The agent callbacks for state modification
+ * @param karton - Object providing state access and modification
  * @returns The unique ID of the newly created chat
  */
-export function createAndActivateNewChat(karton: KartonServer<KartonContract>) {
+export function createAndActivateNewChat(
+  karton: KartonStateProvider<KartonContract['state']>,
+) {
   const chatId = randomUUID();
   const title = `New Chat - ${new Date().toLocaleString('en-US', {
     month: 'short',
@@ -19,12 +28,13 @@ export function createAndActivateNewChat(karton: KartonServer<KartonContract>) {
     hour12: true,
   })}`;
   karton.setState((draft) => {
-    draft.workspace!.agentChat!.chats[chatId] = {
+    if (!draft.workspace?.agentChat) return;
+    draft.workspace.agentChat.chats[chatId] = {
       title,
       createdAt: new Date(),
       messages: [],
     };
-    draft.workspace!.agentChat!.activeChatId = chatId;
+    draft.workspace.agentChat.activeChatId = chatId;
   });
   return chatId;
 }
@@ -32,20 +42,24 @@ export function createAndActivateNewChat(karton: KartonServer<KartonContract>) {
 /**
  * Attaches tool execution results to the corresponding tool parts in a message
  * Updates the tool part state to reflect success or error outcomes
- * @param callbacks - The agent callbacks for state modification
+ * @param karton - Object providing state access and modification
  * @param toolResults - Array of tool execution results to attach
  * @param messageId - The unique identifier of the message containing the tool parts
  */
 export function attachToolOutputToMessage(
-  karton: KartonServer<KartonContract>,
+  karton: KartonStateProvider<KartonContract['state']>,
   toolResults: ToolCallProcessingResult[],
   messageId: string,
 ) {
   karton.setState((draft) => {
     const state = karton.state;
-    const message = draft.workspace!.agentChat!.chats[
-      state.workspace!.agentChat!.activeChatId!
-    ]!.messages.find((m) => m.id === messageId);
+    const activeChatId = state.workspace?.agentChat?.activeChatId;
+    if (!activeChatId || !draft.workspace?.agentChat?.chats[activeChatId])
+      return;
+
+    const message = draft.workspace.agentChat.chats[activeChatId].messages.find(
+      (m) => m.id === messageId,
+    );
     if (!message) return;
     for (const result of toolResults) {
       const part = message.parts.find(
@@ -72,16 +86,16 @@ export function attachToolOutputToMessage(
 
 /**
  * Finds tool calls in the last assistant message that don't have corresponding results
- * @param callbacks - The agent callbacks for state access
+ * @param karton - Object providing state access
  * @param chatId - The chat ID to check
  * @returns Array of pending tool call IDs and their names
  */
 export function findPendingToolCalls(
-  karton: KartonServer<KartonContract>,
+  karton: KartonStateProvider<KartonContract['state']>,
   chatId: string,
 ): Array<{ toolCallId: string }> {
   const state = karton.state;
-  const chat = state.workspace!.agentChat!.chats[chatId];
+  const chat = state.workspace?.agentChat?.chats[chatId];
   if (!chat) return [];
 
   const messages = chat.messages;

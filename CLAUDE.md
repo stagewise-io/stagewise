@@ -30,11 +30,6 @@
   - Path: `apps/cli`
   - Purpose: Hosts the toolbar and the user's dev app on a single output port. Also hosts the stagewise agent.
 
-- Agent
-  - Package name: `@stagewise/agent-client``
-  - Path: `agent/client`
-  - Purpose: Implements the client/CLI-hosted parts of the stagewise agent. Interconnects with both the toolbar via Agent Interface as well as with the backend service via the `@stagewise/api-client` package.
-
 - Toolbar
   - Package name: `@stagewise/toolbar`
   - Path: `toolbar/core`
