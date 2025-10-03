@@ -73,7 +73,7 @@ export const DialogClose = ({
 >) => {
   return (
     <BaseDialog.Close
-      render={() => (
+      render={
         <Button
           variant="ghost"
           size="icon-sm"
@@ -82,7 +82,7 @@ export const DialogClose = ({
         >
           <XIcon className="size-4" />
         </Button>
-      )}
+      }
     />
   );
 };
