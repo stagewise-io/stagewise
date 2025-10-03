@@ -60,9 +60,9 @@ export type AgentError =
       error: { name: string; message: string };
     };
 
-type AppState = {
+export type AppState = {
   workspace: {
-    path: string | null;
+    path: string;
     devAppStatus: {
       status: 'running-as-wrapped-command' | 'not-running' | 'unknown';
       contentAvailableOnPort: boolean; // Is true, if the CLI detects that there is content available on the configured dev app port.

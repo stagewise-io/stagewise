@@ -10,7 +10,7 @@ const Panel = ({
   children?: ReactNode;
   alwaysFullHeight?: boolean;
   className?: string;
-  ref?: React.RefObject<HTMLDivElement>;
+  ref?: React.RefObject<HTMLDivElement | null>;
 }) => {
   return (
     <section
@@ -69,7 +69,7 @@ function PanelHeader({
 export interface PanelContentProps
   extends React.HTMLAttributes<HTMLDivElement> {
   children?: ReactNode;
-  ref?: React.RefObject<HTMLDivElement>;
+  ref?: React.RefObject<HTMLDivElement | null>;
 }
 
 function PanelContent({ children, className, ...props }: PanelContentProps) {
@@ -95,7 +95,7 @@ function PanelFooter({
   children?: ReactNode;
   className?: string;
   clear?: boolean;
-  ref?: React.RefObject<HTMLDivElement>;
+  ref?: React.RefObject<HTMLDivElement | null>;
 }) {
   return (
     <footer

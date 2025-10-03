@@ -1,5 +1,17 @@
 {
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ],
   "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"],
+      "tmp/*": ["./tmp/*"]
+    },
     "types": ["node", "vite/client"],
     "target": "ES2020",
     "useDefineForClassFields": true,
@@ -12,12 +24,8 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "react",
-    "paths": {
-      "@/*": ["./src/*"],
-      "tmp/*": ["./tmp/*"]
-    }
+    "jsxImportSource": "react"
   },
   "basePath": ".",
-  "include": ["src"]
+  "include": []
 }

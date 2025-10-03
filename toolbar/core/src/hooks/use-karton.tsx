@@ -13,7 +13,10 @@ const [KartonProvider, useKartonState, useKartonProcedure, useKartonConnected] =
     fallbackState: {
       workspace: null,
       workspaceStatus: 'closed',
-      userAccount: null,
+      userAccount: {
+        status: 'unauthenticated' as const,
+        loginDialog: null,
+      },
       appInfo: {
         bridgeMode: false,
         envMode: 'production',

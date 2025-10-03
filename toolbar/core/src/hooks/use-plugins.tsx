@@ -19,7 +19,7 @@ const PluginContext = createContext<PluginContextType>({
   plugins: [],
   toolbarContext: {
     sendPrompt: () => {},
-    mainAppWindow: getIFrameWindow(),
+    mainAppWindow: getIFrameWindow()!,
   },
 });
 
@@ -45,7 +45,7 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
         });
         openLeftPanel('chat');
       },
-      mainAppWindow: getIFrameWindow(),
+      mainAppWindow: getIFrameWindow()!,
     };
   }, [sendUserMessage]);
 

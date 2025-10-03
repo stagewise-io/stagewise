@@ -22,6 +22,7 @@ function getElementAttributes(element: HTMLElement): { [key: string]: string } {
 
   for (let i = 0; i < element.attributes.length; i++) {
     const attr = element.attributes[i];
+    if (!attr) continue;
     // Store data-* attributes separately for emphasis
     if (attr.name.startsWith('data-')) {
       dataAttrs.push({ name: attr.name, value: attr.value });

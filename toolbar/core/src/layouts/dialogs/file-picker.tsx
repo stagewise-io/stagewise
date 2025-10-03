@@ -100,7 +100,7 @@ export const FilePickerDialog = () => {
 };
 
 const FilePathBreadcrumb = () => {
-  const currentPath = useKartonState((s) => s.filePicker?.currentPath);
+  const currentPath = useKartonState((s) => s.filePicker?.currentPath) ?? '';
 
   const normalizedPath = useMemo(
     () => currentPath.replace(/\\/g, '/'),
@@ -200,9 +200,9 @@ const SelectorWindow = ({
   const allItems = useMemo(() => {
     // Filter based on mode - if mode is 'file', only show files; if 'directory', only show directories
     if (mode === 'file') {
-      return children.filter((item) => item.type === 'file');
+      return children?.filter((item) => item.type === 'file') ?? [];
     } else if (mode === 'directory') {
-      return children.filter((item) => item.type === 'directory');
+      return children?.filter((item) => item.type === 'directory') ?? [];
     }
     return children;
   }, [children, mode]);
@@ -215,11 +215,16 @@ const SelectorWindow = ({
     const isShiftClick = event.shiftKey;
     const isCtrlClick = event.ctrlKey || event.metaKey;
 
-    if (isShiftClick && lastClickedIndex !== null && allowMultiple) {
+    if (
+      isShiftClick &&
+      lastClickedIndex !== null &&
+      allowMultiple &&
+      allItems
+    ) {
       // Range selection
       const start = Math.min(lastClickedIndex, index);
       const end = Math.max(lastClickedIndex, index);
-      const rangeItems = allItems.slice(start, end + 1);
+      const rangeItems = allItems.slice(start, end + 1) ?? [];
       const rangePaths = rangeItems.map((rangeItem) => rangeItem.path);
 
       // Merge with existing selection, removing duplicates
@@ -259,7 +264,7 @@ const SelectorWindow = ({
         className="flex size-full flex-col flex-wrap items-start justify-start gap-1 overflow-x-auto overflow-y-hidden p-1.5"
         onClick={() => onSelectionUpdate([])}
       >
-        {allItems.map((item, index) => (
+        {allItems?.map((item, index) => (
           <Tooltip key={item.path}>
             <TooltipTrigger>
               <button

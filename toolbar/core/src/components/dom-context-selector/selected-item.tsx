@@ -27,7 +27,7 @@ export function SelectedItem({
         boxRef.current.style.left = `${referenceRect.left - 2}px`;
         boxRef.current.style.width = `${referenceRect.width + 4}px`;
         boxRef.current.style.height = `${referenceRect.height + 4}px`;
-        boxRef.current.style.display = undefined;
+        boxRef.current.style.display = '';
       } else {
         boxRef.current.style.height = '0px';
         boxRef.current.style.width = '0px';

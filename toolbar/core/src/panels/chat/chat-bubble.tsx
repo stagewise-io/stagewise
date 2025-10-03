@@ -70,10 +70,10 @@ export function ChatBubble({
     (p) => p.agentChat.assistantMadeCodeChangesUntilLatestUserMessage,
   );
   const activeChatId = useKartonState(
-    (s) => s.workspace.agentChat?.activeChatId || null,
+    (s) => s.workspace?.agentChat?.activeChatId || null,
   );
   const isWorking = useKartonState(
-    (s) => s.workspace.agentChat?.isWorking || false,
+    (s) => s.workspace?.agentChat?.isWorking || false,
   );
   const { setChatInput } = useChatState();
   const [hasCodeChanges, setHasCodeChanges] = useState(false);
@@ -194,7 +194,7 @@ export function ChatBubble({
                 msg.role === 'assistant' ? 'left-1' : 'right-1',
               )}
             >
-              <TimeAgo date={msg.metadata.createdAt} />
+              <TimeAgo date={msg.metadata?.createdAt ?? new Date()} />
             </div>
             {msg.parts.map((part, index) => {
               if (
@@ -513,16 +513,16 @@ const DiffDisplay = memo(
 
           // If this is the first part or last part, show 1 line
           if (index === 0 && lines.length > 0) {
-            contextLines.push(lines[lines.length - 1]);
+            contextLines.push(lines[lines.length - 1]!);
           } else if (index === changes.length - 1 && lines.length > 0) {
-            contextLines.push(lines[0]);
+            contextLines.push(lines[0]!);
           } else if (lines.length === 1) {
-            contextLines.push(lines[0]);
+            contextLines.push(lines[0]!);
           } else if (lines.length > 1) {
             // Show last line of context before and first line after
-            contextLines.push(lines[lines.length - 1]);
+            contextLines.push(lines[lines.length - 1]!);
             if (index < changes.length - 1) {
-              contextLines.push(lines[0]);
+              contextLines.push(lines[0]!);
             }
           }
 
@@ -575,7 +575,7 @@ const ToolPartItem = memo(
       (p) => p.agentChat.rejectToolCall,
     );
     const toolCallApprovalRequests = useKartonState(
-      (s) => s.workspace.agentChat.toolCallApprovalRequests,
+      (s) => s.workspace?.agentChat?.toolCallApprovalRequests ?? [],
     );
     const [isExpanded, setIsExpanded] = useState(false);
 

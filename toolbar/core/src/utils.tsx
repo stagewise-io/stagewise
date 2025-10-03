@@ -23,19 +23,19 @@ export function getElementAtPoint(x: number, y: number) {
   const iframeRect = getIFrame()?.getBoundingClientRect();
 
   const elementsBelowAnnotation = getIFrameWindow()?.document.elementsFromPoint(
-    x - iframeRect?.left,
-    y - iframeRect?.top,
+    x - (iframeRect?.left ?? 0),
+    y - (iframeRect?.top ?? 0),
   );
 
   const refElement =
-    (elementsBelowAnnotation.find(
+    (elementsBelowAnnotation?.find(
       (element) =>
         !element.closest('svg') &&
         !element.closest('STAGEWISE-TOOLBAR') &&
         isElementAtPoint(
           element as HTMLElement,
-          x - iframeRect?.left,
-          y - iframeRect?.top,
+          x - (iframeRect?.left ?? 0),
+          y - (iframeRect?.top ?? 0),
         ),
     ) as HTMLElement) || getIFrameWindow()?.document.body;
 
@@ -286,9 +286,13 @@ const excludedProperties = new Set([
 ]);
 
 // Truncation utilities to ensure data conforms to schema limits
-const truncateString = (str: string, maxLength: number): string => {
+const truncateString = <T extends string | null | undefined>(
+  str: T,
+  maxLength: number,
+): T => {
+  if (!str) return str;
   if (str.length <= maxLength) return str;
-  return `${str.substring(0, maxLength - 3)}...`;
+  return `${str.substring(0, maxLength - 3)}...` as T;
 };
 
 const truncateAttributes = (
@@ -321,10 +325,10 @@ const truncateAttributes = (
     ]);
 
     if (importantAttributes.has(key)) {
-      result[key] = truncateString(value, 4096);
+      result[key] = truncateString(value, 4096)!;
     } else {
       // Custom attributes have 256 char limit
-      result[key] = truncateString(value, 256);
+      result[key] = truncateString(value, 256)!;
     }
   }
 
@@ -336,7 +340,7 @@ const truncateOwnProperties = (
 ): Record<string, unknown> => {
   const result: Record<string, unknown> = {};
   // const entries = Object.entries(properties);
-  const entries = []; // disable for now - the amount of data might have caused abort errors
+  const entries: [string, unknown][] = []; // disable for now - the amount of data might have caused abort errors
 
   // Limit to 500 entries max
   const limitedEntries = entries.slice(0, 500);
@@ -395,8 +399,8 @@ const truncatePluginInfo = (
   pluginInfo: Array<{ pluginName: string; content: string }>,
 ): Array<{ pluginName: string; content: string }> => {
   return pluginInfo.map((plugin) => ({
-    pluginName: truncateString(plugin.pluginName, 128),
-    content: truncateString(plugin.content, 4096),
+    pluginName: truncateString(plugin.pluginName, 128)!,
+    content: truncateString(plugin.content, 4096)!,
   }));
 };
 
@@ -438,10 +442,11 @@ export const getSelectedElementInfo = (
     );
 
   return {
-    nodeType: truncateString(element.nodeName, 96),
-    xpath: truncateString(getXPathForElement(element, false), 1024),
+    nodeType: truncateString(element.nodeName, 96) ?? 'unknown',
+    xpath:
+      truncateString(getXPathForElement(element, false), 1024) ?? 'unknown',
     attributes: truncateAttributes(rawAttributes),
-    textContent: truncateString(element.textContent || '', 512),
+    textContent: truncateString(element.textContent || '', 512) ?? 'unknown',
     ownProperties: truncateOwnProperties(rawOwnProperties),
     boundingClientRect: {
       top: boundingRect.top,
@@ -452,7 +457,7 @@ export const getSelectedElementInfo = (
     parent:
       element.parentElement && (callDepth ?? 0) < 10
         ? getSelectedElementInfo(element.parentElement, (callDepth ?? 0) + 1)
-        : null,
+        : undefined,
     pluginInfo: truncatePluginInfo([]),
   };
 };
@@ -474,16 +479,16 @@ export const collectUserMessageMetadata = (
   return {
     createdAt: new Date(),
     browserData: {
-      currentUrl: truncateString(iframeWindow?.location.href, 1024),
-      currentTitle: truncateString(iframeWindow?.document.title, 256),
+      currentUrl: truncateString(iframeWindow?.location.href ?? '', 1024),
+      currentTitle: truncateString(iframeWindow?.document.title ?? null, 256),
       currentZoomLevel: 0,
-      devicePixelRatio: iframeWindow?.devicePixelRatio,
-      userAgent: truncateString(iframeWindow?.navigator.userAgent, 1024),
-      locale: truncateString(iframeWindow?.navigator.language, 64),
+      devicePixelRatio: iframeWindow?.devicePixelRatio ?? 1,
+      userAgent: truncateString(iframeWindow?.navigator.userAgent ?? '', 1024),
+      locale: truncateString(iframeWindow?.navigator.language ?? '', 64),
       selectedElements,
       viewportResolution: {
-        width: iframeWindow?.innerWidth,
-        height: iframeWindow?.innerHeight,
+        width: iframeWindow?.innerWidth ?? 0,
+        height: iframeWindow?.innerHeight ?? 0,
       },
     },
     pluginContentItems: {}, // This should be modified afterward sto add all plugin content items

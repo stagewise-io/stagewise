@@ -67,7 +67,7 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
         if (workspace) {
           await closeWorkspace();
         }
-        await openWorkspace(path[0]);
+        await openWorkspace(path[0]!);
       })
       .catch((error) => {
         console.error('Error selecting workspace:', error);
@@ -284,7 +284,7 @@ function OpenPanel() {
         (plugin) => plugin.pluginName === leftPanelPluginName,
       );
       if (plugin) {
-        const panelResult = plugin.onActionClick();
+        const panelResult = plugin.onActionClick?.();
         if (panelResult) {
           return panelResult;
         }

@@ -215,10 +215,15 @@ export function useDraggable(config: DraggableConfig) {
       const { top, left, right, bottom } = providerData.borderLocation;
       const width = right - left;
       const height = bottom - top;
-      const areaCenters = {
+      const areaCenters: Record<
+        keyof DraggableContextType['snapAreas'],
+        { x: number; y: number }
+      > = {
         topLeft: { x: left, y: top },
+        topCenter: { x: (left + right) / 2, y: top },
         topRight: { x: right, y: top },
         bottomLeft: { x: left, y: bottom },
+        bottomCenter: { x: (left + right) / 2, y: bottom },
         bottomRight: { x: right, y: bottom },
       };
       const center = areaCenters[initialSnapArea];

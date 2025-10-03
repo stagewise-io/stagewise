@@ -238,16 +238,26 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       allPluginContexts.forEach((context) => {
         if (!context) return;
 
+        // Initialize metadata and pluginContentItems if needed
+        if (!message.metadata) {
+          message.metadata = {};
+        }
+        if (!message.metadata.pluginContentItems) {
+          message.metadata.pluginContentItems = {};
+        }
+
         // Add to pluginContentItems in metadata
         message.metadata.pluginContentItems[context.pluginName] = {};
 
         context.contextSnippets.forEach((snippet) => {
-          const contentItem: ChatMessage['metadata']['pluginContentItems'][string][string] =
-            {
-              type: 'text',
-              text: snippet.content,
-            };
-          message.metadata.pluginContentItems[context.pluginName][
+          const contentItem = {
+            type: 'text' as const,
+            text: snippet.content,
+          };
+          if (!message.metadata?.pluginContentItems?.[context.pluginName]) {
+            message.metadata!.pluginContentItems![context.pluginName] = {};
+          }
+          message.metadata!.pluginContentItems![context.pluginName]![
             snippet.promptContextName
           ] = contentItem;
         });

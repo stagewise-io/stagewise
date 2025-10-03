@@ -15,7 +15,7 @@ export function ChatPanel() {
   const chatState = useChatState();
   const [isDragging, setIsDragging] = useState(false);
   const isWorking = useKartonState(
-    useComparingSelector((s) => s.workspace.agentChat?.isWorking || false),
+    useComparingSelector((s) => s.workspace?.agentChat?.isWorking || false),
   );
   const isConnected = useKartonConnected();
 
@@ -89,13 +89,13 @@ export function ChatPanel() {
         const heightDifference =
           Number.parseInt(
             window
-              .getComputedStyle(footerRef.current)
+              .getComputedStyle(footerRef.current!)
               .getPropertyValue('padding-bottom'),
-          ) - chatHistoryRef.current.clientHeight;
+          ) - chatHistoryRef.current!.clientHeight;
 
         // scroll the chat history by the height difference after applying the updated padding
-        chatHistoryRef.current.style.paddingBottom = `${footerRef.current.clientHeight}px`;
-        chatHistoryRef.current.scrollTop -= heightDifference;
+        chatHistoryRef.current!.style.paddingBottom = `${footerRef.current!.clientHeight}px`;
+        chatHistoryRef.current!.scrollTop -= heightDifference;
       });
       resizeObserver.observe(footerRef.current);
       return () => {

@@ -32,8 +32,8 @@ export function ChatPanelFooter({
   ref,
   inputRef,
 }: {
-  ref: React.RefObject<HTMLDivElement>;
-  inputRef: React.RefObject<HTMLTextAreaElement>;
+  ref: React.RefObject<HTMLDivElement | null>;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const chatState = useChatState();
   const { isWorking, activeChatId, chats } = useKartonState(
@@ -52,7 +52,7 @@ export function ChatPanelFooter({
   }, [stopAgent]);
 
   const activeChat = useMemo(() => {
-    return activeChatId ? chats[activeChatId] : null;
+    return activeChatId && chats ? chats[activeChatId] : null;
   }, [activeChatId, chats]);
 
   const [isComposing, setIsComposing] = useState(false);
@@ -93,7 +93,7 @@ export function ChatPanelFooter({
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        if (item.kind === 'file') {
+        if (item && item.kind === 'file') {
           const file = item.getAsFile();
           if (file) {
             files.push(file);

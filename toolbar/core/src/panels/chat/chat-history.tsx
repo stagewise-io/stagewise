@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useMemo, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
 import { Loader2Icon, SparklesIcon } from 'lucide-react';
 import { useComparingSelector, useKartonState } from '@/hooks/use-karton';
 import { cn } from '@/utils';
 import { ChatErrorBubble } from './chat-error-bubble';
 
-export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
+export const ChatHistory = forwardRef<HTMLDivElement>((_props, ref) => {
   const wasAtBottomRef = useRef(true);
 
   const { activeChatId, isWorking, chats } = useKartonState(
@@ -17,12 +17,12 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
   );
 
   const activeChat = useMemo(() => {
-    return activeChatId ? chats[activeChatId] : null;
+    return activeChatId ? chats?.[activeChatId] : null;
   }, [activeChatId, chats]);
 
   // Force scroll to the very bottom
   const scrollToBottom = () => {
-    const container = ref.current;
+    const container = (ref as React.RefObject<HTMLDivElement>)?.current;
     if (!container) return;
 
     // Use setTimeout to ensure DOM has updated
@@ -33,7 +33,7 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
 
   // Check if user is at the bottom of the scroll container
   const checkIfAtBottom = () => {
-    const container = ref.current;
+    const container = (ref as React.RefObject<HTMLDivElement>)?.current;
     if (!container) return true;
 
     // Use a more generous threshold to account for sub-pixel differences
@@ -52,7 +52,7 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
 
   // Auto-scroll to bottom when content changes, but only if user was at bottom
   useEffect(() => {
-    const container = ref.current;
+    const container = (ref as React.RefObject<HTMLDivElement>)?.current;
     if (!container) return;
 
     if (wasAtBottomRef.current) {
@@ -63,7 +63,7 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
 
   // Initialize scroll position tracking
   useEffect(() => {
-    const container = ref.current;
+    const container = (ref as React.RefObject<HTMLDivElement>)?.current;
     if (!container) return;
 
     container.addEventListener('scroll', handleScroll);
@@ -95,7 +95,9 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
       className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain py-4 pt-16 pr-0 pb-14 pl-3 text-foreground text-sm focus-within:outline-none hover:bg-white/0 focus:outline-none"
       onScroll={handleScroll}
       onMouseEnter={() => {
-        ref.current?.focus();
+        if (ref && typeof ref !== 'function') {
+          ref.current?.focus();
+        }
       }}
     >
       {renderedMessages.map((message, index) => {
@@ -127,4 +129,4 @@ export function ChatHistory({ ref }: { ref: React.RefObject<HTMLDivElement> }) {
       )}
     </section>
   );
-}
+});

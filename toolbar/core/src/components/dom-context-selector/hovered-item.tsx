@@ -39,13 +39,15 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
       boxRef.current.style.left = `${referenceRect.left - 2}px`;
       boxRef.current.style.width = `${referenceRect.width + 4}px`;
       boxRef.current.style.height = `${referenceRect.height + 4}px`;
-      boxRef.current.style.display = undefined;
+      boxRef.current.style.display = '';
     } else {
-      boxRef.current.style.height = '0px';
-      boxRef.current.style.width = '0px';
-      boxRef.current.style.top = `${windowSize.height / 2}px`;
-      boxRef.current.style.left = `${windowSize.width / 2}px`;
-      boxRef.current.style.display = 'none';
+      if (boxRef.current) {
+        boxRef.current.style.height = '0px';
+        boxRef.current.style.width = '0px';
+        boxRef.current.style.top = `${windowSize.height / 2}px`;
+        boxRef.current.style.left = `${windowSize.width / 2}px`;
+        boxRef.current.style.display = 'none';
+      }
     }
   }, [refElement, windowSize.height, windowSize.width]);
 
@@ -64,7 +66,7 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
           <span className="truncate">{refElement.tagName.toLowerCase()}</span>
         </div>
         {hoveredElementPluginContext
-          .filter((plugin) => plugin.context.annotation)
+          .filter((plugin) => plugin.context?.annotation)
           .map((plugin) => (
             <div
               key={plugin.pluginName}
@@ -76,7 +78,7 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
                     ?.iconSvg
                 }
               </span>
-              <span className="truncate">{plugin.context.annotation}</span>
+              <span className="truncate">{plugin.context?.annotation}</span>
             </div>
           ))}
       </div>

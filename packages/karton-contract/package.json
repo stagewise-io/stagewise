@@ -4,22 +4,17 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "private": true,
-  "scripts": {
-    "build": "tsc"
-  },
   "files": [
-    "dist"
+    "src"
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
     },
-    "./shared-types": {
-      "types": "./dist/shared-types.d.ts",
-      "import": "./dist/shared-types.js",
-      "require": "./dist/shared-types.cjs"
+    "./*": {
+      "import": "./src/*.ts",
+      "require": "./src/*.ts"
     }
   },
   "dependencies": {

@@ -1,5 +1,6 @@
 import './app.css';
 
+import type { FunctionComponent } from 'react';
 import { ContextProviders } from './components/context-providers';
 import { HotkeyListener } from './components/hotkey-listener';
 import { AppStateProvider } from './hooks/use-app-state';
@@ -8,7 +9,7 @@ import { UrlSynchronizer } from './components/url-synchronizer';
 import { MetaSynchronizer } from './components/meta-synchronizer';
 import { DefaultLayout } from './layouts/default';
 
-export function App(config?: InternalToolbarConfig) {
+export const App: FunctionComponent<InternalToolbarConfig> = (config) => {
   // Get the initial URL from the parent window
   // Ensure we have a valid path (default to '/' if empty)
   const pathname = window.location.pathname || '/';
@@ -42,4 +43,4 @@ export function App(config?: InternalToolbarConfig) {
       </AppStateProvider>
     </>
   );
-}
+};

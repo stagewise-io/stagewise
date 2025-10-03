@@ -73,15 +73,15 @@ export function DOMContextSelector() {
       mouseState.current.lastX,
       mouseState.current.lastY,
     );
-    if (selectedItems.includes(refElement)) {
+    if (!refElement || selectedItems.includes(refElement)) {
       setHoversAddable(false);
       lastHoveredElement.current = null;
       setHoveredElement(null);
       return;
     }
     if (lastHoveredElement.current !== refElement) {
-      lastHoveredElement.current = refElement;
-      setHoveredElement(refElement);
+      lastHoveredElement.current = refElement || null;
+      setHoveredElement(refElement || null);
       setHoversAddable(true);
     }
   }, [selectedItems]);
@@ -106,14 +106,20 @@ export function DOMContextSelector() {
       const distance = Math.hypot(deltaX, deltaY);
 
       mouseState.current = {
-        lastX: deltaTime > 0 ? event.clientX : mouseState.current?.lastX,
-        lastY: deltaTime > 0 ? event.clientY : mouseState.current?.lastY,
+        lastX:
+          deltaTime > 0
+            ? event.clientX
+            : (mouseState.current?.lastX ?? event.clientX),
+        lastY:
+          deltaTime > 0
+            ? event.clientY
+            : (mouseState.current?.lastY ?? event.clientY),
         velocity: deltaTime > 0 ? (distance / deltaTime) * 1000 : 0,
         lastTimestamp: currentTimestamp,
       };
 
       // If velocity exceeds 30 pixels per second, delay update
-      if (mouseState.current?.velocity > 30) {
+      if (mouseState.current.velocity > 30) {
         if (nextUpdateTimeout.current) {
           clearTimeout(nextUpdateTimeout.current);
         }
@@ -128,7 +134,9 @@ export function DOMContextSelector() {
   const handleMouseLeave = useCallback<
     MouseEventHandler<HTMLDivElement>
   >(() => {
-    clearTimeout(nextUpdateTimeout.current);
+    if (nextUpdateTimeout.current) {
+      clearTimeout(nextUpdateTimeout.current);
+    }
     lastHoveredElement.current = null;
     setHoveredElement(null);
   }, []);
