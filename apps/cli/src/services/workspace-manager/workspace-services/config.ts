@@ -6,34 +6,13 @@
 
 import type { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
-import { z } from 'zod';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { WorkspaceLoadingOverrides } from '../loading-overrides';
-
-const pluginSchema = z.union([
-  z.string(),
-  z
-    .object({
-      name: z.string(),
-      path: z.string().optional(),
-      url: z.string().optional(),
-    })
-    .refine((data) => (data.path && !data.url) || (!data.path && data.url), {
-      message: 'Plugin must have either path or url, but not both',
-    }),
-]);
-
-export const workspaceConfigSchema = z
-  .object({
-    appPort: z.number(),
-    eddyMode: z.enum(['flappy']).optional(),
-    autoPlugins: z.boolean().optional(),
-    plugins: z.array(pluginSchema).optional(),
-  })
-  .passthrough();
-
-export type WorkspaceConfig = z.infer<typeof workspaceConfigSchema>;
+import {
+  type WorkspaceConfig,
+  workspaceConfigSchema,
+} from '@stagewise/karton-contract/shared-types';
 
 export class ConfigNotExistingException extends Error {
   constructor() {

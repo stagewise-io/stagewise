@@ -1,0 +1,55 @@
+import { z } from 'zod';
+
+/**
+ * GLOBAL CONFIG CAPABILITIES
+ */
+
+export const globalConfigSchema = z
+  .object({
+    telemetryLevel: z.enum(['off', 'anonymous', 'full']).default('anonymous'),
+  })
+  .loose();
+
+export type GlobalConfig = z.infer<typeof globalConfigSchema>;
+
+/**
+ * WORKSPACE CONFIG CAPABILITIES
+ */
+
+export const pluginSchema = z.union([
+  z.string(),
+  z
+    .object({
+      name: z.string(),
+      path: z.string().optional(),
+      url: z.string().optional(),
+    })
+    .refine((data) => (data.path && !data.url) || (!data.path && data.url), {
+      message: 'Plugin must have either path or url, but not both',
+    }),
+]);
+
+export const workspaceConfigSchema = z
+  .object({
+    appPort: z.number(),
+    eddyMode: z.enum(['flappy']).optional(),
+    autoPlugins: z.boolean().optional(),
+    plugins: z.array(pluginSchema).optional(),
+  })
+  .loose();
+
+export type WorkspaceConfig = z.infer<typeof workspaceConfigSchema>;
+
+/**
+ * FILE PICKER CAPABILITIES
+ */
+
+export type FilePickerMode = 'file' | 'directory';
+
+export type FilePickerRequest = {
+  title?: string;
+  description?: string;
+  type: FilePickerMode;
+  multiple?: boolean;
+  allowCreateDirectory?: boolean;
+};

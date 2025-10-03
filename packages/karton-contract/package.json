@@ -15,6 +15,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./shared-types": {
+      "types": "./dist/shared-types.d.ts",
+      "import": "./dist/shared-types.js",
+      "require": "./dist/shared-types.cjs"
     }
   },
   "dependencies": {

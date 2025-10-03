@@ -1,16 +1,11 @@
 import type { GlobalDataPathService } from './global-data-path';
-import { z } from 'zod';
 import fs from 'node:fs/promises';
 import type { Logger } from './logger';
 import type { KartonService } from './karton';
-
-const globalConfigSchema = z
-  .object({
-    telemetryLevel: z.enum(['off', 'anonymous', 'full']).default('anonymous'),
-  })
-  .passthrough();
-
-export type GlobalConfig = z.infer<typeof globalConfigSchema>;
+import {
+  type GlobalConfig,
+  globalConfigSchema,
+} from '@stagewise/karton-contract/shared-types';
 
 /**
  * The global config service gives access to a global config objects that's stored

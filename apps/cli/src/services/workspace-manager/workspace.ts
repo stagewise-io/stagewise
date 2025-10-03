@@ -52,6 +52,7 @@ export class WorkspaceService {
         path: this.workspacePath,
         config: null,
         plugins: null,
+        setupActive: false,
       };
     });
 

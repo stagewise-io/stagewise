@@ -2,16 +2,7 @@ import type { UserMessageMetadata, SelectedElement } from './metadata.js';
 import type { UIMessage, UIDataTypes } from 'ai';
 import type { UITools, ToolPart } from '@stagewise/agent-tools';
 import type { Tool, FileDiff, ToolResult } from '@stagewise/agent-types';
-
-export type FilePickerMode = 'file' | 'directory';
-
-export type FilePickerRequest = {
-  title?: string;
-  description?: string;
-  type: FilePickerMode;
-  multiple?: boolean;
-  allowCreateDirectory?: boolean;
-};
+import type { WorkspaceConfig, FilePickerRequest } from './shared-types';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
 export type { UserMessageMetadata, SelectedElement };
@@ -103,6 +94,7 @@ type AppState = {
           error?: string;
         } & ({ url: string } | { path: string }))[]
       | null; // The list of plugins that were loaded in the workspace
+    setupActive: boolean;
   } | null;
   workspaceStatus: 'open' | 'closed' | 'loading' | 'closing' | 'setup';
   userAccount: {
@@ -202,6 +194,10 @@ export type KartonContract = {
     workspace: {
       open: (path: string) => Promise<void>;
       close: () => Promise<void>;
+      setup: {
+        submit: (config: WorkspaceConfig) => Promise<void>;
+        checkForActiveAppOnPort: (port: number) => Promise<boolean>;
+      };
     };
     filePicker: {
       createRequest: (request: FilePickerRequest) => Promise<string[]>;
