@@ -38,9 +38,9 @@ export function ChatPanelFooter({
   const chatState = useChatState();
   const { isWorking, activeChatId, chats } = useKartonState(
     useComparingSelector((s) => ({
-      isWorking: s.workspace.agentChat?.isWorking || false,
-      activeChatId: s.workspace.agentChat?.activeChatId || null,
-      chats: s.workspace.agentChat?.chats || {},
+      activeChatId: s.workspace?.agentChat?.activeChatId,
+      isWorking: s.workspace?.agentChat?.isWorking,
+      chats: s.workspace?.agentChat?.chats,
     })),
   );
   const stopAgent = useKartonProcedure((p) => p.agentChat.abortAgentCall);

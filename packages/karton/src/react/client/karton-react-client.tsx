@@ -107,14 +107,16 @@ export function createKartonReactClient<T>(
 
     const { client, subscribe } = context;
 
+    const selectorFunc = useCallback(
+      () => selector(client.state),
+      [selector, client.state],
+    );
+
     // Use React's built-in store subscription hook
     const selectedValue = useSyncExternalStore(
       subscribe,
-      useCallback(() => selector(client.state), [selector, client.state]),
-      useCallback(
-        () => selector(config.fallbackState),
-        [selector, config.fallbackState],
-      ),
+      selectorFunc,
+      selectorFunc,
     );
 
     return selectedValue;

@@ -28,27 +28,6 @@ interface InternalAppState extends AppState {
 
 const AppContext = createContext<AppState | null>(null);
 
-const STORAGE_KEY = 'stgws:companion';
-
-function _loadStateFromStorage(): Partial<InternalAppState> {
-  try {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    if (!stored) return {};
-    return JSON.parse(stored);
-  } catch (error) {
-    console.error('Failed to load state from storage:', error);
-    return {};
-  }
-}
-
-function _saveStateToStorage(state: Partial<InternalAppState>) {
-  try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.error('Failed to save state to storage:', error);
-  }
-}
-
 export function AppStateProvider({ children }: { children?: ReactNode }) {
   const [state, setState] = useState<InternalAppState>(() => {
     return {
