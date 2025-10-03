@@ -100,6 +100,7 @@ export type AppState = {
       indexProgress: number;
       indexTotal: number;
     };
+    loadedOnStart: boolean;
   } | null;
   workspaceStatus: 'open' | 'closed' | 'loading' | 'closing' | 'setup';
   userAccount: {

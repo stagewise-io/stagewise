@@ -17,7 +17,9 @@ export const getProxyMiddleware = (
       // - no workspace is active
       const isToolbarPath = pathname.startsWith(stagewiseAppPrefix);
       const isDocument = req.headers['sec-fetch-dest'] === 'document';
-      const isWorkspaceActive = workspaceManager.workspace !== null;
+      const isWorkspaceActive =
+        workspaceManager.workspace !== null &&
+        workspaceManager.workspace?.configService !== null;
 
       if (isToolbarPath || isDocument || !isWorkspaceActive) {
         logger.debug(
@@ -33,7 +35,7 @@ export const getProxyMiddleware = (
     followRedirects: false, // Don't automatically follow redirects to prevent loops
     router: () => {
       const targetPort =
-        workspaceManager.workspace?.configService.get().appPort;
+        workspaceManager.workspace?.configService?.get().appPort;
       if (!targetPort) {
         throw new Error(
           "[DevAppProxy] Proxy request received while no app port is configured. This shouldn't happen...",
@@ -52,7 +54,7 @@ export const getProxyMiddleware = (
       // @ts-expect-error
       error: (err, _req, res: ServerResponse<IncomingMessage>) => {
         const targetPort =
-          workspaceManager.workspace?.configService.get().appPort;
+          workspaceManager.workspace?.configService?.get().appPort;
         logger.error(`[DevAppProxy] Proxy error: ${err}`);
         res.writeHead(503, { 'Content-Type': 'text/html' });
         res.end(errorPage(targetPort ?? 0));

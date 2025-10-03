@@ -118,7 +118,6 @@ export class WorkspaceSetupService {
     });
 
     this._setupCompleted = false;
-    this.onSetupCompleted?.();
   }
 
   private async handleSetupSubmission(config: WorkspaceConfig): Promise<void> {

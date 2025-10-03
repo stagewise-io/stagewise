@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/tooltip';
 import { NotificationToaster } from './notification-toaster';
 import { FooterBar } from './sections/footer-bar';
+import { WorkspaceSetupDialog } from './dialogs/workspace-setup';
 
 export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
   const { leftPanelContent, toggleLeftPanel } = usePanels();
@@ -259,6 +260,7 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
 
       <AuthDialog />
       <FilePickerDialog />
+      <WorkspaceSetupDialog />
     </div>
   );
 }

@@ -32,7 +32,7 @@ export async function setupAppLoaderRoutes(
   // Last, we register the doc handler for the bootstrap HTML document which should be loaded from the root path
   app.get('*', async (_, res) => {
     const plugins =
-      workspaceManager.workspace?.pluginService.loadedPlugins || [];
+      workspaceManager.workspace?.pluginService?.loadedPlugins || [];
     const html = await getBootstrapHtmlDocument(plugins);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -129,7 +129,7 @@ function createToolbarConfigHandler(workspaceManager: WorkspaceManagerService) {
   return async (_req: Request, res: Response) => {
     try {
       const plugins =
-        workspaceManager.workspace?.pluginService.loadedPlugins || [];
+        workspaceManager.workspace?.pluginService?.loadedPlugins || [];
       const availablePlugins = plugins.filter((p) => p.available !== false);
       const pluginImports: string[] = [];
       const pluginExports: string[] = [];
@@ -164,15 +164,15 @@ try {
 
       const convertedConfig: Record<string, any> = {
         plugins: '__PLUGIN_PLACEHOLDER__',
-        devAppPort: workspaceManager.workspace?.configService.get().appPort,
+        devAppPort: workspaceManager.workspace?.configService?.get().appPort,
       };
 
       // Add eddyMode if it exists
       if (
-        workspaceManager.workspace?.configService.get().eddyMode !== undefined
+        workspaceManager.workspace?.configService?.get().eddyMode !== undefined
       ) {
         convertedConfig.eddyMode =
-          workspaceManager.workspace?.configService.get().eddyMode;
+          workspaceManager.workspace?.configService?.get().eddyMode;
       }
 
       let configString = JSON.stringify(convertedConfig);

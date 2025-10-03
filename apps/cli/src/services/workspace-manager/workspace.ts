@@ -11,7 +11,7 @@ import type { TelemetryService } from '../telemetry';
 import type { WorkspaceLoadingOverrides } from './loading-overrides';
 import { WorkspaceConfigService } from './workspace-services/config';
 import { WorkspacePluginService } from './workspace-services/plugin';
-import type { WorkspaceSetupService } from './workspace-services/setup';
+import { WorkspaceSetupService } from './workspace-services/setup';
 import type { AuthService } from '../auth';
 import { RagService } from '../rag';
 
@@ -62,65 +62,73 @@ export class WorkspaceService {
         config: null,
         plugins: null,
         setupActive: false,
+        loadedOnStart: this.loadedOnStart,
       };
     });
 
-    // Start all child services of the workspace
-    this.workspaceConfigService = await WorkspaceConfigService.create(
+    // Start all child services of the workspace. All regular services should only be staarted if the setup service is done.
+    this.workspaceSetupService = await WorkspaceSetupService.create(
       this.logger,
       this.kartonService,
       this.workspacePath,
-      this.workspaceLoadingOverrides,
+      async () => {
+        this.workspaceConfigService = await WorkspaceConfigService.create(
+          this.logger,
+          this.kartonService,
+          this.workspacePath,
+          this.workspaceLoadingOverrides,
+        );
+
+        this.workspacePluginService = await WorkspacePluginService.create(
+          this.logger,
+          this.kartonService,
+          this.workspaceConfigService,
+          this.workspacePath,
+        );
+
+        const clientRuntime = new ClientRuntimeNode({
+          workingDirectory: this.workspacePath,
+        });
+
+        this.agentService = await AgentService.create(
+          this.logger,
+          this.telemetryService,
+          this.kartonService,
+          this.authService,
+          clientRuntime,
+        );
+
+        this.ragService = await RagService.create(
+          this.logger,
+          this.telemetryService,
+          this.kartonService,
+          this.authService,
+          clientRuntime,
+        );
+
+        this.telemetryService.capture('workspace-opened', {
+          auto_plugins_enabled:
+            this.workspaceConfigService.get().autoPlugins ?? true,
+          manual_plugins_count:
+            this.workspacePluginService.loadedPlugins.filter((p) => !p.bundled)
+              .length,
+          loaded_plugins: this.workspacePluginService.loadedPlugins.map(
+            (plugin) => plugin.name,
+          ),
+          has_wrapped_command: false, // TODO: Add has wrapped command flag
+          codebase_line_count: 0, // TODO: Add codebase line count
+          dependency_count: Object.keys(
+            await discoverDependencies(this.workspacePath),
+          ).length, // TODO: Add dependency count
+          loading_method: this.loadedOnStart
+            ? this.pathGivenInStartingArg
+              ? 'on_start_with_arg'
+              : 'on_start'
+            : 'at_runtime_by_user_action',
+          initial_setup: false, // TODO
+        });
+      },
     );
-
-    this.workspacePluginService = await WorkspacePluginService.create(
-      this.logger,
-      this.kartonService,
-      this.workspaceConfigService,
-      this.workspacePath,
-    );
-
-    const clientRuntime = new ClientRuntimeNode({
-      workingDirectory: this.workspacePath,
-    });
-
-    this.agentService = await AgentService.create(
-      this.logger,
-      this.telemetryService,
-      this.kartonService,
-      this.authService,
-      clientRuntime,
-    );
-
-    this.ragService = await RagService.create(
-      this.logger,
-      this.telemetryService,
-      this.kartonService,
-      this.authService,
-      clientRuntime,
-    );
-
-    this.telemetryService.capture('workspace-opened', {
-      auto_plugins_enabled:
-        this.workspaceConfigService.get().autoPlugins ?? true,
-      manual_plugins_count: this.workspacePluginService.loadedPlugins.filter(
-        (p) => !p.bundled,
-      ).length,
-      loaded_plugins: this.workspacePluginService.loadedPlugins.map(
-        (plugin) => plugin.name,
-      ),
-      has_wrapped_command: false, // TODO: Add has wrapped command flag
-      codebase_line_count: 0, // TODO: Add codebase line count
-      dependency_count: Object.keys(
-        await discoverDependencies(this.workspacePath),
-      ).length, // TODO: Add dependency count
-      loading_method: this.loadedOnStart
-        ? this.pathGivenInStartingArg
-          ? 'on_start_with_arg'
-          : 'on_start'
-        : 'at_runtime_by_user_action',
-      initial_setup: false, // TODO
-    });
   }
 
   public static async create(
@@ -152,8 +160,6 @@ export class WorkspaceService {
     this.logger.debug('[WorkspaceService] Teardown called');
 
     // TODO: Teardown all the child services hosted within this workspace.
-    await this.workspaceConfigService?.teardown();
-    await this.workspacePluginService?.teardown();
     this.agentService?.teardown();
     this.ragService?.teardown();
     await this.workspaceSetupService?.teardown();
@@ -169,11 +175,11 @@ export class WorkspaceService {
     return this.workspacePath;
   }
 
-  get configService(): WorkspaceConfigService {
+  get configService(): WorkspaceConfigService | null {
     return this.workspaceConfigService!;
   }
 
-  get pluginService(): WorkspacePluginService {
+  get pluginService(): WorkspacePluginService | null {
     return this.workspacePluginService!;
   }
 }
