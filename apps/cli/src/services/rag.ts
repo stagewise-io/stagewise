@@ -11,7 +11,6 @@ export class RagService {
   private kartonService: KartonService;
   private authService: AuthService;
   private clientRuntime: ClientRuntime;
-  private isIndexing = false;
   private updateRagInterval: NodeJS.Timeout | null = null;
 
   private constructor(
@@ -28,27 +27,48 @@ export class RagService {
     this.clientRuntime = clientRuntime;
 
     this.kartonService.setState((draft) => {
-      if (!draft.workspace?.agentChat) {
-        draft.workspace!.agentChat = {
-          chats: {},
-          activeChatId: null,
-          toolCallApprovalRequests: [],
-          isWorking: false,
+      if (!draft.workspace?.rag) {
+        draft.workspace!.rag = {
+          isIndexing: false,
+          indexProgress: 0,
+          indexTotal: 0,
         };
       }
     });
   }
 
   private async updateRag(apiKey: string) {
-    this.isIndexing = true;
-    for await (const update of initializeRag(this.clientRuntime, apiKey))
+    this.kartonService.setState((draft) => {
+      draft.workspace!.rag = {
+        isIndexing: true,
+        indexProgress: 0,
+        indexTotal: 0,
+      };
+    });
+    let total = 0;
+    for await (const update of initializeRag(this.clientRuntime, apiKey)) {
       this.logger.debug(`updating rag: ${update.progress}/${update.total}`);
-    this.isIndexing = false;
+      this.kartonService.setState((draft) => {
+        draft.workspace!.rag = {
+          isIndexing: true,
+          indexProgress: update.progress,
+          indexTotal: update.total,
+        };
+      });
+      total = update.total;
+    }
+    this.kartonService.setState((draft) => {
+      draft.workspace!.rag = {
+        isIndexing: false,
+        indexProgress: total,
+        indexTotal: total,
+      };
+    });
   }
 
   private async periodicallyUpdateRag(apiKey: string) {
     this.updateRagInterval = setInterval(async () => {
-      if (this.isIndexing) {
+      if (this.kartonService.state.workspace?.rag?.isIndexing) {
         if (this.updateRagInterval) clearInterval(this.updateRagInterval);
         this.updateRagInterval = null;
         this.periodicallyUpdateRag(apiKey);

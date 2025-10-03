@@ -95,6 +95,11 @@ export type AppState = {
         } & ({ url: string } | { path: string }))[]
       | null; // The list of plugins that were loaded in the workspace
     setupActive: boolean;
+    rag: {
+      isIndexing: boolean;
+      indexProgress: number;
+      indexTotal: number;
+    };
   } | null;
   workspaceStatus: 'open' | 'closed' | 'loading' | 'closing' | 'setup';
   userAccount: {

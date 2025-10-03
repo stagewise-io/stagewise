@@ -4,6 +4,11 @@ export const LEVEL_DB_SCHEMA_VERSION = 1;
 
 export { LevelDb } from './utils/typed-db.js';
 
+export { searchAndSaveAppInformationFromProject } from './search-agents/search-app-information.js';
+export { searchAndSaveComponentInformationFromSelectedElements } from './search-agents/search-components.js';
+export { searchAndSaveRouteInformationFromProject } from './search-agents/search-routes.js';
+export { searchAndSaveStyleInformationFromProject } from './search-agents/search-styles.js';
+
 export type { ComponentLibraryInformation } from './search-agents/search-components.js';
 export type { StyleInformation } from './search-agents/search-styles.js';
 export type { RouteMapping } from './search-agents/search-routes.js';
