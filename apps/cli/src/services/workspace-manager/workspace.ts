@@ -13,6 +13,7 @@ import { WorkspaceConfigService } from './workspace-services/config';
 import { WorkspacePluginService } from './workspace-services/plugin';
 import type { WorkspaceSetupService } from './workspace-services/setup';
 import type { AuthService } from '../auth';
+import { RagService } from '../rag';
 
 export class WorkspaceService {
   private logger: Logger;
@@ -28,6 +29,7 @@ export class WorkspaceService {
   private workspacePluginService: WorkspacePluginService | null = null;
   private workspaceSetupService: WorkspaceSetupService | null = null;
   private agentService: AgentService | null = null;
+  private ragService: RagService | null = null;
 
   private constructor(
     logger: Logger,
@@ -90,6 +92,14 @@ export class WorkspaceService {
       clientRuntime,
     );
 
+    this.ragService = await RagService.create(
+      this.logger,
+      this.telemetryService,
+      this.kartonService,
+      this.authService,
+      clientRuntime,
+    );
+
     this.telemetryService.capture('workspace-opened', {
       auto_plugins_enabled:
         this.workspaceConfigService.get().autoPlugins ?? true,
@@ -144,7 +154,8 @@ export class WorkspaceService {
     // TODO: Teardown all the child services hosted within this workspace.
     await this.workspaceConfigService?.teardown();
     await this.workspacePluginService?.teardown();
-    await this.agentService?.teardown();
+    this.agentService?.teardown();
+    this.ragService?.teardown();
     await this.workspaceSetupService?.teardown();
     await this.workspacePluginService?.teardown();
     await this.workspaceConfigService?.teardown();

@@ -1,0 +1,51 @@
+{
+  "name": "@stagewise/agent-rag",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.cjs",
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && pnpm run build:types && pnpm run build:bundle",
+    "build:types": "tsc --emitDeclarationOnly",
+    "build:bundle": "tsx build.ts",
+    "dev": "tsx build.ts --watch",
+    "clean": "rimraf dist",
+    "lint": "echo 'No linting for rag package'",
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test-lance": "tsx src/test-lance.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "2.0.9",
+    "@lancedb/lancedb": "^0.21.3",
+    "@stagewise/agent-prompt-snippets": "workspace:*",
+    "@stagewise/agent-runtime-interface": "workspace:*",
+    "@stagewise/agent-runtime-node": "workspace:*",
+    "@stagewise/agent-tools": "workspace:*",
+    "abstract-level": "^3.1.0",
+    "ai": "5.0.9",
+    "level": "^10.0.0",
+    "openai": "^5.20.2",
+    "zod": "4.0.17"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.9",
+    "rimraf": "^5.0.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
+  }
+}

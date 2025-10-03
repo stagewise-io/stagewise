@@ -54,7 +54,10 @@ async function buildCLI() {
     await mkdir('dist', { recursive: true });
 
     // Only keep external the packages that have issues with bundling
-    const externalPackages: string[] = [];
+    const externalPackages: string[] = [
+      '@lancedb/lancedb', // Native bindings
+      'level', // Native bindings
+    ];
 
     // Build the CLI bundling most dependencies
     const result = await build({

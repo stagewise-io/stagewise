@@ -53,6 +53,7 @@
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
     "@stagewise/agent-utils": "workspace:*",
+    "@stagewise/agent-rag": "workspace:*",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.0",
     "dotenv-cli": "^9.0.0",
