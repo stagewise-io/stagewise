@@ -71,12 +71,13 @@ export class WorkspaceService {
       this.logger,
       this.kartonService,
       this.workspacePath,
-      async () => {
+      async (setupConfig) => {
         this.workspaceConfigService = await WorkspaceConfigService.create(
           this.logger,
           this.kartonService,
           this.workspacePath,
           this.workspaceLoadingOverrides,
+          setupConfig,
         );
 
         this.workspacePluginService = await WorkspacePluginService.create(

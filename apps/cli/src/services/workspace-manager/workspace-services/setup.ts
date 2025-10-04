@@ -12,7 +12,6 @@ import type { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
 import fs from 'node:fs';
 import path from 'node:path';
-import { WorkspaceConfigService } from './config';
 import {
   type WorkspaceConfig,
   workspaceConfigSchema,
@@ -29,13 +28,13 @@ export class WorkspaceSetupService {
   private kartonService: KartonService;
   private workspacePath: string;
   private _setupCompleted = false;
-  private onSetupCompleted?: () => void;
+  private onSetupCompleted?: (config: WorkspaceConfig | null) => void;
 
   private constructor(
     logger: Logger,
     kartonService: KartonService,
     workspacePath: string,
-    onSetupCompleted?: () => void,
+    onSetupCompleted?: (config: WorkspaceConfig | null) => void,
   ) {
     this.logger = logger;
     this.kartonService = kartonService;
@@ -61,7 +60,7 @@ export class WorkspaceSetupService {
           '[WorkspaceSetupService] Config file is valid. Setting setup completed to true..',
         );
         this._setupCompleted = true;
-        this.onSetupCompleted?.();
+        this.onSetupCompleted?.(null);
         return;
       }
     }
@@ -93,7 +92,7 @@ export class WorkspaceSetupService {
     logger: Logger,
     kartonService: KartonService,
     workspacePath: string,
-    onSetupCompleted?: () => void,
+    onSetupCompleted?: (config: WorkspaceConfig | null) => void,
   ): Promise<WorkspaceSetupService> {
     const instance = new WorkspaceSetupService(
       logger,
@@ -116,7 +115,6 @@ export class WorkspaceSetupService {
         draft.workspace.setupActive = false;
       }
     });
-
     this._setupCompleted = false;
   }
 
@@ -127,12 +125,6 @@ export class WorkspaceSetupService {
       throw new Error('Invalid config', { cause: validatedConfig.error });
     }
 
-    // Write the data to the config file (override the existing config file)
-    await WorkspaceConfigService.createNewConfigFile(
-      validatedConfig.data,
-      this.workspacePath,
-    );
-
     // Update the karton state to reflect the new config
     this.kartonService.setState((draft) => {
       if (draft.workspace) {
@@ -142,7 +134,7 @@ export class WorkspaceSetupService {
 
     // Notify the listeners
     this._setupCompleted = true;
-    this.onSetupCompleted?.();
+    this.onSetupCompleted?.(validatedConfig.data);
   }
 
   private async handleCheckForActiveAppOnPort(port: number): Promise<boolean> {

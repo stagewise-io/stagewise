@@ -1,8 +1,9 @@
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
-import type { DependencyMap } from './types.js';
+import type { DependencyMap } from './types';
 import ignore from 'ignore';
+import type { Logger } from '@/services/logger';
 
 async function loadGitignore(dir: string): Promise<ReturnType<typeof ignore>> {
   const ig = ignore();
@@ -61,7 +62,10 @@ async function findPackageJsonFiles(
   return packageJsonFiles;
 }
 
-async function parsePackageJson(filePath: string): Promise<Set<string>> {
+async function parsePackageJson(
+  filePath: string,
+  _logger: Logger,
+): Promise<Set<string>> {
   const dependencies = new Set<string>();
 
   const content = await readFile(filePath, 'utf-8');
@@ -87,7 +91,8 @@ async function parsePackageJson(filePath: string): Promise<Set<string>> {
 }
 
 export async function discoverDependencies(
-  workingDirectory: string = process.cwd(),
+  workingDirectory: string,
+  logger: Logger,
 ): Promise<DependencyMap> {
   // Load gitignore rules
   const ig = await loadGitignore(workingDirectory);
@@ -99,7 +104,12 @@ export async function discoverDependencies(
   const allDependencies = new Set<string>();
 
   for (const file of packageJsonFiles) {
-    const deps = await parsePackageJson(file);
+    const deps = await parsePackageJson(file, logger).catch((err) => {
+      logger.error(
+        `[discoverDependencies] Failed to parse package.json file: ${file}. Reason: ${err}`,
+      );
+      return new Set<string>();
+    });
     deps.forEach((dep) => allDependencies.add(dep));
   }
 

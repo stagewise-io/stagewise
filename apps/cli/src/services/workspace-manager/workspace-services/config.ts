@@ -43,46 +43,74 @@ export class WorkspaceConfigService {
     this.workspaceLoadingOverrides = workspaceLoadingOverrides;
   }
 
-  private async initialize(): Promise<void> {
+  private async initialize(
+    newConfig: WorkspaceConfig | null = null,
+  ): Promise<void> {
     this.logger.debug('[WorkspaceConfigService] Initializing...');
-    const configFilePath = path.join(this.workspacePath, 'stagewise.json');
-    const configFile = await fs.readFile(configFilePath, 'utf-8').catch(() => {
-      this.logger.debug(
-        '[WorkspaceConfigService] No workspace config file found.',
-      );
-      throw new ConfigNotExistingException();
-    });
-    const storedConfig = workspaceConfigSchema.parse(JSON.parse(configFile));
 
-    // Now, we validate the loaded config and set that as the current config in this service.
-    // If the config is invalid, we throw an error.
-    const parsedConfig = workspaceConfigSchema.safeParse(storedConfig);
-    if (!parsedConfig.success) {
-      this.logger.error('The workspace config file is invalid.', {
-        cause: parsedConfig.error,
-        path: configFilePath,
-      });
-      throw new Error('Invalid global config');
-    }
-    this.config = parsedConfig.data;
-
-    // If a workspace loading override was set, now is the time to override the parts of the config that were overridden.
-    // We only do this once on initialization.
-    if (this.workspaceLoadingOverrides) {
-      this.config.appPort =
-        this.workspaceLoadingOverrides.appPort ?? this.config.appPort;
-    }
-
-    this.kartonService.setState((draft) => {
-      if (draft.workspace) {
-        draft.workspace.config = {
-          appPort: parsedConfig.data.appPort,
-          eddyMode: parsedConfig.data.eddyMode,
-          autoPlugins: parsedConfig.data.autoPlugins ?? true,
-          plugins: parsedConfig.data.plugins ?? [],
-        };
+    // If a initial config was passed, we use that instead of the config file and immediately store it
+    if (newConfig) {
+      const parsedConfig = workspaceConfigSchema.safeParse(newConfig);
+      if (!parsedConfig.success) {
+        this.logger.error('The workspace config is invalid.', {
+          cause: parsedConfig.error,
+        });
+        throw new Error('Invalid workspace config');
       }
-    });
+      this.config = newConfig;
+      this.kartonService.setState((draft) => {
+        if (draft.workspace) {
+          draft.workspace.config = {
+            appPort: parsedConfig.data.appPort,
+            eddyMode: parsedConfig.data.eddyMode,
+            autoPlugins: parsedConfig.data.autoPlugins ?? true,
+            plugins: parsedConfig.data.plugins ?? [],
+          };
+        }
+      });
+      return;
+    } else {
+      const configFilePath = path.join(this.workspacePath, 'stagewise.json');
+      const configFile = await fs
+        .readFile(configFilePath, 'utf-8')
+        .catch(() => {
+          this.logger.debug(
+            '[WorkspaceConfigService] No workspace config file found.',
+          );
+          throw new ConfigNotExistingException();
+        });
+      const storedConfig = workspaceConfigSchema.parse(JSON.parse(configFile));
+
+      // Now, we validate the loaded config and set that as the current config in this service.
+      // If the config is invalid, we throw an error.
+      const parsedConfig = workspaceConfigSchema.safeParse(storedConfig);
+      if (!parsedConfig.success) {
+        this.logger.error('The workspace config file is invalid.', {
+          cause: parsedConfig.error,
+          path: configFilePath,
+        });
+        throw new Error('Invalid workspace config');
+      }
+      this.config = parsedConfig.data;
+
+      // If a workspace loading override was set, now is the time to override the parts of the config that were overridden.
+      // We only do this once on initialization.
+      if (this.workspaceLoadingOverrides) {
+        this.config.appPort =
+          this.workspaceLoadingOverrides.appPort ?? this.config.appPort;
+      }
+
+      this.kartonService.setState((draft) => {
+        if (draft.workspace) {
+          draft.workspace.config = {
+            appPort: parsedConfig.data.appPort,
+            eddyMode: parsedConfig.data.eddyMode,
+            autoPlugins: parsedConfig.data.autoPlugins ?? true,
+            plugins: parsedConfig.data.plugins ?? [],
+          };
+        }
+      });
+    }
 
     // We also store the config once it's validated. We do that to make sure that the stored config is always aligned with the schema.
     this.logger.debug(
@@ -97,6 +125,7 @@ export class WorkspaceConfigService {
     kartonService: KartonService,
     workspacePath: string,
     workspaceLoadingOverrides: WorkspaceLoadingOverrides | null = null,
+    initialConfig: WorkspaceConfig | null = null,
   ): Promise<WorkspaceConfigService> {
     const instance = new WorkspaceConfigService(
       logger,
@@ -104,7 +133,7 @@ export class WorkspaceConfigService {
       workspacePath,
       workspaceLoadingOverrides,
     );
-    await instance.initialize();
+    await instance.initialize(initialConfig);
     return instance;
   }
 
@@ -112,18 +141,6 @@ export class WorkspaceConfigService {
     this.logger.debug('[WorkspaceConfigService] Teardown called');
     this.config = null;
     this.configUpdatedListeners = [];
-  }
-
-  /**
-   * This function should be used to create a new config file for a workspace.
-   * The service will only start if the config file exists.
-   */
-  public static async createNewConfigFile(
-    config: WorkspaceConfig,
-    workspacePath: string,
-  ) {
-    const configPath = path.join(workspacePath, 'stagewise.json');
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
   }
 
   public get(): WorkspaceConfig {

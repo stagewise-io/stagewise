@@ -222,10 +222,10 @@ export class WorkspacePluginService {
     // package.json heuristic: combine all dependnencies of all package.json files in the the workspace and check if some plugins match these dependencies
     const allDependencies = await discoverDependencies(
       this.workspacePath,
+      this.logger,
     ).catch((error) => {
       this.logger.error(
-        '[WorkspacePluginService] Failed to discover dependencies',
-        { cause: error },
+        `[WorkspacePluginService] Failed to discover dependencies. Reason: ${error}`,
       );
       return {};
     });
