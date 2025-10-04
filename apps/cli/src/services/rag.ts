@@ -37,6 +37,16 @@ export class RagService {
     });
   }
 
+  private async resetRagState() {
+    this.kartonService.setState((draft) => {
+      draft.workspace!.rag = {
+        isIndexing: false,
+        indexProgress: 0,
+        indexTotal: 0,
+      };
+    });
+  }
+
   private async updateRag(apiKey: string) {
     this.kartonService.setState((draft) => {
       draft.workspace!.rag = {
@@ -68,39 +78,53 @@ export class RagService {
 
   private async periodicallyUpdateRag(apiKey: string) {
     this.updateRagInterval = setInterval(async () => {
-      if (this.kartonService.state.workspace?.rag?.isIndexing) {
+      try {
+        if (this.kartonService.state.workspace?.rag?.isIndexing) {
+          if (this.updateRagInterval) clearInterval(this.updateRagInterval);
+          this.updateRagInterval = null;
+          this.periodicallyUpdateRag(apiKey);
+          return;
+        }
+
+        await this.updateRag(apiKey);
+      } catch (error) {
+        this.logger.error(
+          '[RagService] Failed to periodically update RAG',
+          error,
+        );
+        this.resetRagState();
         if (this.updateRagInterval) clearInterval(this.updateRagInterval);
         this.updateRagInterval = null;
         this.periodicallyUpdateRag(apiKey);
-        return;
       }
-
-      await this.updateRag(apiKey);
     }, 60 * 1000); // 1 Minute
-    return () =>
-      this.updateRagInterval && clearInterval(this.updateRagInterval);
   }
 
   public async initialize() {
-    const tokens = await this.authService.getToken();
-    const apiKey = tokens?.accessToken;
-    if (!apiKey) {
-      this.logger.debug('[RagService] No authentication tokens available');
-      return;
+    try {
+      const tokens = await this.authService.getToken();
+      const apiKey = tokens?.accessToken;
+      if (!apiKey) {
+        this.logger.debug('[RagService] No authentication tokens available');
+        return;
+      }
+
+      this.logger.debug('[RagService] Initializing...');
+
+      // Register all karton procedure handlers
+      this.registerProcedureHandlers();
+
+      // Update RAG
+      await this.updateRag(apiKey);
+
+      // Periodically update RAG
+      this.periodicallyUpdateRag(apiKey);
+
+      this.logger.debug('[RagService] Initialized');
+    } catch (error) {
+      this.logger.error('[RagService] Failed to initialize', error);
+      this.resetRagState();
     }
-
-    this.logger.debug('[RagService] Initializing...');
-
-    // Register all karton procedure handlers
-    this.registerProcedureHandlers();
-
-    // Update RAG
-    await this.updateRag(apiKey);
-
-    // Periodically update RAG
-    this.periodicallyUpdateRag(apiKey);
-
-    this.logger.debug('[RagService] Initialized');
   }
 
   private registerProcedureHandlers() {
@@ -113,7 +137,9 @@ export class RagService {
 
   private removeServerProcedureHandlers() {}
 
-  // TODO: implement the right teardown
+  /**
+   * Teardown the RAG service
+   */
   public teardown() {
     this.removeServerProcedureHandlers();
     this.cleanupPendingOperations('Rag teardown');
