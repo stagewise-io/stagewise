@@ -1,7 +1,6 @@
 import envPaths, { type Paths } from 'env-paths';
 import path from 'node:path';
 import { getEnvMode } from '@/utils/env';
-import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import type { Logger } from './logger';
 
@@ -55,41 +54,11 @@ export class GlobalDataPathService {
   }
 
   /**
-   * Returns the path to a data folder for a specific workspace
-   *
-   * The path is hashed to avoid conflicts with other workspaces.
-   *
-   * @warning If the user moves the workspace, the path will change and thus the old data will become inaccessible.
-   *
-   * @param workspacePath Path to the workspace
-   * @returns Path to the data folder for the workspace
-   */
-  public async getWorkspaceDataPath(workspacePath: string): Promise<string> {
-    try {
-      // Fetch folder form the path and get it's creation time
-      const workspaceFolder = path.dirname(workspacePath);
-      const workspaceFolderCreationTimeSalt = await fs
-        .stat(workspaceFolder)
-        .then((stats) => stats.ctime.getTime().toFixed(0));
-      const workspacePathHash = createHash('sha256')
-        .update(workspacePath + workspaceFolderCreationTimeSalt)
-        .digest('hex');
-      return path.join(this.paths.data, 'workspaces', workspacePathHash);
-    } catch (error) {
-      this.logger.error(
-        '[GlobalDataPathService] Failed to get workspace data path',
-        { cause: error },
-      );
-      throw new Error('Failed to get workspace data path', { cause: error });
-    }
-  }
-
-  /**
    * Returns the path to a cache folder
    *
    * It's recommended to use this folder for temporary files that are not needed after the CLI has finished running.
    */
-  get cachePath(): string {
+  get globalCachePath(): string {
     return this.paths.cache;
   }
 
@@ -98,7 +67,7 @@ export class GlobalDataPathService {
    *
    * It's recommended to use this folder for temporary files that are expected to be deleted by the system.
    */
-  get tempPath(): string {
+  get globalTempPath(): string {
     return this.paths.temp;
   }
 }

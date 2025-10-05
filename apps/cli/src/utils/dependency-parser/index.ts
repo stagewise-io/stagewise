@@ -2,35 +2,12 @@ import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import type { DependencyMap } from './types';
-import ignore from 'ignore';
+import { loadGitignore } from '../load-gitignore';
 import type { Logger } from '@/services/logger';
-
-async function loadGitignore(dir: string): Promise<ReturnType<typeof ignore>> {
-  const ig = ignore();
-  const gitignorePath = join(dir, '.gitignore');
-
-  if (existsSync(gitignorePath)) {
-    const content = await readFile(gitignorePath, 'utf-8');
-    ig.add(content);
-  }
-
-  // Always ignore node_modules and common non-source directories
-  ig.add([
-    'node_modules',
-    '.git',
-    'dist',
-    'build',
-    'coverage',
-    '.next',
-    '.nuxt',
-  ]);
-
-  return ig;
-}
 
 async function findPackageJsonFiles(
   dir: string,
-  ig?: ReturnType<typeof ignore>,
+  ig?: Awaited<ReturnType<typeof loadGitignore>>,
 ): Promise<string[]> {
   const packageJsonFiles: string[] = [];
 

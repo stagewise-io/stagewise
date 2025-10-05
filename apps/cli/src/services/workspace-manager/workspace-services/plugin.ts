@@ -10,8 +10,8 @@ import type { WorkspaceConfigService } from './config';
 import type { KartonContract } from '@stagewise/karton-contract';
 import { existsSync } from 'node:fs';
 import path, { resolve } from 'node:path';
-import { discoverDependencies } from '@/utils/dependency-parser';
 import { fileURLToPath } from 'node:url';
+import type { StaticAnalysisService } from './static-analysis';
 
 // This is the default URL prefix for plugins that are just loaded by name.
 const DEFAULT_PLUGIN_CDN_URL = 'https://esm.sh/';
@@ -79,6 +79,7 @@ export class WorkspacePluginService {
   private logger: Logger;
   private kartonService: KartonService;
   private workspaceConfigService: WorkspaceConfigService;
+  private staticAnalysisService: StaticAnalysisService;
   private workspacePath: string;
   private _configuredPlugins: WorkspacePlugin[] = [];
 
@@ -86,11 +87,13 @@ export class WorkspacePluginService {
     logger: Logger,
     kartonService: KartonService,
     workspaceConfigService: WorkspaceConfigService,
+    staticAnalysisService: StaticAnalysisService,
     workspacePath: string,
   ) {
     this.logger = logger;
     this.kartonService = kartonService;
     this.workspaceConfigService = workspaceConfigService;
+    this.staticAnalysisService = staticAnalysisService;
     this.workspacePath = workspacePath;
   }
 
@@ -107,12 +110,14 @@ export class WorkspacePluginService {
     logger: Logger,
     kartonService: KartonService,
     workspaceConfigService: WorkspaceConfigService,
+    staticAnalysisService: StaticAnalysisService,
     workspacePath: string,
   ): Promise<WorkspacePluginService> {
     const instance = new WorkspacePluginService(
       logger,
       kartonService,
       workspaceConfigService,
+      staticAnalysisService,
       workspacePath,
     );
     await instance.initialize();
@@ -124,7 +129,7 @@ export class WorkspacePluginService {
         oldConfig.plugins !== newConfig.plugins ||
         oldConfig.autoPlugins !== newConfig.autoPlugins
       ) {
-        instance.initPluginSystem();
+        void instance.initPluginSystem();
       }
     });
 
@@ -199,15 +204,17 @@ export class WorkspacePluginService {
     }
 
     // Check for availability of the plugins
-    const availabilityCheckedPlugins =
-      await this.getAvailabilityCheckedPlugins(allPlugins);
-
-    // Check for availability of the plugins
     this._configuredPlugins =
       await this.getAvailabilityCheckedPlugins(allPlugins);
 
+    this.logger.debug(
+      `[WorkspacePluginService] Loaded plugins: ${JSON.stringify(this._configuredPlugins, null, 2)}`,
+    );
+
     this.kartonService.setState((draft) => {
-      draft.workspace!.plugins = availabilityCheckedPlugins;
+      draft.workspace!.plugins = this._configuredPlugins.filter(
+        (p) => p.available,
+      );
     });
   }
 
@@ -220,15 +227,7 @@ export class WorkspacePluginService {
     const recommendedPlugins: BuiltInPlugin[] = [];
 
     // package.json heuristic: combine all dependnencies of all package.json files in the the workspace and check if some plugins match these dependencies
-    const allDependencies = await discoverDependencies(
-      this.workspacePath,
-      this.logger,
-    ).catch((error) => {
-      this.logger.error(
-        `[WorkspacePluginService] Failed to discover dependencies. Reason: ${error}`,
-      );
-      return {};
-    });
+    const allDependencies = this.staticAnalysisService.nodeDependencies;
 
     for (const plugin of BuiltInPlugins) {
       if (plugin.dependencyMatcher.packageJson) {

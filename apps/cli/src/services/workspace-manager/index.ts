@@ -11,6 +11,7 @@ import type { TelemetryService } from '../telemetry';
 import type { KartonService } from '../karton';
 import type { WorkspaceLoadingOverrides } from './loading-overrides';
 import type { AuthService } from '../auth';
+import type { GlobalDataPathService } from '../global-data-path';
 
 export class WorkspaceManagerService {
   private currentWorkspace: WorkspaceService | null = null;
@@ -19,6 +20,7 @@ export class WorkspaceManagerService {
   private telemetryService: TelemetryService;
   private kartonService: KartonService;
   private authService: AuthService;
+  private globalDataPathService: GlobalDataPathService;
 
   private constructor(
     logger: Logger,
@@ -26,12 +28,14 @@ export class WorkspaceManagerService {
     telemetryService: TelemetryService,
     kartonService: KartonService,
     authService: AuthService,
+    globalDataPathService: GlobalDataPathService,
   ) {
     this.logger = logger;
     this.filePickerService = filePickerService;
     this.telemetryService = telemetryService;
     this.kartonService = kartonService;
     this.authService = authService;
+    this.globalDataPathService = globalDataPathService;
   }
 
   private async initialize() {
@@ -61,6 +65,7 @@ export class WorkspaceManagerService {
     telemetryService: TelemetryService,
     kartonService: KartonService,
     authService: AuthService,
+    globalDataPathService: GlobalDataPathService,
   ) {
     const instance = new WorkspaceManagerService(
       logger,
@@ -68,6 +73,7 @@ export class WorkspaceManagerService {
       telemetryService,
       kartonService,
       authService,
+      globalDataPathService,
     );
     await instance.initialize();
     logger.debug('[WorkspaceManagerService] Created service');
@@ -125,6 +131,7 @@ export class WorkspaceManagerService {
       this.telemetryService,
       this.kartonService,
       this.authService,
+      this.globalDataPathService,
       selectedPath!,
       workspaceLoadingOverrides ?? null,
       loadedOnStart,

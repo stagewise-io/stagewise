@@ -64,6 +64,7 @@ export async function main({
     telemetryService,
     kartonService,
     authService,
+    globalDataPathService,
   );
   const uiServerService = await UIServerService.create(
     logger,
