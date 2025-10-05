@@ -58,6 +58,17 @@
   --shadow-glass-inset: var(--shadow-inner);
   --shadow-glass-inset-hover: var(--shadow-xl);
   --shadow-glass-inset-pressed: var(--shadow-md);
+
+
+  --animate-progress-bar-indicator: progress-bar-indicator 500ms linear infinite;
+  @keyframes progress-bar-indicator {
+    0% {
+      transform: translateX(-50px);
+    }
+    100% {
+      transform: translateX(0px);
+    }
+  }
 }
 
 :root {
