@@ -16,7 +16,11 @@ import {
 } from '@stagewise/stage-ui/components/resizable';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { CogIcon, Loader2Icon, MessageCircleIcon } from 'lucide-react';
-import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
+import {
+  useKartonConnected,
+  useKartonProcedure,
+  useKartonState,
+} from '@/hooks/use-karton';
 import {
   Popover,
   PopoverTrigger,
@@ -35,6 +39,8 @@ import { FooterBar } from './sections/footer-bar';
 import { WorkspaceSetupDialog } from './dialogs/workspace-setup';
 
 export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
+  const connected = useKartonConnected();
+
   const { leftPanelContent, toggleLeftPanel } = usePanels();
 
   const workspaceStatus = useKartonState((s) => s.workspaceStatus);
@@ -81,6 +87,14 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
       void openWorkspace(workspacePath);
     });
   }, [closeWorkspace, openWorkspace, workspace]);
+
+  if (!connected) {
+    return (
+      <div className="relative flex size-full flex-col items-center justify-center gap-4 p-4">
+        <Loader2Icon className="size-6 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="root fixed inset-0 flex size-full flex-col items-stretch justify-between bg-zinc-100 p-2 child:pb-2 dark:bg-zinc-900">
