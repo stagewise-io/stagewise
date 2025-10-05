@@ -11,8 +11,10 @@ import {
   getTelemetryLevelCmdHandler,
   setTelemetryLevelCmdHandler,
 } from './subcommands/telemetry';
-import type { GlobalConfig } from '@/services/global-config';
+import type { GlobalConfig } from '@stagewise/karton-contract/shared-types';
 import { main } from './main';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 function myParseInt(value: string) {
   const parsedValue = Number.parseInt(value, 10);
@@ -41,6 +43,14 @@ program
   .option(
     '-w, --workspace <workspace>',
     'The path to the workspace that should be loaded on start. If empty, the current working directory will be loaded as a workspace.',
+    (val) => {
+      // make sure the path exists
+      if (!existsSync(val)) {
+        throw new InvalidArgumentError('Workspace path does not exist.');
+      }
+      // return absolute path
+      return resolve(val);
+    },
   )
   .option('--no-workspace-on-start', 'Do not load a workspace on start.')
   .option('-v, --verbose', 'Output debug information to the CLI')
