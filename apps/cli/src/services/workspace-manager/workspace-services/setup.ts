@@ -138,12 +138,26 @@ export class WorkspaceSetupService {
   }
 
   private async handleCheckForActiveAppOnPort(port: number): Promise<boolean> {
+    this.logger.debug(
+      `[WorkspaceSetupService] Checking for active app on port ${port}...`,
+    );
     const result = await fetch(`http://localhost:${port}/`, {
       method: 'GET',
       redirect: 'follow',
     })
-      .catch(() => false)
-      .then(() => true);
+      .then((res) => {
+        this.logger.debug(
+          `[WorkspaceSetupService] Result from port ${port}: ${res.status} ${res.statusText}`,
+        );
+        return res.status === 200;
+      })
+      .catch((err) => {
+        this.logger.debug(
+          `[WorkspaceSetupService] Error while checking for active app on port ${port}: ${err}`,
+        );
+        return false;
+      });
+
     return result;
   }
 
