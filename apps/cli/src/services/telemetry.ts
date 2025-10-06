@@ -1,6 +1,7 @@
 import { PostHog } from 'posthog-node';
 import type { IdentifierService } from './identifier';
-import type { GlobalConfig, GlobalConfigService } from './global-config';
+import type { GlobalConfigService } from './global-config';
+import type { GlobalConfig } from '@stagewise/karton-contract/shared-types';
 import type { Logger } from './logger';
 
 export interface EventProperties {
@@ -60,6 +61,10 @@ export interface EventProperties {
   'agent-credits-insufficient': {
     hasSubscription?: boolean;
     creditsRemaining?: number;
+  };
+  'rag-updated': {
+    index_progress: number;
+    index_total: number;
   };
 }
 
@@ -168,6 +173,24 @@ export class TelemetryService {
         `[TELEMETRY] Failed to capture analytics event: ${error}`,
       );
     }
+  }
+
+  public captureException(
+    error: Error,
+    properties?: Record<string, any>,
+  ): void {
+    const telemetryLevel = this.globalConfigService.get().telemetryLevel;
+    if (telemetryLevel === 'off') return;
+    const distinctId =
+      telemetryLevel === 'full'
+        ? this.userProperties.user_id
+        : this.identifierService.getMachineId();
+
+    this.posthogClient.captureException(error, distinctId, {
+      properties: {
+        ...properties,
+      },
+    });
   }
 
   async shutdown(): Promise<void> {

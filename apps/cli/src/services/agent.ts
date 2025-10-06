@@ -764,6 +764,7 @@ export class AgentService {
         this.lastMessageId = messageId;
       });
     } catch (error) {
+      this.telemetryService.captureException(error as Error);
       const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
       this.kartonService.setState((draft) => {

@@ -39,6 +39,7 @@ export async function bootstrapGlobalServices({
     logger,
     kartonService,
   );
+
   const telemetryService = new TelemetryService(
     identifierService,
     globalConfigService,

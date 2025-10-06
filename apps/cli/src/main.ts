@@ -36,9 +36,8 @@ export async function main({
     kartonService,
     notificationService,
     globalDataPathService,
-    identifierService,
-    globalConfigService,
     telemetryService,
+    identifierService,
   } = await bootstrapGlobalServices({ verbose: verbose });
 
   logger.debug('[Main] Global services bootstrapped');
@@ -50,6 +49,7 @@ export async function main({
   );
   const authService = await AuthService.create(
     globalDataPathService,
+    identifierService,
     logger,
     kartonService,
     notificationService,

@@ -2,7 +2,7 @@ import {
   createKartonServer,
   type KartonServer,
 } from '@stagewise/karton/server';
-import type { KartonContract } from '@stagewise/karton-contract';
+import { type KartonContract, defaultState } from '@stagewise/karton-contract';
 import type { Logger } from './logger';
 
 /**
@@ -19,7 +19,7 @@ export class KartonService {
 
   private async initialize() {
     this.kartonServer = await createKartonServer<KartonContract>({
-      initialState: this.initialState,
+      initialState: defaultState,
     });
     this.logger.debug('[KartonService] Karton server initialized');
   }
@@ -57,26 +57,4 @@ export class KartonService {
       this.kartonServer,
     );
   }
-
-  private initialState: KartonContract['state'] = {
-    workspace: null,
-    workspaceStatus: 'closed',
-    userAccount: {
-      status: 'unauthenticated',
-      loginDialog: null,
-    },
-    appInfo: {
-      bridgeMode: false,
-      envMode: 'production',
-      verbose: false,
-      version: 'UNKNOWN',
-      runningOnPort: 0,
-    },
-    globalConfig: {
-      telemetryLevel: 'off',
-    },
-    userExperience: {},
-    filePicker: null,
-    notifications: [],
-  };
 }

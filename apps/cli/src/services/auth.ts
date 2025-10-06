@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createNodeApiClient } from '@stagewise/api-client';
 import type { Logger } from './logger';
 import type { GlobalDataPathService } from './global-data-path';
+import type { IdentifierService } from './identifier';
 import type { KartonService } from './karton';
 import type { NotificationService } from './notification';
 import type { KartonContract } from '@stagewise/karton-contract';
@@ -56,6 +57,7 @@ export class AuthService {
   private cachedRefreshToken: string | null = null;
   private readonly logger: Logger;
   private readonly globalDataPathService: GlobalDataPathService;
+  private readonly identifierService: IdentifierService;
   private readonly credentialsFilePath: string;
   private currentAuthState: AuthState;
   private kartonService: KartonService;
@@ -63,17 +65,23 @@ export class AuthService {
 
   private constructor(
     globalDataPathService: GlobalDataPathService,
+    identifierService: IdentifierService,
     logger: Logger,
     kartonService: KartonService,
     notificationService: NotificationService,
   ) {
     this.globalDataPathService = globalDataPathService;
     this.logger = logger;
+    this.identifierService = identifierService;
     this.credentialsFilePath = path.join(
       this.globalDataPathService.globalDataPath,
       CREDENTIALS_FILENAME,
     );
-    this.currentAuthState = { status: 'unauthenticated', loginDialog: null };
+    this.currentAuthState = {
+      status: 'unauthenticated',
+      loginDialog: null,
+      machineId: this.identifierService.getMachineId(),
+    };
     this.kartonService = kartonService;
     this.notificationService = notificationService;
   }
@@ -108,6 +116,7 @@ export class AuthService {
         this.currentAuthState = {
           status: 'unauthenticated',
           loginDialog: null,
+          machineId: this.identifierService.getMachineId(),
         };
         this.kartonService.setState((draft) => {
           draft.userAccount = this.currentAuthState;
@@ -144,6 +153,7 @@ export class AuthService {
         this.currentAuthState = {
           status: 'authentication_invalid',
           loginDialog: null,
+          machineId: this.identifierService.getMachineId(),
         };
         this.kartonService.setState((draft) => {
           draft.userAccount = this.currentAuthState;
@@ -183,6 +193,7 @@ export class AuthService {
           this.currentAuthState = {
             status: 'authentication_invalid',
             loginDialog: null,
+            machineId: this.identifierService.getMachineId(),
           };
           this.kartonService.setState((draft) => {
             draft.userAccount = this.currentAuthState;
@@ -216,6 +227,7 @@ export class AuthService {
             await this.updateSubscriptionInfo(storedToken.accessToken);
           } else {
             this.currentAuthState = {
+              machineId: this.identifierService.getMachineId(),
               status: 'authentication_invalid',
               loginDialog: null,
             };
@@ -241,6 +253,7 @@ export class AuthService {
         } catch (_error) {
           // Server is not reachable
           this.currentAuthState = {
+            machineId: this.identifierService.getMachineId(),
             loginDialog: null,
             status: 'server_unreachable',
             user:
@@ -282,7 +295,11 @@ export class AuthService {
       }
     } catch (error) {
       this.logger.error(`Failed to initialize auth service: ${error}`);
-      this.currentAuthState = { status: 'unauthenticated', loginDialog: null };
+      this.currentAuthState = {
+        machineId: this.identifierService.getMachineId(),
+        status: 'unauthenticated',
+        loginDialog: null,
+      };
       this.kartonService.setState((draft) => {
         draft.userAccount = this.currentAuthState;
       });
@@ -306,6 +323,7 @@ export class AuthService {
 
   public static async create(
     globalDataPathService: GlobalDataPathService,
+    identifierService: IdentifierService,
     logger: Logger,
     kartonService: KartonService,
     notificationService: NotificationService,
@@ -313,6 +331,7 @@ export class AuthService {
     logger.debug('[AuthService] Creating service...');
     const instance = new AuthService(
       globalDataPathService,
+      identifierService,
       logger,
       kartonService,
       notificationService,
@@ -482,7 +501,11 @@ export class AuthService {
       await this.clearToken();
       this.cachedAccessToken = null;
       this.cachedRefreshToken = null;
-      this.currentAuthState = { status: 'unauthenticated', loginDialog: null };
+      this.currentAuthState = {
+        machineId: this.identifierService.getMachineId(),
+        status: 'unauthenticated',
+        loginDialog: null,
+      };
       this.kartonService.setState((draft) => {
         draft.userAccount = this.currentAuthState;
       });
@@ -529,7 +552,11 @@ export class AuthService {
     const storedToken = await this.getStoredToken();
 
     if (!storedToken?.accessToken) {
-      this.currentAuthState = { status: 'unauthenticated', loginDialog: null };
+      this.currentAuthState = {
+        machineId: this.identifierService.getMachineId(),
+        status: 'unauthenticated',
+        loginDialog: null,
+      };
       this.kartonService.setState((draft) => {
         draft.userAccount = this.currentAuthState;
       });
@@ -547,6 +574,7 @@ export class AuthService {
         const updatedToken = await this.getStoredToken();
         if (!updatedToken) {
           this.currentAuthState = {
+            machineId: this.identifierService.getMachineId(),
             status: 'authentication_invalid',
             loginDialog: null,
           };
@@ -565,6 +593,7 @@ export class AuthService {
 
       if (!sessionData?.valid) {
         this.currentAuthState = {
+          machineId: this.identifierService.getMachineId(),
           status: 'authentication_invalid',
           loginDialog: null,
         };
@@ -596,6 +625,7 @@ export class AuthService {
           error.message.includes('Refresh token'))
       ) {
         this.currentAuthState = {
+          machineId: this.identifierService.getMachineId(),
           status: 'authentication_invalid',
           loginDialog: null,
         };
@@ -671,7 +701,11 @@ export class AuthService {
     this.cachedRefreshToken = null;
 
     // Reset auth state
-    this.currentAuthState = { status: 'unauthenticated', loginDialog: null };
+    this.currentAuthState = {
+      machineId: this.identifierService.getMachineId(),
+      status: 'unauthenticated',
+      loginDialog: null,
+    };
     this.kartonService.setState((draft) => {
       draft.userAccount = this.currentAuthState;
     });
@@ -771,6 +805,7 @@ export class AuthService {
     sessionData: SessionValidationResponse,
   ): Promise<void> {
     this.currentAuthState = {
+      machineId: this.identifierService.getMachineId(),
       loginDialog: null,
       status: 'authenticated',
       user: {
@@ -788,6 +823,7 @@ export class AuthService {
   private async updateAuthStateFromToken(tokenData: TokenData): Promise<void> {
     if (tokenData.userId && tokenData.userEmail) {
       this.currentAuthState = {
+        machineId: this.identifierService.getMachineId(),
         loginDialog: null,
         status: 'authenticated',
         user: {

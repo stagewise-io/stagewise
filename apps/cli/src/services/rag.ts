@@ -67,6 +67,10 @@ export class RagService {
       });
       total = update.total;
     }
+    this.telemetryService.capture('rag-updated', {
+      index_progress: total,
+      index_total: total,
+    });
     this.kartonService.setState((draft) => {
       draft.workspace!.rag = {
         isIndexing: false,
@@ -88,6 +92,7 @@ export class RagService {
 
         await this.updateRag(apiKey);
       } catch (error) {
+        this.telemetryService.captureException(error as Error);
         this.logger.error(
           '[RagService] Failed to periodically update RAG',
           error,
@@ -122,6 +127,7 @@ export class RagService {
 
       this.logger.debug('[RagService] Initialized');
     } catch (error) {
+      this.telemetryService.captureException(error as Error);
       this.logger.error('[RagService] Failed to initialize', error);
       this.resetRagState();
     }

@@ -123,6 +123,7 @@ export class WorkspaceService {
             this.authService,
             clientRuntime,
           ).catch((error) => {
+            this.telemetryService.captureException(error as Error);
             this.logger.error(
               '[WorkspaceService] Failed to create agent service',
               {
@@ -139,6 +140,7 @@ export class WorkspaceService {
             this.authService,
             clientRuntime,
           ).catch((error) => {
+            this.telemetryService.captureException(error as Error);
             this.logger.error(
               '[WorkspaceService] Failed to create rag service',
               {

@@ -61,6 +61,12 @@ export type AgentError =
     };
 
 export type AppState = {
+  internalData: {
+    posthog?: {
+      apiKey?: string;
+      host?: string;
+    };
+  };
   workspace: {
     path: string;
     devAppStatus: {
@@ -105,6 +111,7 @@ export type AppState = {
   workspaceStatus: 'open' | 'closed' | 'loading' | 'closing' | 'setup';
   userAccount: {
     status: AuthStatus;
+    machineId?: string;
     user?: {
       id: string;
       email: string;
@@ -217,4 +224,32 @@ export type KartonContract = {
       dismiss: (id: string) => Promise<void>;
     };
   };
+};
+
+export const defaultState: KartonContract['state'] = {
+  internalData: {
+    posthog: {
+      apiKey: process.env.POSTHOG_API_KEY,
+      host: process.env.POSTHOG_HOST || 'https://eu.i.posthog.com',
+    },
+  },
+  workspace: null,
+  workspaceStatus: 'closed',
+  userAccount: {
+    status: 'unauthenticated',
+    loginDialog: null,
+  },
+  appInfo: {
+    bridgeMode: false,
+    envMode: 'production',
+    verbose: false,
+    version: 'UNKNOWN',
+    runningOnPort: 0,
+  },
+  globalConfig: {
+    telemetryLevel: 'off',
+  },
+  userExperience: {},
+  filePicker: null,
+  notifications: [],
 };
