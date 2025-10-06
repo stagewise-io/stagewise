@@ -1,7 +1,7 @@
 import type { Logger } from '@/services/logger';
 import type { Server } from 'node:http';
 import { stagewiseAppPrefix, stagewiseKartonPath } from './shared';
-import type { WorkspaceManager } from '@/workspace/workspace-manager';
+import type { WorkspaceManagerService } from '@/services/workspace-manager';
 import type { ProxyWSUpgradeHandler } from './dev-app-proxy-utils';
 import type { WebSocketServer } from 'ws';
 
@@ -10,7 +10,7 @@ export const configureWebSocketUpgrade = (
   proxyUpgradeHandler: ProxyWSUpgradeHandler,
   kartonWebSocketServer: WebSocketServer,
   logger: Logger,
-  workspaceManager: WorkspaceManager,
+  workspaceManager: WorkspaceManagerService,
 ) => {
   server.on('upgrade', (request, socket, head) => {
     const url = request.url || '';
@@ -19,7 +19,8 @@ export const configureWebSocketUpgrade = (
 
     // For all other requests (except toolbar app paths), proxy them
     if (!pathname.startsWith(stagewiseAppPrefix)) {
-      const targetPort = workspaceManager.workspace?.config.appPort;
+      const targetPort =
+        workspaceManager.workspace?.configService?.get().appPort;
       if (!targetPort) {
         throw new Error(
           "[WebSocketUpgrade] Proxy request received while no app port is configured. This shouldn't happen...",
