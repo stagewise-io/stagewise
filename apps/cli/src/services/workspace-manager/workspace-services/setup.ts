@@ -120,6 +120,9 @@ export class WorkspaceSetupService {
 
   private async handleSetupSubmission(config: WorkspaceConfig): Promise<void> {
     // Check if the given data is valid.
+    this.logger.debug(
+      `[WorkspaceSetupService] Validating config: ${JSON.stringify(config)}`,
+    );
     const validatedConfig = workspaceConfigSchema.safeParse(config);
     if (!validatedConfig.success) {
       throw new Error('Invalid config', { cause: validatedConfig.error });
@@ -131,6 +134,10 @@ export class WorkspaceSetupService {
         draft.workspace.setupActive = false;
       }
     });
+
+    this.logger.debug(
+      `[WorkspaceSetupService] Finished setup submission and notifying listeners`,
+    );
 
     // Notify the listeners
     this._setupCompleted = true;

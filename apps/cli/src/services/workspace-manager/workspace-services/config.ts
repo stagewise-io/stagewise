@@ -50,6 +50,9 @@ export class WorkspaceConfigService {
 
     // If a initial config was passed, we use that instead of the config file and immediately store it
     if (newConfig) {
+      this.logger.debug(
+        `[WorkspaceConfigService] Received initial config: ${JSON.stringify(newConfig)}`,
+      );
       const parsedConfig = workspaceConfigSchema.safeParse(newConfig);
       if (!parsedConfig.success) {
         this.logger.error('The workspace config is invalid.', {
@@ -58,6 +61,7 @@ export class WorkspaceConfigService {
         throw new Error('Invalid workspace config');
       }
       this.config = newConfig;
+      await this.saveConfigFile();
       this.kartonService.setState((draft) => {
         if (draft.workspace) {
           draft.workspace.config = {

@@ -20,7 +20,7 @@ import {
   ArrowRightIcon,
   CheckCircleIcon,
   Loader2Icon,
-  XCircleIcon,
+  CircleAlertIcon,
 } from 'lucide-react';
 
 export function WorkspaceSetupDialog() {
@@ -167,8 +167,8 @@ export function WorkspaceSetupDialog() {
                 </div>
               )}
               {appPortCheckState === 'unavailable' && (
-                <div className="flex flex-row items-center gap-1 text-red-600 text-sm dark:text-red-400">
-                  <XCircleIcon className="size-3" />
+                <div className="flex flex-row items-center gap-1 text-sm text-yellow-600 dark:text-yellow-400">
+                  <CircleAlertIcon className="size-3" />
                   <span>
                     No running app found on this port.
                     <br />
