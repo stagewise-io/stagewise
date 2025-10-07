@@ -33,6 +33,7 @@ export async function* initializeRag(
   const { toAdd, toUpdate, toRemove } = await getRagFilesDiff(
     workspaceDataPath,
     clientRuntime,
+    onError,
   );
   const total = toAdd.length + toUpdate.length + toRemove.length;
   let progress = 0;

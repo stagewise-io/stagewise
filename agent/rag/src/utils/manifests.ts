@@ -16,6 +16,7 @@ export type FileManifest = {
 
 async function getLocalFilesManifests(
   clientRuntime: ClientRuntime,
+  onError?: (error: Error) => void,
 ): Promise<FileManifest[]> {
   const allFiles = new Set<string>();
 
@@ -49,8 +50,8 @@ async function getLocalFilesManifests(
 
     if (!filenameFiles.success) {
       // Log warning but don't fail - some projects might not have these files
-      console.warn(
-        `Warning: Failed to get specific filenames: ${filenameFiles.message}`,
+      onError?.(
+        new Error(`Failed to get specific filenames: ${filenameFiles.message}`),
       );
     } else {
       for (const file of filenameFiles.paths ?? []) {
@@ -64,7 +65,7 @@ async function getLocalFilesManifests(
   for (const file of allFiles) {
     const manifest = await getFileManifest(clientRuntime, file);
     if (!manifest) {
-      console.warn(`Failed to get file manifest for: ${file}`);
+      onError?.(new Error(`Failed to get file manifest for: ${file}`));
       continue;
     }
     manifests.push(manifest);
@@ -172,12 +173,13 @@ export async function deleteStoredFileManifest(
 export async function getRagFilesDiff(
   workspaceDataPath: string,
   clientRuntime: ClientRuntime,
+  onError?: (error: Error) => void,
 ): Promise<{
   toAdd: FileManifest[];
   toRemove: FileManifest[];
   toUpdate: FileManifest[];
 }> {
-  const localManifests = await getLocalFilesManifests(clientRuntime);
+  const localManifests = await getLocalFilesManifests(clientRuntime, onError);
   const storedManifests = await getStoredFilesManifests(workspaceDataPath);
   if ('error' in storedManifests) {
     return {
