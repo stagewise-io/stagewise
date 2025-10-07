@@ -4,8 +4,8 @@
  * It is responsible for setting the telemetry level from CLI.
  */
 
-import type { GlobalConfig } from '@/services/global-config';
 import { bootstrapGlobalServices } from '@/global-service-bootstrap';
+import type { GlobalConfig } from '@stagewise/karton-contract/shared-types';
 
 export async function getTelemetryLevelCmdHandler() {
   const globalServices = await bootstrapGlobalServices({});
@@ -14,19 +14,17 @@ export async function getTelemetryLevelCmdHandler() {
   console.log('The currently configured telemetry level is: ', telemetryLevel);
 }
 
-export async function setTelemetryLevelCmdHandler({
-  level,
-}: {
-  level: GlobalConfig['telemetryLevel'];
-}) {
+export async function setTelemetryLevelCmdHandler(
+  telemetryLevel: GlobalConfig['telemetryLevel'],
+) {
   const globalServices = await bootstrapGlobalServices({});
 
   const config = globalServices.globalConfigService.get();
-  if (config.telemetryLevel === level) {
-    console.log('The telemetry level is already set to: ', level);
+  if (config.telemetryLevel === telemetryLevel) {
+    console.log('The telemetry level is already set to: ', telemetryLevel);
     return;
   }
-  config.telemetryLevel = level;
+  config.telemetryLevel = telemetryLevel;
   await globalServices.globalConfigService.set(config);
-  console.log('The telemetry level has been set to: ', level);
+  console.log('The telemetry level has been set to: ', telemetryLevel);
 }
