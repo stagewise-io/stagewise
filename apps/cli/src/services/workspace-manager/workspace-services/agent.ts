@@ -1,8 +1,8 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { KartonService } from './karton';
-import type { Logger } from './logger';
-import type { TelemetryService } from './telemetry';
-import type { AuthService } from './auth';
+import type { KartonService } from '../../karton';
+import type { Logger } from '../../logger';
+import type { TelemetryService } from '../../telemetry';
+import type { AuthService } from '../../auth';
 import {
   TimeoutManager,
   isAbortError,

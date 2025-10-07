@@ -2,7 +2,7 @@
  * This file contains the workspace service class that is responsible for loading and unloading all the functionality surrounding a workspace.
  */
 
-import { AgentService } from '@/services/agent';
+import { AgentService } from '@/services/workspace-manager/workspace-services/agent';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
@@ -12,7 +12,7 @@ import { WorkspaceConfigService } from './workspace-services/config';
 import { WorkspacePluginService } from './workspace-services/plugin';
 import { WorkspaceSetupService } from './workspace-services/setup';
 import type { AuthService } from '../auth';
-import { RagService } from '../rag';
+import { RagService } from './workspace-services/rag';
 import { StaticAnalysisService } from './workspace-services/static-analysis';
 import { WorkspacePathsService } from './workspace-services/paths';
 import type { GlobalDataPathService } from '@/services/global-data-path';
