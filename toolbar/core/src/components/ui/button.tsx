@@ -35,7 +35,8 @@ export function Button({
         size === 'md' && 'h-12',
         size === 'lg' && 'h-16',
         variant === 'primary' && 'bg-blue-600',
-        variant === 'secondary' && 'bg-black/5 text-zinc-950/70',
+        variant === 'secondary' &&
+          'bg-black/5 text-foreground/70 dark:bg-white/10',
         variant === 'outline' &&
           'border border-zinc-500 bg-white text-blue-500',
         variant === 'ghost' && 'bg-transparent text-blue-500',

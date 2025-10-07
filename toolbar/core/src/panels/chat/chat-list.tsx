@@ -69,7 +69,7 @@ function ChatListEntry({
         <div className="flex flex-1 flex-col items-start justify-start gap-0">
           <span
             className={cn(
-              'truncate font-medium text-sm text-zinc-950',
+              'truncate font-medium text-sm text-zinc-950 dark:text-white',
               isActive && 'text-blue-600',
             )}
           >

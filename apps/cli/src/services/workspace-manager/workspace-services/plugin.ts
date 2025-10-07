@@ -12,6 +12,7 @@ import { existsSync } from 'node:fs';
 import path, { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { StaticAnalysisService } from './static-analysis';
+import type { NotificationService } from '@/services/notification';
 
 // This is the default URL prefix for plugins that are just loaded by name.
 const DEFAULT_PLUGIN_CDN_URL = 'https://esm.sh/';
@@ -80,7 +81,7 @@ export class WorkspacePluginService {
   private kartonService: KartonService;
   private workspaceConfigService: WorkspaceConfigService;
   private staticAnalysisService: StaticAnalysisService;
-  private workspacePath: string;
+  private notificationService: NotificationService;
   private _configuredPlugins: WorkspacePlugin[] = [];
 
   private constructor(
@@ -88,13 +89,13 @@ export class WorkspacePluginService {
     kartonService: KartonService,
     workspaceConfigService: WorkspaceConfigService,
     staticAnalysisService: StaticAnalysisService,
-    workspacePath: string,
+    notificationService: NotificationService,
   ) {
     this.logger = logger;
     this.kartonService = kartonService;
     this.workspaceConfigService = workspaceConfigService;
     this.staticAnalysisService = staticAnalysisService;
-    this.workspacePath = workspacePath;
+    this.notificationService = notificationService;
   }
 
   private async initialize(): Promise<void> {
@@ -111,14 +112,14 @@ export class WorkspacePluginService {
     kartonService: KartonService,
     workspaceConfigService: WorkspaceConfigService,
     staticAnalysisService: StaticAnalysisService,
-    workspacePath: string,
+    notificationService: NotificationService,
   ): Promise<WorkspacePluginService> {
     const instance = new WorkspacePluginService(
       logger,
       kartonService,
       workspaceConfigService,
       staticAnalysisService,
-      workspacePath,
+      notificationService,
     );
     await instance.initialize();
 
@@ -198,6 +199,13 @@ export class WorkspacePluginService {
       allPlugins.some((p2) => p !== p2 && p.name === p2.name),
     );
     if (namingCollisions.length > 0) {
+      this.notificationService.showNotification({
+        title: 'Multiple plugins with the same name were loaded',
+        message: `Loaded plugins: ["${namingCollisions.map((p) => p.name).join('", "')}"]`,
+        type: 'error',
+        actions: [],
+        duration: 30000,
+      });
       throw new Error(
         `Multiple plugins with the same name were loaded. Loaded plugins: ["${namingCollisions.map((p) => p.name).join('", "')}"]`,
       );
@@ -261,6 +269,13 @@ export class WorkspacePluginService {
         } else {
           plugin.available = false;
           plugin.error = `Plugin not found under given path: "${plugin.path}". Make sure that the path is correct and the index.js file exists.`;
+          this.notificationService.showNotification({
+            title: 'Plugin not found',
+            message: plugin.error,
+            type: 'warning',
+            actions: [],
+            duration: 30000,
+          });
         }
       } else {
         // If the plugin has a url defined, check if the url is reachable and returns 200 status code
@@ -270,6 +285,13 @@ export class WorkspacePluginService {
         } else {
           plugin.available = false;
           plugin.error = `Plugin not found under given url: "${plugin.url}". Status code: ${response.status}.`;
+          this.notificationService.showNotification({
+            title: 'Plugin not found',
+            message: plugin.error,
+            type: 'warning',
+            actions: [],
+            duration: 30000,
+          });
         }
       }
     }

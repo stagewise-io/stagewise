@@ -15,6 +15,7 @@ import {
   FormField,
   FormFieldDescription,
   FormFieldLabel,
+  FormFieldSeparator,
 } from '@stagewise/stage-ui/components/form';
 import {
   ArrowRightIcon,
@@ -22,6 +23,7 @@ import {
   Loader2Icon,
   CircleAlertIcon,
 } from 'lucide-react';
+import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 
 export function WorkspaceSetupDialog() {
   const setupActive = useKartonState((s) => s.workspace?.setupActive) ?? false;
@@ -89,6 +91,11 @@ export function WorkspaceSetupDialog() {
     [submitWorkspaceSetup, checkForActiveAppOnPort],
   );
 
+  const [
+    integrateStagewiseIntoDevCommand,
+    setIntegrateStagewiseIntoDevCommand,
+  ] = useState(false);
+
   if (!setupActive) return null;
 
   if (loadedOnStart && !selectedSetupInLoadedOnStart) {
@@ -136,16 +143,7 @@ export function WorkspaceSetupDialog() {
             <FormFieldLabel>
               Dev Server Port (of the app in this directory)
             </FormFieldLabel>
-            <FormFieldDescription>
-              stagewise needs to know the port on which your app's dev server is
-              running on,
-              <br />
-              because we display your app in a live preview.{' '}
-              <a href="dummy" className="text-blue-500">
-                Learn more <ArrowRightIcon className="inline size-3" />
-              </a>
-              .
-            </FormFieldDescription>
+
             <div className="flex flex-row items-center gap-4">
               <Input
                 type="number"
@@ -179,6 +177,35 @@ export function WorkspaceSetupDialog() {
                 </div>
               )}
             </div>
+            <FormFieldDescription>
+              stagewise needs to know the port on which your app's dev server is
+              running on,
+              <br />
+              because we display your app in a live preview.{' '}
+              <a href="dummy" className="text-blue-500">
+                Learn more <ArrowRightIcon className="inline size-3" />
+              </a>
+              .
+            </FormFieldDescription>
+          </FormField>
+
+          <FormFieldSeparator />
+
+          <FormField className="w-full flex-row justify-between">
+            <div className="flex flex-col gap-1">
+              <FormFieldLabel className="col-start-1">
+                Integrate stagewise into <pre className="inline">dev</pre>{' '}
+                command{' '}
+              </FormFieldLabel>
+              <FormFieldDescription>
+                Start stagewise whenever you run your app's dev server
+              </FormFieldDescription>
+            </div>
+
+            <Checkbox
+              checked={integrateStagewiseIntoDevCommand}
+              onCheckedChange={setIntegrateStagewiseIntoDevCommand}
+            />
           </FormField>
         </Form>
         <DialogFooter>

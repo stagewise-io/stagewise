@@ -65,6 +65,7 @@ export async function main({
     kartonService,
     authService,
     globalDataPathService,
+    notificationService,
   );
   const uiServerService = await UIServerService.create(
     logger,

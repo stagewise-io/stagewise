@@ -16,6 +16,7 @@ import { RagService } from './workspace-services/rag';
 import { StaticAnalysisService } from './workspace-services/static-analysis';
 import { WorkspacePathsService } from './workspace-services/paths';
 import type { GlobalDataPathService } from '@/services/global-data-path';
+import type { NotificationService } from '../notification';
 
 export class WorkspaceService {
   private logger: Logger;
@@ -23,6 +24,7 @@ export class WorkspaceService {
   private kartonService: KartonService;
   private authService: AuthService;
   private globalDataPathService: GlobalDataPathService;
+  private notificationService: NotificationService;
   private workspacePath: string;
   private workspaceLoadingOverrides: WorkspaceLoadingOverrides | null = null;
   private loadedOnStart = false;
@@ -42,6 +44,7 @@ export class WorkspaceService {
     kartonService: KartonService,
     authService: AuthService,
     globalDataPathService: GlobalDataPathService,
+    notificationService: NotificationService,
     workspacePath: string,
     workspaceLoadingOverrides: WorkspaceLoadingOverrides | null,
     loadedOnStart: boolean,
@@ -52,6 +55,7 @@ export class WorkspaceService {
     this.kartonService = kartonService;
     this.authService = authService;
     this.globalDataPathService = globalDataPathService;
+    this.notificationService = notificationService;
     this.workspacePath = workspacePath;
     this.workspaceLoadingOverrides = workspaceLoadingOverrides;
     this.loadedOnStart = loadedOnStart;
@@ -108,7 +112,7 @@ export class WorkspaceService {
           this.kartonService,
           this.workspaceConfigService,
           this.staticAnalysisService,
-          this.workspacePath,
+          this.notificationService,
         );
 
         const clientRuntime = new ClientRuntimeNode({
@@ -184,6 +188,7 @@ export class WorkspaceService {
     kartonService: KartonService,
     authService: AuthService,
     globalDataPathService: GlobalDataPathService,
+    notificationService: NotificationService,
     workspacePath: string,
     workspaceLoadingOverrides: WorkspaceLoadingOverrides | null,
     loadedOnStart: boolean,
@@ -195,6 +200,7 @@ export class WorkspaceService {
       kartonService,
       authService,
       globalDataPathService,
+      notificationService,
       workspacePath,
       workspaceLoadingOverrides,
       loadedOnStart,

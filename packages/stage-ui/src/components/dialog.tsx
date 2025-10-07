@@ -93,7 +93,7 @@ export const DialogHeader = ({
   ...props
 }: ComponentProps<'div'>) => {
   return (
-    <div className={cn('mb-1 flex flex-col gap-2', className)} {...props}>
+    <div className={cn('mb-3 flex flex-col gap-2', className)} {...props}>
       {children}
     </div>
   );
@@ -107,7 +107,7 @@ export const DialogFooter = ({
   return (
     <div
       className={cn(
-        'mt-1 flex flex-row-reverse items-center justify-start gap-2',
+        'mt-3 flex flex-row-reverse items-center justify-start gap-2',
         className,
       )}
       {...props}

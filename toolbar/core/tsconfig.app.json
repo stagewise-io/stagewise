@@ -13,6 +13,7 @@
     "baseUrl": ".",
     "jsx": "react-jsx",
     "jsxImportSource": "react",
+    "noEmit": true,
 
     // Bundler mode
     "moduleResolution": "bundler",

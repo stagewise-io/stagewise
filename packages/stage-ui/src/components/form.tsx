@@ -31,7 +31,7 @@ export function FormFieldset({
       className={cn('flex flex-col items-stretch gap-4', className)}
       {...props}
     >
-      <FieldsetBase.Legend className="border-gray-200 border-b pb-2 font-medium text-base text-foreground">
+      <FieldsetBase.Legend className="font-medium text-base text-foreground">
         {title}
       </FieldsetBase.Legend>
       {children}
@@ -55,7 +55,7 @@ export type FormFieldLabelProps = React.ComponentProps<typeof FieldBase.Label>;
 export function FormFieldLabel({ className, ...props }: FormFieldLabelProps) {
   return (
     <FieldBase.Label
-      className={cn('font-medium text-foreground text-sm', className)}
+      className={cn('-mb-1 font-medium text-foreground text-sm', className)}
       {...props}
     />
   );
@@ -70,7 +70,7 @@ export function FormFieldDescription({
 }: FormFieldDescriptionProps) {
   return (
     <FieldBase.Description
-      className={cn('-mt-1.5 text-muted-foreground text-sm', className)}
+      className={cn('text-muted-foreground text-sm', className)}
       {...props}
     />
   );
@@ -83,5 +83,11 @@ export function FormFieldError({ className, ...props }: FormFieldErrorProps) {
       className={cn('text-rose-600 text-sm dark:text-rose-400', className)}
       {...props}
     />
+  );
+}
+
+export function FormFieldSeparator() {
+  return (
+    <hr className="block size-px max-h-full max-w-full border-none bg-border/20" />
   );
 }

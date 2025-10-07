@@ -12,6 +12,7 @@ import type { KartonService } from '../karton';
 import type { WorkspaceLoadingOverrides } from './loading-overrides';
 import type { AuthService } from '../auth';
 import type { GlobalDataPathService } from '../global-data-path';
+import type { NotificationService } from '../notification';
 
 export class WorkspaceManagerService {
   private currentWorkspace: WorkspaceService | null = null;
@@ -21,6 +22,7 @@ export class WorkspaceManagerService {
   private kartonService: KartonService;
   private authService: AuthService;
   private globalDataPathService: GlobalDataPathService;
+  private notificationService: NotificationService;
 
   private constructor(
     logger: Logger,
@@ -29,6 +31,7 @@ export class WorkspaceManagerService {
     kartonService: KartonService,
     authService: AuthService,
     globalDataPathService: GlobalDataPathService,
+    notificationService: NotificationService,
   ) {
     this.logger = logger;
     this.filePickerService = filePickerService;
@@ -36,6 +39,7 @@ export class WorkspaceManagerService {
     this.kartonService = kartonService;
     this.authService = authService;
     this.globalDataPathService = globalDataPathService;
+    this.notificationService = notificationService;
   }
 
   private async initialize() {
@@ -66,6 +70,7 @@ export class WorkspaceManagerService {
     kartonService: KartonService,
     authService: AuthService,
     globalDataPathService: GlobalDataPathService,
+    notificationService: NotificationService,
   ) {
     const instance = new WorkspaceManagerService(
       logger,
@@ -74,6 +79,7 @@ export class WorkspaceManagerService {
       kartonService,
       authService,
       globalDataPathService,
+      notificationService,
     );
     await instance.initialize();
     logger.debug('[WorkspaceManagerService] Created service');
@@ -132,6 +138,7 @@ export class WorkspaceManagerService {
       this.kartonService,
       this.authService,
       this.globalDataPathService,
+      this.notificationService,
       selectedPath!,
       workspaceLoadingOverrides ?? null,
       loadedOnStart,

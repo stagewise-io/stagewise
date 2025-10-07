@@ -184,7 +184,7 @@ export function ChatBubble({
             className={cn(
               'glass-body group relative min-h-8 max-w-full animate-chat-bubble-appear space-y-3 break-words rounded-2xl bg-white/5 px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
               msg.role === 'assistant'
-                ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-zinc-950'
+                ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-zinc-950 dark:bg-zinc-800/60 dark:text-zinc-50'
                 : 'origin-bottom-right rounded-br-xs bg-blue-600/90 text-white',
             )}
           >

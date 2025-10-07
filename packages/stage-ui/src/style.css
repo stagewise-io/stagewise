@@ -4,7 +4,7 @@
   --color-background: var(--color-white);
   --color-foreground: var(--color-zinc-950);
   --color-muted: var(--color-zinc-50);
-  --color-muted-foreground: var(--color-zinc-600);
+  --color-muted-foreground: var(--color-zinc-500);
 
   --color-primary: var(--color-blue-600);
   --color-primary-foreground: var(--color-blue-50);

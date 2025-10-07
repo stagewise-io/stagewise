@@ -24,7 +24,7 @@
         }
       },
       "include": [
-        "tmp/plugin-sdk/unbundled-types/**/*.dts",
+        "tmp/plugin-sdk/unbundled-types/**/*.d.ts",
         "tmp/plugin-sdk/dependencies/**/*.d.ts"
       ]
     }
