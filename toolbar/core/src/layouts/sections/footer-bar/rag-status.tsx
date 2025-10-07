@@ -25,16 +25,16 @@ export function RagStatusArea() {
       <PopoverTrigger>
         <Button
           variant="secondary"
-          size={ragStatus.isIndexing ? 'xs' : 'icon-xs'}
+          size={ragStatus.statusInfo.isIndexing ? 'xs' : 'icon-xs'}
           className="rounded-full"
         >
           <DatabaseIcon className="size-3" />
-          {ragStatus.isIndexing && (
+          {ragStatus.statusInfo.isIndexing && (
             <Progress
               className="w-16"
-              value={ragStatus.indexProgress}
+              value={ragStatus.statusInfo.indexProgress}
               min={0}
-              max={ragStatus.indexTotal}
+              max={ragStatus.statusInfo.indexTotal}
             >
               <ProgressTrack slim busy variant="normal" />
             </Progress>
@@ -43,12 +43,14 @@ export function RagStatusArea() {
       </PopoverTrigger>
       <PopoverContent>
         <PopoverTitle>
-          {ragStatus.isIndexing ? 'Indexing codebase...' : 'Indexed codebase'}
+          {ragStatus.statusInfo.isIndexing
+            ? 'Indexing codebase...'
+            : 'Indexed codebase'}
         </PopoverTitle>
         <PopoverDescription>
-          {ragStatus.isIndexing
-            ? `Indexed ${ragStatus.indexProgress} of ${ragStatus.indexTotal} files`
-            : `Indexed ${ragStatus.indexTotal} files`}
+          {ragStatus.statusInfo.isIndexing
+            ? `Indexed ${ragStatus.statusInfo.indexProgress} of ${ragStatus.statusInfo.indexTotal} files`
+            : `Indexed ${ragStatus.indexedFiles} files`}
         </PopoverDescription>
       </PopoverContent>
     </Popover>

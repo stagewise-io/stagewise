@@ -1,12 +1,12 @@
 import { Level } from 'level';
 import type { AbstractSublevel } from 'abstract-level';
 import type { FileManifest } from './manifests.js';
-import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { RouteMapping } from '../search-agents/search-routes.js';
 import type { StyleInformation } from '../search-agents/search-styles.js';
 import type { ComponentLibraryInformation } from '../search-agents/search-components.js';
 import type { AppInformation } from '../search-agents/search-app-information.js';
 import { LEVEL_DB_SCHEMA_VERSION, RAG_VERSION } from '../index.js';
+import path from 'node:path';
 
 // Singleton cache for LevelDb instances
 const dbInstances = new Map<string, LevelDb>();
@@ -15,14 +15,17 @@ const dbInstances = new Map<string, LevelDb>();
 const schemaMutex = new Map<string, Promise<void>>();
 
 interface DatabaseMetadata {
-  ragVersion: number;
+  rag: {
+    ragVersion: number;
+    lastIndexedAt: Date | null;
+    indexedFiles: number;
+  };
   schemaVersion: number;
   initializedAt: string;
-  appVersion?: string;
 }
 
-function getDatabasePath(clientRuntime: ClientRuntime): string {
-  return clientRuntime.fileSystem.resolvePath('.stagewise/knowledge-base.db');
+function getDatabasePath(workspaceDataPath: string): string {
+  return path.join(workspaceDataPath, 'typed-db');
 }
 
 // Auto-opening wrapper for sublevels
@@ -78,8 +81,8 @@ export class LevelDb {
   }
 
   // Static factory method for getting instances
-  public static getInstance(clientRuntime: ClientRuntime): LevelDb {
-    const dbPath = getDatabasePath(clientRuntime);
+  public static getInstance(workspaceDataPath: string): LevelDb {
+    const dbPath = getDatabasePath(workspaceDataPath);
 
     if (dbInstances.has(dbPath)) return dbInstances.get(dbPath)!;
 
@@ -202,7 +205,11 @@ export class LevelDb {
 
       // Initialize metadata with current schema version
       const metadata: DatabaseMetadata = {
-        ragVersion: RAG_VERSION,
+        rag: {
+          ragVersion: RAG_VERSION,
+          lastIndexedAt: null,
+          indexedFiles: 0,
+        },
         schemaVersion: newSchemaVersion,
         initializedAt: new Date().toISOString(),
       };

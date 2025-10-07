@@ -52,7 +52,7 @@ describe('rag-db', () => {
 
   describe('database connection and configuration', () => {
     it('should create database configuration with defaults', () => {
-      const config = createDatabaseConfig(clientRuntime);
+      const config = createDatabaseConfig(testDbPath);
 
       expect(config.dbPath).toBe(
         path.join(testDbPath, '.stagewise', 'index-db'),
@@ -61,7 +61,7 @@ describe('rag-db', () => {
     });
 
     it('should connect to database successfully', async () => {
-      dbConnection = await connectToDatabase(clientRuntime);
+      dbConnection = await connectToDatabase(testDbPath);
 
       expect(dbConnection.connection).toBeDefined();
       expect(dbConnection.config).toBeDefined();
@@ -79,14 +79,14 @@ describe('rag-db', () => {
         // Directory doesn't exist, which is what we want
       }
 
-      dbConnection = await connectToDatabase(clientRuntime);
+      dbConnection = await connectToDatabase(testDbPath);
 
       // Check that the directory was created
       await expect(fs.access(stageWiseDir)).resolves.not.toThrow();
     });
 
     it('should have null table initially when no table exists', async () => {
-      dbConnection = await connectToDatabase(clientRuntime);
+      dbConnection = await connectToDatabase(testDbPath);
 
       expect(dbConnection.table).toBeNull();
     });
@@ -94,13 +94,13 @@ describe('rag-db', () => {
 
   describe('table creation and schema management', () => {
     beforeEach(async () => {
-      dbConnection = await connectToDatabase(clientRuntime);
+      dbConnection = await connectToDatabase(testDbPath);
     });
 
     it('should create table with correct schema when table does not exist', async () => {
       const updatedConnection = await createOrUpdateTable(
         dbConnection,
-        clientRuntime,
+        testDbPath,
       );
 
       expect(updatedConnection.table).toBeDefined();
@@ -115,7 +115,7 @@ describe('rag-db', () => {
       // First create the table
       let updatedConnection = await createOrUpdateTable(
         dbConnection,
-        clientRuntime,
+        testDbPath,
       );
 
       // Add a test record to verify it persists
@@ -125,7 +125,7 @@ describe('rag-db', () => {
       // Now try to create/update again - should keep existing table
       updatedConnection = await createOrUpdateTable(
         updatedConnection,
-        clientRuntime,
+        testDbPath,
       );
 
       expect(updatedConnection.table).toBeDefined();
@@ -152,11 +152,13 @@ describe('rag-db', () => {
       );
 
       dbConnection = { ...dbConnection, table };
+      const workspaceDataPath =
+        clientRuntime.fileSystem.getCurrentWorkingDirectory();
 
       // This should recreate the table with correct schema
       const updatedConnection = await createOrUpdateTable(
         dbConnection,
-        clientRuntime,
+        workspaceDataPath,
       );
 
       expect(updatedConnection.table).toBeDefined();
@@ -170,12 +172,18 @@ describe('rag-db', () => {
 
     it('should recreate table when RAG version is outdated', async () => {
       // Create LevelDb instance and set old RAG version
-      const levelDb = LevelDb.getInstance(clientRuntime);
+      const workspaceDataPath =
+        clientRuntime.fileSystem.getCurrentWorkingDirectory();
+      const levelDb = LevelDb.getInstance(workspaceDataPath);
       await levelDb.open();
 
       // Set outdated RAG version in metadata
       await levelDb.meta.put('schema', {
-        ragVersion: RAG_VERSION - 1, // Old version
+        rag: {
+          ragVersion: RAG_VERSION - 1, // Old version
+          lastIndexedAt: null,
+          indexedFiles: 0,
+        },
         schemaVersion: 1,
         initializedAt: new Date().toISOString(),
       });
@@ -183,7 +191,7 @@ describe('rag-db', () => {
       // Create table
       let updatedConnection = await createOrUpdateTable(
         dbConnection,
-        clientRuntime,
+        workspaceDataPath,
       );
 
       // Add test record
@@ -193,7 +201,7 @@ describe('rag-db', () => {
       // This should recreate the table due to old RAG version
       updatedConnection = await createOrUpdateTable(
         updatedConnection,
-        clientRuntime,
+        testDbPath,
       );
 
       expect(updatedConnection.table).toBeDefined();
@@ -211,8 +219,10 @@ describe('rag-db', () => {
 
   describe('file record operations', () => {
     beforeEach(async () => {
-      dbConnection = await connectToDatabase(clientRuntime);
-      dbConnection = await createOrUpdateTable(dbConnection, clientRuntime);
+      const workspaceDataPath =
+        clientRuntime.fileSystem.getCurrentWorkingDirectory();
+      dbConnection = await connectToDatabase(workspaceDataPath);
+      dbConnection = await createOrUpdateTable(dbConnection, workspaceDataPath);
     });
 
     it('should create file record with correct structure', () => {
@@ -403,8 +413,10 @@ describe('rag-db', () => {
 
   describe('vector similarity search', () => {
     beforeEach(async () => {
-      dbConnection = await connectToDatabase(clientRuntime);
-      dbConnection = await createOrUpdateTable(dbConnection, clientRuntime);
+      const workspaceDataPath =
+        clientRuntime.fileSystem.getCurrentWorkingDirectory();
+      dbConnection = await connectToDatabase(workspaceDataPath);
+      dbConnection = await createOrUpdateTable(dbConnection, workspaceDataPath);
     });
 
     it('should return empty results for empty table', async () => {
@@ -561,7 +573,7 @@ describe('rag-db', () => {
 
   describe('error handling and edge cases', () => {
     beforeEach(async () => {
-      dbConnection = await connectToDatabase(clientRuntime);
+      dbConnection = await connectToDatabase(testDbPath);
     });
 
     it('should handle operations on uninitialized table', async () => {
@@ -593,7 +605,7 @@ describe('rag-db', () => {
 
     it('should handle operations with invalid table gracefully', async () => {
       // Create a table first
-      dbConnection = await createOrUpdateTable(dbConnection, clientRuntime);
+      dbConnection = await createOrUpdateTable(dbConnection, testDbPath);
 
       // Try to use the search function with null table to test error handling
       const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(0.5);
@@ -604,7 +616,7 @@ describe('rag-db', () => {
     });
 
     it('should handle empty file paths', async () => {
-      dbConnection = await createOrUpdateTable(dbConnection, clientRuntime);
+      dbConnection = await createOrUpdateTable(dbConnection, testDbPath);
 
       await expect(
         deleteFileRecords(dbConnection.table!, ''),
@@ -612,7 +624,7 @@ describe('rag-db', () => {
     });
 
     it('should handle special characters in file paths', async () => {
-      dbConnection = await createOrUpdateTable(dbConnection, clientRuntime);
+      dbConnection = await createOrUpdateTable(dbConnection, testDbPath);
 
       const fileInfo: FileInfo = {
         absolutePath: '/test/file with spaces & symbols!@#.ts',
@@ -647,7 +659,7 @@ describe('rag-db', () => {
     });
 
     it('should handle very large embedding vectors', async () => {
-      dbConnection = await createOrUpdateTable(dbConnection, clientRuntime);
+      dbConnection = await createOrUpdateTable(dbConnection, testDbPath);
 
       const fileInfo: FileInfo = {
         absolutePath: '/test/large-embedding.ts',
@@ -719,8 +731,8 @@ describe('rag-db', () => {
 
   describe('concurrency and performance', () => {
     beforeEach(async () => {
-      dbConnection = await connectToDatabase(clientRuntime);
-      dbConnection = await createOrUpdateTable(dbConnection, clientRuntime);
+      dbConnection = await connectToDatabase(testDbPath);
+      dbConnection = await createOrUpdateTable(dbConnection, testDbPath);
     });
 
     it('should handle concurrent upsert operations', async () => {

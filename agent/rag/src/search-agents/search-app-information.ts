@@ -61,6 +61,7 @@ export type AppInformation = z.infer<typeof appInformationSchema>;
 export async function searchAndSaveAppInformationFromProject(
   apiKey: string,
   clientRuntime: ClientRuntime,
+  workspaceDataPath: string,
   appName = 'website',
 ): Promise<{ success: boolean; message: string }> {
   const baseUrl = process.env.LLM_PROXY_URL || 'http://localhost:3002';
@@ -70,7 +71,7 @@ export async function searchAndSaveAppInformationFromProject(
     description: 'Save the app information to the database.',
     inputSchema: appInformationToolSchema,
     execute: async (args) => {
-      const db = LevelDb.getInstance(clientRuntime);
+      const db = LevelDb.getInstance(workspaceDataPath);
       await db.open();
       await db.app.put(`${args.app}:${args.path}`, {
         ...args,

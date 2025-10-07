@@ -88,6 +88,7 @@ export type StyleInformation = z.infer<typeof styleInformationSchema>;
 export async function searchAndSaveStyleInformationFromProject(
   apiKey: string,
   clientRuntime: ClientRuntime,
+  workspaceDataPath: string,
   appName = 'website',
 ): Promise<{ success: boolean; message: string }> {
   const baseUrl = process.env.LLM_PROXY_URL || 'http://localhost:3002';
@@ -98,7 +99,7 @@ export async function searchAndSaveStyleInformationFromProject(
       'Save the style file information to the database. You can use this tool multiple times to save information about multiple style resources.',
     inputSchema: styleInformationToolSchema,
     execute: async (args) => {
-      const db = LevelDb.getInstance(clientRuntime);
+      const db = LevelDb.getInstance(workspaceDataPath);
       await db.open();
       await db.style.put(`${args.app}`, { ...args, createdAt: Date.now() });
       await db.close();

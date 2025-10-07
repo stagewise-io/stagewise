@@ -4,7 +4,6 @@ import { LevelDb } from '../index.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import type { FileEmbedding } from './embeddings.js';
-import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 
 export type FileInfo = {
   absolutePath: string;
@@ -43,14 +42,10 @@ export interface TableStats {
  * Creates database configuration with defaults
  */
 export function createDatabaseConfig(
-  clientRuntime: ClientRuntime,
+  workspaceDataPath: string,
 ): Required<DatabaseConfig> {
   return {
-    dbPath: path.join(
-      clientRuntime.fileSystem.getCurrentWorkingDirectory(),
-      '.stagewise',
-      'index-db',
-    ),
+    dbPath: path.join(workspaceDataPath, 'codebase-embeddings'),
     tableName: 'codebase_embeddings',
   };
 }
@@ -71,9 +66,9 @@ async function ensureDbDirectory(dbPath: string): Promise<void> {
  * Connects to the database and optionally opens an existing table
  */
 export async function connectToDatabase(
-  clientRuntime: ClientRuntime,
+  workspaceDataPath: string,
 ): Promise<DatabaseConnection> {
-  const fullConfig = createDatabaseConfig(clientRuntime);
+  const fullConfig = createDatabaseConfig(workspaceDataPath);
 
   await ensureDbDirectory(fullConfig.dbPath);
   const connection = await connect(fullConfig.dbPath);
@@ -98,7 +93,7 @@ export async function connectToDatabase(
  */
 async function validateTableSchema(
   table: Table | null,
-  clientRuntime: ClientRuntime,
+  workspaceDataPath: string,
 ): Promise<boolean> {
   if (!table) return true; // No table, so no schema issues
 
@@ -107,12 +102,12 @@ async function validateTableSchema(
     const sample = await table.query().limit(1).toArray();
     if (sample.length === 0) return true; // Empty table, no schema issues
 
-    const db = LevelDb.getInstance(clientRuntime);
+    const db = LevelDb.getInstance(workspaceDataPath);
     await db.open();
 
     const metadata = await db.meta.get('schema');
-    // Schema mismatch detected: Table has ragVersion 0, but 1 is required. Re-indexing needed.
-    if (metadata!.ragVersion !== RAG_VERSION) return false;
+    // Schema mismatch detected: Table has a deprecated version. Re-indexing needed.
+    if (metadata!.rag.ragVersion !== RAG_VERSION) return false;
 
     const embeddingDim = sample[0].embedding?.length;
     // Schema mismatch detected: Table has 0-dimensional embeddings, but 128 dimensions are required. Re-indexing needed.
@@ -145,7 +140,7 @@ function createEmptyRecord(): FileEmbeddingRecord {
  */
 export async function createOrUpdateTable(
   dbConnection: DatabaseConnection,
-  clientRuntime: ClientRuntime,
+  workspaceDataPath: string,
 ): Promise<DatabaseConnection> {
   const { connection, config } = dbConnection;
   const tables = await connection.tableNames();
@@ -165,7 +160,7 @@ export async function createOrUpdateTable(
     let table = await connection.openTable(config.tableName);
 
     // Check if schema is valid
-    const isValid = await validateTableSchema(table, clientRuntime);
+    const isValid = await validateTableSchema(table, workspaceDataPath);
     if (!isValid) {
       // Drop the existing table
       await connection.dropTable(config.tableName);

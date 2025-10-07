@@ -102,9 +102,15 @@ export type AppState = {
       | null; // The list of plugins that were loaded in the workspace
     setupActive: boolean;
     rag: {
-      isIndexing: boolean;
-      indexProgress: number;
-      indexTotal: number;
+      lastIndexedAt: Date | null;
+      indexedFiles: number;
+      statusInfo:
+        | {
+            isIndexing: true;
+            indexProgress: number;
+            indexTotal: number;
+          }
+        | { isIndexing: false; error?: string };
     };
     loadedOnStart: boolean;
   } | null;

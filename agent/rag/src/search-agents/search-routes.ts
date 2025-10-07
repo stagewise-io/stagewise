@@ -92,6 +92,7 @@ export type RouteMapping = z.infer<typeof routeMappingSchema>;
 export async function searchAndSaveRouteInformationFromProject(
   apiKey: string,
   clientRuntime: ClientRuntime,
+  workspaceDataPath: string,
   appName = 'website',
 ): Promise<{ success: boolean; message: string }> {
   const baseUrl = process.env.LLM_PROXY_URL || 'http://localhost:3002';
@@ -158,7 +159,7 @@ export async function searchAndSaveRouteInformationFromProject(
       // consume the stream
     }
 
-    const db = LevelDb.getInstance(clientRuntime);
+    const db = LevelDb.getInstance(workspaceDataPath);
     await db.open();
     await db.routing.put(`${routeEntry.app}`, routeEntry);
     await db.close();

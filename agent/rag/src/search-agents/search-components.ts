@@ -80,6 +80,7 @@ export type ComponentLibraryInformation = z.infer<
 export async function searchAndSaveComponentInformationFromSelectedElements(
   apiKey: string,
   clientRuntime: ClientRuntime,
+  workspaceDataPath: string,
   appName = 'website',
 ): Promise<{ success: boolean; message: string }> {
   const baseUrl = process.env.LLM_PROXY_URL || 'http://localhost:3002';
@@ -142,7 +143,7 @@ export async function searchAndSaveComponentInformationFromSelectedElements(
       // consume the stream
     }
 
-    const db = LevelDb.getInstance(clientRuntime);
+    const db = LevelDb.getInstance(workspaceDataPath);
     await db.open();
     await db.component.put(
       `${componentLibraryEntry.app}`,

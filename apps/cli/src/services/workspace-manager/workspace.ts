@@ -70,9 +70,9 @@ export class WorkspaceService {
         plugins: null,
         setupActive: false,
         rag: {
-          isIndexing: false,
-          indexProgress: 0,
-          indexTotal: 0,
+          lastIndexedAt: null,
+          indexedFiles: 0,
+          statusInfo: { isIndexing: false },
         },
         loadedOnStart: this.loadedOnStart,
       };
@@ -139,6 +139,7 @@ export class WorkspaceService {
             this.kartonService,
             this.authService,
             clientRuntime,
+            this.workspacePathsService!.workspaceDataPath,
           ).catch((error) => {
             this.telemetryService.captureException(error as Error);
             this.logger.error(

@@ -74,9 +74,9 @@ async function getLocalFilesManifests(
 }
 
 async function getStoredFilesManifests(
-  clientRuntime: ClientRuntime,
+  workspaceDataPath: string,
 ): Promise<FileManifest[] | { error: 'table_not_found' | 'unknown_error' }> {
-  const db = LevelDb.getInstance(clientRuntime);
+  const db = LevelDb.getInstance(workspaceDataPath);
   const manifests: FileManifest[] = [];
   try {
     await db.open();
@@ -145,6 +145,7 @@ async function getFileManifest(
 }
 
 export async function createStoredFileManifest(
+  workspaceDataPath: string,
   clientRuntime: ClientRuntime,
   filepath: string,
 ): Promise<void> {
@@ -152,7 +153,7 @@ export async function createStoredFileManifest(
   if (!manifest) {
     throw new Error(`Failed to get file manifest: ${filepath}`);
   }
-  const db = LevelDb.getInstance(clientRuntime);
+  const db = LevelDb.getInstance(workspaceDataPath);
   await db.open();
   await db.manifests.put(filepath, manifest);
   await db.close();
@@ -160,21 +161,24 @@ export async function createStoredFileManifest(
 
 export async function deleteStoredFileManifest(
   filepath: string,
-  clientRuntime: ClientRuntime,
+  workspaceDataPath: string,
 ): Promise<void> {
-  const db = LevelDb.getInstance(clientRuntime);
+  const db = LevelDb.getInstance(workspaceDataPath);
   await db.open();
   await db.manifests.del(filepath);
   await db.close();
 }
 
-export async function getRagFilesDiff(clientRuntime: ClientRuntime): Promise<{
+export async function getRagFilesDiff(
+  workspaceDataPath: string,
+  clientRuntime: ClientRuntime,
+): Promise<{
   toAdd: FileManifest[];
   toRemove: FileManifest[];
   toUpdate: FileManifest[];
 }> {
   const localManifests = await getLocalFilesManifests(clientRuntime);
-  const storedManifests = await getStoredFilesManifests(clientRuntime);
+  const storedManifests = await getStoredFilesManifests(workspaceDataPath);
   if ('error' in storedManifests) {
     return {
       toAdd: localManifests,

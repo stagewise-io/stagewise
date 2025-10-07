@@ -17,7 +17,7 @@ describe('typed-db', () => {
     clientRuntime = new ClientRuntimeNode({
       workingDirectory: testDbPath,
     });
-    db = LevelDb.getInstance(clientRuntime);
+    db = LevelDb.getInstance(testDbPath);
   });
 
   afterEach(async () => {
@@ -117,7 +117,7 @@ describe('typed-db', () => {
 
       // Close and create new instance to test schema version change
       await db.close();
-      db = LevelDb.getInstance(clientRuntime);
+      db = LevelDb.getInstance(testDbPath);
 
       // Second open with different schema version should reset
       await db.open(2);
@@ -217,9 +217,9 @@ describe('typed-db', () => {
 
     it('should handle multiple LevelDb instances for the same database path', async () => {
       // Create multiple instances for the same clientRuntime
-      const db1 = LevelDb.getInstance(clientRuntime);
-      const db2 = LevelDb.getInstance(clientRuntime);
-      const db3 = LevelDb.getInstance(clientRuntime);
+      const db1 = LevelDb.getInstance(testDbPath);
+      const db2 = LevelDb.getInstance(testDbPath);
+      const db3 = LevelDb.getInstance(testDbPath);
 
       // All instances should reference the same singleton
       expect(db1).toBe(db2);
@@ -262,9 +262,9 @@ describe('typed-db', () => {
 
     it('should handle concurrent operations across multiple instances', async () => {
       // Create multiple instances
-      const db1 = LevelDb.getInstance(clientRuntime);
-      const db2 = LevelDb.getInstance(clientRuntime);
-      const db3 = LevelDb.getInstance(clientRuntime);
+      const db1 = LevelDb.getInstance(testDbPath);
+      const db2 = LevelDb.getInstance(testDbPath);
+      const db3 = LevelDb.getInstance(testDbPath);
 
       // Open all instances concurrently
       await Promise.all([db1.open(1), db2.open(1), db3.open(1)]);
@@ -330,7 +330,7 @@ describe('typed-db', () => {
 
       // Close and create new instance to test schema version change
       await db.close();
-      db = LevelDb.getInstance(clientRuntime);
+      db = LevelDb.getInstance(testDbPath);
 
       // Reset with version 2
       await db.open(2);
