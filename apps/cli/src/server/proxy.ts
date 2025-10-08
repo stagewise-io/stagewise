@@ -7,6 +7,7 @@ import { applyHeaderRewrites } from './proxy-utils/headers-rewrites';
 
 export const proxy = createProxyMiddleware({
   changeOrigin: true,
+  secure: false, // Allow self-signed certificates
   pathFilter: (pathname: string, req: IncomingMessage) => {
     // Don't proxy if:
     // - path starts with "stagewise-toolbar-app" (including agent server routes)
@@ -28,7 +29,9 @@ export const proxy = createProxyMiddleware({
   followRedirects: false, // Don't automatically follow redirects to prevent loops
   router: () => {
     const config = configResolver.getConfig();
-    return `http://localhost:${config.appPort}`;
+    // Use HTTPS if configured, otherwise HTTP
+    const protocol = config.appHttps ? 'https' : 'http';
+    return `${protocol}://localhost:${config.appPort}`;
   },
   ws: false, // we handle websocket upgrades manually because we have multiple potential websocket servers
   cookieDomainRewrite: {

@@ -46,6 +46,10 @@ program
     myParsePath,
     process.cwd(),
   )
+  .option(
+    '--app-https',
+    'Use HTTPS when proxying the development app (for apps with self-signed certificates)',
+  )
   .option('-s, --silent', 'Will not request user input or guide through setup')
   .option('-v, --verbose', 'Output debug information to the CLI')
   .option(
@@ -146,6 +150,7 @@ program.parse([...process.argv.slice(0, 2), ...stagewiseArgs]);
 // Initialize variables
 let port: number | undefined;
 let appPort: number | undefined;
+let appHttps: boolean;
 let workspace: string;
 let silent: boolean;
 let verbose: boolean;
@@ -160,6 +165,7 @@ if (commandExecuted === 'auth' || commandExecuted === 'telemetry') {
   // Set default values for auth and telemetry commands
   port = undefined;
   appPort = undefined;
+  appHttps = false;
   workspace = process.cwd();
   silent = false;
   verbose = false;
@@ -169,6 +175,7 @@ if (commandExecuted === 'auth' || commandExecuted === 'telemetry') {
   const {
     port: parsedPort,
     appPort: parsedAppPort,
+    appHttps: parsedAppHttps,
     workspace: parsedWorkspace,
     silent: parsedSilent,
     verbose: parsedVerbose,
@@ -177,6 +184,7 @@ if (commandExecuted === 'auth' || commandExecuted === 'telemetry') {
   } = options as {
     port?: number;
     appPort?: number;
+    appHttps?: boolean;
     workspace: string;
     silent: boolean;
     verbose: boolean;
@@ -191,6 +199,7 @@ if (commandExecuted === 'auth' || commandExecuted === 'telemetry') {
 
   port = parsedPort;
   appPort = parsedAppPort;
+  appHttps = parsedAppHttps || false;
   workspace = parsedWorkspace;
   silent = parsedSilent;
   verbose = parsedVerbose;
@@ -202,6 +211,7 @@ if (commandExecuted === 'auth' || commandExecuted === 'telemetry') {
 export {
   port,
   appPort,
+  appHttps,
   workspace,
   silent,
   verbose,

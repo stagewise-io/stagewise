@@ -82,6 +82,7 @@ export class ConfigResolver {
       this.config = {
         port: args.port || 3100,
         appPort,
+        appHttps: args.appHttps || configFile?.appHttps || false,
         dir: args.workspace,
         silent: args.silent,
         verbose: args.verbose,
@@ -120,6 +121,7 @@ export class ConfigResolver {
     // Merge configurations (CLI args override config file)
     const port = args.port || configFile?.port || 3100;
     let appPort = args.appPort || configFile?.appPort;
+    const appHttps = args.appHttps || configFile?.appHttps || false;
     const autoPlugins = configFile?.autoPlugins ?? true;
     const plugins = configFile?.plugins ?? [];
 
@@ -232,6 +234,7 @@ export class ConfigResolver {
     this.config = {
       port,
       appPort,
+      appHttps,
       dir: args.workspace,
       silent: args.silent,
       verbose: args.verbose,

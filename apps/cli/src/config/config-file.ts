@@ -33,6 +33,10 @@ const configFileSchema = z.object({
     .max(65535)
     .optional()
     .describe('Port number for your development app'),
+  appHttps: z
+    .boolean()
+    .optional()
+    .describe('Whether the development app uses HTTPS'),
   autoPlugins: z.boolean().optional(),
   plugins: z.array(pluginSchema).optional(),
 });
