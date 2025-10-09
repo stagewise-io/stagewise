@@ -7,7 +7,6 @@ export * from './utils/karton-helpers.js';
 export * from './utils/tool-call-utils.js';
 export * from './utils/ui-messages-to-model-messages.js';
 export * from './utils/convert-credits-to-subscription-credits.js';
-export * from './utils/is-insufficient-credits-error.js';
 export * from './utils/is-plan-limit-error.js';
 export * from './utils/is-authentication-error.js';
 export * from './utils/is-abort-error.js';

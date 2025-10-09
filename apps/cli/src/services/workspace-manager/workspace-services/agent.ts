@@ -12,7 +12,6 @@ import {
   attachToolOutputToMessage,
   createAndActivateNewChat,
   findPendingToolCalls,
-  isInsufficientCreditsError,
   uiMessagesToModelMessages,
   processParallelToolCalls,
   type ToolCallProcessingResult,
@@ -673,33 +672,6 @@ export class AgentService {
               });
               return;
             }
-          } else if (isInsufficientCreditsError(error.error)) {
-            this.authRetryCount = 0;
-
-            const subscription =
-              this.kartonService.state.userAccount?.subscription;
-            this.telemetryService.capture('agent-credits-insufficient', {
-              hasSubscription: subscription?.active,
-              creditsRemaining:
-                subscription && 'creditsRemaining' in subscription
-                  ? (subscription.creditsRemaining as number)
-                  : undefined,
-            });
-
-            this.setAgentWorking(false);
-            this.kartonService.setState((draft) => {
-              const chat = draft.workspace?.agentChat?.chats[chatId];
-              if (chat) {
-                chat.error = {
-                  type: AgentErrorType.INSUFFICIENT_CREDITS,
-                  error: {
-                    name: 'Insufficient credits',
-                    message: 'Insufficient credits',
-                  },
-                };
-              }
-            });
-            return;
           } else {
             throw error.error;
           }
