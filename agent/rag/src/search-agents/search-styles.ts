@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { stepCountIs, tool } from 'ai';
 import { streamText, type ModelMessage } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import { createAnthropic } from '@ai-sdk/anthropic';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
 
 async function getSystemPrompt(clientRuntime: ClientRuntime) {
   const projectInfo = await getProjectInfo(clientRuntime);
@@ -86,12 +86,11 @@ const styleInformationToolSchema = styleInformationSchema.omit({
 export type StyleInformation = z.infer<typeof styleInformationSchema>;
 
 export async function searchAndSaveStyleInformationFromProject(
-  apiKey: string,
+  model: LanguageModelV2,
   clientRuntime: ClientRuntime,
   workspaceDataPath: string,
   appName = 'website',
 ): Promise<{ success: boolean; message: string }> {
-  const baseUrl = process.env.LLM_PROXY_URL || 'http://localhost:3002';
   const system = await getSystemPrompt(clientRuntime);
 
   const saveStyleInformationTool = tool({
@@ -108,11 +107,6 @@ export async function searchAndSaveStyleInformationFromProject(
   });
 
   try {
-    const litellm = createAnthropic({
-      apiKey: apiKey,
-      baseURL: `${baseUrl}/v1`,
-    });
-
     const prompt = {
       role: 'user',
       content: [
@@ -126,7 +120,7 @@ export async function searchAndSaveStyleInformationFromProject(
     const allTools = cliTools(clientRuntime);
 
     const stream = streamText({
-      model: litellm('gpt-5-mini'),
+      model,
       messages: [{ role: 'system', content: system }, prompt],
       tools: {
         saveStyleInformation: saveStyleInformationTool,

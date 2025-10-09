@@ -1,4 +1,6 @@
 import { PostHog } from 'posthog-node';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
+import { withTracing } from '@posthog/ai';
 import type { IdentifierService } from './identifier';
 import type { GlobalConfigService } from './global-config';
 import type { GlobalConfig } from '@stagewise/karton-contract/shared-types';
@@ -77,8 +79,8 @@ export class TelemetryService {
   private identifierService: IdentifierService;
   private globalConfigService: GlobalConfigService;
   private logger: Logger;
-  private posthogClient: PostHog;
   private userProperties: UserProperties = {};
+  public posthogClient: PostHog;
 
   public constructor(
     identifierService: IdentifierService,
@@ -132,6 +134,26 @@ export class TelemetryService {
       });
     }
     this.logger.debug('[TelemetryService] User identified');
+  }
+
+  public withTracing(
+    model: LanguageModelV2,
+    properties?: Parameters<typeof withTracing>[2],
+  ): LanguageModelV2 {
+    const telemetryLevel = this.globalConfigService.get().telemetryLevel;
+    if (telemetryLevel === 'off') return model;
+
+    const machineId = this.identifierService.getMachineId();
+
+    return withTracing(model, this.posthogClient, {
+      posthogDistinctId: machineId,
+      ...properties,
+      posthogProperties: {
+        telemetry_level: telemetryLevel,
+        cli_version: process.env.CLI_VERSION,
+        ...properties?.posthogProperties,
+      },
+    });
   }
 
   public capture<T extends keyof EventProperties>(

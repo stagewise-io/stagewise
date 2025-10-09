@@ -4,10 +4,10 @@ import type {
   UserMessageMetadata,
 } from '@stagewise/karton-contract';
 import { generateText, type ModelMessage, generateObject } from 'ai';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
 import { LevelDb } from '@stagewise/agent-rag';
 import { queryRagWithoutRerank } from '@stagewise/agent-rag';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import type {
   ComponentLibraryInformation,
   StyleInformation,
@@ -109,13 +109,9 @@ async function _getRouteFileSnippets(
 async function queryRagForSelectedElement(
   element: SelectedElement,
   workspaceDataPath: string,
+  model: LanguageModelV2,
   apiKey: string,
 ) {
-  const litellm = createAnthropic({
-    apiKey: apiKey,
-    baseURL: `${process.env.LLM_PROXY_URL}/v1`,
-  });
-
   const descriptionPrompt = `You are a helpful assistant that describes the semantic of elements in a web application by looking at the DOM structure and selected elements.\n\nExample:\n\n- user:\n\tThis is the selected element:\n\t\t- <input type="text" id="search-input" placeholder="Search..." classNames="w-full text-blue-500 bg-white">\n\t\t- <button id="search-button" classNames="bg-red-500 text-white">Search</button>\n\n- assistant:\n\tA white search input with blue text with a search button with a red background and white text that triggers a search action.`;
 
   const prompt = {
@@ -129,7 +125,7 @@ async function queryRagForSelectedElement(
   } satisfies ModelMessage;
 
   const elementDescription = await generateText({
-    model: litellm('gemini-2.5-flash-lite'),
+    model,
     messages: [{ role: 'system', content: descriptionPrompt }, prompt],
     temperature: 0.1,
   });
@@ -147,12 +143,14 @@ async function queryRagForSelectedElement(
 export async function retrieveFileForSelectedElement(
   element: SelectedElement,
   workspaceDataPath: string,
+  model: LanguageModelV2,
   apiKey: string,
 ): Promise<RetrievalResult | { error: string }> {
   try {
     const retrievedFiles = await queryRagForSelectedElement(
       element,
       workspaceDataPath,
+      model,
       apiKey,
     );
     const fileParts: ContextFile[] = [];
@@ -164,7 +162,7 @@ export async function retrieveFileForSelectedElement(
     const correctFileSnippet = await pickCorrectFileSnippetFromSnippets(
       element,
       fileParts,
-      apiKey,
+      model,
     );
 
     return correctFileSnippet;
@@ -176,7 +174,7 @@ export async function retrieveFileForSelectedElement(
 async function pickCorrectFileSnippetFromSnippets(
   element: SelectedElement,
   snippets: ContextFile[],
-  apiKey: string,
+  model: LanguageModelV2,
 ) {
   const snippetsWithLineNumbers = snippets.map((s) => {
     const lines = s.content.split('\n');
@@ -283,18 +281,13 @@ async function pickCorrectFileSnippetFromSnippets(
     ],
   } satisfies ModelMessage;
 
-  const litellm = createAnthropic({
-    apiKey: apiKey,
-    baseURL: `${process.env.LLM_PROXY_URL}/v1`,
-  });
-
   const response = await generateObject({
     schema: z.object({
       relativePath: z.string(),
       startLine: z.number(),
       endLine: z.number(),
     }),
-    model: litellm('gemini-2.5-flash-lite'),
+    model,
     messages: [{ role: 'system', content: fileSelectionPrompt }, prompt],
     temperature: 0.1,
   });

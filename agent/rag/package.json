@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "2.0.9",
+    "@ai-sdk/provider": "^2.0.0",
     "@lancedb/lancedb": "^0.21.3",
     "@stagewise/agent-prompt-snippets": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",

@@ -4,8 +4,8 @@ import { LevelDb } from '../utils/typed-db.js';
 import { z } from 'zod';
 import { stepCountIs, tool } from 'ai';
 import { streamText, type ModelMessage } from 'ai';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import { createAnthropic } from '@ai-sdk/anthropic';
 
 async function getSystemPrompt(clientRuntime: ClientRuntime) {
   const projectInfo = await getProjectInfo(clientRuntime);
@@ -59,12 +59,11 @@ const appInformationToolSchema = appInformationSchema.omit({ createdAt: true });
 export type AppInformation = z.infer<typeof appInformationSchema>;
 
 export async function searchAndSaveAppInformationFromProject(
-  apiKey: string,
+  model: LanguageModelV2,
   clientRuntime: ClientRuntime,
   workspaceDataPath: string,
   appName = 'website',
 ): Promise<{ success: boolean; message: string }> {
-  const baseUrl = process.env.LLM_PROXY_URL || 'http://localhost:3002';
   const system = await getSystemPrompt(clientRuntime);
 
   const saveAppInformationTool = tool({
@@ -83,11 +82,6 @@ export async function searchAndSaveAppInformationFromProject(
   });
 
   try {
-    const litellm = createAnthropic({
-      apiKey: apiKey,
-      baseURL: `${baseUrl}/v1`,
-    });
-
     const prompt = {
       role: 'user',
       content: [
@@ -101,7 +95,7 @@ export async function searchAndSaveAppInformationFromProject(
     const allTools = cliTools(clientRuntime);
 
     const stream = streamText({
-      model: litellm('gpt-5-mini'),
+      model,
       messages: [{ role: 'system', content: system }, prompt],
       tools: {
         saveAppInformation: saveAppInformationTool,

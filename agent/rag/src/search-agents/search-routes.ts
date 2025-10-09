@@ -1,11 +1,11 @@
 import { cliTools } from '@stagewise/agent-tools';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
 import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
 import { LevelDb } from '../utils/typed-db.js';
 import { z } from 'zod';
 import { stepCountIs, tool } from 'ai';
 import { streamText, type ModelMessage } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import { createAnthropic } from '@ai-sdk/anthropic';
 
 async function getSystemPrompt(clientRuntime: ClientRuntime) {
   const projectInfo = await getProjectInfo(clientRuntime);
@@ -90,12 +90,11 @@ const routeMappingToolSchema = routeSchema.extend({
 export type RouteMapping = z.infer<typeof routeMappingSchema>;
 
 export async function searchAndSaveRouteInformationFromProject(
-  apiKey: string,
+  model: LanguageModelV2,
   clientRuntime: ClientRuntime,
   workspaceDataPath: string,
   appName = 'website',
 ): Promise<{ success: boolean; message: string }> {
-  const baseUrl = process.env.LLM_PROXY_URL || 'http://localhost:3002';
   const system = await getSystemPrompt(clientRuntime);
   const routeEntry: RouteMapping = {
     app: appName,
@@ -116,11 +115,6 @@ export async function searchAndSaveRouteInformationFromProject(
   });
 
   try {
-    const litellm = createAnthropic({
-      apiKey: apiKey,
-      baseURL: `${baseUrl}/v1`,
-    });
-
     const prompt = {
       role: 'user',
       content: [
@@ -134,7 +128,7 @@ export async function searchAndSaveRouteInformationFromProject(
     const allTools = cliTools(clientRuntime);
 
     const stream = streamText({
-      model: litellm('gpt-5-mini'),
+      model,
       messages: [{ role: 'system', content: system }, prompt],
       tools: {
         saveRouteMapping: saveRouteMappingTool,

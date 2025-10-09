@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { stepCountIs, tool } from 'ai';
 import { streamText, type ModelMessage } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import { createAnthropic } from '@ai-sdk/anthropic';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
 
 async function getSystemPrompt(clientRuntime: ClientRuntime) {
   const projectInfo = await getProjectInfo(clientRuntime);
@@ -78,12 +78,11 @@ export type ComponentLibraryInformation = z.infer<
 >;
 
 export async function searchAndSaveComponentInformationFromSelectedElements(
-  apiKey: string,
+  model: LanguageModelV2,
   clientRuntime: ClientRuntime,
   workspaceDataPath: string,
   appName = 'website',
 ): Promise<{ success: boolean; message: string }> {
-  const baseUrl = process.env.LLM_PROXY_URL || 'http://localhost:3002';
   const system = await getSystemPrompt(clientRuntime);
 
   const componentLibraryEntry: ComponentLibraryInformation = {
@@ -102,11 +101,6 @@ export async function searchAndSaveComponentInformationFromSelectedElements(
   });
 
   try {
-    const litellm = createAnthropic({
-      apiKey: apiKey,
-      baseURL: `${baseUrl}/v1`,
-    });
-
     const prompt = {
       role: 'user',
       content: [
@@ -120,7 +114,7 @@ export async function searchAndSaveComponentInformationFromSelectedElements(
     const allTools = cliTools(clientRuntime);
 
     const stream = streamText({
-      model: litellm('gpt-5-mini'),
+      model,
       messages: [{ role: 'system', content: system }, prompt],
       tools: {
         saveComponentInformation: saveComponentInformationTool,

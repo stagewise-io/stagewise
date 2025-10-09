@@ -566,7 +566,12 @@ export class AgentService {
       if (isFirstUserMessage && lastMessageMetadata.isUserMessage) {
         const title = await generateChatTitle(
           history,
-          this.litellm('gemini-2.5-flash'),
+          this.telemetryService.withTracing(this.litellm('gemini-2.5-flash'), {
+            posthogTraceId: `chat-title-${chatId}`,
+            posthogProperties: {
+              $ai_span_name: 'chat-title',
+            },
+          }),
         );
 
         this.kartonService.setState((draft) => {
@@ -589,8 +594,18 @@ export class AgentService {
         promptSnippets,
       });
 
+      const model = this.telemetryService.withTracing(
+        this.litellm('claude-sonnet-4-20250514'),
+        {
+          posthogTraceId: chatId,
+          posthogProperties: {
+            $ai_span_name: 'agent-chat',
+          },
+        },
+      );
+
       const stream = streamText({
-        model: this.litellm('claude-sonnet-4-20250514'),
+        model,
         abortSignal: this.abortController.signal,
         temperature: 0.7,
         maxOutputTokens: 10000,
