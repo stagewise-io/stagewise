@@ -5,7 +5,6 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { PanelFooter } from '@/components/ui/panel';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn, HotkeyActions } from '@/utils';
-import { Textarea } from '@headlessui/react';
 import {
   ArrowUpIcon,
   SquareIcon,
@@ -22,7 +21,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@stagewise/stage-ui/components/tooltip';
 import { HotkeyComboText } from '@/components/hotkey-combo-text';
 
 const GlassyTextInputClassNames =
@@ -140,7 +139,7 @@ export function ChatPanelFooter({
         <div className="flex flex-1 flex-col items-stretch gap-1">
           {/* Text input area */}
           <div className="relative flex flex-1 pr-1">
-            <Textarea
+            <textarea
               ref={inputRef}
               value={chatState.chatInput}
               onChange={(e) => {

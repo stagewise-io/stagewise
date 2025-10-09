@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { cn, openFileUrl } from '@/utils';
 import type {
   ToolPart,
@@ -10,11 +9,10 @@ import type {
   AgentError,
 } from '@stagewise/karton-contract';
 import { AgentErrorType } from '@stagewise/karton-contract';
-import { RefreshCcwIcon, Redo2, Undo2 } from 'lucide-react';
+import { RefreshCcwIcon, Undo2 } from 'lucide-react';
 import {
   BrainIcon,
   CheckIcon,
-  ChevronDownIcon,
   ChevronRightIcon,
   CogIcon,
   EyeIcon,
@@ -24,29 +22,26 @@ import {
   TrashIcon,
   XIcon,
 } from 'lucide-react';
-import {
-  memo,
-  useMemo,
-  useCallback,
-  Fragment,
-  useState,
-  useEffect,
-} from 'react';
+import { memo, useMemo, useCallback, useState, useEffect } from 'react';
 import TimeAgo from 'react-timeago';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { useChatState } from '@/hooks/use-chat-state';
-import {
-  Disclosure,
-  DisclosureButton,
-  DisclosurePanel,
-  Popover,
-  PopoverButton,
-  PopoverPanel,
-  Transition,
-} from '@headlessui/react';
 import ReactMarkdown from 'react-markdown';
 import { getToolDescription, isFileEditTool } from './chat-bubble-tool-diff';
 import { diffLines } from 'diff';
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverTitle,
+  PopoverDescription,
+} from '@stagewise/stage-ui/components/popover';
+import { Button } from '@stagewise/stage-ui/components/button';
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from '@stagewise/stage-ui/components/collapsible';
 
 export function ChatBubble({
   message: msg,
@@ -240,128 +235,68 @@ export function ChatBubble({
             isLastMessage &&
             !isWorking &&
             hasCodeChanges && (
-              <Popover className="relative">
-                {({ close }) => (
-                  <>
-                    <PopoverButton
-                      type="button"
-                      aria-label="Undo changes"
-                      className="flex cursor-pointer flex-row items-center gap-1 text-xs text-zinc-600 transition-colors hover:text-zinc-900 focus:outline-none"
-                    >
-                      Undo changes
-                      <Undo2 className="size-3" />
-                    </PopoverButton>
-
-                    <Transition
-                      as={Fragment}
-                      enter="transition ease-out duration-200"
-                      enterFrom="opacity-0 translate-y-1 scale-95"
-                      enterTo="opacity-100 translate-y-0 scale-100"
-                      leave="transition ease-in duration-150"
-                      leaveFrom="opacity-100 translate-y-0 scale-100"
-                      leaveTo="opacity-0 translate-y-1 scale-95"
-                    >
-                      <PopoverPanel
-                        anchor="top end"
-                        className="!overflow-visible z-[9999] w-64 p-1 [--anchor-gap:8px]"
-                      >
-                        <div className="rounded-xl bg-white/95 p-3 shadow-xl ring-1 ring-zinc-950/10 ring-inset backdrop-blur-lg">
-                          <p className="font-medium text-sm text-zinc-950">
-                            Undo changes?
-                          </p>
-                          <p className="mt-1 text-xs text-zinc-600">
-                            This will undo all changes the assistant made since
-                            your last message.
-                          </p>
-                          <div className="mt-3 flex justify-end gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => close()}
-                              className="h-7 px-2 py-1 text-xs"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => {
-                                confirmUndo();
-                                close();
-                              }}
-                              className="h-7 px-2 py-1 text-xs"
-                            >
-                              Undo
-                            </Button>
-                          </div>
-                        </div>
-                      </PopoverPanel>
-                    </Transition>
-                  </>
-                )}
+              <Popover>
+                <PopoverTrigger>
+                  <Button variant="secondary" size="xs">
+                    Undo changes
+                    <Undo2 className="size-3" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <PopoverTitle>Undo changes?</PopoverTitle>
+                  <PopoverDescription>
+                    This will undo all changes the assistant made since your
+                    last message.
+                  </PopoverDescription>
+                  <Button variant="secondary" size="xs" onClick={() => close()}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="xs"
+                    onClick={() => {
+                      confirmUndo();
+                      close();
+                    }}
+                  >
+                    Undo
+                  </Button>
+                </PopoverContent>
               </Popover>
             )}
         </div>
 
         {msg.role === 'user' && msg.id && !isWorking && (
-          <Popover className="relative">
-            {({ close }) => (
-              <>
-                <PopoverButton
-                  type="button"
-                  aria-label="Restore checkpoint"
-                  className="mr-1 cursor-pointer text-zinc-600 transition-colors hover:text-zinc-900 focus:outline-none"
-                >
-                  <Redo2 className="size-4" />
-                </PopoverButton>
-
-                <Transition
-                  as={Fragment}
-                  enter="transition ease-out duration-200"
-                  enterFrom="opacity-0 translate-y-1 scale-95"
-                  enterTo="opacity-100 translate-y-0 scale-100"
-                  leave="transition ease-in duration-150"
-                  leaveFrom="opacity-100 translate-y-0 scale-100"
-                  leaveTo="opacity-0 translate-y-1 scale-95"
-                >
-                  <PopoverPanel
-                    anchor="top start"
-                    className="overflow-visible! z-[9999] w-64 p-1 [--anchor-gap:8px]"
-                  >
-                    <div className="rounded-xl bg-white/95 p-3 shadow-xl ring-1 ring-zinc-950/10 ring-inset backdrop-blur-lg">
-                      <p className="font-medium text-sm text-zinc-950">
-                        Restore checkpoint?
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-600">
-                        This will clear the chat history and undo file changes
-                        after this point.
-                      </p>
-                      <div className="mt-3 flex justify-end gap-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => close()}
-                          className="h-7 px-2 py-1 text-xs"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => {
-                            confirmRestore();
-                            close();
-                          }}
-                          className="h-7 px-2 py-1 text-xs"
-                        >
-                          Restore
-                        </Button>
-                      </div>
-                    </div>
-                  </PopoverPanel>
-                </Transition>
-              </>
-            )}
+          <Popover>
+            <PopoverTrigger>
+              <Button
+                aria-label="Restore checkpoint"
+                variant="ghost"
+                size="icon-xs"
+              >
+                <Undo2 className="size-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent>
+              <PopoverTitle>Restore checkpoint?</PopoverTitle>
+              <PopoverDescription>
+                This will clear the chat history and undo file changes after
+                this point.
+              </PopoverDescription>
+              <Button variant="secondary" size="xs" onClick={() => close()}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="xs"
+                onClick={() => {
+                  confirmRestore();
+                  close();
+                }}
+              >
+                Restore
+              </Button>
+            </PopoverContent>
           </Popover>
         )}
 
@@ -371,9 +306,8 @@ export function ChatBubble({
               <Button
                 aria-label={'Retry'}
                 variant="secondary"
-                glassy
+                size="icon-sm"
                 onClick={() => void retrySendingUserMessage()}
-                className="!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg hover:bg-white/60 active:bg-zinc-50/60 disabled:bg-transparent disabled:shadow-none disabled:*:stroke-zinc-500/50"
               >
                 <RefreshCcwIcon className="size-4" />
               </Button>
@@ -396,20 +330,18 @@ const ReasoningPartItem = memo(
   ({ reasoningPart }: { reasoningPart: ReasoningUIPart }) => {
     return (
       <div className="-mx-1 block min-w-32 rounded-xl border-border/20 bg-zinc-500/5 px-2 py-0.5">
-        <Disclosure>
-          <DisclosureButton className="group flex w-full flex-row items-center justify-between gap-2 text-black/60 hover:text-black/90">
+        <Collapsible>
+          <CollapsibleTrigger
+            size="condensed"
+            className="text-muted-foreground"
+          >
             <BrainIcon className="size-3" />
             <span className="block flex-1 text-start text-xs">Thinking...</span>
-            <ChevronDownIcon
-              className={
-                'size-3 transition-all duration-150 ease-out group-hover:stroke-black group-data-open:rotate-180'
-              }
-            />
-          </DisclosureButton>
-          <DisclosurePanel className="markdown pt-1.5 pb-0.5 pl-1 opacity-80">
+          </CollapsibleTrigger>
+          <CollapsibleContent className="markdown pt-1.5 pb-0.5 pl-1 opacity-80">
             <ReactMarkdown>{reasoningPart.text}</ReactMarkdown>
-          </DisclosurePanel>
-        </Disclosure>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     );
   },
@@ -648,7 +580,7 @@ const ToolPartItem = memo(
             <div className="flex flex-row items-center gap-1">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 className="h-4 w-5"
                 onClick={(e) => {
@@ -660,7 +592,7 @@ const ToolPartItem = memo(
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 className="h-4 w-5"
                 onClick={(e) => {

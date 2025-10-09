@@ -5,7 +5,6 @@ import {
   PanelFooter,
 } from '@/components/ui/panel';
 import { MessageCircleQuestionMarkIcon, WifiOffIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import {
   Menu,
   MenuContent,
@@ -13,6 +12,7 @@ import {
   MenuTrigger,
 } from '@stagewise/stage-ui/components/menu';
 import { useKartonConnected } from '@/hooks/use-karton';
+import { Button } from '@stagewise/stage-ui/components/button';
 
 export function AgentConnectivityPanel() {
   const isConnected = useKartonConnected();
@@ -48,7 +48,7 @@ export function AgentConnectivityPanel() {
       <PanelFooter>
         <Menu>
           <MenuTrigger>
-            <Button glassy size="sm" variant="secondary">
+            <Button size="sm" variant="secondary">
               <MessageCircleQuestionMarkIcon className="mr-2 size-4" />
               Need help?
             </Button>

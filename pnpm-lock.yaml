@@ -1435,12 +1435,6 @@ importers:
 
   toolbar/core:
     devDependencies:
-      '@base-ui-components/react':
-        specifier: 1.0.0-beta.2
-        version: 1.0.0-beta.2(@types/react@19.1.10)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      '@headlessui/react':
-        specifier: 2.2.2
-        version: 2.2.2(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       '@microsoft/api-extractor':
         specifier: ^7.52.10
         version: 7.52.10(@types/node@22.15.2)

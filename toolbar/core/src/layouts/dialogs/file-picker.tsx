@@ -27,7 +27,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@stagewise/stage-ui/components/tooltip';
 /**
  * Conditionally rendering dialog for file picking.
  * Is only rendered, if a file picker request is active.

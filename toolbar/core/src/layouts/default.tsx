@@ -21,22 +21,12 @@ import {
   useKartonProcedure,
   useKartonState,
 } from '@/hooks/use-karton';
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  PopoverTitle,
-} from '@stagewise/stage-ui/components/popover';
 import { AuthDialog } from './dialogs/auth';
 import { FilePickerDialog } from './dialogs/file-picker';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { NotificationToaster } from './notification-toaster';
 import { FooterBar } from './sections/footer-bar';
 import { WorkspaceSetupDialog } from './dialogs/workspace-setup';
+import { WorkspaceInfoBadge } from './sections/title-bar/workspace-info-badge';
 
 export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
   const connected = useKartonConnected();
@@ -45,16 +35,6 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
 
   const workspaceStatus = useKartonState((s) => s.workspaceStatus);
   const workspace = useKartonState((s) => s.workspace);
-
-  const workspaceDir = useMemo(() => {
-    return workspace
-      ? workspace.path
-          .replace('\\', '/')
-          .split('/')
-          .filter((p) => p !== '')
-          .pop()
-      : null;
-  }, [workspace]);
 
   const openWorkspace = useKartonProcedure((p) => p.workspace.open);
   const closeWorkspace = useKartonProcedure((p) => p.workspace.close);
@@ -81,13 +61,6 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
       });
   }, [createFilePickerRequest, openWorkspace, workspace, closeWorkspace]);
 
-  const reloadWorkspace = useCallback(() => {
-    const workspacePath = workspace!.path;
-    void closeWorkspace().then(() => {
-      void openWorkspace(workspacePath);
-    });
-  }, [closeWorkspace, openWorkspace, workspace]);
-
   if (!connected) {
     return (
       <div className="relative flex size-full flex-col items-center justify-center gap-4 p-4">
@@ -105,75 +78,7 @@ export function DefaultLayout({ mainApp }: { mainApp: React.ReactNode }) {
 
         {/* Upper center info area */}
         <div className="flex flex-1 basis-1/3 flex-row items-center justify-center">
-          {workspace && (
-            <Popover>
-              <PopoverTrigger>
-                <Button size="sm" variant="ghost" className="rounded-full">
-                  {workspaceDir ?? 'No workspace loaded'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent>
-                <PopoverTitle>Workspace Info</PopoverTitle>
-
-                <div className="flex flex-col gap-0">
-                  <h3 className="font-medium text-sm">Path</h3>
-                  <p className="text-foreground/70 text-sm">
-                    {workspace?.path}
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-0">
-                  <h3 className="font-medium text-sm">Dev App Port</h3>
-                  <p className="font-mono text-foreground/70 text-sm">
-                    {workspace?.config?.appPort ?? 'unknown'}
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-0">
-                  <h3 className="font-medium text-sm">
-                    Loaded Plugins{' '}
-                    <span className="inline-body glass-body rounded-full bg-black/60 px-1 py-px text-white text-xs">
-                      {workspace?.plugins?.length ?? 0}
-                    </span>
-                  </h3>
-                  <p className="text-foreground/70 text-sm">
-                    {workspace?.plugins
-                      ?.map((plugin) => plugin.name)
-                      .join(', ')}
-                    {workspace?.plugins?.length === 0 && 'No plugins loaded'}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="w-full"
-                        onClick={reloadWorkspace}
-                      >
-                        Reload
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Reload workspace</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        className="w-full"
-                        onClick={selectAndOpenWorkspace}
-                      >
-                        Switch
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Switch workspace</TooltipContent>
-                  </Tooltip>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
+          <WorkspaceInfoBadge />
         </div>
 
         {/* Upper right control area */}

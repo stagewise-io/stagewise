@@ -75,7 +75,6 @@ export default async function buildToolbarMain() {
         '@trpc/client',
         'lucide-react',
         'zod',
-        '@headlessui/react',
         'class-variance-authority',
         '@stagewise/karton',
       ],

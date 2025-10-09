@@ -6,7 +6,7 @@ import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
-} from '@/components/ui/tooltip';
+} from '@stagewise/stage-ui/components/tooltip';
 import { buttonVariants } from '@stagewise/stage-ui/components/button';
 
 interface FileAttachmentChipsProps {

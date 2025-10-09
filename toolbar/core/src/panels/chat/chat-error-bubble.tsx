@@ -1,10 +1,10 @@
 import { cn } from '@/utils';
-import { Button } from '@/components/ui/button';
 import { AgentErrorType, type AgentError } from '@stagewise/karton-contract';
 import { RefreshCcwIcon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import Markdown from 'react-markdown';
 import { useMemo } from 'react';
+import { Button } from '@stagewise/stage-ui/components/button';
 
 const formatDuration = (minutes: number): string => {
   if (minutes < 60) {
@@ -104,9 +104,8 @@ export function ChatErrorBubble({ error }: { error: AgentError }) {
           <Button
             aria-label={'Retry'}
             variant="secondary"
-            glassy
+            size="icon-md"
             onClick={() => void retrySendingUserMessage()}
-            className="!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg hover:bg-white/60 active:bg-zinc-50/60 disabled:bg-transparent disabled:shadow-none disabled:*:stroke-zinc-500/50"
           >
             <RefreshCcwIcon className="size-4" />
           </Button>

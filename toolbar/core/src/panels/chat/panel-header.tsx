@@ -13,7 +13,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@stagewise/stage-ui/components/tooltip';
 
 export function ChatPanelHeader() {
   const [chatListOpen, setChatListOpen] = useState(false);

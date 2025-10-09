@@ -12,7 +12,7 @@ export {
 
 export { Badge } from '@/components/ui/badge';
 
-export { Button } from '@/components/ui/button';
+export { Button } from '@stagewise/stage-ui/components/button';
 
 export * from '@/plugin-sdk/plugin';
 

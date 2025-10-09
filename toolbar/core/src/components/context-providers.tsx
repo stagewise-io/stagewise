@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { ConfigProvider } from '@/hooks/use-config';
 import { PanelsProvider } from '@/hooks/use-panels';
 import { KartonProvider } from '@/hooks/use-karton';
-import { Tooltip } from '@base-ui-components/react/tooltip';
+import { TooltipProvider } from '@stagewise/stage-ui/components/tooltip';
 import { ContextChipHoverProvider } from '@/hooks/use-context-chip-hover';
 import { PostHogProvider } from '@/hooks/use-posthog';
 
@@ -17,7 +17,7 @@ export function ContextProviders({
   config?: InternalToolbarConfig;
 }) {
   return (
-    <Tooltip.Provider>
+    <TooltipProvider>
       <ConfigProvider config={config}>
         <KartonProvider>
           <PostHogProvider>
@@ -31,6 +31,6 @@ export function ContextProviders({
           </PostHogProvider>
         </KartonProvider>
       </ConfigProvider>
-    </Tooltip.Provider>
+    </TooltipProvider>
   );
 }
