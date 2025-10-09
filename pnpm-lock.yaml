@@ -287,6 +287,15 @@ importers:
 
   agent/utils:
     dependencies:
+      '@ai-sdk/anthropic':
+        specifier: 2.0.9
+        version: 2.0.9(zod@4.0.17)
+      '@stagewise/agent-rag':
+        specifier: workspace:*
+        version: link:../rag
+      '@stagewise/agent-runtime-interface':
+        specifier: workspace:*
+        version: link:../runtime-interface
       '@stagewise/api-client':
         specifier: 1.4.0
         version: 1.4.0(typescript@5.9.3)

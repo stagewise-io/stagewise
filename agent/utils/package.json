@@ -31,7 +31,10 @@
   "dependencies": {
     "ai": "5.0.9",
     "zod": "4.0.17",
-    "@stagewise/api-client": "1.4.0"
+    "@stagewise/api-client": "1.4.0",
+    "@stagewise/agent-rag": "workspace:*",
+    "@stagewise/agent-runtime-interface": "workspace:*",
+    "@ai-sdk/anthropic": "2.0.9"
   },
   "devDependencies": {
     "@stagewise/agent-prompts": "workspace:*",
