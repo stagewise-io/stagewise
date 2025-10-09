@@ -854,7 +854,7 @@ export default function Home() {
   return (
     <div className="relative mt-12 min-h-screen w-full">
       {/* Hero Section */}
-      <section className="container relative z-10 px-4 pb-16 md:pb-20">
+      <section className="relative z-10 w-full px-4 pb-16 md:pb-20">
         <div className="flex justify-center">
           <div className="max-w-3xl">
             <ScrollReveal>
@@ -967,7 +967,7 @@ export default function Home() {
       {/* Simplified Setup Guide Section */}
       <section
         id="setup-guide"
-        className="container relative z-10 border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800"
+        className="relative z-10 w-full border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800"
       >
         <ScrollReveal>
           <div className="flex justify-center pt-8">
@@ -978,7 +978,7 @@ export default function Home() {
 
       {/* Customer Testimonials Section */}
       <section className="relative z-10 border-zinc-200 border-t py-32 md:py-40 dark:border-zinc-800">
-        <div className="container mx-auto px-4">
+        <div className="mx-auto w-full px-4">
           <div className="flex justify-center">
             <ScrollReveal>
               <div className="mb-20 max-w-4xl pt-8 text-center">
@@ -996,7 +996,7 @@ export default function Home() {
       </section>
 
       {/* Enhanced Bento Grid Features Section */}
-      <section className="container relative z-10 border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800">
+      <section className="relative z-10 w-full border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800">
         <div className="flex justify-center">
           <ScrollReveal>
             <div className="mb-20 max-w-3xl pt-8 text-center">
@@ -1015,7 +1015,7 @@ export default function Home() {
       </section>
 
       {/* Tech Stack Compatibility Section */}
-      <section className="container relative z-10 border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800">
+      <section className="relative z-10 w-full border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800">
         <ScrollReveal>
           <div className="pt-8">
             <CompatibilitySection />
@@ -1024,7 +1024,7 @@ export default function Home() {
       </section>
 
       {/* Development Steps Slideshow Section */}
-      <section className="container relative z-10 border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800">
+      <section className="relative z-10 w-full border-zinc-200 border-t px-4 py-32 md:py-40 dark:border-zinc-800">
         <ScrollReveal>
           <div className="pt-8">
             <DevelopmentStepsSlideshow />
@@ -1033,7 +1033,7 @@ export default function Home() {
       </section>
 
       {/* Second Get Started Section */}
-      <section className="container relative z-10 border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800">
+      <section className="relative z-10 w-full border-zinc-200 border-t px-4 py-24 md:py-32 dark:border-zinc-800">
         <div className="flex justify-center">
           <ScrollReveal>
             <div className="max-w-2xl pt-8 text-center">

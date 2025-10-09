@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { CopyIcon, CheckIcon } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
-import { cn } from '@stagewise/ui/lib/utils';
+import { cn } from '@/lib/utils';
 
 export function Clipboard({
   text,

@@ -1,1 +1,5 @@
-export { default } from '@stagewise/ui/postcss.config';
+export default {
+  plugins: {
+    '@tailwindcss/postcss': {},
+  },
+};

@@ -1,12 +1,13 @@
 @import 'tailwindcss';
 
 /* Additional watch source for tailwind */
-@source "../../node_modules/@stagewise/ui";
 @import "../../node_modules/@stagewise/stage-ui/src/style.css";
 @source "../../node_modules/@stagewise/stage-ui";
 
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
+
+@custom-variant dark (&:is(.dark *));
 
 
 @theme default {

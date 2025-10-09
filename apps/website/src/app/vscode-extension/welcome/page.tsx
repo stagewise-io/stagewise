@@ -7,7 +7,7 @@ import { usePostHog } from 'posthog-js/react';
 import { Logo } from '@/components/landing/logo';
 import { AnimatedGradientBackground } from '@/components/landing/animated-gradient-background';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { cn } from '@stagewise/ui/lib/utils';
+import { cn } from '@/lib/utils';
 
 export default function MigrateToCLI() {
   const posthog = usePostHog();

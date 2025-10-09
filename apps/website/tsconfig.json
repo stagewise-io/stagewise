@@ -17,8 +17,7 @@
     "incremental": true,
     "paths": {
       "@/.source": ["./.source/index.ts"],
-      "@/*": ["./src/*"],
-      "@stagewise/ui/*": ["../../packages/ui/src/*"]
+      "@/*": ["./src/*"]
     },
     "plugins": [
       {

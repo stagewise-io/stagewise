@@ -2,13 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import posthog from 'posthog-js';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@stagewise/ui/components/card';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { getCookieConsent, setCookieConsent } from '@/lib/cookie-consent-utils';
 
@@ -44,28 +37,25 @@ export function CookieBanner() {
 
   return (
     <div className="slide-in-from-bottom fixed right-4 bottom-4 z-50 w-sm animate-in rounded-xl bg-background/80 backdrop-blur-lg duration-300">
-      <Card className="shadow-lg">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Cookie Consent</CardTitle>
-          <CardDescription className="text-sm">
+      <div className="glass-body flex flex-col items-start gap-3 rounded-2xl bg-white/80 p-3">
+        <div className="flex flex-col items-start gap-1">
+          <h2 className="font-semibold text-base text-foreground">
+            Cookie Consent
+          </h2>
+          <p className="text-muted-foreground text-sm">
             We use analytics cookies to understand how you use our website and
             improve your experience.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex gap-2 pt-0">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={handleDeny}
-            className="flex-1"
-          >
-            Deny
-          </Button>
-          <Button size="sm" onClick={handleAccept} className="flex-1">
+          </p>
+        </div>
+        <div className="flex w-full flex-row-reverse items-start justify-start gap-2">
+          <Button size="sm" onClick={handleAccept}>
             Accept
           </Button>
-        </CardContent>
-      </Card>
+          <Button size="sm" variant="secondary" onClick={handleDeny}>
+            Deny
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
