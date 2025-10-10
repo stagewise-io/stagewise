@@ -20,11 +20,11 @@ export const DialogContent = ({
 }: DialogContentProps) => {
   return (
     <BaseDialog.Portal>
-      <BaseDialog.Backdrop className="fixed inset-0 size-full bg-white/10 backdrop-blur-xs transition-all duration-150 ease-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:backdrop-blur-none data-[starting-style]:backdrop-blur-none dark:bg-black/30" />
+      <BaseDialog.Backdrop className="fixed inset-0 z-50 size-full bg-white/10 backdrop-blur-xs transition-all duration-150 ease-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:backdrop-blur-none data-[starting-style]:backdrop-blur-none dark:bg-black/30" />
       <BaseDialog.Popup
         {...props}
         className={cn(
-          '-translate-x-1/2 -translate-y-1/2 glass-body fixed top-1/2 left-1/2 flex h-full w-full flex-col items-stretch gap-6 rounded-3xl bg-white/60 p-5 shadow-xl backdrop-blur-lg duration-150 ease-out data-[ending-style]:origin-top data-[starting-style]:origin-bottom data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm sm:h-fit sm:w-fit sm:min-w-lg',
+          '-translate-x-1/2 -translate-y-1/2 glass-body fixed top-1/2 left-1/2 z-50 flex h-full w-full flex-col items-stretch gap-6 rounded-3xl bg-white/60 p-5 shadow-xl backdrop-blur-lg duration-150 ease-out data-[ending-style]:origin-top data-[starting-style]:origin-bottom data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm sm:h-fit sm:w-fit sm:min-w-lg',
           className,
         )}
       >

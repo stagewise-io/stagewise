@@ -132,10 +132,10 @@ export function ChatPanelFooter({
   return (
     <PanelFooter
       clear
-      className="absolute right-px bottom-px left-px z-10 flex flex-col items-stretch gap-1 px-2 pt-2 pb-2"
+      className="absolute right-px bottom-px left-px z-10 flex flex-col items-stretch gap-1 p-3 pt-2 pb-4"
       ref={ref}
     >
-      <div className="glass-body flex flex-row items-stretch gap-1 rounded-2xl bg-white/25 p-1.5 backdrop-blur-md focus-within:bg-blue-500/5 focus-within:shadow-blue-600/20">
+      <div className="glass-body flex flex-row items-stretch gap-1 rounded-3xl bg-white/80 p-2 backdrop-blur-md focus-within:bg-blue-500/5 focus-within:shadow-blue-600/20">
         <div className="flex flex-1 flex-col items-stretch gap-1">
           {/* Text input area */}
           <div className="relative flex flex-1 pr-1">

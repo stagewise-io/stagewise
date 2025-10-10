@@ -9,6 +9,8 @@ import { bootstrapGlobalServices } from './global-service-bootstrap';
 import { WorkspaceManagerService } from './services/workspace-manager';
 import { UIServerService } from './services/ui-server';
 import { FilePickerService } from './services/file-picker';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export type MainParameters = {
   launchOptions: {
@@ -85,12 +87,20 @@ export async function main({
     draft.appInfo.verbose = verbose ?? false;
     draft.appInfo.bridgeMode = bridgeMode ?? false;
     draft.appInfo.runningOnPort = uiServerService.port;
+    draft.appInfo.startedInPath = process.cwd();
   });
 
   logger.debug('[Main] App info set into karton service');
 
   // After all services got started, we're now ready to load the initial workspace (which is either the user given path or the cwd).
-  if (workspaceOnStart) {
+  // We only load the current workspace as default workspace if the folder contains a stagewise.json file. (We don't verify it tho)
+  const workspacePathToLoad =
+    workspacePath ??
+    (existsSync(resolve(process.cwd(), 'stagewise.json'))
+      ? process.cwd()
+      : undefined);
+
+  if (workspaceOnStart && workspacePathToLoad) {
     logger.debug('[Main] Loading initial workspace...');
     await workspaceManagerService.loadWorkspace(
       workspacePath ?? process.cwd(),

@@ -1,4 +1,4 @@
-import { Panel, PanelContent } from '@/components/ui/panel';
+import { PanelContent } from '@/components/ui/panel';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
@@ -105,36 +105,31 @@ export function ChatPanel() {
   }, []);
 
   return (
-    <Panel
-      ref={panelRef}
-      className={cn('glass-body', isDragging && 'ring-1 ring-blue-500/50')}
+    <div
+      className="relative flex size-full flex-col rounded-3xl bg-transparent p-4"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      role="region"
+      aria-label="Chat panel drop zone"
     >
-      <div
-        className="relative flex size-full flex-col rounded-3xl bg-transparent"
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        role="region"
-        aria-label="Chat panel drop zone"
-      >
-        <ChatPanelHeader />
-        <PanelContent
-          className={cn(
-            'block px-0 py-0',
-            'h-full min-h-64',
-            'mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_48px,black_calc(95%_-_16px),transparent_calc(100%_-_16px))]',
-            'overflow-hidden rounded-[inherit]',
-          )}
-        >
-          {/* This are renders the output of the agent as markdown and makes it scrollable if necessary. */}
-          <ChatHistory ref={chatHistoryRef} />
-        </PanelContent>
-        <ChatPanelFooter ref={footerRef} inputRef={inputRef} />
-        {isDragging && (
-          <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-3xl bg-blue-500/10 backdrop-blur-[1px]" />
+      <ChatPanelHeader />
+      <PanelContent
+        className={cn(
+          'block px-0 py-0',
+          'h-full min-h-64',
+          'mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_48px,black_calc(95%_-_16px),transparent_calc(100%_-_16px))]',
+          'overflow-hidden rounded-[inherit]',
         )}
-      </div>
-    </Panel>
+      >
+        {/* This are renders the output of the agent as markdown and makes it scrollable if necessary. */}
+        <ChatHistory ref={chatHistoryRef} />
+      </PanelContent>
+      <ChatPanelFooter ref={footerRef} inputRef={inputRef} />
+      {isDragging && (
+        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-3xl bg-blue-500/10 backdrop-blur-[1px]" />
+      )}
+    </div>
   );
 }

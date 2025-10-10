@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { useCallback, useMemo } from 'react';
+import { ChevronDownIcon } from 'lucide-react';
 
 export function WorkspaceInfoBadge() {
   const workspace = useKartonState((s) => s.workspace);
@@ -65,11 +66,12 @@ export function WorkspaceInfoBadge() {
   return (
     <Popover>
       <PopoverTrigger>
-        <Button size="sm" variant="ghost" className="rounded-full">
+        <Button size="md" variant="ghost">
           {workspaceDir ?? 'No workspace loaded'}
+          <ChevronDownIcon className="size-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent>
+      <PopoverContent align="start">
         <PopoverTitle>Workspace Info</PopoverTitle>
 
         <div className="flex flex-col gap-0">

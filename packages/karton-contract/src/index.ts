@@ -140,6 +140,7 @@ export type AppState = {
     verbose: boolean; // Whether the app is running in verbose mode.
     version: string; // The version of the app.
     runningOnPort: number; // The port on which the UI of the stagewise app is running.
+    startedInPath: string; // Working directory in which the app was started.
   };
   // The global configuration of the CLI.
   globalConfig: {
@@ -251,6 +252,7 @@ export const defaultState: KartonContract['state'] = {
     verbose: false,
     version: 'UNKNOWN',
     runningOnPort: 0,
+    startedInPath: '',
   },
   globalConfig: {
     telemetryLevel: 'off',

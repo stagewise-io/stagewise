@@ -59,6 +59,7 @@
     "@types/node": "22.15.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.180.0",
     "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.4.21",
     "bowser": "^2.11.0",
@@ -68,6 +69,7 @@
     "lucide-react": "^0.523.0",
     "postcss": "^8.5.3",
     "postcss-prefix-selector": "^2.1.1",
+    "posthog-js": "^1.257.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
@@ -83,7 +85,10 @@
     "vite": "^7.1.9",
     "vite-plugin-css-injected-by-js": "^3.5.2",
     "vite-plugin-dts": "^4.5.4",
-    "zod": "3.25.76",
-    "posthog-js": "^1.257.0"
+    "zod": "3.25.76"
+  },
+  "dependencies": {
+    "@react-three/fiber": "^9.3.0",
+    "three": "^0.180.0"
   }
 }

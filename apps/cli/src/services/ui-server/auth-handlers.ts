@@ -14,7 +14,6 @@ export async function setupAuthRoutes(
   });
 
   app.get(`${stagewiseAppPrefix}/auth/callback`, async (req, res) => {
-    console.log('Auth callback received');
     const authCode = req.query.authCode;
     const error = req.query.error;
 
