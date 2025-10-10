@@ -24,7 +24,6 @@
     "ai": "5.0.9"
   },
   "devDependencies": {
-    "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
     "esbuild": "0.25.9",
