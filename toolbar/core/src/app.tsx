@@ -9,7 +9,6 @@ import { UrlSynchronizer } from './components/url-synchronizer';
 import { MetaSynchronizer } from './components/meta-synchronizer';
 import { ScreenRouter } from './screens';
 import { NotificationToaster } from './notification-toaster';
-import { WorkspaceSetupDialog } from './dialogs/workspace-setup';
 import { AuthDialog } from './dialogs/auth';
 import { FilePickerDialog } from './dialogs/file-picker';
 
@@ -29,7 +28,6 @@ export const App: FunctionComponent<InternalToolbarConfig> = (config) => {
 
           <AuthDialog />
           <FilePickerDialog />
-          <WorkspaceSetupDialog />
 
           <NotificationToaster />
         </ContextProviders>

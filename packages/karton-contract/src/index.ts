@@ -1,7 +1,7 @@
 import type { UserMessageMetadata, SelectedElement } from './metadata.js';
 import type { UIMessage, UIDataTypes } from 'ai';
 import type { UITools, ToolPart } from '@stagewise/agent-tools';
-import type { Tool, FileDiff, ToolResult } from '@stagewise/agent-types';
+import type { FileDiff, ToolResult } from '@stagewise/agent-types';
 import type { WorkspaceConfig, FilePickerRequest } from './shared-types.js';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
@@ -35,6 +35,26 @@ export enum AgentErrorType {
   PLAN_LIMITS_EXCEEDED = 'plan-limits-exceeded',
   AGENT_ERROR = 'agent-error',
   OTHER = 'other',
+}
+
+export type WorkspaceStatus =
+  | 'open'
+  | 'closed'
+  | 'loading'
+  | 'closing'
+  | 'setup';
+
+export enum Layout {
+  SIGNIN = 'signin',
+  OPEN_WORKSPACE = 'open-workspace',
+  MAIN = 'main',
+}
+
+export enum MainTab {
+  DEV_APP_PREVIEW = 'dev-app-preview',
+  IDEATION_CANVAS = 'ideation-canvas',
+  SETTINGS = 'settings',
+  WORKSPACE_SETUP = 'workspace-setup',
 }
 
 export type AgentError =
@@ -114,7 +134,7 @@ export type AppState = {
     };
     loadedOnStart: boolean;
   } | null;
-  workspaceStatus: 'open' | 'closed' | 'loading' | 'closing' | 'setup';
+  workspaceStatus: WorkspaceStatus;
   userAccount: {
     status: AuthStatus;
     machineId?: string;
@@ -147,8 +167,14 @@ export type AppState = {
     telemetryLevel: 'off' | 'anonymous' | 'full';
   };
   // State of the current user experience (getting started etc.)
-  userExperience: {};
-  // State of the file picker UI. If this is null, the picker should not be shown.
+  userExperience:
+    | {
+        activeLayout: Layout.SIGNIN | Layout.OPEN_WORKSPACE;
+      }
+    | {
+        activeLayout: Layout.MAIN;
+        activeMainTab: MainTab | null;
+      };
   filePicker: {
     title: string;
     description: string;
@@ -181,7 +207,20 @@ export type AuthStatus =
 export type KartonContract = {
   state: AppState;
   clientProcedures: {
-    getAvailableTools: () => Promise<Tool[]>;
+    devAppPreview: {
+      getPreviewInfo: () => Promise<{
+        viewport: {
+          width: number;
+          height: number;
+          dpr: number;
+        };
+        currentUrl: string;
+        currentTitle: string;
+        userAgent: string;
+        locale: string;
+        prefersDarkMode: boolean;
+      }>;
+    };
   };
   serverProcedures: {
     agentChat: {
@@ -217,6 +256,11 @@ export type KartonContract = {
       setup: {
         submit: (config: WorkspaceConfig) => Promise<void>;
         checkForActiveAppOnPort: (port: number) => Promise<boolean>;
+      };
+    };
+    userExperience: {
+      mainLayout: {
+        changeTab: (tab: MainTab) => Promise<void>;
       };
     };
     filePicker: {
@@ -257,7 +301,9 @@ export const defaultState: KartonContract['state'] = {
   globalConfig: {
     telemetryLevel: 'off',
   },
-  userExperience: {},
+  userExperience: {
+    activeLayout: Layout.SIGNIN,
+  },
   filePicker: null,
   notifications: [],
 };

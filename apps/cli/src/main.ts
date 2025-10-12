@@ -3,7 +3,7 @@
  */
 
 import { AuthService } from './services/auth';
-import { ExperienceStateService } from './services/experience-state';
+import { UserExperienceService } from './services/experience';
 import { getEnvMode } from './utils/env';
 import { bootstrapGlobalServices } from './global-service-bootstrap';
 import { WorkspaceManagerService } from './services/workspace-manager';
@@ -56,10 +56,6 @@ export async function main({
     kartonService,
     notificationService,
   );
-  const _experienceStateService = await ExperienceStateService.create(
-    logger,
-    kartonService,
-  );
   const workspaceManagerService = await WorkspaceManagerService.create(
     logger,
     filePickerService,
@@ -68,6 +64,10 @@ export async function main({
     authService,
     globalDataPathService,
     notificationService,
+  );
+  const _userExperienceService = await UserExperienceService.create(
+    logger,
+    kartonService,
   );
   const uiServerService = await UIServerService.create(
     logger,

@@ -229,7 +229,7 @@ export type KartonClientProceduresWithClientId<T> = AddClientIdToCalls<
 >;
 
 // Extract only the full paths to procedures (not intermediate objects)
-type ProcedurePaths<T, D extends number = 4> = D extends 0
+type ProcedurePaths<T, D extends number = 10> = D extends 0
   ? never
   : T extends AsyncFunction
     ? never // Functions at this level are already handled by parent
@@ -365,6 +365,12 @@ export interface KartonServer<T> {
     Path extends ProcedurePaths<KartonServerProcedures<T>>,
   >(
     path: Path,
+  ) => void;
+  registerStateChangeCallback: (
+    callback: (state: Readonly<KartonState<T>>) => void,
+  ) => void;
+  unregisterStateChangeCallback: (
+    callback: (state: Readonly<KartonState<T>>) => void,
   ) => void;
 }
 

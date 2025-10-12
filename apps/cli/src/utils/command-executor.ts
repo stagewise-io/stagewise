@@ -1,5 +1,4 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { log } from './logger';
 
 export interface CommandExecutionResult {
   exitCode: number;
@@ -24,7 +23,7 @@ export class CommandExecutor {
       throw new Error('No command provided');
     }
 
-    log.debug(`Executing proxy command: ${command} ${args.join(' ')}`);
+    console.debug(`Executing proxy command: ${command} ${args.join(' ')}`);
 
     return new Promise((resolve, reject) => {
       try {
@@ -38,7 +37,7 @@ export class CommandExecutor {
 
         // Handle process exit
         childProcess.on('exit', (code, signal) => {
-          log.debug(
+          console.debug(
             `Proxy command exited with code: ${code}, signal: ${signal || 'none'}`,
           );
           this.childProcess = null;
@@ -53,7 +52,7 @@ export class CommandExecutor {
 
         // Handle process errors
         childProcess.on('error', (error) => {
-          log.error(`Failed to execute proxy command: ${error.message}`);
+          console.error(`Failed to execute proxy command: ${error.message}`);
           this.childProcess = null;
           this.cleanupSignalHandlers();
           reject(error);
@@ -80,7 +79,7 @@ export class CommandExecutor {
           !this.isShuttingDown &&
           !this.childProcess.killed
         ) {
-          log.debug(`Forwarding ${signal} to proxy command`);
+          console.debug(`Forwarding ${signal} to proxy command`);
           this.childProcess.kill(signal);
         }
       };
@@ -117,7 +116,7 @@ export class CommandExecutor {
     }
 
     this.isShuttingDown = true;
-    log.debug('Shutting down proxy command');
+    console.debug('Shutting down proxy command');
 
     return new Promise((resolve) => {
       if (!this.childProcess) {
@@ -129,7 +128,7 @@ export class CommandExecutor {
       // Set up timeout for forceful termination
       const timeout = setTimeout(() => {
         if (this.childProcess && !this.childProcess.killed) {
-          log.debug('Force killing proxy command');
+          console.debug('Force killing proxy command');
           this.childProcess.kill('SIGKILL');
         }
       }, 5000);

@@ -47,13 +47,29 @@ export class KartonService {
   }
 
   get registerServerProcedureHandler() {
+    this.logger.debug('[KartonService] Registering server procedure handler');
     return this.kartonServer.registerServerProcedureHandler.bind(
       this.kartonServer,
     );
   }
 
   get removeServerProcedureHandler() {
+    this.logger.debug('[KartonService] Removing server procedure handler');
     return this.kartonServer.removeServerProcedureHandler.bind(
+      this.kartonServer,
+    );
+  }
+
+  get registerStateChangeCallback() {
+    this.logger.debug('[KartonService] Registering state change callback');
+    return this.kartonServer.registerStateChangeCallback.bind(
+      this.kartonServer,
+    );
+  }
+
+  get unregisterStateChangeCallback() {
+    this.logger.debug('[KartonService] Unregistering state change callback');
+    return this.kartonServer.unregisterStateChangeCallback.bind(
       this.kartonServer,
     );
   }

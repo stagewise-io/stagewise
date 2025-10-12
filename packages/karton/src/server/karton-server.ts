@@ -35,6 +35,7 @@ class KartonServerImpl<T> implements KartonServer<T> {
   private stateManager: StateManager<KartonState<T>>;
   private serverProcedures: Map<string, any> = new Map();
   private _clientProcedures: KartonClientProceduresWithClientId<T>;
+  private changeListeners: ((state: Readonly<KartonState<T>>) => void)[] = [];
 
   constructor(config: KartonServerConfig<T>, wss: WebSocketServer) {
     this.internalWss = wss;
@@ -159,7 +160,10 @@ class KartonServerImpl<T> implements KartonServer<T> {
   public setState(
     recipe: (draft: Draft<KartonState<T>>) => void,
   ): KartonState<T> {
-    return this.stateManager.setState(recipe);
+    const oldState = this.state;
+    const newState = this.stateManager.setState(recipe);
+    this.notifyStateChangeCallbacks(newState, oldState);
+    return newState;
   }
 
   public get clientProcedures(): KartonClientProceduresWithClientId<T> {
@@ -213,6 +217,29 @@ class KartonServerImpl<T> implements KartonServer<T> {
     return new Promise((resolve) => {
       this.internalWss.close(() => resolve());
     });
+  }
+
+  public registerStateChangeCallback(
+    callback: (state: Readonly<KartonState<T>>) => void,
+  ): void {
+    this.changeListeners.push(callback);
+  }
+
+  public unregisterStateChangeCallback(
+    callback: (state: Readonly<KartonState<T>>) => void,
+  ): void {
+    this.changeListeners = this.changeListeners.filter(
+      (listener) => listener !== callback,
+    );
+  }
+
+  private notifyStateChangeCallbacks(
+    state: Readonly<KartonState<T>>,
+    oldState: Readonly<KartonState<T>>,
+  ): void {
+    if (oldState === state) return;
+    // TODO Check if the paths have actually changed for each callback and notify accordingly.
+    this.changeListeners.forEach((listener) => listener(state));
   }
 }
 

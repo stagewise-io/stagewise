@@ -18,7 +18,7 @@ import type { Logger } from './logger';
 import type { KartonService } from './karton';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { FilePickerRequest } from '@stagewise/karton-contract';
+import type { FilePickerRequest } from '@stagewise/karton-contract/shared-types';
 
 class InvalidUserSelectionException extends Error {
   constructor(message = 'InvalidUserSelectionException') {

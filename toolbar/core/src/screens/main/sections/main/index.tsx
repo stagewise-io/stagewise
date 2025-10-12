@@ -1,5 +1,10 @@
 import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
-import { AppWindowMacIcon, SettingsIcon, WandSparklesIcon } from 'lucide-react';
+import {
+  AppWindowMacIcon,
+  SettingsIcon,
+  StarIcon,
+  WandSparklesIcon,
+} from 'lucide-react';
 
 import { DevAppPreviewPanel } from './panels/dev-app-preview';
 import { IdeationCanvasPanel } from './panels/ideation-canvas';
@@ -9,49 +14,72 @@ import { DevAppPreviewControls } from './controls/dev-app-preview';
 import { IdeationCanvasControls } from './controls/ideation-canvas';
 import { SettingsControls } from './controls/settings';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
+import { MainTab } from '@stagewise/karton-contract';
+import { WorkspaceSetupPanel } from './panels/workspace-setup';
 
 type Tab = {
   title: string;
   icon: React.ReactNode;
   mainContent: React.ReactNode;
-  controls: React.ReactNode;
-  available: boolean;
+  controls: React.ReactNode | null;
+  showInTabBar: boolean;
   disabled: boolean;
+  hideTabBar: boolean;
 };
-type Tabs = Record<string, Tab>;
+type Tabs = Record<MainTab, Tab>;
 
 const tabs: Tabs = {
-  dev_app_preview: {
+  [MainTab.DEV_APP_PREVIEW]: {
     title: 'Preview',
     icon: <AppWindowMacIcon className="mb-0.5 ml-px size-4" />,
     mainContent: <DevAppPreviewPanel />,
     controls: <DevAppPreviewControls />,
-    available: true,
+    showInTabBar: true,
     disabled: false,
+    hideTabBar: false,
   },
-  ideation_canvas: {
+  [MainTab.IDEATION_CANVAS]: {
     title: 'Playground',
-    icon: <WandSparklesIcon className="mb-0.5 ml-px size-4" />,
+    icon: <WandSparklesIcon className="ml-px size-4" />,
     mainContent: <IdeationCanvasPanel />,
     controls: <IdeationCanvasControls />,
-    available: true,
+    showInTabBar: true,
     disabled: false,
+    hideTabBar: false,
   },
-  settings: {
+  [MainTab.SETTINGS]: {
     title: 'Settings',
-    icon: <SettingsIcon className="mb-0.5 ml-px size-4" />,
+    icon: <SettingsIcon className="ml-px size-4" />,
     mainContent: <SettingsPanel />,
     controls: <SettingsControls />,
-    available: true,
+    showInTabBar: true,
     disabled: false,
+    hideTabBar: false,
+  },
+  [MainTab.WORKSPACE_SETUP]: {
+    title: 'Setup',
+    icon: <StarIcon className="ml-px size-4" />,
+    mainContent: <WorkspaceSetupPanel />,
+    controls: null,
+    showInTabBar: false,
+    disabled: true,
+    hideTabBar: true,
   },
 };
 
 export function MainSection() {
-  const [activeTab, setActiveTab] = useState<keyof Tabs>('dev_app_preview');
+  const activeTab = useKartonState((s) =>
+    s.userExperience.activeLayout === 'main'
+      ? s.userExperience.activeMainTab
+      : null,
+  );
+  const setActiveTab = useKartonProcedure(
+    (p) => p.userExperience.mainLayout.changeTab,
+  );
 
   const prevIndexRef = useRef<number>(0);
   const activeIndexRef = useRef<number>(0);
@@ -77,29 +105,47 @@ export function MainSection() {
       className="flex h-full flex-1 flex-col items-stretch justify-between gap-4 p-4"
     >
       {/* Tab navigation and controls area */}
-      <div className="flex flex-row items-center justify-between gap-6">
+      <div
+        className={cn(
+          'flex flex-row items-center justify-between gap-6',
+          activeTab &&
+            tabs[activeTab].hideTabBar &&
+            !tabs[activeTab].controls &&
+            'hidden',
+        )}
+      >
         {/* Tab navigation buttons */}
-        <div className="-ml-0.5 glass-inset flex w-auto shrink-0 flex-row items-center justify-between gap-2 overflow-hidden rounded-full p-1">
-          {Object.entries(tabs).map(([tabId, tab]) => (
-            <Button
-              className={cn(
-                'w-[calc-size(auto,size)] min-w-10 rounded-full transition-all duration-200 ease-out',
-              )}
-              variant={activeTab === tabId ? 'primary' : 'ghost'}
-              size={activeTab === tabId ? 'md' : 'icon-md'}
-              onClick={() => changeTab(tabId)}
-            >
-              {tab.icon}
-              <span
+        <div
+          className={cn(
+            '-ml-0.5 glass-inset flex w-auto shrink-0 flex-row items-center justify-between gap-2 overflow-hidden rounded-full p-1',
+            activeTab &&
+              tabs[activeTab].hideTabBar &&
+              'pointer-events-none opacity-0',
+          )}
+        >
+          {Object.entries(tabs)
+            .filter(([_, tab]) => tab.showInTabBar)
+            .map(([tabId, tab]) => (
+              <Button
                 className={cn(
-                  'whitespace-nowrap',
-                  activeTab !== tabId && 'w-0 overflow-hidden',
+                  'w-[calc-size(auto,size)] min-w-10 rounded-full transition-all duration-200 ease-out',
                 )}
+                variant={activeTab === tabId ? 'primary' : 'ghost'}
+                size={activeTab === tabId ? 'md' : 'icon-md'}
+                onClick={() => changeTab(tabId as MainTab)}
+                disabled={tab.disabled}
               >
-                {tab.title}
-              </span>
-            </Button>
-          ))}
+                {tab.icon}
+                <span
+                  className={cn(
+                    'whitespace-nowrap',
+                    activeTab !== tabId && 'w-0 overflow-hidden',
+                  )}
+                >
+                  {tab.title}
+                </span>
+              </Button>
+            ))}
         </div>
 
         {/* Controls area */}
