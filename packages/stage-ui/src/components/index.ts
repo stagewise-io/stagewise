@@ -16,6 +16,7 @@ export {
   FieldError,
   FieldValidity,
 } from './field';
+export { Skeleton, type SkeletonProps } from './skeleton';
 
 // Re-export utilities
 export { cn } from '../lib/utils';
