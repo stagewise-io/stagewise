@@ -21,7 +21,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "dotenv -e ../../.env -- tsx build.ts",
+    "build": "dotenv -e ../../.env -- tsc --noEmit && dotenv -e ../../.env -- tsx build.ts",
     "dev": "NODE_ENV=development dotenv -e ../../.env -- tsx src/index.ts",
     "run": "dotenv -e ../../.env -- rsx dist/index.js",
     "typecheck": "tsc --noEmit",
