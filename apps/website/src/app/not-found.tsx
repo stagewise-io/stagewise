@@ -11,7 +11,7 @@ export default function NotFound() {
         <Navbar />
         <main className="flex w-full max-w-3xl flex-1 flex-col items-center text-center">
           <h1 className="mb-4 font-bold text-4xl">
-            Opps! You're in uncharted territory
+            Oops! You're in uncharted territory
           </h1>
           <Link
             href="/"
