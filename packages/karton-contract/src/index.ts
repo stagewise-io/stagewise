@@ -56,6 +56,7 @@ export type WorkspaceStatus =
 export enum Layout {
   SIGNIN = 'signin',
   OPEN_WORKSPACE = 'open-workspace',
+  SETUP_WORKSPACE = 'setup-workspace',
   MAIN = 'main',
 }
 
@@ -63,7 +64,6 @@ export enum MainTab {
   DEV_APP_PREVIEW = 'dev-app-preview',
   IDEATION_CANVAS = 'ideation-canvas',
   SETTINGS = 'settings',
-  WORKSPACE_SETUP = 'workspace-setup',
 }
 
 export type AgentError =
@@ -178,7 +178,10 @@ export type AppState = {
   // State of the current user experience (getting started etc.)
   userExperience:
     | {
-        activeLayout: Layout.SIGNIN | Layout.OPEN_WORKSPACE;
+        activeLayout:
+          | Layout.SIGNIN
+          | Layout.OPEN_WORKSPACE
+          | Layout.SETUP_WORKSPACE;
       }
     | {
         activeLayout: Layout.MAIN;

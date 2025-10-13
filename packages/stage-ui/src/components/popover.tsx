@@ -56,10 +56,11 @@ export const PopoverContent = ({
         align={align}
         alignOffset={alignOffset}
         sticky={sticky}
+        className="z-50"
       >
         <PopoverBase.Popup
           {...props}
-          className="glass-body z-50 flex flex-col gap-4 rounded-3xl bg-white/40 p-3 shadow-lg backdrop-blur-sm transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm dark:bg-black/60"
+          className="glass-body flex flex-col gap-4 rounded-3xl bg-background/60 p-3 shadow-xl backdrop-blur-sm transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm"
         >
           {children}
         </PopoverBase.Popup>

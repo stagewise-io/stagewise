@@ -53,14 +53,10 @@ export class UserExperienceService {
       draft.userExperience.activeLayout = this.activeScreen;
 
       if (draft.userExperience.activeLayout === Layout.MAIN) {
-        if (draft.workspaceStatus === 'open' && !draft.workspace?.config) {
-          this.logger.debug('[ExperienceService] Showing workspace setup tab');
-          draft.userExperience.activeMainTab = MainTab.WORKSPACE_SETUP;
-        } else if (
+        if (
           draft.workspaceStatus === 'open' &&
-          draft.workspace?.config &&
-          (!draft.userExperience.activeMainTab ||
-            draft.userExperience.activeMainTab === MainTab.WORKSPACE_SETUP)
+          !draft.workspace?.setupActive &&
+          !draft.userExperience.activeMainTab
         ) {
           this.logger.debug('[ExperienceService] Showing dev app preview tab');
           draft.userExperience.activeMainTab = MainTab.DEV_APP_PREVIEW;
@@ -72,17 +68,6 @@ export class UserExperienceService {
   public changeMainTab(tab: MainTab) {
     this.kartonService.setState((draft) => {
       if (draft.userExperience.activeLayout === Layout.MAIN) {
-        if (tab === MainTab.WORKSPACE_SETUP && draft.workspace?.config) {
-          // Do nothing since we don't allow setup if the workspace config exists.
-          return;
-        }
-
-        if (tab !== MainTab.WORKSPACE_SETUP && !draft.workspace?.config) {
-          // If the workspace config doesn't exist, we force going into the workspace setup tab
-          draft.userExperience.activeMainTab = MainTab.WORKSPACE_SETUP;
-          return;
-        }
-
         draft.userExperience.activeMainTab = tab;
       } else {
         throw new Error('Cannot change Tab when not in main layout');
@@ -97,6 +82,9 @@ export class UserExperienceService {
     }
     if (this.kartonService.state.workspaceStatus === 'closed') {
       return Layout.OPEN_WORKSPACE;
+    }
+    if (this.kartonService.state.workspace?.setupActive) {
+      return Layout.SETUP_WORKSPACE;
     }
 
     return Layout.MAIN;

@@ -1,10 +1,5 @@
 import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
-import {
-  AppWindowMacIcon,
-  SettingsIcon,
-  StarIcon,
-  WandSparklesIcon,
-} from 'lucide-react';
+import { AppWindowMacIcon, SettingsIcon, WandSparklesIcon } from 'lucide-react';
 
 import { DevAppPreviewPanel } from './panels/dev-app-preview';
 import { IdeationCanvasPanel } from './panels/ideation-canvas';
@@ -19,7 +14,6 @@ import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { MainTab } from '@stagewise/karton-contract';
-import { WorkspaceSetupPanel } from './panels/workspace-setup';
 
 type Tab = {
   title: string;
@@ -59,15 +53,6 @@ const tabs: Tabs = {
     showInTabBar: true,
     disabled: false,
     hideTabBar: false,
-  },
-  [MainTab.WORKSPACE_SETUP]: {
-    title: 'Setup',
-    icon: <StarIcon className="ml-px size-4" />,
-    mainContent: <WorkspaceSetupPanel />,
-    controls: null,
-    showInTabBar: false,
-    disabled: true,
-    hideTabBar: true,
   },
 };
 

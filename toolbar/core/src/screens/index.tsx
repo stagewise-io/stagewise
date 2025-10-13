@@ -1,32 +1,52 @@
 import { useKartonConnected, useKartonState } from '@/hooks/use-karton';
-import { Loader2Icon } from 'lucide-react';
 import { SignInScreen } from './signin';
 import { DefaultLayout } from './main';
 import { OpenWorkspaceScreen } from './open-workspace';
+import Iridescence from '@/components/ui/iridescence';
+import { cn } from '@/utils';
+import { Layout } from '@stagewise/karton-contract';
+import { Logo } from '@/components/ui/logo';
+import { SetupWorkspaceScreen } from './setup-workspace';
 
 export function ScreenRouter() {
   // We render different screens based on the app state.
   const connected = useKartonConnected();
 
-  const authStatus = useKartonState((s) => s.userAccount?.status);
+  const displayedLayout = useKartonState((s) => s.userExperience.activeLayout);
 
-  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
+  return (
+    <div className="fixed inset-0 bg-background">
+      <Iridescence
+        className={cn(
+          '-z-10 pointer-events-none absolute inset-0 opacity-0 duration-1000 ease-out',
+          (!connected || displayedLayout !== Layout.MAIN) && 'opacity-100',
+        )}
+        color={[1, 0.95, 1]}
+        speed={0.1}
+      />
 
-  if (!connected) {
-    return (
-      <div className="absolute inset-0 flex size-full flex-col items-center justify-center gap-4 bg-zinc-50 p-4 dark:bg-zinc-950">
-        <Loader2Icon className="size-8 animate-spin text-blue-600" />
+      <div className="absolute inset-0 flex size-full flex-col items-center justify-center">
+        {!connected && (
+          <Logo
+            color="white"
+            className="w-1/6 max-w-12 drop-shadow-black/30 drop-shadow-lg"
+            loading
+            loadingSpeed="fast"
+          />
+        )}
       </div>
-    );
-  }
 
-  if (authStatus === 'unauthenticated') {
-    return <SignInScreen />;
-  }
+      <SignInScreen show={connected && displayedLayout === Layout.SIGNIN} />
 
-  if (workspaceStatus === 'closed') {
-    return <OpenWorkspaceScreen />;
-  }
+      <OpenWorkspaceScreen
+        show={connected && displayedLayout === Layout.OPEN_WORKSPACE}
+      />
 
-  return <DefaultLayout />;
+      <SetupWorkspaceScreen
+        show={connected && displayedLayout === Layout.SETUP_WORKSPACE}
+      />
+
+      <DefaultLayout show={connected && displayedLayout === Layout.MAIN} />
+    </div>
+  );
 }

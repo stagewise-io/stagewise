@@ -89,6 +89,7 @@
   },
   "dependencies": {
     "@react-three/fiber": "^9.3.0",
+    "ogl": "^1.0.11",
     "three": "^0.180.0"
   }
 }

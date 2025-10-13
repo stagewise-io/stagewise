@@ -46,11 +46,12 @@ export function MenuContent({
         side={side}
         sideOffset={sideOffset}
         sticky={sticky}
+        className="z-50"
       >
         <MenuBase.Popup
           {...props}
           className={cn(
-            'glass-body glass-body-motion z-50 flex origin-[var(--transform-origin)] flex-col items-stretch gap-0.5 rounded-lg bg-white/60 p-1 shadow-lg backdrop-blur-xs transition-[transform,scale,opacity] duration-150 ease-out data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/60',
+            'glass-body glass-body-motion flex origin-[var(--transform-origin)] flex-col items-stretch gap-0.5 rounded-lg bg-white/60 p-1 shadow-lg backdrop-blur-xs transition-[transform,scale,opacity] duration-150 ease-out data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/60',
             className,
           )}
         >

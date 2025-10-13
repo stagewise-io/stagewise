@@ -5,8 +5,13 @@ import { ArrowRightIcon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { UserStatusArea } from '../main/sections/sidebar/top/_components/user-status';
 import { useCallback } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+} from '@stagewise/stage-ui/components/dialog';
 
-export const OpenWorkspaceScreen = () => {
+export const OpenWorkspaceScreen = ({ show }: { show: boolean }) => {
   const startedInPath = useKartonState((s) => s.appInfo.startedInPath);
 
   const openWorkspace = useKartonProcedure((p) => p.workspace.open);
@@ -31,8 +36,8 @@ export const OpenWorkspaceScreen = () => {
   }, [openWorkspace, startedInPath]);
 
   return (
-    <div className="absolute inset-0 flex h-scren w-screen flex-col items-center justify-center bg-background">
-      <div className="flex max-w-xl flex-col items-start gap-3 p-4">
+    <Dialog open={show} dismissible={false}>
+      <DialogContent className="gap-3 delay-150 duration-300 md:p-10">
         <div className="flex w-full flex-row items-end justify-between gap-4">
           <div className="glass-body -ml-0.5 flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full">
             <AnimatedGradientBackground className="absolute inset-0 z-0 size-full" />
@@ -48,7 +53,7 @@ export const OpenWorkspaceScreen = () => {
           Workspaces are the root folders of your app under development.
         </p>
 
-        <div className="flex w-full flex-row-reverse gap-2">
+        <DialogFooter>
           <Button
             variant="primary"
             className="shrink-0"
@@ -66,11 +71,11 @@ export const OpenWorkspaceScreen = () => {
             Create in current directory
             <ArrowRightIcon className="size-4" />
           </Button>
-        </div>
+        </DialogFooter>
         <span className="w-full text-end text-muted-foreground text-xs">
           <strong>Current directory:</strong> {startedInPath}
         </span>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

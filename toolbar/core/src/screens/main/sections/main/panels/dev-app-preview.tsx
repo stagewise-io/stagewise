@@ -9,7 +9,7 @@ export const DevAppPreviewPanel = () => {
   const initialUrl = pathname + search + hash;
 
   return (
-    <div className="glass-body size-full rounded-xl">
+    <div className="glass-body size-full overflow-hidden rounded-xl">
       <iframe
         src={initialUrl}
         title="Main user app"

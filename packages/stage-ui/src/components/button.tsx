@@ -9,7 +9,7 @@ export const buttonVariants = cva(
         primary:
           'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive bg-primary text-primary-foreground',
         secondary:
-          'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive text-foreground',
+          'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive bg-background/20 text-foreground',
         destructive:
           'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive bg-rose-600 text-rose-50 dark:bg-rose-800 dark:text-rose-400',
         warning:

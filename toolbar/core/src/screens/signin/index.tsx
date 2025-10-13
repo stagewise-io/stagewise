@@ -3,15 +3,20 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { Logo } from '@/components/ui/logo';
 import { ArrowRightIcon, Loader2Icon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+} from '@stagewise/stage-ui/components/dialog';
 
-export const SignInScreen = () => {
+export const SignInScreen = ({ show }: { show: boolean }) => {
   const startAuth = useKartonProcedure((p) => p.userAccount.startLogin);
 
   const authInProgress = useKartonState((s) => s.userAccount?.loginDialog);
 
   return (
-    <div className="absolute inset-0 flex h-scren w-screen flex-col items-center justify-center bg-background">
-      <div className="flex max-w-xl flex-col items-start gap-3 p-4">
+    <Dialog open={show} dismissible={false}>
+      <DialogContent className="gap-3 delay-150 duration-300 md:p-10">
         <div className="glass-body -ml-0.5 flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full">
           <AnimatedGradientBackground className="absolute inset-0 z-0 size-full" />
           <Logo
@@ -26,7 +31,7 @@ export const SignInScreen = () => {
           Create or sign in to your stagewise account to get started.
         </p>
 
-        <div className="flex w-full flex-row-reverse gap-2">
+        <DialogFooter>
           <Button
             variant="primary"
             size="md"
@@ -39,8 +44,8 @@ export const SignInScreen = () => {
             Get started
             <ArrowRightIcon className="size-5" />
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

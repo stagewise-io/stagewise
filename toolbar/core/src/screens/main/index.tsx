@@ -4,24 +4,18 @@ import {
   ResizablePanelGroup,
   ResizableHandle,
 } from '@stagewise/stage-ui/components/resizable';
-import { Loader2Icon } from 'lucide-react';
-import { useKartonConnected } from '@/hooks/use-karton';
 import { Sidebar } from './sections/sidebar';
 import { MainSection } from './sections/main';
+import { cn } from '@/utils';
 
-export function DefaultLayout() {
-  const connected = useKartonConnected();
-
-  if (!connected) {
-    return (
-      <div className="absolute inset-0 flex size-full flex-col items-center justify-center gap-4 p-4">
-        <Loader2Icon className="size-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
+export function DefaultLayout({ show }: { show: boolean }) {
   return (
-    <div className="root fixed inset-0 flex size-full flex-row items-stretch justify-between bg-zinc-50 dark:bg-zinc-950">
+    <div
+      className={cn(
+        'root fixed inset-0 flex size-full flex-row items-stretch justify-between transition-all delay-150 duration-300 ease-out',
+        !show && 'pointer-events-none translate-y-8 opacity-0 blur-lg',
+      )}
+    >
       <ResizablePanelGroup
         direction="horizontal"
         autoSaveId="stagewise-center-panel-layout"
