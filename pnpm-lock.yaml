@@ -299,6 +299,9 @@ importers:
       '@stagewise/agent-runtime-interface':
         specifier: workspace:*
         version: link:../runtime-interface
+      '@stagewise/agent-tools':
+        specifier: workspace:*
+        version: link:../tools
       '@stagewise/api-client':
         specifier: 1.4.0
         version: 1.4.0(typescript@5.9.3)

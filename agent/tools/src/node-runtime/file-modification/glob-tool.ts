@@ -1,5 +1,6 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { ToolResult } from '@stagewise/agent-types';
+import { tool } from 'ai';
+import { validateToolOutput } from '../..';
 import { z } from 'zod';
 
 export const DESCRIPTION = 'Find files and directories matching a glob pattern';
@@ -18,10 +19,10 @@ export type GlobParams = z.infer<typeof globParamsSchema>;
  * - Can search from a specific directory or the current working directory
  * - Returns matching file paths
  */
-export async function globTool(
+export async function globToolExecute(
   params: GlobParams,
   clientRuntime: ClientRuntime,
-): Promise<ToolResult> {
+) {
   const { pattern, path } = params;
 
   // Validate required parameters
@@ -73,3 +74,13 @@ export async function globTool(
     };
   }
 }
+
+export const globTool = (clientRuntime: ClientRuntime) =>
+  tool({
+    name: 'globTool',
+    description: DESCRIPTION,
+    inputSchema: globParamsSchema,
+    execute: async (args) => {
+      return validateToolOutput(await globToolExecute(args, clientRuntime));
+    },
+  });

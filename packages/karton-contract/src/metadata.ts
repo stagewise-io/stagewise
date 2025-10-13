@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MainTab } from './index.js';
 
 /** Information about a selected element */
 export const baseSelectedElementSchema = z.object({
@@ -133,38 +134,48 @@ export const pluginContentItemSchema = z.object({
 
 export type PluginContentItem = z.infer<typeof pluginContentItemSchema>;
 
-export const userMessageMetadataSchema = z.object({
-  browserData: z
-    .object({
-      currentUrl: z.string().max(1024).url(),
-      currentTitle: z.string().max(256).nullable(),
-      currentZoomLevel: z.number(),
-      viewportMinScale: z.number().optional(),
-      viewportMaxScale: z.number().optional(),
-      viewportResolution: z.object({
-        width: z.number().min(0),
-        height: z.number().min(0),
-      }),
-      devicePixelRatio: z.number(),
-      userAgent: z.string().max(1024),
-      locale: z.string().max(64),
-      selectedElements: z.array(selectedElementSchema),
-    })
-    .optional(),
-  pluginContentItems: z
-    .record(z.string(), z.record(z.string(), pluginContentItemSchema))
-    .optional()
-    .describe(
-      'Plugin content items organized by plugin name and content item name. Structure: pluginContentItems[pluginName][contentItemName] = { type: "text", text: "..." }',
-    ),
-  sentByPlugin: z
-    .boolean()
-    .optional()
-    .describe('Whether the message was sent by a plugin'),
-  createdAt: z
-    .date()
-    .optional()
-    .describe('The date and time the message was created'),
+const metadataSchema = z.object({
+  createdAt: z.date(),
+  selectedPreviewElements: z.array(selectedElementSchema).optional(),
+  currentTab: z.enum(MainTab).optional(), // optional because it is set by the agent -> TODO: find a type-safe way
 });
 
-export type UserMessageMetadata = z.infer<typeof userMessageMetadataSchema>;
+export const browserDataSchema = z.object({
+  currentUrl: z.string().max(1024).url(),
+  currentTitle: z.string().max(256).nullable(),
+  currentZoomLevel: z.number(),
+  viewportMinScale: z.number().optional(),
+  viewportMaxScale: z.number().optional(),
+  viewportResolution: z.object({
+    width: z.number().min(0),
+    height: z.number().min(0),
+  }),
+  devicePixelRatio: z.number(),
+  userAgent: z.string().max(1024),
+  locale: z.string().max(64),
+});
+
+export type BrowserData = z.infer<typeof browserDataSchema>;
+
+// export const userMessageMetadataSchema = z.object({
+//   browserData: z
+//     .object({
+//       currentUrl: z.string().max(1024).url(),
+//       currentTitle: z.string().max(256).nullable(),
+//       currentZoomLevel: z.number(),
+//       viewportMinScale: z.number().optional(),
+//       viewportMaxScale: z.number().optional(),
+//       viewportResolution: z.object({
+//         width: z.number().min(0),
+//         height: z.number().min(0),
+//       }),
+//       devicePixelRatio: z.number(),
+//       userAgent: z.string().max(1024),
+//       locale: z.string().max(64),
+//       selectedElements: z.array(selectedElementSchema),
+//     })
+//     .optional(),
+//   createdAt: z.date(),
+// });
+
+export type UserMessageMetadata = z.infer<typeof metadataSchema>;

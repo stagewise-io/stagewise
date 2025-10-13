@@ -1,4 +1,4 @@
-import { cliTools } from '@stagewise/agent-tools';
+import { codingAgentTools } from '@stagewise/agent-tools';
 import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
 import { LevelDb } from '../utils/typed-db.js';
 import { z } from 'zod';
@@ -92,17 +92,17 @@ export async function searchAndSaveAppInformationFromProject(
       ],
     } satisfies ModelMessage;
 
-    const allTools = cliTools(clientRuntime);
+    const codingTools = codingAgentTools(clientRuntime);
 
     const stream = streamText({
       model,
       messages: [{ role: 'system', content: system }, prompt],
       tools: {
         saveAppInformation: saveAppInformationTool,
-        grepSearchTool: allTools.grepSearchTool,
-        listFilesTool: allTools.listFilesTool,
-        globTool: allTools.globTool,
-        readFileTool: allTools.readFileTool,
+        grepSearchTool: codingTools.grepSearchTool,
+        listFilesTool: codingTools.listFilesTool,
+        globTool: codingTools.globTool,
+        readFileTool: codingTools.readFileTool,
       },
       stopWhen: stepCountIs(100), // Increased to allow more thorough color extraction
       temperature: 0.15,

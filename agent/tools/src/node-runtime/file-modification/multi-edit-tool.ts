@@ -1,8 +1,10 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { ToolResult, FileModifyDiff } from '@stagewise/agent-types';
+import type { FileModifyDiff } from '@stagewise/agent-types';
+import { tool } from 'ai';
+import { validateToolOutput } from '../..';
 import { z } from 'zod';
-import { checkFileSize, prepareDiffContent } from './file-utils';
-import { FILE_SIZE_LIMITS } from './constants';
+import { checkFileSize, prepareDiffContent } from '../../utils/file';
+import { FILE_SIZE_LIMITS } from '../../constants';
 
 export const DESCRIPTION =
   'Make multiple edits to a single file in one operation';
@@ -30,10 +32,10 @@ export type MultiEditParams = z.infer<typeof multiEditParamsSchema>;
  * - Edits are applied sequentially in the order provided
  * - More efficient than multiple single-edit operations
  */
-export async function multiEditTool(
+export async function multiEditToolExecute(
   params: MultiEditParams,
   clientRuntime: ClientRuntime,
-): Promise<ToolResult> {
+) {
   const { file_path, edits } = params;
 
   // Validate required parameters
@@ -244,12 +246,15 @@ export async function multiEditTool(
         };
       }
 
+      console.log('adding diff to the output of multiEditTool', diff.path);
       const result = {
         success: true,
         message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,
         result: { editsApplied: totalEditsApplied },
-        undoExecute,
-        diff,
+        hiddenMetadata: {
+          undoExecute,
+          diff,
+        },
       };
 
       return result;
@@ -270,3 +275,15 @@ export async function multiEditTool(
     };
   }
 }
+
+export const multiEditTool = (clientRuntime: ClientRuntime) =>
+  tool({
+    name: 'multiEditTool',
+    description: DESCRIPTION,
+    inputSchema: multiEditParamsSchema,
+    execute: async (args) => {
+      return validateToolOutput(
+        await multiEditToolExecute(args, clientRuntime),
+      );
+    },
+  });

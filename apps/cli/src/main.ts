@@ -11,6 +11,7 @@ import { UIServerService } from './services/ui-server';
 import { FilePickerService } from './services/file-picker';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { GlobalConfigService } from './services/global-config';
 
 export type MainParameters = {
   launchOptions: {
@@ -56,6 +57,15 @@ export async function main({
     kartonService,
     notificationService,
   );
+  const _globalConfigService = await GlobalConfigService.create(
+    globalDataPathService,
+    logger,
+    kartonService,
+  );
+  // const _experienceStateService = await ExperienceStateService.create(
+  //   logger,
+  //   kartonService,
+  // );
   const workspaceManagerService = await WorkspaceManagerService.create(
     logger,
     filePickerService,

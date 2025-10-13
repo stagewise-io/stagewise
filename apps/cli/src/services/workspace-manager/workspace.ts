@@ -2,7 +2,7 @@
  * This file contains the workspace service class that is responsible for loading and unloading all the functionality surrounding a workspace.
  */
 
-import { AgentService } from '@/services/workspace-manager/workspace-services/agent';
+import { AgentService } from '@/services/workspace-manager/workspace-services/agent/agent';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
@@ -97,10 +97,17 @@ export class WorkspaceService {
         this.workspaceConfigService = await WorkspaceConfigService.create(
           this.logger,
           this.kartonService,
-          this.workspacePath,
+          setupConfig?.appPath ?? this.workspacePath,
           this.workspaceLoadingOverrides,
           setupConfig,
         );
+
+        if (setupConfig && this.workspacePath !== setupConfig.appPath) {
+          // TODO: Refactor service architecture to not require this
+          this.workspacePath = setupConfig.appPath;
+          await this.teardown();
+          await this.initialize();
+        }
 
         this.staticAnalysisService = await StaticAnalysisService.create(
           this.logger,
@@ -116,25 +123,8 @@ export class WorkspaceService {
         );
 
         const clientRuntime = new ClientRuntimeNode({
-          workingDirectory: this.workspacePath,
+          workingDirectory: setupConfig?.projectRoot ?? this.workspacePath,
         });
-
-        this.agentService =
-          (await AgentService.create(
-            this.logger,
-            this.telemetryService,
-            this.kartonService,
-            this.authService,
-            clientRuntime,
-          ).catch((error) => {
-            this.telemetryService.captureException(error as Error);
-            this.logger.error(
-              '[WorkspaceService] Failed to create agent service',
-              {
-                cause: error,
-              },
-            );
-          })) ?? null;
 
         this.ragService =
           (await RagService.create(
@@ -180,6 +170,25 @@ export class WorkspaceService {
         });
       },
     );
+
+    const clientRuntime = new ClientRuntimeNode({
+      workingDirectory: this.workspacePath,
+    });
+
+    this.agentService =
+      (await AgentService.create(
+        this.logger,
+        this.telemetryService,
+        this.kartonService,
+        this.authService,
+        clientRuntime,
+        this.workspaceSetupService,
+      ).catch((error) => {
+        this.telemetryService.captureException(error as Error);
+        this.logger.error(`[WorkspaceService] Failed to create agent service`, {
+          cause: error,
+        });
+      })) ?? null;
   }
 
   public static async create(

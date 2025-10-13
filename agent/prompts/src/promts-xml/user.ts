@@ -1,7 +1,6 @@
 import type { UserMessagePromptConfig } from '../interface/index.js';
-import { browserMetadataToContextSnippet } from './browser-metadata.js';
 import { convertToModelMessages, type UserModelMessage } from 'ai';
-import { htmlElementToContextSnippet } from './html-elements.js';
+import { htmlElementToContextSnippet } from '../utils/html-elements.js';
 
 export function getUserMessagePrompt(
   config: UserMessagePromptConfig,
@@ -36,28 +35,40 @@ export function getUserMessagePrompt(
     }
   }
 
-  const metadataSnippet = config.userMessage.metadata?.browserData
-    ? browserMetadataToContextSnippet(config.userMessage.metadata?.browserData)
+  const tabMetadataSnippet = config.userMessage?.metadata?.currentTab
+    ? `<agent_mode>This message was sent in the ${config.userMessage?.metadata?.currentTab} mode.</agent_mode>`
     : null;
+
+  // const metadataSnippet =
+  //   config.userMessage?.metadata?.currentTab === MainTab.DEV_APP_PREVIEW &&
+  //   config.userMessage?.metadata?.browserData
+  //     ? browserMetadataToContextSnippet(config.tabData.browserData)
+  //     : null;
   const selectedElementsSnippet =
-    (config.userMessage.metadata?.browserData?.selectedElements?.length || 0) >
-    0
+    (config.userMessage.metadata?.selectedPreviewElements?.length || 0) > 0
       ? htmlElementToContextSnippet(
-          config.userMessage.metadata?.browserData?.selectedElements ?? [],
+          config.userMessage.metadata?.selectedPreviewElements ?? [],
         )
       : undefined;
 
-  if (metadataSnippet) {
-    content.push({
-      type: 'text',
-      text: metadataSnippet,
-    });
-  }
+  // if (metadataSnippet) {
+  //   content.push({
+  //     type: 'text',
+  //     text: metadataSnippet,
+  //   });
+  // }
 
   if (selectedElementsSnippet) {
     content.push({
       type: 'text',
       text: selectedElementsSnippet,
+    });
+  }
+
+  if (tabMetadataSnippet) {
+    content.push({
+      type: 'text',
+      text: tabMetadataSnippet,
     });
   }
 

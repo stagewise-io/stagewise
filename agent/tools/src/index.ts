@@ -1,177 +1,168 @@
-import type { ToolResult, ToolWithMetadata } from '@stagewise/agent-types';
-import { tool, type InferUITools, type Tool, type ToolUIPart } from 'ai';
+import type { StagewiseToolMetadata } from '@stagewise/agent-types';
+import type { InferUITools, Tool, ToolUIPart } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import { overwriteFileTool } from './node-runtime/file-modification/overwrite-file-tool.js';
+import { readFileTool } from './node-runtime/file-modification/read-file-tool.js';
+import { listFilesTool } from './node-runtime/file-modification/list-files-tool.js';
+import { grepSearchTool } from './node-runtime/file-modification/grep-search-tool.js';
+import { globTool } from './node-runtime/file-modification/glob-tool.js';
+import { multiEditTool } from './node-runtime/file-modification/multi-edit-tool.js';
+import { deleteFileTool } from './node-runtime/file-modification/delete-file-tool.js';
 import {
-  DESCRIPTION as OVERWRITE_FILE_DESCRIPTION,
-  overwriteFileParamsSchema,
-  overwriteFileTool,
-  type OverwriteFileParams,
-} from './overwrite-file-tool.js';
+  askForPortTool,
+  askForPortOutputSchema,
+  type AskForPortOutput,
+} from './node-runtime/project-setup/ask-for-port-tool.js';
 import {
-  DESCRIPTION as READ_FILE_DESCRIPTION,
-  readFileParamsSchema,
-  readFileTool,
-  type ReadFileParams,
-} from './read-file-tool.js';
+  type SaveRequiredInformationParams,
+  saveRequiredInformationTool,
+} from './node-runtime/project-setup/save-required-information.js';
 import {
-  DESCRIPTION as LIST_FILES_DESCRIPTION,
-  listFilesParamsSchema,
-  listFilesTool,
-  type ListFilesParams,
-} from './list-files-tool.js';
+  askForAppPathTool,
+  askForAppPathOutputSchema,
+  type AskForAppPathOutput,
+} from './node-runtime/project-setup/ask-for-app-path.js';
 import {
-  DESCRIPTION as GREP_SEARCH_DESCRIPTION,
-  grepSearchParamsSchema,
-  grepSearchTool,
-  type GrepSearchParams,
-} from './grep-search-tool.js';
-import {
-  DESCRIPTION as GLOB_DESCRIPTION,
-  globParamsSchema,
-  globTool,
-  type GlobParams,
-} from './glob-tool.js';
-import {
-  DESCRIPTION as MULTI_EDIT_DESCRIPTION,
-  multiEditParamsSchema,
-  multiEditTool,
-  type MultiEditParams,
-} from './multi-edit-tool.js';
-import {
-  DESCRIPTION as DELETE_FILE_DESCRIPTION,
-  deleteFileParamsSchema,
-  deleteFileTool,
-  type DeleteFileParams,
-} from './delete-file-tool.js';
+  askForRootProjectPathTool,
+  askForRootProjectPathOutputSchema,
+  type AskForRootProjectPathOutput,
+} from './node-runtime/project-setup/ask-for-root-project-path.js';
+
+export {
+  askForAppPathTool,
+  askForPortTool,
+  askForRootProjectPathTool,
+  askForAppPathOutputSchema,
+  askForPortOutputSchema,
+  askForRootProjectPathOutputSchema,
+  type AskForAppPathOutput,
+  type AskForPortOutput,
+  type AskForRootProjectPathOutput,
+};
 
 // Export utilities for use by other packages if needed
 export {
   checkFileSize,
   ContentSizeTracker,
   truncateContent,
-} from './file-utils.js';
+} from './utils/file.js';
 export {
   FILE_SIZE_LIMITS,
   FILE_SIZE_ERROR_MESSAGES,
   formatBytes,
 } from './constants.js';
 
-function clientSideTool<T extends Tool>(tool: T): ToolWithMetadata<T> {
+// Validation helper to ensure tool output conforms to SharedToolOutput structure
+// Accepts boolean for success (widened from literals) but validates the structure
+// This preserves the specific return type while ensuring compatibility
+export function validateToolOutput<
+  TOutput extends
+    | { success: boolean; message: string; result?: any; hiddenMetadata?: any }
+    | { success: boolean; message: string; error: string },
+>(output: TOutput): TOutput {
+  return output;
+}
+
+function toolWithMetadata<
+  TInput,
+  TOutput,
+  K extends StagewiseToolMetadata & Record<string, any>,
+>(
+  toolInstance: Tool<TInput, TOutput>,
+  metadata?: K,
+): Tool<TInput, TOutput> & { stagewiseMetadata: StagewiseToolMetadata & K } {
   return {
-    ...tool,
+    ...toolInstance,
     stagewiseMetadata: {
-      runtime: 'client',
+      ...metadata,
     },
-  };
+  } as Tool<TInput, TOutput> & { stagewiseMetadata: StagewiseToolMetadata & K };
 }
 
-// Define explicit return type to avoid exposing internal zod types
-type CliToolsReturn = {
-  overwriteFileTool: ToolWithMetadata<Tool<OverwriteFileParams, ToolResult>>;
-  readFileTool: ToolWithMetadata<Tool<ReadFileParams, ToolResult>>;
-  listFilesTool: ToolWithMetadata<Tool<ListFilesParams, ToolResult>>;
-  grepSearchTool: ToolWithMetadata<Tool<GrepSearchParams, ToolResult>>;
-  globTool: ToolWithMetadata<Tool<GlobParams, ToolResult>>;
-  multiEditTool: ToolWithMetadata<Tool<MultiEditParams, ToolResult>>;
-  deleteFileTool: ToolWithMetadata<Tool<DeleteFileParams, ToolResult>>;
-};
-
-// Place near CliToolsReturn
-export type CliToolsWithoutExecute = {
-  [K in keyof CliToolsReturn]: Pick<
-    CliToolsReturn[K],
-    'description' | 'inputSchema'
-  >;
-};
-
-export function cliTools(clientRuntime: ClientRuntime): CliToolsReturn {
-  return {
-    overwriteFileTool: clientSideTool(
-      tool({
-        name: 'overwriteFileTool',
-        description: OVERWRITE_FILE_DESCRIPTION,
-        inputSchema: overwriteFileParamsSchema,
-        execute: async (args) => {
-          return await overwriteFileTool(args, clientRuntime);
-        },
-      }),
-    ),
-    readFileTool: clientSideTool(
-      tool({
-        name: 'readFileTool',
-        description: READ_FILE_DESCRIPTION,
-        inputSchema: readFileParamsSchema,
-        execute: async (args) => {
-          return await readFileTool(args, clientRuntime);
-        },
-      }),
-    ),
-    listFilesTool: clientSideTool(
-      tool({
-        name: 'listFilesTool',
-        description: LIST_FILES_DESCRIPTION,
-        inputSchema: listFilesParamsSchema,
-        execute: async (args) => {
-          return await listFilesTool(args, clientRuntime);
-        },
-      }),
-    ),
-    grepSearchTool: clientSideTool(
-      tool({
-        name: 'grepSearchTool',
-        description: GREP_SEARCH_DESCRIPTION,
-        inputSchema: grepSearchParamsSchema,
-        execute: async (args) => {
-          return await grepSearchTool(args, clientRuntime);
-        },
-      }),
-    ),
-    globTool: clientSideTool(
-      tool({
-        name: 'globTool',
-        description: GLOB_DESCRIPTION,
-        inputSchema: globParamsSchema,
-        execute: async (args) => {
-          return await globTool(args, clientRuntime);
-        },
-      }),
-    ),
-    multiEditTool: clientSideTool(
-      tool({
-        name: 'multiEditTool',
-        description: MULTI_EDIT_DESCRIPTION,
-        inputSchema: multiEditParamsSchema,
-        execute: async (args) => {
-          return await multiEditTool(args, clientRuntime);
-        },
-      }),
-    ),
-    deleteFileTool: clientSideTool(
-      tool({
-        name: 'deleteFileTool',
-        description: DELETE_FILE_DESCRIPTION,
-        inputSchema: deleteFileParamsSchema,
-        execute: async (args) => {
-          return await deleteFileTool(args, clientRuntime);
-        },
-      }),
-    ),
-  } satisfies CliToolsReturn;
+function userInteractionTool<TInput extends { userInput: any }>(
+  toolInstance: Tool<TInput, any>,
+  metadata?: StagewiseToolMetadata,
+) {
+  return toolWithMetadata(toolInstance, {
+    requiresUserInteraction: true,
+    ...metadata,
+  });
 }
 
-export function cliToolsWithoutExecute(
-  clientRuntime: ClientRuntime,
-): CliToolsWithoutExecute {
-  const base = cliTools(clientRuntime);
-  const out = {} as CliToolsWithoutExecute;
-  for (const key in base) {
-    const k = key as keyof CliToolsReturn;
-    const { description, inputSchema } = base[k];
+export type SetupAgentCallbacks = {
+  onSaveInformation: (
+    information: SaveRequiredInformationParams,
+  ) => Promise<void>;
+};
+
+type _ToolSet = { [key: string]: Tool<any, any> };
+/**
+ * Returns a new tools object with the 'execute' property omitted from each tool.
+ *
+ * This function iterates over all properties of the provided tools object
+ * and constructs a new object containing only the 'description' and 'inputSchema'
+ * properties for each tool, omitting the 'execute' function.
+ *
+ * @param tools - The original tools object with 'execute' and other properties.
+ * @returns A new object containing only 'description' and 'inputSchema' for each tool.
+ */
+export function toolsWithoutExecute<T extends _ToolSet>(tools: T): T {
+  const out = {} as T;
+  for (const key in tools) {
+    const k = key as keyof T;
+    const { description, inputSchema } = tools[k]!;
     (out as any)[k] = { description, inputSchema };
   }
   return out;
 }
 
-export type CliTools = CliToolsReturn;
-export type UITools = InferUITools<CliTools>;
+export function setupAgentTools(
+  clientRuntime: ClientRuntime,
+  callbacks: SetupAgentCallbacks,
+) {
+  return {
+    askForPortTool: userInteractionTool(askForPortTool(clientRuntime)),
+    letUserConfirmRootProjectPathTool: userInteractionTool(
+      askForRootProjectPathTool(clientRuntime),
+    ),
+    letUserPickAppPathTool: userInteractionTool(
+      askForAppPathTool(clientRuntime),
+    ),
+    saveRequiredInformationTool: toolWithMetadata(
+      saveRequiredInformationTool(callbacks.onSaveInformation),
+    ),
+    overwriteFileTool: toolWithMetadata(overwriteFileTool(clientRuntime)),
+    readFileTool: toolWithMetadata(readFileTool(clientRuntime)),
+    listFilesTool: toolWithMetadata(listFilesTool(clientRuntime)),
+    grepSearchTool: toolWithMetadata(grepSearchTool(clientRuntime)),
+    globTool: toolWithMetadata(globTool(clientRuntime)),
+    multiEditTool: toolWithMetadata(multiEditTool(clientRuntime)),
+    deleteFileTool: toolWithMetadata(deleteFileTool(clientRuntime)),
+  };
+}
+
+export function codingAgentTools(clientRuntime: ClientRuntime) {
+  return {
+    overwriteFileTool: toolWithMetadata(overwriteFileTool(clientRuntime)),
+    readFileTool: toolWithMetadata(readFileTool(clientRuntime)),
+    listFilesTool: toolWithMetadata(listFilesTool(clientRuntime)),
+    grepSearchTool: toolWithMetadata(grepSearchTool(clientRuntime)),
+    globTool: toolWithMetadata(globTool(clientRuntime)),
+    multiEditTool: toolWithMetadata(multiEditTool(clientRuntime)),
+    deleteFileTool: toolWithMetadata(deleteFileTool(clientRuntime)),
+  };
+}
+
+export function inspirationAgentTools(_clientRuntime: ClientRuntime) {
+  return {};
+}
+
+export type AllTools =
+  | ReturnType<typeof setupAgentTools>
+  | ReturnType<typeof codingAgentTools>;
+
+export type _AllTools = ReturnType<typeof setupAgentTools> &
+  ReturnType<typeof codingAgentTools>;
+
+export type UITools = InferUITools<_AllTools>;
 export type ToolPart = ToolUIPart<UITools>;

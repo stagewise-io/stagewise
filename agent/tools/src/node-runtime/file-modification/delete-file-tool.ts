@@ -1,7 +1,9 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { ToolResult, FileDeleteDiff } from '@stagewise/agent-types';
+import type { FileDeleteDiff } from '@stagewise/agent-types';
+import { tool } from 'ai';
+import { validateToolOutput } from '../..';
 import { z } from 'zod';
-import { prepareDiffContent } from './file-utils';
+import { prepareDiffContent } from '../../utils/file';
 
 export const DESCRIPTION = 'Delete a file from the file system';
 
@@ -16,10 +18,10 @@ export type DeleteFileParams = z.infer<typeof deleteFileParamsSchema>;
  * Removes a file from the file system.
  * Returns an error if the file doesn't exist or cannot be deleted.
  */
-export async function deleteFileTool(
+export async function deleteFileToolExecute(
   params: DeleteFileParams,
   clientRuntime: ClientRuntime,
-): Promise<ToolResult> {
+) {
   const { path: relPath } = params;
 
   // Validate required parameters
@@ -114,8 +116,10 @@ export async function deleteFileTool(
     return {
       success: true,
       message: `Successfully deleted file: ${relPath}`,
-      undoExecute,
-      diff,
+      hiddenMetadata: {
+        undoExecute,
+        diff,
+      },
     };
   } catch (error) {
     return {
@@ -125,3 +129,15 @@ export async function deleteFileTool(
     };
   }
 }
+
+export const deleteFileTool = (clientRuntime: ClientRuntime) =>
+  tool({
+    name: 'deleteFileTool',
+    description: DESCRIPTION,
+    inputSchema: deleteFileParamsSchema,
+    execute: async (args) => {
+      return validateToolOutput(
+        await deleteFileToolExecute(args, clientRuntime),
+      );
+    },
+  });

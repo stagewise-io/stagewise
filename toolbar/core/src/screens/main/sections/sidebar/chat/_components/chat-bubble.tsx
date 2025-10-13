@@ -42,6 +42,10 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from '@stagewise/stage-ui/components/collapsible';
+import {
+  isInteractionToolPart,
+  InteractionToolPartItem,
+} from './interaction-tool-part';
 
 export function ChatBubble({
   message: msg,
@@ -199,7 +203,7 @@ export function ChatBubble({
                 return (
                   <ToolPartItem
                     key={`content_part_${index.toString()}`}
-                    toolPart={part as ToolPart | DynamicToolUIPart}
+                    toolPart={part as ToolPart}
                   />
                 );
               }
@@ -374,9 +378,14 @@ const FilePartItem = memo(({ filePart }: { filePart: FileUIPart }) => {
 
 const DiffDisplay = memo(
   ({ toolPart }: { toolPart: ToolPart | DynamicToolUIPart }) => {
-    if (!isFileEditTool(toolPart) || !toolPart.output?.diff) return null;
+    if (
+      !isFileEditTool(toolPart) ||
+      !('hiddenMetadata' in toolPart.output) ||
+      !toolPart.output.hiddenMetadata?.diff
+    )
+      return null;
 
-    const { diff } = toolPart.output;
+    const { diff } = toolPart.output.hiddenMetadata;
 
     // Handle different diff types
     let beforeContent = '';
@@ -498,141 +507,140 @@ const DiffDisplay = memo(
   },
 );
 
-const ToolPartItem = memo(
-  ({ toolPart }: { toolPart: ToolPart | DynamicToolUIPart }) => {
-    const approveToolCall = useKartonProcedure(
-      (p) => p.agentChat.approveToolCall,
-    );
-    const rejectToolCall = useKartonProcedure(
-      (p) => p.agentChat.rejectToolCall,
-    );
-    const toolCallApprovalRequests = useKartonState(
-      (s) => s.workspace?.agentChat?.toolCallApprovalRequests ?? [],
-    );
-    const [isExpanded, setIsExpanded] = useState(false);
+const ToolPartItem = memo(({ toolPart }: { toolPart: ToolPart }) => {
+  const approveToolCall = useKartonProcedure(
+    (p) => p.agentChat.approveToolCall,
+  );
+  const rejectToolCall = useKartonProcedure((p) => p.agentChat.rejectToolCall);
+  const toolCallApprovalRequests = useKartonState(
+    (s) => s.workspace?.agentChat?.toolCallApprovalRequests ?? [],
+  );
+  const [isExpanded, setIsExpanded] = useState(false);
 
-    const requiresApproval = useMemo(
-      () =>
-        toolCallApprovalRequests.includes(toolPart.toolCallId) &&
-        (toolPart.state === 'output-available' ||
-          toolPart.state === 'output-error'),
-      [toolCallApprovalRequests, toolPart.toolCallId, toolPart.state],
-    );
+  const requiresApproval = useMemo(
+    () =>
+      toolCallApprovalRequests.includes(toolPart.toolCallId) &&
+      (toolPart.state === 'output-available' ||
+        toolPart.state === 'output-error'),
+    [toolCallApprovalRequests, toolPart.toolCallId, toolPart.state],
+  );
 
-    const canShowDiff = useMemo(
-      () =>
-        isFileEditTool(toolPart) &&
-        toolPart.state === 'output-available' &&
-        toolPart.output?.diff &&
-        (toolPart.output.diff.changeType === 'modify' ||
-          toolPart.output.diff.changeType === 'create' ||
-          toolPart.output.diff.changeType === 'delete'),
-      [toolPart],
-    );
+  const canShowDiff = useMemo(
+    () =>
+      isFileEditTool(toolPart) &&
+      toolPart.state === 'output-available' &&
+      'hiddenMetadata' in toolPart.output &&
+      toolPart.output.hiddenMetadata?.diff &&
+      (toolPart.output.hiddenMetadata.diff.changeType === 'modify' ||
+        toolPart.output.hiddenMetadata.diff.changeType === 'create' ||
+        toolPart.output.hiddenMetadata.diff.changeType === 'delete'),
+    [toolPart],
+  );
 
-    const handleContainerClick = useCallback(() => {
-      if (canShowDiff) {
+  const handleContainerClick = useCallback(() => {
+    if (canShowDiff) {
+      setIsExpanded(!isExpanded);
+    }
+  }, [canShowDiff, isExpanded]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (canShowDiff && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
         setIsExpanded(!isExpanded);
       }
-    }, [canShowDiff, isExpanded]);
+    },
+    [canShowDiff, isExpanded],
+  );
 
-    const handleKeyDown = useCallback(
-      (e: React.KeyboardEvent) => {
-        if (canShowDiff && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault();
-          setIsExpanded(!isExpanded);
-        }
-      },
-      [canShowDiff, isExpanded],
-    );
+  const containerProps = {
+    className: cn(
+      '-mx-1 flex flex-col gap-2 rounded-xl bg-zinc-500/5 px-2 py-0.5',
+      canShowDiff && 'cursor-pointer',
+    ),
+    ...(canShowDiff && {
+      onClick: handleContainerClick,
+      onKeyDown: handleKeyDown,
+      role: 'button' as const,
+      tabIndex: 0,
+    }),
+  };
 
-    const containerProps = {
-      className: cn(
-        '-mx-1 flex flex-col gap-2 rounded-xl bg-zinc-500/5 px-2 py-0.5',
-        canShowDiff && 'cursor-pointer',
-      ),
-      ...(canShowDiff && {
-        onClick: handleContainerClick,
-        onKeyDown: handleKeyDown,
-        role: 'button' as const,
-        tabIndex: 0,
-      }),
-    };
+  if (isInteractionToolPart(toolPart)) {
+    return <InteractionToolPartItem toolPart={toolPart} />;
+  }
 
-    return (
-      <div {...containerProps}>
-        <div className="flex w-full flex-row items-center justify-between gap-2 stroke-black/60">
-          {getToolIcon(toolPart)}
-          <div className="flex flex-1 flex-col items-start gap-0">
-            {getToolDescription(toolPart)}
-            {toolPart.state === 'output-error' && (
-              <span className="text-rose-600 text-xs">
-                {toolPart.errorText}
-              </span>
-            )}
-            {requiresApproval && (
-              <span className="text-black/50 text-xs italic">
-                Waiting for approval
-              </span>
-            )}
-          </div>
-          {requiresApproval && (
-            <div className="flex flex-row items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-4 w-5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  rejectToolCall(toolPart.toolCallId);
-                }}
-              >
-                <XIcon className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-4 w-5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  approveToolCall(toolPart.toolCallId);
-                }}
-              >
-                <CheckIcon className="size-4" />
-              </Button>
-            </div>
-          )}
-          {toolPart.state === 'output-available' && (
-            <>
-              <CheckIcon className="size-3 text-green-600" />
-              {canShowDiff && (
-                <div className="transition-transform duration-150">
-                  <ChevronRightIcon
-                    className={cn(
-                      'size-3 text-zinc-600 transition-transform',
-                      isExpanded && 'rotate-90',
-                    )}
-                  />
-                </div>
-              )}
-            </>
-          )}
+  return (
+    <div {...containerProps}>
+      <div className="flex w-full flex-row items-center justify-between gap-2 stroke-black/60">
+        {getToolIcon(toolPart)}
+        <div className="flex flex-1 flex-col items-start gap-0">
+          {getToolDescription(toolPart)}
           {toolPart.state === 'output-error' && (
-            <XIcon className="size-3 text-rose-600" />
+            <span className="text-rose-600 text-xs">{toolPart.errorText}</span>
           )}
-          {(toolPart.state === 'input-streaming' ||
-            toolPart.state === 'input-available') &&
-            !requiresApproval && (
-              <CogIcon className="size-3 animate-spin text-blue-600" />
-            )}
+          {requiresApproval && (
+            <span className="text-black/50 text-xs italic">
+              Waiting for approval
+            </span>
+          )}
         </div>
-        {isExpanded && canShowDiff && <DiffDisplay toolPart={toolPart} />}
+        {requiresApproval && (
+          <div className="flex flex-row items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-4 w-5"
+              onClick={(e) => {
+                e.stopPropagation();
+                rejectToolCall(toolPart.toolCallId);
+              }}
+            >
+              <XIcon className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-4 w-5"
+              onClick={(e) => {
+                e.stopPropagation();
+                approveToolCall(toolPart.toolCallId);
+              }}
+            >
+              <CheckIcon className="size-4" />
+            </Button>
+          </div>
+        )}
+        {toolPart.state === 'output-available' && (
+          <>
+            <CheckIcon className="size-3 text-green-600" />
+            {canShowDiff && (
+              <div className="transition-transform duration-150">
+                <ChevronRightIcon
+                  className={cn(
+                    'size-3 text-zinc-600 transition-transform',
+                    isExpanded && 'rotate-90',
+                  )}
+                />
+              </div>
+            )}
+          </>
+        )}
+        {toolPart.state === 'output-error' && (
+          <XIcon className="size-3 text-rose-600" />
+        )}
+        {(toolPart.state === 'input-streaming' ||
+          toolPart.state === 'input-available') &&
+          !requiresApproval && (
+            <CogIcon className="size-3 animate-spin text-blue-600" />
+          )}
       </div>
-    );
-  },
-);
+      {isExpanded && canShowDiff && <DiffDisplay toolPart={toolPart} />}
+    </div>
+  );
+});
 
 const getToolIcon = (toolPart: ToolPart | DynamicToolUIPart) => {
   switch (toolPart.type) {

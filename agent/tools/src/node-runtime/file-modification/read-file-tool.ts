@@ -1,8 +1,9 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { ToolResult } from '@stagewise/agent-types';
+import { tool } from 'ai';
+import { validateToolOutput } from '../..';
 import { z } from 'zod';
-import { checkFileSize } from './file-utils';
-import { FILE_SIZE_LIMITS } from './constants';
+import { checkFileSize } from '../../utils/file';
+import { FILE_SIZE_LIMITS } from '../../constants';
 
 export const DESCRIPTION =
   'Read the contents of a file with line-by-line control';
@@ -35,10 +36,10 @@ export type ReadFileParams = z.infer<typeof readFileParamsSchema>;
  * - When should_read_entire_file is false: reads the specified line range (1-indexed, inclusive)
  * - Returns line count information for context
  */
-export async function readFileTool(
+export async function readFileToolExecute(
   params: ReadFileParams,
   clientRuntime: ClientRuntime,
-): Promise<ToolResult> {
+) {
   const {
     target_file,
     should_read_entire_file,
@@ -170,3 +171,13 @@ export async function readFileTool(
     };
   }
 }
+
+export const readFileTool = (clientRuntime: ClientRuntime) =>
+  tool({
+    name: 'readFileTool',
+    description: DESCRIPTION,
+    inputSchema: readFileParamsSchema,
+    execute: async (args) => {
+      return validateToolOutput(await readFileToolExecute(args, clientRuntime));
+    },
+  });

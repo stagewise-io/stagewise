@@ -3,7 +3,7 @@
  */
 
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import { FILE_SIZE_LIMITS, FILE_SIZE_ERROR_MESSAGES } from './constants';
+import { FILE_SIZE_LIMITS, FILE_SIZE_ERROR_MESSAGES } from '../constants.js';
 
 /**
  * Checks if a file is within the specified size limit

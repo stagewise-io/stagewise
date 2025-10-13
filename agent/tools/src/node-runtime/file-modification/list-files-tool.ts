@@ -1,5 +1,6 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { ToolResult } from '@stagewise/agent-types';
+import { tool } from 'ai';
+import { validateToolOutput } from '../..';
 import { z } from 'zod';
 
 export const DESCRIPTION =
@@ -23,10 +24,10 @@ export type ListFilesParams = z.infer<typeof listFilesParamsSchema>;
  * - Supports filtering by file extension or pattern
  * - Returns detailed file information including type and size
  */
-export async function listFilesTool(
+export async function listFilesToolExecute(
   params: ListFilesParams,
   clientRuntime: ClientRuntime,
-): Promise<ToolResult> {
+) {
   const {
     path: relPath = '.',
     recursive = false,
@@ -124,3 +125,15 @@ export async function listFilesTool(
     };
   }
 }
+
+export const listFilesTool = (clientRuntime: ClientRuntime) =>
+  tool({
+    name: 'listFilesTool',
+    description: DESCRIPTION,
+    inputSchema: listFilesParamsSchema,
+    execute: async (args) => {
+      return validateToolOutput(
+        await listFilesToolExecute(args, clientRuntime),
+      );
+    },
+  });

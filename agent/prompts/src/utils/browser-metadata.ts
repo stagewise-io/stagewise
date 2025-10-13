@@ -1,4 +1,4 @@
-import type { UserMessageMetadata } from '@stagewise/karton-contract';
+import type { BrowserData } from '@stagewise/karton-contract';
 
 function escapeXml(str: string | null | undefined): string {
   if (!str) return '';
@@ -11,7 +11,7 @@ function escapeXml(str: string | null | undefined): string {
 }
 
 export function browserMetadataToContextSnippet(
-  browserData: UserMessageMetadata['browserData'] | undefined,
+  browserData: BrowserData | undefined,
 ): string | null {
   if (!browserData) return null;
   return `

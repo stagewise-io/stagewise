@@ -240,26 +240,28 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
         // Initialize metadata and pluginContentItems if needed
         if (!message.metadata) {
-          message.metadata = {};
+          message.metadata = {
+            createdAt: new Date(),
+          };
         }
-        if (!message.metadata.pluginContentItems) {
-          message.metadata.pluginContentItems = {};
-        }
+        // if (!message.metadata.pluginContentItems) {
+        //   message.metadata.pluginContentItems = {};
+        // }
 
         // Add to pluginContentItems in metadata
-        message.metadata.pluginContentItems[context.pluginName] = {};
+        // message.metadata.pluginContentItems[context.pluginName] = {};
 
         context.contextSnippets.forEach((snippet) => {
-          const contentItem = {
+          const _contentItem = {
             type: 'text' as const,
             text: snippet.content,
           };
-          if (!message.metadata?.pluginContentItems?.[context.pluginName]) {
-            message.metadata!.pluginContentItems![context.pluginName] = {};
-          }
-          message.metadata!.pluginContentItems![context.pluginName]![
-            snippet.promptContextName
-          ] = contentItem;
+          // if (!message.metadata?.pluginContentItems?.[context.pluginName]) {
+          //   message.metadata!.pluginContentItems![context.pluginName] = {};
+          // }
+          // message.metadata!.pluginContentItems![context.pluginName]![
+          //   snippet.promptContextName
+          // ] = contentItem;
         });
       });
 

@@ -3,13 +3,21 @@ import { z } from 'zod';
 
 export type { Tool };
 
-export type ToolWithMetadata<T extends Tool> = T & {
-  stagewiseMetadata: StagewiseToolMetadata;
-};
+export type SharedToolOutput =
+  | {
+      success: true;
+      message: string;
+      result?: any;
+      hiddenMetadata?: Record<string, any>;
+    }
+  | {
+      success: false;
+      message: string;
+      error: string;
+    };
 
 export const stagewiseToolMetadataSchema = z.object({
   requiresUserInteraction: z.boolean().default(false).optional(),
-  runtime: z.enum(['client', 'server', 'browser']).default('client').optional(),
 });
 
 export type StagewiseToolMetadata = z.infer<typeof stagewiseToolMetadataSchema>;
@@ -88,6 +96,10 @@ export type ToolResult = {
   message?: string;
   result?: any;
   diff?: FileDiff;
+  hidden?: {
+    diff?: FileDiff;
+    undoExecute?: () => Promise<void>;
+  };
 };
 
 export type Tools = Record<

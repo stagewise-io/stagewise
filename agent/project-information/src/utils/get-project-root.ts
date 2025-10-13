@@ -34,7 +34,7 @@ export async function findProjectRoot(
   clientRuntime: ClientRuntime,
 ): Promise<string | null> {
   const fileSystem = clientRuntime.fileSystem;
-  let currentDir = await fileSystem.getCurrentWorkingDirectory();
+  let currentDir = fileSystem.getCurrentWorkingDirectory();
   let outermostPackageJsonPath: string | null = null;
 
   // Keep track of the previous directory to detect when we've reached the filesystem root

@@ -1,8 +1,5 @@
 import { z } from 'zod';
-import type {
-  SelectedElement,
-  UserMessageMetadata,
-} from '@stagewise/karton-contract';
+import type { SelectedElement, BrowserData } from '@stagewise/karton-contract';
 import { generateText, type ModelMessage, generateObject } from 'ai';
 import type { LanguageModelV2 } from '@ai-sdk/provider';
 import { LevelDb } from '@stagewise/agent-rag';
@@ -66,14 +63,14 @@ function isCurrentRoute(browserRoute: string, storedMappedRoute: string) {
 }
 
 async function _getRouteFileSnippets(
-  userInput: UserMessageMetadata,
+  browserData: BrowserData,
   workspaceDataPath: string,
   clientRuntime: ClientRuntime,
 ) {
   try {
     const db = LevelDb.getInstance(workspaceDataPath);
     await db.open();
-    const currentUrl = userInput.browserData?.currentUrl;
+    const currentUrl = browserData.currentUrl;
     const relativePath = currentUrl ? new URL(currentUrl).pathname : null;
     if (!relativePath) return [];
     const filePaths = [];

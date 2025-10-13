@@ -36,19 +36,28 @@ export const getToolName = (toolPart: ToolPart | DynamicToolUIPart): string => {
     case 'tool-listFilesTool':
       return 'Listing Files';
     case 'tool-grepSearchTool':
-      return 'Searching with Grep';
     case 'tool-globTool':
-      return 'Searching with Glob';
+      return 'Searching the right files';
     case 'tool-overwriteFileTool': {
-      const fileName = getFileName(toolPart.output?.diff?.path ?? '');
+      const fileName = getFileName(
+        toolPart.output?.hiddenMetadata?.diff?.path ?? '',
+      );
       return `Overwriting ${fileName}`;
     }
     case 'tool-multiEditTool': {
-      const fileName = getFileName(toolPart.output?.diff?.path ?? '');
+      if (
+        !toolPart.output ||
+        !('hiddenMetadata' in toolPart.output) ||
+        !toolPart.output.hiddenMetadata?.diff
+      )
+        return '';
+      const fileName = getFileName(toolPart.output.hiddenMetadata.diff.path);
       return `Editing ${fileName}`;
     }
     case 'tool-deleteFileTool': {
-      const fileName = getFileName(toolPart.output?.diff?.path ?? '');
+      const fileName = getFileName(
+        toolPart.output?.hiddenMetadata?.diff?.path ?? '',
+      );
       return `Deleting ${fileName}`;
     }
     case 'dynamic-tool':
@@ -66,25 +75,26 @@ export const getToolDescription = (toolPart: ToolPart | DynamicToolUIPart) => {
   if (
     !isFileEditTool(toolPart) ||
     toolPart.state !== 'output-available' ||
-    toolPart.output.diff === undefined
+    !('hiddenMetadata' in toolPart.output) ||
+    !toolPart.output.hiddenMetadata?.diff
   )
     return getFallbackToolDescription(toolPart);
 
-  switch (toolPart.output.diff.changeType) {
+  switch (toolPart.output.hiddenMetadata.diff.changeType) {
     case 'create': {
-      if (toolPart.output.diff.omitted === true) {
+      if (toolPart.output.hiddenMetadata.diff.omitted === true) {
         return (
           <span className="text-black/80 text-xs">
-            {getFileName(toolPart.output.diff.path)}
+            {getFileName(toolPart.output.hiddenMetadata.diff.path)}
             <span className="text-green-600 text-xs"> (new)</span>
           </span>
         );
       }
-      const lines = diffLines('', toolPart.output.diff.after);
+      const lines = diffLines('', toolPart.output.hiddenMetadata.diff.after);
       const newLineCount = lines
         .filter((line) => line.added)
         .reduce((sum, line) => sum + (line.count || 0), 0);
-      const fileName = getFileName(toolPart.output.diff.path);
+      const fileName = getFileName(toolPart.output.hiddenMetadata.diff.path);
       return (
         <span className="text-black/80 text-xs">
           {fileName}
@@ -93,15 +103,15 @@ export const getToolDescription = (toolPart: ToolPart | DynamicToolUIPart) => {
       );
     }
     case 'delete': {
-      const fileName = getFileName(toolPart.output.diff.path);
-      if (toolPart.output.diff.omitted === true)
+      const fileName = getFileName(toolPart.output.hiddenMetadata.diff.path);
+      if (toolPart.output.hiddenMetadata.diff.omitted === true)
         return (
           <span className="text-black/80 text-xs">
             {fileName}
             <span className="text-rose-600 text-xs"> (deleted)</span>
           </span>
         );
-      const lines = diffLines(toolPart.output.diff.before, '');
+      const lines = diffLines(toolPart.output.hiddenMetadata.diff.before, '');
       const deletedLineCount = lines
         .filter((line) => line.removed)
         .reduce((sum, line) => sum + (line.count || 0), 0);
@@ -117,13 +127,13 @@ export const getToolDescription = (toolPart: ToolPart | DynamicToolUIPart) => {
     }
     case 'modify': {
       if (
-        toolPart.output.diff.afterOmitted === true ||
-        toolPart.output.diff.beforeOmitted === true
+        toolPart.output.hiddenMetadata.diff.afterOmitted === true ||
+        toolPart.output.hiddenMetadata.diff.beforeOmitted === true
       )
         return getFallbackToolDescription(toolPart);
       const lines = diffLines(
-        toolPart.output.diff.before,
-        toolPart.output.diff.after,
+        toolPart.output.hiddenMetadata.diff.before,
+        toolPart.output.hiddenMetadata.diff.after,
       );
       const newLineCount = lines
         .filter((line) => line.added)
@@ -131,7 +141,7 @@ export const getToolDescription = (toolPart: ToolPart | DynamicToolUIPart) => {
       const deletedLineCount = lines
         .filter((line) => line.removed)
         .reduce((sum, line) => sum + (line.count || 0), 0);
-      const fileName = getFileName(toolPart.output.diff.path);
+      const fileName = getFileName(toolPart.output.hiddenMetadata.diff.path);
       return (
         <span className="text-black/80 text-xs">
           {fileName}{' '}

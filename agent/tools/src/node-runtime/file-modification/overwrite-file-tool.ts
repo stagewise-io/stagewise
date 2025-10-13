@@ -1,12 +1,10 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type {
-  ToolResult,
-  FileModifyDiff,
-  FileCreateDiff,
-} from '@stagewise/agent-types';
+import { tool } from 'ai';
+import { validateToolOutput } from '../..';
+import type { FileModifyDiff, FileCreateDiff } from '@stagewise/agent-types';
 import { z } from 'zod';
-import { prepareDiffContent } from './file-utils';
-import type { PreparedDiffContent } from './file-utils';
+import { prepareDiffContent } from '../../utils/file';
+import type { PreparedDiffContent } from '../../utils/file';
 
 export const DESCRIPTION =
   'Overwrite the entire content of a file. Creates the file if it does not exist, along with any necessary directories.';
@@ -23,10 +21,10 @@ export type OverwriteFileParams = z.infer<typeof overwriteFileParamsSchema>;
  * Replaces the entire content of a file with new content.
  * Creates directories as needed.
  */
-export async function overwriteFileTool(
+export async function overwriteFileToolExecute(
   params: OverwriteFileParams,
   clientRuntime: ClientRuntime,
-): Promise<ToolResult> {
+) {
   const { path: relPath, content } = params;
 
   // Validate required parameters
@@ -213,8 +211,10 @@ export async function overwriteFileTool(
     return {
       success: true,
       message,
-      undoExecute,
-      diff,
+      hiddenMetadata: {
+        undoExecute,
+        diff,
+      },
     };
   } catch (error) {
     return {
@@ -224,3 +224,15 @@ export async function overwriteFileTool(
     };
   }
 }
+
+export const overwriteFileTool = (clientRuntime: ClientRuntime) =>
+  tool({
+    name: 'overwriteFileTool',
+    description: DESCRIPTION,
+    inputSchema: overwriteFileParamsSchema,
+    execute: async (args) => {
+      return validateToolOutput(
+        await overwriteFileToolExecute(args, clientRuntime),
+      );
+    },
+  });

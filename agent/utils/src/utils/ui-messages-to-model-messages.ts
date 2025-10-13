@@ -13,7 +13,9 @@ export function uiMessagesToModelMessages(
     switch (message.role) {
       case 'user':
         modelMessages.push(
-          prompts.getUserMessagePrompt({ userMessage: message }),
+          prompts.getUserMessagePrompt({
+            userMessage: message,
+          }),
         );
         break;
       case 'assistant': {
@@ -35,15 +37,20 @@ export function uiMessagesToModelMessages(
             ) {
               // Create a new part without diff and undoExecute
               if (part.output) {
-                const {
-                  diff: _diff,
-                  undoExecute: _undoExecute,
-                  ...cleanOutput
-                } = part.output;
-                return {
-                  ...part,
-                  output: cleanOutput,
-                };
+                // Extract part.output.hiddenMetadata
+                if ('hiddenMetadata' in part.output) {
+                  const { hiddenMetadata: _hiddenMetadata, ...cleanOutput } =
+                    part.output;
+                  return {
+                    ...part,
+                    output: cleanOutput,
+                  };
+                } else {
+                  return {
+                    ...part,
+                    output: part.output,
+                  };
+                }
               }
             }
             return part;

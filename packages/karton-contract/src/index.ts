@@ -1,11 +1,20 @@
-import type { UserMessageMetadata, SelectedElement } from './metadata.js';
+import type {
+  AskForAppPathOutput,
+  AskForPortOutput,
+  AskForRootProjectPathOutput,
+} from '@stagewise/agent-tools';
+import type {
+  UserMessageMetadata,
+  SelectedElement,
+  BrowserData,
+} from './metadata.js';
 import type { UIMessage, UIDataTypes } from 'ai';
 import type { UITools, ToolPart } from '@stagewise/agent-tools';
 import type { FileDiff, ToolResult } from '@stagewise/agent-types';
 import type { WorkspaceConfig, FilePickerRequest } from './shared-types.js';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
-export type { UserMessageMetadata, SelectedElement };
+export type { UserMessageMetadata, SelectedElement, BrowserData };
 
 export type { FileDiff, ToolResult };
 
@@ -232,6 +241,16 @@ export type KartonContract = {
       abortAgentCall: () => Promise<void>;
       approveToolCall: (toolCallId: string) => Promise<void>;
       rejectToolCall: (toolCallId: string) => Promise<void>;
+      submitUserInteractionToolInput: (
+        toolCallId: string,
+        input:
+          | (AskForAppPathOutput & { type: 'askForAppPathTool' })
+          | (AskForPortOutput & { type: 'askForPortTool' })
+          | (AskForRootProjectPathOutput & {
+              type: 'askForRootProjectPathTool';
+            }),
+      ) => Promise<{ success: true } | { success: false; error: string }>; // Returns zod validation success or failure
+      cancelUserInteractionToolInput: (toolCallId: string) => Promise<void>; // Cancels the user interaction tool input.
       undoToolCallsUntilUserMessage: (
         userMessageId: string,
         chatId: string,

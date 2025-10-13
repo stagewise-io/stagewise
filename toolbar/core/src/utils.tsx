@@ -473,26 +473,11 @@ export async function fileToDataUrl(file: File): Promise<string> {
 
 export const collectUserMessageMetadata = (
   selectedElements: SelectedElement[],
-  sentByPlugin?: boolean,
+  _sentByPlugin?: boolean,
 ): UserMessageMetadata => {
-  const iframeWindow = getIFrameWindow();
   return {
     createdAt: new Date(),
-    browserData: {
-      currentUrl: truncateString(iframeWindow?.location.href ?? '', 1024),
-      currentTitle: truncateString(iframeWindow?.document.title ?? null, 256),
-      currentZoomLevel: 0,
-      devicePixelRatio: iframeWindow?.devicePixelRatio ?? 1,
-      userAgent: truncateString(iframeWindow?.navigator.userAgent ?? '', 1024),
-      locale: truncateString(iframeWindow?.navigator.language ?? '', 64),
-      selectedElements,
-      viewportResolution: {
-        width: iframeWindow?.innerWidth ?? 0,
-        height: iframeWindow?.innerHeight ?? 0,
-      },
-    },
-    pluginContentItems: {}, // This should be modified afterward sto add all plugin content items
-    sentByPlugin,
+    selectedPreviewElements: selectedElements,
   };
 };
 

@@ -1,8 +1,21 @@
 import type { SystemModelMessage, UserModelMessage } from 'ai';
+import type { ChatMessage, MainTab } from '@stagewise/karton-contract';
 import type { PromptSnippet } from '@stagewise/agent-types';
-import type { ChatMessage } from '@stagewise/karton-contract';
 
-export type SystemPromptConfig = {
+export type SystemPromptConfig = (
+  | {
+      currentTab: MainTab.WORKSPACE_SETUP;
+    }
+  | {
+      currentTab: MainTab.IDEATION_CANVAS;
+    }
+  | {
+      currentTab: MainTab.DEV_APP_PREVIEW;
+    }
+  | {
+      currentTab: MainTab.SETTINGS;
+    }
+) & {
   userMessageMetadata?: ChatMessage['metadata'];
   promptSnippets?: PromptSnippet[];
 };

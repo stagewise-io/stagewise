@@ -48,7 +48,7 @@ export function createAndActivateNewChat(
  */
 export function attachToolOutputToMessage(
   karton: KartonStateProvider<KartonContract['state']>,
-  toolResults: ToolCallProcessingResult[],
+  toolResults: ToolCallProcessingResult<any>[],
   messageId: string,
 ) {
   karton.setState((draft) => {

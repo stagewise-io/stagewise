@@ -118,7 +118,7 @@ export class WorkspaceSetupService {
     this._setupCompleted = false;
   }
 
-  private async handleSetupSubmission(config: WorkspaceConfig): Promise<void> {
+  public async handleSetupSubmission(config: WorkspaceConfig): Promise<void> {
     // Check if the given data is valid.
     this.logger.debug(
       `[WorkspaceSetupService] Validating config: ${JSON.stringify(config)}`,

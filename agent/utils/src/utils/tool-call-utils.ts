@@ -1,145 +1,77 @@
-import type { ToolResult } from '@stagewise/agent-types';
-import type { History } from '@stagewise/karton-contract';
-import type { Tools } from '@stagewise/agent-types';
-import type { TimeoutManager } from './time-out-manager.js';
+import type { AllTools } from '@stagewise/agent-tools';
 import { ErrorDescriptions } from './error-utils.js';
-import type { TypedToolCall } from 'ai';
+import type { StaticToolCall, TypedToolCall } from 'ai';
+import type { History } from '@stagewise/karton-contract';
 
-// Configuration constants
-const BROWSER_TOOL_TIMEOUT = 60000; // 60 seconds for browser tools
-
-type Tool = Tools[keyof Tools];
-
-export type { Tools };
-
-interface ToolCallContext {
-  tool: Tool;
-  toolName: string;
-  toolCallId: string;
-  input: any;
-  history: History;
-  onToolCallComplete?: (result: ToolCallProcessingResult) => void;
+interface ToolCallContext<T extends StaticToolCall<AllTools>> {
+  toolCall: T;
+  tool: AllTools[T['toolName']];
+  messages: History;
+  onToolCallComplete?: (
+    result: ToolCallProcessingResult<
+      ReturnType<NonNullable<AllTools[T['toolName']]['execute']>>
+    >,
+  ) => void;
 }
 
-export interface ToolCallProcessingResult {
+export interface ToolCallProcessingResult<T> {
   success: boolean;
   toolCallId: string;
   duration: number;
   error?: {
-    type: 'error' | 'user_interaction_required';
+    type: 'error';
     message: string;
   };
-  result?: ToolResult;
-}
-
-/**
- * Processes a browser-based tool call
- */
-export async function processBrowserToolCall(
-  context: ToolCallContext,
-  timeoutManager: TimeoutManager,
-): Promise<ToolCallProcessingResult> {
-  const { toolName, toolCallId } = context;
-
-  // Set up timeout for browser tool
-  const timeoutKey = `browser-tool-${toolCallId}`;
-  timeoutManager.set(
-    timeoutKey,
-    () => {
-      console.warn(`[Agent]: Browser tool ${toolName} timed out`);
-    },
-    BROWSER_TOOL_TIMEOUT,
-  );
-
-  try {
-    // TODO: call
-    const toolCallResult: ToolResult = {
-      success: true,
-      result: {
-        type: 'tool-result' as const,
-        toolName,
-        toolCallId,
-        result: "Not yet implemented, don't try again",
-      },
-    };
-
-    // Clear timeout if successful
-    timeoutManager.clear(timeoutKey);
-
-    const result: ToolCallProcessingResult = {
-      success: true,
-      toolCallId,
-      duration: 0, // Browser tools don't track duration currently
-      result: toolCallResult.result,
-    };
-
-    return result;
-  } catch (error) {
-    const errorDescription = ErrorDescriptions.browserToolError(
-      toolName,
-      error,
-    );
-    timeoutManager.clear(timeoutKey);
-
-    const result: ToolCallProcessingResult = {
-      success: false,
-      toolCallId,
-      duration: 0,
-      error: {
-        type: 'error',
-        message: errorDescription,
-      },
-    };
-
-    if (context.onToolCallComplete) {
-      context.onToolCallComplete(result);
-    }
-
-    throw error;
-  }
+  result?: T;
 }
 
 /**
  * Processes a client-side tool call
  */
-export async function processClientSideToolCall(
-  context: ToolCallContext,
-): Promise<ToolCallProcessingResult> {
-  const { tool, toolName, toolCallId, input } = context;
+export async function processClientSideToolCall<
+  T extends StaticToolCall<AllTools>,
+>(
+  context: ToolCallContext<T>,
+): Promise<
+  | ToolCallProcessingResult<
+      ReturnType<NonNullable<AllTools[T['toolName']]['execute']>>
+    >
+  | { userInteractionrequired: true }
+> {
+  const { tool, toolCall } = context;
 
   const startTime = Date.now();
 
   // Inline handleClientsideToolCall logic
   let result: {
     error: boolean;
-    userInteractionRequired?: boolean;
-    userInteractionType?: string;
-    userInteractionParams?: any;
     errorMessage?: string;
-    result?: ToolResult;
+    result?: ReturnType<NonNullable<AllTools[T['toolName']]['execute']>>;
   };
 
-  if (tool.stagewiseMetadata?.runtime !== 'client') {
-    result = {
-      error: true,
-      errorMessage: 'Tool is not clientside',
-    };
+  if (tool.stagewiseMetadata?.requiresUserInteraction) {
+    return { userInteractionrequired: true };
   } else if (!tool.execute) {
+    // if (!tool.execute) {
     result = {
       error: true,
       errorMessage: 'Issue with the tool - no handler found',
     };
   } else {
     // Execute the tool
-    const executeResult = await tool.execute(input, {
-      toolCallId,
-      messages: [], // the empty array is fine, we don't need to pass in the history - only when the tool calls need it
+    // TypeScript can't narrow the generic constraint properly, but we know the types match
+    // because ToolCallContext ensures tool and toolCall are correctly paired
+    const executeResult = await tool.execute(toolCall.input as any, {
+      toolCallId: toolCall.toolCallId,
+      // messages: uiMessagesToModelMessages(context.messages),
+      messages: [], // TODO: Fix the AIConversion error (tool state input-available not supported)!
     });
 
     result = {
       error: false,
-      userInteractionRequired: false,
-      result: executeResult,
+      result: executeResult as ReturnType<
+        NonNullable<AllTools[T['toolName']]['execute']>
+      >,
     };
   }
 
@@ -147,35 +79,21 @@ export async function processClientSideToolCall(
 
   if (result.error) {
     const errorDescription = ErrorDescriptions.toolCallFailed(
-      toolName,
+      toolCall.toolName,
       result.errorMessage || result.error,
-      input,
+      toolCall.input,
       duration,
     );
 
-    const processResult: ToolCallProcessingResult = {
+    const processResult: ToolCallProcessingResult<
+      ReturnType<NonNullable<AllTools[T['toolName']]['execute']>>
+    > = {
       success: false,
-      toolCallId,
+      toolCallId: toolCall.toolCallId,
       duration,
       error: {
         type: 'error',
         message: errorDescription,
-      },
-    };
-
-    if (context.onToolCallComplete) {
-      context.onToolCallComplete(processResult);
-    }
-
-    return processResult;
-  } else if (result.userInteractionRequired) {
-    const processResult: ToolCallProcessingResult = {
-      success: false,
-      toolCallId,
-      duration,
-      error: {
-        type: 'user_interaction_required',
-        message: 'User interaction required',
       },
     };
 
@@ -186,9 +104,11 @@ export async function processClientSideToolCall(
     return processResult;
   } else {
     // Successful completion
-    const processResult: ToolCallProcessingResult = {
+    const processResult: ToolCallProcessingResult<
+      ReturnType<NonNullable<AllTools[T['toolName']]['execute']>>
+    > = {
       success: true,
-      toolCallId,
+      toolCallId: toolCall.toolCallId,
       duration,
       result: result.result,
     };
@@ -202,94 +122,60 @@ export async function processClientSideToolCall(
 }
 
 /**
- * Processes a single tool call based on its runtime
- * Note: This no longer adds the assistant message - that's handled at a higher level
+ * Processes multiple tool calls in parallel and returns the results.
+ * If the result is { userInteractionrequired: true }, the result should NOT be appended to the tool outputs automatically -
+ * the frontend should wait for user interaction and then attach the result to the tool outputs via rpc call.
+ *
+ * @param toolCalls - The tool calls to process
+ * @param tools - The tools to use
+ * @param onToolCallComplete - The callback to call when a tool call is complete
+ * @returns
  */
-export async function processToolCall(
-  context: ToolCallContext,
-  timeoutManager: TimeoutManager,
-): Promise<ToolCallProcessingResult> {
-  const { tool } = context;
-
-  // Process based on runtime
-  if (tool.stagewiseMetadata?.runtime === 'browser') {
-    return await processBrowserToolCall(context, timeoutManager);
-  } else {
-    return await processClientSideToolCall(context);
-  }
-}
-
-/**
- * Processes multiple tool calls in parallel
- */
-export async function processParallelToolCalls(
-  toolCalls: TypedToolCall<
-    Record<string, { description: string; inputSchema: any }>
-  >[],
-  tools: Tools,
-  history: History,
-  timeoutManager: TimeoutManager,
-  onToolCallComplete?: (result: ToolCallProcessingResult) => void,
-): Promise<ToolCallProcessingResult[]> {
+export async function processToolCalls(
+  toolCalls: TypedToolCall<AllTools>[],
+  tools: AllTools,
+  messages: History,
+  onToolCallComplete?: (
+    result: ToolCallProcessingResult<
+      ReturnType<NonNullable<AllTools[keyof AllTools]['execute']>>
+    >,
+  ) => void,
+) {
   // Process all tool calls
-  const results: ToolCallProcessingResult[] = [];
-
-  // Separate browser tools from client-side tools
-  const browserToolCalls = toolCalls.filter(
-    (tc) => tools[tc.toolName]?.stagewiseMetadata?.runtime === 'browser',
-  );
-  const clientToolCalls = toolCalls.filter(
-    (tc) => tools[tc.toolName]?.stagewiseMetadata?.runtime !== 'browser',
-  );
+  const results: (
+    | ToolCallProcessingResult<
+        ReturnType<NonNullable<AllTools[keyof AllTools]['execute']>>
+      >
+    | { userInteractionrequired: true }
+  )[] = [];
 
   // Process client-side tools in parallel
-  const clientPromises = clientToolCalls.map(async (tc) => {
-    const tool = tools[tc.toolName];
-    if (!tool) return null;
+  const clientPromises = toolCalls.map(async (tc) => {
+    if (tc.dynamic)
+      throw new Error('Dynamic tool calls are not supported yet.'); // Dynamic tool calls are not supported yet.
 
-    const context: ToolCallContext = {
+    const tool = tools[tc.toolName];
+    if (!tool)
+      throw new Error(`Tool ${tc.toolName} not found in provided tools.`);
+
+    const context = {
+      toolCall: tc,
       tool,
-      toolName: tc.toolName,
-      toolCallId: tc.toolCallId,
-      input: tc.input,
-      history,
+      messages,
       onToolCallComplete,
     };
 
     try {
-      return await processToolCall(context, timeoutManager);
+      return await processClientSideToolCall(context);
     } catch (_error) {
       // Error already handled in processToolCall
       return null;
     }
   });
 
-  // Process browser tools sequentially (they may need to interact with the UI)
-  for (const tc of browserToolCalls) {
-    const tool = tools[tc.toolName];
-    if (!tool) continue;
-
-    const context: ToolCallContext = {
-      tool,
-      toolName: tc.toolName,
-      toolCallId: tc.toolCallId,
-      input: tc.input,
-      history,
-    };
-
-    try {
-      const result = await processToolCall(context, timeoutManager);
-      results.push(result);
-    } catch (_error) {
-      // Error already handled in processToolCall
-    }
-  }
-
   // Wait for all client-side tools to complete
   const clientResults = await Promise.all(clientPromises);
-  results.push(
-    ...clientResults.filter((r): r is ToolCallProcessingResult => r !== null),
-  );
+  results.push(...clientResults.filter((r) => r !== null));
 
   return results;
 }

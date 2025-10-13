@@ -1,7 +1,8 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { ToolResult } from '@stagewise/agent-types';
+import { tool } from 'ai';
+import { validateToolOutput } from '../..';
 import { z } from 'zod';
-import { GREP_LIMITS } from './constants.js';
+import { GREP_LIMITS } from '../../constants.js';
 
 export const DESCRIPTION =
   'Fast, exact regex searches over text files using ripgrep';
@@ -49,10 +50,10 @@ const _grepMatchSchema = z.object({
  * - Can filter files by include/exclude patterns
  * - Returns matches with file paths, line numbers, and previews
  */
-export async function grepSearchTool(
+export async function grepSearchToolExecute(
   params: GrepSearchParams,
   clientRuntime: ClientRuntime,
-): Promise<ToolResult> {
+) {
   const {
     query,
     case_sensitive,
@@ -147,3 +148,15 @@ export async function grepSearchTool(
     };
   }
 }
+
+export const grepSearchTool = (clientRuntime: ClientRuntime) =>
+  tool({
+    name: 'grepSearchTool',
+    description: DESCRIPTION,
+    inputSchema: grepSearchParamsSchema,
+    execute: async (args) => {
+      return validateToolOutput(
+        await grepSearchToolExecute(args, clientRuntime),
+      );
+    },
+  });
