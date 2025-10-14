@@ -106,7 +106,7 @@ export type SetupAgentCallbacks = {
 };
 
 export type InspirationAgentCallbacks = {
-  onGenerated: (component: InspirationComponent) => void;
+  onGenerated: (component: Omit<InspirationComponent, 'compiledCode'>) => void;
 };
 
 type _ToolSet = { [key: string]: Tool<any, any> };

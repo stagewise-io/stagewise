@@ -112,6 +112,7 @@ export function MainSection() {
             .filter(([_, tab]) => tab.showInTabBar)
             .map(([tabId, tab]) => (
               <Button
+                key={tabId}
                 className={cn(
                   'w-[calc-size(auto,size)] min-w-10 rounded-full transition-all duration-200 ease-out',
                 )}

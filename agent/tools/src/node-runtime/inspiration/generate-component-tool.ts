@@ -152,6 +152,11 @@ export type InspirationComponent = {
   compiledCode: string;
 };
 
+type UncompiledInspirationComponent = Omit<
+  InspirationComponent,
+  'compiledCode'
+>;
+
 /**
  * Generate component tool
  * - Generates a component for a given project
@@ -162,7 +167,7 @@ export type InspirationComponent = {
 export async function generateComponentToolExecute(
   params: GenerateComponentParams,
   apiKey: string,
-  onGenerated: (component: InspirationComponent) => void,
+  onGenerated: (component: UncompiledInspirationComponent) => void,
 ) {
   try {
     const litellm = createAnthropic({
@@ -183,7 +188,6 @@ export async function generateComponentToolExecute(
       id: crypto.randomUUID(),
       createdAt: new Date(),
       reactCode: result.text,
-      compiledCode: result.text, // TODO: Compile the code
     });
     return {
       success: true,
@@ -201,7 +205,7 @@ export async function generateComponentToolExecute(
 
 export const generateComponentTool = (
   apiKey: string,
-  onGenerated: (component: InspirationComponent) => void,
+  onGenerated: (component: UncompiledInspirationComponent) => void,
 ) =>
   tool({
     name: 'generateComponentTool',

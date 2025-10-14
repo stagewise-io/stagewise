@@ -52,6 +52,7 @@ import {
 } from '@stagewise/agent-prompt-snippets';
 import type { AsyncIterableStream, InferUIMessageChunk, ToolUIPart } from 'ai';
 import type { WorkspaceSetupService } from '../setup';
+import { compileInspirationComponent } from './utils/compile-inspiration-component';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -163,9 +164,16 @@ export class AgentService {
         if (!this.apiKey) throw new Error('No API key available');
         return inspirationAgentTools(this.clientRuntime, this.apiKey, {
           onGenerated: async (component) => {
+            const componentWithCompiledCode = await compileInspirationComponent(
+              component,
+              this.logger,
+            );
+
             this.kartonService.setState((draft) => {
               if (draft.workspace?.inspirationComponents) {
-                draft.workspace.inspirationComponents.push(component);
+                draft.workspace.inspirationComponents.push(
+                  componentWithCompiledCode,
+                );
               }
             });
             this.logger.debug('[AgentService] Inspiration component generated');
