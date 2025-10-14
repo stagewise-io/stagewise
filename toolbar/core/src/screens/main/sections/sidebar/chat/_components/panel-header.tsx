@@ -15,7 +15,11 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 
-export function ChatPanelHeader() {
+export function ChatPanelHeader({
+  multiChatControls,
+}: {
+  multiChatControls: boolean;
+}) {
   const [chatListOpen, setChatListOpen] = useState(false);
 
   const createChatProcedure = useKartonProcedure((p) => p.agentChat.create);
@@ -45,12 +49,16 @@ export function ChatPanelHeader() {
   const showChatListButton = Object.keys(chats).length > 1;
   const showNewChatButton = activeChatId && !emptyChatExists;
 
+  if (!multiChatControls) {
+    return null;
+  }
+
   return (
     <PanelHeader
       className={cn(
-        'pointer-events-none absolute top-px right-px left-px z-20 mb-0 origin-bottom px-3 py-3 pl-4.5 transition-all duration-300 ease-out *:pointer-events-auto',
+        'pointer-events-none absolute top-0 right-0 left-0 z-20 mb-0 origin-bottom p-0 pb-0 transition-all duration-300 ease-out *:pointer-events-auto',
         chatListOpen
-          ? 'h-[calc(100%-2px)] rounded-[inherit] bg-white/60 backdrop-blur-lg'
+          ? 'h-[calc(100%-2px)] rounded-[inherit] backdrop-blur-2xl'
           : '!h-[calc-size(auto,size)] h-auto',
       )}
       title={chatListOpen && <span className="mt-0.5">Chats</span>}

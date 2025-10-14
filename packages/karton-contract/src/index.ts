@@ -186,10 +186,25 @@ export type AppState = {
           | Layout.OPEN_WORKSPACE
           | Layout.SETUP_WORKSPACE;
       }
-    | {
+    | ({
         activeLayout: Layout.MAIN;
-        activeMainTab: MainTab | null;
-      };
+      } & (
+        | {
+            activeMainTab: MainTab.IDEATION_CANVAS | MainTab.SETTINGS | null;
+          }
+        | {
+            activeMainTab: MainTab.DEV_APP_PREVIEW;
+            devAppPreview: {
+              isFullScreen: boolean;
+              inShowCodeMode: boolean;
+              customScreenSize: {
+                width: number;
+                height: number;
+                preset: string | null; // Preset can be a name like "mobile" or "iPhone 13" or whatever
+              } | null;
+            };
+          }
+      ));
   filePicker: {
     title: string;
     description: string;
@@ -286,6 +301,17 @@ export type KartonContract = {
     userExperience: {
       mainLayout: {
         changeTab: (tab: MainTab) => Promise<void>;
+        mainLayout: {
+          devAppPreview: {
+            toggleFullScreen: () => Promise<void>;
+            toggleShowCodeMode: () => Promise<void>;
+            changeScreenSize: (size: {
+              width: number;
+              height: number;
+              presetName: string | null;
+            }) => Promise<void>;
+          };
+        };
       };
     };
     filePicker: {

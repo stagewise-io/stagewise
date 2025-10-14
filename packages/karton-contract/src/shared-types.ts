@@ -42,6 +42,7 @@ export const workspaceConfigSchema = z
         'The path of the app - can be different from the workspace path (e.g. in case of a monorepo)',
       ),
     appPort: z.number(),
+    appExecutionCommand: z.string().describe('The command to execute the app'),
     eddyMode: z.enum(['flappy']).optional(),
     autoPlugins: z.boolean().optional(),
     plugins: z.array(pluginSchema).optional(),

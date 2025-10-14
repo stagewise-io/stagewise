@@ -37,6 +37,55 @@ export class UserExperienceService {
         this.changeMainTab(tab);
       },
     );
+    this.kartonService.registerServerProcedureHandler(
+      'userExperience.mainLayout.mainLayout.devAppPreview.changeScreenSize',
+      async (size: {
+        width: number;
+        height: number;
+        presetName: string | null;
+      }) => {
+        this.kartonService.setState((draft) => {
+          if (
+            draft.userExperience.activeLayout === Layout.MAIN &&
+            draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
+          ) {
+            draft.userExperience.devAppPreview.customScreenSize = {
+              width: size.width,
+              height: size.height,
+              preset: size.presetName,
+            };
+          }
+        });
+      },
+    );
+    this.kartonService.registerServerProcedureHandler(
+      'userExperience.mainLayout.mainLayout.devAppPreview.toggleShowCodeMode',
+      async () => {
+        this.kartonService.setState((draft) => {
+          if (
+            draft.userExperience.activeLayout === Layout.MAIN &&
+            draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
+          ) {
+            draft.userExperience.devAppPreview.inShowCodeMode =
+              !draft.userExperience.devAppPreview.inShowCodeMode;
+          }
+        });
+      },
+    );
+    this.kartonService.registerServerProcedureHandler(
+      'userExperience.mainLayout.mainLayout.devAppPreview.toggleFullScreen',
+      async () => {
+        this.kartonService.setState((draft) => {
+          if (
+            draft.userExperience.activeLayout === Layout.MAIN &&
+            draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
+          ) {
+            draft.userExperience.devAppPreview.isFullScreen =
+              !draft.userExperience.devAppPreview.isFullScreen;
+          }
+        });
+      },
+    );
   }
 
   public tearDown() {
@@ -59,7 +108,15 @@ export class UserExperienceService {
           !draft.userExperience.activeMainTab
         ) {
           this.logger.debug('[ExperienceService] Showing dev app preview tab');
-          draft.userExperience.activeMainTab = MainTab.DEV_APP_PREVIEW;
+          draft.userExperience = {
+            activeLayout: Layout.MAIN,
+            activeMainTab: MainTab.DEV_APP_PREVIEW,
+            devAppPreview: {
+              isFullScreen: false,
+              inShowCodeMode: false,
+              customScreenSize: null,
+            },
+          };
         }
       }
     });
@@ -67,8 +124,23 @@ export class UserExperienceService {
 
   public changeMainTab(tab: MainTab) {
     this.kartonService.setState((draft) => {
+      if (
+        tab ===
+        (draft.userExperience as { activeMainTab: MainTab }).activeMainTab
+      ) {
+        return;
+      }
+
       if (draft.userExperience.activeLayout === Layout.MAIN) {
         draft.userExperience.activeMainTab = tab;
+        if (draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW) {
+          // TODO We can make this nicer by persisting the config in between sessions.
+          draft.userExperience.devAppPreview = {
+            isFullScreen: false,
+            inShowCodeMode: false,
+            customScreenSize: null,
+          };
+        }
       } else {
         throw new Error('Cannot change Tab when not in main layout');
       }

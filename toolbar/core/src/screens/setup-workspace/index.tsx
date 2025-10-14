@@ -14,7 +14,7 @@ export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
 
   return (
     <Dialog open={show} dismissible={false}>
-      <DialogContent className="gap-3 delay-150 duration-300 sm:h-4/6 sm:max-h-5/6 sm:min-h-96 sm:w-4/6 sm:min-w-96 sm:max-w-5/6 md:p-10">
+      <DialogContent className="gap-3 delay-150 duration-300 sm:h-4/6 sm:max-h-5/6 sm:min-h-96 sm:w-4/6 sm:min-w-96 sm:max-w-5/6 md:p-6">
         <div className="flex flex-row items-start justify-between gap-4">
           <DialogHeader>
             <DialogTitle>Setup workspace</DialogTitle>
@@ -30,7 +30,7 @@ export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
             Abort
           </Button>
         </div>
-        <ChatPanel />
+        <ChatPanel multiChatControls={false} />
       </DialogContent>
     </Dialog>
   );

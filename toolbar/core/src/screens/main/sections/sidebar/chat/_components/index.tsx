@@ -11,7 +11,11 @@ import {
   useKartonState,
 } from '@/hooks/use-karton';
 
-export function ChatPanel() {
+export function ChatPanel({
+  multiChatControls = true,
+}: {
+  multiChatControls?: boolean;
+}) {
   const chatState = useChatState();
   const [isDragging, setIsDragging] = useState(false);
   const isWorking = useKartonState(
@@ -114,7 +118,7 @@ export function ChatPanel() {
       role="region"
       aria-label="Chat panel drop zone"
     >
-      <ChatPanelHeader />
+      <ChatPanelHeader multiChatControls={multiChatControls} />
       <PanelContent
         className={cn(
           'block px-0 py-0',
