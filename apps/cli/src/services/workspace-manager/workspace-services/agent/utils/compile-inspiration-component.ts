@@ -11,6 +11,7 @@ export async function compileInspirationComponent(
       loader: 'tsx',
       format: 'esm',
       target: 'es2020',
+      jsx: 'automatic',
     });
     return {
       ...component,

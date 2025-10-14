@@ -4,10 +4,10 @@ import { validateToolOutput } from '../..';
 import { z } from 'zod';
 
 export const DESCRIPTION =
-  "Generate a component design for the current project based on the user's prompt.";
+  "Generate a component design for the current project based on the user's prompt. Always export the top level of the generated component as a default export.";
 
 const examplePrompt = `Generate a glassy blue button with the primary color #2563eb, the secondary color #dbeafe, Inter font, a border radius of 12px and subtle hover animations`;
-const exampleComponent = `export function GlassyButton() {
+const exampleComponent = `export default function GlassyButton() {
   return (
     <button
       type="button"
@@ -23,7 +23,7 @@ const exampleComponent2 = `'use client';
 
 import { useEffect, useState } from 'react';
 
-export function RelaceButton() {
+export default function RelaceButton() {
   const [rotation, setRotation] = useState(0);
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export function RelaceButton() {
 }
 `;
 const examplePrompt3 = `Generate a 3D button with heavy press and hover animations with the primary color #FCFCFD, the secondary color #36395A, monospace font and a border radius of 8px`;
-const exampleComponent3 = `export function ThreeDButton() {
+const exampleComponent3 = `export default function ThreeDButton() {
   return (
     <button
       type="button"
@@ -89,7 +89,7 @@ const systemPrompt = `You are an expert React component generator. Your task is 
 1. **No custom Tailwind configuration**: Your code must work with any standard React project using default Tailwind configuration. Never assume custom colors, spacing, or other config exists.
 2. **Single file component**: Output exactly ONE component in ONE file
 3. **No additional dependencies**: Only use react, tailwind, framer-motion, and lucide-react
-4. **Named exports**: Always use named function exports (e.g., \`export function ComponentName()\`)
+4. **Default exports**: Always use default function exports (e.g., \`export default function ComponentName()\`)
 5. **Client components**: Add 'use client' directive at the top when using hooks, state, or interactive features
 6. **Basic Tailwind only**: Use standard Tailwind utilities that exist in the default configuration
 

@@ -34,7 +34,7 @@ export class WorkspaceService {
   private workspaceConfigService: WorkspaceConfigService | null = null;
   private workspacePluginService: WorkspacePluginService | null = null;
   private workspaceSetupService: WorkspaceSetupService | null = null;
-  private agentService: AgentService | null = null;
+  private _agentService: AgentService | null = null;
   private ragService: RagService | null = null;
   private staticAnalysisService: StaticAnalysisService | null = null;
 
@@ -177,7 +177,7 @@ export class WorkspaceService {
       workingDirectory: this.workspacePath,
     });
 
-    this.agentService =
+    this._agentService =
       (await AgentService.create(
         this.logger,
         this.telemetryService,
@@ -226,7 +226,7 @@ export class WorkspaceService {
     this.logger.debug('[WorkspaceService] Teardown called');
 
     // TODO: Teardown all the child services hosted within this workspace.
-    this.agentService?.teardown();
+    this._agentService?.teardown();
     this.ragService?.teardown();
     await this.workspaceSetupService?.teardown();
     await this.workspacePluginService?.teardown();
@@ -249,5 +249,9 @@ export class WorkspaceService {
 
   get pluginService(): WorkspacePluginService | null {
     return this.workspacePluginService!;
+  }
+
+  get agentService(): AgentService | null {
+    return this._agentService!;
   }
 }

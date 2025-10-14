@@ -9,6 +9,7 @@ import { createServer, type Server } from 'node:http';
 import { configureWebSocketUpgrade } from './websocket-upgrade';
 import type { AuthService } from '../auth';
 import { setupAuthRoutes } from './auth-handlers';
+import { setupComponentConvasRoutes } from './component-canvas-utils';
 
 /**
  * This class orchestrates the startup of the server that hosts the UI.
@@ -92,6 +93,11 @@ export class UIServerService {
     this._logger.debug(`[UIServerService] Setting up auth routes...`);
 
     setupAuthRoutes(this.app, this._authService);
+
+    this._logger.debug(
+      `[UIServerService] Setting up component canvas routes...`,
+    );
+    setupComponentConvasRoutes(this.app, this._workspaceManager);
 
     this._logger.debug(`[UIServerService] Setting up app loader routes...`);
 

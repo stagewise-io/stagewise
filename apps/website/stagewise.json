@@ -1,6 +1,6 @@
 {
+  "projectRoot": ".",
+  "appPath": ".",
   "appPort": 3000,
-  "autoPlugins": true,
-  "plugins": [],
   "port": 3100
 }

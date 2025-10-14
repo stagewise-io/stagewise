@@ -1118,4 +1118,8 @@ export class AgentService {
     logger.debug('[AgentService] Created service');
     return instance;
   }
+
+  public getInspirationComponents() {
+    return this.kartonService.state.workspace?.inspirationComponents ?? [];
+  }
 }
