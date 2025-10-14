@@ -8,7 +8,7 @@ export type SharedToolOutput =
       success: true;
       message: string;
       result?: any;
-      hiddenMetadata?: Record<string, any>;
+      hiddenMetadata?: { diff?: FileDiff; undoExecute?: () => Promise<void> };
     }
   | {
       success: false;
@@ -108,3 +108,38 @@ export type Tools = Record<
     stagewiseMetadata?: StagewiseToolMetadata;
   }
 >;
+
+/**
+ * Type guard to check if a SharedToolOutput has undoExecute in hiddenMetadata
+ */
+export function hasUndoMetadata(output: any): output is {
+  hiddenMetadata: { undoExecute: () => Promise<void> };
+} {
+  return (
+    output &&
+    typeof output === 'object' &&
+    'hiddenMetadata' in output &&
+    output.hiddenMetadata &&
+    typeof output.hiddenMetadata === 'object' &&
+    'undoExecute' in output.hiddenMetadata &&
+    typeof output.hiddenMetadata.undoExecute === 'function'
+  );
+}
+
+/**
+ * Type guard to check if a SharedToolOutput has diff in hiddenMetadata
+ */
+export function hasDiffMetadata(
+  output: any,
+): output is { hiddenMetadata: { diff: FileDiff } } {
+  return (
+    output &&
+    typeof output === 'object' &&
+    'hiddenMetadata' in output &&
+    output.hiddenMetadata &&
+    typeof output.hiddenMetadata === 'object' &&
+    'diff' in output.hiddenMetadata &&
+    output.hiddenMetadata.diff !== null &&
+    output.hiddenMetadata.diff !== undefined
+  );
+}

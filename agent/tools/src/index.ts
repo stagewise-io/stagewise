@@ -1,4 +1,4 @@
-import type { StagewiseToolMetadata } from '@stagewise/agent-types';
+import type { FileDiff, StagewiseToolMetadata } from '@stagewise/agent-types';
 import type { InferUITools, Tool, ToolUIPart } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { overwriteFileTool } from './node-runtime/file-modification/overwrite-file-tool.js';
@@ -27,6 +27,10 @@ import {
   askForRootProjectPathOutputSchema,
   type AskForRootProjectPathOutput,
 } from './node-runtime/project-setup/ask-for-root-project-path.js';
+import {
+  generateComponentTool,
+  type InspirationComponent,
+} from './node-runtime/inspiration/generate-component-tool.js';
 
 export {
   askForAppPathTool,
@@ -38,6 +42,7 @@ export {
   type AskForAppPathOutput,
   type AskForPortOutput,
   type AskForRootProjectPathOutput,
+  type InspirationComponent,
 };
 
 // Export utilities for use by other packages if needed
@@ -57,7 +62,12 @@ export {
 // This preserves the specific return type while ensuring compatibility
 export function validateToolOutput<
   TOutput extends
-    | { success: boolean; message: string; result?: any; hiddenMetadata?: any }
+    | {
+        success: boolean;
+        message: string;
+        result?: any;
+        hiddenMetadata?: { diff?: FileDiff; undoExecute?: () => Promise<void> };
+      }
     | { success: boolean; message: string; error: string },
 >(output: TOutput): TOutput {
   return output;
@@ -93,6 +103,10 @@ export type SetupAgentCallbacks = {
   onSaveInformation: (
     information: SaveRequiredInformationParams,
   ) => Promise<void>;
+};
+
+export type InspirationAgentCallbacks = {
+  onGenerated: (component: InspirationComponent) => void;
 };
 
 type _ToolSet = { [key: string]: Tool<any, any> };
@@ -153,16 +167,31 @@ export function codingAgentTools(clientRuntime: ClientRuntime) {
   };
 }
 
-export function inspirationAgentTools(_clientRuntime: ClientRuntime) {
-  return {};
+export function inspirationAgentTools(
+  clientRuntime: ClientRuntime,
+  apiKey: string,
+  callbacks: InspirationAgentCallbacks,
+) {
+  return {
+    readFileTool: toolWithMetadata(readFileTool(clientRuntime)),
+    listFilesTool: toolWithMetadata(listFilesTool(clientRuntime)),
+    grepSearchTool: toolWithMetadata(grepSearchTool(clientRuntime)),
+    globTool: toolWithMetadata(globTool(clientRuntime)),
+    generateComponentTool: toolWithMetadata(
+      generateComponentTool(apiKey, callbacks.onGenerated),
+    ),
+  };
 }
 
 export type AllTools =
   | ReturnType<typeof setupAgentTools>
-  | ReturnType<typeof codingAgentTools>;
+  | ReturnType<typeof codingAgentTools>
+  | ReturnType<typeof inspirationAgentTools>;
 
-export type _AllTools = ReturnType<typeof setupAgentTools> &
-  ReturnType<typeof codingAgentTools>;
+export type AllToolsUnion = ReturnType<typeof setupAgentTools> &
+  ReturnType<typeof codingAgentTools> &
+  ReturnType<typeof codingAgentTools> &
+  ReturnType<typeof inspirationAgentTools>;
 
-export type UITools = InferUITools<_AllTools>;
+export type UITools = InferUITools<AllToolsUnion>;
 export type ToolPart = ToolUIPart<UITools>;

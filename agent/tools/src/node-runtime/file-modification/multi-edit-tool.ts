@@ -248,7 +248,7 @@ export async function multiEditToolExecute(
 
       console.log('adding diff to the output of multiEditTool', diff.path);
       const result = {
-        success: true,
+        success: true as const,
         message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,
         result: { editsApplied: totalEditsApplied },
         hiddenMetadata: {

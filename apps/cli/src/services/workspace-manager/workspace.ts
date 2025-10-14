@@ -65,8 +65,16 @@ export class WorkspaceService {
   public async initialize() {
     this.logger.debug('[WorkspaceService] Initializing...');
 
+    this.workspacePathsService = await WorkspacePathsService.create(
+      this.logger,
+      this.globalDataPathService,
+      this.workspacePath,
+    );
+
     this.kartonService.setState((draft) => {
       draft.workspace = {
+        dataPath: this.workspacePathsService!.workspaceDataPath,
+        inspirationComponents: [],
         agentChat: null,
         devAppStatus: null,
         path: this.workspacePath,
@@ -81,12 +89,6 @@ export class WorkspaceService {
         loadedOnStart: this.loadedOnStart,
       };
     });
-
-    this.workspacePathsService = await WorkspacePathsService.create(
-      this.logger,
-      this.globalDataPathService,
-      this.workspacePath,
-    );
 
     // Start all child services of the workspace. All regular services should only be staarted if the setup service is done.
     this.workspaceSetupService = await WorkspaceSetupService.create(

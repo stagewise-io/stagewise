@@ -1,10 +1,10 @@
 import type { SystemModelMessage, UserModelMessage } from 'ai';
-import type { ChatMessage, MainTab } from '@stagewise/karton-contract';
+import type { ChatMessage, MainTab, Layout } from '@stagewise/karton-contract';
 import type { PromptSnippet } from '@stagewise/agent-types';
 
 export type SystemPromptConfig = (
   | {
-      currentTab: MainTab.WORKSPACE_SETUP;
+      currentTab: Layout.SETUP_WORKSPACE;
     }
   | {
       currentTab: MainTab.IDEATION_CANVAS;

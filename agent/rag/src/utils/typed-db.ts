@@ -6,6 +6,7 @@ import type { StyleInformation } from '../search-agents/search-styles.js';
 import type { ComponentLibraryInformation } from '../search-agents/search-components.js';
 import type { AppInformation } from '../search-agents/search-app-information.js';
 import { LEVEL_DB_SCHEMA_VERSION, RAG_VERSION } from '../index.js';
+import type { InspirationComponent } from '@stagewise/agent-tools';
 import path from 'node:path';
 
 // Singleton cache for LevelDb instances
@@ -75,6 +76,12 @@ export class LevelDb {
     string,
     DatabaseMetadata
   >;
+  public inspirationComponent!: AbstractSublevel<
+    Level,
+    string | Buffer | Uint8Array,
+    string,
+    InspirationComponent
+  >;
 
   private constructor(dbPath: string) {
     this.dbPath = dbPath;
@@ -116,6 +123,12 @@ export class LevelDb {
     this.meta = this.db.sublevel<string, DatabaseMetadata>('meta', {
       valueEncoding: 'json',
     });
+    this.inspirationComponent = this.db.sublevel<string, InspirationComponent>(
+      'inspirationComponent',
+      {
+        valueEncoding: 'json',
+      },
+    );
   }
 
   public async open(newSchemaVersion = LEVEL_DB_SCHEMA_VERSION): Promise<void> {

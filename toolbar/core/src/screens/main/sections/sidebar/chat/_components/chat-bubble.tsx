@@ -9,7 +9,7 @@ import type {
   AgentError,
 } from '@stagewise/karton-contract';
 import { AgentErrorType } from '@stagewise/karton-contract';
-import { RefreshCcwIcon, Undo2 } from 'lucide-react';
+import { PaletteIcon, RefreshCcwIcon, Undo2 } from 'lucide-react';
 import {
   BrainIcon,
   CheckIcon,
@@ -650,6 +650,8 @@ const getToolIcon = (toolPart: ToolPart | DynamicToolUIPart) => {
     case 'tool-grepSearchTool':
     case 'tool-globTool':
       return <SearchIcon className="size-3" />;
+    case 'tool-generateComponentTool':
+      return <PaletteIcon className="size-3" />;
     case 'tool-overwriteFileTool':
     case 'tool-multiEditTool':
       return <PencilIcon className="size-3" />;

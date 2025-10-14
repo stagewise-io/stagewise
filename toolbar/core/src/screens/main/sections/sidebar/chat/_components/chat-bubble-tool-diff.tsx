@@ -40,7 +40,10 @@ export const getToolName = (toolPart: ToolPart | DynamicToolUIPart): string => {
       return 'Searching the right files';
     case 'tool-overwriteFileTool': {
       const fileName = getFileName(
-        toolPart.output?.hiddenMetadata?.diff?.path ?? '',
+        (toolPart.output &&
+          'hiddenMetadata' in toolPart.output &&
+          toolPart.output.hiddenMetadata?.diff?.path) ||
+          '',
       );
       return `Overwriting ${fileName}`;
     }
@@ -56,10 +59,15 @@ export const getToolName = (toolPart: ToolPart | DynamicToolUIPart): string => {
     }
     case 'tool-deleteFileTool': {
       const fileName = getFileName(
-        toolPart.output?.hiddenMetadata?.diff?.path ?? '',
+        (toolPart.output &&
+          'hiddenMetadata' in toolPart.output &&
+          toolPart.output.hiddenMetadata?.diff?.path) ||
+          '',
       );
       return `Deleting ${fileName}`;
     }
+    case 'tool-generateComponentTool':
+      return 'Generating Component...';
     case 'dynamic-tool':
       return toolPart.toolName;
     default:

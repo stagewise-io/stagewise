@@ -243,6 +243,9 @@ importers:
 
   agent/tools:
     dependencies:
+      '@ai-sdk/anthropic':
+        specifier: 2.0.9
+        version: 2.0.9(zod@4.0.17)
       ai:
         specifier: 5.0.9
         version: 5.0.9(zod@4.0.17)

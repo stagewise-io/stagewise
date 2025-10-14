@@ -2,6 +2,7 @@ import type {
   AskForAppPathOutput,
   AskForPortOutput,
   AskForRootProjectPathOutput,
+  InspirationComponent,
 } from '@stagewise/agent-tools';
 import type {
   UserMessageMetadata,
@@ -98,6 +99,7 @@ export type AppState = {
   };
   workspace: {
     path: string;
+    dataPath: string;
     devAppStatus: {
       status: 'running-as-wrapped-command' | 'not-running' | 'unknown';
       contentAvailableOnPort: boolean; // Is true, if the CLI detects that there is content available on the configured dev app port.
@@ -108,6 +110,7 @@ export type AppState = {
       toolCallApprovalRequests: string[];
       isWorking: boolean;
     } | null;
+    inspirationComponents: InspirationComponent[];
     config: {
       appPort: number;
       eddyMode: 'flappy' | undefined;

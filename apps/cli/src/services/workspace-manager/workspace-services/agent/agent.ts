@@ -21,6 +21,7 @@ import {
   createAuthenticatedClient,
   type KartonStateProvider,
 } from '@stagewise/agent-utils';
+import { hasUndoMetadata, hasDiffMetadata } from '@stagewise/agent-types';
 import {
   type KartonContract,
   type History,
@@ -35,9 +36,11 @@ import {
 } from '@ai-sdk/anthropic';
 import {
   codingAgentTools,
+  inspirationAgentTools,
   setupAgentTools,
   toolsWithoutExecute,
   type UITools,
+  type AllTools,
 } from '@stagewise/agent-tools';
 import { streamText, generateId, readUIMessageStream } from 'ai';
 import { XMLPrompts } from '@stagewise/agent-prompts';
@@ -69,6 +72,7 @@ export class AgentService {
   private authService: AuthService;
   private workspaceSetupService: WorkspaceSetupService;
   private clientRuntime: ClientRuntime;
+  private apiKey: string | null = null;
 
   private client!: TRPCClient<AppRouter>;
   private isWorking = false;
@@ -136,10 +140,10 @@ export class AgentService {
     );
   }
 
-  private getTools() {
+  private getTools(): AllTools {
     const currentTab = this.getCurrentTab();
     switch (currentTab) {
-      case MainTab.WORKSPACE_SETUP:
+      case Layout.SETUP_WORKSPACE:
         return setupAgentTools(this.clientRuntime, {
           onSaveInformation: async (params) => {
             this.logger.debug(
@@ -155,6 +159,19 @@ export class AgentService {
         });
       case MainTab.DEV_APP_PREVIEW:
         return codingAgentTools(this.clientRuntime);
+      case MainTab.IDEATION_CANVAS: {
+        if (!this.apiKey) throw new Error('No API key available');
+        return inspirationAgentTools(this.clientRuntime, this.apiKey, {
+          onGenerated: async (component) => {
+            this.kartonService.setState((draft) => {
+              if (draft.workspace?.inspirationComponents) {
+                draft.workspace.inspirationComponents.push(component);
+              }
+            });
+            this.logger.debug('[AgentService] Inspiration component generated');
+          },
+        });
+      }
       default:
         return codingAgentTools(this.clientRuntime);
     }
@@ -168,6 +185,8 @@ export class AgentService {
     if (!tokens) {
       throw new Error('No authentication tokens available');
     }
+
+    this.apiKey = tokens.accessToken;
 
     this.litellm = createAnthropic({
       baseURL: `${LLM_PROXY_URL}/v1`,
@@ -440,6 +459,7 @@ export class AgentService {
       this.kartonService.registerServerProcedureHandler(
         'agentChat.sendUserMessage',
         async (message: ChatMessage, _callingClientId: string) => {
+          this.logger.debug('[AgentService] Sending user message');
           const activeChatId =
             this.kartonService.state.workspace?.agentChat?.activeChatId;
           if (!activeChatId) return;
@@ -503,6 +523,8 @@ export class AgentService {
           if (projectInfoPromptSnippet) {
             promptSnippets.push(projectInfoPromptSnippet);
           }
+
+          this.logger.debug('[AgentService] Calling agent');
 
           await this.callAgent({
             chatId: activeChatId,
@@ -654,12 +676,12 @@ export class AgentService {
     }
   }
 
-  private getCurrentTab(): MainTab {
+  private getCurrentTab(): MainTab | Layout.SETUP_WORKSPACE {
     if (this.kartonService.state.userExperience.activeLayout !== Layout.MAIN)
-      return MainTab.WORKSPACE_SETUP;
+      return Layout.SETUP_WORKSPACE;
 
     if (!this.kartonService.state.userExperience.activeMainTab)
-      return MainTab.WORKSPACE_SETUP;
+      return Layout.SETUP_WORKSPACE;
 
     return this.kartonService.state.userExperience.activeMainTab;
   }
@@ -854,11 +876,7 @@ export class AgentService {
             this.getTools(),
             messages,
             (result) => {
-              if (
-                result.result &&
-                'hiddenMetadata' in result.result &&
-                result.result.hiddenMetadata?.undoExecute
-              ) {
+              if (result.result && hasUndoMetadata(result.result)) {
                 this.undoToolCallStack.get(chatId)?.push({
                   toolCallId: result.toolCallId,
                   undoExecute: result.result.hiddenMetadata.undoExecute,
@@ -988,11 +1006,7 @@ export class AgentService {
       for (const part of message.parts) {
         if (isToolCallType(part.type)) {
           const toolCall = part as ToolUIPart<UITools>;
-          if (
-            toolCall.output &&
-            'hiddenMetadata' in toolCall.output &&
-            toolCall.output?.hiddenMetadata?.diff
-          ) {
+          if (toolCall.output && hasDiffMetadata(toolCall.output)) {
             hasMadeCodeChanges = true;
             break;
           }

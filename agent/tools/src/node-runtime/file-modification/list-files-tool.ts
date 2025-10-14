@@ -94,7 +94,7 @@ export async function listFilesToolExecute(
       return {
         success: false,
         message: `Failed to list files in: ${relPath}`,
-        error: result.error,
+        error: result.error || 'UNKNOWN_ERROR',
       };
     }
 

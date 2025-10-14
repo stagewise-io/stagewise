@@ -22,7 +22,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "ai": "5.0.9"
+    "ai": "5.0.9",
+    "@ai-sdk/anthropic": "2.0.9"
   },
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",
