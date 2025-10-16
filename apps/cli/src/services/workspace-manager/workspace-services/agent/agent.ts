@@ -41,6 +41,7 @@ import {
   toolsWithoutExecute,
   type UITools,
   type AllTools,
+  type InspirationComponent,
 } from '@stagewise/agent-tools';
 import { streamText, generateId, readUIMessageStream } from 'ai';
 import { XMLPrompts } from '@stagewise/agent-prompts';
@@ -162,23 +163,47 @@ export class AgentService {
         return codingAgentTools(this.clientRuntime);
       case MainTab.IDEATION_CANVAS: {
         if (!this.apiKey) throw new Error('No API key available');
-        return inspirationAgentTools(this.clientRuntime, this.apiKey, {
-          onGenerated: async (component) => {
-            const componentWithCompiledCode = await compileInspirationComponent(
-              component,
-              this.logger,
-            );
-
-            this.kartonService.setState((draft) => {
-              if (draft.workspace?.inspirationComponents) {
-                draft.workspace.inspirationComponents.push(
-                  componentWithCompiledCode,
+        return inspirationAgentTools(
+          this.clientRuntime,
+          this.telemetryService.withTracing(this.litellm('gpt-5'), {
+            posthogProperties: {
+              $ai_span_name: 'inspiration-agent',
+              developerTag: process.env.DEVELOPER_TAG || undefined,
+            },
+          }),
+          {
+            onGenerated: async (component) => {
+              let componentWithCompiledCode: InspirationComponent;
+              try {
+                componentWithCompiledCode = await compileInspirationComponent(
+                  component,
+                  this.logger,
                 );
+              } catch (error) {
+                componentWithCompiledCode = {
+                  ...component,
+                  compiledCode: `export default function ErrorComponent() {
+                    return <div>
+                      Error compiling component.
+                      ${error instanceof Error ? error.message : 'Unknown error'}
+                    </div>
+                  }`,
+                };
               }
-            });
-            this.logger.debug('[AgentService] Inspiration component generated');
+
+              this.kartonService.setState((draft) => {
+                if (draft.workspace?.inspirationComponents) {
+                  draft.workspace.inspirationComponents.push(
+                    componentWithCompiledCode,
+                  );
+                }
+              });
+              this.logger.debug(
+                '[AgentService] Inspiration component generated',
+              );
+            },
           },
-        });
+        );
       }
       default:
         return codingAgentTools(this.clientRuntime);
@@ -741,12 +766,15 @@ export class AgentService {
       if (isFirstUserMessage && lastMessageMetadata.isUserMessage) {
         const title = await generateChatTitle(
           history,
-          this.telemetryService.withTracing(this.litellm('gemini-2.5-flash'), {
-            posthogTraceId: `chat-title-${chatId}`,
-            posthogProperties: {
-              $ai_span_name: 'chat-title',
+          this.telemetryService.withTracing(
+            this.litellm('gemini-2.5-flash-lite'),
+            {
+              posthogTraceId: `chat-title-${chatId}`,
+              posthogProperties: {
+                $ai_span_name: 'chat-title',
+              },
             },
-          }),
+          ),
         );
 
         this.kartonService.setState((draft) => {
@@ -776,6 +804,8 @@ export class AgentService {
           posthogTraceId: chatId,
           posthogProperties: {
             $ai_span_name: 'agent-chat',
+            developerTag: process.env.DEVELOPER_TAG || undefined,
+            currentTab: this.getCurrentTab(),
           },
         },
       );

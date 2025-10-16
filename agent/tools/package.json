@@ -23,7 +23,8 @@
   },
   "dependencies": {
     "ai": "5.0.9",
-    "@ai-sdk/anthropic": "2.0.9"
+    "@ai-sdk/anthropic": "2.0.9",
+    "@ai-sdk/provider": "^2.0.0"
   },
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",

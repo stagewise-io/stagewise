@@ -71,13 +71,13 @@
     "zod": "4.0.17"
   },
   "dependencies": {
-    "esbuild": "0.25.9",
     "@ai-sdk/anthropic": "2.0.9",
     "@ai-sdk/openai": "^2.0.23",
     "@ai-sdk/provider": "^2.0.0",
     "@posthog/ai": "^6.4.3",
     "ai": "5.0.9",
     "diff": "^8.0.2",
+    "esbuild": "0.25.9",
     "node-fetch": "^3.3.2",
     "prompts": "^2.4.2",
     "ws": "^8.18.3"

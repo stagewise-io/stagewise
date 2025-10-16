@@ -51,11 +51,15 @@ import { createElement } from "react";
 
 import CreatedComponent from "stagewise-preview-component";
 
-const appRoot = createRoot(document.body);
-appRoot.render(createElement(CreatedComponent, {}, null));
+const container = document.getElementById("root");
+if (container) {
+  const appRoot = createRoot(container);
+  appRoot.render(createElement(CreatedComponent, {}, null));
+}
 </script>
 </head>
 <body className="fixed size-full inset-0 bg-zinc-100 dark:bg-zinc-900 flex flex-col items-center justify-center p-4">
+  <div id="root" className="w-full h-full"></div>
 </body>
 </html>`;
 
@@ -64,16 +68,23 @@ appRoot.render(createElement(CreatedComponent, {}, null));
 
 const getImportMap = async (componentId: string) => {
   // Dynamically generate a importmap.json file based on the vite app entries, config and external react deps
-  const reactDepsDevSuffix =
-    process.env.NODE_ENV === 'development' ? '?dev' : '';
+  // Use React 18.3.1 for better library compatibility (especially Framer Motion)
+  // Always use production builds for consistency - esm.sh builds libraries expecting production React,
+  // and mixing dev/prod builds causes "Cannot read properties of null (reading 'useContext')" errors
+  const reactVersion = '18.3.1';
+
+  // Dependency hints tell esm.sh to externalize React (don't bundle it)
+  // The import map below ensures all packages use the same React instance
+  const reactDeps = `deps=react@${reactVersion},react-dom@${reactVersion}`;
+
   return {
     imports: {
-      react: `https://esm.sh/react@19.1.0${reactDepsDevSuffix}`,
-      'react-dom': `https://esm.sh/react-dom@19.1.0${reactDepsDevSuffix}`,
-      'react-dom/client': `https://esm.sh/react-dom@19.1.0/client${reactDepsDevSuffix}`,
-      'react/jsx-runtime': `https://esm.sh/react@19.1.0/jsx-runtime${reactDepsDevSuffix}`,
-      'lucide-react': `https://esm.sh/lucide-react`,
-      'framer-motion': `https://esm.sh/framer-motion`,
+      react: `https://esm.sh/react@${reactVersion}`,
+      'react-dom': `https://esm.sh/react-dom@${reactVersion}`,
+      'react-dom/client': `https://esm.sh/react-dom@${reactVersion}/client`,
+      'react/jsx-runtime': `https://esm.sh/react@${reactVersion}/jsx-runtime`,
+      'lucide-react': `https://esm.sh/lucide-react?${reactDeps}`,
+      'framer-motion': `https://esm.sh/framer-motion@11?${reactDeps}&external=react,react-dom`,
       'stagewise-preview-component': `/stagewise-toolbar-app/component-canvas/preview-module/${componentId}`,
     },
   };

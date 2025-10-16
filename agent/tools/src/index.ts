@@ -1,4 +1,5 @@
 import type { FileDiff, StagewiseToolMetadata } from '@stagewise/agent-types';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
 import type { InferUITools, Tool, ToolUIPart } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { overwriteFileTool } from './node-runtime/file-modification/overwrite-file-tool.js';
@@ -169,7 +170,7 @@ export function codingAgentTools(clientRuntime: ClientRuntime) {
 
 export function inspirationAgentTools(
   clientRuntime: ClientRuntime,
-  apiKey: string,
+  model: LanguageModelV2,
   callbacks: InspirationAgentCallbacks,
 ) {
   return {
@@ -178,7 +179,7 @@ export function inspirationAgentTools(
     grepSearchTool: toolWithMetadata(grepSearchTool(clientRuntime)),
     globTool: toolWithMetadata(globTool(clientRuntime)),
     generateComponentTool: toolWithMetadata(
-      generateComponentTool(apiKey, callbacks.onGenerated),
+      generateComponentTool(model, callbacks.onGenerated),
     ),
   };
 }

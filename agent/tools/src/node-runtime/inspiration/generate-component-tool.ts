@@ -1,6 +1,6 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, tool } from 'ai';
 import { validateToolOutput } from '../..';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
 import { z } from 'zod';
 
 export const DESCRIPTION =
@@ -80,9 +80,9 @@ export type GenerateComponentParams = z.infer<
 const systemPrompt = `You are an expert React component generator. Your task is to generate standalone, production-ready React components based on text descriptions.
 
 ## Tech Stack Requirements
-- **React.js**: Use functional components with hooks when needed
+- **React.js 18**: Use functional components with hooks when needed (targeting React 18.3.1)
 - **Tailwind CSS**: Use ONLY basic Tailwind classes that work with default configuration
-- **Framer Motion**: Use for animations when appropriate
+- **Framer Motion**: Use for animations when appropriate (version 11.x)
 - **Lucide React**: Use for icons when needed
 
 ## Critical Constraints
@@ -166,17 +166,12 @@ type UncompiledInspirationComponent = Omit<
  */
 export async function generateComponentToolExecute(
   params: GenerateComponentParams,
-  apiKey: string,
+  model: LanguageModelV2,
   onGenerated: (component: UncompiledInspirationComponent) => void,
 ) {
   try {
-    const litellm = createAnthropic({
-      apiKey,
-      baseURL: `${process.env.LLM_PROXY_URL || 'http://localhost:3002'}/v1`,
-    });
-
     const result = await generateText({
-      model: litellm('gemini-2.5-flash-lite'),
+      model,
       temperature: 1.5,
       maxOutputTokens: 10000,
       messages: [
@@ -204,7 +199,7 @@ export async function generateComponentToolExecute(
 }
 
 export const generateComponentTool = (
-  apiKey: string,
+  model: LanguageModelV2,
   onGenerated: (component: UncompiledInspirationComponent) => void,
 ) =>
   tool({
@@ -213,7 +208,7 @@ export const generateComponentTool = (
     inputSchema: generateComponentParamsSchema,
     execute: async (args) => {
       return validateToolOutput(
-        await generateComponentToolExecute(args, apiKey, onGenerated),
+        await generateComponentToolExecute(args, model, onGenerated),
       );
     },
   });
