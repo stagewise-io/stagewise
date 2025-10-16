@@ -35,6 +35,7 @@ import {
   PopoverContent,
   PopoverTitle,
   PopoverDescription,
+  PopoverFooter,
 } from '@stagewise/stage-ui/components/popover';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
@@ -174,7 +175,7 @@ export function ChatBubble({
     <div className="flex flex-col gap-1">
       <div
         className={cn(
-          'mt-2 flex w-full shrink-0 items-center justify-start gap-2',
+          'group mt-2 flex w-full shrink-0 items-center justify-start gap-2',
           msg.role === 'assistant' ? 'flex-row' : 'flex-row-reverse',
         )}
       >
@@ -275,10 +276,11 @@ export function ChatBubble({
             <PopoverTrigger>
               <Button
                 aria-label="Restore checkpoint"
-                variant="ghost"
-                size="icon-xs"
+                variant="secondary"
+                size="icon-sm"
+                className="opacity-0 blur-xs transition-all duration-150 ease-out group-hover:opacity-100 group-hover:blur-none"
               >
-                <Undo2 className="size-3" />
+                <Undo2 className="size-4" />
               </Button>
             </PopoverTrigger>
             <PopoverContent>
@@ -287,19 +289,21 @@ export function ChatBubble({
                 This will clear the chat history and undo file changes after
                 this point.
               </PopoverDescription>
-              <Button variant="secondary" size="xs" onClick={() => close()}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="xs"
-                onClick={() => {
-                  confirmRestore();
-                  close();
-                }}
-              >
-                Restore
-              </Button>
+              <PopoverFooter>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    confirmRestore();
+                    close();
+                  }}
+                >
+                  Restore
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => close()}>
+                  Cancel
+                </Button>
+              </PopoverFooter>
             </PopoverContent>
           </Popover>
         )}
@@ -311,6 +315,7 @@ export function ChatBubble({
                 aria-label={'Retry'}
                 variant="secondary"
                 size="icon-sm"
+                className="opacity-0 blur-xs group-hover:opacity-100 group-hover:blur-none"
                 onClick={() => void retrySendingUserMessage()}
               >
                 <RefreshCcwIcon className="size-4" />

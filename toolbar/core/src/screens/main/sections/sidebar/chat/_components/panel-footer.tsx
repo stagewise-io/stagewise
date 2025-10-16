@@ -133,7 +133,7 @@ export function ChatPanelFooter({
       className="absolute right-0 bottom-0 left-0 z-10 flex flex-col items-stretch gap-1 p-0 pt-2"
       ref={ref}
     >
-      <div className="glass-body flex flex-row items-stretch gap-1 rounded-3xl bg-background/20 p-2 backdrop-blur-md before:absolute before:inset-0 before:rounded-3xl focus-within:shadow-blue-600/20 focus-within:before:bg-blue-500/5">
+      <div className="glass-body flex flex-row items-stretch gap-1 rounded-xl bg-background/10 p-2 before:absolute before:inset-0 before:rounded-xl focus-within:shadow-blue-600/20 focus-within:before:bg-blue-500/5">
         <div className="flex flex-1 flex-col items-stretch gap-1">
           {/* Text input area */}
           <div className="relative flex flex-1 pr-1">
@@ -150,7 +150,7 @@ export function ChatPanelFooter({
               disabled={!enableInputField}
               className={cn(
                 GlassyTextInputClassNames,
-                'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent z-10 h-28 w-full resize-none border-none bg-transparent px-2 py-1 text-foreground outline-none ring-0 transition-all duration-300 ease-out placeholder:text-muted-foreground focus:outline-none',
+                'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent z-10 h-28 w-full resize-none border-none bg-transparent px-2 py-1 text-foreground outline-none ring-0 transition-all duration-300 ease-out placeholder:text-muted-foreground focus:outline-none disabled:bg-transparent',
               )}
               placeholder={!showTextSlideshow ? 'Type a message...' : undefined}
             />

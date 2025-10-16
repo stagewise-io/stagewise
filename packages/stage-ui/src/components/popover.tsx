@@ -2,7 +2,7 @@ import { Popover as PopoverBase } from '@base-ui-components/react/popover';
 import { cn } from '../lib/utils';
 import { Button } from './button';
 import { XIcon } from 'lucide-react';
-import type { ReactElement } from 'react';
+import type { ComponentProps, ReactElement } from 'react';
 
 <PopoverBase.Root>
   <PopoverBase.Trigger />
@@ -60,7 +60,7 @@ export const PopoverContent = ({
       >
         <PopoverBase.Popup
           {...props}
-          className="glass-body flex flex-col gap-4 rounded-3xl bg-background/60 p-3 shadow-xl backdrop-blur-sm transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm"
+          className="glass-body flex max-w-80 flex-col gap-4 rounded-3xl bg-background/60 p-3 shadow-xl backdrop-blur-sm transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm"
         >
           {children}
         </PopoverBase.Popup>
@@ -122,6 +122,21 @@ export const PopoverClose = ({ className, ...props }: PopoverCloseProps) => {
           <XIcon />
         </Button>
       )}
+    />
+  );
+};
+
+export const PopoverFooter = ({
+  className,
+  ...props
+}: ComponentProps<'div'>) => {
+  return (
+    <div
+      className={cn(
+        'mt-1 flex h-fit w-full flex-row-reverse items-center justify-start gap-2',
+        className,
+      )}
+      {...props}
     />
   );
 };

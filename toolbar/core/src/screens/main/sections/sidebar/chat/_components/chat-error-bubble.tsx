@@ -104,7 +104,7 @@ export function ChatErrorBubble({ error }: { error: AgentError }) {
           <Button
             aria-label={'Retry'}
             variant="secondary"
-            size="icon-md"
+            size="icon-sm"
             onClick={() => void retrySendingUserMessage()}
           >
             <RefreshCcwIcon className="size-4" />
