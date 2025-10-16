@@ -10,7 +10,7 @@ export function Form({ className, ...props }: FormProps) {
   return (
     <FormBase
       {...props}
-      className={cn('flex flex-col items-stretch gap-4', className)}
+      className={cn('flex flex-col items-stretch gap-8', className)}
     />
   );
 }
@@ -28,7 +28,7 @@ export function FormFieldset({
 }: FormFieldsetProps) {
   return (
     <FieldsetBase.Root
-      className={cn('flex flex-col items-stretch gap-4', className)}
+      className={cn('flex flex-col items-stretch gap-6', className)}
       {...props}
     >
       <FieldsetBase.Legend className="font-medium text-base text-foreground">
@@ -86,8 +86,17 @@ export function FormFieldError({ className, ...props }: FormFieldErrorProps) {
   );
 }
 
-export function FormFieldSeparator() {
+export function FormFieldSeparator({
+  orientation = 'horizontal',
+}: {
+  orientation?: 'horizontal' | 'vertical';
+}) {
   return (
-    <hr className="block size-px max-h-full max-w-full border-none bg-border/20" />
+    <hr
+      className={cn(
+        'block max-h-full max-w-full border-none bg-border/20',
+        orientation === 'horizontal' ? 'h-px w-full' : 'h-full w-px',
+      )}
+    />
   );
 }

@@ -10,7 +10,7 @@ import {
   DialogFooter,
 } from '@stagewise/stage-ui/components/dialog';
 import { ChatPanel } from '../main/sections/sidebar/chat/_components';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { generateId } from '@/utils';
 
 export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
