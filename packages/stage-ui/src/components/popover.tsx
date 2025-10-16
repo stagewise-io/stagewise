@@ -112,16 +112,19 @@ export type PopoverCloseProps = Omit<
 export const PopoverClose = ({ className, ...props }: PopoverCloseProps) => {
   return (
     <PopoverBase.Close
-      render={() => (
+      render={
         <Button
           variant="ghost"
           size="icon-xs"
           {...props}
-          className={cn('absolute top-2 right-2', className)}
+          className={cn(
+            'absolute top-2.5 right-2.5 text-muted-foreground',
+            className,
+          )}
         >
-          <XIcon />
+          <XIcon className="size-4" />
         </Button>
-      )}
+      }
     />
   );
 };

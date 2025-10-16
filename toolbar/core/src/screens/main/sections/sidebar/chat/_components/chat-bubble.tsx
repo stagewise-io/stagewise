@@ -36,6 +36,7 @@ import {
   PopoverTitle,
   PopoverDescription,
   PopoverFooter,
+  PopoverClose,
 } from '@stagewise/stage-ui/components/popover';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
@@ -182,10 +183,10 @@ export function ChatBubble({
         <div className="flex max-w-full flex-col items-end gap-2">
           <div
             className={cn(
-              'glass-body group relative min-h-8 max-w-full animate-chat-bubble-appear space-y-3 break-words rounded-2xl bg-white/5 px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
+              'glass-body group relative min-h-8 max-w-full animate-chat-bubble-appear space-y-3 break-words rounded-2xl bg-white/5 px-3 py-2 font-normal text-sm last:mb-0.5',
               msg.role === 'assistant'
-                ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-zinc-950 dark:bg-zinc-800/60 dark:text-zinc-50'
-                : 'origin-bottom-right rounded-br-xs bg-blue-600/90 text-white',
+                ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 pl-5 text-zinc-950 dark:bg-zinc-800/60 dark:text-zinc-50'
+                : 'origin-bottom-right rounded-br-xs bg-blue-600/90 pr-5 text-white',
             )}
           >
             <div
@@ -253,19 +254,12 @@ export function ChatBubble({
                     This will undo all changes the assistant made since your
                     last message.
                   </PopoverDescription>
-                  <Button variant="secondary" size="xs" onClick={() => close()}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="xs"
-                    onClick={() => {
-                      confirmUndo();
-                      close();
-                    }}
-                  >
-                    Undo
-                  </Button>
+                  <PopoverClose />
+                  <PopoverFooter>
+                    <Button variant="primary" size="sm" onClick={confirmUndo}>
+                      Undo
+                    </Button>
+                  </PopoverFooter>
                 </PopoverContent>
               </Popover>
             )}
@@ -278,7 +272,7 @@ export function ChatBubble({
                 aria-label="Restore checkpoint"
                 variant="secondary"
                 size="icon-sm"
-                className="opacity-0 blur-xs transition-all duration-150 ease-out group-hover:opacity-100 group-hover:blur-none"
+                className="opacity-0 blur-xs transition-all group-hover:scale-100 group-hover:opacity-100 group-hover:blur-none"
               >
                 <Undo2 className="size-4" />
               </Button>
@@ -289,6 +283,7 @@ export function ChatBubble({
                 This will clear the chat history and undo file changes after
                 this point.
               </PopoverDescription>
+              <PopoverClose />
               <PopoverFooter>
                 <Button
                   variant="primary"
@@ -299,9 +294,6 @@ export function ChatBubble({
                   }}
                 >
                   Restore
-                </Button>
-                <Button variant="secondary" size="sm" onClick={() => close()}>
-                  Cancel
                 </Button>
               </PopoverFooter>
             </PopoverContent>

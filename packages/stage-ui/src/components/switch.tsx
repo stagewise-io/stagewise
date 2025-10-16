@@ -11,7 +11,7 @@ export function Switch(props: React.ComponentProps<typeof BaseSwitch.Root>) {
         props.className,
       )}
     >
-      <BaseSwitch.Thumb className="glass-body glass-body-motion aspect-square h-full rounded-full bg-black/50 transition-transform duration-200 data-[checked]:translate-x-4 data-[checked]:bg-white/80" />
+      <BaseSwitch.Thumb className="glass-body glass-body-motion aspect-square h-full rounded-full bg-black/50 transition-transform duration-200 data-[checked]:translate-x-4 data-[checked]:bg-white/90" />
     </BaseSwitch.Root>
   );
 }
