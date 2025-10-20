@@ -1,6 +1,5 @@
 {
-  "projectRoot": ".",
-  "appPath": ".",
+  "agentAccessPath": "{GIT_REPO_ROOT}",
   "appPort": 3000,
   "port": 3100
 }

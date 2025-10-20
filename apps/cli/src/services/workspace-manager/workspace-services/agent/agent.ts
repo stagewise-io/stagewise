@@ -152,8 +152,8 @@ export class AgentService {
               '[AgentService] Saving information for workspace setup',
             );
             this.workspaceSetupService.handleSetupSubmission({
+              agentAccessPath: params.agentAccessPath,
               appPort: params.appPort,
-              projectRoot: params.rootProjectPath,
               appPath: params.appPath,
             });
             // TODO: Call GlobalService

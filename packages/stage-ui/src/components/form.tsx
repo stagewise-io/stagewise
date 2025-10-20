@@ -28,10 +28,13 @@ export function FormFieldset({
 }: FormFieldsetProps) {
   return (
     <FieldsetBase.Root
-      className={cn('flex flex-col items-stretch gap-6', className)}
+      className={cn(
+        'mt-10 flex flex-col items-stretch gap-4 first:mt-0',
+        className,
+      )}
       {...props}
     >
-      <FieldsetBase.Legend className="font-medium text-base text-foreground">
+      <FieldsetBase.Legend className="font-semibold text-base text-foreground">
         {title}
       </FieldsetBase.Legend>
       {children}
@@ -55,6 +58,21 @@ export type FormFieldLabelProps = React.ComponentProps<typeof FieldBase.Label>;
 export function FormFieldLabel({ className, ...props }: FormFieldLabelProps) {
   return (
     <FieldBase.Label
+      className={cn(
+        '-mb-1 font-medium text-foreground text-sm has-data-checked:border-primary has-data-checked:bg-primary/5',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export type FormFieldTitleProps = React.ComponentProps<
+  typeof FieldBase.Description
+>;
+export function FormFieldTitle({ className, ...props }: FormFieldTitleProps) {
+  return (
+    <FieldBase.Description
       className={cn('-mb-1 font-medium text-foreground text-sm', className)}
       {...props}
     />
@@ -70,7 +88,7 @@ export function FormFieldDescription({
 }: FormFieldDescriptionProps) {
   return (
     <FieldBase.Description
-      className={cn('text-muted-foreground text-sm', className)}
+      className={cn('font-normal text-muted-foreground text-sm', className)}
       {...props}
     />
   );

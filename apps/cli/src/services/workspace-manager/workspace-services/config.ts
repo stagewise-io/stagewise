@@ -64,12 +64,7 @@ export class WorkspaceConfigService {
       await this.saveConfigFile();
       this.kartonService.setState((draft) => {
         if (draft.workspace) {
-          draft.workspace.config = {
-            appPort: parsedConfig.data.appPort,
-            eddyMode: parsedConfig.data.eddyMode,
-            autoPlugins: parsedConfig.data.autoPlugins ?? true,
-            plugins: parsedConfig.data.plugins ?? [],
-          };
+          draft.workspace.config = parsedConfig.data;
         }
       });
       return;
@@ -106,15 +101,15 @@ export class WorkspaceConfigService {
 
       this.kartonService.setState((draft) => {
         if (draft.workspace) {
-          draft.workspace.config = {
-            appPort: parsedConfig.data.appPort,
-            eddyMode: parsedConfig.data.eddyMode,
-            autoPlugins: parsedConfig.data.autoPlugins ?? true,
-            plugins: parsedConfig.data.plugins ?? [],
-          };
+          draft.workspace.config = this.config;
         }
       });
     }
+
+    this.kartonService.registerServerProcedureHandler(
+      'workspace.config.set',
+      async (config: WorkspaceConfig) => this.set(config),
+    );
 
     // We also store the config once it's validated. We do that to make sure that the stored config is always aligned with the schema.
     this.logger.debug(
@@ -145,6 +140,7 @@ export class WorkspaceConfigService {
     this.logger.debug('[WorkspaceConfigService] Teardown called');
     this.config = null;
     this.configUpdatedListeners = [];
+    this.kartonService.removeServerProcedureHandler('workspace.config.set');
   }
 
   public get(): WorkspaceConfig {
@@ -167,19 +163,32 @@ export class WorkspaceConfigService {
   public async set(newConfig: WorkspaceConfig): Promise<void> {
     this.logger.debug('[WorkspaceConfigService] Setting workspace config...');
     const oldConfig = structuredClone(this.config);
+    const parsedConfig = workspaceConfigSchema.parse(newConfig);
+    this.config = parsedConfig;
     await this.saveConfigFile();
-    this.config = newConfig;
+    this.kartonService.setState((draft) => {
+      if (draft.workspace) {
+        draft.workspace.config = this.config;
+      }
+    });
     this.configUpdatedListeners.forEach((listener) =>
       listener(newConfig, oldConfig),
     );
-    this.logger.debug('[WorkspaceConfigService] Workspace config set');
+    this.logger.debug(
+      `[WorkspaceConfigService] Workspace config set: ${JSON.stringify(this.config)}`,
+    );
   }
 
   private async saveConfigFile(): Promise<void> {
-    this.logger.debug('[WorkspaceConfigService] Saving config file...');
     const configPath = path.join(this.workspacePath, 'stagewise.json');
+    this.logger.debug(
+      `[WorkspaceConfigService] Saving config file to path ${configPath}...`,
+    );
     const config = workspaceConfigSchema.parse(this.config);
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    await fs.writeFile(configPath, JSON.stringify(config, null, 2), {
+      encoding: 'utf-8',
+      flush: true,
+    });
     this.logger.debug('[WorkspaceConfigService] Config file saved');
   }
 

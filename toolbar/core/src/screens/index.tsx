@@ -21,7 +21,7 @@ export function ScreenRouter() {
           '-z-10 pointer-events-none absolute inset-0 opacity-0 duration-1000 ease-out',
           (!connected || displayedLayout !== Layout.MAIN) && 'opacity-100',
         )}
-        color={[1, 0.95, 1]}
+        color={[0.9, 0.85, 1]}
         speed={0.1}
       />
 

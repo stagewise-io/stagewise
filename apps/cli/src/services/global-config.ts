@@ -57,6 +57,10 @@ export class GlobalConfigService {
     this.kartonService.setState((draft) => {
       draft.globalConfig = parsedConfig.data;
     });
+    this.kartonService.registerServerProcedureHandler(
+      'config.set',
+      async (config: GlobalConfig) => this.set(config),
+    );
 
     // We also store the config once it's validated. We do that to make sure that the stored config is always aligned with the schema.
     this.logger.debug(
@@ -97,17 +101,25 @@ export class GlobalConfigService {
   public async set(newConfig: GlobalConfig): Promise<void> {
     this.logger.debug('[GlobalConfigService] Setting global config...');
     const oldConfig = structuredClone(this.config);
+    const parsedConfig = globalConfigSchema.parse(newConfig);
+    this.config = parsedConfig;
     await this.saveConfigFile();
-    this.config = newConfig;
+    this.kartonService.setState((draft) => {
+      draft.globalConfig = parsedConfig;
+    });
     this.configUpdatedListeners.forEach((listener) =>
       listener(newConfig, oldConfig),
     );
-    this.logger.debug('[GlobalConfigService] Global config set');
+    this.logger.debug(
+      `[GlobalConfigService] Global config set: ${JSON.stringify(this.config)}`,
+    );
   }
 
   private async saveConfigFile(): Promise<void> {
-    this.logger.debug('[GlobalConfigService] Saving config file...');
     const configPath = this.globalDataPathService.configFilePath;
+    this.logger.debug(
+      `[GlobalConfigService] Saving config file to path ${configPath}...`,
+    );
     const config = globalConfigSchema.parse(this.config);
     await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
     this.logger.debug('[GlobalConfigService] Config file saved');

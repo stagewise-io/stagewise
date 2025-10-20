@@ -4,6 +4,7 @@ import { toast as sonnerToast } from 'sonner';
 import { Button } from './button';
 import { AlertCircleIcon, AlertTriangleIcon, XIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { PopoverFooter } from './popover';
 
 export { Toaster } from 'sonner';
 
@@ -45,7 +46,7 @@ function Toast({ notification, onDismiss }: ToastProps) {
   return (
     <div
       className={cn(
-        'glass-body flex w-92 max-w-full flex-col items-stretch gap-1 rounded-xl bg-white/60 p-4 shadow-lg backdrop-blur-md dark:bg-black/60',
+        'glass-body flex max-w-80 flex-col gap-2 rounded-3xl bg-background/80 p-3 shadow-xl backdrop-blur-sm transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm',
         notification.type === 'warning' &&
           'bg-yellow-100/60 dark:bg-yellow-800/60',
         notification.type === 'error' && 'bg-rose-100/60 dark:bg-rose-800/60',
@@ -75,20 +76,22 @@ function Toast({ notification, onDismiss }: ToastProps) {
         </div>
       )}
       <p className="text-muted-foreground text-sm">{notification.message}</p>
-      {notification.actions.length > 0 && (
-        <div className="flex w-full flex-row-reverse items-center justify-start gap-2">
-          {notification.actions.map((action, index) => (
-            <Button
-              key={action.label}
-              variant={index === 0 ? action.type : 'secondary'}
-              size="sm"
-              onClick={action.onClick}
-            >
-              {action.label}
-            </Button>
-          ))}
-        </div>
-      )}
+      <PopoverFooter>
+        {notification.actions.length > 0 && (
+          <div className="flex w-full flex-row-reverse items-center justify-start gap-2">
+            {notification.actions.map((action, index) => (
+              <Button
+                key={action.label}
+                variant={index === 0 ? action.type : 'secondary'}
+                size="sm"
+                onClick={action.onClick}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
+        )}
+      </PopoverFooter>
     </div>
   );
 }

@@ -6,7 +6,11 @@ export const DESCRIPTION =
   'Save the required information for the project setup';
 
 export const saveRequiredInformationParamsSchema = z.object({
-  rootProjectPath: z.string().describe('The root project path'),
+  agentAccessPath: z
+    .string()
+    .describe(
+      "The relative path to which the agent should have access. In monorepos, this could be a relative path that moves up one or more levels. The alias '{GIT_REPO_ROOT}' is the reocmmended default value and simply gives the agent access to the whole parent git repository.",
+    ),
   appPath: z.string().describe('The app path'),
   appPort: z.number().describe('The app port'),
 });
@@ -29,7 +33,7 @@ export async function saveRequiredInformationToolExecute(
     success: true,
     message: `Required information saved`,
     result: {
-      rootProjectPath: params.rootProjectPath,
+      agentAccessPath: params.agentAccessPath,
       appPath: params.appPath,
       appPort: params.appPort,
     },

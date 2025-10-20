@@ -17,6 +17,8 @@ import { StaticAnalysisService } from './workspace-services/static-analysis';
 import { WorkspacePathsService } from './workspace-services/paths';
 import type { GlobalDataPathService } from '@/services/global-data-path';
 import type { NotificationService } from '../notification';
+import path from 'node:path';
+import { getRepoRootForPath } from '@/utils/git-tools';
 
 export class WorkspaceService {
   private logger: Logger;
@@ -76,6 +78,7 @@ export class WorkspaceService {
         dataPath: this.workspacePathsService!.workspaceDataPath,
         inspirationComponents: [],
         agentChat: null,
+        agent: null,
         devAppStatus: null,
         path: this.workspacePath,
         config: null,
@@ -99,17 +102,10 @@ export class WorkspaceService {
         this.workspaceConfigService = await WorkspaceConfigService.create(
           this.logger,
           this.kartonService,
-          setupConfig?.appPath ?? this.workspacePath,
+          this.workspacePath,
           this.workspaceLoadingOverrides,
           setupConfig,
         );
-
-        if (setupConfig && this.workspacePath !== setupConfig.appPath) {
-          // TODO: Refactor service architecture to not require this
-          this.workspacePath = setupConfig.appPath;
-          await this.teardown();
-          await this.initialize();
-        }
 
         this.staticAnalysisService = await StaticAnalysisService.create(
           this.logger,
@@ -125,7 +121,31 @@ export class WorkspaceService {
         );
 
         const clientRuntime = new ClientRuntimeNode({
-          workingDirectory: setupConfig?.projectRoot ?? this.workspacePath,
+          workingDirectory:
+            this.configService?.get().agentAccessPath.trim() ===
+            '{GIT_REPO_ROOT}'
+              ? getRepoRootForPath(this.workspacePath)
+              : path.join(
+                  this.workspacePath,
+                  this.configService?.get().agentAccessPath ?? '',
+                ),
+        });
+        this.kartonService.setState((draft) => {
+          draft.workspace!.agent = {
+            accessPath: clientRuntime.fileSystem.getCurrentWorkingDirectory(),
+          };
+        });
+        this.workspaceConfigService.addConfigUpdatedListener((newConfig) => {
+          clientRuntime.updateWorkingDirectory(
+            newConfig.agentAccessPath.trim() === '{GIT_REPO_ROOT}'
+              ? getRepoRootForPath(this.workspacePath)
+              : path.join(this.workspacePath, newConfig.agentAccessPath ?? ''),
+          );
+          this.kartonService.setState((draft) => {
+            draft.workspace!.agent = {
+              accessPath: clientRuntime.fileSystem.getCurrentWorkingDirectory(),
+            };
+          });
         });
 
         this.ragService =

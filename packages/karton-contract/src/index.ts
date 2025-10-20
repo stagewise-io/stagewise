@@ -13,7 +13,11 @@ import type {
 import type { UIMessage, UIDataTypes } from 'ai';
 import type { UITools, ToolPart } from '@stagewise/agent-tools';
 import type { FileDiff, ToolResult } from '@stagewise/agent-types';
-import type { WorkspaceConfig, FilePickerRequest } from './shared-types.js';
+import type {
+  WorkspaceConfig,
+  FilePickerRequest,
+  GlobalConfig,
+} from './shared-types.js';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
 export type { UserMessageMetadata, SelectedElement, BrowserData };
@@ -105,6 +109,9 @@ export type AppState = {
       status: 'running-as-wrapped-command' | 'not-running' | 'unknown';
       contentAvailableOnPort: boolean; // Is true, if the CLI detects that there is content available on the configured dev app port.
     } | null;
+    agent: {
+      accessPath: string;
+    } | null;
     agentChat: {
       activeChatId: ChatId | null;
       chats: Record<ChatId, Chat>;
@@ -112,19 +119,7 @@ export type AppState = {
       isWorking: boolean;
     } | null;
     inspirationComponents: InspirationComponent[];
-    config: {
-      appPort: number;
-      eddyMode: 'flappy' | undefined;
-      autoPlugins: boolean;
-      plugins: (
-        | string
-        | {
-            name: string;
-            path?: string | undefined;
-            url?: string | undefined;
-          }
-      )[]; // A list of plugins that the user defined in the config.
-    } | null;
+    config: WorkspaceConfig | null;
     plugins:
       | ({
           name: string;
@@ -301,6 +296,9 @@ export type KartonContract = {
         submit: (config: WorkspaceConfig) => Promise<void>;
         checkForActiveAppOnPort: (port: number) => Promise<boolean>;
       };
+      config: {
+        set: (config: WorkspaceConfig) => Promise<void>;
+      };
     };
     userExperience: {
       mainLayout: {
@@ -328,6 +326,9 @@ export type KartonContract = {
     notifications: {
       triggerAction: (id: string, actionIndex: number) => Promise<void>;
       dismiss: (id: string) => Promise<void>;
+    };
+    config: {
+      set: (config: GlobalConfig) => Promise<void>;
     };
   };
 };

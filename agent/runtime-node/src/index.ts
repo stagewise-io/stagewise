@@ -47,6 +47,10 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     return this.config.workingDirectory;
   }
 
+  setCurrentWorkingDirectory(dir: string) {
+    this.config.workingDirectory = dir;
+  }
+
   async readFile(
     path: string,
     options?: { startLine?: number; endLine?: number },
@@ -1123,4 +1127,7 @@ export class ClientRuntimeNode implements ClientRuntime {
       workingDirectory: config.workingDirectory,
     });
   }
+
+  updateWorkingDirectory = (dir: string) =>
+    this.fileSystem.setCurrentWorkingDirectory(dir);
 }

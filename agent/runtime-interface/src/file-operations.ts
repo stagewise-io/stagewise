@@ -302,6 +302,11 @@ export interface IFileSystemProvider {
   getCurrentWorkingDirectory(): string;
 
   /**
+   * Updates the current working directory.
+   */
+  setCurrentWorkingDirectory(dir: string): void;
+
+  /**
    * Watches files for changes.
    * @param path - The relative path to watch (chokidar pattern, e.g. "**\/*.ts" or ".")
    * @param onFileChange - The callback to call when a file changes
@@ -461,6 +466,7 @@ export abstract class BaseFileSystemProvider implements IFileSystemProvider {
   abstract getFileExtension(path: string): string;
 
   abstract getCurrentWorkingDirectory(): string;
+  abstract setCurrentWorkingDirectory(dir: string): void;
 
   /**
    * Watches files for changes.

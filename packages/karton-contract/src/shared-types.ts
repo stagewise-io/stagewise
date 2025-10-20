@@ -31,17 +31,15 @@ export const pluginSchema = z.union([
 
 export const workspaceConfigSchema = z
   .object({
-    projectRoot: z
+    agentAccessPath: z
       .string()
       .describe(
-        'The root folder path of the web project in open_path (can be different from open_path, e.g. when the USER has opened a package inside a monorepo).',
-      ),
-    appPath: z
-      .string()
-      .describe(
-        'The path of the app - can be different from the workspace path (e.g. in case of a monorepo)',
-      ),
-    appPort: z.number(),
+        'Relative path to the active workspace path that defines to which paths the agent has access.',
+      )
+      .default('{GIT_REPO_ROOT}'),
+    appPort: z
+      .number()
+      .describe('The port on which the app dev server serves the app preview'),
     appExecutionCommand: z
       .string()
       .optional()

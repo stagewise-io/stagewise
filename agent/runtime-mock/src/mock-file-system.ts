@@ -676,6 +676,10 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
     return this.config.workingDirectory;
   }
 
+  setCurrentWorkingDirectory(dir: string): void {
+    this.config.workingDirectory = dir;
+  }
+
   async watchFiles(
     _path: string,
     _onFileChange: (event: FileChangeEvent) => void,
