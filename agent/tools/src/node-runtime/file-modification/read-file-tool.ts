@@ -10,19 +10,22 @@ export const DESCRIPTION =
 
 export const readFileParamsSchema = z.object({
   target_file: z.string().describe('Relative path of the file to read'),
-  should_read_entire_file: z
-    .boolean()
-    .describe('Whether to read the entire file'),
-  start_line_one_indexed: z
+  start_line: z
     .number()
     .int()
     .min(1)
-    .describe('Starting line number (1-indexed)'),
-  end_line_one_indexed_inclusive: z
+    .optional()
+    .describe(
+      'Starting line number (first file line is value 1). Omit if tool should read from file start.',
+    ),
+  end_line: z
     .number()
     .int()
     .min(1)
-    .describe('Ending line number (1-indexed, inclusive)'),
+    .optional()
+    .describe(
+      'Ending line number (first file line is value 1). Must be larger than `start_line`. Includes the last line. Omit if tool should read to file end.',
+    ),
   explanation: z
     .string()
     .describe('One sentence explanation of why this tool is being used'),
@@ -40,12 +43,7 @@ export async function readFileToolExecute(
   params: ReadFileParams,
   clientRuntime: ClientRuntime,
 ) {
-  const {
-    target_file,
-    should_read_entire_file,
-    start_line_one_indexed,
-    end_line_one_indexed_inclusive,
-  } = params;
+  const { target_file, start_line, end_line } = params;
 
   // Validate required parameters
   if (!target_file) {
@@ -57,39 +55,16 @@ export async function readFileToolExecute(
   }
 
   // Validate line range when not reading entire file
-  if (!should_read_entire_file) {
-    if (
-      !Number.isInteger(start_line_one_indexed) ||
-      start_line_one_indexed < 1
-    ) {
-      return {
-        success: false,
-        message:
-          'start_line_one_indexed must be a positive integer (1-indexed)',
-        error: 'INVALID_START_LINE',
-      };
-    }
-
-    if (
-      !Number.isInteger(end_line_one_indexed_inclusive) ||
-      end_line_one_indexed_inclusive < 1
-    ) {
-      return {
-        success: false,
-        message:
-          'end_line_one_indexed_inclusive must be a positive integer (1-indexed)',
-        error: 'INVALID_END_LINE',
-      };
-    }
-
-    if (end_line_one_indexed_inclusive < start_line_one_indexed) {
-      return {
-        success: false,
-        message:
-          'end_line_one_indexed_inclusive must be greater than or equal to start_line_one_indexed',
-        error: 'INVALID_LINE_RANGE',
-      };
-    }
+  if (
+    start_line !== undefined &&
+    end_line !== undefined &&
+    start_line > end_line
+  ) {
+    return {
+      success: false,
+      message: 'end_line must be equal or larger than start_line',
+      error: 'INVALID_LINE_NUMBERS',
+    };
   }
 
   try {
@@ -106,7 +81,7 @@ export async function readFileToolExecute(
     }
 
     // Check file size before reading (only when reading entire file)
-    if (should_read_entire_file) {
+    if (start_line === undefined && end_line === undefined) {
       const sizeCheck = await checkFileSize(
         clientRuntime,
         absolutePath,
@@ -124,12 +99,10 @@ export async function readFileToolExecute(
     }
 
     // Read the file
-    const readOptions = should_read_entire_file
-      ? undefined
-      : {
-          startLine: start_line_one_indexed,
-          endLine: end_line_one_indexed_inclusive,
-        };
+    const readOptions = {
+      startLine: start_line,
+      endLine: end_line,
+    };
 
     const readResult = await clientRuntime.fileSystem.readFile(
       absolutePath,
@@ -147,13 +120,8 @@ export async function readFileToolExecute(
     const content = readResult.content;
     const totalLines = readResult.totalLines || content?.split('\n').length;
 
-    let message: string;
-    if (should_read_entire_file) {
-      message = `Successfully read entire file: ${target_file} (${totalLines} lines)`;
-    } else {
-      const linesRead = content?.split('\n').length || 0;
-      message = `Successfully read lines ${start_line_one_indexed}-${end_line_one_indexed_inclusive} from file: ${target_file} (${linesRead} lines of ${totalLines} total)`;
-    }
+    const linesRead = content?.split('\n').length || 0;
+    const message = `Successfully read lines ${start_line}-${end_line} from file: ${target_file} (${linesRead} lines of ${totalLines} total)`;
 
     return {
       success: true,
