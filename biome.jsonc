@@ -57,7 +57,7 @@
         "useFocusableInteractive": "off", // Disable focusable interactive element requirement
         "useAriaPropsForRole": "off", // Disable required ARIA attributes check
         "useKeyWithClickEvents": "off", // Disable keyboard event requirement with click events,
-        "noStaticElementInteractions": "warn",
+        "noStaticElementInteractions": "off",
         "useValidAutocomplete": "warn"
       },
       "complexity": {

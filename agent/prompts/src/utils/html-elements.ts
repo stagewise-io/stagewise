@@ -1,5 +1,138 @@
 import type { SelectedElement } from '@stagewise/karton-contract';
 
+type ElementRole = 'parent' | 'selected-element' | 'sibling' | 'child';
+
+interface CollectedElement {
+  element: SelectedElement;
+  role: ElementRole;
+  depth: number;
+}
+
+/**
+ * Collects parent elements up to maxDepth levels
+ */
+function collectParents(
+  element: SelectedElement,
+  maxDepth: number,
+): CollectedElement[] {
+  const parents: CollectedElement[] = [];
+  let current = element.parent;
+  let depth = -1;
+
+  while (current && parents.length < maxDepth) {
+    parents.unshift({
+      element: current,
+      role: 'parent',
+      depth: depth--,
+    });
+    current = current.parent;
+  }
+
+  return parents;
+}
+
+/**
+ * Recursively collects children up to maxDepth levels
+ */
+function collectChildren(
+  element: SelectedElement,
+  maxDepth: number,
+  currentDepth = 1,
+): CollectedElement[] {
+  if (currentDepth > maxDepth || !element.children?.length) {
+    return [];
+  }
+
+  const collected: CollectedElement[] = [];
+
+  for (const child of element.children) {
+    collected.push({
+      element: child,
+      role: 'child',
+      depth: currentDepth,
+    });
+
+    // Recursively collect deeper children
+    collected.push(...collectChildren(child, maxDepth, currentDepth + 1));
+  }
+
+  return collected;
+}
+
+/**
+ * Gets siblings of the selected element from its parent
+ */
+function getSiblings(element: SelectedElement): SelectedElement[] {
+  if (!element.parent?.children) {
+    return [];
+  }
+
+  return element.parent.children.filter(
+    (child) => child.stagewiseId !== element.stagewiseId,
+  );
+}
+
+/**
+ * Serializes a single element with role and depth metadata
+ */
+function serializeElement(
+  element: SelectedElement,
+  role: ElementRole,
+  depth: number,
+  isSelected = false,
+): string {
+  const elementType = element.nodeType.toLowerCase();
+  let selector: string | undefined;
+
+  // Construct selector from attributes if available
+  if (element.attributes.id) {
+    selector = `#${element.attributes.id}`;
+  } else if (element.attributes.class) {
+    selector = `.${element.attributes.class.split(' ').join('.')}`;
+  }
+
+  // Construct HTML representation
+  let htmlString = `<${elementType}`;
+
+  // Add attributes
+  Object.entries(element.attributes).forEach(([key, value]) => {
+    htmlString += ` ${key}="${value}"`;
+  });
+
+  htmlString += '>';
+
+  // Add text content if present
+  if (element.textContent) {
+    htmlString += element.textContent;
+  }
+
+  htmlString += `</${elementType}>`;
+
+  // Build opening tag with metadata
+  let openingTag = '<html-element';
+
+  if (elementType) {
+    openingTag += ` type="${elementType}"`;
+  }
+
+  openingTag += ` role="${role}"`;
+
+  if (isSelected) {
+    openingTag += ' selected="true"';
+  }
+
+  openingTag += ` depth="${depth}"`;
+
+  if (selector) {
+    openingTag += ` selector="${selector}"`;
+  }
+
+  openingTag += ` xpath="${element.xpath}"`;
+  openingTag += '>';
+
+  return `${openingTag}\n${htmlString.trim()}\n</html-element>`;
+}
+
 /**
  * Converts a list of DOM elements to an LLM-readable string with DOM element context.
  *
@@ -21,7 +154,7 @@ export function htmlElementToContextSnippet(
 
 /**
  * Converts a DOM element to an LLM-readable context snippet.
- * This is a convenience function for browser environments.
+ * Includes up to 2 parent levels, siblings, and up to 4 child levels.
  *
  * @param element - The DOM element to convert
  * @param maxCharacterAmount - Optional maximum number of characters to include
@@ -35,94 +168,120 @@ export function htmlElementsToContextSnippet(
     throw new Error('Element cannot be null or undefined');
   }
 
-  let htmlString: string;
-  let elementType: string;
-  let selector: string | undefined;
-
-  // Extract element type from nodeType
-  elementType = element.nodeType.toLowerCase();
-
-  // Construct selector from attributes if available
-  if (element.attributes.id) {
-    selector = `#${element.attributes.id}`;
-  } else if (element.attributes.class) {
-    selector = `.${element.attributes.class.split(' ').join('.')}`;
-  }
-
-  // Construct a simple HTML representation
-  htmlString = `<${elementType}`;
-
-  // Add attributes
-  Object.entries(element.attributes).forEach(([key, value]) => {
-    htmlString += ` ${key}="${value}"`;
-  });
-
-  // Close opening tag
-  htmlString += '>';
-
-  // Add text content if present
-  if (element.textContent) {
-    htmlString += element.textContent;
-  }
-
-  // Add closing tag
-  htmlString += `</${elementType}>`;
-
-  if (!htmlString || htmlString.trim() === '') {
-    throw new Error('HTML string cannot be empty');
-  }
+  // Create a safe version for logging (avoid circular references)
+  const safeElement = {
+    stagewiseId: element.stagewiseId,
+    nodeType: element.nodeType,
+    xpath: element.xpath,
+    attributes: element.attributes,
+    hasParent: !!element.parent,
+    hasChildren: !!(element.children && element.children.length > 0),
+  };
+  console.log(
+    `\n\nRAW Selected Element: \n\n${JSON.stringify(safeElement, null, 2)}`,
+  );
 
   try {
-    // Clean the HTML string
-    const cleanedHtml = htmlString.trim();
+    // Collect all elements in the hierarchy
+    const parents = collectParents(element, 2);
+    const siblings = getSiblings(element);
+    const children = collectChildren(element, 3);
 
-    // Create XML-like tags with element metadata
-    let openingTag = '<html-element';
+    // Build the full hierarchy as a flat list
+    const allElements: CollectedElement[] = [
+      ...parents,
+      { element, role: 'selected-element', depth: 0 },
+      ...siblings.map((sibling) => ({
+        element: sibling,
+        role: 'sibling' as ElementRole,
+        depth: 0,
+      })),
+      ...children,
+    ];
 
-    if (elementType) {
-      openingTag += ` type="${elementType}"`;
-    }
+    // Serialize all elements
+    let serializedElements = allElements.map((item) =>
+      serializeElement(
+        item.element,
+        item.role,
+        item.depth,
+        item.role === 'selected-element',
+      ),
+    );
 
-    if (selector) {
-      openingTag += ` selector="${selector}"`;
-    }
+    // Apply character limit by truncating from deepest children upward
+    let result = serializedElements.join('\n\n');
 
-    // Add xpath information
-    openingTag += ` xpath="${element.xpath}"`;
-    openingTag += '>';
-
-    let result = `${openingTag}\n${cleanedHtml}\n</html-element>`;
-
-    // Apply character limit if specified
     if (maxCharacterAmount && result.length > maxCharacterAmount) {
-      // Build the truncated opening tag first to know its length
-      let truncatedOpeningTag = '<html-element';
+      // Start removing deepest children first
+      let currentMaxDepth = 4;
 
-      if (elementType) {
-        truncatedOpeningTag += ` type="${elementType}"`;
+      while (result.length > maxCharacterAmount && currentMaxDepth > 0) {
+        // Filter out elements at the current max depth
+        serializedElements = allElements
+          .filter((item) => {
+            // Keep everything except children at or beyond current max depth
+            if (item.role === 'child') {
+              return item.depth < currentMaxDepth;
+            }
+            return true;
+          })
+          .map((item) =>
+            serializeElement(
+              item.element,
+              item.role,
+              item.depth,
+              item.role === 'selected-element',
+            ),
+          );
+
+        result = serializedElements.join('\n\n');
+        currentMaxDepth--;
       }
 
-      if (selector) {
-        truncatedOpeningTag += ` selector="${selector}"`;
+      // If still too long, start removing siblings
+      if (result.length > maxCharacterAmount) {
+        serializedElements = allElements
+          .filter(
+            (item) =>
+              item.role !== 'sibling' &&
+              (item.role !== 'child' || item.depth < currentMaxDepth),
+          )
+          .map((item) =>
+            serializeElement(
+              item.element,
+              item.role,
+              item.depth,
+              item.role === 'selected-element',
+            ),
+          );
+
+        result = serializedElements.join('\n\n');
       }
 
-      // Add xpath information
-      truncatedOpeningTag += ` xpath="${element.xpath}"`;
-      truncatedOpeningTag += ' truncated="true">';
+      // If still too long, start removing parents from oldest
+      if (result.length > maxCharacterAmount) {
+        serializedElements = allElements
+          .filter(
+            (item) =>
+              (item.role === 'parent' && item.depth > -2) ||
+              item.role === 'selected-element' ||
+              (item.role === 'child' && item.depth < currentMaxDepth),
+          )
+          .map((item) =>
+            serializeElement(
+              item.element,
+              item.role,
+              item.depth,
+              item.role === 'selected-element',
+            ),
+          );
 
-      const truncatedOpeningTagWithNewline = `${truncatedOpeningTag}\n`;
-      const closingTagWithNewline = '\n</html-element>';
-      const availableChars =
-        maxCharacterAmount -
-        truncatedOpeningTagWithNewline.length -
-        closingTagWithNewline.length;
+        result = serializedElements.join('\n\n');
+      }
 
-      if (availableChars > 0) {
-        // Truncate the HTML content to fit
-        const truncatedContent = cleanedHtml.substring(0, availableChars);
-        result = `${truncatedOpeningTag}\n${truncatedContent}\n</html-element>`;
-      } else {
-        // If even the tags are too long, just truncate it
+      // Final truncation if still over limit (truncate selected element content)
+      if (result.length > maxCharacterAmount) {
         result = result.substring(0, maxCharacterAmount);
       }
     }

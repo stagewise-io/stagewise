@@ -18,7 +18,8 @@
     "dev": "tsx build.ts --watch",
     "clean": "rimraf dist",
     "lint": "biome check .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest"
   },
   "dependencies": {
     "ai": "5.0.9"

@@ -10,6 +10,7 @@ function createSelectedElement(
   partial: Partial<SelectedElement>,
 ): SelectedElement {
   return {
+    stagewiseId: partial.stagewiseId || 'test-stagewise-id',
     nodeType: 'DIV',
     xpath: '/html/body/div',
     attributes: {},
@@ -335,7 +336,8 @@ describe('htmlElementsToContextSnippet', () => {
 
       const result = htmlElementsToContextSnippet(element, 200);
       expect(result.length).toBeLessThanOrEqual(200);
-      expect(result).toContain('truncated="true"');
+      expect(result).toContain('role="selected-element"');
+      expect(result).toContain('id="long"');
     });
 
     it('should handle very small character limit', () => {
@@ -359,8 +361,9 @@ describe('htmlElementsToContextSnippet', () => {
       });
 
       const result = htmlElementsToContextSnippet(element, 300);
-      expect(result).toContain('truncated="true"');
       expect(result.length).toBeLessThanOrEqual(300);
+      expect(result).toContain('role="selected-element"');
+      expect(result).toContain('id="multiline"');
     });
 
     it('should handle element with no truncation needed exactly at limit', () => {
@@ -408,6 +411,519 @@ describe('htmlElementsToContextSnippet', () => {
       expect(result).not.toContain('lines="');
       expect(result).not.toContain('total="');
       expect(result).toContain('Line 1\nLine 2\nLine 3');
+    });
+  });
+
+  describe('parent hierarchy', () => {
+    it('should include no parents when element has no parent', () => {
+      const element = createSelectedElement({
+        nodeType: 'DIV',
+        attributes: { id: 'orphan' },
+        xpath: '/html/body/div',
+        parent: undefined,
+      });
+
+      const result = htmlElementsToContextSnippet(element);
+      expect(result).toContain('role="selected-element"');
+      expect(result).toContain('selected="true"');
+      expect(result).not.toContain('role="parent"');
+    });
+
+    it('should include 1 parent when available', () => {
+      const parent = createSelectedElement({
+        stagewiseId: 'parent-1',
+        nodeType: 'DIV',
+        attributes: { id: 'parent' },
+        xpath: '/html/body',
+      });
+
+      const element = createSelectedElement({
+        nodeType: 'BUTTON',
+        attributes: { id: 'selected' },
+        xpath: '/html/body/button',
+        parent,
+      });
+
+      const result = htmlElementsToContextSnippet(element);
+      expect(result).toContain('role="parent"');
+      expect(result).toContain('depth="-1"');
+      expect(result).toContain('id="parent"');
+      expect(result).toContain('role="selected-element"');
+      expect(result).toContain('id="selected"');
+    });
+
+    it('should include up to 2 parents', () => {
+      const grandparent = createSelectedElement({
+        stagewiseId: 'grandparent',
+        nodeType: 'BODY',
+        attributes: { id: 'grandparent' },
+        xpath: '/html/body',
+      });
+
+      const parent = createSelectedElement({
+        stagewiseId: 'parent',
+        nodeType: 'DIV',
+        attributes: { id: 'parent' },
+        xpath: '/html/body/div',
+        parent: grandparent,
+      });
+
+      const element = createSelectedElement({
+        nodeType: 'BUTTON',
+        attributes: { id: 'selected' },
+        xpath: '/html/body/div/button',
+        parent,
+      });
+
+      const result = htmlElementsToContextSnippet(element);
+
+      // Should have grandparent at depth -2
+      expect(result).toContain('role="parent"');
+      expect(result).toContain('depth="-2"');
+      expect(result).toContain('id="grandparent"');
+
+      // Should have parent at depth -1
+      expect(result).toContain('depth="-1"');
+      expect(result).toContain('id="parent"');
+
+      // Should have selected at depth 0
+      expect(result).toContain('depth="0"');
+      expect(result).toContain('selected="true"');
+      expect(result).toContain('id="selected"');
+    });
+
+    it('should limit to 2 parents even when more exist', () => {
+      const greatGrandparent = createSelectedElement({
+        stagewiseId: 'great-grandparent',
+        nodeType: 'HTML',
+        attributes: { id: 'great-grandparent' },
+        xpath: '/html',
+      });
+
+      const grandparent = createSelectedElement({
+        stagewiseId: 'grandparent',
+        nodeType: 'BODY',
+        attributes: { id: 'grandparent' },
+        xpath: '/html/body',
+        parent: greatGrandparent,
+      });
+
+      const parent = createSelectedElement({
+        stagewiseId: 'parent',
+        nodeType: 'DIV',
+        attributes: { id: 'parent' },
+        xpath: '/html/body/div',
+        parent: grandparent,
+      });
+
+      const element = createSelectedElement({
+        nodeType: 'BUTTON',
+        attributes: { id: 'selected' },
+        xpath: '/html/body/div/button',
+        parent,
+      });
+
+      const result = htmlElementsToContextSnippet(element);
+
+      // Should not have great-grandparent
+      expect(result).not.toContain('id="great-grandparent"');
+
+      // Should have grandparent at depth -2
+      expect(result).toContain('id="grandparent"');
+      expect(result).toContain('depth="-2"');
+
+      // Should have parent at depth -1
+      expect(result).toContain('id="parent"');
+      expect(result).toContain('depth="-1"');
+
+      // Count parent elements - should be exactly 2
+      const parentMatches = result.match(/role="parent"/g);
+      expect(parentMatches).toHaveLength(2);
+    });
+  });
+
+  describe('children hierarchy', () => {
+    it('should include no children when element has no children', () => {
+      const element = createSelectedElement({
+        nodeType: 'DIV',
+        attributes: { id: 'leaf' },
+        xpath: '/html/body/div',
+        children: [],
+      });
+
+      const result = htmlElementsToContextSnippet(element);
+      expect(result).toContain('role="selected-element"');
+      expect(result).not.toContain('role="child"');
+    });
+
+    it('should include 1 level of children', () => {
+      const element = createSelectedElement({
+        nodeType: 'DIV',
+        attributes: { id: 'parent' },
+        xpath: '/html/body/div',
+        children: [
+          createSelectedElement({
+            stagewiseId: 'child-1',
+            nodeType: 'SPAN',
+            attributes: { id: 'child-1' },
+            xpath: '/html/body/div/span',
+          }),
+        ],
+      });
+
+      const result = htmlElementsToContextSnippet(element);
+      expect(result).toContain('role="selected-element"');
+      expect(result).toContain('role="child"');
+      expect(result).toContain('depth="1"');
+      expect(result).toContain('id="child-1"');
+    });
+
+    it('should include up to 4 levels of children', () => {
+      const level4 = createSelectedElement({
+        stagewiseId: 'child-4',
+        nodeType: 'I',
+        attributes: { id: 'child-4' },
+        xpath: '/html/body/div/span/em/i',
+      });
+
+      const level3 = createSelectedElement({
+        stagewiseId: 'child-3',
+        nodeType: 'EM',
+        attributes: { id: 'child-3' },
+        xpath: '/html/body/div/span/em',
+        children: [level4],
+      });
+
+      const level2 = createSelectedElement({
+        stagewiseId: 'child-2',
+        nodeType: 'STRONG',
+        attributes: { id: 'child-2' },
+        xpath: '/html/body/div/span',
+        children: [level3],
+      });
+
+      const level1 = createSelectedElement({
+        stagewiseId: 'child-1',
+        nodeType: 'SPAN',
+        attributes: { id: 'child-1' },
+        xpath: '/html/body/div/span',
+        children: [level2],
+      });
+
+      const element = createSelectedElement({
+        nodeType: 'DIV',
+        attributes: { id: 'selected' },
+        xpath: '/html/body/div',
+        children: [level1],
+      });
+
+      const result = htmlElementsToContextSnippet(element);
+
+      // Should have selected
+      expect(result).toContain('role="selected-element"');
+      expect(result).toContain('id="selected"');
+
+      // Should have all 4 levels
+      expect(result).toContain('depth="1"');
+      expect(result).toContain('id="child-1"');
+
+      expect(result).toContain('depth="2"');
+      expect(result).toContain('id="child-2"');
+
+      expect(result).toContain('depth="3"');
+      expect(result).toContain('id="child-3"');
+
+      expect(result).toContain('depth="4"');
+      expect(result).toContain('id="child-4"');
+    });
+
+    it('should limit to 4 levels even when more exist', () => {
+      const level6 = createSelectedElement({
+        stagewiseId: 'child-6',
+        nodeType: 'U',
+        attributes: { id: 'child-6' },
+        xpath: '/html/body/div/span/em/i/b/u',
+      });
+
+      const level5 = createSelectedElement({
+        stagewiseId: 'child-5',
+        nodeType: 'B',
+        attributes: { id: 'child-5' },
+        xpath: '/html/body/div/span/em/i/b',
+        children: [level6],
+      });
+
+      const level4 = createSelectedElement({
+        stagewiseId: 'child-4',
+        nodeType: 'I',
+        attributes: { id: 'child-4' },
+        xpath: '/html/body/div/span/em/i',
+        children: [level5],
+      });
+
+      const level3 = createSelectedElement({
+        stagewiseId: 'child-3',
+        nodeType: 'EM',
+        attributes: { id: 'child-3' },
+        xpath: '/html/body/div/span/em',
+        children: [level4],
+      });
+
+      const level2 = createSelectedElement({
+        stagewiseId: 'child-2',
+        nodeType: 'STRONG',
+        attributes: { id: 'child-2' },
+        xpath: '/html/body/div/span',
+        children: [level3],
+      });
+
+      const level1 = createSelectedElement({
+        stagewiseId: 'child-1',
+        nodeType: 'SPAN',
+        attributes: { id: 'child-1' },
+        xpath: '/html/body/div/span',
+        children: [level2],
+      });
+
+      const element = createSelectedElement({
+        nodeType: 'DIV',
+        attributes: { id: 'selected' },
+        xpath: '/html/body/div',
+        children: [level1],
+      });
+
+      const result = htmlElementsToContextSnippet(element);
+
+      // Should have up to depth 4
+      expect(result).toContain('depth="1"');
+      expect(result).toContain('depth="2"');
+      expect(result).toContain('depth="3"');
+      expect(result).toContain('depth="4"');
+
+      // Should NOT have depth 5 or 6
+      expect(result).not.toContain('depth="5"');
+      expect(result).not.toContain('depth="6"');
+      expect(result).not.toContain('id="child-5"');
+      expect(result).not.toContain('id="child-6"');
+    });
+  });
+
+  describe('siblings', () => {
+    it('should not include siblings when element has no parent', () => {
+      const element = createSelectedElement({
+        nodeType: 'DIV',
+        attributes: { id: 'orphan' },
+        xpath: '/html/body/div',
+        parent: undefined,
+      });
+
+      const result = htmlElementsToContextSnippet(element);
+      expect(result).not.toContain('role="sibling"');
+    });
+
+    it('should include siblings when parent has multiple children', () => {
+      const sibling1 = createSelectedElement({
+        stagewiseId: 'sibling-1',
+        nodeType: 'SPAN',
+        attributes: { id: 'sibling-1' },
+        xpath: '/html/body/div/span[1]',
+      });
+
+      const selected = createSelectedElement({
+        stagewiseId: 'selected',
+        nodeType: 'BUTTON',
+        attributes: { id: 'selected' },
+        xpath: '/html/body/div/button',
+      });
+
+      const sibling2 = createSelectedElement({
+        stagewiseId: 'sibling-2',
+        nodeType: 'INPUT',
+        attributes: { id: 'sibling-2' },
+        xpath: '/html/body/div/input',
+      });
+
+      const parent = createSelectedElement({
+        stagewiseId: 'parent',
+        nodeType: 'DIV',
+        attributes: { id: 'parent' },
+        xpath: '/html/body/div',
+        children: [sibling1, selected, sibling2],
+      });
+
+      selected.parent = parent;
+
+      const result = htmlElementsToContextSnippet(selected);
+
+      // Should have selected element
+      expect(result).toContain('role="selected-element"');
+      expect(result).toContain('id="selected"');
+
+      // Should have siblings
+      expect(result).toContain('role="sibling"');
+      expect(result).toContain('id="sibling-1"');
+      expect(result).toContain('id="sibling-2"');
+
+      // Siblings should be at depth 0
+      const siblingMatches = result.match(/role="sibling"/g);
+      expect(siblingMatches).toHaveLength(2);
+    });
+  });
+
+  describe('role and depth attributes', () => {
+    it('should correctly assign role and depth to all elements', () => {
+      const grandparent = createSelectedElement({
+        stagewiseId: 'grandparent',
+        nodeType: 'BODY',
+        attributes: { id: 'grandparent' },
+        xpath: '/html/body',
+      });
+
+      const parent = createSelectedElement({
+        stagewiseId: 'parent',
+        nodeType: 'DIV',
+        attributes: { id: 'parent' },
+        xpath: '/html/body/div',
+        parent: grandparent,
+      });
+
+      const sibling = createSelectedElement({
+        stagewiseId: 'sibling',
+        nodeType: 'ASIDE',
+        attributes: { id: 'sibling' },
+        xpath: '/html/body/div/aside',
+      });
+
+      const child = createSelectedElement({
+        stagewiseId: 'child',
+        nodeType: 'SPAN',
+        attributes: { id: 'child' },
+        xpath: '/html/body/div/section/span',
+      });
+
+      const element = createSelectedElement({
+        stagewiseId: 'selected',
+        nodeType: 'SECTION',
+        attributes: { id: 'selected' },
+        xpath: '/html/body/div/section',
+        parent,
+        children: [child],
+      });
+
+      parent.children = [sibling, element];
+
+      const result = htmlElementsToContextSnippet(element);
+
+      // Verify grandparent
+      expect(result).toMatch(/role="parent".*depth="-2".*id="grandparent"/s);
+
+      // Verify parent
+      expect(result).toMatch(/role="parent".*depth="-1".*id="parent"/s);
+
+      // Verify selected
+      expect(result).toMatch(
+        /role="selected-element".*selected="true".*depth="0".*id="selected"/s,
+      );
+
+      // Verify sibling
+      expect(result).toMatch(/role="sibling".*depth="0".*id="sibling"/s);
+
+      // Verify child
+      expect(result).toMatch(/role="child".*depth="1".*id="child"/s);
+    });
+  });
+
+  describe('character limit with hierarchy', () => {
+    it('should truncate deepest children first when over limit', () => {
+      const level3 = createSelectedElement({
+        stagewiseId: 'child-3',
+        nodeType: 'EM',
+        attributes: { id: 'child-3' },
+        xpath: '/html/body/div/span/em',
+        textContent: 'a'.repeat(100),
+      });
+
+      const level2 = createSelectedElement({
+        stagewiseId: 'child-2',
+        nodeType: 'STRONG',
+        attributes: { id: 'child-2' },
+        xpath: '/html/body/div/span',
+        textContent: 'b'.repeat(100),
+        children: [level3],
+      });
+
+      const level1 = createSelectedElement({
+        stagewiseId: 'child-1',
+        nodeType: 'SPAN',
+        attributes: { id: 'child-1' },
+        xpath: '/html/body/div/span',
+        textContent: 'c'.repeat(100),
+        children: [level2],
+      });
+
+      const element = createSelectedElement({
+        nodeType: 'DIV',
+        attributes: { id: 'selected' },
+        xpath: '/html/body/div',
+        textContent: 'd'.repeat(100),
+        children: [level1],
+      });
+
+      const result = htmlElementsToContextSnippet(element, 500);
+
+      // Should be under limit
+      expect(result.length).toBeLessThanOrEqual(500);
+
+      // Should still have selected
+      expect(result).toContain('role="selected-element"');
+      expect(result).toContain('id="selected"');
+    });
+
+    it('should remove siblings before parents when truncating', () => {
+      const grandparent = createSelectedElement({
+        stagewiseId: 'grandparent',
+        nodeType: 'BODY',
+        attributes: { id: 'grandparent' },
+        xpath: '/html/body',
+        textContent: 'x'.repeat(50),
+      });
+
+      const parent = createSelectedElement({
+        stagewiseId: 'parent',
+        nodeType: 'DIV',
+        attributes: { id: 'parent' },
+        xpath: '/html/body/div',
+        textContent: 'y'.repeat(50),
+        parent: grandparent,
+      });
+
+      const sibling1 = createSelectedElement({
+        stagewiseId: 'sibling-1',
+        nodeType: 'ASIDE',
+        attributes: { id: 'sibling-1' },
+        xpath: '/html/body/div/aside',
+        textContent: 'z'.repeat(100),
+      });
+
+      const element = createSelectedElement({
+        stagewiseId: 'selected',
+        nodeType: 'SECTION',
+        attributes: { id: 'selected' },
+        xpath: '/html/body/div/section',
+        textContent: 'w'.repeat(100),
+        parent,
+      });
+
+      parent.children = [sibling1, element];
+
+      const result = htmlElementsToContextSnippet(element, 400);
+
+      // Should be under limit
+      expect(result.length).toBeLessThanOrEqual(400);
+
+      // Should still have selected and parents
+      expect(result).toContain('role="selected-element"');
+      expect(result).toContain('id="selected"');
     });
   });
 });
