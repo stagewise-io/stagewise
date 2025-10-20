@@ -57,7 +57,10 @@ export function uiMessagesToModelMessages(
           }),
         };
         const convertedMessages = convertToModelMessages([cleanedMessage]);
-        modelMessages.push(...convertedMessages);
+        const sanitizedConvertedMessages = convertedMessages.map((message) =>
+          sanitizeModelMessageToolCallInput(message),
+        );
+        modelMessages.push(...sanitizedConvertedMessages);
         break;
       }
       default: {
@@ -68,4 +71,30 @@ export function uiMessagesToModelMessages(
     }
   }
   return modelMessages;
+}
+
+/**
+ * This fixes the issue that the ai SDK returns the tool call input as a string, which is not JSON parsable and lets the litellm backend fail.
+ *
+ * @param message - The model message to sanitize.
+ * @returns The sanitized model message.
+ */
+function sanitizeModelMessageToolCallInput(
+  message: ModelMessage,
+): ModelMessage {
+  if (typeof message.content === 'string') return message;
+  if (message.role !== 'assistant') return message;
+
+  return {
+    ...message,
+    content: message.content.map((part) => {
+      if (part.type === 'tool-call' && typeof part.input === 'string') {
+        return {
+          ...part,
+          input: JSON.parse(part.input),
+        };
+      }
+      return part;
+    }),
+  };
 }

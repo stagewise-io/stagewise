@@ -151,10 +151,28 @@ export async function processToolCalls(
 
   // Process client-side tools in parallel
   const clientPromises = toolCalls.map(async (tc) => {
+    if (tc.invalid) {
+      const errorDescription = ErrorDescriptions.toolCallFailed(
+        tc.toolName,
+        tc.error,
+        tc.input,
+        0,
+      );
+      return {
+        success: false,
+        toolCallId: tc.toolCallId,
+        duration: 0,
+        error: {
+          type: 'error' as const,
+          message: errorDescription,
+        },
+      };
+    }
     if (tc.dynamic)
-      throw new Error('Dynamic tool calls are not supported yet.'); // Dynamic tool calls are not supported yet.
+      throw new Error('Dynamic tool calls are not supported yet.');
 
     const tool = tools[tc.toolName];
+
     if (!tool)
       throw new Error(`Tool ${tc.toolName} not found in provided tools.`);
 
