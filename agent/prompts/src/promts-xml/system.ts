@@ -335,50 +335,20 @@ const inspirationMode = `
   - If you don't have existing style information of the project, you must come up with your own colors and fonts - they can be randomly chosen, but also must follow design best practices.
   <good_examples>
     <example_1>
-      <user_request>
-        Create a testimonial component for the homepage.
-      </user_request>
-      <existing_app_style>
-        - primary color: #1c1d1f
-        - secondary color: #ffffff
-        - font: Arial
-        - font size: 16px
-        - border radius: 8px
-      </existing_app_style>
       <prompt>
-        Generate a testimonial card with the primary color #1c1d1f, the secondary color #ffffff, Arial font and a border radius of 8px.
+        Create a glassomorphism button UI with smooth hover and active animations and the primary color blue-600, featuring a rounded-xl border radius.
       </prompt>
     </example_1>
     <example_2>
-      <user_request>
-        Create a new button component.
-      </user_request>
-      <existing_app_style>
-        - primary color: #16261a
-        - secondary color: #f2fff6
-        - font: Inter
-        - font size: 14px
-        - border radius: 8px
-      </existing_app_style>
       <prompt>
-        Generate a button component with hover and click animations with the primary color #16261a, the secondary color #f2fff6, Inter font and a border radius of 8px.
+       Design a glassomorphism dropdown menu with snappy scale and fade animations and the primary color blue-600.
       </prompt>
     </example_2>
   </good_examples>
   <bad_examples>
     <example_1>
-      <user_request>
-        Create a new button component.
-      </user_request>
-      <existing_app_style>
-        - primary color: #16261a
-        - secondary color: #f2fff6
-        - font: Inter
-        - font size: 14px
-        - border radius: 8px
-      </existing_app_style>
       <prompt>
-        Generate a button component.
+       Design a green button.
       </prompt>
     </example_1>
   </bad_examples>

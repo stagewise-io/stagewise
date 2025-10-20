@@ -165,7 +165,7 @@ export class AgentService {
         if (!this.apiKey) throw new Error('No API key available');
         return inspirationAgentTools(
           this.clientRuntime,
-          this.telemetryService.withTracing(this.litellm('gpt-5'), {
+          this.telemetryService.withTracing(this.litellm('gemini-2.5-flash'), {
             posthogProperties: {
               $ai_span_name: 'inspiration-agent',
               developerTag: process.env.DEVELOPER_TAG || undefined,
@@ -859,6 +859,10 @@ export class AgentService {
             this.cleanupPendingOperations('Plan limits exceeded');
             return;
           } else if (isAuthenticationError(error.error)) {
+            this.logger.log(
+              'error',
+              `[Agent Service Authentication]: Error, ${error.error}`,
+            );
             if (this.authRetryCount < this.maxAuthRetries) {
               this.authRetryCount++;
 
