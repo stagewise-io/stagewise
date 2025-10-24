@@ -1,3 +1,5 @@
+import { useCyclicUpdate } from '@/hooks/use-cyclic-update';
+import { getIFrame } from '@/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Popover,
@@ -10,28 +12,188 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
+import { Input } from '@stagewise/stage-ui/components/input';
 import {
   PlayIcon,
   Maximize2Icon,
   ProportionsIcon,
   CodeIcon,
   Minimize2Icon,
+  RefreshCwIcon,
+  BookImageIcon,
+  ArrowLeftIcon,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { RadioGroup, Radio } from '@stagewise/stage-ui/components/radio';
+import {
+  FormField,
+  FormFieldLabel,
+  FormFieldTitle,
+} from '@stagewise/stage-ui/components/form';
+import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
+import { Layout, MainTab } from '@stagewise/karton-contract';
 
 export function DevAppPreviewControls() {
   return (
-    <div className="flex flex-row-reverse items-center gap-2">
+    <div className="flex w-full flex-1 flex-row-reverse items-center justify-start gap-2">
       <DevAppStateInfo />
       <FullScreenToggle />
       <ScreenSizeControl />
       <CodeShowModeToggle />
+      <SocialMediaPreviewsToggle />
+      <UrlControl />
     </div>
   );
 }
 
+export function UrlControl() {
+  const [url, setUrl] = useState('');
+  const [isOverridingUrl, setIsOverridingUrl] = useState(false);
+
+  const syncUrl = useCallback(() => {
+    if (isOverridingUrl) return;
+    // Fetch everything in the url thats past the origin, unless the origin is different to the one of the main app.
+    const mainAppOrigin = window.location.origin;
+    const iframeOrigin = getIFrame()?.contentWindow?.location.origin;
+    if (iframeOrigin !== mainAppOrigin) {
+      setUrl(getIFrame()?.contentWindow?.location.href ?? '');
+    } else {
+      setUrl(
+        getIFrame()?.contentWindow?.location.href?.split(mainAppOrigin)[1] ??
+          '',
+      );
+    }
+  }, [getIFrame, url, isOverridingUrl]);
+
+  useCyclicUpdate(syncUrl, 10);
+
+  const navigateToUrl = useCallback(() => {
+    const iframe = getIFrame();
+    if (iframe) {
+      const fulfilledUrl = new URL(url, window.location.origin).toString();
+      iframe?.contentWindow?.location.replace(fulfilledUrl);
+    }
+    setIsOverridingUrl(false);
+  }, [getIFrame, url]);
+
+  const changeUrl = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsOverridingUrl(true);
+    // Set the url to the full url and fallback to the origin of the current window.
+
+    setUrl(e.target.value);
+  }, []);
+
+  const reloadIFrame = useCallback(() => {
+    const iframe = getIFrame();
+    if (iframe) {
+      iframe.contentWindow?.location.reload();
+    }
+  }, [getIFrame]);
+
+  const [canNavigateBack, setCanNavigateBack] = useState(false);
+  const checkCanNavigateBack = useCallback(() => {
+    const iframe = getIFrame();
+    if (iframe) {
+      setCanNavigateBack((iframe.contentWindow?.history.length ?? 0) > 1);
+    }
+  }, [getIFrame]);
+  useCyclicUpdate(checkCanNavigateBack, 10);
+
+  const navigateBack = useCallback(() => {
+    const iframe = getIFrame();
+    if (iframe) {
+      iframe.contentWindow?.history.back();
+    }
+  }, [getIFrame]);
+
+  return (
+    <div className="glass-body flex h-10 w-full flex-1 flex-row items-center gap-2 rounded-full p-1">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={navigateBack}
+        disabled={!canNavigateBack}
+      >
+        <ArrowLeftIcon className="size-4" />
+      </Button>
+      <div className="flex flex-1 flex-row items-center">
+        <span className="-mr-9.5 font-bold text-muted-foreground text-xs tracking-wide">
+          URL:
+        </span>
+        <Input
+          className="flex h-8 w-full max-w-none flex-1 flex-row items-center rounded-full pl-10"
+          inputClassName="pl-1.5 rounded-full outline-offset-0 h-full"
+          type="text"
+          placeholder="URL"
+          onSubmit={navigateToUrl}
+          value={url.length > 0 ? url : '/'}
+          onChange={changeUrl}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              navigateToUrl();
+            }
+          }}
+        />
+      </div>
+
+      <Tooltip>
+        <TooltipTrigger>
+          <Button variant="ghost" size="icon-sm" onClick={reloadIFrame}>
+            <RefreshCwIcon className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Reload page</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
+export function SocialMediaPreviewsToggle() {
+  return (
+    <Tooltip>
+      <TooltipTrigger>
+        <Button variant="secondary" size="icon-md">
+          <BookImageIcon className="size-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>View social media previews</TooltipContent>
+    </Tooltip>
+  );
+}
+
+const screenSizes: Record<
+  string,
+  { width: number; height: number; presetName: string } | null
+> = {
+  'full-screen': null,
+  'iphone-16': { width: 393, height: 852, presetName: 'iPhone 16' },
+  'ipad-11': { width: 810, height: 1080, presetName: 'iPad 11' },
+  desktop: { width: 1920, height: 1080, presetName: 'Desktop' },
+  'widescreen-desktop': {
+    width: 2560,
+    height: 1440,
+    presetName: 'Widescreen Desktop',
+  },
+};
+
 export function ScreenSizeControl() {
-  const [changedScreenSize, _setChangedScreenSize] = useState(false);
+  const screenSize = useKartonState((s) =>
+    s.userExperience.activeLayout === Layout.MAIN &&
+    s.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
+      ? s.userExperience.devAppPreview.customScreenSize
+      : null,
+  );
+  const setScreenSize = useKartonProcedure(
+    (p) =>
+      p.userExperience.mainLayout.mainLayout.devAppPreview.changeScreenSize,
+  );
+
+  const onValueChange = useCallback(
+    (value: string | null) => {
+      setScreenSize(value ? screenSizes[value as string]! : null);
+    },
+    [setScreenSize],
+  );
 
   return (
     <Popover>
@@ -39,7 +201,7 @@ export function ScreenSizeControl() {
         <TooltipTrigger>
           <PopoverTrigger>
             <Button
-              variant={changedScreenSize ? 'primary' : 'secondary'}
+              variant={screenSize ? 'primary' : 'secondary'}
               size="icon-md"
               className="transition-all"
             >
@@ -51,6 +213,28 @@ export function ScreenSizeControl() {
       </Tooltip>
       <PopoverContent>
         <PopoverTitle>Change screen size</PopoverTitle>
+        <RadioGroup
+          value={
+            Object.entries(screenSizes).find(
+              ([_, value]) => value?.presetName === screenSize?.presetName,
+            )?.[0] ?? 'full-screen'
+          }
+          onValueChange={(value) => onValueChange(value as string | null)}
+        >
+          {Object.entries(screenSizes).map(([key, value]) => (
+            <FormField>
+              <FormFieldLabel
+                htmlFor={`screen-size-${key}`}
+                className="glass-body flex w-full flex-row items-center justify-between gap-4 rounded-xl py-1.5 pr-1.5 pl-3"
+              >
+                <FormFieldTitle>
+                  {value?.presetName ?? 'Default'}
+                </FormFieldTitle>
+                <Radio value={key} id={`screen-size-${key}`} />
+              </FormFieldLabel>
+            </FormField>
+          ))}
+        </RadioGroup>
       </PopoverContent>
     </Popover>
   );

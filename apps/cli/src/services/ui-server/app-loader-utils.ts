@@ -30,7 +30,7 @@ export async function setupAppLoaderRoutes(
   // TODO
 
   // Last, we register the doc handler for the bootstrap HTML document which should be loaded from the root path
-  app.get('*', async (_, res) => {
+  app.get('/', async (_, res) => {
     const plugins =
       workspaceManager.workspace?.pluginService?.loadedPlugins || [];
     const html = await getBootstrapHtmlDocument(plugins);
@@ -39,6 +39,9 @@ export async function setupAppLoaderRoutes(
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.send(html);
+  });
+  app.get('*', async (_, res) => {
+    res.redirect('/');
   });
 }
 
@@ -54,6 +57,7 @@ async function getBootstrapHtmlDocument(plugins: WorkspacePlugin[]) {
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>stagewise</title>
+  <link rel="icon" href="https://stagewise.io/icon.png">
   <link rel="preconnect" href="https://rsms.me/">
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <script type="importmap">${JSON.stringify(importMap)}</script>

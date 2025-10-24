@@ -39,21 +39,25 @@ export class UserExperienceService {
     );
     this.kartonService.registerServerProcedureHandler(
       'userExperience.mainLayout.mainLayout.devAppPreview.changeScreenSize',
-      async (size: {
-        width: number;
-        height: number;
-        presetName: string | null;
-      }) => {
+      async (
+        size: {
+          width: number;
+          height: number;
+          presetName: string;
+        } | null,
+      ) => {
         this.kartonService.setState((draft) => {
           if (
             draft.userExperience.activeLayout === Layout.MAIN &&
             draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
           ) {
-            draft.userExperience.devAppPreview.customScreenSize = {
-              width: size.width,
-              height: size.height,
-              preset: size.presetName,
-            };
+            draft.userExperience.devAppPreview.customScreenSize = size
+              ? {
+                  width: size.width,
+                  height: size.height,
+                  presetName: size.presetName,
+                }
+              : null;
           }
         });
       },

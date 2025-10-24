@@ -196,7 +196,7 @@ export type AppState = {
               customScreenSize: {
                 width: number;
                 height: number;
-                preset: string | null; // Preset can be a name like "mobile" or "iPhone 13" or whatever
+                presetName: string; // Preset can be a name like "mobile" or "iPhone 13" or whatever
               } | null;
             };
           }
@@ -307,11 +307,13 @@ export type KartonContract = {
           devAppPreview: {
             toggleFullScreen: () => Promise<void>;
             toggleShowCodeMode: () => Promise<void>;
-            changeScreenSize: (size: {
-              width: number;
-              height: number;
-              presetName: string | null;
-            }) => Promise<void>;
+            changeScreenSize: (
+              size: {
+                width: number;
+                height: number;
+                presetName: string;
+              } | null,
+            ) => Promise<void>;
           };
         };
       };

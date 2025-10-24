@@ -135,12 +135,12 @@ export function MainSection() {
         </div>
 
         {/* Controls area */}
-        <div className="flex flex-row items-center gap-2">
+        <div className="flex w-full flex-row items-center gap-2">
           {Object.entries(tabs).map(([tabId, tab]) => (
             <div
               key={tabId}
               className={cn(
-                '-translate-y-1/2 absolute top-1/2 right-0 origin-center transition-all duration-300 ease-out',
+                '-translate-y-1/2 absolute top-1/2 right-0 w-full origin-center transition-all duration-300 ease-out',
                 activeTab === tabId
                   ? 'scale-100 opacity-100 blur-none'
                   : 'pointer-events-none scale-90 opacity-0 blur-sm',
@@ -160,14 +160,14 @@ export function MainSection() {
             className={cn(
               'absolute inset-0 size-full transition-all duration-300 ease-out',
               activeTab === tabId
-                ? 'z-40 scale-y-100 opacity-100 blur-none'
-                : 'z-30 scale-y-90 opacity-0 blur-sm',
-              index > prevIndexRef.current ? 'origin-bottom' : 'origin-top',
+                ? 'z-40 opacity-100 blur-none'
+                : 'z-30 opacity-0 blur-sm',
+              index > prevIndexRef.current ? 'origin-right' : 'origin-left',
               activeTab !== tabId &&
                 (activeIndexRef.current >
                 Object.entries(tabs).findIndex(([id, _]) => id === tabId)
-                  ? '-translate-y-6'
-                  : 'translate-y-6'),
+                  ? '-translate-x-12'
+                  : 'translate-x-12'),
             )}
           >
             {tab.mainContent}

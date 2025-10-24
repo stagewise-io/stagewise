@@ -5,33 +5,27 @@ import { ContextProviders } from './components/context-providers';
 import { HotkeyListener } from './components/hotkey-listener';
 import { AppStateProvider } from './hooks/use-app-state';
 import type { InternalToolbarConfig } from './config';
-import { UrlSynchronizer } from './components/url-synchronizer';
-import { MetaSynchronizer } from './components/meta-synchronizer';
 import { ScreenRouter } from './screens';
 import { NotificationToaster } from './notification-toaster';
 import { AuthDialog } from './dialogs/auth';
 import { FilePickerDialog } from './dialogs/file-picker';
+import { TitleManager } from './components/title-manager';
 
 export const App: FunctionComponent<InternalToolbarConfig> = (config) => {
   return (
-    <>
-      <UrlSynchronizer
-        appPort={config?.appPort}
-        urlSyncConfig={config?.urlSync}
-      />
-      <MetaSynchronizer />
-      <AppStateProvider>
-        <ContextProviders config={config}>
-          <HotkeyListener />
+    <AppStateProvider>
+      <ContextProviders config={config}>
+        <TitleManager />
 
-          <ScreenRouter />
+        <HotkeyListener />
 
-          <AuthDialog />
-          <FilePickerDialog />
+        <ScreenRouter />
 
-          <NotificationToaster />
-        </ContextProviders>
-      </AppStateProvider>
-    </>
+        <AuthDialog />
+        <FilePickerDialog />
+
+        <NotificationToaster />
+      </ContextProviders>
+    </AppStateProvider>
   );
 };
