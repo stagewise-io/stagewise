@@ -20,22 +20,24 @@ export function getElementAtPoint(x: number, y: number) {
     return getIFrameWindow()?.document.body;
   }
 
+  const iframe = getIFrame();
   const iframeRect = getIFrame()?.getBoundingClientRect();
+  const iframeScale = iframeRect ? iframeRect.width / iframe!.offsetWidth : 1;
 
-  const elementsBelowAnnotation = getIFrameWindow()?.document.elementsFromPoint(
-    x - (iframeRect?.left ?? 0),
-    y - (iframeRect?.top ?? 0),
+  const elementsBelowPoint = getIFrameWindow()?.document.elementsFromPoint(
+    (x - (iframeRect?.left ?? 0)) / iframeScale,
+    (y - (iframeRect?.top ?? 0)) / iframeScale,
   );
 
   const refElement =
-    (elementsBelowAnnotation?.find(
+    (elementsBelowPoint?.find(
       (element) =>
         !element.closest('svg') &&
         !element.closest('STAGEWISE-TOOLBAR') &&
         isElementAtPoint(
           element as HTMLElement,
-          x - (iframeRect?.left ?? 0),
-          y - (iframeRect?.top ?? 0),
+          (x - (iframeRect?.left ?? 0)) / iframeScale,
+          (y - (iframeRect?.top ?? 0)) / iframeScale,
         ),
     ) as HTMLElement) || getIFrameWindow()?.document.body;
 

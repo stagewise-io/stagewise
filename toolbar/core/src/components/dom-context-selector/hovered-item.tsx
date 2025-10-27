@@ -13,7 +13,7 @@ export interface HoveredItemProps extends HTMLAttributes<HTMLDivElement> {
 export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
   const boxRef = useRef<HTMLDivElement>(null);
 
-  const _iframeRef = useRef<HTMLIFrameElement>(getIFrame());
+  const iframeRef = useRef<HTMLIFrameElement>(getIFrame());
 
   const windowSize = useWindowSize();
 
@@ -35,10 +35,15 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
     if (boxRef.current && refElement) {
       const referenceRect = refElement.getBoundingClientRect();
 
-      boxRef.current.style.top = `${referenceRect.top - 2}px`;
-      boxRef.current.style.left = `${referenceRect.left - 2}px`;
-      boxRef.current.style.width = `${referenceRect.width + 4}px`;
-      boxRef.current.style.height = `${referenceRect.height + 4}px`;
+      const iFrameScale = iframeRef.current
+        ? iframeRef.current.getBoundingClientRect().width /
+          iframeRef.current.offsetWidth
+        : 1;
+
+      boxRef.current.style.top = `${referenceRect.top * iFrameScale - 2}px`;
+      boxRef.current.style.left = `${referenceRect.left * iFrameScale - 2}px`;
+      boxRef.current.style.width = `${referenceRect.width * iFrameScale + 4}px`;
+      boxRef.current.style.height = `${referenceRect.height * iFrameScale + 4}px`;
       boxRef.current.style.display = '';
     } else {
       if (boxRef.current) {
@@ -49,7 +54,7 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
         boxRef.current.style.display = 'none';
       }
     }
-  }, [refElement, windowSize.height, windowSize.width]);
+  }, [refElement, windowSize.height, windowSize.width, iframeRef.current]);
 
   useCyclicUpdate(updateBoxPosition, 30);
 
@@ -57,7 +62,7 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
     <div
       {...props}
       className={cn(
-        'absolute z-10 flex items-center justify-center rounded-sm border-2 border-blue-600/70 border-dotted bg-blue-600/5 text-white transition-all duration-100',
+        'absolute z-10 flex items-center justify-center rounded-sm border-3 border-blue-600/70 border-dashed bg-blue-600/5 text-white transition-colors duration-100',
       )}
       ref={boxRef}
     >

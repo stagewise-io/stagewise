@@ -1,5 +1,5 @@
 import { useCyclicUpdate } from '@/hooks/use-cyclic-update';
-import { getIFrame } from '@/utils';
+import { cn, getIFrame } from '@/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Popover,
@@ -34,8 +34,19 @@ import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { Layout, MainTab } from '@stagewise/karton-contract';
 
 export function DevAppPreviewControls() {
+  const isFullScreen = useKartonState(
+    (s) =>
+      s.userExperience.activeLayout === Layout.MAIN &&
+      s.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW &&
+      s.userExperience.devAppPreview.isFullScreen,
+  );
   return (
-    <div className="flex w-full flex-1 flex-row-reverse items-center justify-start gap-2">
+    <div
+      className={cn(
+        'z-30 flex w-full flex-1 flex-row-reverse items-center justify-start gap-2',
+        isFullScreen && 'pr-1',
+      )}
+    >
       <DevAppStateInfo />
       <FullScreenToggle />
       <ScreenSizeControl />
@@ -107,7 +118,7 @@ export function UrlControl() {
   }, [getIFrame]);
 
   return (
-    <div className="glass-body flex h-10 w-full flex-1 flex-row items-center gap-2 rounded-full p-1">
+    <div className="glass-body flex h-10 w-full flex-1 flex-row items-center gap-2 rounded-full bg-background/80 p-1 backdrop-blur-lg">
       <Button
         variant="ghost"
         size="icon-sm"
@@ -116,8 +127,8 @@ export function UrlControl() {
       >
         <ArrowLeftIcon className="size-4" />
       </Button>
-      <div className="flex flex-1 flex-row items-center">
-        <span className="-mr-9.5 font-bold text-muted-foreground text-xs tracking-wide">
+      <div className="relative flex-1">
+        <span className="-translate-y-1/2 absolute top-1/2 left-2 font-bold text-muted-foreground text-xs tracking-wide">
           URL:
         </span>
         <Input
@@ -152,7 +163,11 @@ export function SocialMediaPreviewsToggle() {
   return (
     <Tooltip>
       <TooltipTrigger>
-        <Button variant="secondary" size="icon-md">
+        <Button
+          variant="secondary"
+          size="icon-md"
+          className="bg-background/80 backdrop-blur-lg"
+        >
           <BookImageIcon className="size-4" />
         </Button>
       </TooltipTrigger>
@@ -203,7 +218,10 @@ export function ScreenSizeControl() {
             <Button
               variant={screenSize ? 'primary' : 'secondary'}
               size="icon-md"
-              className="transition-all"
+              className={cn(
+                'backdrop-blur-lg transition-all',
+                screenSize ? 'bg-primary' : 'bg-background/80',
+              )}
             >
               <ProportionsIcon className="size-4" />
             </Button>
@@ -241,16 +259,26 @@ export function ScreenSizeControl() {
 }
 
 export function FullScreenToggle() {
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const toggleFullScreen = useCallback(
-    () => setIsFullScreen((prev) => !prev),
-    [],
+  const isFullScreen = useKartonState(
+    (s) =>
+      s.userExperience.activeLayout === Layout.MAIN &&
+      s.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW &&
+      s.userExperience.devAppPreview.isFullScreen,
+  );
+  const toggleFullScreen = useKartonProcedure(
+    (p) =>
+      p.userExperience.mainLayout.mainLayout.devAppPreview.toggleFullScreen,
   );
 
   return (
     <Tooltip>
       <TooltipTrigger>
-        <Button variant="secondary" size="icon-md" onClick={toggleFullScreen}>
+        <Button
+          variant="secondary"
+          size="icon-md"
+          className="bg-background/80 backdrop-blur-lg"
+          onClick={() => toggleFullScreen()}
+        >
           {isFullScreen ? (
             <Minimize2Icon className="size-4" />
           ) : (
@@ -288,7 +316,11 @@ export function DevAppStateInfo() {
       <Tooltip>
         <TooltipTrigger>
           <PopoverTrigger>
-            <Button variant="secondary" size="icon-md">
+            <Button
+              variant="secondary"
+              size="icon-md"
+              className="bg-background/80 backdrop-blur-lg"
+            >
               <PlayIcon className="size-4" />
             </Button>
           </PopoverTrigger>
@@ -316,7 +348,10 @@ const CodeShowModeToggle = () => {
           variant={inCodeShowMode ? 'primary' : 'secondary'}
           size="icon-md"
           onClick={toggleCodeShowMode}
-          className="transition-all"
+          className={cn(
+            'backdrop-blur-lg transition-all',
+            inCodeShowMode ? 'bg-primary' : 'bg-background/80',
+          )}
         >
           <CodeIcon className="size-4" />
         </Button>

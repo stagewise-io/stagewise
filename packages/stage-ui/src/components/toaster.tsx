@@ -69,7 +69,7 @@ function Toast({ notification, onDismiss }: ToastProps) {
             <AlertCircleIcon className="size-4" />
           )}
           {notification.title && (
-            <p className="font-semibold text-base text-foreground">
+            <p className="mr-8 font-semibold text-base text-foreground">
               {notification.title}
             </p>
           )}

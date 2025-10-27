@@ -12,15 +12,17 @@ import { useContextChipHover } from '@/hooks/use-context-chip-hover';
 import { SelectedItem } from './selected-item';
 import { cn, getElementAtPoint, getXPathForElement } from '@/utils';
 
-export function DOMContextSelector() {
+export function DOMContextSelector({
+  ref,
+}: {
+  ref?: React.RefObject<HTMLDivElement>;
+}) {
   const {
     domContextElements,
     addChatDomContext,
     isContextSelectorActive,
     removeChatDomContext,
   } = useChatState();
-
-  const shouldShow = isContextSelectorActive;
 
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(
     null,
@@ -69,6 +71,7 @@ export function DOMContextSelector() {
 
   const updateHoveredElement = useCallback(() => {
     if (!mouseState.current) return;
+
     const refElement = getElementAtPoint(
       mouseState.current.lastX,
       mouseState.current.lastY,
@@ -89,6 +92,16 @@ export function DOMContextSelector() {
   useEffect(() => {
     updateHoveredElement();
   }, [updateHoveredElement]);
+
+  useEffect(() => {
+    if (!isContextSelectorActive) {
+      if (nextUpdateTimeout.current) {
+        clearTimeout(nextUpdateTimeout.current);
+        nextUpdateTimeout.current = null;
+      }
+      setHoveredElement(null);
+    }
+  }, [isContextSelectorActive]);
 
   const handleMouseMove = useCallback<MouseEventHandler<HTMLDivElement>>(
     (event) => {
@@ -123,12 +136,11 @@ export function DOMContextSelector() {
         if (nextUpdateTimeout.current) {
           clearTimeout(nextUpdateTimeout.current);
         }
-        nextUpdateTimeout.current = setTimeout(updateHoveredElement, 1000 / 28);
-      } else if (!nextUpdateTimeout.current) {
-        nextUpdateTimeout.current = setTimeout(updateHoveredElement, 1000 / 28);
       }
+
+      nextUpdateTimeout.current = setTimeout(updateHoveredElement, 1000 / 28);
     },
-    [updateHoveredElement],
+    [updateHoveredElement, isContextSelectorActive],
   );
 
   const handleMouseLeave = useCallback<
@@ -154,12 +166,13 @@ export function DOMContextSelector() {
     [handleElementSelected, selectedItems],
   );
 
-  if (!shouldShow) return null;
   return (
     <div
+      ref={ref}
       className={cn(
-        'pointer-events-auto absolute inset-0 size-full overflow-hidden',
+        '-translate-x-1/2 -translate-y-1/2 pointer-events-auto absolute inset-0 top-1/2 left-1/2 size-full overflow-hidden',
         hoversAddable ? 'cursor-copy' : 'cursor-default',
+        !isContextSelectorActive && 'pointer-events-none',
       )}
       id="element-selector"
       onMouseMove={handleMouseMove}
@@ -169,7 +182,7 @@ export function DOMContextSelector() {
       tabIndex={0}
     >
       {/* Show blue proposal overlay for new elements */}
-      {hoveredElement && !hoveredSelectedElement && (
+      {hoveredElement && !hoveredSelectedElement && isContextSelectorActive && (
         <HoveredItem refElement={hoveredElement} />
       )}
 

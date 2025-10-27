@@ -1,9 +1,12 @@
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
-import { useKartonState } from '@/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
+import { cn } from '@/utils';
 import { Layout, MainTab } from '@stagewise/karton-contract';
+import { Loader2Icon } from 'lucide-react';
 import { useEffect, useRef, useCallback } from 'react';
 
 export const DevAppPreviewPanel = () => {
+  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
   // Whenever the main website is resized, calculate the maximum size of the iframe that can fit within the toolbar and scale the iframe to that size.
 
   // The size of the iframe itself is the size that the user defined.
@@ -23,9 +26,10 @@ export const DevAppPreviewPanel = () => {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const selectorCanvasRef = useRef<HTMLDivElement | null>(null);
 
   const updateFrameSize = useCallback(() => {
-    // If there is no custom size configured, we simply< set the iframe scale to 1 since it just fills up the container. Otherwise, we need to calculate the scale based on the container size and the custom size.
+    // If there is no custom size configured, we simply set the iframe scale to 1 since it just fills up the container. Otherwise, we need to calculate the scale based on the container size and the custom size.
     if (!iframeRef.current || !containerRef.current) return;
 
     if (!size) {
@@ -36,11 +40,14 @@ export const DevAppPreviewPanel = () => {
       // Calculate ratio of container to (iframe + 16px) size (height and width). take the smallest scale and apply it, if it's smaller than 1.
       const widthRatio = container.clientWidth / (size.width + 32);
       const heightRatio =
-        container.clientHeight / (size.height + (isFullScreen ? 96 : 32));
-      const scale = Math.min(widthRatio, heightRatio);
-      if (scale < 1) {
-        iframeRef.current.style.transform = `scale(${scale})`;
-      }
+        container.clientHeight / (size.height + (isFullScreen ? 128 : 32));
+      const scale = Math.min(widthRatio, heightRatio, 1);
+      iframeRef.current.style.transform = `scale(${scale})`;
+    }
+    if (selectorCanvasRef.current) {
+      const iframeRect = iframeRef.current.getBoundingClientRect();
+      selectorCanvasRef.current.style.width = `${iframeRect.width}px`;
+      selectorCanvasRef.current.style.height = `${iframeRect.height}px`;
     }
   }, [size, isFullScreen]);
 
@@ -57,25 +64,59 @@ export const DevAppPreviewPanel = () => {
     };
   }, [updateFrameSize]);
 
+  const isFullScreenMode = useKartonState(
+    (s) =>
+      s.userExperience.activeLayout === Layout.MAIN &&
+      s.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW &&
+      s.userExperience.devAppPreview.isFullScreen,
+  );
+
+  const toggleFullScreen = useKartonProcedure(
+    (p) =>
+      p.userExperience.mainLayout.mainLayout.devAppPreview.toggleFullScreen,
+  );
+
+  const stopFullScreen = useCallback(() => {
+    if (!isFullScreenMode) return;
+    void toggleFullScreen();
+  }, [toggleFullScreen, isFullScreenMode]);
+
+  if (workspaceStatus === 'loading') {
+    return (
+      <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-xl">
+        <Loader2Icon className="size-10 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
-      className="flex size-full flex-col items-center justify-center overflow-hidden rounded-xl bg-zinc-200"
+      className={cn(
+        'flex size-full select-none flex-col items-center justify-center overflow-hidden rounded-xl bg-zinc-200',
+        isFullScreenMode
+          ? 'fixed inset-0 z-30 rounded-none bg-black/40 p-3 shadow-[0_0_16px_16px_rgba(0,0,0,0.2)] backdrop-blur-sm'
+          : 'glass-body',
+      )}
+      onClick={() => stopFullScreen()}
     >
       <iframe
         ref={iframeRef}
         src="/"
         title="Main user app"
-        className="size-full p-0"
+        className={cn(
+          'size-full overflow-hidden rounded-xl p-0',
+          size && 'rounded-2xl ring-8 ring-black',
+        )}
         style={{
           width: size?.width ?? '100%',
           height: size?.height ?? '100%',
-          border: size ? '12px solid black' : 'none',
-          borderRadius: size ? '32px' : '0px',
         }}
         id="user-app-iframe"
       />
-      <DOMContextSelector />
+      <DOMContextSelector
+        ref={selectorCanvasRef as React.RefObject<HTMLDivElement>}
+      />
     </div>
   );
 };

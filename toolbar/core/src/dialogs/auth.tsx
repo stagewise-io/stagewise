@@ -17,7 +17,7 @@ export const AuthDialog = () => {
 
   return (
     <Dialog open={!!loginDialogData} dismissible={false}>
-      <DialogContent className="h-[80vh] max-h-[80vh] min-h-[80vh] w-[80vw] min-w-[80vw] max-w-[80vw]">
+      <DialogContent className="sm:ax-h-[80vh] h-[80vh] min-h-[80vh] min-w-[80vw] sm:w-[80vw] sm:max-w-[80vw]">
         <DialogClose
           onClick={() => {
             void abortLogin();

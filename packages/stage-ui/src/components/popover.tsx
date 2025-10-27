@@ -82,7 +82,7 @@ export const PopoverTitle = ({
   return (
     <PopoverBase.Title
       {...props}
-      className={cn('mr-5 font-semibold text-base text-foreground', className)}
+      className={cn('mr-8 font-semibold text-base text-foreground', className)}
     >
       {children}
     </PopoverBase.Title>

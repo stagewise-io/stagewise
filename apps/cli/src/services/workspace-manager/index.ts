@@ -147,6 +147,13 @@ export class WorkspaceManagerService {
       this.logger.error(
         `[WorkspaceManagerService] Failed to create workspace service. Reason: ${error}`,
       );
+      this.notificationService.showNotification({
+        title: 'Failed to load workspace',
+        message: `Failed to load workspace at path: "${selectedPath}". Reason: ${error}`,
+        type: 'error',
+        duration: 20000, // 20 seconds
+        actions: [],
+      });
       return null;
     });
 

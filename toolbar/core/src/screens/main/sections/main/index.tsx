@@ -135,7 +135,7 @@ export function MainSection() {
         </div>
 
         {/* Controls area */}
-        <div className="flex w-full flex-row items-center gap-2">
+        <div className="z-20 flex w-full flex-row items-center gap-2">
           {Object.entries(tabs).map(([tabId, tab]) => (
             <div
               key={tabId}
@@ -153,15 +153,15 @@ export function MainSection() {
       </div>
 
       {/* Main content boxes. They're big cards that move around and resize themselves. */}
-      <div className="flex-1">
+      <div className="z-10 flex-1">
         {Object.entries(tabs).map(([tabId, tab], index) => (
           <div
             key={tabId}
             className={cn(
               'absolute inset-0 size-full transition-all duration-300 ease-out',
               activeTab === tabId
-                ? 'z-40 opacity-100 blur-none'
-                : 'z-30 opacity-0 blur-sm',
+                ? 'z-0 opacity-100 blur-none'
+                : '-z-10 opacity-0 blur-sm',
               index > prevIndexRef.current ? 'origin-right' : 'origin-left',
               activeTab !== tabId &&
                 (activeIndexRef.current >

@@ -36,7 +36,7 @@ export function UserStatusArea() {
           {userAccount.user?.email.at(0)?.toUpperCase() ?? '?'}
           <div
             className={cn(
-              'glass-body absolute right-px bottom-px z-20 size-3 rounded-full bg-green-600',
+              'glass-body absolute right-px bottom-px z-10 size-3 rounded-full bg-green-600',
               userAccount.status === 'authenticated' && 'bg-green-600',
               ['authentication_invalid', 'server_unreachable'].includes(
                 userAccount.status,
