@@ -1,5 +1,5 @@
 import { Button } from '@stagewise/stage-ui/components/button';
-import { ArrowLeftIcon, ArrowRightIcon } from 'lucide-react';
+import { ArrowLeftIcon, ArrowRightIcon, Loader2Icon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import {
   Dialog,
@@ -18,6 +18,13 @@ export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
     (s) => s.workspace?.agentChat?.activeChatId,
   );
   const chat = useKartonState((s) => s.workspace?.agentChat?.chats);
+
+  const workspace = useKartonState((s) => s.workspace);
+
+  const agentChatAvailable = useMemo(() => {
+    const activeChatId = workspace?.agentChat?.activeChatId;
+    return activeChatId !== undefined && activeChatId !== null;
+  }, [workspace]);
 
   const hasChatMessage = useMemo(() => {
     return !!activeChatId && (chat?.[activeChatId]?.messages.length ?? 0) > 0;
@@ -52,12 +59,17 @@ export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
           <DialogFooter>
             <Button
               variant="primary"
+              disabled={!agentChatAvailable}
               onClick={() => {
                 void startSetup();
               }}
             >
               Get started
-              <ArrowRightIcon className="size-4" />
+              {agentChatAvailable ? (
+                <ArrowRightIcon className="size-4" />
+              ) : (
+                <Loader2Icon className="size-4 animate-spin" />
+              )}
             </Button>
             <Button
               variant="secondary"
