@@ -44,11 +44,7 @@ export const AskForAppPathToolPartContent = memo(
         >
           {toolPart.input?.userInput.suggestedPaths.map((path) => (
             <RadioLabel key={path.absolutePath}>
-              <Radio
-                value={path.absolutePath}
-                size="xs"
-                disabled={isDisabled}
-              />
+              <Radio value={path.absolutePath} disabled={isDisabled} />
               <span className={isDisabled ? 'opacity-50' : ''}>
                 {path.displayName}
               </span>
