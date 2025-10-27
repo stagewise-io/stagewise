@@ -47,7 +47,7 @@ import {
 import {
   isInteractionToolPart,
   InteractionToolPartItem,
-} from './interaction-tool-part';
+} from './user-interaction-tool-part';
 
 export function ChatBubble({
   message: msg,

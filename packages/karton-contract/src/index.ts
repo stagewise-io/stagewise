@@ -1,5 +1,6 @@
 import type {
   AskForAppPathOutput,
+  AskForDevScriptIntegrationOutput,
   AskForPortOutput,
   AskForRootProjectPathOutput,
   InspirationComponent,
@@ -269,6 +270,9 @@ export type KartonContract = {
           | (AskForPortOutput & { type: 'askForPortTool' })
           | (AskForRootProjectPathOutput & {
               type: 'askForRootProjectPathTool';
+            })
+          | (AskForDevScriptIntegrationOutput & {
+              type: 'askForDevScriptIntegrationTool';
             }),
       ) => Promise<{ success: true } | { success: false; error: string }>; // Returns zod validation success or failure
       cancelUserInteractionToolInput: (toolCallId: string) => Promise<void>; // Cancels the user interaction tool input.

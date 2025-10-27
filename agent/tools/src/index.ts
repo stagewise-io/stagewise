@@ -10,6 +10,11 @@ import { globTool } from './node-runtime/file-modification/glob-tool.js';
 import { multiEditTool } from './node-runtime/file-modification/multi-edit-tool.js';
 import { deleteFileTool } from './node-runtime/file-modification/delete-file-tool.js';
 import {
+  askForDevScriptIntegrationTool,
+  askForDevScriptIntegrationOutputSchema,
+  type AskForDevScriptIntegrationOutput,
+} from './node-runtime/project-setup/ask-for-dev-script-integration.js';
+import {
   askForPortTool,
   askForPortOutputSchema,
   type AskForPortOutput,
@@ -37,12 +42,15 @@ export {
   askForAppPathTool,
   askForPortTool,
   askForRootProjectPathTool,
+  askForDevScriptIntegrationTool,
+  askForDevScriptIntegrationOutputSchema,
   askForAppPathOutputSchema,
   askForPortOutputSchema,
   askForRootProjectPathOutputSchema,
   type AskForAppPathOutput,
   type AskForPortOutput,
   type AskForRootProjectPathOutput,
+  type AskForDevScriptIntegrationOutput,
   type InspirationComponent,
 };
 
@@ -137,11 +145,12 @@ export function setupAgentTools(
 ) {
   return {
     askForPortTool: userInteractionTool(askForPortTool(clientRuntime)),
-    letUserConfirmRootProjectPathTool: userInteractionTool(
+    askForRootProjectPathTool: userInteractionTool(
       askForRootProjectPathTool(clientRuntime),
     ),
-    letUserPickAppPathTool: userInteractionTool(
-      askForAppPathTool(clientRuntime),
+    askForAppPathTool: userInteractionTool(askForAppPathTool(clientRuntime)),
+    askForDevScriptIntegrationTool: userInteractionTool(
+      askForDevScriptIntegrationTool(clientRuntime),
     ),
     saveRequiredInformationTool: toolWithMetadata(
       saveRequiredInformationTool(callbacks.onSaveInformation),

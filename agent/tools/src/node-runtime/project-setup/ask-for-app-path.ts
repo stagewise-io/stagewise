@@ -8,9 +8,18 @@ export const DESCRIPTION =
 export const askForAppPathParamsSchema = z.object({
   userInput: z.object({
     suggestedPaths: z
-      .array(z.string())
+      .array(
+        z.object({
+          absolutePath: z.string(),
+          displayName: z
+            .string()
+            .describe(
+              'A short name for the app, e.g., "apps/website", "apps/docs"',
+            ),
+        }),
+      )
       .describe(
-        'The app paths the USER can pick from - will be open_path if the project is not a monorepo',
+        'The app paths the USER can pick from - will be open_path if the project is not a monorepo. The display name is a short name for the app, e.g., "apps/website", "apps/docs" and will be displayed to the user.',
       )
       .min(1),
   }),
@@ -23,24 +32,6 @@ export const askForAppPathOutputSchema = z.object({
 export type AskForAppPathOutput = z.infer<typeof askForAppPathOutputSchema>;
 
 export type AskForAppPathParams = z.infer<typeof askForAppPathParamsSchema>;
-
-/**
- * Ask for app path tool
- * Let the user pick the app path from the open project
- * Returns the app path that the user picked
- */
-export async function askForAppPathToolExecute(
-  params: AskForAppPathParams,
-  _clientRuntime: ClientRuntime,
-) {
-  const { userInput } = params;
-  const dummyPath = userInput.suggestedPaths[0];
-  return {
-    success: true,
-    message: `USER picked path: ${dummyPath}`,
-    result: { path: dummyPath },
-  };
-}
 
 export const askForAppPathTool = (_clientRuntime: ClientRuntime) =>
   tool({

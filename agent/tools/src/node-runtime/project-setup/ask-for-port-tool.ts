@@ -24,24 +24,6 @@ export type AskForPortOutput = z.infer<typeof askForPortOutputSchema>;
 
 export type AskForPortParams = z.infer<typeof askForPortParamsSchema>;
 
-/**
- * Ask for port tool
- * Asks the user for a port
- * Returns the port if the user provides one, otherwise returns the suggested port
- */
-export async function askForPortToolExecute(
-  params: AskForPortParams,
-  _clientRuntime: ClientRuntime,
-) {
-  const { userInput: _userInput } = params;
-  const dummyPort = 3000;
-  return {
-    success: true,
-    message: `USER provided port: ${dummyPort}`,
-    result: { port: dummyPort },
-  };
-}
-
 export const askForPortTool = (_clientRuntime: ClientRuntime) =>
   tool({
     name: 'askForPortTool',

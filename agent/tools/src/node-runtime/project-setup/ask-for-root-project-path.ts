@@ -27,24 +27,6 @@ export type AskForRootProjectPathParams = z.infer<
   typeof askForRootProjectPathParamsSchema
 >;
 
-/**
- * Ask for root project path tool
- * Ask the user to confirm the root project path
- * Returns the root project path that the user confirmed
- */
-export async function askForRootProjectPathToolExecute(
-  params: AskForRootProjectPathParams,
-  _clientRuntime: ClientRuntime,
-) {
-  const { userInput } = params;
-  const dummyPath = userInput.suggestedPath;
-  return {
-    success: true,
-    message: `USER confirmed path: ${dummyPath}`,
-    result: { path: dummyPath },
-  };
-}
-
 export const askForRootProjectPathTool = (_clientRuntime: ClientRuntime) =>
   tool({
     name: 'askForRootProjectPathTool',
