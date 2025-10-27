@@ -7,7 +7,6 @@ import type {
 } from '@/plugin-sdk/plugin';
 import { useConfig } from './use-config';
 import { collectUserMessageMetadata, getIFrameWindow } from '@/utils';
-import { usePanels } from './use-panels';
 import { useKartonProcedure } from './use-karton';
 
 export interface PluginContextType {
@@ -30,8 +29,6 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
     (s) => s.agentChat.sendUserMessage,
   );
 
-  const { openLeftPanel } = usePanels();
-
   const plugins = config?.plugins || [];
 
   const toolbarContext = useMemo(() => {
@@ -43,7 +40,6 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
           metadata: collectUserMessageMetadata([], true),
           role: 'user',
         });
-        openLeftPanel('chat');
       },
       mainAppWindow: getIFrameWindow()!,
     };

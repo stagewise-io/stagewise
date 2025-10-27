@@ -68,9 +68,8 @@ function FileAttachmentChip({ attachment, onDelete }: FileAttachmentChipProps) {
     <div
       className={cn(
         buttonVariants({ variant: 'secondary', size: 'xs' }),
-        validation.supported
-          ? 'hover:border-border/40 hover:bg-white/80'
-          : 'opacity-50 hover:opacity-70',
+        'bg-background/80',
+        !validation.supported && 'opacity-50 hover:opacity-70',
       )}
     >
       {isImage ? (

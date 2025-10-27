@@ -87,12 +87,12 @@ export function MainSection() {
       id="opened-content-panel"
       order={2}
       defaultSize={70}
-      className="flex h-full flex-1 flex-col items-stretch justify-between gap-4 p-4"
+      className="flex h-full flex-1 flex-col items-stretch justify-between gap-4 p-3 pl-1"
     >
       {/* Tab navigation and controls area */}
       <div
         className={cn(
-          'flex flex-row items-center justify-between gap-6',
+          'flex flex-row items-center justify-between gap-20',
           activeTab &&
             tabs[activeTab].hideTabBar &&
             !tabs[activeTab].controls &&
@@ -102,7 +102,7 @@ export function MainSection() {
         {/* Tab navigation buttons */}
         <div
           className={cn(
-            '-ml-0.5 glass-inset flex w-auto shrink-0 flex-row items-center justify-between gap-2 overflow-hidden rounded-full p-1',
+            '-ml-0.5 glass-inset flex w-auto shrink-0 flex-row items-center justify-between gap-1 overflow-hidden rounded-full p-1',
             activeTab &&
               tabs[activeTab].hideTabBar &&
               'pointer-events-none opacity-0',

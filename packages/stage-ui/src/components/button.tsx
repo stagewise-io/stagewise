@@ -2,19 +2,20 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/utils';
 
 export const buttonVariants = cva(
-  'relative flex flex-row items-center justify-center font-normal disabled:opacity-50',
+  'relative flex flex-row items-center justify-center font-normal disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
         primary:
-          'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive bg-primary text-primary-foreground',
+          'glass-body enabled:glass-body-interactive glass-body-motion enabled:glass-body-motion-interactive bg-primary text-primary-foreground',
         secondary:
-          'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive bg-background/20 text-foreground',
+          'glass-body enabled:glass-body-interactive glass-body-motion enabled:glass-body-motion-interactive bg-background/20 text-foreground',
         destructive:
-          'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive bg-rose-600 text-rose-50 dark:bg-rose-800 dark:text-rose-400',
+          'glass-body enabled:glass-body-interactive glass-body-motion enabled:glass-body-motion-interactive bg-rose-600 text-rose-50 dark:bg-rose-800 dark:text-rose-400',
         warning:
-          'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive bg-yellow-200 text-yellow-900 dark:bg-yellow-800 dark:text-yellow-400',
-        ghost: 'bg-transparent font-medium text-foreground hover:bg-zinc-500/5',
+          'glass-body enabled:glass-body-interactive glass-body-motion enabled:glass-body-motion-interactive bg-yellow-200 text-yellow-900 dark:bg-yellow-800 dark:text-yellow-400',
+        ghost:
+          'bg-transparent font-medium text-foreground enabled:hover:bg-zinc-500/5',
       },
       size: {
         xs: 'h-6 gap-1 rounded-xl px-2.5 py-1 text-xs',
@@ -22,9 +23,9 @@ export const buttonVariants = cva(
         md: 'h-10 gap-2 rounded-xl px-4 py-2 text-sm',
         lg: 'h-12 gap-2 rounded-xl px-6 py-3 text-base',
         xl: 'h-14 gap-3 rounded-xl px-8 py-4 text-lg',
-        'icon-xs': 'size-6 rounded-full',
-        'icon-sm': 'size-8 rounded-full',
-        'icon-md': 'size-10 rounded-full',
+        'icon-xs': 'size-6 rounded-full text-xs',
+        'icon-sm': 'size-8 rounded-full text-sm',
+        'icon-md': 'size-10 rounded-full text-sm',
       },
     },
   },

@@ -11,7 +11,7 @@ export function Sidebar() {
       defaultSize={30}
       minSize={25}
       maxSize={50}
-      className="flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-foreground/5"
+      className="flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-muted-foreground/5"
     >
       <SidebarTopSection />
 

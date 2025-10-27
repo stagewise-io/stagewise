@@ -174,7 +174,7 @@ export function DOMContextSelector({
         hoversAddable ? 'cursor-copy' : 'cursor-default',
         !isContextSelectorActive && 'pointer-events-none',
       )}
-      id="element-selector"
+      id="context-selector-element-canvas"
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={handleMouseClick}

@@ -3,7 +3,6 @@ import type { InternalToolbarConfig } from '../config';
 import { ChatStateProvider } from '@/hooks/use-chat-state';
 import type { ReactNode } from 'react';
 import { ConfigProvider } from '@/hooks/use-config';
-import { PanelsProvider } from '@/hooks/use-panels';
 import { KartonProvider } from '@/hooks/use-karton';
 import { TooltipProvider } from '@stagewise/stage-ui/components/tooltip';
 import { ContextChipHoverProvider } from '@/hooks/use-context-chip-hover';
@@ -21,13 +20,11 @@ export function ContextProviders({
       <ConfigProvider config={config}>
         <KartonProvider>
           <PostHogProvider>
-            <PanelsProvider>
-              <PluginProvider>
-                <ContextChipHoverProvider>
-                  <ChatStateProvider>{children}</ChatStateProvider>
-                </ContextChipHoverProvider>
-              </PluginProvider>
-            </PanelsProvider>
+            <PluginProvider>
+              <ContextChipHoverProvider>
+                <ChatStateProvider>{children}</ChatStateProvider>
+              </ContextChipHoverProvider>
+            </PluginProvider>
           </PostHogProvider>
         </KartonProvider>
       </ConfigProvider>

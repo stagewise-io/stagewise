@@ -2,7 +2,6 @@ import './app.css';
 
 import type { FunctionComponent } from 'react';
 import { ContextProviders } from './components/context-providers';
-import { HotkeyListener } from './components/hotkey-listener';
 import { AppStateProvider } from './hooks/use-app-state';
 import type { InternalToolbarConfig } from './config';
 import { ScreenRouter } from './screens';
@@ -16,8 +15,6 @@ export const App: FunctionComponent<InternalToolbarConfig> = (config) => {
     <AppStateProvider>
       <ContextProviders config={config}>
         <TitleManager />
-
-        <HotkeyListener />
 
         <ScreenRouter />
 
