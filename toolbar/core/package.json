@@ -80,7 +80,7 @@
     "tailwindcss": "^4.1.5",
     "tsup": "^8.4.0",
     "typescript": "^5.9.2",
-    "vite": "^6.3.5",
+    "vite": "^6.4.1",
     "vite-plugin-css-injected-by-js": "^3.5.2",
     "vite-plugin-dts": "^4.5.4",
     "zod": "3.25.76"
