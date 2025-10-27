@@ -10,7 +10,7 @@ export const RadioGroup = ({ className, ...props }: RadioGroupProps) => {
     <RadioGroupBase
       className={(state) =>
         cn(
-          'glass-inset flex size-5 shrink-0 flex-col items-start justify-start gap-2 rounded-full bg-white/20 disabled:opacity-50 data-[checked]:bg-primary',
+          'flex shrink-0 flex-col items-start justify-start gap-2 rounded-full bg-white/20 disabled:opacity-50 data-[checked]:bg-primary',
           typeof className === 'function' ? className(state) : className,
         )
       }
