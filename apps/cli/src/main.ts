@@ -51,7 +51,7 @@ export async function main({
     logger,
     kartonService,
   );
-  const authService = await AuthService.create(
+  const authService = AuthService.create(
     globalDataPathService,
     identifierService,
     logger,

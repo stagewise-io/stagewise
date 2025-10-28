@@ -86,7 +86,7 @@ export class AuthService {
     this.notificationService = notificationService;
   }
 
-  private async initialize(): Promise<void> {
+  private async initializeAsync(): Promise<void> {
     try {
       // Register all karton procedure handlers
       this.kartonService.registerServerProcedureHandler(
@@ -313,7 +313,7 @@ export class AuthService {
             label: 'Try again',
             type: 'primary',
             onClick: () => {
-              this.initialize();
+              void this.initializeAsync();
             },
           },
         ],
@@ -321,13 +321,13 @@ export class AuthService {
     }
   }
 
-  public static async create(
+  public static create(
     globalDataPathService: GlobalDataPathService,
     identifierService: IdentifierService,
     logger: Logger,
     kartonService: KartonService,
     notificationService: NotificationService,
-  ): Promise<AuthService> {
+  ): AuthService {
     logger.debug('[AuthService] Creating service...');
     const instance = new AuthService(
       globalDataPathService,
@@ -336,8 +336,11 @@ export class AuthService {
       kartonService,
       notificationService,
     );
-    await instance.initialize();
-    logger.debug('[AuthService] Service created');
+    // Initialize asynchronously - don't block service creation
+    instance.initializeAsync();
+    logger.debug(
+      '[AuthService] Service created, authentication check in progress',
+    );
     return instance;
   }
 
