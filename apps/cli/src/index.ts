@@ -30,6 +30,7 @@ program
   .name('stagewise')
   .description('stagewise - Agentic frontend IDE')
   .version(process.env.CLI_VERSION ?? '0.0.1')
+  .allowExcessArguments(true)
   .option<number>(
     '-p, --port [port]',
     'The port on which the stagewise UI will be exposed',
@@ -67,6 +68,9 @@ program
       bridge: boolean;
       workspaceOnStart: boolean;
     }) => {
+      const wrappedCommand =
+        program.args.length > 0 ? program.args.join(' ') : undefined;
+
       await main({
         launchOptions: {
           port: options.port,
@@ -75,6 +79,7 @@ program
           verbose: options.verbose,
           bridgeMode: options.bridge,
           workspaceOnStart: options.workspaceOnStart,
+          wrappedCommand: wrappedCommand,
         },
       });
     },

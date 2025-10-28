@@ -153,6 +153,7 @@ export class AgentService {
             );
             this.workspaceSetupService.handleSetupSubmission({
               agentAccessPath: params.agentAccessPath,
+              useAutoFoundAppPort: true,
               appPort: params.appPort,
               appPath: params.appPath,
             });

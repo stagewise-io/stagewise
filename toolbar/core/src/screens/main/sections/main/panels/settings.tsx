@@ -26,6 +26,7 @@ import {
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
+import { Switch } from '@stagewise/stage-ui/components/switch';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 
 export const SettingsPanel = () => {
@@ -71,6 +72,7 @@ export const WorkspaceSettingsTabContent = () => {
     _workspaceConfig ?? {
       agentAccessPath: '',
       appPort: 0,
+      useAutoFoundAppPort: true,
       eddyMode: undefined,
       autoPlugins: true,
       plugins: [],
@@ -89,6 +91,13 @@ export const WorkspaceSettingsTabContent = () => {
       });
     },
     [config, setConfigOptimistic, _setWorkspaceConfig],
+  );
+
+  const autoFoundAppPort = useKartonState(
+    (s) => s.workspace?.devAppStatus?.childProcessOwnedPorts[0],
+  );
+  const wrappedCommand = useKartonState(
+    (s) => s.workspace?.devAppStatus?.wrappedCommand,
   );
 
   return (
@@ -175,19 +184,60 @@ export const WorkspaceSettingsTabContent = () => {
         </FormField>
         <FormField className="lg:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
+            <FormFieldLabel htmlFor="dev-application-use-auto-found-port">
+              Use automatically found port
+            </FormFieldLabel>
+            <FormFieldDescription>
+              If stagewise starts your app, it can try to determine the port
+              automatically and use that instead of the default configured port.
+              {autoFoundAppPort && (
+                <>
+                  <br />
+                  <span className="italic">
+                    Current automatically found port:{' '}
+                    <strong className="font-mono">{autoFoundAppPort}</strong>
+                  </span>
+                </>
+              )}
+            </FormFieldDescription>
+          </div>
+          <Switch
+            id="dev-application-use-auto-found-port"
+            defaultChecked={config.useAutoFoundAppPort}
+            onCheckedChange={(checked) =>
+              setConfig({ useAutoFoundAppPort: checked })
+            }
+          />
+        </FormField>
+        <FormField className="lg:flex-row">
+          <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel htmlFor="dev-application-command">
               Start Command
             </FormFieldLabel>
             <FormFieldDescription>
               The command that should be executed to start the dev application.
+              {wrappedCommand && (
+                <>
+                  <br />
+                  <span className="italic">
+                    Overriden by wrapped command:{' '}
+                    <strong className="font-mono">{wrappedCommand}</strong>
+                  </span>
+                </>
+              )}
             </FormFieldDescription>
           </div>
           <Input
             type="text"
             id="dev-application-command"
             className="min-w-80 font-mono lg:w-min"
-            defaultValue={config.appExecutionCommand}
-            onValueChange={(value) => setConfig({ appExecutionCommand: value })}
+            defaultValue={config.appExecutionCommand ?? ''}
+            onValueChange={(value) =>
+              setConfig({
+                appExecutionCommand:
+                  value.length > 0 ? value.trim() : undefined,
+              })
+            }
             debounce={200}
             placeholder={'e.g. "dotenv . -- pnpm dev"'}
           />

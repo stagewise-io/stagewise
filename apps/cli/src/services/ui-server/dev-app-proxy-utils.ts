@@ -34,8 +34,11 @@ export const getProxyMiddleware = (
     },
     followRedirects: false, // Don't automatically follow redirects to prevent loops
     router: () => {
-      const targetPort =
-        workspaceManager.workspace?.configService?.get().appPort;
+      const useAutoFoundAppPort =
+        workspaceManager.workspace?.configService?.get().useAutoFoundAppPort;
+      const targetPort = useAutoFoundAppPort
+        ? workspaceManager.workspace?.devAppStateService?.getPort()
+        : workspaceManager.workspace?.configService?.get().appPort;
       if (!targetPort) {
         throw new Error(
           "[DevAppProxy] Proxy request received while no app port is configured. This shouldn't happen...",
@@ -53,8 +56,11 @@ export const getProxyMiddleware = (
     on: {
       // @ts-expect-error
       error: (err, _req, res: ServerResponse<IncomingMessage>) => {
-        const targetPort =
-          workspaceManager.workspace?.configService?.get().appPort;
+        const useAutoFoundAppPort =
+          workspaceManager.workspace?.configService?.get().useAutoFoundAppPort;
+        const targetPort = useAutoFoundAppPort
+          ? workspaceManager.workspace?.devAppStateService?.getPort()
+          : workspaceManager.workspace?.configService?.get().appPort;
         logger.error(`[DevAppProxy] Proxy error: ${err}`);
         res.writeHead(503, { 'Content-Type': 'text/html' });
         res.end(errorPage(targetPort ?? 0));

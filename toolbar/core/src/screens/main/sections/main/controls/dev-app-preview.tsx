@@ -22,8 +22,10 @@ import {
   RefreshCwIcon,
   BookImageIcon,
   ArrowLeftIcon,
+  SquareIcon,
+  Loader2Icon,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { RadioGroup, Radio } from '@stagewise/stage-ui/components/radio';
 import {
   FormField,
@@ -117,6 +119,25 @@ export function UrlControl() {
     }
   }, [getIFrame]);
 
+  const stopLoading = useCallback(() => {
+    const iframe = getIFrame();
+    if (iframe) {
+      iframe.contentWindow?.stop();
+    }
+  }, [getIFrame]);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const checkIsLoading = useCallback(() => {
+    const iframe = getIFrame();
+    if (iframe) {
+      setIsLoading(
+        !iframe.contentWindow?.closed &&
+          iframe.contentWindow?.document.readyState === 'loading',
+      );
+    }
+  }, [getIFrame]);
+  useCyclicUpdate(checkIsLoading, 10);
+
   return (
     <div className="glass-body flex h-10 w-full flex-1 flex-row items-center gap-2 rounded-full bg-background/80 p-1 backdrop-blur-lg">
       <Button
@@ -149,8 +170,19 @@ export function UrlControl() {
 
       <Tooltip>
         <TooltipTrigger>
-          <Button variant="ghost" size="icon-sm" onClick={reloadIFrame}>
-            <RefreshCwIcon className="size-4" />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => (isLoading ? stopLoading() : reloadIFrame())}
+          >
+            {isLoading && (
+              <Loader2Icon className="size-6 animate-spin text-primary" />
+            )}
+            {!isLoading ? (
+              <RefreshCwIcon className="size-4" />
+            ) : (
+              <SquareIcon className="size-3.5 fill-current" />
+            )}
           </Button>
         </TooltipTrigger>
         <TooltipContent>Reload page</TooltipContent>
@@ -294,22 +326,35 @@ export function FullScreenToggle() {
 }
 
 export function DevAppStateInfo() {
-  const [_contentOnPort, _setContentOnPort] = useState(false);
-  const [_hostingApp, _setHostingApp] = useState(false);
-  const [_hostedAppRunning, setHostedAppRunning] = useState(false);
+  const appState = useKartonState((s) => s.workspace?.devAppStatus);
 
-  const startHostedApp = useCallback(() => {
-    setHostedAppRunning(true);
-  }, []);
+  const configuredAppCommand = useKartonState(
+    (s) => s.workspace?.config?.appExecutionCommand,
+  );
 
-  const stopHostedApp = useCallback(() => {
-    setHostedAppRunning(false);
-  }, []);
+  const startApp = useKartonProcedure((p) => p.workspace.devAppState.start);
+  const stopApp = useKartonProcedure((p) => p.workspace.devAppState.stop);
+  const restartApp = useKartonProcedure((p) => p.workspace.devAppState.restart);
 
-  const _restartHostedApp = useCallback(() => {
-    stopHostedApp();
-    startHostedApp();
-  }, [startHostedApp, stopHostedApp]);
+  const canControlApp = useMemo(() => {
+    return !!(appState?.wrappedCommand || configuredAppCommand);
+  }, [
+    appState?.wrappedCommand,
+    configuredAppCommand,
+    appState?.childProcessRunning,
+  ]);
+
+  const canStartApp = useMemo(() => {
+    return !appState?.childProcessRunning;
+  }, [appState]);
+
+  const canRestartApp = useMemo(() => {
+    return !!appState?.childProcessRunning;
+  }, [appState]);
+
+  const canStopApp = useMemo(() => {
+    return !!appState?.childProcessRunning;
+  }, [appState]);
 
   return (
     <Popover>
@@ -322,6 +367,16 @@ export function DevAppStateInfo() {
               className="bg-background/80 backdrop-blur-lg"
             >
               <PlayIcon className="size-4" />
+              <div
+                className={cn(
+                  'glass-body absolute right-px bottom-px z-10 size-3 rounded-full bg-green-600',
+                  appState?.childProcessRunning
+                    ? appState?.contentAvailableOnPort
+                      ? 'bg-green-600'
+                      : 'bg-yellow-600'
+                    : 'bg-gray-500',
+                )}
+              />
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
@@ -329,6 +384,91 @@ export function DevAppStateInfo() {
       </Tooltip>
       <PopoverContent>
         <PopoverTitle>Dev App Server Status</PopoverTitle>
+        <div className="flex flex-col items-stretch gap-4">
+          <div className="flex flex-col items-stretch gap-2">
+            <div className="flex flex-row items-center justify-between gap-4">
+              <p className="text-muted-foreground text-sm">
+                Child process running
+              </p>
+              <p className="font-mono text-sm">
+                {appState?.childProcessRunning ? 'Yes' : 'No'}
+              </p>
+            </div>
+
+            <div className="flex flex-row items-center justify-between gap-4">
+              <p className="text-muted-foreground text-sm">Child process PID</p>
+              <p className="text-sm">{appState?.childProcessPid ?? '––'}</p>
+            </div>
+
+            <div className="flex flex-row items-center justify-between gap-4">
+              <p className="text-muted-foreground text-sm">
+                Child process port
+              </p>
+              <p className="font-mono text-sm">
+                {appState?.childProcessOwnedPorts.join(', ') ?? '––'}
+              </p>
+            </div>
+
+            <div className="flex flex-row items-center justify-between gap-4">
+              <p className="text-muted-foreground text-sm">
+                Content available on port
+              </p>
+              <p className="text-sm">
+                {appState?.contentAvailableOnPort ? 'Yes' : 'No'}
+              </p>
+            </div>
+
+            <div className="flex flex-row items-center justify-between gap-4">
+              <p className="text-muted-foreground text-sm">Last error</p>
+              <p className="text-sm">
+                {appState?.lastChildProcessError?.message ?? 'None'}
+              </p>
+            </div>
+            <div className="flex flex-row items-center justify-between gap-4">
+              <p className="text-muted-foreground text-sm">Last error code</p>
+              <p className="text-sm">
+                {appState?.lastChildProcessError?.code ?? 'None'}
+              </p>
+            </div>
+            <div className="flex flex-row items-center justify-between gap-4">
+              <p className="text-muted-foreground text-sm">Wrapped command</p>
+              <p className="font-mono text-sm">
+                {appState?.wrappedCommand ?? 'None'}
+              </p>
+            </div>
+          </div>
+        </div>
+        {canControlApp && (
+          <div className="flex flex-row-reverse items-center justify-start gap-2">
+            <Button
+              variant="primary"
+              size="icon-sm"
+              className="bg-green-600 text-green-50 dark:bg-green-700 dark:text-green-400"
+              onClick={() => startApp()}
+              disabled={!canStartApp}
+            >
+              <PlayIcon className="size-4" />
+            </Button>
+            <Button
+              variant="primary"
+              size="icon-sm"
+              className="bg-yellow-600 text-yellow-50 dark:bg-yellow-700 dark:text-yellow-400"
+              onClick={() => restartApp()}
+              disabled={!canRestartApp}
+            >
+              <RefreshCwIcon className="size-4" />
+            </Button>
+            <Button
+              variant="primary"
+              size="icon-sm"
+              className="bg-rose-600 text-rose-50 dark:bg-rose-700 dark:text-rose-400"
+              onClick={() => stopApp()}
+              disabled={!canStopApp}
+            >
+              <SquareIcon className="size-3.5 fill-current" />
+            </Button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

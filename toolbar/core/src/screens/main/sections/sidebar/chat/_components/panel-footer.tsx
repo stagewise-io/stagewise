@@ -295,10 +295,10 @@ export function ChatPanelFooter({
                 <Button
                   onClick={abortAgent}
                   aria-label="Stop agent"
-                  variant={'primary'}
-                  className="!opacity-100 group z-10 size-8 cursor-pointer rounded-full bg-rose-600 p-1 shadow-md backdrop-blur-lg !disabled:*:opacity-10"
+                  variant={'secondary'}
+                  className="!opacity-100 group z-10 size-8 cursor-pointer rounded-full bg-rose-100/60 p-1 shadow-md backdrop-blur-lg !disabled:*:opacity-10 dark:bg-rose-900/60"
                 >
-                  <SquareIcon className="size-3 fill-zinc-500 stroke-zinc-500 group-hover:fill-zinc-800 group-hover:stroke-zinc-800" />
+                  <SquareIcon className="size-3.5 fill-current text-rose-600" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Stop agent</TooltipContent>

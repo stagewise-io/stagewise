@@ -40,6 +40,13 @@ export const workspaceConfigSchema = z
     appPort: z
       .number()
       .describe('The port on which the app dev server serves the app preview'),
+    useAutoFoundAppPort: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether to use the automatically found app port. If true, stagewise will try to find the app port automatically and use that instead of the configured value.',
+      )
+      .default(true),
     appExecutionCommand: z
       .string()
       .optional()

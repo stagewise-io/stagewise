@@ -1,5 +1,7 @@
 {
   "agentAccessPath": "{GIT_REPO_ROOT}",
   "appPort": 3000,
+  "useAutoFoundAppPort": true,
+  "appExecutionCommand": "pnpm dev",
   "port": 3100
 }

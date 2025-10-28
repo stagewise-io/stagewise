@@ -20,6 +20,7 @@ export type MainParameters = {
     verbose?: boolean;
     bridgeMode?: boolean;
     workspaceOnStart?: boolean;
+    wrappedCommand?: string;
   };
 };
 
@@ -31,6 +32,7 @@ export async function main({
     verbose,
     bridgeMode,
     workspaceOnStart,
+    wrappedCommand,
   },
 }: MainParameters) {
   const {
@@ -109,6 +111,7 @@ export async function main({
       },
       true,
       !!workspacePath,
+      wrappedCommand,
     );
     logger.debug('[Main] Initial workspace loaded');
   }

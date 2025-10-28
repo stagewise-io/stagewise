@@ -107,8 +107,12 @@ export type AppState = {
     path: string;
     dataPath: string;
     devAppStatus: {
-      status: 'running-as-wrapped-command' | 'not-running' | 'unknown';
-      contentAvailableOnPort: boolean; // Is true, if the CLI detects that there is content available on the configured dev app port.
+      contentAvailableOnPort: boolean; // Is true, if the CLI detected that there is content available on the configured dev app port.
+      childProcessRunning: boolean;
+      childProcessPid: number | null;
+      childProcessOwnedPorts: number[];
+      lastChildProcessError: { message: string; code: number } | null;
+      wrappedCommand: string | null; // Will only be true on the initially loaded workspace if stagewise directly wraps a command.
     } | null;
     agent: {
       accessPath: string;
@@ -309,6 +313,11 @@ export type KartonContract = {
       };
       config: {
         set: (config: WorkspaceConfig) => Promise<void>;
+      };
+      devAppState: {
+        start: () => Promise<void>;
+        stop: () => Promise<void>;
+        restart: () => Promise<void>;
       };
     };
     userExperience: {

@@ -91,6 +91,7 @@ export class WorkspaceManagerService {
     workspaceLoadingOverrides?: WorkspaceLoadingOverrides,
     loadedOnStart = false,
     pathGivenInStartingArg = false,
+    wrappedCommand?: string,
   ) {
     // Fail if there already is a workspace loaded.
     if (this.currentWorkspace) {
@@ -143,6 +144,7 @@ export class WorkspaceManagerService {
       workspaceLoadingOverrides ?? null,
       loadedOnStart,
       pathGivenInStartingArg,
+      wrappedCommand,
     ).catch((error) => {
       this.logger.error(
         `[WorkspaceManagerService] Failed to create workspace service. Reason: ${error}`,

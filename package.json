@@ -45,9 +45,13 @@
     ],
     "ignoredBuiltDependencies": [
       "keytar"
-    ]
+    ],
+    "overrides": {
+      "stagewise": "link:apps/cli"
+    }
   },
   "dependencies": {
+    "stagewise": "link:apps/cli",
     "tsx": "^4.20.3"
   }
 }
