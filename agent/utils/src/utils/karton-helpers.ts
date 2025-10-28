@@ -33,6 +33,7 @@ export function createAndActivateNewChat(
       title,
       createdAt: new Date(),
       messages: [],
+      usage: { maxContextWindowSize: 200000, usedContextWindowSize: 0 },
     };
     draft.workspace.agentChat.activeChatId = chatId;
   });

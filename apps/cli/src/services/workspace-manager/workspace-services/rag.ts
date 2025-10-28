@@ -1,5 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import { initializeRag, LevelDb } from '@stagewise/agent-rag';
+import { initializeRag, getRagMetadata } from '@stagewise/agent-rag';
 import { isAuthenticationError } from '@stagewise/agent-utils';
 import type { KartonService } from '../../karton';
 import type { Logger } from '../../logger';
@@ -14,7 +14,6 @@ export class RagService {
   private clientRuntime: ClientRuntime;
   private workspaceDataPath: string;
   private updateRagInterval: NodeJS.Timeout | null = null;
-  private levelDb: LevelDb;
   private authRetryCount = 0;
   private maxAuthRetries = 2;
 
@@ -32,30 +31,17 @@ export class RagService {
     this.authService = authService;
     this.clientRuntime = clientRuntime;
     this.workspaceDataPath = workspaceDataPath;
-    this.levelDb = LevelDb.getInstance(workspaceDataPath);
   }
 
   private async initializeRagState() {
-    await this.levelDb.open();
-    const metadata = await this.levelDb.meta.get('schema');
-    if (!metadata) {
-      this.kartonService.setState((draft) => {
-        draft.workspace!.rag = {
-          lastIndexedAt: null,
-          indexedFiles: 0,
-          statusInfo: { isIndexing: false },
-        };
-      });
-    } else {
-      this.kartonService.setState((draft) => {
-        draft.workspace!.rag = {
-          lastIndexedAt: metadata.rag.lastIndexedAt,
-          indexedFiles: metadata.rag.indexedFiles,
-          statusInfo: { isIndexing: false },
-        };
-      });
-    }
-    await this.levelDb.close();
+    const metadata = await getRagMetadata(this.workspaceDataPath);
+    this.kartonService.setState((draft) => {
+      draft.workspace!.rag = {
+        lastIndexedAt: metadata.lastIndexedAt,
+        indexedFiles: metadata.indexedFiles,
+        statusInfo: { isIndexing: false },
+      };
+    });
   }
 
   private async resetRagStatusWithError(error: string) {
@@ -86,7 +72,6 @@ export class RagService {
           this.logger.error('[RagService] Failed to initialize RAG', error);
         },
       )) {
-        this.logger.debug(`updating rag: ${update.progress}/${update.total}`);
         this.kartonService.setState((draft) => {
           draft.workspace!.rag.statusInfo = {
             isIndexing: true,
@@ -148,7 +133,7 @@ export class RagService {
     }
   }
 
-  private async periodicallyUpdateRag(apiKey: string) {
+  private periodicallyUpdateRag(apiKey: string) {
     this.updateRagInterval = setInterval(async () => {
       try {
         if (this.kartonService.state.workspace?.rag?.statusInfo?.isIndexing) {
@@ -173,7 +158,7 @@ export class RagService {
         this.updateRagInterval = null;
         this.periodicallyUpdateRag(apiKey);
       }
-    }, 10 * 1000); // 10 seconds
+    }, 60 * 1000); // 60 seconds
   }
 
   public async initialize() {
@@ -189,9 +174,6 @@ export class RagService {
 
       // Register all karton procedure handlers
       this.registerProcedureHandlers();
-
-      // Update RAG
-      await this.updateRag(apiKey);
 
       // Periodically update RAG
       this.periodicallyUpdateRag(apiKey);

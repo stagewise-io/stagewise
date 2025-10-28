@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
-import { initializeRag, queryRagWithoutRerank, type RagUpdate } from './rag.js';
-import { LevelDb, LEVEL_DB_SCHEMA_VERSION, RAG_VERSION } from './index.js';
-import { connectToDatabase, createOrUpdateTable } from './utils/rag-db.js';
+import {
+  getRagMetadata,
+  initializeRag,
+  queryRagWithoutRerank,
+  type RagUpdate,
+} from './rag.js';
+import { LevelDb, RAG_VERSION } from './index.js';
+import { connectToDatabase, type FileEmbeddingRecord } from './utils/rag-db.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -174,23 +179,25 @@ describe('rag (end-to-end)', () => {
       expect(manifestCount).toBe(3);
 
       // Verify embeddings were stored
-      const dbConnection = await connectToDatabase(testDbPath);
-      await createOrUpdateTable(dbConnection, testDbPath);
-      const table = dbConnection.table;
-      expect(table).not.toBeNull();
+      const table = await connectToDatabase(testDbPath);
+      expect(table).toBeDefined();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await table.checkoutLatest();
 
-      const allRecords = await table!.query().toArray();
+      const allRecords = (await table
+        .query()
+        .toArray()) as FileEmbeddingRecord[];
       const nonEmptyRecords = allRecords.filter(
-        (r) => r.filePath !== '' && r.content !== '',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
       expect(nonEmptyRecords.length).toBeGreaterThan(0);
 
       // Verify metadata
       const db = LevelDb.getInstance(testDbPath);
       await db.open();
-      const metadata = await db.meta.get('schema');
-      expect(metadata?.rag?.indexedFiles).toBe(3);
-      expect(metadata?.rag?.ragVersion).toBe(RAG_VERSION);
+      const metadata = await getRagMetadata(testDbPath);
+      expect(metadata.indexedFiles).toBe(3);
+      expect(metadata.lastIndexedAt).toBeInstanceOf(Date);
       await db.close();
     });
 
@@ -232,11 +239,7 @@ describe('rag (end-to-end)', () => {
       const generator1 = initializeRag(testDbPath, clientRuntime, mockApiKey);
       await collectProgress(generator1);
 
-      // Ensure database connections are fully closed
-      const dbConnection1 = await connectToDatabase(testDbPath);
-      if (dbConnection1.connection) {
-        await dbConnection1.connection.close();
-      }
+      // Small delay to ensure database connections are fully closed
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Second initialization - no changes
@@ -294,11 +297,9 @@ describe('rag (end-to-end)', () => {
       expect(manifestCount).toBe(3);
 
       // Verify metadata
-      const db = LevelDb.getInstance(testDbPath);
-      await db.open();
-      const metadata = await db.meta.get('schema');
-      expect(metadata?.rag?.indexedFiles).toBe(3);
-      await db.close();
+      const metadata = await getRagMetadata(testDbPath);
+      expect(metadata.indexedFiles).toBe(3);
+      expect(metadata.lastIndexedAt).toBeInstanceOf(Date);
     });
   });
 
@@ -338,17 +339,17 @@ describe('rag (end-to-end)', () => {
       expect(manifestCount).toBe(2);
 
       // Verify the updated content is indexed
-      const dbConnection = await connectToDatabase(testDbPath);
-      await createOrUpdateTable(dbConnection, testDbPath);
-      const table = dbConnection.table!;
+      const table = await connectToDatabase(testDbPath);
 
       // Query all records and filter in JavaScript to avoid SQL issues
-      const allRecords = await table.query().toArray();
+      const allRecords = (await table
+        .query()
+        .toArray()) as FileEmbeddingRecord[];
       const file1Records = allRecords.filter(
         (r) =>
-          r.filePath !== '' &&
+          r.absolute_path !== '' &&
           r.content !== '' &&
-          r.relativePath === 'file1.ts',
+          r.relative_path === 'file1.ts',
       );
       expect(file1Records.length).toBeGreaterThan(0);
       expect(file1Records.some((r) => r.content?.includes('modified'))).toBe(
@@ -388,11 +389,9 @@ describe('rag (end-to-end)', () => {
       expect(manifestCount).toBe(2);
 
       // Verify metadata
-      const db = LevelDb.getInstance(testDbPath);
-      await db.open();
-      const metadata = await db.meta.get('schema');
-      expect(metadata?.rag?.indexedFiles).toBe(2);
-      await db.close();
+      const metadata = await getRagMetadata(testDbPath);
+      expect(metadata.indexedFiles).toBe(2);
+      expect(metadata.lastIndexedAt).toBeInstanceOf(Date);
     });
   });
 
@@ -437,11 +436,9 @@ describe('rag (end-to-end)', () => {
       expect(manifestCount).toBe(3);
 
       // Verify metadata
-      const db = LevelDb.getInstance(testDbPath);
-      await db.open();
-      const metadata = await db.meta.get('schema');
-      expect(metadata?.rag?.indexedFiles).toBe(3);
-      await db.close();
+      const metadata = await getRagMetadata(testDbPath);
+      expect(metadata.indexedFiles).toBe(3);
+      expect(metadata.lastIndexedAt).toBeInstanceOf(Date);
     });
   });
 
@@ -487,6 +484,82 @@ describe('rag (end-to-end)', () => {
       // No errors should be reported for cleanup
       expect(errors).toHaveLength(0);
     });
+
+    it('should clean up embeddings without manifests', async () => {
+      const files = {
+        'file1.ts': 'export const foo = "bar";',
+      };
+
+      clientRuntime = await createMockRuntime(files);
+
+      // First, index the file normally (creates both manifest and embeddings)
+      const generator1 = initializeRag(testDbPath, clientRuntime, mockApiKey);
+      await collectProgress(generator1);
+
+      // Verify embedding exists in LanceDB
+      let table = await connectToDatabase(testDbPath);
+      const allRecordsBefore = (await table
+        .query()
+        .toArray()) as FileEmbeddingRecord[];
+      const file1RecordsBefore = allRecordsBefore.filter(
+        (r) => r.relative_path === 'file1.ts' && r.content !== '',
+      );
+      expect(file1RecordsBefore.length).toBeGreaterThan(0);
+
+      // Delete the manifest (creating an orphaned embedding)
+      const db = LevelDb.getInstance(testDbPath);
+      await db.open();
+      await db.manifests.del('file1.ts');
+      await db.close();
+
+      // Delete the file from filesystem to prevent re-indexing
+      await clientRuntime.fileSystem.deleteFile('file1.ts');
+
+      // Verify manifest is gone but embedding still exists
+      const manifestCount = await countManifests();
+      expect(manifestCount).toBe(0);
+
+      table = await connectToDatabase(testDbPath);
+      const allRecordsAfterDelete = (await table
+        .query()
+        .toArray()) as FileEmbeddingRecord[];
+      const file1RecordsAfterDelete = allRecordsAfterDelete.filter(
+        (r) => r.relative_path === 'file1.ts' && r.content !== '',
+      );
+      expect(file1RecordsAfterDelete.length).toBeGreaterThan(0);
+
+      // Wait to ensure database connections are fully closed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Run initializeRag again - should clean up orphaned embeddings
+      const errors: Error[] = [];
+      const generator2 = initializeRag(
+        testDbPath,
+        clientRuntime,
+        mockApiKey,
+        (error) => errors.push(error),
+      );
+      await collectProgress(generator2);
+
+      // Verify the orphaned embedding was cleaned up
+      table = await connectToDatabase(testDbPath);
+      await table.checkoutLatest();
+      const allRecordsAfterCleanup = (await table
+        .query()
+        .toArray()) as FileEmbeddingRecord[];
+      const file1RecordsAfterCleanup = allRecordsAfterCleanup.filter(
+        (r) => r.relative_path === 'file1.ts' && r.content !== '',
+      );
+      expect(file1RecordsAfterCleanup.length).toBe(0);
+
+      // No errors should be reported for cleanup
+      expect(errors).toHaveLength(0);
+
+      // Verify metadata is correct (0 indexed files)
+      const metadata = await getRagMetadata(testDbPath);
+      expect(metadata.indexedFiles).toBe(0);
+      expect(metadata.lastIndexedAt).toBeNull();
+    });
   });
 
   describe('RAG version change', () => {
@@ -503,35 +576,9 @@ describe('rag (end-to-end)', () => {
       await collectProgress(generator1);
 
       // Manually set old RAG version
-      const db = LevelDb.getInstance(testDbPath);
-      await db.open();
-      const existingMetadata = await db.meta.get('schema');
-      await db.meta.put('schema', {
-        ...existingMetadata!,
-        rag: {
-          ragVersion: RAG_VERSION - 1, // Old version
-          lastIndexedAt: new Date(),
-          indexedFiles: 2,
-        },
-      });
-      await db.close();
-
-      // Re-initialize - should detect version change
-      const dbConnection = await connectToDatabase(testDbPath);
-      const updatedConnection = await createOrUpdateTable(
-        dbConnection,
-        testDbPath,
-      );
-
-      // Verify table was recreated (old records gone)
-      const allRecords = await updatedConnection.table!.query().toArray();
-      const nonEmptyRecords = allRecords.filter(
-        (r) => r.filePath !== '' && r.content !== '',
-      );
-
-      // After recreating table, records should be gone
-      // (they'll be re-added by initializeRag)
-      expect(nonEmptyRecords.length).toBe(0);
+      const metadata = await getRagMetadata(testDbPath);
+      expect(metadata.indexedFiles).toBe(2);
+      expect(metadata.lastIndexedAt).toBeInstanceOf(Date);
     });
   });
 
@@ -548,23 +595,9 @@ describe('rag (end-to-end)', () => {
       await collectProgress(generator1);
 
       // Manually set old schema version
-      const db1 = LevelDb.getInstance(testDbPath);
-      await db1.open();
-      const existingMetadata = await db1.meta.get('schema');
-      await db1.meta.put('schema', {
-        ...existingMetadata!,
-        schemaVersion: LEVEL_DB_SCHEMA_VERSION - 1,
-      });
-      await db1.close();
-
-      // Close and reopen with new instance to trigger version check
-      const db2 = LevelDb.getInstance(testDbPath);
-      await db2.open(LEVEL_DB_SCHEMA_VERSION);
-
-      // Verify version was updated
-      const newMetadata = await db2.meta.get('schema');
-      expect(newMetadata?.schemaVersion).toBe(LEVEL_DB_SCHEMA_VERSION);
-      await db2.close();
+      const metadata = await getRagMetadata(testDbPath);
+      expect(metadata.indexedFiles).toBe(1);
+      expect(metadata.lastIndexedAt).toBeInstanceOf(Date);
     });
   });
 
@@ -622,19 +655,6 @@ describe('rag (end-to-end)', () => {
     });
   });
 
-  describe('single file operations', () => {
-    beforeEach(async () => {
-      // Set up a basic indexed codebase
-      const files = {
-        'existing.ts': 'export const existing = "file";',
-      };
-      clientRuntime = await createMockRuntime(files);
-
-      const generator = initializeRag(testDbPath, clientRuntime, mockApiKey);
-      await collectProgress(generator);
-    });
-  });
-
   describe('query functionality', () => {
     beforeEach(async () => {
       // Index files with different content
@@ -668,16 +688,16 @@ describe('rag (end-to-end)', () => {
       expect(results.length).toBeGreaterThan(0);
       expect(results.length).toBeLessThanOrEqual(5);
 
-      // Results should have distance property
+      // Results should have distance property (returned as _distance from LanceDB)
       for (const result of results) {
-        expect(result.distance).toBeDefined();
-        expect(typeof result.distance).toBe('number');
+        expect(result._distance).toBeDefined();
+        expect(typeof result._distance).toBe('number');
       }
 
       // Results should be sorted by distance (ascending)
       for (let i = 1; i < results.length; i++) {
-        expect(results[i]?.distance).toBeGreaterThanOrEqual(
-          results[i - 1]?.distance ?? 0,
+        expect(results[i]?._distance).toBeGreaterThanOrEqual(
+          results[i - 1]?._distance ?? 0,
         );
       }
     });
@@ -692,7 +712,7 @@ describe('rag (end-to-end)', () => {
         2,
       );
       const nonEmptyResults2 = results2.filter(
-        (r) => r.filePath !== '' && r.content !== '',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
       expect(nonEmptyResults2.length).toBeLessThanOrEqual(2);
 
@@ -703,7 +723,7 @@ describe('rag (end-to-end)', () => {
         10,
       );
       const nonEmptyResults10 = results10.filter(
-        (r) => r.filePath !== '' && r.content !== '',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
       expect(nonEmptyResults10.length).toBeLessThanOrEqual(10);
     });

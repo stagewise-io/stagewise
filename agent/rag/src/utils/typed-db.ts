@@ -5,7 +5,7 @@ import type { RouteMapping } from '../search-agents/search-routes.js';
 import type { StyleInformation } from '../search-agents/search-styles.js';
 import type { ComponentLibraryInformation } from '../search-agents/search-components.js';
 import type { AppInformation } from '../search-agents/search-app-information.js';
-import { LEVEL_DB_SCHEMA_VERSION, RAG_VERSION } from '../index.js';
+import { LEVEL_DB_SCHEMA_VERSION } from '../index.js';
 import type { InspirationComponent } from '@stagewise/agent-tools';
 import path from 'node:path';
 
@@ -16,11 +16,6 @@ const dbInstances = new Map<string, LevelDb>();
 const schemaMutex = new Map<string, Promise<void>>();
 
 interface DatabaseMetadata {
-  rag: {
-    ragVersion: number;
-    lastIndexedAt: Date | null;
-    indexedFiles: number;
-  };
   schemaVersion: number;
   initializedAt: string;
 }
@@ -218,31 +213,11 @@ export class LevelDb {
 
       // Initialize metadata with current schema version
       const metadata: DatabaseMetadata = {
-        rag: {
-          ragVersion: RAG_VERSION,
-          lastIndexedAt: null,
-          indexedFiles: 0,
-        },
         schemaVersion: newSchemaVersion,
         initializedAt: new Date().toISOString(),
       };
 
       await this.meta.put('schema', metadata);
-
-      // Also clear the LanceDB table to keep databases in sync
-      try {
-        const { connectToDatabase } = await import('./rag-db.js');
-        const workspaceDataPath = this.dbPath.replace('/typed-db', '');
-        const dbConnection = await connectToDatabase(workspaceDataPath);
-        if (dbConnection.table) {
-          await dbConnection.connection.dropTable(
-            dbConnection.config.tableName,
-          );
-        }
-      } catch (_error) {
-        // If LanceDB cleanup fails, log but don't fail the reset
-        // The table will be recreated on next use
-      }
     } catch (_) {
       throw new Error('Failed to reset database');
     }

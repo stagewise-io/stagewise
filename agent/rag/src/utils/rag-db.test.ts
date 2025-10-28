@@ -1,44 +1,33 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
-import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import type { Table } from '@lancedb/lancedb';
 import {
   connectToDatabase,
-  createOrUpdateTable,
   createFileRecord,
-  upsertFileRecord,
+  addFileRecord,
   deleteFileRecords,
   searchSimilarFiles,
   createDatabaseConfig,
-  type DatabaseConnection,
+  getRagMetadata,
   type FileInfo,
   type FileEmbeddingRecord,
 } from './rag-db.js';
-import { LevelDb } from './typed-db.js';
 import { EXPECTED_EMBEDDING_DIM, RAG_VERSION } from '../index.js';
 import type { FileEmbedding } from './embeddings.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 describe('rag-db', () => {
-  let clientRuntime: ClientRuntime;
   let testDbPath: string;
-  let dbConnection: DatabaseConnection;
+  let table: Table | null = null;
 
   beforeEach(async () => {
     // Use a unique test directory for each test
     testDbPath = `./test-db/${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    clientRuntime = new ClientRuntimeNode({
-      workingDirectory: testDbPath,
-    });
   });
 
   afterEach(async () => {
     // Clean up after each test
     try {
-      if (dbConnection?.connection) {
-        await dbConnection.connection.close();
-      }
-
       // Small delay to ensure LanceDB has fully released file handles
       await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -59,12 +48,9 @@ describe('rag-db', () => {
     });
 
     it('should connect to database successfully', async () => {
-      dbConnection = await connectToDatabase(testDbPath);
+      table = await connectToDatabase(testDbPath);
 
-      expect(dbConnection.connection).toBeDefined();
-      expect(dbConnection.config).toBeDefined();
-      expect(dbConnection.config.dbPath).toContain('codebase-embeddings');
-      expect(dbConnection.config.tableName).toBe('codebase_embeddings');
+      expect(table).toBeDefined();
     });
 
     it('should create database directory if it does not exist', async () => {
@@ -77,173 +63,16 @@ describe('rag-db', () => {
         // Directory doesn't exist, which is what we want
       }
 
-      dbConnection = await connectToDatabase(testDbPath);
+      table = await connectToDatabase(testDbPath);
 
       // Check that the directory was created
       await expect(fs.access(dbDir)).resolves.not.toThrow();
-    });
-
-    it('should have null table initially when no table exists', async () => {
-      dbConnection = await connectToDatabase(testDbPath);
-
-      expect(dbConnection.table).toBeNull();
-    });
-  });
-
-  describe('table creation and schema management', () => {
-    beforeEach(async () => {
-      dbConnection = await connectToDatabase(testDbPath);
-    });
-
-    it('should create table with correct schema when table does not exist', async () => {
-      const updatedConnection = await createOrUpdateTable(
-        dbConnection,
-        testDbPath,
-      );
-
-      expect(updatedConnection.table).toBeDefined();
-      expect(updatedConnection.table).not.toBeNull();
-
-      // Verify table exists in connection
-      const tableNames = await updatedConnection.connection.tableNames();
-      expect(tableNames).toContain(updatedConnection.config.tableName);
-    });
-
-    it.skip('should validate and keep existing table with correct schema', async () => {
-      // First create the table
-      let updatedConnection = await createOrUpdateTable(
-        dbConnection,
-        testDbPath,
-      );
-
-      // Add a test record to verify it persists
-      const testRecord = createMockFileEmbeddingRecord();
-      await updatedConnection.table!.add([testRecord as any]);
-
-      // Give LanceDB time to flush to disk
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Count records before calling createOrUpdateTable again
-      const recordsBefore = await updatedConnection.table!.query().toArray();
-      const nonEmptyBefore = recordsBefore.filter(
-        (r) => r.filePath !== '' && r.content !== '',
-      );
-      expect(nonEmptyBefore).toHaveLength(1);
-
-      // Call createOrUpdateTable again - should keep existing table (not recreate)
-      updatedConnection = await createOrUpdateTable(
-        updatedConnection,
-        testDbPath,
-      );
-
-      expect(updatedConnection.table).toBeDefined();
-
-      // Verify the test record still exists (table wasn't recreated)
-      const recordsAfter = await updatedConnection.table!.query().toArray();
-      const nonEmptyAfter = recordsAfter.filter(
-        (r) => r.filePath !== '' && r.content !== '',
-      );
-      expect(nonEmptyAfter).toHaveLength(1);
-    });
-
-    it.skip('should recreate table when schema is invalid (wrong embedding dimensions)', async () => {
-      // Create table with wrong embedding dimensions
-      const wrongDimRecord = {
-        ...createMockFileEmbeddingRecord(),
-        embedding: new Array(512).fill(0), // Wrong dimension
-      };
-
-      // Manually create table with wrong schema
-      const table = await dbConnection.connection.createTable(
-        dbConnection.config.tableName,
-        [wrongDimRecord as any],
-      );
-
-      //  Give LanceDB time to flush
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      dbConnection = { ...dbConnection, table };
-      const workspaceDataPath =
-        clientRuntime.fileSystem.getCurrentWorkingDirectory();
-
-      // This should detect wrong dimensions and recreate the table
-      const updatedConnection = await createOrUpdateTable(
-        dbConnection,
-        workspaceDataPath,
-      );
-
-      expect(updatedConnection.table).toBeDefined();
-
-      // Verify we can add records with correct dimensions
-      const correctRecord = createMockFileEmbeddingRecord();
-      await expect(
-        updatedConnection.table!.add([correctRecord as any]),
-      ).resolves.not.toThrow();
-
-      // Give LanceDB time to flush
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Verify the new record was added successfully
-      const records = await updatedConnection.table!.query().toArray();
-      const nonEmptyRecords = records.filter(
-        (r) => r.filePath !== '' && r.content !== '',
-      );
-      expect(nonEmptyRecords.length).toBeGreaterThan(0);
-    });
-
-    it('should recreate table when RAG version is outdated', async () => {
-      // Create LevelDb instance and set old RAG version
-      const workspaceDataPath =
-        clientRuntime.fileSystem.getCurrentWorkingDirectory();
-      const levelDb = LevelDb.getInstance(workspaceDataPath);
-      await levelDb.open();
-
-      // Set outdated RAG version in metadata
-      await levelDb.meta.put('schema', {
-        rag: {
-          ragVersion: RAG_VERSION - 1, // Old version
-          lastIndexedAt: null,
-          indexedFiles: 0,
-        },
-        schemaVersion: 1,
-        initializedAt: new Date().toISOString(),
-      });
-
-      // Create table
-      let updatedConnection = await createOrUpdateTable(
-        dbConnection,
-        workspaceDataPath,
-      );
-
-      // Add test record
-      const testRecord = createMockFileEmbeddingRecord();
-      await updatedConnection.table!.add([testRecord as any]);
-
-      // This should recreate the table due to old RAG version
-      updatedConnection = await createOrUpdateTable(
-        updatedConnection,
-        testDbPath,
-      );
-
-      expect(updatedConnection.table).toBeDefined();
-
-      // Old record should be gone
-      const records = await updatedConnection
-        .table!.query()
-        .where(`"filePath" = "${testRecord.filePath}"`)
-        .toArray();
-      expect(records).toHaveLength(0);
-
-      await levelDb.close();
     });
   });
 
   describe('file record operations', () => {
     beforeEach(async () => {
-      const workspaceDataPath =
-        clientRuntime.fileSystem.getCurrentWorkingDirectory();
-      dbConnection = await connectToDatabase(workspaceDataPath);
-      dbConnection = await createOrUpdateTable(dbConnection, workspaceDataPath);
+      table = await connectToDatabase(testDbPath);
     });
 
     it('should create file record with correct structure', () => {
@@ -253,7 +82,7 @@ describe('rag-db', () => {
       };
 
       const embedding: FileEmbedding = {
-        filePath: '/test/file.ts',
+        absolutePath: '/test/file.ts',
         relativePath: 'test/file.ts',
         chunkIndex: 0,
         totalChunks: 1,
@@ -265,22 +94,22 @@ describe('rag-db', () => {
 
       const record = createFileRecord(fileInfo, embedding);
 
-      expect(record.filePath).toBe(fileInfo.absolutePath);
-      expect(record.relativePath).toBe(fileInfo.relativePath);
+      expect(record.absolute_path).toBe(fileInfo.absolutePath);
+      expect(record.relative_path).toBe(fileInfo.relativePath);
       expect(record.content).toBe(embedding.content);
       expect(record.embedding).toHaveLength(EXPECTED_EMBEDDING_DIM);
-      expect(record.ragVersion).toBe(RAG_VERSION);
-      expect(record.chunkIndex).toBe(0);
+      expect(record.rag_version).toBe(RAG_VERSION);
+      expect(record.chunk_index).toBe(0);
     });
 
-    it('should upsert file record (insert new)', async () => {
+    it('should add file record (insert new)', async () => {
       const fileInfo: FileInfo = {
         absolutePath: '/test/new-file.ts',
         relativePath: 'test/new-file.ts',
       };
 
       const embedding: FileEmbedding = {
-        filePath: '/test/new-file.ts',
+        absolutePath: '/test/new-file.ts',
         relativePath: 'test/new-file.ts',
         chunkIndex: 0,
         totalChunks: 1,
@@ -290,67 +119,56 @@ describe('rag-db', () => {
         embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.2),
       };
 
-      await upsertFileRecord(dbConnection.table!, fileInfo, embedding);
+      await addFileRecord(table!, fileInfo, embedding);
 
       // Verify record was inserted by counting all non-empty records
-      const allRecords = await dbConnection.table!.query().toArray();
+      const allRecords = await table!.query().toArray();
       const nonEmptyRecords = allRecords.filter(
-        (r) => r.filePath !== '' && r.content !== '',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
 
       expect(nonEmptyRecords).toHaveLength(1);
       expect(nonEmptyRecords[0]?.content).toBe('new file content');
-      expect(nonEmptyRecords[0]?.relativePath).toBe('test/new-file.ts');
+      expect(nonEmptyRecords[0]?.relative_path).toBe('test/new-file.ts');
     });
 
-    it('should upsert file record (update existing)', async () => {
+    it('should add multiple records for the same file', async () => {
       const fileInfo: FileInfo = {
-        absolutePath: '/test/existing-file.ts',
-        relativePath: 'test/existing-file.ts',
+        absolutePath: '/test/multi-chunk.ts',
+        relativePath: 'test/multi-chunk.ts',
       };
 
-      // Insert initial record
-      const initialEmbedding: FileEmbedding = {
-        filePath: '/test/existing-file.ts',
-        relativePath: 'test/existing-file.ts',
-        chunkIndex: 0,
-        totalChunks: 1,
-        startLine: 1,
-        endLine: 10,
-        content: 'initial content',
-        embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.3),
-      };
+      // Add multiple chunks for the same file
+      for (let i = 0; i < 3; i++) {
+        const embedding: FileEmbedding = {
+          absolutePath: '/test/multi-chunk.ts',
+          relativePath: 'test/multi-chunk.ts',
+          chunkIndex: i,
+          totalChunks: 3,
+          startLine: i * 10 + 1,
+          endLine: (i + 1) * 10,
+          content: `chunk ${i} content`,
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1 * (i + 1)),
+        };
 
-      await upsertFileRecord(dbConnection.table!, fileInfo, initialEmbedding);
+        await addFileRecord(table!, fileInfo, embedding);
+      }
 
-      // Update with new content
-      const updatedEmbedding: FileEmbedding = {
-        ...initialEmbedding,
-        content: 'updated content',
-        embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.4),
-      };
-
-      await upsertFileRecord(dbConnection.table!, fileInfo, updatedEmbedding);
-
-      // Note: Due to WHERE clause limitations in LanceDB, upsert may add records instead of replacing
-      // Verify at least one record exists with updated content
-      const allRecords = await dbConnection.table!.query().toArray();
+      // Verify all chunks were added
+      const allRecords = await table!.query().toArray();
       const nonEmptyRecords = allRecords.filter(
-        (r) => r.filePath !== '' && r.content !== '',
-      );
-      const updatedRecords = nonEmptyRecords.filter(
-        (r) => r.content === 'updated content',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
 
-      expect(updatedRecords).toHaveLength(1);
-      expect(updatedRecords[0]?.content).toBe('updated content');
-      // Note: embedding might be stored as Vector object in LanceDB, check if it exists
-      const embedding = updatedRecords[0]?.embedding;
-      if (Array.isArray(embedding)) {
-        expect(embedding[0]).toBe(0.4);
-      } else {
-        // If it's a Vector object, just verify it exists
-        expect(embedding).toBeDefined();
+      expect(nonEmptyRecords).toHaveLength(3);
+
+      // Verify each chunk exists
+      for (let i = 0; i < 3; i++) {
+        const chunkRecords = nonEmptyRecords.filter(
+          (r) => r.content === `chunk ${i} content`,
+        );
+        expect(chunkRecords).toHaveLength(1);
+        expect(chunkRecords[0]?.chunk_index).toBe(i);
       }
     });
 
@@ -361,7 +179,7 @@ describe('rag-db', () => {
       };
 
       const embedding: FileEmbedding = {
-        filePath: '/test/to-delete.ts',
+        absolutePath: '/test/to-delete.ts',
         relativePath: 'test/to-delete.ts',
         chunkIndex: 0,
         totalChunks: 1,
@@ -372,288 +190,38 @@ describe('rag-db', () => {
       };
 
       // Insert record
-      await upsertFileRecord(dbConnection.table!, fileInfo, embedding);
+      await addFileRecord(table!, fileInfo, embedding);
 
       // Verify record exists
-      let allRecords = await dbConnection.table!.query().toArray();
+      let allRecords = (await table!
+        .query()
+        .toArray()) as FileEmbeddingRecord[];
       let nonEmptyRecords = allRecords.filter(
-        (r) => r.filePath !== '' && r.content !== '',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
       expect(nonEmptyRecords).toHaveLength(1);
 
       // Delete record
-      await deleteFileRecords(dbConnection.table!, fileInfo.absolutePath);
+      await deleteFileRecords(table!, fileInfo.relativePath);
 
-      // Note: Due to WHERE clause limitations in LanceDB, delete may not work as expected
-      // Verify that the record count hasn't increased (delete operation attempted)
-      allRecords = await dbConnection.table!.query().toArray();
+      // Verify deletion operation completed
+      await table?.checkoutLatest();
+      allRecords = await table!.query().toArray();
       nonEmptyRecords = allRecords.filter(
-        (r) => r.filePath !== '' && r.content !== '',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
-      // We can't guarantee the record was deleted, but we can verify the operation doesn't fail
-      expect(nonEmptyRecords.length).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should handle multiple chunks for the same file', async () => {
-      const fileInfo: FileInfo = {
-        absolutePath: '/test/multi-chunk.ts',
-        relativePath: 'test/multi-chunk.ts',
-      };
-
-      // Add multiple chunks for the same file
-      for (let i = 0; i < 3; i++) {
-        const embedding: FileEmbedding = {
-          filePath: '/test/multi-chunk.ts',
-          relativePath: 'test/multi-chunk.ts',
-          chunkIndex: i,
-          totalChunks: 3,
-          startLine: i * 10 + 1,
-          endLine: (i + 1) * 10,
-          content: `chunk ${i} content`,
-          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1 * (i + 1)),
-        };
-
-        await upsertFileRecord(dbConnection.table!, fileInfo, embedding);
-      }
-
-      // Note: Due to WHERE clause limitations, each upsert may add records instead of replacing
-      // Verify the final chunk exists among the records
-      const allRecords = await dbConnection.table!.query().toArray();
-      const nonEmptyRecords = allRecords.filter(
-        (r) => r.filePath !== '' && r.content !== '',
-      );
-      const finalChunkRecords = nonEmptyRecords.filter(
-        (r) => r.content === 'chunk 2 content',
-      );
-
-      expect(finalChunkRecords).toHaveLength(1);
-      expect(finalChunkRecords[0]?.chunkIndex).toBe(2);
-      expect(finalChunkRecords[0]?.content).toBe('chunk 2 content');
-    });
-  });
-
-  describe('vector similarity search', () => {
-    beforeEach(async () => {
-      const workspaceDataPath =
-        clientRuntime.fileSystem.getCurrentWorkingDirectory();
-      dbConnection = await connectToDatabase(workspaceDataPath);
-      dbConnection = await createOrUpdateTable(dbConnection, workspaceDataPath);
-    });
-
-    it('should return empty results for empty table', async () => {
-      const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(0.5);
-
-      const results = await searchSimilarFiles(
-        dbConnection.table!,
-        queryEmbedding,
-        5,
-      );
-
-      // Filter out empty records that may persist from table creation
-      const nonEmptyResults = results.filter(
-        (r) => r.filePath !== '' && r.content !== '',
-      );
-      expect(nonEmptyResults).toHaveLength(0);
-    });
-
-    it('should find similar files based on vector similarity', async () => {
-      // Add test records with different embeddings
-      const testRecords = [
-        {
-          filePath: '/test/similar1.ts',
-          relativePath: 'test/similar1.ts',
-          content: 'similar content 1',
-          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.8), // High similarity
-          chunkIndex: 0,
-          startLine: 1,
-          endLine: 10,
-          ragVersion: RAG_VERSION,
-        },
-        {
-          filePath: '/test/similar2.ts',
-          relativePath: 'test/similar2.ts',
-          content: 'similar content 2',
-          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.7), // Medium similarity
-          chunkIndex: 0,
-          startLine: 1,
-          endLine: 10,
-          ragVersion: RAG_VERSION,
-        },
-        {
-          filePath: '/test/different.ts',
-          relativePath: 'test/different.ts',
-          content: 'very different content',
-          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1), // Low similarity
-          chunkIndex: 0,
-          startLine: 1,
-          endLine: 10,
-          ragVersion: RAG_VERSION,
-        },
-      ];
-
-      // Insert all test records
-      await dbConnection.table!.add(testRecords as any);
-
-      // Search with query similar to the high similarity record
-      const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(0.75);
-
-      const results = await searchSimilarFiles(
-        dbConnection.table!,
-        queryEmbedding,
-        3,
-      );
-
-      expect(results.length).toBeGreaterThan(0);
-      expect(results.length).toBeLessThanOrEqual(3);
-
-      // Results should include distance information
-      for (const result of results) {
-        expect(result.distance).toBeDefined();
-        expect(typeof result.distance).toBe('number');
-        expect(result.filePath).toBeDefined();
-        expect(result.content).toBeDefined();
-        expect(result.embedding).toHaveLength(EXPECTED_EMBEDDING_DIM);
-      }
-
-      // Results should be ordered by similarity (lower distance = more similar)
-      for (let i = 1; i < results.length; i++) {
-        expect(results[i]?.distance).toBeGreaterThanOrEqual(
-          results[i - 1]?.distance ?? 0,
-        );
-      }
-    });
-
-    it('should respect the limit parameter', async () => {
-      // Add multiple test records
-      for (let i = 0; i < 10; i++) {
-        const record = {
-          filePath: `/test/file${i}.ts`,
-          relativePath: `test/file${i}.ts`,
-          content: `content ${i}`,
-          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1 * i),
-          chunkIndex: 0,
-          startLine: 1,
-          endLine: 10,
-          ragVersion: RAG_VERSION,
-        };
-        await dbConnection.table!.add([record as any]);
-      }
-
-      const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(0.5);
-
-      // Test different limits
-      const results3 = await searchSimilarFiles(
-        dbConnection.table!,
-        queryEmbedding,
-        3,
-      );
-      // Filter out empty records
-      const nonEmptyResults3 = results3.filter(
-        (r) => r.filePath !== '' && r.content !== '',
-      );
-      expect(nonEmptyResults3).toHaveLength(3);
-
-      const results5 = await searchSimilarFiles(
-        dbConnection.table!,
-        queryEmbedding,
-        5,
-      );
-      const nonEmptyResults5 = results5.filter(
-        (r) => r.filePath !== '' && r.content !== '',
-      );
-      expect(nonEmptyResults5).toHaveLength(5);
-
-      const results15 = await searchSimilarFiles(
-        dbConnection.table!,
-        queryEmbedding,
-        15,
-      );
-      // Filter out empty records and check count
-      const nonEmptyResults15 = results15.filter(
-        (r) => r.filePath !== '' && r.content !== '',
-      );
-      expect(nonEmptyResults15).toHaveLength(10); // Limited by actual record count
-    });
-
-    it('should throw error for wrong embedding dimensions', async () => {
-      const wrongDimEmbedding = new Array(512).fill(0.5); // Wrong dimension
-
-      await expect(
-        searchSimilarFiles(dbConnection.table!, wrongDimEmbedding, 5),
-      ).rejects.toThrow(/dimensions are required/);
-    });
-
-    it('should throw error when table is not initialized', async () => {
-      const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(0.5);
-
-      await expect(
-        searchSimilarFiles(null as any, queryEmbedding, 5),
-      ).rejects.toThrow('Table not initialized');
-    });
-  });
-
-  describe('error handling and edge cases', () => {
-    beforeEach(async () => {
-      dbConnection = await connectToDatabase(testDbPath);
-    });
-
-    it('should handle operations on uninitialized table', async () => {
-      const fileInfo: FileInfo = {
-        absolutePath: '/test/file.ts',
-        relativePath: 'test/file.ts',
-      };
-
-      const embedding: FileEmbedding = {
-        filePath: '/test/file.ts',
-        relativePath: 'test/file.ts',
-        chunkIndex: 0,
-        totalChunks: 1,
-        startLine: 1,
-        endLine: 10,
-        content: 'test content',
-        embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1),
-      };
-
-      // Try operations without creating table first
-      await expect(
-        upsertFileRecord(null as any, fileInfo, embedding),
-      ).rejects.toThrow('Table not initialized');
-
-      await expect(
-        deleteFileRecords(null as any, fileInfo.absolutePath),
-      ).rejects.toThrow('Table not initialized');
-    });
-
-    it('should handle operations with invalid table gracefully', async () => {
-      // Create a table first
-      dbConnection = await createOrUpdateTable(dbConnection, testDbPath);
-
-      // Try to use the search function with null table to test error handling
-      const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(0.5);
-
-      await expect(
-        searchSimilarFiles(null as any, queryEmbedding, 5),
-      ).rejects.toThrow('Table not initialized');
-    });
-
-    it('should handle empty file paths', async () => {
-      dbConnection = await createOrUpdateTable(dbConnection, testDbPath);
-
-      await expect(
-        deleteFileRecords(dbConnection.table!, ''),
-      ).resolves.not.toThrow();
+      // After deletion, there should be no non-empty records
+      expect(nonEmptyRecords.length).toBe(0);
     });
 
     it('should handle special characters in file paths', async () => {
-      dbConnection = await createOrUpdateTable(dbConnection, testDbPath);
-
       const fileInfo: FileInfo = {
         absolutePath: '/test/file with spaces & symbols!@#.ts',
         relativePath: 'test/file with spaces & symbols!@#.ts',
       };
 
       const embedding: FileEmbedding = {
-        filePath: '/test/file with spaces & symbols!@#.ts',
+        absolutePath: '/test/file with spaces & symbols!@#.ts',
         relativePath: 'test/file with spaces & symbols!@#.ts',
         chunkIndex: 0,
         totalChunks: 1,
@@ -664,13 +232,13 @@ describe('rag-db', () => {
       };
 
       await expect(
-        upsertFileRecord(dbConnection.table!, fileInfo, embedding),
+        addFileRecord(table!, fileInfo, embedding),
       ).resolves.not.toThrow();
 
       // Verify the record was inserted
-      const allRecords = await dbConnection.table!.query().toArray();
+      const allRecords = await table!.query().toArray();
       const nonEmptyRecords = allRecords.filter(
-        (r) => r.filePath !== '' && r.content !== '',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
 
       expect(nonEmptyRecords).toHaveLength(1);
@@ -680,8 +248,6 @@ describe('rag-db', () => {
     });
 
     it('should handle very large embedding vectors', async () => {
-      dbConnection = await createOrUpdateTable(dbConnection, testDbPath);
-
       const fileInfo: FileInfo = {
         absolutePath: '/test/large-embedding.ts',
         relativePath: 'test/large-embedding.ts',
@@ -693,7 +259,7 @@ describe('rag-db', () => {
         .map((_, i) => (i % 2 === 0 ? 1000 : -1000));
 
       const embedding: FileEmbedding = {
-        filePath: '/test/large-embedding.ts',
+        absolutePath: '/test/large-embedding.ts',
         relativePath: 'test/large-embedding.ts',
         chunkIndex: 0,
         totalChunks: 1,
@@ -704,62 +270,172 @@ describe('rag-db', () => {
       };
 
       await expect(
-        upsertFileRecord(dbConnection.table!, fileInfo, embedding),
+        addFileRecord(table!, fileInfo, embedding),
       ).resolves.not.toThrow();
 
-      // Verify record was inserted first
-      const allRecords = await dbConnection.table!.query().toArray();
+      // Verify record was inserted
+      const allRecords = await table!.query().toArray();
       const nonEmptyRecords = allRecords.filter(
-        (r) => r.filePath !== '' && r.content !== '',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
-      const insertedRecords = nonEmptyRecords.filter(
-        (r) => r.content === 'content with large embedding values',
+      expect(nonEmptyRecords).toHaveLength(1);
+      expect(nonEmptyRecords[0]?.content).toBe(
+        'content with large embedding values',
       );
-      expect(insertedRecords).toHaveLength(1);
+    });
+  });
 
-      // Test search with large query embedding
-      const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(500);
+  describe('vector similarity search', () => {
+    beforeEach(async () => {
+      table = await connectToDatabase(testDbPath);
+    });
 
-      const results = await searchSimilarFiles(
-        dbConnection.table!,
-        queryEmbedding,
-        5, // Increase limit to catch more results
-      );
+    it('should return empty results for empty table', async () => {
+      const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(0.5);
 
-      // Filter out empty records and verify we have at least one result
+      const results = await searchSimilarFiles(table!, queryEmbedding, 5);
+
+      // Filter out empty records that may persist from table creation
       const nonEmptyResults = results.filter(
-        (r) => r.filePath !== '' && r.content !== '',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
+      expect(nonEmptyResults).toHaveLength(0);
+    });
 
-      // If no non-empty results, the search itself works but didn't find the record
-      // This might be due to vector similarity not finding the match
-      if (nonEmptyResults.length === 0) {
-        // Just verify the upsert operation worked
-        expect(insertedRecords).toHaveLength(1);
-      } else {
-        // Find the record with our test content
-        const testResult = nonEmptyResults.find(
-          (r) => r.content === 'content with large embedding values',
-        );
-        if (testResult) {
-          expect(testResult?.content).toBe(
-            'content with large embedding values',
-          );
-        }
+    it('should find similar files based on vector similarity', async () => {
+      // Add test records with different embeddings
+      const testRecords: FileEmbeddingRecord[] = [
+        {
+          absolute_path: '/test/similar1.ts',
+          relative_path: 'test/similar1.ts',
+          content: 'similar content 1',
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.8), // High similarity
+          chunk_index: 0,
+          start_line: 1,
+          end_line: 10,
+          rag_version: RAG_VERSION,
+          indexed_at: Date.now(),
+        },
+        {
+          absolute_path: '/test/similar2.ts',
+          relative_path: 'test/similar2.ts',
+          content: 'similar content 2',
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.7), // Medium similarity
+          chunk_index: 0,
+          start_line: 1,
+          end_line: 10,
+          rag_version: RAG_VERSION,
+          indexed_at: Date.now(),
+        },
+        {
+          absolute_path: '/test/different.ts',
+          relative_path: 'test/different.ts',
+          content: 'very different content',
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1), // Low similarity
+          chunk_index: 0,
+          start_line: 1,
+          end_line: 10,
+          rag_version: RAG_VERSION,
+          indexed_at: Date.now(),
+        },
+      ];
+
+      // Insert all test records
+      await table!.add(testRecords as any);
+
+      // Search with query similar to the high similarity record
+      const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(0.75);
+
+      const results = await searchSimilarFiles(table!, queryEmbedding, 3);
+
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.length).toBeLessThanOrEqual(3);
+
+      // Results should include distance information
+      for (const result of results) {
+        expect(result._distance).toBeDefined();
+        expect(typeof result._distance).toBe('number');
+        expect(result.absolute_path).toBeDefined();
+        expect(result.content).toBeDefined();
+        expect(result.embedding).toHaveLength(EXPECTED_EMBEDDING_DIM);
       }
+
+      // Results should be ordered by similarity (lower distance = more similar)
+      for (let i = 1; i < results.length; i++) {
+        expect(results[i]?._distance).toBeGreaterThanOrEqual(
+          results[i - 1]?._distance ?? 0,
+        );
+      }
+    });
+
+    it('should respect the limit parameter', async () => {
+      // Add multiple test records
+      for (let i = 0; i < 10; i++) {
+        const record = {
+          absolute_path: `/test/file${i}.ts`,
+          relative_path: `test/file${i}.ts`,
+          content: `content ${i}`,
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1 * i),
+          chunk_index: 0,
+          start_line: 1,
+          end_line: 10,
+          rag_version: RAG_VERSION,
+        };
+        await table!.add([record as any]);
+      }
+
+      const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(0.5);
+
+      // Test different limits
+      const results3 = await searchSimilarFiles(table!, queryEmbedding, 3);
+      // Filter out empty records
+      const nonEmptyResults3 = results3.filter(
+        (r) => r.absolute_path !== '' && r.content !== '',
+      );
+      expect(nonEmptyResults3).toHaveLength(3);
+
+      const results5 = await searchSimilarFiles(table!, queryEmbedding, 5);
+      const nonEmptyResults5 = results5.filter(
+        (r) => r.absolute_path !== '' && r.content !== '',
+      );
+      expect(nonEmptyResults5).toHaveLength(5);
+
+      const results15 = await searchSimilarFiles(table!, queryEmbedding, 15);
+      // Filter out empty records and check count
+      const nonEmptyResults15 = results15.filter(
+        (r) => r.absolute_path !== '' && r.content !== '',
+      );
+      expect(nonEmptyResults15).toHaveLength(10); // Limited by actual record count
+    });
+
+    it('should throw error for wrong embedding dimensions', async () => {
+      const wrongDimEmbedding = new Array(512).fill(0.5); // Wrong dimension
+
+      await expect(
+        searchSimilarFiles(table!, wrongDimEmbedding, 5),
+      ).rejects.toThrow(/dimensions are required/);
+    });
+  });
+
+  describe('error handling and edge cases', () => {
+    beforeEach(async () => {
+      table = await connectToDatabase(testDbPath);
+    });
+
+    it('should handle empty file paths in delete operations', async () => {
+      await expect(deleteFileRecords(table!, '')).resolves.not.toThrow();
     });
   });
 
   describe('concurrency and performance', () => {
     beforeEach(async () => {
-      dbConnection = await connectToDatabase(testDbPath);
-      dbConnection = await createOrUpdateTable(dbConnection, testDbPath);
+      table = await connectToDatabase(testDbPath);
     });
 
-    it('should handle concurrent upsert operations', async () => {
+    it('should handle concurrent add operations', async () => {
       const concurrentPromises = [];
 
-      // Create multiple concurrent upsert operations
+      // Create multiple concurrent add operations
       for (let i = 0; i < 10; i++) {
         const fileInfo: FileInfo = {
           absolutePath: `/test/concurrent-${i}.ts`,
@@ -767,7 +443,7 @@ describe('rag-db', () => {
         };
 
         const embedding: FileEmbedding = {
-          filePath: `/test/concurrent-${i}.ts`,
+          absolutePath: `/test/concurrent-${i}.ts`,
           relativePath: `test/concurrent-${i}.ts`,
           chunkIndex: 0,
           totalChunks: 1,
@@ -777,18 +453,16 @@ describe('rag-db', () => {
           embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1 * i),
         };
 
-        concurrentPromises.push(
-          upsertFileRecord(dbConnection.table!, fileInfo, embedding),
-        );
+        concurrentPromises.push(addFileRecord(table!, fileInfo, embedding));
       }
 
       // All operations should complete successfully
       await expect(Promise.all(concurrentPromises)).resolves.not.toThrow();
 
       // Verify all records were inserted (excluding empty record)
-      const allRecords = await dbConnection.table!.query().toArray();
+      const allRecords = await table!.query().toArray();
       const nonEmptyRecords = allRecords.filter(
-        (r) => r.filePath !== '' && r.content !== '',
+        (r) => r.absolute_path !== '' && r.content !== '',
       );
       expect(nonEmptyRecords).toHaveLength(10);
     });
@@ -796,17 +470,18 @@ describe('rag-db', () => {
     it('should handle concurrent search operations', async () => {
       // First, add some test data
       for (let i = 0; i < 20; i++) {
-        const record = {
-          filePath: `/test/search-${i}.ts`,
-          relativePath: `test/search-${i}.ts`,
+        const record: FileEmbeddingRecord = {
+          absolute_path: `/test/search-${i}.ts`,
+          relative_path: `test/search-${i}.ts`,
           content: `search content ${i}`,
           embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1 * i),
-          chunkIndex: 0,
-          startLine: 1,
-          endLine: 10,
-          ragVersion: RAG_VERSION,
+          chunk_index: 0,
+          start_line: 1,
+          end_line: 10,
+          rag_version: RAG_VERSION,
+          indexed_at: Date.now(),
         };
-        await dbConnection.table!.add([record as any]);
+        await table!.add([record as any]);
       }
 
       // Perform concurrent searches
@@ -815,9 +490,7 @@ describe('rag-db', () => {
         const queryEmbedding = new Array(EXPECTED_EMBEDDING_DIM).fill(
           0.1 * i + 0.5,
         );
-        searchPromises.push(
-          searchSimilarFiles(dbConnection.table!, queryEmbedding, 5),
-        );
+        searchPromises.push(searchSimilarFiles(table!, queryEmbedding, 5));
       }
 
       const results = await Promise.all(searchPromises);
@@ -830,21 +503,216 @@ describe('rag-db', () => {
       }
     });
   });
-});
 
-// Helper function to create a mock FileEmbeddingRecord
-function createMockFileEmbeddingRecord(
-  overrides: Partial<FileEmbeddingRecord> = {},
-): FileEmbeddingRecord {
-  return {
-    filePath: '/test/mock-file.ts',
-    relativePath: 'test/mock-file.ts',
-    chunkIndex: 0,
-    content: 'mock file content',
-    embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1),
-    startLine: 1,
-    endLine: 10,
-    ragVersion: RAG_VERSION,
-    ...overrides,
-  };
-}
+  describe('getRagMetadata', () => {
+    beforeEach(async () => {
+      table = await connectToDatabase(testDbPath);
+    });
+
+    it('should return null lastIndexedAt and 0 indexedFiles for empty table', async () => {
+      const metadata = await getRagMetadata(table!);
+
+      expect(metadata.lastIndexedAt).toBeNull();
+      expect(metadata.indexedFiles).toBe(0);
+    });
+
+    it('should return correct metadata for single file with single chunk', async () => {
+      const now = Date.now();
+      const record: FileEmbeddingRecord = {
+        absolute_path: '/test/file1.ts',
+        relative_path: 'test/file1.ts',
+        content: 'test content',
+        embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1),
+        chunk_index: 0,
+        start_line: 1,
+        end_line: 10,
+        rag_version: RAG_VERSION,
+        indexed_at: now,
+      };
+
+      await table!.add([record as any]);
+
+      const metadata = await getRagMetadata(table!);
+
+      expect(metadata.indexedFiles).toBe(1);
+      expect(metadata.lastIndexedAt).toBeInstanceOf(Date);
+      expect(metadata.lastIndexedAt?.getTime()).toBe(now);
+    });
+
+    it('should return correct count for multiple files with single chunk each', async () => {
+      const baseTime = Date.now();
+      const records: FileEmbeddingRecord[] = [];
+
+      for (let i = 0; i < 5; i++) {
+        records.push({
+          absolute_path: `/test/file${i}.ts`,
+          relative_path: `test/file${i}.ts`,
+          content: `content ${i}`,
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1 * i),
+          chunk_index: 0,
+          start_line: 1,
+          end_line: 10,
+          rag_version: RAG_VERSION,
+          indexed_at: baseTime + i * 1000, // Different timestamps
+        });
+      }
+
+      await table!.add(records as any);
+
+      const metadata = await getRagMetadata(table!);
+
+      expect(metadata.indexedFiles).toBe(5);
+      // Should return the newest timestamp
+      expect(metadata.lastIndexedAt?.getTime()).toBe(baseTime + 4 * 1000);
+    });
+
+    it('should count file with multiple chunks as single file', async () => {
+      const now = Date.now();
+      const records: FileEmbeddingRecord[] = [];
+
+      // Add 3 chunks for the same file
+      for (let i = 0; i < 3; i++) {
+        records.push({
+          absolute_path: '/test/multi-chunk.ts',
+          relative_path: 'test/multi-chunk.ts',
+          content: `chunk ${i} content`,
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1 * (i + 1)),
+          chunk_index: i,
+          start_line: i * 10 + 1,
+          end_line: (i + 1) * 10,
+          rag_version: RAG_VERSION,
+          indexed_at: now + i * 100, // Slightly different timestamps
+        });
+      }
+
+      await table!.add(records as any);
+
+      const metadata = await getRagMetadata(table!);
+
+      // Should count as 1 file despite 3 chunks
+      expect(metadata.indexedFiles).toBe(1);
+      // Should return the newest timestamp from the chunks
+      expect(metadata.lastIndexedAt?.getTime()).toBe(now + 2 * 100);
+    });
+
+    it('should handle multiple files with multiple chunks correctly', async () => {
+      const baseTime = Date.now();
+      const records: FileEmbeddingRecord[] = [];
+
+      // File 1: 2 chunks
+      for (let i = 0; i < 2; i++) {
+        records.push({
+          absolute_path: '/test/file1.ts',
+          relative_path: 'test/file1.ts',
+          content: `file1 chunk ${i}`,
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1),
+          chunk_index: i,
+          start_line: i * 10 + 1,
+          end_line: (i + 1) * 10,
+          rag_version: RAG_VERSION,
+          indexed_at: baseTime,
+        });
+      }
+
+      // File 2: 3 chunks
+      for (let i = 0; i < 3; i++) {
+        records.push({
+          absolute_path: '/test/file2.ts',
+          relative_path: 'test/file2.ts',
+          content: `file2 chunk ${i}`,
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.2),
+          chunk_index: i,
+          start_line: i * 10 + 1,
+          end_line: (i + 1) * 10,
+          rag_version: RAG_VERSION,
+          indexed_at: baseTime + 5000,
+        });
+      }
+
+      // File 3: 1 chunk
+      records.push({
+        absolute_path: '/test/file3.ts',
+        relative_path: 'test/file3.ts',
+        content: 'file3 content',
+        embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.3),
+        chunk_index: 0,
+        start_line: 1,
+        end_line: 10,
+        rag_version: RAG_VERSION,
+        indexed_at: baseTime + 10000, // This is the newest
+      });
+
+      await table!.add(records as any);
+
+      const metadata = await getRagMetadata(table!);
+
+      // Should count 3 unique files (not 6 total chunks)
+      expect(metadata.indexedFiles).toBe(3);
+      // Should return the newest timestamp across all files
+      expect(metadata.lastIndexedAt?.getTime()).toBe(baseTime + 10000);
+    });
+
+    it('should return newest timestamp across files with varying indexed_at values', async () => {
+      const oldTime = Date.now() - 100000;
+      const newTime = Date.now();
+
+      const records: FileEmbeddingRecord[] = [
+        {
+          absolute_path: '/test/old-file.ts',
+          relative_path: 'test/old-file.ts',
+          content: 'old content',
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1),
+          chunk_index: 0,
+          start_line: 1,
+          end_line: 10,
+          rag_version: RAG_VERSION,
+          indexed_at: oldTime,
+        },
+        {
+          absolute_path: '/test/new-file.ts',
+          relative_path: 'test/new-file.ts',
+          content: 'new content',
+          embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.2),
+          chunk_index: 0,
+          start_line: 1,
+          end_line: 10,
+          rag_version: RAG_VERSION,
+          indexed_at: newTime,
+        },
+      ];
+
+      await table!.add(records as any);
+
+      const metadata = await getRagMetadata(table!);
+
+      expect(metadata.indexedFiles).toBe(2);
+      // Should return the newer timestamp
+      expect(metadata.lastIndexedAt?.getTime()).toBe(newTime);
+    });
+
+    it('should filter out empty initialization records', async () => {
+      const now = Date.now();
+
+      // Add actual file record
+      const record: FileEmbeddingRecord = {
+        absolute_path: '/test/file1.ts',
+        relative_path: 'test/file1.ts',
+        content: 'test content',
+        embedding: new Array(EXPECTED_EMBEDDING_DIM).fill(0.1),
+        chunk_index: 0,
+        start_line: 1,
+        end_line: 10,
+        rag_version: RAG_VERSION,
+        indexed_at: now,
+      };
+
+      await table!.add([record as any]);
+
+      const metadata = await getRagMetadata(table!);
+
+      // Should count only the non-empty record, not the initialization record
+      expect(metadata.indexedFiles).toBe(1);
+      expect(metadata.lastIndexedAt?.getTime()).toBe(now);
+    });
+  });
+});

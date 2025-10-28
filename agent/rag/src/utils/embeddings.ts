@@ -12,7 +12,7 @@ export interface EmbeddingConfig {
 }
 
 export interface FileEmbedding {
-  filePath: string;
+  absolutePath: string;
   relativePath: string;
   chunkIndex: number;
   totalChunks: number;
@@ -245,7 +245,7 @@ export async function* generateFileEmbeddings(
 
         if (embedding && embedding.length === EXPECTED_EMBEDDING_DIM) {
           yield {
-            filePath: info.filePath,
+            absolutePath: info.filePath,
             relativePath: info.filePath,
             chunkIndex: info.chunkIndex,
             totalChunks: info.totalChunks,
@@ -295,7 +295,7 @@ export const generateSingleEmbedding = async (
   const embedding = embeddings[0] || [];
 
   return {
-    filePath,
+    absolutePath: filePath,
     relativePath: filePath,
     chunkIndex: 0,
     totalChunks: chunks.length,
