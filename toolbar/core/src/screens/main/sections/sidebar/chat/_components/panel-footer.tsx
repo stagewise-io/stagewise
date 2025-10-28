@@ -312,7 +312,7 @@ export function ChatPanelFooter({
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      className="text-muted-foreground data-[context-selector-active=true]:text-primary"
+                      className="text-muted-foreground data-[context-selector-active=true]:bg-primary/5 data-[context-selector-active=true]:text-primary data-[context-selector-active=true]:hover:bg-primary/10"
                       data-context-selector-active={
                         chatState.isContextSelectorActive
                       }
@@ -328,7 +328,7 @@ export function ChatPanelFooter({
                       }}
                       aria-label="Select context elements"
                     >
-                      <SquareDashedMousePointerIcon className="size-4 stroke-2.5" />
+                      <SquareDashedMousePointerIcon className="size-3.5 stroke-[2.5px]" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
