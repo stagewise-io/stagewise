@@ -264,7 +264,7 @@ async function example5_SearchOperations() {
 
   grepResult.matches?.forEach((match) => {
     console.log(
-      `  📄 ${match.path}:${match.line}:${match.column} - "${match.match}"`,
+      `  📄 ${match.relativePath}:${match.line}:${match.column} - "${match.match}"`,
     );
     console.log(`     Preview: ${match.preview}`);
   });
@@ -272,7 +272,7 @@ async function example5_SearchOperations() {
   // Test glob functionality
   const globResult = await mockRuntime.fileSystem.glob('**/*.ts');
   console.log('\n🌐 Glob results for "**/*.ts":');
-  globResult.paths?.forEach((path) => {
+  globResult.relativePaths?.forEach((path) => {
     console.log(`  📄 ${path}`);
   });
 }

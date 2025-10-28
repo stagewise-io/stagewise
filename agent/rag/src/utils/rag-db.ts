@@ -141,6 +141,7 @@ function createEmptyRecord(): FileEmbeddingRecord {
 export async function createOrUpdateTable(
   dbConnection: DatabaseConnection,
   workspaceDataPath: string,
+  onError?: (error: unknown) => void,
 ): Promise<DatabaseConnection> {
   const { connection, config } = dbConnection;
   const tables = await connection.tableNames();
@@ -165,6 +166,44 @@ export async function createOrUpdateTable(
       // Drop the existing table
       await connection.dropTable(config.tableName);
 
+      // Also clear LevelDB manifests to keep databases in sync
+      try {
+        const db = LevelDb.getInstance(workspaceDataPath);
+        await db.open();
+        try {
+          // Clear all manifests
+          const manifestKeys: string[] = [];
+          for await (const key of db.manifests.keys()) {
+            manifestKeys.push(key);
+          }
+          for (const key of manifestKeys) {
+            await db.manifests.del(key);
+          }
+
+          // Update metadata to reflect empty state
+          const existingMetadata = await db.meta.get('schema');
+          if (existingMetadata) {
+            await db.meta.put('schema', {
+              ...existingMetadata,
+              rag: {
+                ragVersion: RAG_VERSION,
+                lastIndexedAt: null,
+                indexedFiles: 0,
+              },
+            });
+          }
+        } finally {
+          await db.close();
+        }
+      } catch (error) {
+        // If manifest cleanup fails, log but don't fail the table recreation
+        onError?.(
+          new Error(
+            `Failed to clear manifests during LanceDB schema reset: ${error}`,
+          ),
+        );
+      }
+
       // Recreate with correct schema
       const emptyRecord = createEmptyRecord();
       table = await connection.createTable(config.tableName, [
@@ -180,8 +219,9 @@ export async function createOrUpdateTable(
 
 /**
  * Gets a file record by file path
+ * Currently unused but kept for potential future use
  */
-const getFileRecords = async (
+const _getFileRecords = async (
   table: Table,
   filePath: string,
 ): Promise<FileEmbeddingRecord[] | null> => {
@@ -221,7 +261,8 @@ export function createFileRecord(
 }
 
 /**
- * Upserts a file record (insert or update)
+ * Inserts a file record. Caller is responsible for deleting old records if needed.
+ * For files with multiple chunks, this will be called once per chunk.
  */
 export async function upsertFileRecord(
   table: Table,
@@ -234,28 +275,25 @@ export async function upsertFileRecord(
 
   const record = createFileRecord(fileInfo, embedding);
 
-  // Check if record exists
-  const existing = await getFileRecords(table, fileInfo.absolutePath);
-
-  if (existing && existing.length > 0)
-    await deleteFileRecords(table, fileInfo.absolutePath);
-
-  // Insert new record
+  // Just insert the new record. LanceDB will handle duplicates.
+  // If you need to replace old records, caller should call deleteFileRecords first.
   await table.add([record as any]);
 }
 
 /**
- * Deletes a file record by file path
+ * Deletes a file record by relative path
  */
 export async function deleteFileRecords(
   table: Table,
-  filePath: string,
+  relativePath: string,
 ): Promise<void> {
   if (!table) {
     throw new Error('Table not initialized');
   }
 
-  await table.delete(`"filePath" = "${filePath}"`);
+  // Escape double quotes in the path to prevent SQL injection
+  const escapedPath = relativePath.replace(/"/g, '""');
+  await table.delete(`"relativePath" = "${escapedPath}"`);
 }
 
 /**

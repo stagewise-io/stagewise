@@ -52,11 +52,11 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
   }
 
   async readFile(
-    path: string,
+    relativePath: string,
     options?: { startLine?: number; endLine?: number },
   ) {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       const content = await fs.readFile(fullPath, 'utf-8');
       const lines = content.split('\n');
       const totalLines = lines.length;
@@ -100,15 +100,15 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     } catch (error) {
       return {
         success: false,
-        message: `Failed to read file: ${path}`,
+        message: `Failed to read file: ${relativePath}`,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
-  async writeFile(path: string, content: string) {
+  async writeFile(relativePath: string, content: string) {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
 
       // Create directory if it doesn't exist
       await this.createDirectory(dirname(fullPath));
@@ -116,25 +116,25 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
 
       return {
         success: true,
-        message: `Successfully wrote file: ${path}`,
+        message: `Successfully wrote file: ${relativePath}`,
       };
     } catch (error) {
       return {
         success: false,
-        message: `Failed to write file: ${path}`,
+        message: `Failed to write file: ${relativePath}`,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
   async editFile(
-    path: string,
+    relativePath: string,
     content: string,
     startLine: number,
     endLine: number,
   ) {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       const fileContent = await fs.readFile(fullPath, 'utf-8');
       const lines = fileContent.split('\n');
 
@@ -167,31 +167,31 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     } catch (error) {
       return {
         success: false,
-        message: `Failed to edit file: ${path}`,
+        message: `Failed to edit file: ${relativePath}`,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
-  async createDirectory(path: string) {
+  async createDirectory(relativePath: string) {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       await fs.mkdir(fullPath, { recursive: true });
       return {
         success: true,
-        message: `Successfully created directory: ${path}`,
+        message: `Successfully created directory: ${relativePath}`,
       };
     } catch (error) {
       return {
         success: false,
-        message: `Failed to create directory: ${path}`,
+        message: `Failed to create directory: ${relativePath}`,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
   async listDirectory(
-    path: string,
+    relativePath: string,
     options?: {
       recursive?: boolean;
       maxDepth?: number;
@@ -202,9 +202,9 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     },
   ) {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       const files: Array<{
-        path: string;
+        relativePath: string;
         name: string;
         type: 'file' | 'directory';
         size?: number;
@@ -240,7 +240,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
             totalDirectories++;
             if (options?.includeDirectories !== false) {
               files.push({
-                path: relative(this.config.workingDirectory, entryPath),
+                relativePath: relative(this.config.workingDirectory, entryPath),
                 name: entry.name,
                 type: 'directory' as const,
                 depth,
@@ -254,7 +254,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
             if (options?.includeFiles !== false) {
               const stat = await fs.stat(entryPath);
               files.push({
-                path: relative(this.config.workingDirectory, entryPath),
+                relativePath: relative(this.config.workingDirectory, entryPath),
                 name: entry.name,
                 type: 'file' as const,
                 size: stat.size,
@@ -269,7 +269,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
 
       return {
         success: true,
-        message: `Successfully listed directory: ${path}`,
+        message: `Successfully listed directory: ${relativePath}`,
         files,
         totalFiles,
         totalDirectories,
@@ -277,14 +277,14 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     } catch (error) {
       return {
         success: false,
-        message: `Failed to list directory: ${path}`,
+        message: `Failed to list directory: ${relativePath}`,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
   async grep(
-    path: string,
+    relativePath: string,
     pattern: string,
     options?: {
       recursive?: boolean;
@@ -302,7 +302,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       const matches: GrepMatch[] = [];
       let filesSearched = 0;
       let totalOutputSize = 0;
-      const basePath = this.resolvePath(path);
+      const basePath = this.resolvePath(relativePath);
       const MAX_OUTPUT_SIZE = 1 * 1024 * 1024; // 1MB limit for total output
 
       const searchFile = async (filePath: string) => {
@@ -367,7 +367,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
               }
 
               const matchEntry: GrepMatch = {
-                path: relative(this.config.workingDirectory, filePath),
+                relativePath: relative(this.config.workingDirectory, filePath),
                 line: i + 1,
                 column: match.index + 1,
                 match: match[0],
@@ -432,7 +432,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
         }
       };
 
-      if (await this.isDirectory(path)) {
+      if (await this.isDirectory(relativePath)) {
         await searchDirectory(basePath, 0);
       } else {
         await searchFile(basePath);
@@ -525,7 +525,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       return {
         success: true,
         message: `Found ${paths.length} matching paths`,
-        paths,
+        relativePaths: paths,
         totalMatches: paths.length,
       };
     } catch (error) {
@@ -538,7 +538,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
   }
 
   async searchAndReplace(
-    filePath: string,
+    relativePath: string,
     searchString: string,
     replaceString: string,
     options?: {
@@ -551,7 +551,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     },
   ): Promise<SearchReplaceResult> {
     try {
-      const fullPath = this.resolvePath(filePath);
+      const fullPath = this.resolvePath(relativePath);
       const content = await fs.readFile(fullPath, 'utf-8');
       const lines = content.split('\n');
       const replacements: SearchReplaceMatch[] = [];
@@ -714,18 +714,18 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     return replacement;
   }
 
-  async deleteFile(path: string) {
+  async deleteFile(relativePath: string) {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       await fs.unlink(fullPath);
       return {
         success: true,
-        message: `Successfully deleted file: ${path}`,
+        message: `Successfully deleted file: ${relativePath}`,
       };
     } catch (error) {
       return {
         success: false,
-        message: `Failed to delete file: ${path}`,
+        message: `Failed to delete file: ${relativePath}`,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
@@ -775,9 +775,9 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     }
   }
 
-  async fileExists(path: string) {
+  async fileExists(relativePath: string) {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       await fs.access(fullPath);
       return true;
     } catch {
@@ -785,9 +785,9 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     }
   }
 
-  async isDirectory(path: string) {
+  async isDirectory(relativePath: string) {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       const stat = await fs.stat(fullPath);
       return stat.isDirectory();
     } catch {
@@ -795,8 +795,8 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     }
   }
 
-  async getFileStats(path: string) {
-    const fullPath = this.resolvePath(path);
+  async getFileStats(relativePath: string) {
+    const fullPath = this.resolvePath(relativePath);
     const stat = await fs.stat(fullPath);
     return {
       size: stat.size,
@@ -805,29 +805,29 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
   }
 
   // Path operations using Node.js path module
-  resolvePath(path: string): string {
+  resolvePath(relativePath: string): string {
     // If path is already absolute, return it as-is
-    if (resolve(path) === path) {
-      return path;
+    if (resolve(relativePath) === relativePath) {
+      return relativePath;
     }
     // Otherwise resolve it relative to the working directory
-    return resolve(this.config.workingDirectory, path);
+    return resolve(this.config.workingDirectory, relativePath);
   }
 
-  getDirectoryName(path: string): string {
-    return dirname(path);
+  getDirectoryName(relativePath: string): string {
+    return dirname(relativePath);
   }
 
-  joinPaths(...paths: string[]): string {
-    return join(...paths);
+  joinPaths(...relativePaths: string[]): string {
+    return join(...relativePaths);
   }
 
   getRelativePath(from: string, to: string): string {
     return relative(from, to);
   }
 
-  getFileExtension(path: string): string {
-    return extname(path);
+  getFileExtension(relativePath: string): string {
+    return extname(relativePath);
   }
 
   async getGitignorePatterns(): Promise<string[]> {
@@ -840,35 +840,35 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     return allPatterns;
   }
 
-  async isIgnored(path: string): Promise<boolean> {
+  async isIgnored(relativePath: string): Promise<boolean> {
     await this.ensureGitignoreInitialized();
 
-    return this.isIgnoredSync(path);
+    return this.isIgnoredSync(relativePath);
   }
 
   /**
    * Synchronous version of isIgnored for use with chokidar and other sync APIs
    * Note: This assumes gitignore has already been initialized
    */
-  isIgnoredSync(path: string): boolean {
+  isIgnoredSync(relativePath: string): boolean {
     // Handle empty or undefined paths
-    if (!path || path === '') {
+    if (!relativePath || relativePath === '') {
       return false;
     }
 
     // Skip glob patterns - these are not actual paths
     // Chokidar passes patterns like "**/*.ts", "**", etc.
     if (
-      path.includes('*') ||
-      path.includes('?') ||
-      path.includes('[') ||
-      path.includes(']')
+      relativePath.includes('*') ||
+      relativePath.includes('?') ||
+      relativePath.includes('[') ||
+      relativePath.includes(']')
     ) {
       return false;
     }
 
     // Handle special paths - don't ignore current and parent directory references
-    if (path === '.' || path === '..') {
+    if (relativePath === '.' || relativePath === '..') {
       return false;
     }
 
@@ -879,7 +879,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     }
 
     // Convert path to absolute if it isn't already
-    const absolutePath = this.resolvePath(path);
+    const absolutePath = this.resolvePath(relativePath);
 
     // Check each gitignore file from most specific (deepest) to least specific
     const sortedGitignores = Array.from(this.gitignoreMap.values()).sort(
@@ -905,9 +905,9 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     return false;
   }
 
-  async isBinary(path: string): Promise<boolean> {
+  async isBinary(relativePath: string): Promise<boolean> {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       const stats = await fs.stat(fullPath);
       const bytesToRead = Math.min(
         stats.size,
@@ -1079,13 +1079,13 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
   }
 
   async watchFiles(
-    path: string,
+    relativePath: string,
     onFileChange: (event: FileChangeEvent) => void,
   ): Promise<() => Promise<void>> {
     // Ensure gitignore is fully initialized before creating the watcher
     await this.ensureGitignoreInitialized();
 
-    const watcher = chokidar.watch(this.resolvePath(path), {
+    const watcher = chokidar.watch(this.resolvePath(relativePath), {
       persistent: true,
       ignored: (path: string) => this.isIgnoredSync(path),
     });

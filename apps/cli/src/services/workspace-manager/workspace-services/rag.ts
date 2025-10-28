@@ -1,5 +1,6 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { initializeRag, LevelDb } from '@stagewise/agent-rag';
+import { isAuthenticationError } from '@stagewise/agent-utils';
 import type { KartonService } from '../../karton';
 import type { Logger } from '../../logger';
 import type { TelemetryService } from '../../telemetry';
@@ -14,6 +15,8 @@ export class RagService {
   private workspaceDataPath: string;
   private updateRagInterval: NodeJS.Timeout | null = null;
   private levelDb: LevelDb;
+  private authRetryCount = 0;
+  private maxAuthRetries = 2;
 
   private constructor(
     logger: Logger,
@@ -55,41 +58,94 @@ export class RagService {
     await this.levelDb.close();
   }
 
-  private async resetRagStatus(error?: string) {
+  private async resetRagStatusWithError(error: string) {
     this.kartonService.setState((draft) => {
       draft.workspace!.rag.statusInfo = {
         isIndexing: false,
+        hasError: true,
         error,
       };
     });
   }
 
   private async updateRag(apiKey: string) {
+    this.logger.debug('[RagService] Starting RAG update');
     let total = 0;
-    for await (const update of initializeRag(
-      this.workspaceDataPath,
-      this.clientRuntime,
-      apiKey,
-      (error) => {
-        this.telemetryService.captureException(error);
-        this.logger.error('[RagService] Failed to initialize RAG', error);
-      },
-    )) {
-      this.logger.debug(`updating rag: ${update.progress}/${update.total}`);
-      this.kartonService.setState((draft) => {
-        draft.workspace!.rag.statusInfo = {
-          isIndexing: true,
-          indexProgress: update.progress,
-          indexTotal: update.total,
-        };
+    try {
+      for await (const update of initializeRag(
+        this.workspaceDataPath,
+        this.clientRuntime,
+        apiKey,
+        (error) => {
+          // Check if this is an auth error - if so, throw to interrupt iteration
+          if (isAuthenticationError(error)) {
+            throw error;
+          }
+          // Non-auth errors are logged but don't interrupt the process
+          this.telemetryService.captureException(error);
+          this.logger.error('[RagService] Failed to initialize RAG', error);
+        },
+      )) {
+        this.logger.debug(`updating rag: ${update.progress}/${update.total}`);
+        this.kartonService.setState((draft) => {
+          draft.workspace!.rag.statusInfo = {
+            isIndexing: true,
+            indexProgress: update.progress,
+            indexTotal: update.total,
+          };
+        });
+        total = update.total;
+      }
+      this.telemetryService.capture('rag-updated', {
+        index_progress: total,
+        index_total: total,
       });
-      total = update.total;
+      await this.initializeRagState();
+
+      // Reset auth retry count on success
+      this.authRetryCount = 0;
+    } catch (error) {
+      // Check if this is an authentication error
+      if (isAuthenticationError(error)) {
+        this.logger.log(
+          'error',
+          `[RagService Authentication]: Error, ${error}`,
+        );
+
+        if (this.authRetryCount < this.maxAuthRetries) {
+          this.authRetryCount++;
+          this.logger.debug(
+            `[RagService] Retrying RAG update with fresh token (attempt ${this.authRetryCount}/${this.maxAuthRetries})`,
+          );
+
+          // Refresh auth tokens
+          await this.authService.refreshAuthData();
+          const tokens = await this.authService.getToken();
+
+          if (!tokens) {
+            this.authRetryCount = 0;
+            this.resetRagStatusWithError(
+              'Authentication failed - failed to refresh tokens',
+            );
+            return;
+          }
+
+          // Retry with fresh token
+          await this.updateRag(tokens.accessToken);
+          return;
+        } else {
+          // Exceeded max retries
+          this.authRetryCount = 0;
+          this.resetRagStatusWithError(
+            'Authentication failed - please restart the CLI',
+          );
+          return;
+        }
+      }
+
+      // Re-throw non-auth errors to be handled by caller
+      throw error;
     }
-    this.telemetryService.capture('rag-updated', {
-      index_progress: total,
-      index_total: total,
-    });
-    await this.initializeRagState();
   }
 
   private async periodicallyUpdateRag(apiKey: string) {
@@ -109,14 +165,15 @@ export class RagService {
           '[RagService] Failed to periodically update RAG',
           error,
         );
-        this.resetRagStatus(
+        this.authRetryCount = 0; // Reset auth retry count on error
+        this.resetRagStatusWithError(
           "Failed to update the codebase index - we'll try again later.",
         );
         if (this.updateRagInterval) clearInterval(this.updateRagInterval);
         this.updateRagInterval = null;
         this.periodicallyUpdateRag(apiKey);
       }
-    }, 60 * 1000); // 1 Minute
+    }, 10 * 1000); // 10 seconds
   }
 
   public async initialize() {
@@ -143,7 +200,10 @@ export class RagService {
     } catch (error) {
       this.telemetryService.captureException(error as Error);
       this.logger.error('[RagService] Failed to initialize', error);
-      this.resetRagStatus();
+      this.authRetryCount = 0; // Reset auth retry count on error
+      this.resetRagStatusWithError(
+        "Failed to initialize the codebase index - we'll try again later.",
+      );
     }
   }
 

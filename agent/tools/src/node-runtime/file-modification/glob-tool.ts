@@ -62,7 +62,7 @@ export async function globToolExecute(
       success: true,
       message,
       result: {
-        paths: globResult.paths,
+        relativePaths: globResult.relativePaths,
         totalMatches: globResult.totalMatches,
       },
     };

@@ -55,11 +55,11 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
 
   // File operations
   async readFile(
-    path: string,
+    relativePath: string,
     options?: { startLine?: number; endLine?: number },
   ): Promise<FileContentResult> {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       const content = this.volume.readFileSync(fullPath, 'utf8') as string;
       const lines = content.split('\n');
 
@@ -87,9 +87,12 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
     }
   }
 
-  async writeFile(path: string, content: string): Promise<FileOperationResult> {
+  async writeFile(
+    relativePath: string,
+    content: string,
+  ): Promise<FileOperationResult> {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       const dirPath = this.getDirectoryName(fullPath);
 
       // Ensure parent directory exists
@@ -110,13 +113,13 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
   }
 
   async editFile(
-    path: string,
+    relativePath: string,
     content: string,
     startLine: number,
     endLine: number,
   ): Promise<FileOperationResult> {
     try {
-      const readResult = await this.readFile(path);
+      const readResult = await this.readFile(relativePath);
       if (!readResult.success || !readResult.content) {
         return {
           success: false,
@@ -134,7 +137,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
 
       lines.splice(start, end - start, ...newLines);
 
-      return await this.writeFile(path, lines.join('\n'));
+      return await this.writeFile(relativePath, lines.join('\n'));
     } catch (error) {
       return {
         success: false,
@@ -145,9 +148,9 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
   }
 
   // Directory operations
-  async createDirectory(path: string): Promise<FileOperationResult> {
+  async createDirectory(relativePath: string): Promise<FileOperationResult> {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       this.volume.mkdirSync(fullPath, { recursive: true });
 
       return {
@@ -164,7 +167,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
   }
 
   async listDirectory(
-    path: string,
+    relativePath: string,
     options: {
       recursive?: boolean;
       maxDepth?: number;
@@ -175,7 +178,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
     } = {},
   ): Promise<DirectoryListResult> {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       const entries: DirectoryEntry[] = [];
 
       const {
@@ -198,7 +201,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
 
           for (const item of items) {
             const itemPath = this.joinPaths(dirPath, item);
-            const relativePath = this.getRelativePath(
+            const itemRelativePath = this.getRelativePath(
               this.config.workingDirectory,
               itemPath,
             );
@@ -206,7 +209,10 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
             const isDirectory = stats.isDirectory();
 
             // Check gitignore patterns
-            if (respectGitignore && this.shouldIgnorePattern(relativePath)) {
+            if (
+              respectGitignore &&
+              this.shouldIgnorePattern(itemRelativePath)
+            ) {
               continue;
             }
 
@@ -228,7 +234,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
             }
 
             entries.push({
-              path: relativePath,
+              relativePath: itemRelativePath,
               name: item,
               type: isDirectory ? 'directory' : 'file',
               size: isDirectory ? undefined : stats.size,
@@ -270,7 +276,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
 
   // Search operations
   async grep(
-    path: string,
+    relativePath: string,
     pattern: string,
     options: {
       recursive?: boolean;
@@ -300,7 +306,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
       let filesSearched = 0;
 
       // Get files to search
-      const listResult = await this.listDirectory(path, {
+      const listResult = await this.listDirectory(relativePath, {
         recursive,
         maxDepth,
         pattern: filePattern,
@@ -323,14 +329,14 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
         // Check exclude patterns
         if (
           excludePatterns.some((pattern) =>
-            this.matchesPattern(file.path, pattern),
+            this.matchesPattern(file.relativePath, pattern),
           )
         ) {
           continue;
         }
 
         try {
-          const readResult = await this.readFile(file.path);
+          const readResult = await this.readFile(file.relativePath);
           if (!readResult.success || !readResult.content) continue;
 
           filesSearched++;
@@ -353,7 +359,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
             match = regex.exec(line);
             while (match && totalMatches < maxMatches) {
               matches.push({
-                path: file.path,
+                relativePath: file.relativePath,
                 line: lineIndex + 1,
                 column: match.index + 1,
                 match: match[0],
@@ -406,7 +412,6 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
         respectGitignore = true,
       } = options;
 
-      const searchPath = this.resolvePath(cwd);
       const paths: string[] = [];
 
       // Simple glob implementation - for production, consider using a proper glob library
@@ -421,7 +426,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
 
       const regex = globToRegex(pattern);
 
-      const listResult = await this.listDirectory(searchPath, {
+      const listResult = await this.listDirectory(cwd, {
         recursive: true,
         includeFiles: true,
         includeDirectories,
@@ -440,14 +445,16 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
         // Check exclude patterns
         if (
           excludePatterns.some((pattern) =>
-            this.matchesPattern(file.path, pattern),
+            this.matchesPattern(file.relativePath, pattern),
           )
         ) {
           continue;
         }
 
-        if (regex.test(file.path)) {
-          const resultPath = absolute ? this.resolvePath(file.path) : file.path;
+        if (regex.test(file.relativePath)) {
+          const resultPath = absolute
+            ? this.resolvePath(file.relativePath)
+            : file.relativePath;
           paths.push(resultPath);
         }
       }
@@ -455,7 +462,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
       return {
         success: true,
         message: 'Glob search completed',
-        paths,
+        relativePaths: paths,
         totalMatches: paths.length,
       };
     } catch (error) {
@@ -468,7 +475,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
   }
 
   async searchAndReplace(
-    filePath: string,
+    relativePath: string,
     searchString: string,
     replaceString: string,
     options: {
@@ -490,7 +497,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
         dryRun = false,
       } = options;
 
-      const readResult = await this.readFile(filePath);
+      const readResult = await this.readFile(relativePath);
       if (!readResult.success || !readResult.content) {
         return {
           success: false,
@@ -565,7 +572,10 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
 
       // Write changes if not dry run
       if (!dryRun && fileModified) {
-        const writeResult = await this.writeFile(filePath, lines.join('\n'));
+        const writeResult = await this.writeFile(
+          relativePath,
+          lines.join('\n'),
+        );
         if (!writeResult.success) {
           return {
             success: false,
@@ -592,19 +602,19 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
   }
 
   // Path operations
-  resolvePath(path: string): string {
-    if (path.startsWith('/')) {
-      return path; // Already absolute
+  resolvePath(relativePath: string): string {
+    if (relativePath.startsWith('/')) {
+      return relativePath; // Already absolute
     }
-    return this.joinPaths(this.config.workingDirectory, path);
+    return this.joinPaths(this.config.workingDirectory, relativePath);
   }
 
-  getDirectoryName(path: string): string {
-    return path.split('/').slice(0, -1).join('/') || '/';
+  getDirectoryName(relativePath: string): string {
+    return relativePath.split('/').slice(0, -1).join('/') || '/';
   }
 
-  joinPaths(...paths: string[]): string {
-    return paths
+  joinPaths(...relativePaths: string[]): string {
+    return relativePaths
       .map((p) => p.replace(/^\/+|\/+$/g, ''))
       .filter((p) => p.length > 0)
       .join('/')
@@ -631,29 +641,29 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
     return relativeParts.join('/') || '.';
   }
 
-  getFileExtension(path: string): string {
-    const lastDot = path.lastIndexOf('.');
-    const lastSlash = path.lastIndexOf('/');
+  getFileExtension(relativePath: string): string {
+    const lastDot = relativePath.lastIndexOf('.');
+    const lastSlash = relativePath.lastIndexOf('/');
 
     if (lastDot > lastSlash && lastDot !== -1) {
-      return path.substring(lastDot);
+      return relativePath.substring(lastDot);
     }
     return '';
   }
 
   // Utility operations
-  async fileExists(path: string): Promise<boolean> {
+  async fileExists(relativePath: string): Promise<boolean> {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       return this.volume.existsSync(fullPath);
     } catch {
       return false;
     }
   }
 
-  async isDirectory(path: string): Promise<boolean> {
+  async isDirectory(relativePath: string): Promise<boolean> {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       const stats = this.volume.statSync(fullPath);
       return stats.isDirectory();
     } catch {
@@ -662,9 +672,9 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
   }
 
   async getFileStats(
-    path: string,
+    relativePath: string,
   ): Promise<{ size: number; modifiedTime?: Date }> {
-    const fullPath = this.resolvePath(path);
+    const fullPath = this.resolvePath(relativePath);
     const stats = this.volume.statSync(fullPath);
     return {
       size: stats.size || 0,
@@ -681,15 +691,15 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
   }
 
   async watchFiles(
-    _path: string,
+    _relativePath: string,
     _onFileChange: (event: FileChangeEvent) => void,
   ): Promise<() => Promise<void>> {
     return async () => {};
   }
 
-  async deleteFile(path: string): Promise<FileOperationResult> {
+  async deleteFile(relativePath: string): Promise<FileOperationResult> {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       this.volume.unlinkSync(fullPath);
 
       return {
@@ -782,14 +792,14 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
     }
   }
 
-  async isIgnored(path: string): Promise<boolean> {
+  async isIgnored(relativePath: string): Promise<boolean> {
     const patterns = await this.getGitignorePatterns();
-    return this.shouldIgnorePattern(path, patterns);
+    return this.shouldIgnorePattern(relativePath, patterns);
   }
 
-  async isBinary(path: string): Promise<boolean> {
+  async isBinary(relativePath: string): Promise<boolean> {
     try {
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(relativePath);
       const content = this.volume.readFileSync(fullPath);
 
       // Check if content is a Buffer
@@ -804,7 +814,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
       return false;
     } catch (error) {
       // If we can't read the file, assume it's not binary
-      console.warn(`[isBinary] Error checking file ${path}:`, error);
+      console.warn(`[isBinary] Error checking file ${relativePath}:`, error);
       return false;
     }
   }
@@ -819,10 +829,13 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
     return regex.test(text);
   }
 
-  private shouldIgnorePattern(path: string, patterns?: string[]): boolean {
+  private shouldIgnorePattern(
+    relativePath: string,
+    patterns?: string[],
+  ): boolean {
     const patternsToCheck = patterns || this.gitignorePatterns;
     return patternsToCheck.some(
-      (pattern) => pattern && this.matchesPattern(path, pattern),
+      (pattern) => pattern && this.matchesPattern(relativePath, pattern),
     );
   }
 

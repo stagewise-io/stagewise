@@ -68,6 +68,7 @@
         "noUselessContinue": "off" // Turned off due to developer preferences
       },
       "correctness": {
+        "useYield": "off", // Turned off due to developer preferences,
         "noUnusedImports": "warn", // Not in recommended ruleset, turning on manually
         "useJsxKeyInIterable": "off", // Rule is buggy, revisit later
         "useExhaustiveDependencies": "off", // Community feedback on this rule has been poor, we will continue with ESLint

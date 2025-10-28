@@ -228,6 +228,21 @@ export class LevelDb {
       };
 
       await this.meta.put('schema', metadata);
+
+      // Also clear the LanceDB table to keep databases in sync
+      try {
+        const { connectToDatabase } = await import('./rag-db.js');
+        const workspaceDataPath = this.dbPath.replace('/typed-db', '');
+        const dbConnection = await connectToDatabase(workspaceDataPath);
+        if (dbConnection.table) {
+          await dbConnection.connection.dropTable(
+            dbConnection.config.tableName,
+          );
+        }
+      } catch (_error) {
+        // If LanceDB cleanup fails, log but don't fail the reset
+        // The table will be recreated on next use
+      }
     } catch (_) {
       throw new Error('Failed to reset database');
     }

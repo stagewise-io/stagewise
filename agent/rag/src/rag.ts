@@ -6,9 +6,9 @@ import {
   generateFileEmbeddings,
 } from './utils/embeddings.js';
 import {
-  createStoredFileManifest,
-  deleteStoredFileManifest,
   getRagFilesDiff,
+  createStoredFileManifestBatch,
+  deleteStoredFileManifestBatch,
 } from './utils/manifests.js';
 import {
   connectToDatabase,
@@ -30,6 +30,8 @@ export async function* initializeRag(
   apiKey: string,
   onError?: (error: Error) => void,
 ): AsyncGenerator<RagUpdate> {
+  // Clean up any orphaned manifests from previous failed runs BEFORE starting
+
   const { toAdd, toUpdate, toRemove } = await getRagFilesDiff(
     workspaceDataPath,
     clientRuntime,
@@ -37,12 +39,13 @@ export async function* initializeRag(
   );
   const total = toAdd.length + toUpdate.length + toRemove.length;
   let progress = 0;
-  const filesToAdd = toAdd.map((file) => file.path);
-  const filesToUpdate = toUpdate.map((file) => file.path);
-  const filesToRemove = toRemove.map((file) => file.path);
+  const filesToAdd = toAdd.map((file) => file.relativePath);
+  const filesToUpdate = toUpdate.map((file) => file.relativePath);
+  const filesToRemove = toRemove.map((file) => file.relativePath);
 
-  // Process files to add - batch processing with file-based progress tracking
+  // Process files to add - transactional: only save manifest if embedding succeeds
   const processedFiles = new Set<string>();
+  const successfullyEmbedded: string[] = [];
   try {
     for await (const result of embedFiles(
       filesToAdd,
@@ -50,48 +53,87 @@ export async function* initializeRag(
       workspaceDataPath,
       apiKey,
     )) {
-      await createStoredFileManifest(
-        workspaceDataPath,
-        clientRuntime,
-        result.relativePath,
-      );
+      successfullyEmbedded.push(result.relativePath);
       if (!processedFiles.has(result.relativePath)) {
         processedFiles.add(result.relativePath);
         progress++;
         yield { progress, total };
       }
     }
+
+    // Batch save manifests for all successfully embedded files
+    if (successfullyEmbedded.length > 0) {
+      const manifestResult = await createStoredFileManifestBatch(
+        workspaceDataPath,
+        clientRuntime,
+        successfullyEmbedded,
+      );
+      // Log any manifest save failures but don't stop the process
+      for (const failure of manifestResult.failed) {
+        onError?.(
+          new Error(
+            `Failed to save manifest for ${failure.path}: ${failure.error.message}`,
+          ),
+        );
+      }
+    }
   } catch (error) {
     onError?.(error as Error);
   }
 
-  // Process files to update - batch processing with file-based progress tracking
+  // Process files to update - delete old records first, then insert new ones
   processedFiles.clear();
+  successfullyEmbedded.length = 0;
   if (filesToUpdate.length > 0) {
     try {
       const dbConnection = await connectToDatabase(workspaceDataPath);
-      await createOrUpdateTable(dbConnection, workspaceDataPath);
+      await createOrUpdateTable(dbConnection, workspaceDataPath, (error) =>
+        onError?.(new Error(`Failed to update table: ${error}`)),
+      );
       const table = dbConnection.table;
       if (!table) throw new Error('Table not initialized');
-      // Remove old records
-      for (const filePath of filesToUpdate)
-        await deleteFileRecords(table, filePath);
 
+      // Delete old records for all files we're about to update
+      for (const filePath of filesToUpdate) {
+        try {
+          await deleteFileRecords(table, filePath);
+        } catch (error) {
+          onError?.(
+            new Error(
+              `Failed to delete old records for ${filePath}: ${(error as Error).message}`,
+            ),
+          );
+        }
+      }
+
+      // Now generate new embeddings (old ones are already deleted)
       for await (const result of embedFiles(
         filesToUpdate,
         clientRuntime,
         workspaceDataPath,
         apiKey,
       )) {
-        await createStoredFileManifest(
-          workspaceDataPath,
-          clientRuntime,
-          result.relativePath,
-        );
+        successfullyEmbedded.push(result.relativePath);
         if (!processedFiles.has(result.relativePath)) {
           processedFiles.add(result.relativePath);
           progress++;
           yield { progress, total };
+        }
+      }
+
+      // Batch update manifests for all successfully embedded files
+      if (successfullyEmbedded.length > 0) {
+        const manifestResult = await createStoredFileManifestBatch(
+          workspaceDataPath,
+          clientRuntime,
+          successfullyEmbedded,
+        );
+        for (const failure of manifestResult.failed) {
+          onError?.(
+            new Error(
+              `Failed to update manifest for ${failure.path}: ${failure.error.message}`,
+            ),
+          );
         }
       }
     } catch (error) {
@@ -99,7 +141,7 @@ export async function* initializeRag(
     }
   }
 
-  // Process files to remove - no embedding needed, just deletion
+  // Process files to remove - transactional deletion
   if (filesToRemove.length > 0) {
     try {
       const dbConnection = await connectToDatabase(workspaceDataPath);
@@ -107,91 +149,67 @@ export async function* initializeRag(
       const table = dbConnection.table;
       if (!table) throw new Error('Table not initialized');
 
+      const successfullyDeleted: string[] = [];
+
       for (const filePath of filesToRemove) {
-        await deleteFileRecords(table, filePath);
-        await deleteStoredFileManifest(filePath, workspaceDataPath);
-        progress++;
-        yield { progress, total };
+        try {
+          await deleteFileRecords(table, filePath);
+          successfullyDeleted.push(filePath);
+          progress++;
+          yield { progress, total };
+        } catch (error) {
+          onError?.(
+            new Error(
+              `Failed to delete embeddings for ${filePath}: ${(error as Error).message}`,
+            ),
+          );
+        }
+      }
+
+      // Batch delete manifests only for files where embeddings were successfully deleted
+      if (successfullyDeleted.length > 0) {
+        const manifestResult = await deleteStoredFileManifestBatch(
+          successfullyDeleted,
+          workspaceDataPath,
+        );
+        for (const failure of manifestResult.failed) {
+          onError?.(
+            new Error(
+              `Failed to delete manifest for ${failure.path}: ${failure.error.message}`,
+            ),
+          );
+        }
       }
     } catch (error) {
       onError?.(error as Error);
     }
   }
 
-  // Update the RAG metadata
+  // Update the RAG metadata with accurate file count
   let totalIndexedFiles = 0;
   try {
     const db = LevelDb.getInstance(workspaceDataPath);
     await db.open();
-    for await (const _path of db.manifests.keys()) totalIndexedFiles++;
+    try {
+      for await (const _path of db.manifests.keys()) totalIndexedFiles++;
 
-    const existingMetadata = await db.meta.get('schema');
-    await db.meta.put('schema', {
-      rag: {
-        ragVersion: RAG_VERSION,
-        lastIndexedAt: new Date(),
-        indexedFiles: totalIndexedFiles,
-      },
-      schemaVersion: existingMetadata?.schemaVersion || LEVEL_DB_SCHEMA_VERSION,
-      initializedAt:
-        existingMetadata?.initializedAt || new Date().toISOString(),
-    });
-    await db.close();
+      const existingMetadata = await db.meta.get('schema');
+      await db.meta.put('schema', {
+        rag: {
+          ragVersion: RAG_VERSION,
+          lastIndexedAt: new Date(),
+          indexedFiles: totalIndexedFiles,
+        },
+        schemaVersion:
+          existingMetadata?.schemaVersion || LEVEL_DB_SCHEMA_VERSION,
+        initializedAt:
+          existingMetadata?.initializedAt || new Date().toISOString(),
+      });
+    } finally {
+      await db.close();
+    }
   } catch (error) {
     onError?.(error as Error);
-  }
-}
-
-export async function updateRag(
-  relativePath: string,
-  event: 'add' | 'update' | 'delete',
-  clientRuntime: ClientRuntime,
-  workspaceDataPath: string,
-  apiKey: string,
-) {
-  const dbConnection = await connectToDatabase(workspaceDataPath);
-  await createOrUpdateTable(dbConnection, workspaceDataPath);
-  const table = dbConnection.table;
-  if (!table) throw new Error('Table not initialized');
-
-  switch (event) {
-    case 'add': {
-      for await (const _ of embedFiles(
-        [relativePath],
-        clientRuntime,
-        workspaceDataPath,
-        apiKey,
-      )) {
-      }
-      await createStoredFileManifest(
-        workspaceDataPath,
-        clientRuntime,
-        relativePath,
-      );
-      break;
-    }
-    case 'update': {
-      await deleteStoredFileManifest(relativePath, workspaceDataPath);
-      await deleteFileRecords(table, relativePath);
-      for await (const _ of embedFiles(
-        [relativePath],
-        clientRuntime,
-        workspaceDataPath,
-        apiKey,
-      )) {
-      }
-      await createStoredFileManifest(
-        workspaceDataPath,
-        clientRuntime,
-        relativePath,
-      );
-      break;
-    }
-    case 'delete': {
-      await deleteFileRecords(table, relativePath);
-      await deleteStoredFileManifest(relativePath, workspaceDataPath);
-      break;
-    }
   }
 }
 

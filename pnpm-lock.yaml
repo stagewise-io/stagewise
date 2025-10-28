@@ -157,6 +157,9 @@ importers:
         specifier: 4.0.17
         version: 4.0.17
     devDependencies:
+      '@stagewise/agent-runtime-mock':
+        specifier: workspace:*
+        version: link:../runtime-mock
       esbuild:
         specifier: 0.25.9
         version: 0.25.9

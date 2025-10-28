@@ -8,7 +8,7 @@ import { LevelDb } from './typed-db.js';
 import { RAG_VERSION } from '../index.js';
 
 export type FileManifest = {
-  path: string;
+  relativePath: string;
   contentHash: string;
   ragVersion: number;
   indexedAt: number;
@@ -34,7 +34,7 @@ async function getLocalFilesManifests(
       );
     }
 
-    for (const file of extensionFiles.paths ?? []) {
+    for (const file of extensionFiles.relativePaths ?? []) {
       allFiles.add(file);
     }
   }
@@ -54,7 +54,7 @@ async function getLocalFilesManifests(
         new Error(`Failed to get specific filenames: ${filenameFiles.message}`),
       );
     } else {
-      for (const file of filenameFiles.paths ?? []) {
+      for (const file of filenameFiles.relativePaths ?? []) {
         allFiles.add(file);
       }
     }
@@ -63,7 +63,7 @@ async function getLocalFilesManifests(
   const manifests: FileManifest[] = [];
 
   for (const file of allFiles) {
-    const manifest = await getFileManifest(clientRuntime, file);
+    const manifest = await getFileManifestContent(clientRuntime, file);
     if (!manifest) {
       onError?.(new Error(`Failed to get file manifest for: ${file}`));
       continue;
@@ -106,7 +106,7 @@ async function compareFileManifests(
 
   for (const manifest of localManifests) {
     const storedManifest = storedManifests.find(
-      (s) => s.path === manifest.path,
+      (s) => s.relativePath === manifest.relativePath,
     );
 
     if (!storedManifest) {
@@ -120,7 +120,7 @@ async function compareFileManifests(
   }
 
   for (const manifest of storedManifests) {
-    if (!localManifests.some((l) => l.path === manifest.path)) {
+    if (!localManifests.some((l) => l.relativePath === manifest.relativePath)) {
       toRemove.push(manifest);
     }
   }
@@ -128,7 +128,7 @@ async function compareFileManifests(
   return { toAdd, toUpdate, toRemove };
 }
 
-async function getFileManifest(
+async function getFileManifestContent(
   clientRuntime: ClientRuntime,
   filepath: string,
 ): Promise<FileManifest | null> {
@@ -136,7 +136,7 @@ async function getFileManifest(
   if (!content.success) return null;
 
   return {
-    path: filepath,
+    relativePath: filepath,
     contentHash: createHash('sha256')
       .update(content.content ?? '')
       .digest('hex'),
@@ -148,26 +148,110 @@ async function getFileManifest(
 export async function createStoredFileManifest(
   workspaceDataPath: string,
   clientRuntime: ClientRuntime,
-  filepath: string,
+  relativePath: string,
 ): Promise<void> {
-  const manifest = await getFileManifest(clientRuntime, filepath);
+  const manifest = await getFileManifestContent(clientRuntime, relativePath);
   if (!manifest) {
-    throw new Error(`Failed to get file manifest: ${filepath}`);
+    throw new Error(`Failed to get file manifest: ${relativePath}`);
   }
   const db = LevelDb.getInstance(workspaceDataPath);
   await db.open();
-  await db.manifests.put(filepath, manifest);
-  await db.close();
+  try {
+    await db.manifests.put(relativePath, manifest);
+  } finally {
+    await db.close();
+  }
 }
 
 export async function deleteStoredFileManifest(
-  filepath: string,
+  relativePath: string,
   workspaceDataPath: string,
 ): Promise<void> {
   const db = LevelDb.getInstance(workspaceDataPath);
   await db.open();
-  await db.manifests.del(filepath);
-  await db.close();
+  try {
+    await db.manifests.del(relativePath);
+  } finally {
+    await db.close();
+  }
+}
+
+/**
+ * Batch version of createStoredFileManifest that keeps the database open
+ * for multiple operations. More efficient for bulk operations.
+ */
+export async function createStoredFileManifestBatch(
+  workspaceDataPath: string,
+  clientRuntime: ClientRuntime,
+  relativePaths: string[],
+): Promise<{
+  succeeded: string[];
+  failed: Array<{ path: string; error: Error }>;
+}> {
+  const db = LevelDb.getInstance(workspaceDataPath);
+  await db.open();
+
+  const succeeded: string[] = [];
+  const failed: Array<{ path: string; error: Error }> = [];
+
+  try {
+    for (const relativePath of relativePaths) {
+      try {
+        const manifest = await getFileManifestContent(
+          clientRuntime,
+          relativePath,
+        );
+        if (!manifest) {
+          failed.push({
+            path: relativePath,
+            error: new Error(`Failed to get file manifest: ${relativePath}`),
+          });
+          continue;
+        }
+        await db.manifests.put(relativePath, manifest);
+        succeeded.push(relativePath);
+      } catch (error) {
+        failed.push({ path: relativePath, error: error as Error });
+      }
+    }
+  } finally {
+    await db.close();
+  }
+
+  return { succeeded, failed };
+}
+
+/**
+ * Batch version of deleteStoredFileManifest that keeps the database open
+ * for multiple operations. More efficient for bulk operations.
+ */
+export async function deleteStoredFileManifestBatch(
+  filepaths: string[],
+  workspaceDataPath: string,
+): Promise<{
+  succeeded: string[];
+  failed: Array<{ path: string; error: Error }>;
+}> {
+  const db = LevelDb.getInstance(workspaceDataPath);
+  await db.open();
+
+  const succeeded: string[] = [];
+  const failed: Array<{ path: string; error: Error }> = [];
+
+  try {
+    for (const filepath of filepaths) {
+      try {
+        await db.manifests.del(filepath);
+        succeeded.push(filepath);
+      } catch (error) {
+        failed.push({ path: filepath, error: error as Error });
+      }
+    }
+  } finally {
+    await db.close();
+  }
+
+  return { succeeded, failed };
 }
 
 export async function getRagFilesDiff(

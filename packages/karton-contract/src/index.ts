@@ -138,7 +138,8 @@ export type AppState = {
             indexProgress: number;
             indexTotal: number;
           }
-        | { isIndexing: false; error?: string };
+        | { isIndexing: false }
+        | { isIndexing: false; hasError: true; error: string };
     };
     loadedOnStart: boolean;
   } | null;
@@ -281,6 +282,15 @@ export type KartonContract = {
       assistantMadeCodeChangesUntilLatestUserMessage: (
         chatId: string,
       ) => Promise<boolean>;
+      contextElementsChanged: (elements: SelectedElement[]) => Promise<void>; // Notifies when selected context elements change in the toolbar
+      getContextElementFile: (element: SelectedElement) => Promise<
+        | {
+            relativePath: string;
+            startLine: number;
+            endLine: number;
+          }
+        | { error: string }
+      >;
     };
     userAccount: {
       refreshStatus: () => Promise<void>;

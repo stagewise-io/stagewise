@@ -228,6 +228,7 @@ export class AgentService {
   }
 
   private async initializeClient() {
+    await this.authService.refreshAuthData();
     const tokens = await this.authService.getToken();
     if (!tokens) {
       throw new Error('No authentication tokens available');

@@ -27,7 +27,7 @@ export const FileContentResultSchema = FileOperationResultSchema.extend({
 export type FileContentResult = z.infer<typeof FileContentResultSchema>;
 
 export const DirectoryEntrySchema = z.object({
-  path: z.string(),
+  relativePath: z.string(),
   name: z.string(),
   type: z.enum(['file', 'directory']),
   size: z.number().optional(),
@@ -48,7 +48,7 @@ export type DirectoryListResult = z.infer<typeof DirectoryListResultSchema>;
  * Result schema for grep operations
  */
 export const GrepMatchSchema = z.object({
-  path: z.string(),
+  relativePath: z.string(),
   line: z.number(),
   column: z.number(),
   match: z.string(),
@@ -69,7 +69,7 @@ export type GrepResult = z.infer<typeof GrepResultSchema>;
  * Result schema for glob operations
  */
 export const GlobResultSchema = FileOperationResultSchema.extend({
-  paths: z.array(z.string()).optional(),
+  relativePaths: z.array(z.string()).optional(),
   totalMatches: z.number().optional(),
 });
 
@@ -104,19 +104,18 @@ export type SearchReplaceResult = z.infer<typeof SearchReplaceResultSchema>;
  * Provides comprehensive access to the local file system including
  * reading, writing, searching, and pattern matching capabilities.
  *
- * IMPORTANT: All path parameters in this interface expect relative paths.
- * The client runtime will resolve these paths relative to the current working directory.
+ * IMPORTANT: All relative path parameters in this interface expect relative paths to the current working directory.
  */
 export interface IFileSystemProvider {
   // File operations
   /**
    * Reads the content of a file.
-   * @param path - The relative file path to read
+   * @param relativePath - The relative file path to read
    * @param options - Optional parameters to read specific line ranges
    * @returns File content and metadata
    */
   readFile(
-    path: string,
+    relativePath: string,
     options?: {
       startLine?: number;
       endLine?: number;
@@ -125,23 +124,26 @@ export interface IFileSystemProvider {
 
   /**
    * Writes content to a file, creating it if it doesn't exist.
-   * @param path - The relative file path to write to
+   * @param relativePath - The relative file path to write to
    * @param content - The content to write
    * @returns Operation result
    */
-  writeFile(path: string, content: string): Promise<FileOperationResult>;
+  writeFile(
+    relativePath: string,
+    content: string,
+  ): Promise<FileOperationResult>;
 
   /**
    * Edits a file by replacing content between specified lines.
    * More versatile than insertLines/overwriteLines.
-   * @param path - The relative file path to edit
+   * @param relativePath - The relative file path to edit
    * @param content - The new content
    * @param startLine - Starting line number (1-based)
    * @param endLine - Ending line number (inclusive)
    * @returns Operation result
    */
   editFile(
-    path: string,
+    relativePath: string,
     content: string,
     startLine: number,
     endLine: number,
@@ -150,19 +152,19 @@ export interface IFileSystemProvider {
   // Directory operations
   /**
    * Creates a directory, including parent directories if needed.
-   * @param path - The relative directory path to create
+   * @param relativePath - The relative directory path to create
    * @returns Operation result
    */
-  createDirectory(path: string): Promise<FileOperationResult>;
+  createDirectory(relativePath: string): Promise<FileOperationResult>;
 
   /**
    * Lists files and directories in a given path.
-   * @param path - The relative directory path to list
+   * @param relativePath - The relative directory path to list
    * @param options - Filtering and recursion options
    * @returns List of directory entries
    */
   listDirectory(
-    path: string,
+    relativePath: string,
     options?: {
       recursive?: boolean;
       maxDepth?: number;
@@ -177,13 +179,13 @@ export interface IFileSystemProvider {
   /**
    * Searches for content patterns across files in a directory.
    * Similar to the Unix grep command.
-   * @param path - The relative directory path to search in
+   * @param relativePath - The relative directory path to search in
    * @param pattern - Regular expression pattern to search for
    * @param options - Search configuration options
    * @returns Matching results with file paths and line information
    */
   grep(
-    path: string,
+    relativePath: string,
     pattern: string,
     options?: {
       recursive?: boolean;
@@ -216,14 +218,14 @@ export interface IFileSystemProvider {
 
   /**
    * Searches and replaces occurrences of a string in a file.
-   * @param filePath - The relative file path to perform search and replace on
+   * @param relativePath - The relative file path to perform search and replace on
    * @param searchString - The string or regex pattern to search for
    * @param replaceString - The string to replace matches with
    * @param options - Search and replace configuration options
    * @returns Results including all replacements made and file modification status
    */
   searchAndReplace(
-    filePath: string,
+    relativePath: string,
     searchString: string,
     replaceString: string,
     options?: {
@@ -239,61 +241,63 @@ export interface IFileSystemProvider {
   // Path operations
   /**
    * Resolves a relative path to its absolute form.
-   * @param path - The relative path to resolve
+   * @param relativePath - The relative path to resolve
    * @returns Absolute path
    */
-  resolvePath(path: string): string;
+  resolvePath(relativePath: string): string;
 
   /**
    * Gets the directory name from a path.
-   * @param path - The file or directory path
+   * @param relativePath - The file or directory path
    * @returns Parent directory path
    */
-  getDirectoryName(path: string): string;
+  getDirectoryName(relativePath: string): string;
 
   /**
    * Joins multiple path segments into a single path.
-   * @param paths - Path segments to join
+   * @param relativePaths - Path segments to join
    * @returns Combined path
    */
-  joinPaths(...paths: string[]): string;
+  joinPaths(...relativePaths: string[]): string;
 
   /**
    * Gets the relative path from one location to another.
-   * @param from - Starting path
-   * @param to - Target path
+   * @param from - Starting relative path
+   * @param to - Target relative path
    * @returns Relative path
    */
   getRelativePath(from: string, to: string): string;
 
   /**
    * Extracts the file extension from a path.
-   * @param path - The file path
+   * @param relativePath - The file path
    * @returns File extension including the dot (e.g., ".ts")
    */
-  getFileExtension(path: string): string;
+  getFileExtension(relativePath: string): string;
 
   // Utility operations
   /**
    * Checks if a file or directory exists.
-   * @param path - The relative path to check
+   * @param relativePath - The relative path to check
    * @returns True if exists, false otherwise
    */
-  fileExists(path: string): Promise<boolean>;
+  fileExists(relativePath: string): Promise<boolean>;
 
   /**
    * Checks if a path is a directory.
-   * @param path - The relative path to check
+   * @param relativePath - The relative path to check
    * @returns True if directory, false otherwise
    */
-  isDirectory(path: string): Promise<boolean>;
+  isDirectory(relativePath: string): Promise<boolean>;
 
   /**
    * Gets file statistics.
-   * @param path - The relative file path
+   * @param relativePath - The relative file path
    * @returns File statistics including size in bytes
    */
-  getFileStats(path: string): Promise<{ size: number; modifiedTime?: Date }>;
+  getFileStats(
+    relativePath: string,
+  ): Promise<{ size: number; modifiedTime?: Date }>;
 
   /**
    * Gets the current working directory.
@@ -308,21 +312,21 @@ export interface IFileSystemProvider {
 
   /**
    * Watches files for changes.
-   * @param path - The relative path to watch (chokidar pattern, e.g. "**\/*.ts" or ".")
+   * @param relativePath - The relative path to watch (chokidar pattern, e.g. "**\/*.ts" or ".")
    * @param onFileChange - The callback to call when a file changes
    * @returns A promise that resolves to a function to stop the watcher
    */
   watchFiles(
-    path: string,
+    relativePath: string,
     onFileChange: (event: FileChangeEvent) => void,
   ): Promise<() => Promise<void>>;
 
   /**
    * Deletes a file.
-   * @param path - The relative file path to delete
+   * @param relativePath - The relative file path to delete
    * @returns Operation result
    */
-  deleteFile(path: string): Promise<FileOperationResult>;
+  deleteFile(relativePath: string): Promise<FileOperationResult>;
 
   /**
    * Copies a file from source to destination.
@@ -348,17 +352,17 @@ export interface IFileSystemProvider {
 
   /**
    * Checks if a path should be ignored based on gitignore patterns.
-   * @param path - The relative path to check
+   * @param relativePath - The relative path to check
    * @returns True if the path should be ignored, false otherwise
    */
-  isIgnored(path: string): Promise<boolean>;
+  isIgnored(relativePath: string): Promise<boolean>;
 
   /**
    * Checks if a file contains binary content.
-   * @param path - The relative file path to check
+   * @param relativePath - The relative file path to check
    * @returns True if the file is binary, false if it's text
    */
-  isBinary(path: string): Promise<boolean>;
+  isBinary(relativePath: string): Promise<boolean>;
 }
 
 /**
@@ -379,22 +383,22 @@ export abstract class BaseFileSystemProvider implements IFileSystemProvider {
   }
 
   abstract readFile(
-    path: string,
+    relativePath: string,
     options?: { startLine?: number; endLine?: number },
   ): Promise<FileContentResult>;
   abstract writeFile(
-    path: string,
+    relativePath: string,
     content: string,
   ): Promise<FileOperationResult>;
   abstract editFile(
-    path: string,
+    relativePath: string,
     content: string,
     startLine: number,
     endLine: number,
   ): Promise<FileOperationResult>;
-  abstract createDirectory(path: string): Promise<FileOperationResult>;
+  abstract createDirectory(relativePath: string): Promise<FileOperationResult>;
   abstract listDirectory(
-    path: string,
+    relativePath: string,
     options?: {
       recursive?: boolean;
       maxDepth?: number;
@@ -405,7 +409,7 @@ export abstract class BaseFileSystemProvider implements IFileSystemProvider {
     },
   ): Promise<DirectoryListResult>;
   abstract grep(
-    path: string,
+    relativePath: string,
     pattern: string,
     options?: {
       recursive?: boolean;
@@ -428,7 +432,7 @@ export abstract class BaseFileSystemProvider implements IFileSystemProvider {
     },
   ): Promise<GlobResult>;
   abstract searchAndReplace(
-    filePath: string,
+    relativePath: string,
     searchString: string,
     replaceString: string,
     options?: {
@@ -440,42 +444,45 @@ export abstract class BaseFileSystemProvider implements IFileSystemProvider {
       dryRun?: boolean;
     },
   ): Promise<SearchReplaceResult>;
-  abstract fileExists(path: string): Promise<boolean>;
-  abstract isDirectory(path: string): Promise<boolean>;
+  abstract fileExists(relativePath: string): Promise<boolean>;
+  abstract isDirectory(relativePath: string): Promise<boolean>;
   abstract getFileStats(
-    path: string,
+    relativePath: string,
   ): Promise<{ size: number; modifiedTime?: Date }>;
-  abstract deleteFile(path: string): Promise<FileOperationResult>;
+  abstract deleteFile(relativePath: string): Promise<FileOperationResult>;
   abstract copyFile(
-    source: string,
-    destination: string,
+    sourceRelativePath: string,
+    destinationRelativePath: string,
   ): Promise<FileOperationResult>;
   abstract moveFile(
-    source: string,
-    destination: string,
+    sourceRelativePath: string,
+    destinationRelativePath: string,
   ): Promise<FileOperationResult>;
   abstract getGitignorePatterns(): Promise<string[]>;
-  abstract isIgnored(path: string): Promise<boolean>;
-  abstract isBinary(path: string): Promise<boolean>;
+  abstract isIgnored(relativePath: string): Promise<boolean>;
+  abstract isBinary(relativePath: string): Promise<boolean>;
 
   // Default implementations for path operations that can be overridden if needed
-  abstract resolvePath(path: string): string;
-  abstract getDirectoryName(path: string): string;
-  abstract joinPaths(...paths: string[]): string;
-  abstract getRelativePath(from: string, to: string): string;
-  abstract getFileExtension(path: string): string;
+  abstract resolvePath(relativePath: string): string;
+  abstract getDirectoryName(relativePath: string): string;
+  abstract joinPaths(...relativePaths: string[]): string;
+  abstract getRelativePath(
+    fromRelativePath: string,
+    toRelativePath: string,
+  ): string;
+  abstract getFileExtension(relativePath: string): string;
 
   abstract getCurrentWorkingDirectory(): string;
   abstract setCurrentWorkingDirectory(dir: string): void;
 
   /**
    * Watches files for changes.
-   * @param path - The relative path to watch (chokidar pattern, e.g. "**\/*.ts" or ".")
+   * @param relativePath - The relative path to watch (chokidar pattern, e.g. "**\/*.ts" or ".")
    * @param onFileChange - The callback to call when a file changes
    * @returns A function to stop the watcher
    */
   abstract watchFiles(
-    path: string,
+    relativePath: string,
     onFileChange: (event: FileChangeEvent) => void,
   ): Promise<() => Promise<void>>;
 }

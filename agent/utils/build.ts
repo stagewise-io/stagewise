@@ -9,7 +9,13 @@ const baseOptions: BuildOptions = {
   bundle: true,
   platform: 'node',
   target: 'es2020',
-  external: ['@stagewise/karton'],
+  external: [
+    '@stagewise/karton',
+    '@stagewise/agent-runtime-interface',
+    '@stagewise/agent-rag', // Has native dependencies via lancedb
+    '@lancedb/lancedb', // Has native bindings, must be external
+    'level', // Has native bindings, must be external
+  ],
   sourcemap: false,
   minify: true,
   treeShaking: true,

@@ -79,7 +79,7 @@ describe('typed-db', () => {
 
       // Add some test data
       await db.manifests.put('test-key', {
-        path: '/test/path',
+        relativePath: '/test/path',
         contentHash: 'test-hash',
         ragVersion: 1,
         indexedAt: Date.now(),
@@ -94,7 +94,7 @@ describe('typed-db', () => {
       // Test data should still exist
       const testManifest = await db.manifests.get('test-key');
       expect(testManifest).toBeDefined();
-      expect(testManifest!.path).toBe('/test/path');
+      expect(testManifest!.relativePath).toBe('/test/path');
     });
 
     it('should reset database when schema versions differ', async () => {
@@ -106,7 +106,7 @@ describe('typed-db', () => {
 
       // Add some test data
       await db.manifests.put('test-key', {
-        path: '/test/path',
+        relativePath: '/test/path',
         contentHash: 'test-hash',
         ragVersion: 1,
         indexedAt: Date.now(),
@@ -236,7 +236,7 @@ describe('typed-db', () => {
 
       // Data written through one instance should be accessible through others
       await db1.manifests.put('test-key', {
-        path: '/test/path',
+        relativePath: '/test/path',
         contentHash: 'test-hash',
         ragVersion: 1,
         indexedAt: Date.now(),
@@ -247,8 +247,8 @@ describe('typed-db', () => {
 
       expect(dataFromDb2).toBeDefined();
       expect(dataFromDb3).toBeDefined();
-      expect(dataFromDb2!.path).toBe('/test/path');
-      expect(dataFromDb3!.path).toBe('/test/path');
+      expect(dataFromDb2!.relativePath).toBe('/test/path');
+      expect(dataFromDb3!.relativePath).toBe('/test/path');
 
       // Closing through one instance should affect all
       await db2.close();
@@ -272,19 +272,19 @@ describe('typed-db', () => {
       // Perform concurrent writes through different instances
       const writePromises = [
         db1.manifests.put('file1', {
-          path: '/file1',
+          relativePath: '/file1',
           contentHash: 'hash1',
           ragVersion: 1,
           indexedAt: Date.now(),
         }),
         db2.manifests.put('file2', {
-          path: '/file2',
+          relativePath: '/file2',
           contentHash: 'hash2',
           ragVersion: 1,
           indexedAt: Date.now(),
         }),
         db3.manifests.put('file3', {
-          path: '/file3',
+          relativePath: '/file3',
           contentHash: 'hash3',
           ragVersion: 1,
           indexedAt: Date.now(),
@@ -298,18 +298,18 @@ describe('typed-db', () => {
       const file2FromDb2 = await db2.manifests.get('file2');
       const file3FromDb3 = await db3.manifests.get('file3');
 
-      expect(file1FromDb1!.path).toBe('/file1');
-      expect(file2FromDb2!.path).toBe('/file2');
-      expect(file3FromDb3!.path).toBe('/file3');
+      expect(file1FromDb1!.relativePath).toBe('/file1');
+      expect(file2FromDb2!.relativePath).toBe('/file2');
+      expect(file3FromDb3!.relativePath).toBe('/file3');
 
       // Cross-instance reads should also work
       const file1FromDb2 = await db2.manifests.get('file1');
       const file2FromDb3 = await db3.manifests.get('file2');
       const file3FromDb1 = await db1.manifests.get('file3');
 
-      expect(file1FromDb2!.path).toBe('/file1');
-      expect(file2FromDb3!.path).toBe('/file2');
-      expect(file3FromDb1!.path).toBe('/file3');
+      expect(file1FromDb2!.relativePath).toBe('/file1');
+      expect(file2FromDb3!.relativePath).toBe('/file2');
+      expect(file3FromDb1!.relativePath).toBe('/file3');
 
       await db1.close();
     });
@@ -322,7 +322,7 @@ describe('typed-db', () => {
 
       // Add some data
       await db.manifests.put('test1', {
-        path: '/test1',
+        relativePath: '/test1',
         contentHash: 'hash1',
         ragVersion: 1,
         indexedAt: Date.now(),
@@ -337,7 +337,7 @@ describe('typed-db', () => {
 
       // Should be able to add new data
       await db.manifests.put('test2', {
-        path: '/test2',
+        relativePath: '/test2',
         contentHash: 'hash2',
         ragVersion: 1,
         indexedAt: Date.now(),
@@ -345,7 +345,7 @@ describe('typed-db', () => {
 
       // New data should be retrievable
       const manifest = await db.manifests.get('test2');
-      expect(manifest!.path).toBe('/test2');
+      expect(manifest!.relativePath).toBe('/test2');
       expect(manifest!.contentHash).toBe('hash2');
 
       // Old data should be gone
@@ -360,7 +360,7 @@ describe('typed-db', () => {
 
       // Should be able to write to all sublevels
       await db.manifests.put('manifest1', {
-        path: '/test',
+        relativePath: '/test',
         contentHash: 'hash',
         ragVersion: 1,
         indexedAt: Date.now(),

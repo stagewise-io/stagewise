@@ -43,6 +43,7 @@
     "zod": "4.0.17"
   },
   "devDependencies": {
+    "@stagewise/agent-runtime-mock": "workspace:*",
     "esbuild": "0.25.9",
     "rimraf": "^5.0.0",
     "tsx": "^4.7.1",

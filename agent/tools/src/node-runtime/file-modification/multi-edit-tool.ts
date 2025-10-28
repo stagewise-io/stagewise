@@ -246,7 +246,6 @@ export async function multiEditToolExecute(
         };
       }
 
-      console.log('adding diff to the output of multiEditTool', diff.path);
       const result = {
         success: true as const,
         message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,

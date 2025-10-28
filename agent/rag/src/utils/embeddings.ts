@@ -144,25 +144,20 @@ export const generateEmbedding = async <T extends string | string[]>(
   text: T,
   model = 'gemini-embedding-001',
 ): Promise<number[][]> => {
-  try {
-    const result = await client.embeddings.create({
-      model: `${model}`,
-      input: text, // Wrap text in array as per API spec
-      encoding_format: 'float',
-    });
-    const embedding = result.data?.map((d) => d.embedding || []) || [];
+  const result = await client.embeddings.create({
+    model: `${model}`,
+    input: text, // Wrap text in array as per API spec
+    encoding_format: 'float',
+  });
+  const embedding = result.data?.map((d) => d.embedding || []) || [];
 
-    if (embedding.some((e) => e.length !== EXPECTED_EMBEDDING_DIM)) {
-      throw new Error(
-        `Embedding has ${embedding.some((e) => e.length !== EXPECTED_EMBEDDING_DIM)} dimensions, but ${EXPECTED_EMBEDDING_DIM} dimensions are required.`,
-      );
-    }
-
-    return embedding;
-  } catch (error) {
-    console.error('Failed to generate embedding:', error);
-    throw error;
+  if (embedding.some((e) => e.length !== EXPECTED_EMBEDDING_DIM)) {
+    throw new Error(
+      `Embedding has ${embedding.some((e) => e.length !== EXPECTED_EMBEDDING_DIM)} dimensions, but ${EXPECTED_EMBEDDING_DIM} dimensions are required.`,
+    );
   }
+
+  return embedding;
 };
 
 /**
@@ -172,6 +167,7 @@ export async function* generateFileEmbeddings(
   config: EmbeddingConfig,
   filePaths: string[],
   clientRuntime: ClientRuntime,
+  onError?: (error: unknown) => void,
 ): AsyncGenerator<FileEmbedding> {
   const client = createEmbeddingClient(config);
   const model = config.model || 'gemini-embedding-001';
@@ -190,7 +186,6 @@ export async function* generateFileEmbeddings(
       try {
         const content = await clientRuntime.fileSystem.readFile(filePath);
         if (!content.success) {
-          console.error(`Failed to read file: ${filePath}`);
           continue;
         }
         const allChunks = await getFileChunks(filePath, clientRuntime);
@@ -200,7 +195,7 @@ export async function* generateFileEmbeddings(
         );
         fileChunksData.push({ filePath, chunks: nonEmptyChunks });
       } catch (error) {
-        console.error(`Error processing file ${filePath}:`, error);
+        onError?.(new Error(`Error processing file ${filePath}: ${error}`));
       }
     }
 
@@ -235,39 +230,37 @@ export async function* generateFileEmbeddings(
       const chunkBatch = chunkInfoList.slice(j, j + embeddingBatchSize);
       const texts = chunkBatch.map((info) => info.chunk.text);
 
-      try {
-        // Batch embed all texts at once
-        const embeddings = await generateEmbedding(client, texts, model);
+      // Batch embed all texts at once
+      const embeddings = await generateEmbedding(client, texts, model);
 
-        // Yield FileEmbedding for each chunk with its corresponding embedding
-        for (let k = 0; k < chunkBatch.length; k++) {
-          const info = chunkBatch[k];
-          const embedding = embeddings[k];
+      // Yield FileEmbedding for each chunk with its corresponding embedding
+      for (let k = 0; k < chunkBatch.length; k++) {
+        const info = chunkBatch[k];
+        const embedding = embeddings[k];
 
-          if (!info) {
-            console.error(`Missing chunk info at index ${k}`);
-            continue;
-          }
-
-          if (embedding && embedding.length === EXPECTED_EMBEDDING_DIM) {
-            yield {
-              filePath: info.filePath,
-              relativePath: info.filePath,
-              chunkIndex: info.chunkIndex,
-              totalChunks: info.totalChunks,
-              startLine: info.chunk.startLine,
-              endLine: info.chunk.endLine,
-              content: info.chunk.text,
-              embedding: embedding,
-            };
-          } else {
-            console.error(
-              `Invalid embedding for ${info.filePath} chunk ${info.chunkIndex}`,
-            );
-          }
+        if (!info) {
+          onError?.(new Error(`Missing chunk info at index ${k}`));
+          continue;
         }
-      } catch (error) {
-        console.error('Failed to generate embeddings for batch:', error);
+
+        if (embedding && embedding.length === EXPECTED_EMBEDDING_DIM) {
+          yield {
+            filePath: info.filePath,
+            relativePath: info.filePath,
+            chunkIndex: info.chunkIndex,
+            totalChunks: info.totalChunks,
+            startLine: info.chunk.startLine,
+            endLine: info.chunk.endLine,
+            content: info.chunk.text,
+            embedding: embedding,
+          };
+        } else {
+          onError?.(
+            new Error(
+              `Invalid embedding for ${info.filePath} chunk ${info.chunkIndex}`,
+            ),
+          );
+        }
       }
 
       // Add a small delay between embedding batches to avoid rate limiting
