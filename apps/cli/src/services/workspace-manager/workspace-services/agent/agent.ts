@@ -935,6 +935,14 @@ export class AgentService {
             },
           );
 
+          // Updating the used context window size of the chat.
+          this.kartonService.setState((draft) => {
+            const chat = draft.workspace?.agentChat?.chats[chatId];
+            if (chat && r.totalUsage.inputTokens)
+              chat.usage.usedContextWindowSize = r.totalUsage.inputTokens;
+            return draft;
+          });
+
           if (
             toolResults.length > 0 &&
             !toolResults.some(

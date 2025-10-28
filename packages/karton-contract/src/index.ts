@@ -43,6 +43,7 @@ export type Chat = {
   createdAt: Date;
   messages: History;
   error?: AgentError;
+  usage: { maxContextWindowSize: number; usedContextWindowSize: number };
 };
 
 export enum AgentErrorType {
