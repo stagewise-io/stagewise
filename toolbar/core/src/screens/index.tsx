@@ -16,14 +16,15 @@ export function ScreenRouter() {
 
   return (
     <div className="fixed inset-0 bg-background">
-      <Iridescence
-        className={cn(
-          '-z-10 pointer-events-none absolute inset-0 opacity-0 duration-1000 ease-out',
-          (!connected || displayedLayout !== Layout.MAIN) && 'opacity-100',
-        )}
-        color={[0.9, 0.85, 1]}
-        speed={0.1}
-      />
+      {connected && displayedLayout !== Layout.MAIN && (
+        <Iridescence
+          className={cn(
+            '-z-10 pointer-events-none absolute inset-0 opacity-100 duration-1000 ease-out',
+          )}
+          color={[0.9, 0.85, 1]}
+          speed={0.1}
+        />
+      )}
 
       <div className="absolute inset-0 flex size-full flex-col items-center justify-center">
         {!connected && (
