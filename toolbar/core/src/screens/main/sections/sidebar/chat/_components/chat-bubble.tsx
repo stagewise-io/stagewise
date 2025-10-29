@@ -180,7 +180,7 @@ export function ChatBubble({
           msg.role === 'assistant' ? 'flex-row' : 'flex-row-reverse',
         )}
       >
-        <div className="flex max-w-full flex-col items-end gap-2">
+        <div className="flex max-w-full flex-col items-start gap-2">
           <div
             className={cn(
               'glass-body group relative min-h-8 max-w-full animate-chat-bubble-appear space-y-3 break-words rounded-2xl bg-white/5 px-3 py-2 font-normal text-sm last:mb-0.5',

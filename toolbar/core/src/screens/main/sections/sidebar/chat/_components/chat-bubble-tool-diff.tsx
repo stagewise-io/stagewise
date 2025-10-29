@@ -66,6 +66,8 @@ export const getToolName = (toolPart: ToolPart | DynamicToolUIPart): string => {
       );
       return `Deleting ${fileName}`;
     }
+    case 'tool-saveRequiredInformationTool':
+      return 'Starting stagewise for your app...';
     case 'tool-generateComponentTool':
       return 'Generating Component...';
     case 'dynamic-tool':

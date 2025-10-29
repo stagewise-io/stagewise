@@ -59,7 +59,7 @@ export const AskForDevScriptIntegrationToolPartContent = memo(
         {toolPart.state === 'input-available' && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
             <Button variant="secondary" size="xs" onClick={onCancel}>
-              Cancel
+              Don't integrate
             </Button>
             <Button
               variant="primary"
