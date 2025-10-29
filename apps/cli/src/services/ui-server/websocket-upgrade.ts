@@ -21,15 +21,16 @@ export const configureWebSocketUpgrade = (
     if (!pathname.startsWith(stagewiseAppPrefix)) {
       const targetPort =
         workspaceManager.workspace?.configService?.get().appPort;
-      if (!targetPort) {
-        throw new Error(
-          "[WebSocketUpgrade] Proxy request received while no app port is configured. This shouldn't happen...",
-        );
-      }
       logger.debug(
         `[WebSocketUpgrade] Proxying WebSocket request to app port ${targetPort}`,
       );
-      proxyUpgradeHandler(request, socket as any, head);
+      if (!targetPort) {
+        console.error(
+          "[WebSocketUpgrade] Proxy request received while no app port is configured. This shouldn't happen...",
+        );
+      } else {
+        proxyUpgradeHandler(request, socket as any, head);
+      }
     } else if (pathname === stagewiseKartonPath) {
       // The only websocket that stagewise uses internally is the karton websocket, so if that fits, we simply forward to that
       kartonWebSocketServer.handleUpgrade(request, socket, head, (ws) => {
