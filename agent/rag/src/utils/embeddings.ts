@@ -12,7 +12,6 @@ export interface EmbeddingConfig {
 }
 
 export interface FileEmbedding {
-  absolutePath: string;
   relativePath: string;
   chunkIndex: number;
   totalChunks: number;
@@ -34,14 +33,14 @@ export const createEmbeddingClient = (config: EmbeddingConfig): OpenAI => {
 };
 
 export function getFileChunkContent(
-  filePath: string,
+  relativePath: string,
   _clientRuntime: ClientRuntime,
   content: string,
 ) {
-  const description = (filePath: string) => {
-    const fileName = path.basename(filePath);
-    const extension = path.extname(filePath);
-    const defaultDescription = `A ${extension} file with the name ${fileName} from the file ${filePath}.`;
+  const description = (relativePath: string) => {
+    const fileName = path.basename(relativePath);
+    const extension = path.extname(relativePath);
+    const defaultDescription = `A ${extension} file with the name ${fileName} from the file ${relativePath}.`;
     switch (extension) {
       case '.tsx':
       case '.jsx':
@@ -65,71 +64,88 @@ export function getFileChunkContent(
     }
   };
   const codeBlock = (code: string) => `\n\nCode:\n---\n${code}\n---`;
-  return description(filePath) + codeBlock(content);
+  return description(relativePath) + codeBlock(content);
 }
 
 /**
  * Chunks text into smaller pieces while preserving line boundaries
  */
 export const getFileChunks = async (
-  filePath: string,
+  relativePath: string,
   clientRuntime: ClientRuntime,
   maxChunkSize = 8000,
 ): Promise<{ text: string; startLine: number; endLine: number }[]> => {
-  const content = await clientRuntime.fileSystem.readFile(filePath);
+  const content = await clientRuntime.fileSystem.readFile(relativePath);
   if (!content.success) return [];
   const text = content.content || '';
 
+  const lines = text.split('\n');
+
+  // If the entire file fits in one chunk
   if (text.length <= maxChunkSize) {
     return [
       {
-        text: getFileChunkContent(filePath, clientRuntime, text),
-        startLine: 0,
-        endLine: text.length,
+        text: getFileChunkContent(relativePath, clientRuntime, text),
+        startLine: 1,
+        endLine: lines.length,
       },
     ];
   }
 
   const chunks: { text: string; startLine: number; endLine: number }[] = [];
   let currentChunk = '';
-  const lines = text.split('\n');
+  let chunkStartLine = 1;
 
-  for (const line of lines) {
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx];
+    if (line === undefined) continue; // Skip if line is undefined (should not happen)
+
+    const lineNumber = lineIdx + 1; // 1-indexed line numbers
+
+    // Check if adding this line would exceed max size
     if (currentChunk.length + line.length + 1 > maxChunkSize) {
+      // Flush current chunk if it has content
       if (currentChunk) {
         chunks.push({
-          text: getFileChunkContent(filePath, clientRuntime, currentChunk),
-          startLine: 0,
-          endLine: currentChunk.length,
+          text: getFileChunkContent(relativePath, clientRuntime, currentChunk),
+          startLine: chunkStartLine,
+          endLine: lineNumber - 1, // Previous line was the last one in this chunk
         });
         currentChunk = '';
+        chunkStartLine = lineNumber; // New chunk starts at current line
       }
-      // If a single line is too long, split it
+
+      // Handle extremely long single line (exceeds maxChunkSize by itself)
       if (line.length > maxChunkSize) {
         for (let i = 0; i < line.length; i += maxChunkSize) {
           chunks.push({
             text: getFileChunkContent(
-              filePath,
+              relativePath,
               clientRuntime,
               line.substring(i, i + maxChunkSize),
             ),
-            startLine: 0,
-            endLine: line.length,
+            startLine: lineNumber,
+            endLine: lineNumber, // All segments are from the same line
           });
         }
+        chunkStartLine = lineNumber + 1; // Next chunk starts after this line
       } else {
+        // Start new chunk with this line
         currentChunk = line;
+        // chunkStartLine is already correctly set to lineNumber
       }
     } else {
+      // Add line to current chunk
       currentChunk += (currentChunk ? '\n' : '') + line;
     }
   }
 
+  // Flush any remaining chunk
   if (currentChunk) {
     chunks.push({
-      text: getFileChunkContent(filePath, clientRuntime, currentChunk),
-      startLine: 0,
-      endLine: currentChunk.length,
+      text: getFileChunkContent(relativePath, clientRuntime, currentChunk),
+      startLine: chunkStartLine,
+      endLine: lines.length, // Last line of the file
     });
   }
 
@@ -139,7 +155,7 @@ export const getFileChunks = async (
 /**
  * Generates an embedding for the given text using the specified model
  */
-export const generateEmbedding = async <T extends string | string[]>(
+export const callEmbeddingApi = async <T extends string | string[]>(
   client: OpenAI,
   text: T,
   model = 'gemini-embedding-001',
@@ -165,7 +181,7 @@ export const generateEmbedding = async <T extends string | string[]>(
  */
 export async function* generateFileEmbeddings(
   config: EmbeddingConfig,
-  filePaths: string[],
+  relativePaths: string[],
   clientRuntime: ClientRuntime,
   onError?: (error: unknown) => void,
 ): AsyncGenerator<FileEmbedding> {
@@ -173,44 +189,42 @@ export async function* generateFileEmbeddings(
   const model = config.model || 'gemini-embedding-001';
   const batchSize = config.batchSize || 100;
 
-  for (let i = 0; i < filePaths.length; i += batchSize) {
-    const batch = filePaths.slice(i, i + batchSize);
+  for (let i = 0; i < relativePaths.length; i += batchSize) {
+    const batch = relativePaths.slice(i, i + batchSize);
 
     // First, read all files and chunk them
     const fileChunksData: Array<{
-      filePath: string;
+      relativePath: string;
       chunks: Array<{ text: string; startLine: number; endLine: number }>;
     }> = [];
 
-    for (const filePath of batch) {
+    for (const relativePath of batch) {
       try {
-        const content = await clientRuntime.fileSystem.readFile(filePath);
-        if (!content.success) {
-          continue;
-        }
-        const allChunks = await getFileChunks(filePath, clientRuntime);
+        const content = await clientRuntime.fileSystem.readFile(relativePath);
+        if (!content.success) continue;
+        const allChunks = await getFileChunks(relativePath, clientRuntime);
         // Filter out empty or whitespace-only chunks
         const nonEmptyChunks = allChunks.filter(
           (chunk) => chunk.text.trim().length > 0,
         );
-        fileChunksData.push({ filePath, chunks: nonEmptyChunks });
+        fileChunksData.push({ relativePath, chunks: nonEmptyChunks });
       } catch (error) {
-        onError?.(new Error(`Error processing file ${filePath}: ${error}`));
+        onError?.(new Error(`Error processing file ${relativePath}: ${error}`));
       }
     }
 
     // Prepare all chunks for batch embedding
     const chunkInfoList: Array<{
-      filePath: string;
+      relativePath: string;
       chunkIndex: number;
       totalChunks: number;
       chunk: { text: string; startLine: number; endLine: number };
     }> = [];
 
-    for (const { filePath, chunks } of fileChunksData) {
+    for (const { relativePath, chunks } of fileChunksData) {
       chunks.forEach((chunk, index) => {
         chunkInfoList.push({
-          filePath,
+          relativePath,
           chunkIndex: index,
           totalChunks: chunks.length,
           chunk,
@@ -222,16 +236,14 @@ export async function* generateFileEmbeddings(
     const embeddingBatchSize = 100; // Max number of texts to embed at once
 
     // Skip embedding generation if there are no chunks to process
-    if (chunkInfoList.length === 0) {
-      continue;
-    }
+    if (chunkInfoList.length === 0) continue;
 
     for (let j = 0; j < chunkInfoList.length; j += embeddingBatchSize) {
       const chunkBatch = chunkInfoList.slice(j, j + embeddingBatchSize);
       const texts = chunkBatch.map((info) => info.chunk.text);
 
       // Batch embed all texts at once
-      const embeddings = await generateEmbedding(client, texts, model);
+      const embeddings = await callEmbeddingApi(client, texts, model);
 
       // Yield FileEmbedding for each chunk with its corresponding embedding
       for (let k = 0; k < chunkBatch.length; k++) {
@@ -245,8 +257,7 @@ export async function* generateFileEmbeddings(
 
         if (embedding && embedding.length === EXPECTED_EMBEDDING_DIM) {
           yield {
-            absolutePath: info.filePath,
-            relativePath: info.filePath,
+            relativePath: info.relativePath,
             chunkIndex: info.chunkIndex,
             totalChunks: info.totalChunks,
             startLine: info.chunk.startLine,
@@ -257,7 +268,7 @@ export async function* generateFileEmbeddings(
         } else {
           onError?.(
             new Error(
-              `Invalid embedding for ${info.filePath} chunk ${info.chunkIndex}`,
+              `Invalid embedding for ${info.relativePath} chunk ${info.chunkIndex}`,
             ),
           );
         }
@@ -270,38 +281,8 @@ export async function* generateFileEmbeddings(
     }
 
     // Add a small delay between file batches to avoid rate limiting
-    if (i + batchSize < filePaths.length) {
+    if (i + batchSize < relativePaths.length) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
 }
-
-/**
- * Generates an embedding for a single file
- */
-export const generateSingleEmbedding = async (
-  config: EmbeddingConfig,
-  filePath: string,
-  clientRuntime: ClientRuntime,
-): Promise<FileEmbedding> => {
-  const client = createEmbeddingClient(config);
-  const model = config.model || 'gemini-embedding-001';
-
-  const chunks = await getFileChunks(filePath, clientRuntime);
-  const firstChunk = chunks[0] || { text: '', startLine: 0, endLine: 0 };
-  const embeddings = await generateEmbedding(client, firstChunk.text, model);
-
-  // generateEmbedding returns an array of embeddings, get the first one
-  const embedding = embeddings[0] || [];
-
-  return {
-    absolutePath: filePath,
-    relativePath: filePath,
-    chunkIndex: 0,
-    totalChunks: chunks.length,
-    startLine: firstChunk.startLine,
-    endLine: firstChunk.endLine,
-    content: firstChunk.text,
-    embedding: embedding,
-  };
-};

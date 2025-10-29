@@ -82,7 +82,6 @@ describe('rag-db', () => {
       };
 
       const embedding: FileEmbedding = {
-        absolutePath: '/test/file.ts',
         relativePath: 'test/file.ts',
         chunkIndex: 0,
         totalChunks: 1,
@@ -109,7 +108,6 @@ describe('rag-db', () => {
       };
 
       const embedding: FileEmbedding = {
-        absolutePath: '/test/new-file.ts',
         relativePath: 'test/new-file.ts',
         chunkIndex: 0,
         totalChunks: 1,
@@ -141,7 +139,6 @@ describe('rag-db', () => {
       // Add multiple chunks for the same file
       for (let i = 0; i < 3; i++) {
         const embedding: FileEmbedding = {
-          absolutePath: '/test/multi-chunk.ts',
           relativePath: 'test/multi-chunk.ts',
           chunkIndex: i,
           totalChunks: 3,
@@ -179,7 +176,6 @@ describe('rag-db', () => {
       };
 
       const embedding: FileEmbedding = {
-        absolutePath: '/test/to-delete.ts',
         relativePath: 'test/to-delete.ts',
         chunkIndex: 0,
         totalChunks: 1,
@@ -221,7 +217,6 @@ describe('rag-db', () => {
       };
 
       const embedding: FileEmbedding = {
-        absolutePath: '/test/file with spaces & symbols!@#.ts',
         relativePath: 'test/file with spaces & symbols!@#.ts',
         chunkIndex: 0,
         totalChunks: 1,
@@ -259,7 +254,6 @@ describe('rag-db', () => {
         .map((_, i) => (i % 2 === 0 ? 1000 : -1000));
 
       const embedding: FileEmbedding = {
-        absolutePath: '/test/large-embedding.ts',
         relativePath: 'test/large-embedding.ts',
         chunkIndex: 0,
         totalChunks: 1,
@@ -443,7 +437,6 @@ describe('rag-db', () => {
         };
 
         const embedding: FileEmbedding = {
-          absolutePath: `/test/concurrent-${i}.ts`,
           relativePath: `test/concurrent-${i}.ts`,
           chunkIndex: 0,
           totalChunks: 1,

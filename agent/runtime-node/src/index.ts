@@ -70,14 +70,9 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
           };
         }
 
-        const effectiveEndLine = options.endLine ?? totalLines;
-        if (effectiveEndLine > totalLines) {
-          return {
-            success: false,
-            message: `endLine ${effectiveEndLine} exceeds file length (${totalLines} lines)`,
-            error: 'LINE_OUT_OF_RANGE',
-          };
-        }
+        const requestedEndLine = options.endLine ?? totalLines;
+        // Cap endLine to totalLines if it exceeds the file length
+        const effectiveEndLine = Math.min(requestedEndLine, totalLines);
 
         const selectedLines = lines.slice(
           options.startLine - 1,

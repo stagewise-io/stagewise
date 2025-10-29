@@ -175,7 +175,10 @@ export class RagService {
       // Register all karton procedure handlers
       this.registerProcedureHandlers();
 
-      // Periodically update RAG
+      // Immediately run RAG update on creation
+      void this.updateRag(apiKey);
+
+      // Then periodically update RAG
       this.periodicallyUpdateRag(apiKey);
 
       this.logger.debug('[RagService] Initialized');

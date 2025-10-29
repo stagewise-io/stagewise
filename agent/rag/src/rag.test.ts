@@ -37,6 +37,10 @@ vi.mock('./utils/embeddings.js', () => {
     generateEmbedding: vi.fn(async (_client, text: string) => {
       return [createEmbedding(text)];
     }),
+    callEmbeddingApi: vi.fn(async (_client, text: string | string[]) => {
+      const texts = Array.isArray(text) ? text : [text];
+      return texts.map((t) => createEmbedding(t));
+    }),
     generateFileEmbeddings: vi.fn(async function* (
       _config,
       filePaths: string[],

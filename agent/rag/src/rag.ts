@@ -2,7 +2,7 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import OpenAI from 'openai';
 import {
   type FileEmbedding,
-  generateEmbedding,
+  callEmbeddingApi,
   generateFileEmbeddings,
 } from './utils/embeddings.js';
 import {
@@ -222,7 +222,7 @@ export async function queryRagWithoutRerank(
     apiKey,
     baseURL: process.env.LLM_PROXY_URL || 'http://localhost:3002',
   });
-  const embeddings = await generateEmbedding(
+  const embeddings = await callEmbeddingApi(
     openai,
     query,
     'gemini-embedding-001',

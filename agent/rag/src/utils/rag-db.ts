@@ -150,8 +150,8 @@ export function createFileRecord(
     relative_path: fileInfo.relativePath,
     content: embedding.content,
     embedding: embedding.embedding,
-    start_line: 0,
-    end_line: 0,
+    start_line: embedding.startLine,
+    end_line: embedding.endLine,
     rag_version: RAG_VERSION,
     indexed_at: Date.now(),
   };
