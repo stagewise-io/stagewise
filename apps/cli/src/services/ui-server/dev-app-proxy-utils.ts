@@ -62,7 +62,8 @@ export const getProxyMiddleware = (
           ? workspaceManager.workspace?.devAppStateService?.getPort()
           : workspaceManager.workspace?.configService?.get().appPort;
         logger.error(`[DevAppProxy] Proxy error: ${err}`);
-        res.writeHead(503, { 'Content-Type': 'text/html' });
+        res.setHeader('Content-Type', 'text/html');
+        res.statusCode = 503;
         res.end(errorPage(targetPort ?? 0));
         // TODO: Forward this error to the UI or somewhere else so that the UI can render a proper fallback UI for this case
       },

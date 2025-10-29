@@ -129,11 +129,13 @@ export function UrlControl() {
   const [isLoading, setIsLoading] = useState(false);
   const checkIsLoading = useCallback(() => {
     const iframe = getIFrame();
-    if (iframe) {
-      setIsLoading(
-        !iframe.contentWindow?.closed &&
-          iframe.contentWindow?.document.readyState === 'loading',
-      );
+    const iframeDoc = iframe
+      ? iframe.contentDocument || iframe.contentWindow!.document
+      : null;
+    if (iframeDoc && iframeDoc.readyState === 'complete') {
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
     }
   }, [getIFrame]);
   useCyclicUpdate(checkIsLoading, 10);
@@ -176,12 +178,12 @@ export function UrlControl() {
             onClick={() => (isLoading ? stopLoading() : reloadIFrame())}
           >
             {isLoading && (
-              <Loader2Icon className="size-6 animate-spin text-primary" />
+              <Loader2Icon className="size-8 animate-spin text-primary" />
             )}
             {!isLoading ? (
               <RefreshCwIcon className="size-4" />
             ) : (
-              <SquareIcon className="size-3.5 fill-current" />
+              <SquareIcon className="-translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 size-3 fill-current" />
             )}
           </Button>
         </TooltipTrigger>

@@ -81,6 +81,27 @@ export const DevAppPreviewPanel = () => {
     void toggleFullScreen();
   }, [toggleFullScreen, isFullScreenMode]);
 
+  // If the app state change to be running (or the port changes), we should reload the iframe
+  const lastAppRunningState = useRef<boolean>(false);
+  const lastAppPort = useRef<number>(0);
+  const appRunningState = useKartonState(
+    (s) => s.workspace?.devAppStatus?.childProcessRunning ?? false,
+  );
+  const appPort = useKartonState(
+    (s) => s.workspace?.devAppStatus?.childProcessOwnedPorts[0] ?? 0,
+  );
+  useEffect(() => {
+    if (
+      (appRunningState !== lastAppRunningState.current ||
+        appPort !== lastAppPort.current) &&
+      appRunningState
+    ) {
+      iframeRef.current?.contentWindow?.location.reload();
+    }
+    lastAppRunningState.current = appRunningState;
+    lastAppPort.current = appPort;
+  }, [appRunningState, appPort]);
+
   if (workspaceStatus === 'loading') {
     return (
       <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-xl">

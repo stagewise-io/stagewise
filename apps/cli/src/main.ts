@@ -11,6 +11,7 @@ import { UIServerService } from './services/ui-server';
 import { FilePickerService } from './services/file-picker';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import open from 'open';
 
 export type MainParameters = {
   launchOptions: {
@@ -115,6 +116,11 @@ export async function main({
     );
     logger.debug('[Main] Initial workspace loaded');
   }
+
+  logger.info(
+    `Opening browser to stagewise hosted on port ${uiServerService.port}`,
+  );
+  open(`http://localhost:${uiServerService.port}`);
 
   logger.debug('[Main] Startup complete');
 }
