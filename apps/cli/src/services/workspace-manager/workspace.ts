@@ -127,14 +127,7 @@ export class WorkspaceService {
         );
 
         const clientRuntime = new ClientRuntimeNode({
-          workingDirectory:
-            this.configService?.get().agentAccessPath.trim() ===
-            '{GIT_REPO_ROOT}'
-              ? getRepoRootForPath(this.workspacePath)
-              : path.join(
-                  this.workspacePath,
-                  this.configService?.get().agentAccessPath ?? '',
-                ),
+          workingDirectory: this.getAbsoluteAgentAccessPath(),
         });
         this.kartonService.setState((draft) => {
           draft.workspace!.agent = {
@@ -143,9 +136,7 @@ export class WorkspaceService {
         });
         this.workspaceConfigService.addConfigUpdatedListener((newConfig) => {
           clientRuntime.updateWorkingDirectory(
-            newConfig.agentAccessPath.trim() === '{GIT_REPO_ROOT}'
-              ? getRepoRootForPath(this.workspacePath)
-              : path.join(this.workspacePath, newConfig.agentAccessPath ?? ''),
+            this.getAbsoluteAgentAccessPath(newConfig.agentAccessPath),
           );
           this.kartonService.setState((draft) => {
             draft.workspace!.agent = {
@@ -209,7 +200,7 @@ export class WorkspaceService {
     );
 
     const clientRuntime = new ClientRuntimeNode({
-      workingDirectory: this.workspacePath,
+      workingDirectory: this.getAbsoluteAgentAccessPath(),
     });
 
     this._agentService =
@@ -275,6 +266,25 @@ export class WorkspaceService {
     this.kartonService.setState((draft) => {
       draft.workspace = null;
     });
+  }
+
+  /**
+   * Resolves the absolute agent access path.
+   * If the agent access path is not a git repo root, the agent access path will be joined with the workspace path.
+   *
+   * @param agentAccessPath - The access path to the agent. If not provided, the agent access path from the workspace config will be used.
+   * @returns The absolute agent access path.
+   */
+  private getAbsoluteAgentAccessPath(agentAccessPath?: string): string {
+    const accessPath =
+      agentAccessPath ?? this.workspaceConfigService?.get().agentAccessPath;
+    if (!accessPath) return getRepoRootForPath(this.workspacePath);
+
+    const isGitRepoRoot = accessPath.trim() === '{GIT_REPO_ROOT}';
+    if (isGitRepoRoot) return getRepoRootForPath(this.workspacePath);
+
+    const absolutePath = path.join(this.workspacePath, accessPath);
+    return absolutePath;
   }
 
   get path(): string {
