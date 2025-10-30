@@ -407,8 +407,16 @@ const truncatePluginInfo = (
 };
 
 export const getSelectedElementInfo = (
+  stagewiseId: string,
   element: HTMLElement,
+  codeMetadata: {
+    relativePath: string;
+    startLine: number;
+    endLine: number;
+  } | null,
+  mode: 'originalElement' | 'children' | 'parents' = 'originalElement',
   callDepth?: number,
+  childrenCount?: number,
 ): SelectedElement => {
   const boundingRect = element.getBoundingClientRect();
 
@@ -444,6 +452,7 @@ export const getSelectedElementInfo = (
     );
 
   return {
+    stagewiseId,
     nodeType: truncateString(element.nodeName, 96) ?? 'unknown',
     xpath:
       truncateString(getXPathForElement(element, false), 1024) ?? 'unknown',
@@ -456,11 +465,37 @@ export const getSelectedElementInfo = (
       height: boundingRect.height,
       width: boundingRect.width,
     },
+    children:
+      (mode === 'children' || mode === 'originalElement') &&
+      (childrenCount ?? 0) < 10
+        ? Array.from(element.children)
+            .slice(0, 5)
+            .map((c) => {
+              return getSelectedElementInfo(
+                generateId(),
+                c as HTMLElement,
+                null,
+                'children',
+                undefined,
+                (childrenCount ?? 0) + 1,
+              );
+            })
+        : undefined,
     parent:
-      element.parentElement && (callDepth ?? 0) < 10
-        ? getSelectedElementInfo(element.parentElement, (callDepth ?? 0) + 1)
+      (mode === 'parents' || mode === 'originalElement') &&
+      element.parentElement &&
+      (callDepth ?? 0) < 10
+        ? getSelectedElementInfo(
+            stagewiseId,
+            element.parentElement,
+            codeMetadata,
+            'parents',
+            (callDepth ?? 0) + 1,
+            undefined,
+          )
         : undefined,
     pluginInfo: truncatePluginInfo([]),
+    codeMetadata: codeMetadata || undefined,
   };
 };
 

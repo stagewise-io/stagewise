@@ -20,6 +20,7 @@ import {
   type PlanLimitsExceededError,
   createAuthenticatedClient,
   type KartonStateProvider,
+  getContextFileFromSelectedElement,
 } from '@stagewise/agent-utils';
 import { hasUndoMetadata, hasDiffMetadata } from '@stagewise/agent-types';
 import {
@@ -73,6 +74,7 @@ export class AgentService {
   private kartonService: KartonService;
   private authService: AuthService;
   private workspaceSetupService: WorkspaceSetupService;
+  private workspaceDataPath: string;
   private clientRuntime: ClientRuntime;
   private apiKey: string | null = null;
 
@@ -101,6 +103,7 @@ export class AgentService {
     authService: AuthService,
     clientRuntime: ClientRuntime,
     workspaceSetupService: WorkspaceSetupService,
+    workspaceDataPath: string,
   ) {
     this.logger = logger;
     this.telemetryService = telemetryService;
@@ -108,7 +111,7 @@ export class AgentService {
     this.authService = authService;
     this.clientRuntime = clientRuntime;
     this.workspaceSetupService = workspaceSetupService;
-
+    this.workspaceDataPath = workspaceDataPath;
     this.kartonService.setState((draft) => {
       if (!draft.workspace?.agentChat) {
         draft.workspace!.agentChat = {
@@ -166,7 +169,7 @@ export class AgentService {
         if (!this.apiKey) throw new Error('No API key available');
         return inspirationAgentTools(
           this.clientRuntime,
-          this.telemetryService.withTracing(this.litellm('gemini-2.5-flash'), {
+          this.telemetryService.withTracing(this.litellm('claude-haiku-4-5'), {
             posthogProperties: {
               $ai_span_name: 'inspiration-agent',
               developerTag: process.env.DEVELOPER_TAG || undefined,
@@ -502,6 +505,12 @@ export class AgentService {
             this.kartonService as KartonStateProvider<KartonContract['state']>,
             activeChatId,
           );
+          const codeMetadata = message.metadata?.selectedPreviewElements?.map(
+            (element) => element.codeMetadata,
+          );
+          this.logger.debug(
+            `[AgentService] Code metadata: ${JSON.stringify(codeMetadata)}`,
+          );
           // User-Interaction tool calls could still have open inputs - cancel them
           if (pendingToolCalls.length > 0) {
             pendingToolCalls.forEach(({ toolCallId }) => {
@@ -587,6 +596,11 @@ export class AgentService {
             ],
             this.lastMessageId!,
           );
+          const pendingToolCalls = findPendingToolCalls(
+            this.kartonService as KartonStateProvider<KartonContract['state']>,
+            this.kartonService.state.workspace?.agentChat?.activeChatId!,
+          );
+          if (pendingToolCalls.length > 0) return { success: true }; // Other tool calls are still pending - only call agent on the last submission
           this.setAgentWorking(true);
           this.callAgent({
             chatId:
@@ -644,6 +658,45 @@ export class AgentService {
       );
 
       this.kartonService.registerServerProcedureHandler(
+        'agentChat.getContextElementFile',
+        async (element) => {
+          const file = await getContextFileFromSelectedElement(
+            element,
+            this.apiKey!,
+            this.workspaceDataPath,
+            this.telemetryService.withTracing(
+              this.litellm('gemini-2.5-flash-lite'),
+              {
+                posthogProperties: {
+                  $ai_span_name: 'get-context-element-file',
+                },
+              },
+            ),
+            this.clientRuntime,
+            (error) => {
+              this.logger.error(
+                `[AgentService] Failed to get context element file: ${error}`,
+              );
+            },
+          );
+          if ('error' in file) return file;
+          this.logger.debug(
+            `[AgentService] Get context element file: ${file.relativePath} - ${file.startLine} - ${file.endLine}`,
+          );
+
+          const fileContent = await this.clientRuntime.fileSystem.readFile(
+            file.relativePath,
+          );
+          return {
+            relativePath: file.relativePath,
+            startLine: file.startLine,
+            endLine: file.endLine,
+            content: fileContent.content,
+          };
+        },
+      );
+
+      this.kartonService.registerServerProcedureHandler(
         'userAccount.refreshSubscription',
         async () => {
           await this.fetchSubscription();
@@ -688,6 +741,9 @@ export class AgentService {
     );
     this.kartonService.removeServerProcedureHandler(
       'agentChat.assistantMadeCodeChangesUntilLatestUserMessage',
+    );
+    this.kartonService.removeServerProcedureHandler(
+      'agentChat.contextElementsChanged',
     );
     this.kartonService.removeServerProcedureHandler(
       'userAccount.refreshSubscription',
@@ -801,7 +857,7 @@ export class AgentService {
       });
 
       const model = this.telemetryService.withTracing(
-        this.litellm('claude-sonnet-4'),
+        this.litellm('claude-haiku-4-5'),
         {
           posthogTraceId: chatId,
           posthogProperties: {
@@ -822,6 +878,7 @@ export class AgentService {
           anthropic: {
             thinking: { type: 'enabled', budgetTokens: 10000 },
           } satisfies AnthropicProviderOptions,
+          openai: {},
         },
         messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
         onError: async (error) => {
@@ -1149,6 +1206,7 @@ export class AgentService {
     authService: AuthService,
     clientRuntime: ClientRuntime,
     workspaceSetupService: WorkspaceSetupService,
+    workspaceDataPath: string,
   ) {
     const instance = new AgentService(
       logger,
@@ -1157,6 +1215,7 @@ export class AgentService {
       authService,
       clientRuntime,
       workspaceSetupService,
+      workspaceDataPath,
     );
     await instance.initialize();
     logger.debug('[AgentService] Created service');

@@ -29,8 +29,10 @@ async function getLocalFilesManifests(
     );
 
     if (!extensionFiles.success) {
-      throw new Error(
-        `Failed to get files with extensions: ${extensionFiles.message}`,
+      onError?.(
+        new Error(
+          `Failed to get files with extensions: ${extensionFiles.message}`,
+        ),
       );
     }
 

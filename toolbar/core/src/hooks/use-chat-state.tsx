@@ -1,4 +1,5 @@
 import { type ReactNode, createContext } from 'react';
+import { usePostHog } from 'posthog-js/react';
 import { useContext, useState, useCallback } from 'react';
 import { usePlugins } from './use-plugins';
 import {
@@ -9,7 +10,11 @@ import {
   isAnthropicSupportedFile,
 } from '@/utils';
 import { useKartonProcedure } from './use-karton';
-import type { ChatMessage, FileUIPart } from '@stagewise/karton-contract';
+import type {
+  ChatMessage,
+  FileUIPart,
+  SelectedElement,
+} from '@stagewise/karton-contract';
 
 interface ContextSnippet {
   promptContextName: string;
@@ -32,6 +37,12 @@ interface ChatContext {
   chatInput: string;
   setChatInput: (value: string) => void;
   domContextElements: {
+    stagewiseId: string;
+    codeMetadata?: {
+      relativePath: string;
+      startLine: number;
+      endLine: number;
+    } | null;
     element: HTMLElement;
     pluginContext: {
       pluginName: string;
@@ -77,6 +88,7 @@ interface ChatStateProviderProps {
 }
 
 export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
+  const posthog = usePostHog();
   const [chatInput, setChatInput] = useState<string>('');
   const [_isPromptCreationMode, _setIsPromptCreationMode] =
     useState<boolean>(false);
@@ -86,6 +98,13 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const [domContextElements, setDomContextElements] = useState<
     {
       element: HTMLElement;
+      stagewiseId: string;
+      codeMetadata: {
+        relativePath: string;
+        startLine: number;
+        endLine: number;
+        content?: string;
+      } | null;
       pluginContext: {
         pluginName: string;
         context: any;
@@ -98,6 +117,14 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const sendChatMessage = useKartonProcedure(
     (p) => p.agentChat.sendUserMessage,
+  );
+
+  const notifyContextElementsChanged = useKartonProcedure(
+    (p) => p.agentChat.contextElementsChanged,
+  );
+
+  const getContextElementFile = useKartonProcedure(
+    (p) => p.agentChat.getContextElementFile,
   );
 
   const addFileAttachment = useCallback((file: File) => {
@@ -139,25 +166,85 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         (plugin) => plugin.onContextElementSelect,
       );
 
-      setDomContextElements((prev) => [
-        ...prev,
-        {
-          element,
-          pluginContext: pluginsWithContextGetters.map((plugin) => ({
-            pluginName: plugin.pluginName,
-            context: plugin.onContextElementSelect?.(element),
-          })),
-        },
-      ]);
+      const newElement = {
+        stagewiseId: generateId(),
+        element,
+        pluginContext: pluginsWithContextGetters.map((plugin) => ({
+          pluginName: plugin.pluginName,
+          context: plugin.onContextElementSelect?.(element),
+        })),
+        codeMetadata: null,
+      };
+
+      setDomContextElements((prev) => {
+        const newElements = [...prev, newElement];
+
+        const selectedElements: SelectedElement[] = newElements.map((item) =>
+          getSelectedElementInfo(
+            item.stagewiseId,
+            item.element,
+            item.codeMetadata,
+          ),
+        );
+        // Notify CLI about the change
+        notifyContextElementsChanged(selectedElements);
+
+        return newElements;
+      });
+
+      const selectedElement = getSelectedElementInfo(
+        newElement.stagewiseId,
+        newElement.element,
+        newElement.codeMetadata,
+      );
+
+      getContextElementFile(selectedElement)
+        .then((file) => {
+          if (!('error' in file)) {
+            setDomContextElements((prev) => {
+              return prev.map((item) => {
+                if (item.stagewiseId === newElement.stagewiseId) {
+                  item.codeMetadata = {
+                    relativePath: file.relativePath,
+                    startLine: file.startLine,
+                    endLine: file.endLine,
+                    content: file.content,
+                  };
+                }
+                return item;
+              });
+            });
+          } else {
+            posthog.captureException(new Error(file.error));
+          }
+        })
+        .catch((error) => {
+          posthog.captureException(error);
+        });
     },
-    [plugins],
+    [plugins, notifyContextElementsChanged],
   );
 
-  const removeChatDomContext = useCallback((element: HTMLElement) => {
-    setDomContextElements((prev) =>
-      prev.filter((item) => item.element !== element),
-    );
-  }, []);
+  const removeChatDomContext = useCallback(
+    (element: HTMLElement) => {
+      setDomContextElements((prev) => {
+        const newElements = prev.filter((item) => item.element !== element);
+
+        // Notify CLI about the change
+        const selectedElements: SelectedElement[] = newElements.map((item) =>
+          getSelectedElementInfo(
+            item.stagewiseId,
+            item.element,
+            item.codeMetadata,
+          ),
+        );
+        notifyContextElementsChanged(selectedElements);
+
+        return newElements;
+      });
+    },
+    [notifyContextElementsChanged],
+  );
 
   const sendMessage = useCallback(async () => {
     if (!chatInput.trim()) return;
@@ -182,7 +269,13 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       // Collect metadata for selected elements
       const metadata = collectUserMessageMetadata(
-        domContextElements.map((item) => getSelectedElementInfo(item.element)),
+        domContextElements.map((item) =>
+          getSelectedElementInfo(
+            item.stagewiseId,
+            item.element,
+            item.codeMetadata,
+          ),
+        ),
         false,
       );
 
@@ -196,79 +289,13 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         },
       };
 
-      // Process plugin content for both old and new format
-      const pluginProcessingPromises = plugins.map(async (plugin) => {
-        const handlerResult = await plugin.onPromptSend?.(message);
-
-        if (
-          !handlerResult ||
-          !handlerResult.contextSnippets ||
-          handlerResult.contextSnippets.length === 0
-        ) {
-          return null;
-        }
-
-        const snippetPromises = handlerResult.contextSnippets.map(
-          async (snippet) => {
-            const resolvedContent =
-              typeof snippet.content === 'string'
-                ? snippet.content
-                : await snippet.content();
-            return {
-              promptContextName: snippet.promptContextName,
-              content: resolvedContent,
-            };
-          },
-        );
-
-        const resolvedSnippets = await Promise.all(snippetPromises);
-
-        if (resolvedSnippets.length > 0) {
-          return {
-            pluginName: plugin.pluginName,
-            contextSnippets: resolvedSnippets,
-          };
-        }
-        return null;
-      });
-
-      const allPluginContexts = await Promise.all(pluginProcessingPromises);
-
-      // Add plugin content as additional text parts if needed
-      allPluginContexts.forEach((context) => {
-        if (!context) return;
-
-        // Initialize metadata and pluginContentItems if needed
-        if (!message.metadata) {
-          message.metadata = {
-            createdAt: new Date(),
-          };
-        }
-        // if (!message.metadata.pluginContentItems) {
-        //   message.metadata.pluginContentItems = {};
-        // }
-
-        // Add to pluginContentItems in metadata
-        // message.metadata.pluginContentItems[context.pluginName] = {};
-
-        context.contextSnippets.forEach((snippet) => {
-          const _contentItem = {
-            type: 'text' as const,
-            text: snippet.content,
-          };
-          // if (!message.metadata?.pluginContentItems?.[context.pluginName]) {
-          //   message.metadata!.pluginContentItems![context.pluginName] = {};
-          // }
-          // message.metadata!.pluginContentItems![context.pluginName]![
-          //   snippet.promptContextName
-          // ] = contentItem;
-        });
-      });
-
       // Reset state after sending
       setChatInput('');
       setDomContextElements([]);
       clearFileAttachments();
+
+      // Notify CLI that context elements are cleared
+      notifyContextElementsChanged([]);
 
       // Send the message using the chat capability
       await sendChatMessage(message);
@@ -282,6 +309,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     plugins,
     sendChatMessage,
     clearFileAttachments,
+    notifyContextElementsChanged,
   ]);
 
   const value: ChatContext = {

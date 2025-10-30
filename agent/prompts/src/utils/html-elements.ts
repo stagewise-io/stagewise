@@ -1,6 +1,76 @@
 import type { SelectedElement } from '@stagewise/karton-contract';
 
-type ElementRole = 'selected-element';
+type ElementRole = 'parent' | 'selected-element' | 'sibling' | 'child';
+
+interface CollectedElement {
+  element: SelectedElement;
+  role: ElementRole;
+  depth: number;
+}
+
+/**
+ * Collects parent elements up to maxDepth levels
+ */
+function collectParents(
+  element: SelectedElement,
+  maxDepth: number,
+): CollectedElement[] {
+  const parents: CollectedElement[] = [];
+  let current = element.parent;
+  let depth = -1;
+
+  while (current && parents.length < maxDepth) {
+    parents.unshift({
+      element: current,
+      role: 'parent',
+      depth: depth--,
+    });
+    current = current.parent;
+  }
+
+  return parents;
+}
+
+/**
+ * Recursively collects children up to maxDepth levels
+ */
+function collectChildren(
+  element: SelectedElement,
+  maxDepth: number,
+  currentDepth = 1,
+): CollectedElement[] {
+  if (currentDepth > maxDepth || !element.children?.length) {
+    return [];
+  }
+
+  const collected: CollectedElement[] = [];
+
+  for (const child of element.children) {
+    collected.push({
+      element: child,
+      role: 'child',
+      depth: currentDepth,
+    });
+
+    // Recursively collect deeper children
+    collected.push(...collectChildren(child, maxDepth, currentDepth + 1));
+  }
+
+  return collected;
+}
+
+/**
+ * Gets siblings of the selected element from its parent
+ */
+function getSiblings(element: SelectedElement): SelectedElement[] {
+  if (!element.parent?.children) {
+    return [];
+  }
+
+  return element.parent.children.filter(
+    (child) => child.stagewiseId !== element.stagewiseId,
+  );
+}
 
 /**
  * Serializes a single element with role and depth metadata
@@ -78,12 +148,23 @@ export function htmlElementToContextSnippet(
     <content>
       ${elements.map((element) => htmlElementsToContextSnippet(element)).join('\n\n')}
     </content>
-  </dom-elements>`;
+  </dom-elements>
+
+  <code-metadata>
+    <description>
+    These are the code snippets that belong to the HTML elements that the user has selected before making the request.
+    </description>
+    <content>
+      ${elements.map((element) => `<relative-path>${element?.codeMetadata?.relativePath}</relative-path>\n<start-line>${element?.codeMetadata?.startLine}</start-line>\n<end-line>${element?.codeMetadata?.endLine}</end-line>${element?.codeMetadata?.content ? `<content>${element?.codeMetadata?.content}</content>` : ''}`).join('\n\n')}
+    </content>
+  </code-metadata>
+  `;
   return result;
 }
 
 /**
  * Converts a DOM element to an LLM-readable context snippet.
+ * Includes up to 2 parent levels, siblings, and up to 4 child levels.
  *
  * @param element - The DOM element to convert
  * @param maxCharacterAmount - Optional maximum number of characters to include
@@ -98,12 +179,108 @@ export function htmlElementsToContextSnippet(
   }
 
   try {
-    // Serialize the element
-    let result = serializeElement(element, 'selected-element', 0, true);
+    // Collect all elements in the hierarchy
+    const parents = collectParents(element, 2);
+    const siblings = getSiblings(element);
+    const children = collectChildren(element, 4);
 
-    // Apply character limit if needed
+    // Build the full hierarchy as a flat list
+    const allElements: CollectedElement[] = [
+      ...parents,
+      { element, role: 'selected-element', depth: 0 },
+      ...siblings.map((sibling) => ({
+        element: sibling,
+        role: 'sibling' as ElementRole,
+        depth: 0,
+      })),
+      ...children,
+    ];
+
+    // Serialize all elements
+    let serializedElements = allElements.map((item) =>
+      serializeElement(
+        item.element,
+        item.role,
+        item.depth,
+        item.role === 'selected-element',
+      ),
+    );
+
+    // Apply character limit by truncating from deepest children upward
+    let result = serializedElements.join('\n\n');
+
     if (maxCharacterAmount && result.length > maxCharacterAmount) {
-      result = result.substring(0, maxCharacterAmount);
+      // Start removing deepest children first
+      let currentMaxDepth = 4;
+
+      while (result.length > maxCharacterAmount && currentMaxDepth > 0) {
+        // Filter out elements at the current max depth
+        serializedElements = allElements
+          .filter((item) => {
+            // Keep everything except children at or beyond current max depth
+            if (item.role === 'child') {
+              return item.depth < currentMaxDepth;
+            }
+            return true;
+          })
+          .map((item) =>
+            serializeElement(
+              item.element,
+              item.role,
+              item.depth,
+              item.role === 'selected-element',
+            ),
+          );
+
+        result = serializedElements.join('\n\n');
+        currentMaxDepth--;
+      }
+
+      // If still too long, start removing siblings
+      if (result.length > maxCharacterAmount) {
+        serializedElements = allElements
+          .filter(
+            (item) =>
+              item.role !== 'sibling' &&
+              (item.role !== 'child' || item.depth < currentMaxDepth),
+          )
+          .map((item) =>
+            serializeElement(
+              item.element,
+              item.role,
+              item.depth,
+              item.role === 'selected-element',
+            ),
+          );
+
+        result = serializedElements.join('\n\n');
+      }
+
+      // If still too long, start removing parents from oldest
+      if (result.length > maxCharacterAmount) {
+        serializedElements = allElements
+          .filter(
+            (item) =>
+              (item.role === 'parent' && item.depth > -2) ||
+              item.role === 'selected-element' ||
+              (item.role === 'child' && item.depth < currentMaxDepth),
+          )
+          .map((item) =>
+            serializeElement(
+              item.element,
+              item.role,
+              item.depth,
+              item.role === 'selected-element',
+            ),
+          );
+
+        result = serializedElements.join('\n\n');
+      }
+
+      // Final truncation if still over limit (truncate selected element content)
+      if (result.length > maxCharacterAmount) {
+        result = result.substring(0, maxCharacterAmount);
+      }
     }
 
     return result;

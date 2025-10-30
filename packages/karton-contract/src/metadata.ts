@@ -3,6 +3,13 @@ import { MainTab } from './index.js';
 
 /** Information about a selected element */
 export const baseSelectedElementSchema = z.object({
+  stagewiseId: z
+    .string()
+    .min(1)
+    .max(128)
+    .describe(
+      'A unique identifier for the element. This is used to track the element across different sessions.',
+    ),
   nodeType: z.string().min(1).max(96).describe('The node type of the element.'),
   xpath: z.string().min(1).max(1024).describe('The XPath of the element.'),
   attributes: z
@@ -117,14 +124,24 @@ export const baseSelectedElementSchema = z.object({
       content: z.string().max(4096),
     }),
   ),
+  codeMetadata: z
+    .object({
+      relativePath: z.string().max(1024),
+      startLine: z.number(),
+      endLine: z.number(),
+      content: z.string().max(100000).optional(),
+    })
+    .optional(),
 });
 
 export type SelectedElement = z.infer<typeof baseSelectedElementSchema> & {
   parent?: SelectedElement;
+  children?: SelectedElement[];
 };
 
 export const selectedElementSchema = baseSelectedElementSchema.extend({
   parent: baseSelectedElementSchema.optional(),
+  children: z.array(baseSelectedElementSchema).optional(),
 });
 
 export const pluginContentItemSchema = z.object({

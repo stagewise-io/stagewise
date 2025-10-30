@@ -212,6 +212,7 @@ export class WorkspaceService {
         this.authService,
         clientRuntime,
         this.workspaceSetupService,
+        this.workspacePathsService!.workspaceDataPath,
       ).catch((error) => {
         this.telemetryService.captureException(error as Error);
         this.logger.error(`[WorkspaceService] Failed to create agent service`, {
