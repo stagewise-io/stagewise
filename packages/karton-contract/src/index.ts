@@ -10,7 +10,11 @@ import type {
   SelectedElement,
   BrowserData,
 } from './metadata.js';
-import type { UIMessage, UIDataTypes } from 'ai';
+import type {
+  UIMessage,
+  UIDataTypes,
+  UIMessagePart as AIMessagePart,
+} from 'ai';
 import type { UITools, ToolPart } from '@stagewise/agent-tools';
 import type { FileDiff, ToolResult } from '@stagewise/agent-types';
 import type {
@@ -21,6 +25,7 @@ import type {
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
 export type { UserMessageMetadata, SelectedElement, BrowserData };
+export type UIMessagePart = AIMessagePart<UIDataTypes, UITools>;
 
 export type { FileDiff, ToolResult };
 

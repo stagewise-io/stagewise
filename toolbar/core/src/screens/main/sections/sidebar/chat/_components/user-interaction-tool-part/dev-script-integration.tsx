@@ -1,8 +1,8 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { diffLines } from 'diff';
 import { Button } from '@stagewise/stage-ui/components/button';
 import type { PickToolPart } from './index.js';
-import { CheckIcon } from 'lucide-react';
+import { CheckIcon, XIcon } from 'lucide-react';
 
 export const AskForDevScriptIntegrationToolPartContent = memo(
   ({
@@ -28,12 +28,28 @@ export const AskForDevScriptIntegrationToolPartContent = memo(
       .filter((line) => line.removed)
       .reduce((sum, line) => sum + (line.count || 0), 0);
 
+    const isError = useMemo(() => {
+      return toolPart.state === 'output-error';
+    }, [toolPart.state]);
+
+    const isInputAvailable = useMemo(() => {
+      return toolPart.state === 'input-available';
+    }, [toolPart.state]);
+
+    const isOutputAvailable = useMemo(() => {
+      return toolPart.state === 'output-available';
+    }, [toolPart.state]);
+
     return (
       <div className="flex w-full flex-col gap-2">
-        <div className="text-sm">
+        <div
+          className={`text-sm ${isError || isOutputAvailable ? 'opacity-50' : ''}`}
+        >
           Do you want to integrate stagewise into the dev script of your app?
         </div>
-        <div className="rounded border border-black/10 bg-black/5 p-3 font-mono text-xs">
+        <div
+          className={`rounded border border-black/10 bg-black/5 p-3 font-mono text-xs ${isError || isOutputAvailable ? 'opacity-50' : ''}`}
+        >
           <div className="mb-2 flex items-center gap-2">
             <span className="text-black/60">Changes:</span>
             <span className="text-green-600">+{newLineCount}</span>
@@ -56,28 +72,43 @@ export const AskForDevScriptIntegrationToolPartContent = memo(
             ))}
           </div>
         </div>
-        {toolPart.state === 'input-available' && (
+        {(isInputAvailable || isError || isOutputAvailable) && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
-            <Button variant="secondary" size="xs" onClick={onCancel}>
-              Don't integrate
-            </Button>
-            <Button
-              variant="primary"
-              size="xs"
-              onClick={() => {
-                onSubmit({
-                  shouldIntegrate: true,
-                  type: 'askForDevScriptIntegrationTool',
-                });
-              }}
-            >
-              Confirm Integration
-            </Button>
+            {isInputAvailable && (
+              <>
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  onClick={onCancel}
+                  disabled={isError || isOutputAvailable}
+                >
+                  Don't integrate
+                </Button>
+                <Button
+                  variant="primary"
+                  size="xs"
+                  onClick={() => {
+                    onSubmit({
+                      shouldIntegrate: true,
+                      type: 'askForDevScriptIntegrationTool',
+                    });
+                  }}
+                  disabled={isError || isOutputAvailable}
+                >
+                  Confirm Integration
+                </Button>
+              </>
+            )}
           </div>
         )}
-        {toolPart.state === 'output-available' && (
+        {isOutputAvailable && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
             <CheckIcon className="size-3 text-green-600" />
+          </div>
+        )}
+        {isError && (
+          <div className="flex w-full flex-row items-center justify-end gap-2">
+            <XIcon className="size-3 text-rose-600" />
           </div>
         )}
       </div>

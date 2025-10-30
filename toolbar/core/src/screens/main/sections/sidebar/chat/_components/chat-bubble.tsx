@@ -7,6 +7,7 @@ import type {
   DynamicToolUIPart,
   ReasoningUIPart,
   AgentError,
+  UIMessagePart,
 } from '@stagewise/karton-contract';
 import { AgentErrorType } from '@stagewise/karton-contract';
 import { PaletteIcon, RefreshCcwIcon, Undo2 } from 'lucide-react';
@@ -47,7 +48,12 @@ import {
 import {
   isInteractionToolPart,
   InteractionToolPartItem,
+  type InteractionToolPart,
 } from './user-interaction-tool-part';
+
+function isToolPart(part: UIMessagePart): part is ToolPart {
+  return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
+}
 
 export function ChatBubble({
   message: msg,
@@ -198,10 +204,14 @@ export function ChatBubble({
               <TimeAgo date={msg.metadata?.createdAt ?? new Date()} />
             </div>
             {msg.parts.map((part, index) => {
-              if (
-                part.type === 'dynamic-tool' ||
-                part.type.startsWith('tool-')
-              ) {
+              if (isToolPart(part) && isInteractionToolPart(part)) {
+                return (
+                  <InteractionToolPartItem
+                    key={`content_part_${index.toString()}`}
+                    toolPart={part as InteractionToolPart}
+                  />
+                );
+              } else if (isToolPart(part)) {
                 return (
                   <ToolPartItem
                     key={`content_part_${index.toString()}`}
@@ -562,10 +572,6 @@ const ToolPartItem = memo(({ toolPart }: { toolPart: ToolPart }) => {
       tabIndex: 0,
     }),
   };
-
-  if (isInteractionToolPart(toolPart)) {
-    return <InteractionToolPartItem toolPart={toolPart} />;
-  }
 
   return (
     <div {...containerProps}>

@@ -6,7 +6,7 @@ import {
   RadioLabel,
 } from '@stagewise/stage-ui/components/radio';
 import type { PickToolPart } from '.';
-import { CheckIcon } from 'lucide-react';
+import { CheckIcon, XIcon } from 'lucide-react';
 
 export const AskForAppPathToolPartContent = memo(
   ({
@@ -30,14 +30,17 @@ export const AskForAppPathToolPartContent = memo(
       );
     }
 
-    const isDisabled = toolPart.state === 'output-error';
+    const isDisabled =
+      toolPart.state === 'output-error' ||
+      toolPart.state === 'output-available';
 
     return (
       <div className="relative flex w-full flex-col gap-2">
-        <span className={isDisabled ? 'opacity-50' : ''}>
-          Choose the app you want to work on:
-        </span>
+        <h3 className={isDisabled ? 'opacity-50' : ''}>
+          Which app do you want to use stagewise for?
+        </h3>
         <RadioGroup
+          className="bg-transparent"
           value={selectedPath}
           onValueChange={(value) => setSelectedPath(value as string)}
           disabled={isDisabled}
@@ -51,8 +54,9 @@ export const AskForAppPathToolPartContent = memo(
             </RadioLabel>
           ))}
         </RadioGroup>
-        {(toolPart.state === 'input-available' || isDisabled) && (
-          <div className="flex flex-row items-center gap-2">
+        {(toolPart.state === 'input-available' ||
+          toolPart.state === 'output-error') && (
+          <div className="ml-auto flex flex-row items-center gap-2">
             <Button
               variant="secondary"
               size="xs"
@@ -74,6 +78,11 @@ export const AskForAppPathToolPartContent = memo(
             >
               Choose App
             </Button>
+          </div>
+        )}
+        {toolPart.state === 'output-error' && (
+          <div className="flex w-full flex-row items-center justify-end gap-2">
+            <XIcon className="size-3 text-rose-600" />
           </div>
         )}
         {toolPart.state === 'output-available' && (
