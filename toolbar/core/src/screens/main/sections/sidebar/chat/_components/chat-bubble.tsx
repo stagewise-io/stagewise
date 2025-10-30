@@ -300,7 +300,6 @@ export function ChatBubble({
                   size="sm"
                   onClick={() => {
                     confirmRestore();
-                    close();
                   }}
                 >
                   Restore
