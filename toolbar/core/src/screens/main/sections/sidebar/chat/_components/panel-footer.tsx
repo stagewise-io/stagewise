@@ -32,6 +32,7 @@ import {
   MenuTrigger,
 } from '@stagewise/stage-ui/components/menu';
 import { Layout, MainTab } from '@stagewise/karton-contract';
+import { useEventListener } from '@/hooks/use-event-listener';
 
 const GlassyTextInputClassNames =
   'origin-center rounded-xl border border-black/10 ring-1 ring-white/20 transition-all duration-150 ease-out after:absolute after:inset-0 after:size-full after:content-normal after:rounded-[inherit] after:bg-gradient-to-b after:from-white/5 after:to-white/0 after:transition-colors after:duration-150 after:ease-out disabled:pointer-events-none disabled:bg-black/5 disabled:text-foreground/60 disabled:opacity-30';
@@ -215,6 +216,20 @@ export function ChatPanelFooter({
     }, [chatState]),
     HotkeyActions.ESC,
   );
+
+  useEffect(() => {
+    if (chatInputActive) {
+      window.dispatchEvent(new Event('sidebar-chat-panel-focussed'));
+    }
+  }, [chatInputActive]);
+
+  useEventListener('sidebar-chat-panel-closed', () => {
+    setChatInputActive(false);
+  });
+
+  useEventListener('sidebar-chat-panel-opened', () => {
+    setChatInputActive(true);
+  });
 
   return (
     <footer

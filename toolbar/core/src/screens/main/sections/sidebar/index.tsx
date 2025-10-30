@@ -5,11 +5,29 @@ import {
 } from '@stagewise/stage-ui/components/resizable';
 import { SidebarTopSection } from './top';
 import { SidebarSubsystemStatusSection } from './subsystem-status';
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useEventListener } from '@/hooks/use-event-listener';
 
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const panelRef = useRef<ImperativePanelHandle>(null);
+
+  const openChatPanel = useCallback(() => {
+    panelRef.current?.expand();
+    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+  }, []);
+
+  useEffect(() => {
+    if (isCollapsed) {
+      window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
+    } else {
+      window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+    }
+  }, [isCollapsed]);
+
+  useEventListener('sidebar-chat-panel-focussed', () => {
+    panelRef.current?.expand();
+  });
 
   return (
     <ResizablePanel
@@ -39,7 +57,7 @@ export function Sidebar() {
       <hr className="h-px border-none bg-zinc-500/20" />
 
       {/* Chat area */}
-      <SidebarChatSection openChatPanel={() => panelRef.current?.expand()} />
+      <SidebarChatSection openChatPanel={openChatPanel} />
     </ResizablePanel>
   );
 }
