@@ -11,7 +11,7 @@ import {
   PaperclipIcon,
   ImageUpIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import {
   useKartonState,
   useKartonProcedure,
@@ -50,13 +50,9 @@ const chatTextSlideshowTexts: Record<MainTab | 'fallback', string[]> = {
   [MainTab.SETTINGS]: ['Ask stage any question...'],
   fallback: ['Ask stage any question...'],
 };
-export function ChatPanelFooter({
-  ref,
-  inputRef,
-}: {
-  ref: React.RefObject<HTMLDivElement | null>;
-  inputRef: React.RefObject<HTMLTextAreaElement | null>;
-}) {
+export function ChatPanelFooter() {
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
   const openTab = useKartonState((s) =>
     s.userExperience.activeLayout === Layout.MAIN
       ? s.userExperience.activeMainTab
@@ -232,10 +228,7 @@ export function ChatPanelFooter({
   });
 
   return (
-    <footer
-      className="absolute right-0 bottom-0 left-0 z-10 flex flex-col items-stretch gap-1 p-0 pt-2"
-      ref={ref}
-    >
+    <footer className="z-10 flex flex-col items-stretch gap-1 p-0">
       <div
         className="glass-body flex flex-row items-stretch gap-1 rounded-xl bg-background/20 p-2 before:absolute before:inset-0 before:rounded-xl data-[chat-active=true]:shadow-blue-600/20 data-[chat-active=true]:before:bg-blue-500/5"
         id="chat-input-container-box"

@@ -42,7 +42,7 @@ export function Sidebar() {
       onCollapse={() => setIsCollapsed(true)}
       onExpand={() => setIsCollapsed(false)}
       data-collapsed={isCollapsed}
-      className="group flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-muted-foreground/5 data-[collapsed=true]:w-16 data-[collapsed=true]:min-w-16 data-[collapsed=true]:max-w-16"
+      className="group flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-muted-foreground/5 data-[collapsed=true]:w-16 data-[collapsed=false]:min-w-52 data-[collapsed=true]:min-w-16 data-[collapsed=true]:max-w-16"
     >
       <SidebarTopSection isCollapsed={isCollapsed} />
 

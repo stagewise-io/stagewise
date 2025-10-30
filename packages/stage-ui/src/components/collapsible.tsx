@@ -22,12 +22,12 @@ export const CollapsibleTrigger = ({
 
   return (
     <CollapsibleBase.Trigger
+      {...props}
       className={cn(
-        'group w-full font-medium text-sm transition-all duration-150 ease-out hover:bg-black/5 active:bg-black/10 dark:active:bg-white/10 dark:hover:bg-white/5',
+        'group flex w-full flex-row items-center justify-between font-medium text-sm transition-all duration-150 ease-out hover:bg-black/5 active:bg-black/10 dark:active:bg-white/10 dark:hover:bg-white/5',
         paddingClass,
         props.className,
       )}
-      {...props}
     >
       <div className={cn('flex flex-1 flex-row items-center', gapClass)}>
         {children}

@@ -255,7 +255,7 @@ export const WorkspaceSettingsTabContent = () => {
               This path is used to store persistent data for the workspace.
             </FormFieldDescription>
           </div>
-          <p className="font-medium font-mono text-muted-foreground text-sm">
+          <p className="text-end font-medium font-mono text-muted-foreground text-sm">
             {workspaceDataPath}
           </p>
         </FormField>
@@ -267,7 +267,7 @@ export const WorkspaceSettingsTabContent = () => {
               This path is used to store cached data for the workspace.
             </FormFieldDescription>
           </div>
-          <p className="font-medium font-mono text-muted-foreground text-sm">
+          <p className="text-end font-medium font-mono text-muted-foreground text-sm">
             {workspaceCachePath}
           </p>
         </FormField>
@@ -279,7 +279,7 @@ export const WorkspaceSettingsTabContent = () => {
               This path is used to store temporary data for the workspace.
             </FormFieldDescription>
           </div>
-          <p className="font-medium font-mono text-muted-foreground text-sm">
+          <p className="text-end font-medium font-mono text-muted-foreground text-sm">
             {workspaceTempPath}
           </p>
         </FormField>

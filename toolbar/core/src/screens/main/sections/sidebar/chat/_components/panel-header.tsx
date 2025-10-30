@@ -56,12 +56,12 @@ export function ChatPanelHeader({
   return (
     <PanelHeader
       className={cn(
-        'pointer-events-none absolute top-0 right-0 left-0 z-20 mb-0 origin-bottom p-0 pb-0 transition-all duration-300 ease-out *:pointer-events-auto',
+        '-inset-3 pointer-events-none absolute z-20 origin-bottom p-2 transition-all duration-300 ease-out *:pointer-events-auto',
         chatListOpen
           ? 'h-[calc(100%-2px)] rounded-[inherit] backdrop-blur-2xl'
           : '!h-[calc-size(auto,size)] h-auto',
       )}
-      title={chatListOpen && <span className="mt-0.5">Chats</span>}
+      title={chatListOpen && <span className="mt-0.5 ml-2">Chats</span>}
       clear
       actionArea={
         <>

@@ -182,7 +182,7 @@ export function ChatBubble({
     <div className="flex flex-col gap-1">
       <div
         className={cn(
-          'group mt-2 flex w-full shrink-0 items-center justify-start gap-2',
+          'group/chat-bubble mt-2 flex w-full shrink-0 items-center justify-start gap-2',
           msg.role === 'assistant' ? 'flex-row' : 'flex-row-reverse',
         )}
       >
@@ -191,13 +191,13 @@ export function ChatBubble({
             className={cn(
               'glass-body group relative min-h-8 max-w-full animate-chat-bubble-appear space-y-3 break-words rounded-2xl bg-white/5 px-3 py-2 font-normal text-sm last:mb-0.5',
               msg.role === 'assistant'
-                ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 pl-5 text-zinc-950 dark:bg-zinc-800/60 dark:text-zinc-50'
-                : 'origin-bottom-right rounded-br-xs bg-blue-600/90 pr-5 text-white',
+                ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 pl-4 text-zinc-950 dark:bg-zinc-800/60 dark:text-zinc-50'
+                : 'origin-bottom-right rounded-br-xs bg-blue-600/90 pr-4 text-white',
             )}
           >
             <div
               className={cn(
-                'group-hover:-top-3 -top-2 absolute z-20 w-max rounded-full bg-white/90 px-1.5 py-0.5 text-xs text-zinc-950/80 opacity-0 shadow-sm ring-1 ring-zinc-500/10 ring-inset transition-all duration-150 ease-out group-hover:opacity-100',
+                'group-hover/chat-bubble:-top-3 -top-2 absolute z-20 w-max rounded-full bg-white/90 px-1.5 py-0.5 text-xs text-zinc-950/80 opacity-0 shadow-sm ring-1 ring-zinc-500/10 ring-inset transition-all duration-150 ease-out group-hover/chat-bubble:opacity-100',
                 msg.role === 'assistant' ? 'left-1' : 'right-1',
               )}
             >
@@ -282,7 +282,7 @@ export function ChatBubble({
                 aria-label="Restore checkpoint"
                 variant="secondary"
                 size="icon-sm"
-                className="opacity-0 blur-xs transition-all group-hover:scale-100 group-hover:opacity-100 group-hover:blur-none"
+                className="shrink-0 opacity-0 blur-xs transition-all group-hover:scale-100 group-hover:opacity-100 group-hover:blur-none"
               >
                 <Undo2 className="size-4" />
               </Button>
@@ -344,7 +344,7 @@ const ReasoningPartItem = memo(
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
           <CollapsibleTrigger
             size="condensed"
-            className="text-muted-foreground"
+            className="cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground"
           >
             <BrainIcon className="size-3" />
             <span className="flex-1 text-start text-xs">Thinking...</span>

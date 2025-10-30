@@ -1,13 +1,13 @@
-import { forwardRef, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
 import { Loader2Icon, SparklesIcon } from 'lucide-react';
 import { useComparingSelector, useKartonState } from '@/hooks/use-karton';
 import { cn } from '@/utils';
 import { ChatErrorBubble } from './chat-error-bubble';
 
-export const ChatHistory = forwardRef<HTMLDivElement>((_props, ref) => {
+export const ChatHistory = () => {
   const wasAtBottomRef = useRef(true);
-
+  const ref = useRef<HTMLDivElement>(null);
   const { activeChatId, isWorking, chats } = useKartonState(
     useComparingSelector((s) => ({
       activeChatId: s.workspace?.agentChat?.activeChatId,
@@ -92,13 +92,8 @@ export const ChatHistory = forwardRef<HTMLDivElement>((_props, ref) => {
     <section
       ref={ref}
       aria-label="Agent message display"
-      className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain py-4 pt-16 pr-0 pb-14 pl-3 text-foreground text-sm focus-within:outline-none hover:bg-white/0 focus:outline-none"
+      className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain py-4 pt-16 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none"
       onScroll={handleScroll}
-      onMouseEnter={() => {
-        if (ref && typeof ref !== 'function') {
-          ref.current?.focus();
-        }
-      }}
     >
       {renderedMessages.map((message, index) => {
         return (
@@ -129,4 +124,4 @@ export const ChatHistory = forwardRef<HTMLDivElement>((_props, ref) => {
       )}
     </section>
   );
-});
+};
