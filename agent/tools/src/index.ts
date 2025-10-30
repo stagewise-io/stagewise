@@ -29,10 +29,10 @@ import {
   type AskForAppPathOutput,
 } from './node-runtime/project-setup/ask-for-app-path.js';
 import {
-  askForRootProjectPathTool,
-  askForRootProjectPathOutputSchema,
-  type AskForRootProjectPathOutput,
-} from './node-runtime/project-setup/ask-for-root-project-path.js';
+  askForAgentAccessPathTool,
+  askForAgentAccessPathOutputSchema,
+  type AskForAgentAccessPathOutput,
+} from './node-runtime/project-setup/ask-for-agent-access-path.js';
 import {
   generateComponentTool,
   type InspirationComponent,
@@ -41,15 +41,15 @@ import {
 export {
   askForAppPathTool,
   askForPortTool,
-  askForRootProjectPathTool,
+  askForAgentAccessPathTool,
   askForDevScriptIntegrationTool,
   askForDevScriptIntegrationOutputSchema,
   askForAppPathOutputSchema,
   askForPortOutputSchema,
-  askForRootProjectPathOutputSchema,
+  askForAgentAccessPathOutputSchema,
   type AskForAppPathOutput,
   type AskForPortOutput,
-  type AskForRootProjectPathOutput,
+  type AskForAgentAccessPathOutput,
   type AskForDevScriptIntegrationOutput,
   type InspirationComponent,
 };
@@ -145,8 +145,8 @@ export function setupAgentTools(
 ) {
   return {
     askForPortTool: userInteractionTool(askForPortTool(clientRuntime)),
-    askForRootProjectPathTool: userInteractionTool(
-      askForRootProjectPathTool(clientRuntime),
+    askForAgentAccessPathTool: userInteractionTool(
+      askForAgentAccessPathTool(clientRuntime),
     ),
     askForAppPathTool: userInteractionTool(askForAppPathTool(clientRuntime)),
     askForDevScriptIntegrationTool: userInteractionTool(

@@ -2,7 +2,7 @@ import type {
   AskForAppPathOutput,
   AskForDevScriptIntegrationOutput,
   AskForPortOutput,
-  AskForRootProjectPathOutput,
+  AskForAgentAccessPathOutput,
   InspirationComponent,
 } from '@stagewise/agent-tools';
 import type {
@@ -269,8 +269,8 @@ export type KartonContract = {
         input:
           | (AskForAppPathOutput & { type: 'askForAppPathTool' })
           | (AskForPortOutput & { type: 'askForPortTool' })
-          | (AskForRootProjectPathOutput & {
-              type: 'askForRootProjectPathTool';
+          | (AskForAgentAccessPathOutput & {
+              type: 'askForAgentAccessPathTool';
             })
           | (AskForDevScriptIntegrationOutput & {
               type: 'askForDevScriptIntegrationTool';

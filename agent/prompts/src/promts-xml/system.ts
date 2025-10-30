@@ -141,8 +141,8 @@ const projectSetupMode = `
 </given_information>
 
 <required_information>
-  - root_project_path: The absolute root folder path of the web project in open_path (can be different from open_path, e.g. when the USER has opened a package inside a monorepo, e.g. "/Users/username/projects/my-project").
   - app_path: The absolute folder path of the app that the USER wants to integrate stagewise into (e.g. "/Users/username/projects/my-project/apps/website" or "/Users/username/projects/my-project/apps/app" - it can also be open_path, e.g. if the project is not a monorepo, e.g. "/Users/username/non-monorepo-projects/my-project").
+  - agent_access_path: The relative path to the root folder of the web project, relative to app_path (can be different from app_path, e.g. when the USER has opened a package inside a monorepo, e.g. "../.."). Should have values like ".", "../..", "{GIT_REPO_ROOT}", etc.
   - app_port: The local port on which the app is running in development mode (e.g. 3000 for Next.js running on http://localhost:3000).
 </required_information>
 

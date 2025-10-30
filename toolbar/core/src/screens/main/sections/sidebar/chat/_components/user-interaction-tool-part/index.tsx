@@ -1,7 +1,7 @@
 import type { ToolPart } from '@stagewise/karton-contract';
 import { AskForAppPathToolPartContent } from './app-path';
 import { AskForPortToolPartContent } from './ask-for-port';
-import { AskForRootProjectPathToolPartContent } from './project-root-path';
+import { AskForAgentAccessPathToolPartContent } from './agent-access-path';
 import { cn } from '@/utils';
 import { XIcon } from 'lucide-react';
 import { memo } from 'react';
@@ -15,7 +15,7 @@ export type InteractionToolPart = Extract<
   | {
       type: 'tool-askForAppPathTool';
     }
-  | { type: 'tool-askForRootProjectPathTool' }
+  | { type: 'tool-askForAgentAccessPathTool' }
   | { type: 'tool-askForDevScriptIntegrationTool' }
 >;
 
@@ -32,7 +32,7 @@ export function isInteractionToolPart(
   return (
     toolPart.type === 'tool-askForPortTool' ||
     toolPart.type === 'tool-askForAppPathTool' ||
-    toolPart.type === 'tool-askForRootProjectPathTool' ||
+    toolPart.type === 'tool-askForAgentAccessPathTool' ||
     toolPart.type === 'tool-askForDevScriptIntegrationTool'
   );
 }
@@ -95,8 +95,8 @@ export const InteractionToolPartItem = memo(
                   }
                 />
               )}
-              {toolPart.type === 'tool-askForRootProjectPathTool' && (
-                <AskForRootProjectPathToolPartContent
+              {toolPart.type === 'tool-askForAgentAccessPathTool' && (
+                <AskForAgentAccessPathToolPartContent
                   toolPart={toolPart}
                   onSubmit={(input) =>
                     void submitUserInteractionToolInput(
