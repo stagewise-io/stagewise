@@ -339,17 +339,24 @@ const TextPartItem = memo(({ textPart }: { textPart: TextUIPart }) => {
 
 const ReasoningPartItem = memo(
   ({ reasoningPart }: { reasoningPart: ReasoningUIPart }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
     return (
       <div className="-mx-1 block min-w-32 rounded-xl border-border/20 bg-zinc-500/5 px-2 py-0.5">
-        <Collapsible>
+        <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
           <CollapsibleTrigger
             size="condensed"
             className="text-muted-foreground"
           >
             <BrainIcon className="size-3" />
-            <span className="block flex-1 text-start text-xs">Thinking...</span>
+            <span className="flex-1 text-start text-xs">Thinking...</span>
+            <ChevronRightIcon
+              className={cn(
+                'size-3 transition-transform duration-150',
+                isExpanded && 'rotate-90',
+              )}
+            />
           </CollapsibleTrigger>
-          <CollapsibleContent className="markdown pt-1.5 pb-0.5 pl-1 opacity-80">
+          <CollapsibleContent className="markdown pt-1.5 pb-0.5 pl-1 text-[0.8rem] opacity-80">
             <ReactMarkdown>{reasoningPart.text}</ReactMarkdown>
           </CollapsibleContent>
         </Collapsible>
@@ -620,14 +627,12 @@ const ToolPartItem = memo(({ toolPart }: { toolPart: ToolPart }) => {
           <>
             <CheckIcon className="size-3 text-green-600" />
             {canShowDiff && (
-              <div className="transition-transform duration-150">
-                <ChevronRightIcon
-                  className={cn(
-                    'size-3 text-zinc-600 transition-transform',
-                    isExpanded && 'rotate-90',
-                  )}
-                />
-              </div>
+              <ChevronRightIcon
+                className={cn(
+                  'size-3 text-zinc-600 transition-transform duration-150',
+                  isExpanded && 'rotate-90',
+                )}
+              />
             )}
           </>
         )}

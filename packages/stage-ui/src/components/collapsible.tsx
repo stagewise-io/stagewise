@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { Collapsible as CollapsibleBase } from '@base-ui-components/react/collapsible';
 import { cn } from '../lib/utils';
-import { ChevronDown } from 'lucide-react';
 
 export const Collapsible = CollapsibleBase.Root;
 
@@ -18,22 +17,21 @@ export const CollapsibleTrigger = ({
   size,
   ...props
 }: CollapsibleTriggerProps) => {
+  const paddingClass = size === 'default' ? 'p-3' : 'px-1.5 py-1';
+  const gapClass = size === 'default' ? 'gap-2' : 'gap-1';
+
   return (
     <CollapsibleBase.Trigger
       className={cn(
-        'group flex flex-row items-center justify-between font-medium text-sm transition-all duration-150 ease-out hover:bg-black/5 active:bg-black/10 dark:active:bg-white/10 dark:hover:bg-white/5',
-        size === 'default' ? 'gap-2 p-3' : 'gap-1 px-1.5 py-1',
+        'group w-full font-medium text-sm transition-all duration-150 ease-out hover:bg-black/5 active:bg-black/10 dark:active:bg-white/10 dark:hover:bg-white/5',
+        paddingClass,
         props.className,
       )}
       {...props}
     >
-      <div className="flex flex-1 flex-row items-center gap-2">{children}</div>
-      <ChevronDown
-        className={cn(
-          size === 'default' ? 'size-4' : 'size-3',
-          'shrink-0 text-zinc-500 opacity-50 transition-transform duration-150 ease-out group-hover:opacity-100 group-data-[panel-open]:rotate-180',
-        )}
-      />
+      <div className={cn('flex flex-1 flex-row items-center', gapClass)}>
+        {children}
+      </div>
     </CollapsibleBase.Trigger>
   );
 };
