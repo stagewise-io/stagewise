@@ -98,6 +98,8 @@ export function ChatPanelFooter({
   const handleSubmit = useCallback(() => {
     if (canSendMessage) {
       chatState.sendMessage();
+      chatState.stopContextSelector();
+      setChatInputActive(false);
       // stopPromptCreation is already called in sendMessage
     }
   }, [chatState, canSendMessage]);

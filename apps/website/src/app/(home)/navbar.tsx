@@ -3,12 +3,18 @@
 import { AnimatedGradientBackground } from '@/components/landing/animated-gradient-background';
 import { Logo } from '@/components/landing/logo';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
+import {
+  Menu,
+  MenuTrigger,
+  MenuContent,
+  MenuItem,
+} from '@stagewise/stage-ui/components/menu';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { MenuIcon, XIcon } from 'lucide-react';
+import { MenuIcon, XIcon, Share2, UserCog } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { SiDiscord, SiX } from 'react-icons/si';
+import { SiDiscord, SiX, SiGithub } from 'react-icons/si';
 
 function NavbarButton({
   children,
@@ -79,24 +85,51 @@ export function Navbar() {
           <NavbarButton href="/docs">Docs</NavbarButton>
           <NavbarButton href="/news">News</NavbarButton>
         </div>
-        <div className="flex w-24 flex-row items-center justify-end gap-2">
+        <div className="flex flex-row items-center justify-end gap-2">
+          <Menu>
+            <MenuTrigger>
+              <Button size="icon-md" variant="secondary">
+                <Share2 className="size-4" />
+              </Button>
+            </MenuTrigger>
+            <MenuContent side="bottom" align="end" className="w-48">
+              <MenuItem asChild>
+                <Link
+                  href="https://x.com/stagewise_io"
+                  className="flex items-center gap-3"
+                >
+                  <SiX className="size-4" />
+                  Follow on X
+                </Link>
+              </MenuItem>
+              <MenuItem asChild>
+                <Link
+                  href="https://discord.gg/gkdGsDYaKA"
+                  className="flex items-center gap-3"
+                >
+                  <SiDiscord className="size-4" />
+                  Join Discord
+                </Link>
+              </MenuItem>
+              <MenuItem asChild>
+                <Link
+                  href="https://github.com/stagewise-io/stagewise"
+                  className="flex items-center gap-3"
+                >
+                  <SiGithub className="size-4" />
+                  View on GitHub
+                </Link>
+              </MenuItem>
+            </MenuContent>
+          </Menu>
           <Link
+            href="https://console.stagewise.io"
             className={buttonVariants({
               size: 'icon-md',
-              variant: 'secondary',
+              variant: 'primary',
             })}
-            href="https://x.com/stagewise_io"
           >
-            <SiX className="size-5" />
-          </Link>
-          <Link
-            className={buttonVariants({
-              size: 'icon-md',
-              variant: 'secondary',
-            })}
-            href="https://discord.gg/gkdGsDYaKA"
-          >
-            <SiDiscord className="size-5" />
+            <UserCog className="size-4" />
           </Link>
         </div>
       </div>
