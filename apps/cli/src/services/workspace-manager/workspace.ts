@@ -148,6 +148,7 @@ export class WorkspaceService {
         this.workspaceDevAppStateService =
           await WorkspaceDevAppStateService.create(
             this.logger,
+            this.telemetryService,
             this.kartonService,
             this.workspaceConfigService,
             this.workspacePath,
@@ -181,7 +182,7 @@ export class WorkspaceService {
           loaded_plugins: this.workspacePluginService.loadedPlugins.map(
             (plugin) => plugin.name,
           ),
-          has_wrapped_command: false, // TODO: Add "has wrapped command" flag
+          has_wrapped_command: this.wrappedCommand !== undefined,
           codebase_line_count:
             Object.values(
               this.staticAnalysisService?.linesOfCodeCounts ?? {},

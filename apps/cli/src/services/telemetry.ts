@@ -68,6 +68,12 @@ export interface EventProperties {
     index_progress: number;
     index_total: number;
   };
+  'dev-app-started': {
+    wrapped_command: string | null;
+  };
+  'dev-app-stopped': {
+    wrapped_command: string | null;
+  };
 }
 
 export interface UserProperties {

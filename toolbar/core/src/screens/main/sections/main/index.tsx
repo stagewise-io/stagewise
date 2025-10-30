@@ -41,7 +41,7 @@ const tabs: Tabs = {
     icon: <WandSparklesIcon className="ml-px size-4" />,
     mainContent: <IdeationCanvasPanel />,
     controls: <IdeationCanvasControls />,
-    showInTabBar: true,
+    showInTabBar: false,
     disabled: false,
     hideTabBar: false,
   },

@@ -50,10 +50,7 @@ export function DevAppPreviewControls() {
       )}
     >
       <DevAppStateInfo />
-      <FullScreenToggle />
       <ScreenSizeControl />
-      <CodeShowModeToggle />
-      <SocialMediaPreviewsToggle />
       <UrlControl />
     </div>
   );
@@ -476,7 +473,7 @@ export function DevAppStateInfo() {
   );
 }
 
-const CodeShowModeToggle = () => {
+const _CodeShowModeToggle = () => {
   const [inCodeShowMode, setInCodeShowMode] = useState(false);
 
   const toggleCodeShowMode = useCallback(() => {

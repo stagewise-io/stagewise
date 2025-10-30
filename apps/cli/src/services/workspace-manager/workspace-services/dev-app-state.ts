@@ -9,6 +9,7 @@ import {
 } from '@/utils/port-utils';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import type { TelemetryService } from '@/services/telemetry';
 
 // Constants
 const DEFAULT_PORT = 3000;
@@ -23,6 +24,7 @@ type AppError = { message: string; code: number };
  */
 export class WorkspaceDevAppStateService {
   private readonly logger: Logger;
+  private readonly telemetryService: TelemetryService;
   private readonly kartonService: KartonService;
   private readonly configService: WorkspaceConfigService;
   private readonly workspacePath: string;
@@ -39,12 +41,14 @@ export class WorkspaceDevAppStateService {
 
   private constructor(
     logger: Logger,
+    telemetryService: TelemetryService,
     kartonService: KartonService,
     configService: WorkspaceConfigService,
     workspacePath: string,
     wrappedCommand?: string,
   ) {
     this.logger = logger;
+    this.telemetryService = telemetryService;
     this.kartonService = kartonService;
     this.configService = configService;
     this.workspacePath = workspacePath;
@@ -56,6 +60,7 @@ export class WorkspaceDevAppStateService {
 
   public static async create(
     logger: Logger,
+    telemetryService: TelemetryService,
     kartonService: KartonService,
     configService: WorkspaceConfigService,
     workspacePath: string,
@@ -63,6 +68,7 @@ export class WorkspaceDevAppStateService {
   ): Promise<WorkspaceDevAppStateService> {
     const instance = new WorkspaceDevAppStateService(
       logger,
+      telemetryService,
       kartonService,
       configService,
       workspacePath,
@@ -132,6 +138,8 @@ export class WorkspaceDevAppStateService {
     }
 
     await this.spawnProcess(command, port);
+
+    void this.telemetryService.capture('dev-app-started');
     this.logger.debug('[WorkspaceDevAppStateService] App started');
   }
 
@@ -146,6 +154,9 @@ export class WorkspaceDevAppStateService {
     this.isPassThroughMode = false;
     await this.removePidFile();
     this.updateKartonState();
+
+    void this.telemetryService.capture('dev-app-stopped');
+
     this.logger.debug('[WorkspaceDevAppStateService] App stopped');
   }
 
