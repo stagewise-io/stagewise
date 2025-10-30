@@ -1,8 +1,13 @@
 import { useContextChipHover } from '@/hooks/use-context-chip-hover';
 import { XIcon, SquareDashedMousePointer } from 'lucide-react';
 import { useMemo } from 'react';
-import { buttonVariants } from '@stagewise/stage-ui/components/button';
-import { cn } from '@/utils';
+import { Button } from '@stagewise/stage-ui/components/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@stagewise/stage-ui/components/popover';
 
 interface ContextElementsChipsProps {
   domContextElements: {
@@ -11,6 +16,12 @@ interface ContextElementsChipsProps {
       pluginName: string;
       context: any;
     }[];
+    codeMetadata: {
+      relativePath: string;
+      startLine: number;
+      endLine: number;
+      content?: string;
+    } | null;
   }[];
   removeChatDomContext: (element: HTMLElement) => void;
 }
@@ -32,6 +43,7 @@ export function ContextElementsChipsFlexible({
           key={`${contextElement.element.tagName}-${index}`}
           element={contextElement.element}
           pluginContext={contextElement.pluginContext}
+          codeMetadata={contextElement.codeMetadata}
           onDelete={() => removeChatDomContext(contextElement.element)}
           onHover={setHoveredElement}
           onUnhover={() => setHoveredElement(null)}
@@ -47,6 +59,12 @@ interface ContextElementChipProps {
     pluginName: string;
     context: any;
   }[];
+  codeMetadata: {
+    relativePath: string;
+    startLine: number;
+    endLine: number;
+    content?: string;
+  } | null;
   onDelete: () => void;
   onHover: (element: HTMLElement) => void;
   onUnhover: () => void;
@@ -55,6 +73,7 @@ interface ContextElementChipProps {
 function ContextElementChip({
   element,
   pluginContext,
+  codeMetadata,
   onDelete,
   onHover,
   onUnhover,
@@ -76,28 +95,43 @@ function ContextElementChip({
   }, [element, pluginContext]);
 
   return (
-    <div
-      className={cn(
-        buttonVariants({ variant: 'secondary', size: 'xs' }),
-        'bg-background/80',
-      )}
-      onMouseEnter={() => onHover(element)}
-      onMouseLeave={() => onUnhover()}
-    >
-      <SquareDashedMousePointer className="size-3 text-foreground/60" />
-      <span className="max-w-24 truncate font-medium text-foreground/80">
-        {chipLabel}
-      </span>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        className="text-muted-foreground transition-colors hover:text-red-500"
-      >
-        <XIcon className="size-3" />
-      </button>
-    </div>
+    <Popover>
+      <PopoverTrigger>
+        <Button
+          size="xs"
+          variant="secondary"
+          onMouseEnter={() => onHover(element)}
+          onMouseLeave={() => onUnhover()}
+          className="pr-0"
+        >
+          <SquareDashedMousePointer className="size-3 text-foreground/60" />
+          <span className="max-w-24 truncate font-medium text-foreground/80">
+            {chipLabel}
+          </span>
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="text-muted-foreground transition-colors hover:text-red-500"
+          >
+            <XIcon className="size-3" />
+          </Button>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent>
+        <PopoverTitle>Code Metadata</PopoverTitle>
+        <div className="flex flex-col gap-2">
+          <p className="text-foreground/70 text-sm">
+            {codeMetadata?.relativePath}
+          </p>
+          <p className="text-foreground/70 text-sm">
+            {codeMetadata?.startLine}
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

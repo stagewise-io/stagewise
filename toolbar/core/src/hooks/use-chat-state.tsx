@@ -38,7 +38,7 @@ interface ChatContext {
   setChatInput: (value: string) => void;
   domContextElements: {
     stagewiseId: string;
-    codeMetadata?: {
+    codeMetadata: {
       relativePath: string;
       startLine: number;
       endLine: number;

@@ -92,34 +92,42 @@ export function Navbar() {
                 <Share2 className="size-4" />
               </Button>
             </MenuTrigger>
-            <MenuContent side="bottom" align="end" className="w-48">
-              <MenuItem asChild>
-                <Link
-                  href="https://x.com/stagewise_io"
-                  className="flex items-center gap-3"
-                >
+            <MenuContent side="bottom" align="end">
+              <Link
+                href="https://x.com/stagewise_io"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full"
+              >
+                <MenuItem>
                   <SiX className="size-4" />
                   Follow on X
-                </Link>
-              </MenuItem>
-              <MenuItem asChild>
-                <Link
-                  href="https://discord.gg/gkdGsDYaKA"
-                  className="flex items-center gap-3"
-                >
+                </MenuItem>
+              </Link>
+
+              <Link
+                href="https://discord.gg/gkdGsDYaKA"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full"
+              >
+                <MenuItem>
                   <SiDiscord className="size-4" />
                   Join Discord
-                </Link>
-              </MenuItem>
-              <MenuItem asChild>
-                <Link
-                  href="https://github.com/stagewise-io/stagewise"
-                  className="flex items-center gap-3"
-                >
+                </MenuItem>
+              </Link>
+
+              <Link
+                href="https://github.com/stagewise-io/stagewise"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full"
+              >
+                <MenuItem>
                   <SiGithub className="size-4" />
                   View on GitHub
-                </Link>
-              </MenuItem>
+                </MenuItem>
+              </Link>
             </MenuContent>
           </Menu>
           <Link

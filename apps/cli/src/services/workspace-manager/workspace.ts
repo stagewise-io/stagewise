@@ -81,12 +81,16 @@ export class WorkspaceService {
 
     this.kartonService.setState((draft) => {
       draft.workspace = {
-        dataPath: this.workspacePathsService!.workspaceDataPath,
+        path: this.workspacePath,
+        paths: {
+          data: this.workspacePathsService!.workspaceDataPath,
+          cache: this.workspacePathsService!.workspaceCachePath,
+          temp: this.workspacePathsService!.workspaceTempPath,
+        },
         inspirationComponents: [],
         agentChat: null,
         agent: null,
         devAppStatus: null,
-        path: this.workspacePath,
         config: null,
         plugins: null,
         setupActive: false,

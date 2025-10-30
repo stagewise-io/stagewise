@@ -12,9 +12,9 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { useCallback, useMemo } from 'react';
-import { ChevronDownIcon } from 'lucide-react';
+import { ChevronDownIcon, FolderIcon } from 'lucide-react';
 
-export function WorkspaceInfoBadge() {
+export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
   const workspace = useKartonState((s) => s.workspace);
 
   const workspaceDir = useMemo(() => {
@@ -66,9 +66,15 @@ export function WorkspaceInfoBadge() {
   return (
     <Popover>
       <PopoverTrigger>
-        <Button size="md" variant="ghost">
-          {workspaceDir ?? 'No workspace loaded'}
-          <ChevronDownIcon className="size-4" />
+        <Button size={isCollapsed ? 'icon-md' : 'md'} variant="ghost">
+          {isCollapsed ? (
+            <FolderIcon className="size-5" />
+          ) : (
+            <>
+              {workspaceDir ?? 'No workspace loaded'}
+              <ChevronDownIcon className="size-4" />
+            </>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start">

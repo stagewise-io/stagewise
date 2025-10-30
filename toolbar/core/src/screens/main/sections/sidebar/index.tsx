@@ -1,29 +1,45 @@
 import { SidebarChatSection } from './chat';
-import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
+import {
+  ResizablePanel,
+  type ImperativePanelHandle,
+} from '@stagewise/stage-ui/components/resizable';
 import { SidebarTopSection } from './top';
 import { SidebarSubsystemStatusSection } from './subsystem-status';
+import { useState, useRef } from 'react';
 
 export function Sidebar() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const panelRef = useRef<ImperativePanelHandle>(null);
+
   return (
     <ResizablePanel
+      ref={panelRef}
       id="sidebar-panel"
       order={1}
       defaultSize={30}
       minSize={25}
       maxSize={50}
-      className="flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-muted-foreground/5"
+      collapsible
+      collapsedSize={4}
+      onCollapse={() => setIsCollapsed(true)}
+      onExpand={() => setIsCollapsed(false)}
+      data-collapsed={isCollapsed}
+      className="group flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-muted-foreground/5 data-[collapsed=true]:w-16 data-[collapsed=true]:min-w-16 data-[collapsed=true]:max-w-16"
     >
-      <SidebarTopSection />
-
-      <hr className="mx-4 h-px border-none bg-zinc-500/10" />
+      <SidebarTopSection isCollapsed={isCollapsed} />
 
       {/* Subsystem status area */}
-      <SidebarSubsystemStatusSection />
+      {!isCollapsed && (
+        <>
+          <hr className="mx-4 h-px border-none bg-zinc-500/10" />
+          <SidebarSubsystemStatusSection />
+        </>
+      )}
 
       <hr className="h-px border-none bg-zinc-500/20" />
 
       {/* Chat area */}
-      <SidebarChatSection />
+      <SidebarChatSection openChatPanel={() => panelRef.current?.expand()} />
     </ResizablePanel>
   );
 }

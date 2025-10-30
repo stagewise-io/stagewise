@@ -105,7 +105,11 @@ export type AppState = {
   };
   workspace: {
     path: string;
-    dataPath: string;
+    paths: {
+      data: string;
+      cache: string;
+      temp: string;
+    };
     devAppStatus: {
       contentAvailableOnPort: boolean; // Is true, if the CLI detected that there is content available on the configured dev app port.
       childProcessRunning: boolean;

@@ -100,6 +100,10 @@ export const WorkspaceSettingsTabContent = () => {
     (s) => s.workspace?.devAppStatus?.wrappedCommand,
   );
 
+  const workspaceDataPath = useKartonState((s) => s.workspace?.paths.data);
+  const workspaceCachePath = useKartonState((s) => s.workspace?.paths.cache);
+  const workspaceTempPath = useKartonState((s) => s.workspace?.paths.temp);
+
   return (
     <TabsContent
       value="workspace"
@@ -241,6 +245,43 @@ export const WorkspaceSettingsTabContent = () => {
             debounce={200}
             placeholder={'e.g. "dotenv . -- pnpm dev"'}
           />
+        </FormField>
+      </FormFieldset>
+      <FormFieldset title="Other information">
+        <FormField className="lg:flex-row">
+          <div className="flex flex-1 flex-col items-start gap-2">
+            <FormFieldLabel>Workspace data path</FormFieldLabel>
+            <FormFieldDescription>
+              This path is used to store persistent data for the workspace.
+            </FormFieldDescription>
+          </div>
+          <p className="font-medium font-mono text-muted-foreground text-sm">
+            {workspaceDataPath}
+          </p>
+        </FormField>
+
+        <FormField className="lg:flex-row">
+          <div className="flex flex-1 flex-col items-start gap-2">
+            <FormFieldLabel>Workspace cache path</FormFieldLabel>
+            <FormFieldDescription>
+              This path is used to store cached data for the workspace.
+            </FormFieldDescription>
+          </div>
+          <p className="font-medium font-mono text-muted-foreground text-sm">
+            {workspaceCachePath}
+          </p>
+        </FormField>
+
+        <FormField className="lg:flex-row">
+          <div className="flex flex-1 flex-col items-start gap-2">
+            <FormFieldLabel>Workspace temp path</FormFieldLabel>
+            <FormFieldDescription>
+              This path is used to store temporary data for the workspace.
+            </FormFieldDescription>
+          </div>
+          <p className="font-medium font-mono text-muted-foreground text-sm">
+            {workspaceTempPath}
+          </p>
         </FormField>
       </FormFieldset>
     </TabsContent>
