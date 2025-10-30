@@ -19,7 +19,7 @@ export function SidebarChatSection({
           aria-label="Open chat"
           onClick={openChatPanel}
         >
-          <MessageCircleIcon className="size-4" />
+          <MessageCircleIcon className="size-5" />
         </Button>
       </div>
     </div>
