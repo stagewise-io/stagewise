@@ -187,7 +187,7 @@ export function ChatBubble({
           >
             <div
               className={cn(
-                'group-hover/chat-bubble:-top-3 -top-2 absolute z-20 w-fit rounded-full bg-white/90 px-1.5 py-0.5 text-xs text-zinc-950/80 opacity-0 shadow-sm ring-1 ring-zinc-500/10 ring-inset transition-all duration-150 ease-out group-hover/chat-bubble:opacity-100',
+                'group-hover/chat-bubble:-top-3 -top-2 absolute z-20 w-auto max-w-36 rounded-full bg-white/90 px-1.5 py-0.5 text-xs text-zinc-950/80 opacity-0 shadow-sm ring-1 ring-zinc-500/10 ring-inset transition-all duration-150 ease-out group-hover/chat-bubble:opacity-100',
                 msg.role === 'assistant' ? 'left-1' : 'right-1',
               )}
             >

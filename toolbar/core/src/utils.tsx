@@ -659,3 +659,126 @@ export const openFileUrl = async (url: string, filename?: string) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 };
+
+export const getTruncatedFileUrl = (
+  url: string,
+  maxPathParts = 3,
+  maxLength = 128,
+) => {
+  if (!url) return '';
+
+  // Ensure sane limits
+  const partsLimit = Math.max(1, Math.floor(maxPathParts || 1));
+  const perPartMaxLen = Math.max(1, Math.floor(maxLength || 1));
+
+  // Try to parse as a URL first (handles http/https/file)
+  let prefix = '';
+  let pathPortion = url;
+
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'file:') {
+      // Keep scheme only for file://
+      prefix = 'file://';
+      pathPortion = u.pathname || '';
+    } else {
+      // Keep origin for other protocols
+      prefix = `${u.protocol}//${u.host}`;
+      pathPortion = u.pathname || '';
+    }
+  } catch {
+    // Not a standard URL; handle custom schemes or plain paths
+    const schemeMatch = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)/);
+    if (schemeMatch) {
+      const scheme = schemeMatch[1] ?? '';
+      const rest = url.slice(scheme.length);
+      // Extract optional authority (until next slash or backslash)
+      const sepIdx = rest.search(/[/\\]/);
+      if (sepIdx === -1) {
+        // No path portion; truncate the authority/key itself
+        const truncated = truncateString(rest, perPartMaxLen) as string;
+        return `${scheme}${truncated}`;
+      }
+      const authority = rest.slice(0, sepIdx);
+      prefix = `${scheme}${authority}`;
+      pathPortion = rest.slice(sepIdx);
+    } else {
+      // Plain path (likely filesystem)
+      prefix = '';
+      pathPortion = url;
+    }
+  }
+
+  // Strip query/hash from the path portion
+  let pathOnly = pathPortion;
+  const qIdx = pathOnly.indexOf('?');
+  if (qIdx !== -1) pathOnly = pathOnly.slice(0, qIdx);
+  const hIdx = pathOnly.indexOf('#');
+  if (hIdx !== -1) pathOnly = pathOnly.slice(0, hIdx);
+
+  // Preserve knowledge about leading separator
+  let leadingSep = '';
+  if (pathOnly.startsWith('/') || pathOnly.startsWith('\\')) {
+    leadingSep = pathOnly.charAt(0);
+  }
+
+  // Detect Windows drive (supports file:///C:/... and C:\...)
+  let drive = '';
+  const winDriveMatch = pathOnly.match(/^\/?([A-Za-z]:)[/\\]?/);
+  if (winDriveMatch) {
+    drive = winDriveMatch[1] ?? '';
+    pathOnly = pathOnly.replace(/^\/?([A-Za-z]:)[/\\]?/, '');
+    leadingSep = '';
+  }
+
+  // Choose join separator: prefer backslash only for plain Windows paths
+  const useBackslash = /\\/.test(url) && !/^file:\/\//.test(url);
+  const sep = useBackslash ? '\\' : '/';
+
+  const rawSegments = pathOnly.split(/[/\\]+/).filter(Boolean);
+
+  if (rawSegments.length === 0) {
+    // Nothing to truncate; just return prefix + drive if present or original url
+    if (drive) {
+      return prefix ? `${prefix}/${drive}` : `${drive}`;
+    }
+    if (prefix) {
+      // Ensure at least a slash after prefix if there was a path originally
+      return `${prefix}${leadingSep || ''}` || url;
+    }
+    return url;
+  }
+
+  const limitedCount = Math.min(rawSegments.length, partsLimit);
+  const tail = rawSegments.slice(-limitedCount);
+
+  const truncatedTail = tail.map((p) => {
+    return (truncateString(p, perPartMaxLen) as string) || '';
+  });
+
+  let truncatedPath = truncatedTail.join(sep);
+  const hadMore = rawSegments.length > limitedCount;
+  if (hadMore) {
+    truncatedPath = `...${sep}${truncatedPath}`;
+  }
+
+  // Rebuild final string
+  if (drive) {
+    if (prefix) {
+      // file:///C:/...
+      return `${prefix}/${drive}${truncatedPath ? sep + truncatedPath : ''}`;
+    }
+    return `${drive}${truncatedPath ? sep + truncatedPath : ''}`;
+  }
+
+  if (prefix) {
+    // For URLs (http/https/file without drive), ensure a leading slash before the path
+    const normalizedPath = useBackslash
+      ? truncatedPath.replace(/\\/g, '/')
+      : truncatedPath;
+    const lead = normalizedPath ? '/' : '';
+    return `${prefix}${lead}${normalizedPath}`;
+  }
+
+  return `${leadingSep || ''}${truncatedPath}`;
+};

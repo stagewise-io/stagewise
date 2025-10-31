@@ -1,6 +1,7 @@
 import type { ToolPart } from '@stagewise/karton-contract';
 import { ToolPartUIBase } from './_shared';
 import { EyeIcon } from 'lucide-react';
+import { getTruncatedFileUrl } from '@/utils';
 
 export const ReadFileToolPart = ({
   part,
@@ -12,7 +13,7 @@ export const ReadFileToolPart = ({
       part={part}
       toolIcon={<EyeIcon className="size-3" />}
       toolName={`Reading file...`}
-      toolSubtitle={part.input?.target_file}
+      toolSubtitle={getTruncatedFileUrl(part.input?.target_file ?? '')}
     />
   );
 };

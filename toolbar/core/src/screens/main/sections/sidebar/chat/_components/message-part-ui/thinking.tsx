@@ -107,7 +107,7 @@ export const ThinkingPart = ({
   }, [part.text, isExpanded, containerReady]);
 
   const displayedText = useTypeWriterText(part.text, {
-    charsPerInterval: 1,
+    charsPerInterval: 2,
     framesPerInterval: 1,
     showAllOnFirstRender: true,
     animateOnIncreaseOnly: true,

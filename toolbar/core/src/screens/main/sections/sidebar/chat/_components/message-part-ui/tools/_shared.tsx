@@ -6,7 +6,6 @@ import {
   XIcon,
   WrenchIcon,
   ChevronRightIcon,
-  FileIcon,
 } from 'lucide-react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
@@ -21,7 +20,7 @@ import {
 } from '@stagewise/stage-ui/components/collapsible';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useState } from 'react';
-import { diffLines } from 'diff';
+import type { ChangeObject } from 'diff';
 
 export function ToolPartUIBase({
   toolIcon,
@@ -49,7 +48,7 @@ export function ToolPartUIBase({
         <div className="flex flex-col items-start gap-0">
           {toolName && <div className="text-start text-xs">{toolName}</div>}
           {toolSubtitle && (
-            <div className="text-start text-muted-foreground text-xs">
+            <div className="truncate text-start text-muted-foreground text-xs">
               {toolSubtitle}
             </div>
           )}
@@ -103,7 +102,7 @@ export function ToolPartUIBase({
         >
           <CollapsibleTrigger
             size="condensed"
-            className="h-fit cursor-pointer gap-1 rounded-full px-2.5 text-foreground"
+            className="h-fit cursor-pointer gap-1 rounded-xl px-2.5 text-foreground"
           >
             {toolTitleContent}
             <ChevronRightIcon
@@ -127,52 +126,23 @@ export function ToolPartUIBase({
   );
 }
 
-export function DiffPreview({
-  filePath,
-  before,
-  after,
-}: {
-  filePath: string;
-  before: string;
-  after: string;
-}) {
-  const lines = diffLines(before, after);
-
-  const newLineCount = lines
-    .filter((line) => line.added)
-    .reduce((sum, line) => sum + (line.count || 0), 0);
-  const deletedLineCount = lines
-    .filter((line) => line.removed)
-    .reduce((sum, line) => sum + (line.count || 0), 0);
-
+export function DiffPreview({ diff }: { diff: ChangeObject<string>[] }) {
   return (
-    <div className="flex flex-col items-stretch gap-1">
-      <div className="flex flex-row items-center justify-between gap-6">
-        <div className="flex flex-row items-center gap-2">
-          <FileIcon className="size-3 text-muted-foreground" />
-          <span className="text-start text-xs">{filePath}</span>
+    <div className="flex flex-col gap-0.5 rounded-lg border border-black/5 bg-zinc-500/5 p-1">
+      {diff.map((line, index) => (
+        <div
+          key={`${index}-${line.value.slice(0, 20)}`}
+          className={
+            line.added
+              ? 'bg-green-100 text-green-800'
+              : line.removed
+                ? 'bg-rose-100 text-rose-800'
+                : 'text-black/60'
+          }
+        >
+          {line.value}
         </div>
-        <div className="flex shrink-0 flex-row items-center gap-2 font-medium text-xs">
-          <span className="shrink-0 text-green-600">+{newLineCount}</span>
-          <span className="shrink-0 text-rose-600">-{deletedLineCount}</span>
-        </div>
-      </div>
-      <div className="flex flex-col gap-0.5 rounded-lg border border-black/5 bg-zinc-500/5 p-1">
-        {lines.map((line, index) => (
-          <div
-            key={`${index}-${line.value.slice(0, 20)}`}
-            className={
-              line.added
-                ? 'bg-green-100 text-green-800'
-                : line.removed
-                  ? 'bg-rose-100 text-rose-800'
-                  : 'text-black/60'
-            }
-          >
-            {line.value}
-          </div>
-        ))}
-      </div>
+      ))}
     </div>
   );
 }

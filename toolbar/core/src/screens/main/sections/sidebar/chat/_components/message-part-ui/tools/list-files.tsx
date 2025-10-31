@@ -1,6 +1,7 @@
 import type { ToolPart } from '@stagewise/karton-contract';
 import { ToolPartUIBase } from './_shared';
 import { ListIcon } from 'lucide-react';
+import { getTruncatedFileUrl } from '@/utils';
 
 export const ListFilesToolPart = ({
   part,
@@ -12,7 +13,9 @@ export const ListFilesToolPart = ({
       part={part}
       toolIcon={<ListIcon className="size-3" />}
       toolName={`Listing ${part.input ? (part.input.includeDirectories ? 'directories' : 'files') : ''}...`}
-      toolSubtitle={part.input?.path && `Looking in ${part.input?.path}`}
+      toolSubtitle={
+        part.input?.path && `Looking in ${getTruncatedFileUrl(part.input.path)}`
+      }
     />
   );
 };
