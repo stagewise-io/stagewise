@@ -3,14 +3,14 @@ import { tool } from 'ai';
 import { z } from 'zod';
 
 export const DESCRIPTION =
-  'Ask the user to confirm the path that the agent should have access to. Pick the project root path. Relative to the app path (e.g. "../..", or "{GIT_REPO_ROOT}" to give access to the git root).';
+  'Ask the user to confirm the path that the agent should have access to. Pick the project root path. Relative to the app path (e.g. "../..", or ".").';
 
 export const askForAgentAccessPathParamsSchema = z.object({
   userInput: z.object({
     suggestedPath: z
       .string()
       .describe(
-        'The project root path that the USER should confirm. Relative to the app path (e.g. "../..", or "{GIT_REPO_ROOT}" to give access to the git root).',
+        'The relative project root path that the USER should confirm. Relative to the app path (e.g. "../..", or ".").',
       ),
   }),
 });

@@ -11,7 +11,7 @@
 import type { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
 import fs from 'node:fs';
-import path from 'node:path';
+import path, { resolve } from 'node:path';
 import {
   type WorkspaceConfig,
   workspaceConfigSchema,
@@ -73,6 +73,12 @@ export class WorkspaceSetupService {
     this.kartonService.registerServerProcedureHandler(
       'workspace.setup.submit',
       this.handleSetupSubmission.bind(this),
+    );
+    this.kartonService.registerServerProcedureHandler(
+      'workspace.setup.resolveRelativePathToAbsolutePath',
+      async (relativePath: string) => {
+        return await this.handleResolveRelativePathToAbsolutePath(relativePath);
+      },
     );
 
     // Update the karton state to reflect
@@ -142,6 +148,16 @@ export class WorkspaceSetupService {
     // Notify the listeners
     this._setupCompleted = true;
     this.onSetupCompleted?.(validatedConfig.data);
+  }
+
+  private async handleResolveRelativePathToAbsolutePath(
+    relativePath: string,
+  ): Promise<string | null> {
+    try {
+      return resolve(this.workspacePath, relativePath);
+    } catch {
+      return null;
+    }
   }
 
   private async handleCheckForActiveAppOnPort(port: number): Promise<boolean> {

@@ -314,6 +314,9 @@ export type KartonContract = {
       setup: {
         submit: (config: WorkspaceConfig) => Promise<void>;
         checkForActiveAppOnPort: (port: number) => Promise<boolean>;
+        resolveRelativePathToAbsolutePath: (
+          relativePath: string,
+        ) => Promise<string | null>;
       };
       config: {
         set: (config: WorkspaceConfig) => Promise<void>;
