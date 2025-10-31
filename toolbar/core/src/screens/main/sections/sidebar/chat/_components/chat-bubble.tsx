@@ -340,14 +340,16 @@ const ReasoningPartItem = memo(
   ({ reasoningPart }: { reasoningPart: ReasoningUIPart }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     return (
-      <div className="-mx-1 block min-w-32 rounded-xl border-border/20 bg-zinc-500/5 px-2 py-0.5">
+      <div className="-mx-1 block min-w-32 rounded-xl border-border/20 bg-zinc-500/5 px-1">
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
           <CollapsibleTrigger
             size="condensed"
-            className="cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground"
+            className="h-4 cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground active:bg-transparent"
           >
             <BrainIcon className="size-3" />
-            <span className="flex-1 text-start text-xs">Thinking...</span>
+            <span className="flex-1 text-start font-normal text-xs">
+              Thinking...
+            </span>
             <ChevronRightIcon
               className={cn(
                 'size-3 transition-transform duration-150',

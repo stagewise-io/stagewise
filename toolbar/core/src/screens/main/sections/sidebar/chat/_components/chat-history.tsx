@@ -92,7 +92,7 @@ export const ChatHistory = () => {
     <section
       ref={ref}
       aria-label="Agent message display"
-      className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain py-4 pt-16 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none"
+      className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent -mr-3 pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain py-4 pt-16 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none"
       onScroll={handleScroll}
     >
       {renderedMessages.map((message, index) => {

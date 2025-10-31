@@ -153,7 +153,7 @@ export function UrlControl() {
         </span>
         <Input
           className="flex h-8 w-full max-w-none flex-1 flex-row items-center rounded-full pl-10"
-          inputClassName="pl-1.5 rounded-full outline-offset-0 h-full"
+          inputClassName="pl-1.5 rounded-full outline-offset-0 h-6 mr-1"
           type="text"
           placeholder="URL"
           onSubmit={navigateToUrl}

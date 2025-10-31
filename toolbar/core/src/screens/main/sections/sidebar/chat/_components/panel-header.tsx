@@ -58,7 +58,7 @@ export function ChatPanelHeader({
       className={cn(
         '-inset-3 pointer-events-none absolute z-20 origin-bottom p-2 transition-all duration-300 ease-out *:pointer-events-auto',
         chatListOpen
-          ? 'h-[calc(100%-2px)] rounded-[inherit] backdrop-blur-2xl'
+          ? 'rounded-[inherit] backdrop-blur-2xl'
           : '!h-[calc-size(auto,size)] h-auto',
       )}
       title={chatListOpen && <span className="mt-0.5 ml-2">Chats</span>}
