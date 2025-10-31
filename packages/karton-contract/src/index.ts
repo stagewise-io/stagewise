@@ -254,18 +254,7 @@ export type KartonContract = {
   state: AppState;
   clientProcedures: {
     devAppPreview: {
-      getPreviewInfo: () => Promise<{
-        viewport: {
-          width: number;
-          height: number;
-          dpr: number;
-        };
-        currentUrl: string;
-        currentTitle: string;
-        userAgent: string;
-        locale: string;
-        prefersDarkMode: boolean;
-      }>;
+      getPreviewInfo: () => Promise<BrowserData>;
     };
   };
   serverProcedures: {

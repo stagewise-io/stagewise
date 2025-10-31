@@ -17,7 +17,7 @@ export function browserMetadataToContextSnippet(
   return `
   <browser-metadata>
     <description>
-      This is the metadata of the browser that the user is using.
+      This is the current browser metadata of the USER.
     </description>
     <content>
       <current-url>
@@ -28,17 +28,15 @@ export function browserMetadataToContextSnippet(
         ${escapeXml(browserData.currentTitle)}
       </current-title>
 
-      <current-zoom-level>
-        ${browserData.currentZoomLevel}
-      </current-zoom-level>
+      <viewport>
+        <width>${browserData.viewport.width}</width>
+        <height>${browserData.viewport.height}</height>
+        <device-pixel-ratio>${browserData.viewport.dpr}</device-pixel-ratio>
+      </viewport>
 
-      <viewport-resolution>
-        ${browserData.viewportResolution.width}x${browserData.viewportResolution.height}
-      </viewport-resolution>
-
-      <device-pixel-ratio>
-        ${browserData.devicePixelRatio}
-      </device-pixel-ratio>
+      <prefers-dark-mode>
+        ${browserData.prefersDarkMode}
+      </prefers-dark-mode>
 
       <user-agent>
         ${escapeXml(browserData.userAgent)}

@@ -1,4 +1,4 @@
-import { getIFrameWindow } from '@/utils';
+import { getBrowserData } from '@/utils';
 import { type KartonContract, defaultState } from '@stagewise/karton-contract';
 import {
   createKartonReactClient,
@@ -11,25 +11,9 @@ const [KartonProvider, useKartonState, useKartonProcedure, useKartonConnected] =
     procedures: {
       devAppPreview: {
         getPreviewInfo: async () => {
-          const iframe = getIFrameWindow();
-
-          if (!iframe) {
-            throw new Error('Iframe not found');
-          }
-
-          return {
-            viewport: {
-              width: iframe.innerWidth,
-              height: iframe.innerHeight,
-              dpr: iframe.devicePixelRatio,
-            },
-            currentUrl: iframe.location.href,
-            currentTitle: iframe.document.title,
-            userAgent: iframe.navigator.userAgent,
-            locale: iframe.navigator.language,
-            prefersDarkMode: iframe.matchMedia('(prefers-color-scheme: dark)')
-              .matches,
-          };
+          const browserData = getBrowserData();
+          if (!browserData) throw new Error('Browser data not available.');
+          return browserData;
         },
       },
     },

@@ -1,4 +1,5 @@
 import type {
+  BrowserData,
   SelectedElement,
   UserMessageMetadata,
 } from '@stagewise/karton-contract';
@@ -508,13 +509,34 @@ export async function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+export const getBrowserData = (): BrowserData | null => {
+  const iframe = getIFrameWindow();
+
+  if (!iframe) return null;
+
+  return {
+    viewport: {
+      width: iframe.innerWidth,
+      height: iframe.innerHeight,
+      dpr: iframe.devicePixelRatio,
+    },
+    currentUrl: iframe.location.href,
+    currentTitle: iframe.document.title,
+    userAgent: iframe.navigator.userAgent,
+    locale: iframe.navigator.language,
+    prefersDarkMode: iframe.matchMedia('(prefers-color-scheme: dark)').matches,
+  };
+};
+
 export const collectUserMessageMetadata = (
   selectedElements: SelectedElement[],
   _sentByPlugin?: boolean,
 ): UserMessageMetadata => {
+  const browserData = getBrowserData();
   return {
     createdAt: new Date(),
     selectedPreviewElements: selectedElements,
+    browserData: browserData || undefined,
   };
 };
 
