@@ -142,6 +142,7 @@ function serializeElement(
 export function htmlElementToContextSnippet(
   elements: SelectedElement[],
 ): string {
+  const hasCodeMetadata = elements.some((element) => element?.codeMetadata);
   const result = `
   <dom-elements>
     <description> These are the elements that the user has selected before making the request: </description>
@@ -150,6 +151,9 @@ export function htmlElementToContextSnippet(
     </content>
   </dom-elements>
 
+  ${
+    hasCodeMetadata
+      ? `
   <code-metadata>
     <description>
     These are the code snippets that belong to the HTML elements that the user has selected before making the request.
@@ -158,6 +162,9 @@ export function htmlElementToContextSnippet(
       ${elements.map((element) => `<relative-path>${element?.codeMetadata?.relativePath}</relative-path>\n<start-line>${element?.codeMetadata?.startLine}</start-line>\n<end-line>${element?.codeMetadata?.endLine}</end-line>${element?.codeMetadata?.content ? `<content>${element?.codeMetadata?.content}</content>` : ''}`).join('\n\n')}
     </content>
   </code-metadata>
+  `
+      : ''
+  }
   `;
   return result;
 }

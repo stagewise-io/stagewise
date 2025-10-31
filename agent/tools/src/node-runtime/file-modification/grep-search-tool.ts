@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { GREP_LIMITS } from '../../constants.js';
 
 export const DESCRIPTION =
-  'Fast, exact regex searches over text files using ripgrep';
+  'Fast, exact regex searches over text files using ripgrep. Use this tool to search for the right files in the project.';
 
 export const grepSearchParamsSchema = z.object({
   query: z.string().describe('The regex pattern to search for'),
@@ -16,7 +16,7 @@ export const grepSearchParamsSchema = z.object({
   include_file_pattern: z
     .string()
     .optional()
-    .describe('Glob pattern for files to include (e.g., "*.ts")'),
+    .describe('Glob pattern for files to include (e.g., "*.ts", "**/*.ts")'),
   exclude_file_pattern: z
     .string()
     .optional()

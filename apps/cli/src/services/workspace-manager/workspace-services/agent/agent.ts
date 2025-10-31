@@ -365,11 +365,11 @@ export class AgentService {
           });
 
           const promptSnippets: PromptSnippet[] = [];
-          const projectPathPromptSnippet = await getProjectPath(
+          const projectInfoPromptSnippet = await getProjectInfo(
             this.clientRuntime,
           );
-          if (projectPathPromptSnippet) {
-            promptSnippets.push(projectPathPromptSnippet);
+          if (projectInfoPromptSnippet) {
+            promptSnippets.push(projectInfoPromptSnippet);
           }
 
           const messages =
@@ -859,7 +859,7 @@ export class AgentService {
       });
 
       const model = this.telemetryService.withTracing(
-        this.litellm('claude-haiku-4-5'),
+        this.litellm('claude-sonnet-4-5'),
         {
           posthogTraceId: chatId,
           posthogProperties: {

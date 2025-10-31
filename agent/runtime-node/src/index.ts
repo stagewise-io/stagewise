@@ -354,12 +354,16 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
                 return;
               }
 
-              const MAX_PREVIEW_LENGTH = 200; // Limit preview to 200 characters
-              let preview = line?.trim() || '';
-              if (preview.length > MAX_PREVIEW_LENGTH) {
-                // Truncate long previews and add ellipsis
-                preview = `${preview.substring(0, MAX_PREVIEW_LENGTH - 3)}...`;
-              }
+              // Extract context: 5 lines before and 5 lines after the match
+              const contextBefore = 5;
+              const contextAfter = 5;
+              const startLine = Math.max(0, i - contextBefore);
+              const endLine = Math.min(lines.length - 1, i + contextAfter);
+              const contextLines = lines.slice(startLine, endLine + 1);
+              const preview = contextLines.join('\n');
+
+              // Note: We don't truncate preview length here to preserve full context
+              // The total output size is still limited by MAX_OUTPUT_SIZE check below
 
               const matchEntry: GrepMatch = {
                 relativePath: relative(this.config.workingDirectory, filePath),
