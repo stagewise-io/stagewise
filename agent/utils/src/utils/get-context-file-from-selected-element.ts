@@ -21,8 +21,8 @@ async function retrieveFilesForSelectedElement(
   apiKey: string,
 ) {
   const descriptionPrompt = `
-  You are a helpful assistant that describes the semantic and content of elements in a web application by looking at the DOM structure and selected elements.
-  
+  You are a helpful assistant that identifies and describes the semantic and content of elements in a web application by looking at the DOM structure and selected elements. You should describe the elements as precisely as possible and include details.
+
   Example:
     - user:
         This is the selected element:
@@ -44,11 +44,10 @@ async function retrieveFilesForSelectedElement(
 
   IMPORTANT: Include text content and business logic of elements when possible (e.g. instead of saying: 'A rounded chip element with subtle shadow', say: 'A rounded chip element with subtle shadow that displays the latest monthly user growth percentage')
 
-  IMPORTANT: Be very specific and detailed in your description, prefer longer descriptions over shorter ones. Include information about:
-  - Visual styling (colors, sizes, spacing, shadows, borders)
-  - Layout and positioning of elements
+  IMPORTANT: Be very specific and detailed in your description, include information about:
+  - Visual styling (colors, classes)
   - Text content and data being displayed
-  - Business logic and functionality of interactive elements
+  - Surrounding children/ parent elements and their purpose and text content
   - The overall purpose and context of the component`;
 
   const prompt = {
