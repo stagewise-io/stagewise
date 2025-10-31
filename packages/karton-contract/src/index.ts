@@ -54,6 +54,7 @@ export type Chat = {
 export enum AgentErrorType {
   INSUFFICIENT_CREDITS = 'insufficient-credits-message',
   PLAN_LIMITS_EXCEEDED = 'plan-limits-exceeded',
+  CONTEXT_LIMIT_EXCEEDED = 'context-limit-exceeded',
   AGENT_ERROR = 'agent-error',
   OTHER = 'other',
 }
@@ -91,6 +92,10 @@ export type AgentError =
         isPaidPlan: boolean;
         cooldownMinutes?: number;
       };
+    }
+  | {
+      type: AgentErrorType.CONTEXT_LIMIT_EXCEEDED;
+      error: { name: string; message: string };
     }
   | {
       type: AgentErrorType.AGENT_ERROR;

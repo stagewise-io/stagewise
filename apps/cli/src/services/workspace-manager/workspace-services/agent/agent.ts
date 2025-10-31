@@ -1,4 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import { isContextLimitError } from '@stagewise/agent-utils';
 import type { KartonService } from '../../../karton';
 import type { Logger } from '../../../logger';
 import type { TelemetryService } from '../../../telemetry';
@@ -21,6 +22,7 @@ import {
   createAuthenticatedClient,
   type KartonStateProvider,
   getContextFileFromSelectedElement,
+  extractDetailsFromError,
 } from '@stagewise/agent-utils';
 import { hasUndoMetadata, hasDiffMetadata } from '@stagewise/agent-types';
 import {
@@ -882,83 +884,7 @@ export class AgentService {
         },
         messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
         onError: async (error) => {
-          if (isAbortError(error.error)) {
-            this.authRetryCount = 0;
-            this.cleanupPendingOperations('Agent call aborted');
-          } else if (isPlanLimitsExceededError(error.error)) {
-            const planLimitsExceededError = isPlanLimitsExceededError(
-              error.error,
-            ) as PlanLimitsExceededError;
-            this.authRetryCount = 0;
-
-            this.telemetryService.capture('agent-plan-limits-exceeded', {
-              hasSubscription:
-                this.kartonService.state.userAccount?.subscription?.active,
-              isPaidPlan: planLimitsExceededError.data.isPaidPlan || false,
-              cooldownMinutes: planLimitsExceededError.data.cooldownMinutes,
-            });
-
-            this.kartonService.setState((draft) => {
-              const chat = draft.workspace?.agentChat?.chats[chatId];
-              if (chat) {
-                chat.error = {
-                  type: AgentErrorType.PLAN_LIMITS_EXCEEDED,
-                  error: {
-                    name: 'Plan limit exceeded',
-                    message: `Plan limit exceeded, please wait ${planLimitsExceededError.data.cooldownMinutes} minutes before your next request.`,
-                    isPaidPlan:
-                      planLimitsExceededError.data.isPaidPlan || false,
-                    cooldownMinutes:
-                      planLimitsExceededError.data.cooldownMinutes,
-                  },
-                };
-              }
-            });
-
-            this.cleanupPendingOperations('Plan limits exceeded');
-            return;
-          } else if (isAuthenticationError(error.error)) {
-            this.logger.log(
-              'error',
-              `[Agent Service Authentication]: Error, ${error.error}`,
-            );
-            if (this.authRetryCount < this.maxAuthRetries) {
-              this.authRetryCount++;
-
-              // Auth service will handle token refresh internally
-              // We just need to reinitialize our client and litellm
-              await this.initializeClient();
-              await this.initializeLitellm();
-
-              const messages =
-                this.kartonService.state.workspace?.agentChat?.chats[chatId]
-                  ?.messages;
-              await this.callAgent({
-                chatId,
-                history: messages,
-                clientRuntime,
-                promptSnippets,
-              });
-              return;
-            } else {
-              this.authRetryCount = 0;
-              this.setAgentWorking(false);
-              this.kartonService.setState((draft) => {
-                const chat = draft.workspace?.agentChat?.chats[chatId];
-                if (chat) {
-                  chat.error = {
-                    type: AgentErrorType.AGENT_ERROR,
-                    error: new Error(
-                      'Authentication failed, please restart the cli.',
-                    ),
-                  };
-                }
-              });
-              return;
-            }
-          } else {
-            throw error.error;
-          }
+          await this.handleStreamingError(error, chatId, promptSnippets);
         },
         // Get the tools based on the agent mode
         tools: toolsWithoutExecute(this.getTools()),
@@ -1224,5 +1150,118 @@ export class AgentService {
 
   public getInspirationComponents() {
     return this.kartonService.state.workspace?.inspirationComponents ?? [];
+  }
+
+  private async handleStreamingError(
+    error: { error: unknown },
+    chatId: string,
+    promptSnippets?: PromptSnippet[],
+  ) {
+    if (isAbortError(error.error)) {
+      this.authRetryCount = 0;
+      this.cleanupPendingOperations('Agent call aborted');
+    } else if (isPlanLimitsExceededError(error.error)) {
+      const planLimitsExceededError = isPlanLimitsExceededError(
+        error.error,
+      ) as PlanLimitsExceededError;
+      this.authRetryCount = 0;
+
+      this.telemetryService.capture('agent-plan-limits-exceeded', {
+        hasSubscription:
+          this.kartonService.state.userAccount?.subscription?.active,
+        isPaidPlan: planLimitsExceededError.data.isPaidPlan || false,
+        cooldownMinutes: planLimitsExceededError.data.cooldownMinutes,
+      });
+
+      this.kartonService.setState((draft) => {
+        const chat = draft.workspace?.agentChat?.chats[chatId];
+        if (chat) {
+          chat.error = {
+            type: AgentErrorType.PLAN_LIMITS_EXCEEDED,
+            error: {
+              name: 'Plan limit exceeded',
+              message: `Plan limit exceeded, please wait ${planLimitsExceededError.data.cooldownMinutes} minutes before your next request.`,
+              isPaidPlan: planLimitsExceededError.data.isPaidPlan || false,
+              cooldownMinutes: planLimitsExceededError.data.cooldownMinutes,
+            },
+          };
+        }
+      });
+
+      this.cleanupPendingOperations('Plan limits exceeded');
+      return;
+    } else if (
+      isAuthenticationError(error.error) &&
+      this.authRetryCount < this.maxAuthRetries
+    ) {
+      this.logger.log(
+        'error',
+        `[Agent Service Authentication]: Error, ${error.error}`,
+      );
+      this.authRetryCount++;
+
+      // Auth service will handle token refresh internally
+      // We just need to reinitialize our client and litellm
+      await this.initializeClient();
+      await this.initializeLitellm();
+
+      const messages =
+        this.kartonService.state.workspace?.agentChat?.chats[chatId]?.messages;
+      await this.callAgent({
+        chatId,
+        history: messages,
+        clientRuntime: this.clientRuntime,
+        promptSnippets,
+      });
+      return;
+    } else if (
+      isAuthenticationError(error.error) &&
+      this.authRetryCount >= this.maxAuthRetries
+    ) {
+      this.authRetryCount = 0;
+      this.setAgentWorking(false);
+      this.kartonService.setState((draft) => {
+        const chat = draft.workspace?.agentChat?.chats[chatId];
+        if (chat) {
+          chat.error = {
+            type: AgentErrorType.AGENT_ERROR,
+            error: new Error('Authentication failed, please restart the cli.'),
+          };
+        }
+      });
+      return;
+    } else if (isContextLimitError(error.error)) {
+      this.kartonService.setState((draft) => {
+        const chat = draft.workspace?.agentChat?.chats[chatId];
+        if (chat)
+          chat.error = {
+            type: AgentErrorType.CONTEXT_LIMIT_EXCEEDED,
+            error: {
+              name: 'Context limit exceeded',
+              message:
+                'This chat exceeds the context limit. Please start a new chat.',
+            },
+          };
+      });
+      this.cleanupPendingOperations('Context limit exceeded');
+      return;
+    } else {
+      const errorDetails = extractDetailsFromError(error.error);
+      this.logger.error(
+        `[Agent Service] Agent failed with error ${errorDetails?.message}`,
+      );
+      this.telemetryService.captureException(error.error as Error);
+      const errorDesc = formatErrorDescription('Agent failed', errorDetails);
+      this.setAgentWorking(false);
+      this.kartonService.setState((draft) => {
+        const chat = draft.workspace?.agentChat?.chats[chatId];
+        if (chat) {
+          chat.error = {
+            type: AgentErrorType.AGENT_ERROR,
+            error: new Error(errorDesc),
+          };
+        }
+      });
+    }
   }
 }

@@ -26,9 +26,8 @@ export function extractDetailsFromError(error: unknown): ErrorDetails | null {
         const parsedMessage = JSON.parse(parsed.error.message);
         return parsedMessage;
       }
-    } catch {
+    } catch (_e) {
       return null;
-      // If JSON parsing fails, return null
     }
   }
 

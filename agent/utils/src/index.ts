@@ -1,4 +1,5 @@
 export * from './utils/time-out-manager.js';
+export * from './utils/is-context-limit-error.js';
 export * from './utils/extract-details-from-error.js';
 export * from './utils/error-utils.js';
 export * from './utils/generate-chat-title.js';

@@ -65,6 +65,8 @@ export function ChatErrorBubble({ error }: { error: AgentError }) {
         return subscription?.active
           ? paidPlanLimitExceededMessage(error.error.cooldownMinutes)
           : freeTrialPlanLimitExceededMessage(error.error.cooldownMinutes);
+      case AgentErrorType.CONTEXT_LIMIT_EXCEEDED:
+        return 'This chat exceeds the context limit. Please start a new chat.';
       default:
         return error.error.message;
     }
