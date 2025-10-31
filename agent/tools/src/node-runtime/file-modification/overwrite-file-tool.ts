@@ -27,23 +27,6 @@ export async function overwriteFileToolExecute(
 ) {
   const { path: relPath, content } = params;
 
-  // Validate required parameters
-  if (!relPath) {
-    return {
-      success: false,
-      message: 'Missing required parameter: path',
-      error: 'MISSING_PATH',
-    };
-  }
-
-  if (content === undefined) {
-    return {
-      success: false,
-      message: 'Missing required parameter: content',
-      error: 'MISSING_CONTENT',
-    };
-  }
-
   try {
     const absolutePath = clientRuntime.fileSystem.resolvePath(relPath);
 
@@ -54,13 +37,11 @@ export async function overwriteFileToolExecute(
 
     if (fileExists) {
       const readResult = await clientRuntime.fileSystem.readFile(absolutePath);
-      if (!readResult.success || readResult.content === undefined) {
-        return {
-          success: false,
-          message: `Failed to read existing file: ${relPath}`,
-          error: 'READ_ERROR',
-        };
-      }
+      if (!readResult.success || readResult.content === undefined)
+        throw new Error(
+          `Failed to read existing file: ${relPath} - ${readResult.message} - ${readResult.error || ''}`,
+        );
+
       originalContent = readResult.content;
       beforePrepared = await prepareDiffContent(
         originalContent,
@@ -97,13 +78,10 @@ export async function overwriteFileToolExecute(
       absolutePath,
       cleanContent,
     );
-    if (!writeResult.success) {
-      return {
-        success: false,
-        message: `Failed to write file: ${relPath}`,
-        error: writeResult.error || 'WRITE_ERROR',
-      };
-    }
+    if (!writeResult.success)
+      throw new Error(
+        `Failed to write file: ${relPath} - ${writeResult.message} - ${writeResult.error || ''}`,
+      );
 
     // Create the undo function
     const undoExecute = async (): Promise<void> => {
@@ -116,7 +94,7 @@ export async function overwriteFileToolExecute(
 
         if (!restoreResult.success) {
           throw new Error(
-            `Failed to restore original content for file: ${relPath}`,
+            `Failed to restore original content for file: ${relPath} - ${restoreResult.message} - ${restoreResult.error || ''}`,
           );
         }
       } else {
@@ -124,9 +102,10 @@ export async function overwriteFileToolExecute(
         const deleteResult =
           await clientRuntime.fileSystem.deleteFile(absolutePath);
 
-        if (!deleteResult.success) {
-          throw new Error(`Failed to delete newly created file: ${relPath}`);
-        }
+        if (!deleteResult.success)
+          throw new Error(
+            `Failed to delete newly created file: ${relPath} - ${deleteResult.message} - ${deleteResult.error || ''}`,
+          );
       }
     };
 
@@ -209,7 +188,6 @@ export async function overwriteFileToolExecute(
     }
 
     return {
-      success: true,
       message,
       hiddenMetadata: {
         undoExecute,
@@ -217,11 +195,8 @@ export async function overwriteFileToolExecute(
       },
     };
   } catch (error) {
-    return {
-      success: false,
-      message: `Failed to overwrite file: ${relPath}`,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    if (error instanceof Error) throw error;
+    else throw new Error(`Unknown Error`);
   }
 }
 

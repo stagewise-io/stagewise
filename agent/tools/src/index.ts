@@ -70,14 +70,11 @@ export {
 // Accepts boolean for success (widened from literals) but validates the structure
 // This preserves the specific return type while ensuring compatibility
 export function validateToolOutput<
-  TOutput extends
-    | {
-        success: boolean;
-        message: string;
-        result?: any;
-        hiddenMetadata?: { diff?: FileDiff; undoExecute?: () => Promise<void> };
-      }
-    | { success: boolean; message: string; error: string },
+  TOutput extends {
+    message: string;
+    result?: any;
+    hiddenMetadata?: { diff?: FileDiff; undoExecute?: () => Promise<void> };
+  },
 >(output: TOutput): TOutput {
   return output;
 }

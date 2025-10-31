@@ -45,40 +45,20 @@ export async function readFileToolExecute(
 ) {
   const { target_file, start_line, end_line } = params;
 
-  // Validate required parameters
-  if (!target_file) {
-    return {
-      success: false,
-      message: 'Missing required parameter: target_file',
-      error: 'MISSING_TARGET_FILE',
-    };
-  }
-
   // Validate line range when not reading entire file
   if (
     start_line !== undefined &&
     end_line !== undefined &&
     start_line > end_line
-  ) {
-    return {
-      success: false,
-      message: 'end_line must be equal or larger than start_line',
-      error: 'INVALID_LINE_NUMBERS',
-    };
-  }
+  )
+    throw new Error(`end_line must be equal or larger than start_line`);
 
   try {
     const absolutePath = clientRuntime.fileSystem.resolvePath(target_file);
 
     // Check if file exists
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
-    if (!fileExists) {
-      return {
-        success: false,
-        message: `File does not exist: ${target_file}`,
-        error: 'FILE_NOT_FOUND',
-      };
-    }
+    if (!fileExists) throw new Error(`File does not exist: ${target_file}`);
 
     // Check file size before reading (only when reading entire file)
     if (start_line === undefined && end_line === undefined) {
@@ -88,14 +68,10 @@ export async function readFileToolExecute(
         FILE_SIZE_LIMITS.DEFAULT_MAX_FILE_SIZE,
       );
 
-      if (!sizeCheck.isWithinLimit) {
-        return {
-          success: false,
-          message:
-            sizeCheck.error || `File is too large to read: ${target_file}`,
-          error: 'FILE_TOO_LARGE',
-        };
-      }
+      if (!sizeCheck.isWithinLimit)
+        throw new Error(
+          `File is too large to read: ${target_file} - ${sizeCheck.error || ''}`,
+        );
     }
 
     // Read the file
@@ -109,13 +85,10 @@ export async function readFileToolExecute(
       readOptions,
     );
 
-    if (!readResult.success) {
-      return {
-        success: false,
-        message: `Failed to read file: ${target_file}`,
-        error: readResult.error || 'READ_ERROR',
-      };
-    }
+    if (!readResult.success)
+      throw new Error(
+        `Failed to read file: ${target_file} - ${readResult.message} - ${readResult.error || ''}`,
+      );
 
     const content = readResult.content;
     const totalLines = readResult.totalLines || content?.split('\n').length;
@@ -132,11 +105,8 @@ export async function readFileToolExecute(
       },
     };
   } catch (error) {
-    return {
-      success: false,
-      message: `Failed to read file: ${target_file}`,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    if (error instanceof Error) throw error;
+    else throw new Error(`Unknown Error`);
   }
 }
 

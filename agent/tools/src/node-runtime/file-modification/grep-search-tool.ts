@@ -35,14 +35,6 @@ export const grepSearchParamsSchema = z.object({
 
 export type GrepSearchParams = z.infer<typeof grepSearchParamsSchema>;
 
-const _grepMatchSchema = z.object({
-  path: z.string(),
-  line: z.number(),
-  column: z.number(),
-  match: z.string(),
-  preview: z.string(),
-});
-
 /**
  * Grep search tool for fast regex searches across files
  * - Uses the file system's grep functionality for efficient searching
@@ -60,25 +52,8 @@ export async function grepSearchToolExecute(
     include_file_pattern,
     exclude_file_pattern,
     max_matches = GREP_LIMITS.DEFAULT_MAX_MATCHES,
-    explanation,
+    explanation: _explanation,
   } = params;
-
-  // Validate required parameters
-  if (!query) {
-    return {
-      success: false,
-      message: 'Missing required parameter: query',
-      error: 'MISSING_QUERY',
-    };
-  }
-
-  if (!explanation) {
-    return {
-      success: false,
-      message: 'Missing required parameter: explanation',
-      error: 'MISSING_EXPLANATION',
-    };
-  }
 
   try {
     // Build exclude patterns array if exclude_file_pattern is provided
@@ -101,37 +76,29 @@ export async function grepSearchToolExecute(
       },
     );
 
-    if (!grepResult.success) {
-      return {
-        success: false,
-        message: `Grep search failed: ${grepResult.message}`,
-        error: grepResult.error || 'GREP_ERROR',
-      };
-    }
+    if (!grepResult.success)
+      throw new Error(
+        `Grep search failed: ${grepResult.message} - ${grepResult.error || ''}`,
+      );
 
     // Check if results were truncated
     const wasTruncated = grepResult.totalMatches === max_matches;
 
     // Format the success message
     let message = `Found ${grepResult.totalMatches || 0} matches`;
-    if (wasTruncated) {
+    if (wasTruncated)
       message = `Found ${max_matches}+ matches (showing first ${max_matches})`;
-    }
-    if (grepResult.filesSearched !== undefined) {
+
+    if (grepResult.filesSearched !== undefined)
       message += ` in ${grepResult.filesSearched} files`;
-    }
-    if (include_file_pattern) {
-      message += ` (included: ${include_file_pattern})`;
-    }
-    if (exclude_file_pattern) {
-      message += ` (excluded: ${exclude_file_pattern})`;
-    }
-    if (wasTruncated) {
-      message += GREP_LIMITS.TRUNCATION_MESSAGE;
-    }
+
+    if (include_file_pattern) message += ` (included: ${include_file_pattern})`;
+
+    if (exclude_file_pattern) message += ` (excluded: ${exclude_file_pattern})`;
+
+    if (wasTruncated) message += GREP_LIMITS.TRUNCATION_MESSAGE;
 
     return {
-      success: true,
       message,
       result: {
         matches: grepResult.matches,
@@ -141,11 +108,8 @@ export async function grepSearchToolExecute(
       },
     };
   } catch (error) {
-    return {
-      success: false,
-      message: `Grep search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    if (error instanceof Error) throw error;
+    else throw new Error(`Unknown Error`);
   }
 }
 

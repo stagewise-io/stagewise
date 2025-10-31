@@ -24,38 +24,20 @@ export async function deleteFileToolExecute(
 ) {
   const { path: relPath } = params;
 
-  // Validate required parameters
-  if (!relPath) {
-    return {
-      success: false,
-      message: 'Missing required parameter: path',
-      error: 'MISSING_PATH',
-    };
-  }
-
   try {
     const absolutePath = clientRuntime.fileSystem.resolvePath(relPath);
 
     // Check if file exists
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
-    if (!fileExists) {
-      return {
-        success: false,
-        message: `File not found: ${relPath}`,
-        error: 'FILE_NOT_FOUND',
-      };
-    }
+    if (!fileExists) throw new Error(`File not found: ${relPath}`);
 
     // Read the file content before deletion for undo capability
     const originalContent =
       await clientRuntime.fileSystem.readFile(absolutePath);
-    if (!originalContent.success || originalContent.content === undefined) {
-      return {
-        success: false,
-        message: `Failed to read file before deletion: ${relPath}`,
-        error: 'READ_ERROR',
-      };
-    }
+    if (!originalContent.success || originalContent.content === undefined)
+      throw new Error(
+        `Failed to read file before deletion: ${relPath} - ${originalContent.message} - ${originalContent.error || ''}`,
+      );
 
     // Store the original content for undo
     const fileContent = originalContent.content;
@@ -70,13 +52,10 @@ export async function deleteFileToolExecute(
     // Delete the file
     const deleteResult =
       await clientRuntime.fileSystem.deleteFile(absolutePath);
-    if (!deleteResult.success) {
-      return {
-        success: false,
-        message: `Failed to delete file: ${relPath}`,
-        error: deleteResult.error || 'DELETE_ERROR',
-      };
-    }
+    if (!deleteResult.success)
+      throw new Error(
+        `Failed to delete file: ${relPath} - ${deleteResult.message} - ${deleteResult.error || ''}`,
+      );
 
     // Create the undo function
     const undoExecute = async (): Promise<void> => {
@@ -90,9 +69,10 @@ export async function deleteFileToolExecute(
         fileContent,
       );
 
-      if (!restoreResult.success) {
-        throw new Error(`Failed to restore deleted file: ${relPath}`);
-      }
+      if (!restoreResult.success)
+        throw new Error(
+          `Failed to restore deleted file: ${relPath} - ${restoreResult.message} - ${restoreResult.error || ''}`,
+        );
     };
 
     // Create diff data based on discriminated union
@@ -114,19 +94,15 @@ export async function deleteFileToolExecute(
         };
 
     return {
-      success: true,
       message: `Successfully deleted file: ${relPath}`,
       hiddenMetadata: {
         undoExecute,
         diff,
       },
     };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Failed to delete file: ${relPath}`,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+  } catch (e) {
+    if (e instanceof Error) throw e;
+    else throw new Error('Unknown error');
   }
 }
 

@@ -38,69 +38,17 @@ export async function multiEditToolExecute(
 ) {
   const { file_path, edits } = params;
 
-  // Validate required parameters
-  if (!file_path) {
-    return {
-      success: false,
-      message: 'Missing required parameter: file_path',
-      error: 'MISSING_FILE_PATH',
-    };
-  }
-
-  if (!edits || edits.length === 0) {
-    return {
-      success: false,
-      message:
-        'Missing required parameter: edits (must contain at least one edit)',
-      error: 'MISSING_EDITS',
-    };
-  }
-
-  // Validate each edit
-  for (let i = 0; i < edits.length; i++) {
-    const edit = edits[i];
-    if (!edit) {
-      return {
-        success: false,
-        message: `Edit at index ${i} is undefined`,
-        error: 'INVALID_EDIT',
-      };
-    }
-    if (!edit.old_string) {
-      return {
-        success: false,
-        message: `Edit at index ${i} missing required field: old_string`,
-        error: 'INVALID_EDIT',
-      };
-    }
-    if (edit.new_string === undefined) {
-      return {
-        success: false,
-        message: `Edit at index ${i} missing required field: new_string`,
-        error: 'INVALID_EDIT',
-      };
-    }
-    if (edit.old_string === edit.new_string) {
-      return {
-        success: false,
-        message: `Edit at index ${i} has identical old_string and new_string`,
-        error: 'INVALID_EDIT',
-      };
-    }
-  }
+  if (edits.length === 0)
+    throw new Error(
+      `Missing required parameter: edits (must contain at least one edit)`,
+    );
 
   try {
     const absolutePath = clientRuntime.fileSystem.resolvePath(file_path);
 
     // Check if file exists
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
-    if (!fileExists) {
-      return {
-        success: false,
-        message: `File does not exist: ${file_path}`,
-        error: 'FILE_NOT_FOUND',
-      };
-    }
+    if (!fileExists) throw new Error(`File does not exist: ${file_path}`);
 
     // Check file size before reading
     const sizeCheck = await checkFileSize(
@@ -109,23 +57,17 @@ export async function multiEditToolExecute(
       FILE_SIZE_LIMITS.EDIT_MAX_FILE_SIZE,
     );
 
-    if (!sizeCheck.isWithinLimit) {
-      return {
-        success: false,
-        message: sizeCheck.error || `File is too large to edit: ${file_path}`,
-        error: 'FILE_TOO_LARGE',
-      };
-    }
+    if (!sizeCheck.isWithinLimit)
+      throw new Error(
+        `File is too large to edit: ${file_path} - ${sizeCheck.error || ''}`,
+      );
 
     // Read the current file content
     const readResult = await clientRuntime.fileSystem.readFile(absolutePath);
-    if (!readResult.success || !readResult.content) {
-      return {
-        success: false,
-        message: `Failed to read file: ${file_path}`,
-        error: readResult.error || 'READ_ERROR',
-      };
-    }
+    if (!readResult.success || !readResult.content)
+      throw new Error(
+        `Failed to read file before edit: ${file_path} - ${readResult.message} - ${readResult.error || ''}`,
+      );
 
     // Store the original content for undo capability
     const originalContent = readResult.content;
@@ -143,9 +85,7 @@ export async function multiEditToolExecute(
       // Count occurrences before replacement
       const occurrences = content.split(old_string).length - 1;
 
-      if (occurrences === 0) {
-        continue;
-      }
+      if (occurrences === 0) continue;
 
       // Apply the replacement
       if (replace_all) {
@@ -166,112 +106,104 @@ export async function multiEditToolExecute(
     }
 
     // Write the modified content back to the file
-    if (totalEditsApplied > 0) {
-      const writeResult = await clientRuntime.fileSystem.writeFile(
-        absolutePath,
-        content,
-      );
-      if (!writeResult.success) {
-        return {
-          success: false,
-          message: `Failed to write file: ${file_path}`,
-          error: writeResult.error || 'WRITE_ERROR',
-        };
-      }
-
-      // Create the undo function to restore the original content
-      const undoExecute = async (): Promise<void> => {
-        const restoreResult = await clientRuntime.fileSystem.writeFile(
-          absolutePath,
-          originalContent,
-        );
-
-        if (!restoreResult.success) {
-          throw new Error(
-            `Failed to restore original content for file: ${file_path}`,
-          );
-        }
-      };
-
-      // Prepare content for diff (check for binary/large files)
-      const beforePrepared = await prepareDiffContent(
-        originalContent,
-        absolutePath,
-        clientRuntime,
-      );
-      const afterPrepared = await prepareDiffContent(
-        content,
-        absolutePath,
-        clientRuntime,
-      );
-
-      // Create diff data based on discriminated union
-      const baseModifyDiff = {
-        path: file_path,
-        changeType: 'modify' as const,
-        beforeTruncated: beforePrepared.truncated,
-        afterTruncated: afterPrepared.truncated,
-        beforeContentSize: beforePrepared.contentSize,
-        afterContentSize: afterPrepared.contentSize,
-      };
-
-      let diff: FileModifyDiff;
-      if (!beforePrepared.omitted && !afterPrepared.omitted) {
-        diff = {
-          ...baseModifyDiff,
-          before: beforePrepared.content!,
-          after: afterPrepared.content!,
-          beforeOmitted: false,
-          afterOmitted: false,
-        };
-      } else if (!beforePrepared.omitted && afterPrepared.omitted) {
-        diff = {
-          ...baseModifyDiff,
-          before: beforePrepared.content!,
-          beforeOmitted: false,
-          afterOmitted: true,
-        };
-      } else if (beforePrepared.omitted && !afterPrepared.omitted) {
-        diff = {
-          ...baseModifyDiff,
-          after: afterPrepared.content!,
-          beforeOmitted: true,
-          afterOmitted: false,
-        };
-      } else {
-        diff = {
-          ...baseModifyDiff,
-          beforeOmitted: true,
-          afterOmitted: true,
-        };
-      }
-
-      const result = {
-        success: true as const,
-        message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,
-        result: { editsApplied: totalEditsApplied },
+    if (totalEditsApplied === 0)
+      return {
+        message: `Applied 0 edits to ${file_path}.`,
+        result: {
+          editsApplied: totalEditsApplied,
+        },
         hiddenMetadata: {
-          undoExecute,
-          diff,
+          undoExecute: async () => {},
+          diff: undefined,
         },
       };
 
-      return result;
+    const writeResult = await clientRuntime.fileSystem.writeFile(
+      absolutePath,
+      content,
+    );
+    if (!writeResult.success)
+      throw new Error(
+        `Failed to write file: ${file_path} - ${writeResult.message} - ${writeResult.error || ''}`,
+      );
+
+    // Create the undo function to restore the original content
+    const undoExecute = async (): Promise<void> => {
+      const restoreResult = await clientRuntime.fileSystem.writeFile(
+        absolutePath,
+        originalContent,
+      );
+
+      if (!restoreResult.success)
+        throw new Error(
+          `Failed to restore original content for file: ${file_path} - ${restoreResult.message} - ${restoreResult.error || ''}`,
+        );
+    };
+
+    // Prepare content for diff (check for binary/large files)
+    const beforePrepared = await prepareDiffContent(
+      originalContent,
+      absolutePath,
+      clientRuntime,
+    );
+    const afterPrepared = await prepareDiffContent(
+      content,
+      absolutePath,
+      clientRuntime,
+    );
+
+    // Create diff data based on discriminated union
+    const baseModifyDiff = {
+      path: file_path,
+      changeType: 'modify' as const,
+      beforeTruncated: beforePrepared.truncated,
+      afterTruncated: afterPrepared.truncated,
+      beforeContentSize: beforePrepared.contentSize,
+      afterContentSize: afterPrepared.contentSize,
+    };
+
+    let diff: FileModifyDiff;
+    if (!beforePrepared.omitted && !afterPrepared.omitted) {
+      diff = {
+        ...baseModifyDiff,
+        before: beforePrepared.content!,
+        after: afterPrepared.content!,
+        beforeOmitted: false,
+        afterOmitted: false,
+      };
+    } else if (!beforePrepared.omitted && afterPrepared.omitted) {
+      diff = {
+        ...baseModifyDiff,
+        before: beforePrepared.content!,
+        beforeOmitted: false,
+        afterOmitted: true,
+      };
+    } else if (beforePrepared.omitted && !afterPrepared.omitted) {
+      diff = {
+        ...baseModifyDiff,
+        after: afterPrepared.content!,
+        beforeOmitted: true,
+        afterOmitted: false,
+      };
+    } else {
+      diff = {
+        ...baseModifyDiff,
+        beforeOmitted: true,
+        afterOmitted: true,
+      };
     }
 
     return {
-      success: true,
       message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,
-      result: {
-        editsApplied: totalEditsApplied,
+      result: { editsApplied: totalEditsApplied },
+      hiddenMetadata: {
+        undoExecute,
+        diff,
       },
     };
   } catch (error) {
-    return {
-      success: false,
-      message: `MultiEdit failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    if (error instanceof Error) throw error;
+    else throw new Error('Unknown Error');
   }
 }
 

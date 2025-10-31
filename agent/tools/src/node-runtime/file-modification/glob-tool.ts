@@ -25,15 +25,6 @@ export async function globToolExecute(
 ) {
   const { pattern, path } = params;
 
-  // Validate required parameters
-  if (!pattern) {
-    return {
-      success: false,
-      message: 'Missing required parameter: pattern',
-      error: 'MISSING_PATTERN',
-    };
-  }
-
   try {
     // Use the provided path as the search directory, or fall back to cwd
     const searchPath = path || undefined;
@@ -46,20 +37,16 @@ export async function globToolExecute(
       respectGitignore: true, // Respect .gitignore by default
     });
 
-    if (!globResult.success) {
-      return {
-        success: false,
-        message: `Glob search failed: ${globResult.message}`,
-        error: globResult.error || 'GLOB_ERROR',
-      };
-    }
+    if (!globResult.success)
+      throw new Error(
+        `Glob search failed: ${globResult.error}: ${globResult.message} - ${globResult.error || ''}`,
+      );
 
     // Format the success message
     const searchLocation = path ? ` in "${path}"` : ' in current directory';
     const message = `Found ${globResult.totalMatches || 0} matches for pattern "${pattern}"${searchLocation}`;
 
     return {
-      success: true,
       message,
       result: {
         relativePaths: globResult.relativePaths,
@@ -67,11 +54,8 @@ export async function globToolExecute(
       },
     };
   } catch (error) {
-    return {
-      success: false,
-      message: `Glob search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    if (error instanceof Error) throw error;
+    else throw new Error('Unknown Error');
   }
 }
 

@@ -9,7 +9,7 @@ export const DESCRIPTION =
 export const listFilesParamsSchema = z.object({
   path: z.string().optional(),
   recursive: z.boolean().optional(), // Whether to list files recursively
-  maxDepth: z.number().optional(), // Maximum recursion depth (default: unlimited)
+  maxDepth: z.number().min(0).optional(), // Maximum recursion depth (default: unlimited)
   pattern: z.string().optional(), // File extension (e.g., ".ts") or glob-like pattern
   includeDirectories: z.boolean().optional(), // Whether to include directories in results (default: true)
   includeFiles: z.boolean().optional(), // Whether to include files in results (default: true)
@@ -37,48 +37,22 @@ export async function listFilesToolExecute(
     includeFiles = true,
   } = params;
 
-  // Validate optional parameters
-  if (maxDepth !== undefined) {
-    if (!Number.isInteger(maxDepth) || maxDepth < 0) {
-      return {
-        success: false,
-        message: 'maxDepth must be a non-negative integer',
-        error: 'INVALID_MAX_DEPTH',
-      };
-    }
-  }
-
-  if (!includeFiles && !includeDirectories) {
-    return {
-      success: false,
-      message:
-        'At least one of includeFiles or includeDirectories must be true',
-      error: 'INVALID_INCLUDE_OPTIONS',
-    };
-  }
+  if (!includeFiles && !includeDirectories)
+    throw new Error(
+      `At least one of includeFiles or includeDirectories must be true`,
+    );
 
   try {
     const absolutePath = clientRuntime.fileSystem.resolvePath(relPath);
 
     // Check if path exists and is accessible
     const pathExists = await clientRuntime.fileSystem.fileExists(absolutePath);
-    if (!pathExists) {
-      return {
-        success: false,
-        message: `Path does not exist or is not accessible: ${relPath}`,
-        error: 'PATH_NOT_FOUND',
-      };
-    }
+    if (!pathExists)
+      throw new Error(`Path does not exist or is not accessible: ${relPath}`);
 
     // Check if path is a directory
     const isDir = await clientRuntime.fileSystem.isDirectory(absolutePath);
-    if (!isDir) {
-      return {
-        success: false,
-        message: `Path is not a directory: ${relPath}`,
-        error: 'NOT_A_DIRECTORY',
-      };
-    }
+    if (!isDir) throw new Error(`Path is not a directory: ${relPath}`);
 
     // Use the ClientRuntime's listDirectory function which already implements most of our needs
     const result = await clientRuntime.fileSystem.listDirectory(absolutePath, {
@@ -90,13 +64,10 @@ export async function listFilesToolExecute(
       respectGitignore: true, // Respect .gitignore by default
     });
 
-    if (!result.success) {
-      return {
-        success: false,
-        message: `Failed to list files in: ${relPath}`,
-        error: result.error || 'UNKNOWN_ERROR',
-      };
-    }
+    if (!result.success)
+      throw new Error(
+        `Failed to list files in: ${relPath} - ${result.message} - ${result.error || ''}`,
+      );
 
     // Build success message
     let message = `Successfully listed ${result.files?.length || 0} items in: ${relPath}`;
@@ -109,7 +80,6 @@ export async function listFilesToolExecute(
     message += ` - ${result.totalFiles || 0} files, ${result.totalDirectories || 0} directories`;
 
     return {
-      success: true,
       message,
       result: {
         files: result.files,
@@ -118,11 +88,8 @@ export async function listFilesToolExecute(
       },
     };
   } catch (error) {
-    return {
-      success: false,
-      message: `Failed to list files in: ${relPath}`,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    if (error instanceof Error) throw error;
+    else throw new Error(`Unknown Error`);
   }
 }
 

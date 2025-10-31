@@ -185,16 +185,12 @@ export async function generateComponentToolExecute(
       reactCode: result.text,
     });
     return {
-      success: true,
       message: 'Component generated successfully',
       result: result.text,
     };
   } catch (error) {
-    return {
-      success: false,
-      message: 'Failed to generate component',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    if (error instanceof Error) throw error;
+    else throw new Error(`Unknown Error`);
   }
 }
 

@@ -111,7 +111,6 @@ export const uiDebugMessage: ChatMessage = {
         path: 'dummy-path.txt',
       },
       output: {
-        success: true,
         message: 'File deleted successfully.',
         hiddenMetadata: {
           undoExecute: () => Promise.resolve(),
@@ -153,7 +152,6 @@ export const uiDebugMessage: ChatMessage = {
         path: 'dummy-path.txt',
       },
       output: {
-        success: true,
         message: 'File globbed successfully.',
         result: {
           relativePaths: ['dummy-path.txt'],
@@ -191,7 +189,6 @@ export const uiDebugMessage: ChatMessage = {
         explanation: 'This is a dummy tool explanation.',
       },
       output: {
-        success: true,
         message: 'File grepped successfully.',
         result: {
           matches: [
@@ -246,7 +243,6 @@ export const uiDebugMessage: ChatMessage = {
         includeFiles: true,
       },
       output: {
-        success: true,
         message: 'Files listed successfully.',
         result: {
           files: [
@@ -327,7 +323,6 @@ export const uiDebugMessage: ChatMessage = {
         ],
       },
       output: {
-        success: true,
         message: 'File multi-edited successfully.',
         result: {
           editsApplied: 1,
