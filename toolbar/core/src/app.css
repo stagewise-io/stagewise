@@ -2,6 +2,7 @@
 @import "../node_modules/@stagewise/stage-ui/src/style.css";
 
 @source "../node_modules/@stagewise/stage-ui";
+@source "../node_modules/streamdown/dist/index.js";
 
 @plugin 'tailwind-scrollbar';
 
@@ -176,6 +177,7 @@ body {
   --animate-chat-bubble-appear: chat-bubble-appear 300ms var(--ease-spring-soft);
   --animate-spin-slow: spin 1500ms linear infinite;
   --animate-spin-fast: spin 500ms linear infinite;
+  --animate-thinking-part-brain-pulse: thinking-part-brain-pulse 750ms linear infinite alternate;
 
   @keyframes chat-bubble-appear {
     0% {
@@ -200,4 +202,16 @@ body {
       transform: rotate(360deg);
     }
   }
+
+  @keyframes thinking-part-brain-pulse {
+    0% {
+      stroke-width: 2.5px;
+      color: var(--color-zinc-700);
+    }
+    100% {
+      stroke-width: 1.5px;
+      color: var(--color-zinc-400);
+    }
+  }
+
 }

@@ -230,7 +230,7 @@ export function ChatPanelFooter() {
   return (
     <footer className="z-10 flex flex-col items-stretch gap-1 p-0">
       <div
-        className="glass-body flex flex-row items-stretch gap-1 rounded-xl bg-background/20 p-2 before:absolute before:inset-0 before:rounded-xl data-[chat-active=true]:shadow-blue-600/20 data-[chat-active=true]:before:bg-blue-500/5"
+        className="glass-body glass-body-interactive flex flex-row items-stretch gap-1 rounded-xl bg-background/20 p-2 shadow shadow-black/5 before:absolute before:inset-0 before:rounded-xl data-[chat-active=true]:bg-primary/5 data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/10"
         id="chat-input-container-box"
         data-chat-active={chatInputActive}
       >
@@ -252,7 +252,7 @@ export function ChatPanelFooter() {
               disabled={!enableInputField}
               className={cn(
                 GlassyTextInputClassNames,
-                'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent z-10 h-28 w-full resize-none border-none bg-transparent px-2 py-1 text-foreground outline-none ring-0 transition-all duration-300 ease-out placeholder:text-muted-foreground focus:outline-none disabled:bg-transparent',
+                'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent z-10 h-28 w-full resize-none border-none bg-transparent px-2 py-1 text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out placeholder:text-muted-foreground focus:outline-none disabled:bg-transparent',
               )}
               placeholder={!showTextSlideshow ? 'Type a message...' : undefined}
             />

@@ -85,7 +85,8 @@
     "vite": "^7.1.9",
     "vite-plugin-css-injected-by-js": "^3.5.2",
     "vite-plugin-dts": "^4.5.4",
-    "zod": "3.25.76"
+    "zod": "3.25.76",
+    "streamdown": "^1.4.0"
   },
   "dependencies": {
     "@react-three/fiber": "^9.3.0",

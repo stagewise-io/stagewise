@@ -1,35 +1,19 @@
-import { cn, openFileUrl } from '@/utils';
+import { cn } from '@/utils';
 import type {
   ToolPart,
   ChatMessage,
   TextUIPart,
   FileUIPart,
-  DynamicToolUIPart,
   ReasoningUIPart,
   AgentError,
   UIMessagePart,
 } from '@stagewise/karton-contract';
 import { AgentErrorType } from '@stagewise/karton-contract';
-import { PaletteIcon, RefreshCcwIcon, Undo2 } from 'lucide-react';
-import {
-  BrainIcon,
-  CheckIcon,
-  ChevronRightIcon,
-  CogIcon,
-  EyeIcon,
-  FileIcon,
-  PencilIcon,
-  SearchIcon,
-  TrashIcon,
-  XIcon,
-} from 'lucide-react';
-import { memo, useMemo, useCallback, useState, useEffect } from 'react';
+import { RefreshCcwIcon, Undo2 } from 'lucide-react';
+import { useMemo, useCallback, useState, useEffect } from 'react';
 import TimeAgo from 'react-timeago';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { useChatState } from '@/hooks/use-chat-state';
-import ReactMarkdown from 'react-markdown';
-import { getToolDescription, isFileEditTool } from './chat-bubble-tool-diff';
-import { diffLines } from 'diff';
 import {
   Popover,
   PopoverTrigger,
@@ -41,15 +25,20 @@ import {
 } from '@stagewise/stage-ui/components/popover';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from '@stagewise/stage-ui/components/collapsible';
-import {
   isInteractionToolPart,
   InteractionToolPartItem,
   type InteractionToolPart,
 } from './user-interaction-tool-part';
+import { ThinkingPart } from './message-part-ui/thinking';
+import { FilePart } from './message-part-ui/file';
+import { TextPart } from './message-part-ui/text';
+import { DeleteFileToolPart } from './message-part-ui/tools/delete-file';
+import { GlobToolPart } from './message-part-ui/tools/glob';
+import { GrepSearchToolPart } from './message-part-ui/tools/grep-search';
+import { ListFilesToolPart } from './message-part-ui/tools/list-files';
+import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
+import { OverwriteFileToolPart } from './message-part-ui/tools/overwrite-file';
+import { ReadFileToolPart } from './message-part-ui/tools/read-file';
 
 function isToolPart(part: UIMessagePart): part is ToolPart {
   return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
@@ -193,59 +182,71 @@ export function ChatBubble({
               msg.role === 'assistant'
                 ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 pl-4 text-zinc-950 dark:bg-zinc-800/60 dark:text-zinc-50'
                 : 'origin-bottom-right rounded-br-xs bg-blue-600/90 pr-4 text-white',
+              msg.parts.length > 1 && 'w-full',
             )}
           >
             <div
               className={cn(
-                'group-hover/chat-bubble:-top-3 -top-2 absolute z-20 w-max rounded-full bg-white/90 px-1.5 py-0.5 text-xs text-zinc-950/80 opacity-0 shadow-sm ring-1 ring-zinc-500/10 ring-inset transition-all duration-150 ease-out group-hover/chat-bubble:opacity-100',
+                'group-hover/chat-bubble:-top-3 -top-2 absolute z-20 w-fit rounded-full bg-white/90 px-1.5 py-0.5 text-xs text-zinc-950/80 opacity-0 shadow-sm ring-1 ring-zinc-500/10 ring-inset transition-all duration-150 ease-out group-hover/chat-bubble:opacity-100',
                 msg.role === 'assistant' ? 'left-1' : 'right-1',
               )}
             >
               <TimeAgo date={msg.metadata?.createdAt ?? new Date()} />
             </div>
-            {msg.parts.map((part, index) => {
-              if (isToolPart(part) && isInteractionToolPart(part)) {
-                return (
-                  <InteractionToolPartItem
-                    key={`content_part_${index.toString()}`}
-                    toolPart={part as InteractionToolPart}
-                  />
-                );
-              } else if (isToolPart(part)) {
-                return (
-                  <ToolPartItem
-                    key={`content_part_${index.toString()}`}
-                    toolPart={part as ToolPart}
-                  />
-                );
-              }
-              switch (part.type) {
-                case 'text':
+            {(() => {
+              const typeCounters: Record<string, number> = {};
+              return msg.parts.map((part, index) => {
+                const currentTypeIndex = typeCounters[part.type] ?? 0;
+                typeCounters[part.type] = currentTypeIndex + 1;
+                const stableKey = `${msg.id}:${part.type}:${currentTypeIndex}`;
+
+                if (isToolPart(part) && isInteractionToolPart(part)) {
                   return (
-                    <TextPartItem
-                      key={`content_part_${index.toString()}`}
-                      textPart={part}
+                    <InteractionToolPartItem
+                      key={stableKey}
+                      toolPart={part as InteractionToolPart}
                     />
                   );
-                case 'reasoning':
-                  if (part.text.trim() === '') return null; // Sometimes, empty reasoning parts are returned
-                  return (
-                    <ReasoningPartItem
-                      key={`content_part_${index.toString()}`}
-                      reasoningPart={part}
-                    />
-                  );
-                case 'file':
-                  return (
-                    <FilePartItem
-                      key={`content_part_${index.toString()}`}
-                      filePart={part}
-                    />
-                  );
-                default:
-                  return null;
-              }
-            })}
+                }
+                switch (part.type) {
+                  case 'text':
+                    return (
+                      <TextPart key={stableKey} part={part as TextUIPart} />
+                    );
+                  case 'reasoning':
+                    if (part.text.trim() === '') return null; // Sometimes, empty reasoning parts are returned
+                    return (
+                      <ThinkingPart
+                        key={stableKey}
+                        part={part as ReasoningUIPart}
+                        isLastPart={index === msg.parts.length - 1}
+                      />
+                    );
+                  case 'file':
+                    return (
+                      <FilePart key={stableKey} part={part as FileUIPart} />
+                    );
+                  case 'tool-deleteFileTool':
+                    return <DeleteFileToolPart key={stableKey} part={part} />;
+                  case 'tool-globTool':
+                    return <GlobToolPart key={stableKey} part={part} />;
+                  case 'tool-grepSearchTool':
+                    return <GrepSearchToolPart key={stableKey} part={part} />;
+                  case 'tool-listFilesTool':
+                    return <ListFilesToolPart key={stableKey} part={part} />;
+                  case 'tool-multiEditTool':
+                    return <MultiEditToolPart key={stableKey} part={part} />;
+                  case 'tool-overwriteFileTool':
+                    return (
+                      <OverwriteFileToolPart key={stableKey} part={part} />
+                    );
+                  case 'tool-readFileTool':
+                    return <ReadFileToolPart key={stableKey} part={part} />;
+                  default:
+                    return null;
+                }
+              });
+            })()}
           </div>
           {msg.role === 'assistant' &&
             isLastMessage &&
@@ -282,7 +283,7 @@ export function ChatBubble({
                 aria-label="Restore checkpoint"
                 variant="secondary"
                 size="icon-sm"
-                className="shrink-0 opacity-0 blur-xs transition-all group-hover:scale-100 group-hover:opacity-100 group-hover:blur-none"
+                className="shrink-0 opacity-0 blur-xs transition-all group-hover/chat-bubble:scale-100 group-hover/chat-bubble:opacity-100 group-hover/chat-bubble:blur-none"
               >
                 <Undo2 className="size-4" />
               </Button>
@@ -327,348 +328,3 @@ export function ChatBubble({
     </div>
   );
 }
-
-const TextPartItem = memo(({ textPart }: { textPart: TextUIPart }) => {
-  return (
-    <div className="markdown">
-      <ReactMarkdown>{textPart.text}</ReactMarkdown>
-    </div>
-  );
-});
-
-const ReasoningPartItem = memo(
-  ({ reasoningPart }: { reasoningPart: ReasoningUIPart }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    return (
-      <div className="-mx-1 block min-w-32 rounded-xl border-border/20 bg-zinc-500/5 px-1">
-        <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-          <CollapsibleTrigger
-            size="condensed"
-            className="h-4 cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground active:bg-transparent"
-          >
-            <BrainIcon className="size-3" />
-            <span className="flex-1 text-start font-normal text-xs">
-              Thinking...
-            </span>
-            <ChevronRightIcon
-              className={cn(
-                'size-3 transition-transform duration-150',
-                isExpanded && 'rotate-90',
-              )}
-            />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="markdown pt-1.5 pb-0.5 pl-1 text-[0.8rem] opacity-80">
-            <ReactMarkdown>{reasoningPart.text}</ReactMarkdown>
-          </CollapsibleContent>
-        </Collapsible>
-      </div>
-    );
-  },
-);
-
-const FilePartItem = memo(({ filePart }: { filePart: FileUIPart }) => {
-  const isImage = filePart.mediaType.startsWith('image/');
-
-  return (
-    <div
-      role="button"
-      className="flex w-full cursor-pointer items-center gap-2 rounded-lg bg-black/5 p-2 hover:bg-black/10"
-      onClick={() => {
-        void openFileUrl(filePart.url, filePart.filename);
-      }}
-    >
-      {isImage ? (
-        <img
-          src={filePart.url}
-          alt={filePart.filename ?? 'Generated file'}
-          className="size-4 rounded object-cover"
-        />
-      ) : (
-        <FileIcon className="size-4" />
-      )}
-      <span className="text-xs">{filePart.filename ?? 'Generated file'}</span>
-    </div>
-  );
-});
-
-const DiffDisplay = memo(
-  ({ toolPart }: { toolPart: ToolPart | DynamicToolUIPart }) => {
-    if (
-      !isFileEditTool(toolPart) ||
-      !('hiddenMetadata' in toolPart.output) ||
-      !toolPart.output.hiddenMetadata?.diff
-    )
-      return null;
-
-    const { diff } = toolPart.output.hiddenMetadata;
-
-    // Handle different diff types
-    let beforeContent = '';
-    let afterContent = '';
-    let isOmitted = false;
-
-    if (diff.changeType === 'create') {
-      if ('omitted' in diff && diff.omitted) {
-        isOmitted = true;
-      } else if ('after' in diff) {
-        afterContent = diff.after;
-      }
-    } else if (diff.changeType === 'delete') {
-      if ('omitted' in diff && diff.omitted) {
-        isOmitted = true;
-      } else if ('before' in diff) {
-        beforeContent = diff.before;
-      }
-    } else if (diff.changeType === 'modify') {
-      if (diff.beforeOmitted && diff.afterOmitted) {
-        isOmitted = true;
-      } else {
-        if ('before' in diff && !diff.beforeOmitted) {
-          beforeContent = diff.before;
-        }
-        if ('after' in diff && !diff.afterOmitted) {
-          afterContent = diff.after;
-        }
-        if (diff.beforeOmitted || diff.afterOmitted) {
-          isOmitted = true;
-        }
-      }
-    }
-
-    // Don't show diff if content is omitted
-    if (isOmitted) {
-      return (
-        <div className="mt-2 rounded-lg bg-zinc-100/50 p-2 text-xs text-zinc-600">
-          <span className="italic">Diff content omitted (file too large)</span>
-        </div>
-      );
-    }
-
-    const changes = diffLines(beforeContent, afterContent);
-
-    // Process changes to show context lines
-    const processedChanges: Array<{
-      type: 'add' | 'remove' | 'context';
-      lines: string[];
-    }> = [];
-
-    changes.forEach((part, index) => {
-      const lines = (part.value || '').split('\n').filter((l, i, arr) => {
-        // Remove empty last line if it's the result of split
-        return !(i === arr.length - 1 && l === '');
-      });
-
-      if (part.added) {
-        processedChanges.push({ type: 'add', lines });
-      } else if (part.removed) {
-        processedChanges.push({ type: 'remove', lines });
-      } else {
-        // Context lines - show only 1 line before and after changes
-        if (lines.length > 0) {
-          const contextLines: string[] = [];
-
-          // If this is the first part or last part, show 1 line
-          if (index === 0 && lines.length > 0) {
-            contextLines.push(lines[lines.length - 1]!);
-          } else if (index === changes.length - 1 && lines.length > 0) {
-            contextLines.push(lines[0]!);
-          } else if (lines.length === 1) {
-            contextLines.push(lines[0]!);
-          } else if (lines.length > 1) {
-            // Show last line of context before and first line after
-            contextLines.push(lines[lines.length - 1]!);
-            if (index < changes.length - 1) {
-              contextLines.push(lines[0]!);
-            }
-          }
-
-          if (contextLines.length > 0) {
-            processedChanges.push({ type: 'context', lines: contextLines });
-          }
-        }
-      }
-    });
-
-    return (
-      <div className="mt-2 overflow-x-auto rounded-lg bg-zinc-900 font-mono text-xs">
-        <div className="min-w-fit">
-          {processedChanges.map((change, idx) => (
-            <div key={`${change.type}-${idx}-${change.lines.length}`}>
-              {change.lines.map((line, lineIdx) => (
-                <div
-                  key={`${change.type}-${idx}-${lineIdx}-${line.slice(0, 20)}`}
-                  className={cn(
-                    'whitespace-pre px-2 py-0.5',
-                    change.type === 'add' && 'bg-green-900/30 text-green-300',
-                    change.type === 'remove' && 'bg-red-900/30 text-red-300',
-                    change.type === 'context' && 'text-zinc-400',
-                  )}
-                >
-                  <span className="select-none opacity-50">
-                    {change.type === 'add'
-                      ? '+'
-                      : change.type === 'remove'
-                        ? '-'
-                        : ' '}
-                  </span>{' '}
-                  {line}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  },
-);
-
-const ToolPartItem = memo(({ toolPart }: { toolPart: ToolPart }) => {
-  const approveToolCall = useKartonProcedure(
-    (p) => p.agentChat.approveToolCall,
-  );
-  const rejectToolCall = useKartonProcedure((p) => p.agentChat.rejectToolCall);
-  const toolCallApprovalRequests = useKartonState(
-    (s) => s.workspace?.agentChat?.toolCallApprovalRequests ?? [],
-  );
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const requiresApproval = useMemo(
-    () =>
-      toolCallApprovalRequests.includes(toolPart.toolCallId) &&
-      (toolPart.state === 'output-available' ||
-        toolPart.state === 'output-error'),
-    [toolCallApprovalRequests, toolPart.toolCallId, toolPart.state],
-  );
-
-  const canShowDiff = useMemo(
-    () =>
-      isFileEditTool(toolPart) &&
-      toolPart.state === 'output-available' &&
-      'hiddenMetadata' in toolPart.output &&
-      toolPart.output.hiddenMetadata?.diff &&
-      (toolPart.output.hiddenMetadata.diff.changeType === 'modify' ||
-        toolPart.output.hiddenMetadata.diff.changeType === 'create' ||
-        toolPart.output.hiddenMetadata.diff.changeType === 'delete'),
-    [toolPart],
-  );
-
-  const handleContainerClick = useCallback(() => {
-    if (canShowDiff) {
-      setIsExpanded(!isExpanded);
-    }
-  }, [canShowDiff, isExpanded]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (canShowDiff && (e.key === 'Enter' || e.key === ' ')) {
-        e.preventDefault();
-        setIsExpanded(!isExpanded);
-      }
-    },
-    [canShowDiff, isExpanded],
-  );
-
-  const containerProps = {
-    className: cn(
-      '-mx-1 flex flex-col gap-2 rounded-xl bg-zinc-500/5 px-2 py-0.5',
-      canShowDiff && 'cursor-pointer',
-    ),
-    ...(canShowDiff && {
-      onClick: handleContainerClick,
-      onKeyDown: handleKeyDown,
-      role: 'button' as const,
-      tabIndex: 0,
-    }),
-  };
-
-  return (
-    <div {...containerProps}>
-      <div className="flex w-full flex-row items-center justify-between gap-2 stroke-black/60">
-        {getToolIcon(toolPart)}
-        <div className="flex flex-1 flex-col items-start gap-0">
-          {getToolDescription(toolPart)}
-          {toolPart.state === 'output-error' && (
-            <span className="text-rose-600 text-xs">{toolPart.errorText}</span>
-          )}
-          {requiresApproval && (
-            <span className="text-black/50 text-xs italic">
-              Waiting for approval
-            </span>
-          )}
-        </div>
-        {requiresApproval && (
-          <div className="flex flex-row items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-4 w-5"
-              onClick={(e) => {
-                e.stopPropagation();
-                rejectToolCall(toolPart.toolCallId);
-              }}
-            >
-              <XIcon className="size-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-4 w-5"
-              onClick={(e) => {
-                e.stopPropagation();
-                approveToolCall(toolPart.toolCallId);
-              }}
-            >
-              <CheckIcon className="size-4" />
-            </Button>
-          </div>
-        )}
-        {toolPart.state === 'output-available' && (
-          <>
-            <CheckIcon className="size-3 text-green-600" />
-            {canShowDiff && (
-              <ChevronRightIcon
-                className={cn(
-                  'size-3 text-zinc-600 transition-transform duration-150',
-                  isExpanded && 'rotate-90',
-                )}
-              />
-            )}
-          </>
-        )}
-        {toolPart.state === 'output-error' && (
-          <XIcon className="size-3 text-rose-600" />
-        )}
-        {(toolPart.state === 'input-streaming' ||
-          toolPart.state === 'input-available') &&
-          !requiresApproval && (
-            <CogIcon className="size-3 animate-spin text-blue-600" />
-          )}
-      </div>
-      {isExpanded && canShowDiff && <DiffDisplay toolPart={toolPart} />}
-    </div>
-  );
-});
-
-const getToolIcon = (toolPart: ToolPart | DynamicToolUIPart) => {
-  switch (toolPart.type) {
-    case 'tool-readFileTool':
-    case 'tool-listFilesTool':
-      return <EyeIcon className="size-3" />;
-    case 'tool-grepSearchTool':
-    case 'tool-globTool':
-      return <SearchIcon className="size-3" />;
-    case 'tool-generateComponentTool':
-      return <PaletteIcon className="size-3" />;
-    case 'tool-overwriteFileTool':
-    case 'tool-multiEditTool':
-      return <PencilIcon className="size-3" />;
-    case 'tool-deleteFileTool':
-      return <TrashIcon className="size-3" />;
-    case 'dynamic-tool':
-      return <CogIcon className="size-3" />;
-    default:
-      return <CogIcon className="size-3" />;
-  }
-};

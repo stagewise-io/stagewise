@@ -79,9 +79,12 @@ export const ChatHistory = () => {
 
   const renderedMessages = useMemo(() => {
     if (!activeChat?.messages) return [];
-    return activeChat.messages.filter((message) => {
-      return message.role === 'user' || message.role === 'assistant';
-    });
+
+    return (
+      activeChat?.messages.filter((message) => {
+        return message.role === 'user' || message.role === 'assistant';
+      }) ?? []
+    );
   }, [activeChat]);
 
   /* We're adding a bg color on hover because there's a brower bug
@@ -92,7 +95,7 @@ export const ChatHistory = () => {
     <section
       ref={ref}
       aria-label="Agent message display"
-      className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent -mr-3 pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain py-4 pt-16 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none"
+      className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent -mr-1.5 pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain py-4 pt-16 pb-4 pl-1.5 text-foreground text-sm focus-within:outline-none focus:outline-none"
       onScroll={handleScroll}
     >
       {renderedMessages.map((message, index) => {
@@ -109,7 +112,7 @@ export const ChatHistory = () => {
 
       <div
         className={cn(
-          'mt-4 flex h-0 w-full flex-row items-center justify-start gap-2 pl-1 text-xs text-zinc-500 opacity-0',
+          'mt-4 flex h-0 w-full flex-row items-center justify-start gap-2 pl-2 text-xs text-zinc-500 opacity-0',
           isWorking && 'h-auto opacity-100',
         )}
       >
