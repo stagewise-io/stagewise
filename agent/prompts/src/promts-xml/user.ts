@@ -1,4 +1,5 @@
 import type { UserMessagePromptConfig } from '../interface/index.js';
+import { browserMetadataToContextSnippet } from '../utils/browser-metadata.js';
 import { convertToModelMessages, type UserModelMessage } from 'ai';
 import { htmlElementToContextSnippet } from '../utils/html-elements.js';
 
@@ -39,38 +40,16 @@ export function getUserMessagePrompt(
     ? `<agent_mode>This message was sent in the ${config.userMessage?.metadata?.currentTab} mode.</agent_mode>`
     : null;
 
-  const codeContentSnippet: string[] = [];
-  config.userMessage.metadata?.selectedPreviewElements?.forEach(
-    async (element) => {
-      if (!element.codeMetadata) return;
+  const browserMetadataSnippet = config.userMessage?.metadata?.browserData
+    ? browserMetadataToContextSnippet(config.userMessage?.metadata?.browserData)
+    : null;
 
-      const _startLine = element.codeMetadata.startLine - 200;
-      const _endLine = element.codeMetadata.endLine + 200;
-      const startLine = Math.max(1, _startLine);
-      const endLine = Math.min(
-        element.codeMetadata.content?.split('\n').length || 0,
-        _endLine,
-      );
-
-      const codeContent = element.codeMetadata.content
-        ?.split('\n')
-        .slice(startLine - 1, endLine)
-        .join('\n');
-
-      const snippet = `
- <snippet>
- <description>A code snippet from the file ${element.codeMetadata.relativePath} between lines ${startLine} and ${endLine} (inclusive)</description>
- <content>${codeContent}</content>
-</snippet>`;
-      codeContentSnippet.push(snippet);
-    },
-  );
-
-  // const metadataSnippet =
-  //   config.userMessage?.metadata?.currentTab === MainTab.DEV_APP_PREVIEW &&
-  //   config.userMessage?.metadata?.browserData
-  //     ? browserMetadataToContextSnippet(config.tabData.browserData)
-  //     : null;
+  if (browserMetadataSnippet) {
+    content.push({
+      type: 'text',
+      text: browserMetadataSnippet,
+    });
+  }
 
   const selectedElementsSnippet =
     (config.userMessage.metadata?.selectedPreviewElements?.length || 0) > 0
@@ -78,13 +57,6 @@ export function getUserMessagePrompt(
           config.userMessage.metadata?.selectedPreviewElements ?? [],
         )
       : undefined;
-
-  // if (metadataSnippet) {
-  //   content.push({
-  //     type: 'text',
-  //     text: metadataSnippet,
-  //   });
-  // }
 
   if (tabMetadataSnippet) {
     content.push({
@@ -97,13 +69,6 @@ export function getUserMessagePrompt(
     content.push({
       type: 'text',
       text: selectedElementsSnippet,
-    });
-  }
-
-  if (codeContentSnippet.length > 0) {
-    content.push({
-      type: 'text',
-      text: codeContentSnippet.join('\n\n'),
     });
   }
 
