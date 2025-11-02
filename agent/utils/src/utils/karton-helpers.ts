@@ -62,19 +62,29 @@ export function attachToolOutputToMessage(
       (m) => m.id === messageId,
     );
     if (!message) return;
+
     for (const result of toolResults) {
       const part = message.parts.find(
         (p: any) => 'toolCallId' in p && p.toolCallId === result.toolCallId,
       );
       if (!part) continue;
+
       if (part.type !== 'dynamic-tool' && !part.type.startsWith('tool-'))
         continue;
 
       const toolPart = part as ToolUIPart;
 
-      toolPart.state = 'output-available';
+      if ('error' in result) {
+        toolPart.state = 'output-error';
+        toolPart.errorText = result.error.message;
+      } else if ('result' in result) {
+        toolPart.state = 'output-available';
+        toolPart.output = result.result;
+      } else if ('userInteractionrequired' in result) {
+        // Skip user interaction required results
+      }
+
       toolPart.input = toolPart.input ?? {};
-      toolPart.output = result;
     }
   });
 }

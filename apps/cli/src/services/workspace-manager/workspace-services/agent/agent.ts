@@ -785,9 +785,8 @@ export class AgentService {
     clientRuntime: ClientRuntime;
     promptSnippets?: PromptSnippet[];
   }): Promise<void> {
-    if (!this.undoToolCallStack.has(chatId)) {
+    if (!this.undoToolCallStack.has(chatId))
       this.undoToolCallStack.set(chatId, []);
-    }
 
     if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
       const errorDesc = ErrorDescriptions.recursionDepthExceeded(

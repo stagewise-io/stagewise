@@ -28,7 +28,7 @@ export type ToolCallProcessingResult<T extends StaticToolCall<AllTools>> =
 export async function processClientSideToolCall<
   T extends StaticToolCall<AllTools>,
 >(context: ToolCallContext<T>): Promise<ToolCallProcessingResult<T>> {
-  const { tool, toolCall } = context;
+  const { tool, toolCall, onToolCallComplete } = context;
 
   const startTime = Date.now();
 
@@ -53,6 +53,14 @@ export async function processClientSideToolCall<
         toolCallId: toolCall.toolCallId,
         // messages: uiMessagesToModelMessages(context.messages),
         messages: [], // TODO: Fix the AIConversion error (tool state input-available not supported)!
+      });
+
+      onToolCallComplete?.({
+        toolCallId: toolCall.toolCallId,
+        duration: Date.now() - startTime,
+        result: executeResult as ReturnType<
+          NonNullable<AllTools[T['toolName']]['execute']>
+        >,
       });
 
       return {
@@ -92,9 +100,6 @@ export async function processToolCalls(
     result: ToolCallProcessingResult<StaticToolCall<AllTools>>,
   ) => void,
 ): Promise<ToolCallProcessingResult<StaticToolCall<AllTools>>[]> {
-  // Process all tool calls
-  const results: ToolCallProcessingResult<StaticToolCall<AllTools>>[] = [];
-
   // Process client-side tools in parallel
   const clientPromises = toolCalls.map(async (tc) => {
     if (tc.invalid) {
@@ -132,7 +137,5 @@ export async function processToolCalls(
 
   // Wait for all client-side tools to complete
   const clientResults = await Promise.all(clientPromises);
-  results.push(...clientResults.filter((r) => r !== null));
-
-  return results;
+  return clientResults;
 }
