@@ -1,9 +1,11 @@
 import type { ToolPart } from '@stagewise/karton-contract';
-import { DiffPreview, ToolPartUIBase } from './_shared';
+import { ToolPartUIBase } from './_shared';
 import { PencilIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
 import { diffLines } from 'diff';
 import { useMemo } from 'react';
+import { CodeBlock } from '@/components/ui/code-block';
+import type { BundledLanguage } from 'shiki';
 
 export const MultiEditToolPart = ({
   part,
@@ -14,6 +16,7 @@ export const MultiEditToolPart = ({
     () =>
       part.output &&
       'hiddenMetadata' in part.output &&
+      part.output.hiddenMetadata?.diff &&
       'before' in part.output.hiddenMetadata.diff &&
       'after' in part.output.hiddenMetadata.diff &&
       part.output.hiddenMetadata?.diff
@@ -24,6 +27,19 @@ export const MultiEditToolPart = ({
         : [],
     [part.output],
   );
+
+  const diffContent = useMemo(() => {
+    return diff
+      .map((line) => {
+        return line.added
+          ? `+${line.value}`
+          : line.removed
+            ? `-${line.value}`
+            : line.value;
+      })
+      .join('\n');
+  }, [diff]);
+
   const newLineCount = useMemo(
     () => diff?.filter((line) => line.added).length ?? 0,
     [diff],
@@ -32,6 +48,11 @@ export const MultiEditToolPart = ({
     () => diff?.filter((line) => line.removed).length ?? 0,
     [diff],
   );
+
+  const fileLanguage = useMemo(() => {
+    const filename = part.input?.file_path?.replace(/^.*[\\/]/, '');
+    return filename?.split('.').pop()?.toLowerCase() ?? 'text';
+  }, [part.input?.file_path]);
 
   return (
     <ToolPartUIBase
@@ -48,15 +69,14 @@ export const MultiEditToolPart = ({
         </div>
       }
       collapsedContent={
-        part.output &&
-        'hiddenMetadata' in part.output &&
-        part.output.hiddenMetadata?.diff &&
-        (!part.output.hiddenMetadata.diff.afterOmitted &&
-        !part.output.hiddenMetadata.diff.beforeOmitted ? (
-          <DiffPreview diff={diff} />
+        diffContent ? (
+          <CodeBlock
+            code={diffContent}
+            language={fileLanguage as BundledLanguage}
+          />
         ) : (
           <span>Diff content omitted (file too large)</span>
-        ))
+        )
       }
     />
   );

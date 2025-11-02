@@ -522,11 +522,9 @@ export class AgentService {
                 >,
                 [
                   {
-                    success: false,
                     toolCallId,
                     duration: 0,
                     error: {
-                      type: 'error' as const,
                       message: 'Tool execution skipped by user',
                     },
                   },
@@ -590,7 +588,6 @@ export class AgentService {
             this.kartonService as KartonStateProvider<KartonContract['state']>,
             [
               {
-                success: true,
                 toolCallId,
                 result: cleanInput,
                 duration: 0,
@@ -625,11 +622,9 @@ export class AgentService {
             this.kartonService as KartonStateProvider<KartonContract['state']>,
             [
               {
-                success: false,
                 toolCallId,
                 duration: 0,
                 error: {
-                  type: 'error' as const,
                   message: 'Tool execution cancelled by user',
                 },
               },
@@ -903,10 +898,10 @@ export class AgentService {
             this.getTools(),
             messages,
             (result) => {
-              if (result.result && hasUndoMetadata(result.result)) {
+              if (result && hasUndoMetadata(result)) {
                 this.undoToolCallStack.get(chatId)?.push({
                   toolCallId: result.toolCallId,
-                  undoExecute: result.result.hiddenMetadata.undoExecute,
+                  undoExecute: result.hiddenMetadata.undoExecute,
                 });
               }
               attachToolOutputToMessage(

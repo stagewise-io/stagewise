@@ -8,7 +8,7 @@ import {
 } from '@stagewise/stage-ui/components/collapsible';
 import { BrainIcon } from 'lucide-react';
 import { ChevronRightIcon } from 'lucide-react';
-import { Streamdown } from 'streamdown';
+import { Streamdown } from '@/components/streamdown';
 import { useTypeWriterText } from '@/hooks/use-type-writer-text';
 
 export const ThinkingPart = ({

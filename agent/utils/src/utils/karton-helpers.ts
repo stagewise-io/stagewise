@@ -72,15 +72,9 @@ export function attachToolOutputToMessage(
 
       const toolPart = part as ToolUIPart;
 
-      if (result.success) {
-        toolPart.state = 'output-available';
-        toolPart.input = toolPart.input ?? {};
-        toolPart.output = result.result;
-      } else {
-        toolPart.input = toolPart.input ?? {};
-        toolPart.state = 'output-error';
-        toolPart.errorText = result.error?.message;
-      }
+      toolPart.state = 'output-available';
+      toolPart.input = toolPart.input ?? {};
+      toolPart.output = result;
     }
   });
 }

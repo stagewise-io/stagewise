@@ -1,6 +1,6 @@
 import type { TextUIPart } from '@stagewise/karton-contract';
 import { memo } from 'react';
-import { Streamdown } from 'streamdown';
+import { Streamdown } from '@/components/streamdown';
 import { useTypeWriterText } from '@/hooks/use-type-writer-text';
 
 interface TextPartProps {
