@@ -11,8 +11,15 @@ export const OverwriteFileToolPart = ({
   part: Extract<ToolPart, { type: 'tool-overwriteFileTool' }>;
 }) => {
   const diff = useMemo(
-    () => diffLines('', part.input?.content ?? ''),
-    [part.input?.content],
+    () =>
+      diffLines(
+        part.output?.hiddenMetadata?.diff.before ?? '', // TODO GLENN: Handle null case
+        part.output?.hiddenMetadata?.diff.after ?? '', // TODO GLENN: Handle null case
+      ),
+    [
+      part.output?.hiddenMetadata?.diff.before,
+      part.output?.hiddenMetadata?.diff.after,
+    ],
   );
 
   const newLineCount = useMemo(

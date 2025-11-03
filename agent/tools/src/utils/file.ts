@@ -170,7 +170,7 @@ export async function prepareDiffContent(
   }
 
   // Check if content exceeds the max diff size
-  const maxDiffBytes = FILE_SIZE_LIMITS.MAX_DIFF_BYTES || 100 * 1024; // 100KB default
+  const maxDiffBytes = FILE_SIZE_LIMITS.MAX_DIFF_BYTES || 2 * 1024 * 1024; // 2MB default
   if (contentSize > maxDiffBytes) {
     // Truncate the content to fit within the limit
     const truncationIndicator = '\n... (content truncated)';

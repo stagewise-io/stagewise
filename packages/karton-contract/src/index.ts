@@ -16,7 +16,7 @@ import type {
   UIMessagePart as AIMessagePart,
 } from 'ai';
 import type { UITools, ToolPart } from '@stagewise/agent-tools';
-import type { FileDiff, ToolResult } from '@stagewise/agent-types';
+import type { FileDiff } from '@stagewise/agent-types';
 import type {
   WorkspaceConfig,
   FilePickerRequest,
@@ -27,7 +27,7 @@ export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
 export type { UserMessageMetadata, SelectedElement, BrowserData };
 export type UIMessagePart = AIMessagePart<UIDataTypes, UITools>;
 
-export type { FileDiff, ToolResult };
+export type { FileDiff };
 
 export type {
   TextUIPart,

@@ -39,9 +39,9 @@ export const FILE_SIZE_LIMITS = {
 
   /**
    * Maximum file size for storing file content in diffs/undo operations
-   * 100KB - reasonable limit to prevent token/memory issues while preserving undo for most text files
+   * 2MB - reasonable limit to prevent token/memory issues while preserving undo for most text files
    */
-  MAX_DIFF_BYTES: 100 * 1024, // 100KB
+  MAX_DIFF_BYTES: 2 * 1024 * 1024, // 2MB
 };
 
 /**

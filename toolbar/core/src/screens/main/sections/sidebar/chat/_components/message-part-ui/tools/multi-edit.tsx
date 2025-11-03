@@ -21,8 +21,8 @@ export const MultiEditToolPart = ({
       'after' in part.output.hiddenMetadata.diff &&
       part.output.hiddenMetadata?.diff
         ? diffLines(
-            part.output.hiddenMetadata.diff.before,
-            part.output.hiddenMetadata.diff.after,
+            part.output.hiddenMetadata.diff.before || '', // TODO GLENN: Handle null case
+            part.output.hiddenMetadata.diff.after || '', // TODO GLENN: Handle null case
           )
         : [],
     [part.output],

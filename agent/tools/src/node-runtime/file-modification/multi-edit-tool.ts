@@ -1,10 +1,9 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { FileModifyDiff } from '@stagewise/agent-types';
+import type { FileDiff } from '@stagewise/agent-types';
 import { tool } from 'ai';
 import { validateToolOutput } from '../..';
 import { z } from 'zod';
-import { checkFileSize, prepareDiffContent } from '../../utils/file';
-import { FILE_SIZE_LIMITS } from '../../constants';
+import { prepareDiffContent } from '../../utils/file';
 
 export const DESCRIPTION =
   'Make multiple edits to a single file in one operation';
@@ -49,18 +48,6 @@ export async function multiEditToolExecute(
     // Check if file exists
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
     if (!fileExists) throw new Error(`File does not exist: ${file_path}`);
-
-    // Check file size before reading
-    const sizeCheck = await checkFileSize(
-      clientRuntime,
-      absolutePath,
-      FILE_SIZE_LIMITS.EDIT_MAX_FILE_SIZE,
-    );
-
-    if (!sizeCheck.isWithinLimit)
-      throw new Error(
-        `File is too large to edit: ${file_path} - ${sizeCheck.error || ''}`,
-      );
 
     // Read the current file content
     const readResult = await clientRuntime.fileSystem.readFile(absolutePath);
@@ -153,43 +140,30 @@ export async function multiEditToolExecute(
     );
 
     // Create diff data based on discriminated union
-    const baseModifyDiff = {
-      path: file_path,
-      changeType: 'modify' as const,
-      beforeTruncated: beforePrepared.truncated,
-      afterTruncated: afterPrepared.truncated,
-      beforeContentSize: beforePrepared.contentSize,
-      afterContentSize: afterPrepared.contentSize,
-    };
-
-    let diff: FileModifyDiff;
+    let diff: FileDiff;
     if (!beforePrepared.omitted && !afterPrepared.omitted) {
       diff = {
-        ...baseModifyDiff,
+        path: file_path,
         before: beforePrepared.content!,
         after: afterPrepared.content!,
-        beforeOmitted: false,
-        afterOmitted: false,
       };
     } else if (!beforePrepared.omitted && afterPrepared.omitted) {
       diff = {
-        ...baseModifyDiff,
+        path: file_path,
         before: beforePrepared.content!,
-        beforeOmitted: false,
-        afterOmitted: true,
+        after: null,
       };
     } else if (beforePrepared.omitted && !afterPrepared.omitted) {
       diff = {
-        ...baseModifyDiff,
+        path: file_path,
+        before: null,
         after: afterPrepared.content!,
-        beforeOmitted: true,
-        afterOmitted: false,
       };
     } else {
       diff = {
-        ...baseModifyDiff,
-        beforeOmitted: true,
-        afterOmitted: true,
+        path: file_path,
+        before: null,
+        after: null,
       };
     }
 

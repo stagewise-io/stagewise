@@ -1,5 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { FileDeleteDiff } from '@stagewise/agent-types';
+import type { FileDiff } from '@stagewise/agent-types';
 import { tool } from 'ai';
 import { validateToolOutput } from '../..';
 import { z } from 'zod';
@@ -76,21 +76,16 @@ export async function deleteFileToolExecute(
     };
 
     // Create diff data based on discriminated union
-    const diff: FileDeleteDiff = preparedContent.omitted
+    const diff: FileDiff = preparedContent.omitted
       ? {
           path: relPath,
-          changeType: 'delete',
-          truncated: preparedContent.truncated,
-          omitted: true,
-          contentSize: preparedContent.contentSize,
+          before: null,
+          after: null,
         }
       : {
           path: relPath,
-          changeType: 'delete',
           before: preparedContent.content!,
-          truncated: preparedContent.truncated,
-          omitted: false,
-          contentSize: preparedContent.contentSize,
+          after: null,
         };
 
     return {

@@ -1,7 +1,7 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { tool } from 'ai';
 import { validateToolOutput } from '../..';
-import type { FileModifyDiff, FileCreateDiff } from '@stagewise/agent-types';
+import type { FileDiff } from '@stagewise/agent-types';
 import { z } from 'zod';
 import { prepareDiffContent } from '../../utils/file';
 import type { PreparedDiffContent } from '../../utils/file';
@@ -121,26 +121,15 @@ export async function overwriteFileToolExecute(
     );
 
     // Create diff based on discriminated unions
-    let diff: FileModifyDiff | FileCreateDiff;
+    let diff: FileDiff;
 
     if (fileExists) {
       // FileModifyDiff - handle 4 cases based on omitted flags
-      const baseModifyDiff = {
-        path: relPath,
-        changeType: 'modify' as const,
-        beforeTruncated: beforePrepared?.truncated || false,
-        afterTruncated: afterPrepared.truncated,
-        beforeContentSize: beforePrepared?.contentSize || 0,
-        afterContentSize: afterPrepared.contentSize,
-      };
-
       if (beforePrepared && !beforePrepared.omitted && !afterPrepared.omitted) {
         diff = {
-          ...baseModifyDiff,
+          path: relPath,
           before: beforePrepared.content!,
           after: afterPrepared.content!,
-          beforeOmitted: false,
-          afterOmitted: false,
         };
       } else if (
         beforePrepared &&
@@ -148,23 +137,21 @@ export async function overwriteFileToolExecute(
         afterPrepared.omitted
       ) {
         diff = {
-          ...baseModifyDiff,
+          path: relPath,
           before: beforePrepared.content!,
-          beforeOmitted: false,
-          afterOmitted: true,
+          after: null,
         };
       } else if (beforePrepared?.omitted && !afterPrepared.omitted) {
         diff = {
-          ...baseModifyDiff,
+          path: relPath,
+          before: null,
           after: afterPrepared.content!,
-          beforeOmitted: true,
-          afterOmitted: false,
         };
       } else {
         diff = {
-          ...baseModifyDiff,
-          beforeOmitted: true,
-          afterOmitted: true,
+          path: relPath,
+          before: null,
+          after: null,
         };
       }
     } else {
@@ -172,18 +159,13 @@ export async function overwriteFileToolExecute(
       diff = afterPrepared.omitted
         ? {
             path: relPath,
-            changeType: 'create',
-            truncated: afterPrepared.truncated,
-            omitted: true,
-            contentSize: afterPrepared.contentSize,
+            before: null,
+            after: null,
           }
         : {
             path: relPath,
-            changeType: 'create',
+            before: null,
             after: afterPrepared.content!,
-            truncated: afterPrepared.truncated,
-            omitted: false,
-            contentSize: afterPrepared.contentSize,
           };
     }
 
