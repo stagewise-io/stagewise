@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  type HTMLAttributes,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type HTMLAttributes, useEffect, useRef, useState } from 'react';
 import {
   type BundledLanguage,
   bundledLanguages,
@@ -22,20 +16,12 @@ import CodeBlockDarkTheme from './code-block-dark-theme.json';
 
 const PRE_TAG_REGEX = /<pre(\s|>)/;
 
-type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
+type CodeBlockProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   code: string;
   language: BundledLanguage;
   preClassName?: string;
-  isStreaming?: boolean;
+  hideActionButtons?: boolean;
 };
-
-type CodeBlockContextType = {
-  code: string;
-};
-
-const CodeBlockContext = createContext<CodeBlockContextType>({
-  code: '',
-});
 
 class HighlighterManager {
   private lightHighlighter: Awaited<
@@ -171,9 +157,8 @@ export const CodeBlock = ({
   code,
   language,
   className,
-  children,
-  preClassName,
-  isStreaming,
+  preClassName = 'overflow-x-auto font-mono text-xs p-4',
+  hideActionButtons,
   ...rest
 }: CodeBlockProps) => {
   const [html, setHtml] = useState<string>('');
@@ -198,40 +183,28 @@ export const CodeBlock = ({
   }, [code, language, preClassName]);
 
   return (
-    <CodeBlockContext.Provider value={{ code }}>
-      <div
-        className="-mx-1 my-4 w-full overflow-hidden rounded-2xl bg-zinc-500/5 p-2"
-        data-code-block-container
-        data-language={language}
-      >
+    <div
+      data-code-block-container
+      data-language={language}
+      className="w-full overflow-hidden rounded-lg border border-black/5 dark:border-white/5"
+    >
+      <div className="min-w-full">
         <div
-          className="flex items-center justify-between text-muted-foreground text-xs"
-          data-code-block-header
+          className={cn('overflow-x-auto dark:hidden', className)}
+          dangerouslySetInnerHTML={{ __html: html }}
+          data-code-block
           data-language={language}
-        >
-          <span className="ml-1.5 font-mono lowercase">{language}</span>
-          <div className="flex items-center gap-2">{children}</div>
-        </div>
-        <div className="mt-2 w-full overflow-hidden rounded-lg">
-          <div className="min-w-full">
-            <div
-              className={cn('overflow-x-auto dark:hidden', className)}
-              dangerouslySetInnerHTML={{ __html: html }}
-              data-code-block
-              data-language={language}
-              {...rest}
-            />
-            <div
-              className={cn('hidden overflow-x-auto dark:block', className)}
-              dangerouslySetInnerHTML={{ __html: darkHtml }}
-              data-code-block
-              data-language={language}
-              {...rest}
-            />
-          </div>
-        </div>
+          {...rest}
+        />
+        <div
+          className={cn('hidden overflow-x-auto dark:block', className)}
+          dangerouslySetInnerHTML={{ __html: darkHtml }}
+          data-code-block
+          data-language={language}
+          {...rest}
+        />
       </div>
-    </CodeBlockContext.Provider>
+    </div>
   );
 };
 

@@ -19,8 +19,10 @@ import {
   CollapsibleTrigger,
 } from '@stagewise/stage-ui/components/collapsible';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { ChangeObject } from 'diff';
+import { CodeBlock } from '@/components/ui/code-block';
+import type { BundledLanguage } from 'shiki';
 
 export function ToolPartUIBase({
   toolIcon,
@@ -111,7 +113,7 @@ export function ToolPartUIBase({
               )}
             />
           </CollapsibleTrigger>
-          <CollapsibleContent className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%_-_8px),transparent)] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-black/30 block max-h-32 overflow-y-auto overscroll-y-none pt-1.5 pb-0.5 pl-3">
+          <CollapsibleContent className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%_-_8px),transparent)] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-black/30 block max-h-40 overflow-y-auto overscroll-y-none pt-1.5 pb-0.5 pl-3">
             <div className="pt-2 pb-1 font-normal text-xs">
               {collapsedContent}
             </div>
@@ -126,23 +128,32 @@ export function ToolPartUIBase({
   );
 }
 
-export function DiffPreview({ diff }: { diff: ChangeObject<string>[] }) {
+export function DiffPreview({
+  diff,
+  filePath,
+}: {
+  diff: ChangeObject<string>[];
+  filePath: string;
+}) {
+  const diffContent = useMemo(() => {
+    return diff.reduce((acc, line) => {
+      const newLine = line.added
+        ? `+${line.value}`
+        : line.removed
+          ? `-${line.value}`
+          : line.value;
+      return `${acc}${newLine}`;
+    }, '');
+  }, [diff]);
+
+  const fileLanguage = useMemo(() => {
+    const filename = filePath.replace(/^.*[\\/]/, '');
+    return (
+      (filename?.split('.').pop()?.toLowerCase() as BundledLanguage) ?? 'text'
+    );
+  }, [filePath]);
+
   return (
-    <div className="flex flex-col gap-0.5 rounded-lg border border-black/5 bg-zinc-500/5 p-1">
-      {diff.map((line, index) => (
-        <div
-          key={`${index}-${line.value.slice(0, 20)}`}
-          className={
-            line.added
-              ? 'bg-green-100 text-green-800'
-              : line.removed
-                ? 'bg-rose-100 text-rose-800'
-                : 'text-black/60'
-          }
-        >
-          {line.value}
-        </div>
-      ))}
-    </div>
+    <CodeBlock code={diffContent} language={fileLanguage} hideActionButtons />
   );
 }

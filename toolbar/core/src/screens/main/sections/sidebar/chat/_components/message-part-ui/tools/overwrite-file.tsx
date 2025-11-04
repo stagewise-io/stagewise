@@ -12,14 +12,13 @@ export const OverwriteFileToolPart = ({
 }) => {
   const diff = useMemo(
     () =>
-      diffLines(
-        part.output?.hiddenMetadata?.diff.before ?? '', // TODO GLENN: Handle null case
-        part.output?.hiddenMetadata?.diff.after ?? '', // TODO GLENN: Handle null case
-      ),
-    [
-      part.output?.hiddenMetadata?.diff.before,
-      part.output?.hiddenMetadata?.diff.after,
-    ],
+      part.output?.hiddenMetadata
+        ? diffLines(
+            part.output?.hiddenMetadata?.diff.before ?? '',
+            part.output?.hiddenMetadata?.diff.after ?? '',
+          )
+        : null,
+    [part.output?.hiddenMetadata],
   );
 
   const newLineCount = useMemo(
@@ -46,7 +45,11 @@ export const OverwriteFileToolPart = ({
         </div>
       }
       collapsedContent={
-        part.input && part.output && <DiffPreview diff={diff} />
+        diff ? (
+          <DiffPreview diff={diff} filePath={part.input?.path ?? ''} />
+        ) : (
+          <span>Diff view not available (not ready or too large)</span>
+        )
       }
     />
   );

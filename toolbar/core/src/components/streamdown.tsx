@@ -116,7 +116,7 @@ const CodeComponent = ({
     return (
       <div
         className={cn(
-          'group relative my-4 h-auto rounded-2xl bg-zinc-500/5 p-2',
+          'group relative my-4 flex h-auto flex-col rounded-2xl bg-zinc-500/5 p-2',
           className,
         )}
         data-streamdown="mermaid-block"
@@ -137,21 +137,33 @@ const CodeComponent = ({
   }
 
   return (
-    <CodeBlock
-      className={cn('overflow-x-auto', className)}
-      code={code}
-      data-language={language}
-      data-streamdown="code-block"
-      language={language}
-      isStreaming={isStreaming}
-      preClassName="overflow-x-auto font-mono text-xs p-4"
-    >
-      {!isStreaming && (
-        <div className="flex items-center justify-end gap-2">
-          <CodeBlockCopyButton code={code} />
-        </div>
+    <div
+      className={cn(
+        'group relative my-4 flex h-auto flex-col gap-1 rounded-2xl bg-zinc-500/5 p-2',
+        className,
       )}
-    </CodeBlock>
+      data-streamdown="code-block"
+    >
+      <div className="flex flex-row items-center justify-between">
+        <span className="ml-1.5 font-medium font-mono text-muted-foreground text-sm lowercase">
+          {language}
+        </span>
+        {!isStreaming && (
+          <div className="flex flex-row items-center justify-end gap-2">
+            <CodeBlockCopyButton code={code} />
+          </div>
+        )}
+      </div>
+      <CodeBlock
+        className={cn('overflow-x-auto', className)}
+        code={code}
+        data-language={language}
+        data-streamdown="code-block"
+        language={language}
+        hideActionButtons={isStreaming}
+        preClassName="overflow-x-auto font-mono text-xs p-4"
+      />
+    </div>
   );
 };
 

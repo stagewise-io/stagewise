@@ -1,11 +1,9 @@
 import type { ToolPart } from '@stagewise/karton-contract';
-import { ToolPartUIBase } from './_shared';
+import { DiffPreview, ToolPartUIBase } from './_shared';
 import { PencilIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
 import { diffLines } from 'diff';
 import { useMemo } from 'react';
-import { CodeBlock } from '@/components/ui/code-block';
-import type { BundledLanguage } from 'shiki';
 
 export const MultiEditToolPart = ({
   part,
@@ -14,31 +12,14 @@ export const MultiEditToolPart = ({
 }) => {
   const diff = useMemo(
     () =>
-      part.output &&
-      'hiddenMetadata' in part.output &&
-      part.output.hiddenMetadata?.diff &&
-      'before' in part.output.hiddenMetadata.diff &&
-      'after' in part.output.hiddenMetadata.diff &&
-      part.output.hiddenMetadata?.diff
+      part.output?.hiddenMetadata?.diff
         ? diffLines(
-            part.output.hiddenMetadata.diff.before || '', // TODO GLENN: Handle null case
-            part.output.hiddenMetadata.diff.after || '', // TODO GLENN: Handle null case
+            part.output?.hiddenMetadata?.diff.before ?? '',
+            part.output?.hiddenMetadata?.diff.after ?? '',
           )
-        : [],
-    [part.output],
+        : null,
+    [part.output?.hiddenMetadata],
   );
-
-  const diffContent = useMemo(() => {
-    return diff
-      .map((line) => {
-        return line.added
-          ? `+${line.value}`
-          : line.removed
-            ? `-${line.value}`
-            : line.value;
-      })
-      .join('\n');
-  }, [diff]);
 
   const newLineCount = useMemo(
     () => diff?.filter((line) => line.added).length ?? 0,
@@ -48,11 +29,6 @@ export const MultiEditToolPart = ({
     () => diff?.filter((line) => line.removed).length ?? 0,
     [diff],
   );
-
-  const fileLanguage = useMemo(() => {
-    const filename = part.input?.file_path?.replace(/^.*[\\/]/, '');
-    return filename?.split('.').pop()?.toLowerCase() ?? 'text';
-  }, [part.input?.file_path]);
 
   return (
     <ToolPartUIBase
@@ -69,13 +45,10 @@ export const MultiEditToolPart = ({
         </div>
       }
       collapsedContent={
-        diffContent ? (
-          <CodeBlock
-            code={diffContent}
-            language={fileLanguage as BundledLanguage}
-          />
+        diff ? (
+          <DiffPreview diff={diff} filePath={part.input?.file_path ?? ''} />
         ) : (
-          <span>Diff content omitted (file too large)</span>
+          <span>Diff view not available (not ready or too large)</span>
         )
       }
     />

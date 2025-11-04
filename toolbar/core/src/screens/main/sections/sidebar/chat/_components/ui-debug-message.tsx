@@ -32,6 +32,10 @@ export const uiDebugMessage: ChatMessage = {
       filename: 'dummy-pdf.pdf',
     },
     {
+      type: 'text',
+      text: "# Hey!\n\nI'm a markdown formatted text part. Here's a code block:\n\n```tsx\nconsole.log(\"Hello, world!\");\n``` \n\nAnd here's a mermaid diagram:\n\n```mermaid\ngraph TD;\n  A-->B;\n  A-->C;\n  B-->D;\n  C-->D;\n```\n\nCool right??",
+    },
+    {
       type: 'dynamic-tool',
       toolCallId: 'dummy-tool-call-id',
       toolName: 'unknown-dynamic-tool',
@@ -108,19 +112,18 @@ export const uiDebugMessage: ChatMessage = {
       toolCallId: 'delete-file-tool-call-id-3',
       state: 'output-available',
       input: {
-        path: 'dummy-path.txt',
+        path: 'dummy-path.tsx',
       },
       output: {
         message: 'File deleted successfully.',
         hiddenMetadata: {
           undoExecute: () => Promise.resolve(),
           diff: {
-            path: 'dummy-path.txt',
-            changeType: 'delete',
-            before: 'dummy-content.txt',
-            truncated: false,
-            omitted: false,
-            contentSize: 100,
+            path: 'dummy-path.tsx',
+            before:
+              'import React from "react";\n\nconst App = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App;\n',
+            after:
+              'import React from "react";\n\nconst App2 = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App2;\n',
           },
         },
       },
@@ -314,7 +317,7 @@ export const uiDebugMessage: ChatMessage = {
       toolCallId: 'multi-edit-tool-call-id-3',
       state: 'output-available',
       input: {
-        file_path: 'dummy-path.txt',
+        file_path: 'dummy-path.js',
         edits: [
           {
             old_string: 'dummy-old-string',
@@ -330,16 +333,11 @@ export const uiDebugMessage: ChatMessage = {
         hiddenMetadata: {
           undoExecute: () => Promise.resolve(),
           diff: {
-            path: 'dummy-path.txt',
-            changeType: 'modify',
-            before: 'dummy-content.txt',
-            after: 'dummy-content.txt',
-            beforeOmitted: false,
-            afterOmitted: false,
-            beforeTruncated: false,
-            afterTruncated: false,
-            beforeContentSize: 100,
-            afterContentSize: 100,
+            path: 'dummy-path.js',
+            before:
+              'import React from "react";\n\nconst App = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App;\n',
+            after:
+              'import React from "react";\n\nconst App2 = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App2;\n',
           },
         },
       },
