@@ -4,8 +4,6 @@ import { z } from 'zod';
 import type { LanguageModelV2 } from '@ai-sdk/provider';
 import { queryRagWithoutRerank } from '@stagewise/agent-rag';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 
 type RetrievalResult = {
   relativePath: string;
