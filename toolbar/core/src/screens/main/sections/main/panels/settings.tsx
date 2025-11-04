@@ -76,6 +76,7 @@ export const WorkspaceSettingsTabContent = () => {
       eddyMode: undefined,
       autoPlugins: true,
       plugins: [],
+      appPath: '',
     },
     (state, update) => {
       const optimisticState = { ...state, ...update };

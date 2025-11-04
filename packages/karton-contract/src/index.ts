@@ -316,6 +316,7 @@ export type KartonContract = {
         checkForActiveAppOnPort: (port: number) => Promise<boolean>;
         resolveRelativePathToAbsolutePath: (
           relativePath: string,
+          basePath?: string,
         ) => Promise<string | null>;
       };
       config: {

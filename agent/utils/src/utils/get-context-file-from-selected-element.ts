@@ -73,35 +73,6 @@ async function retrieveFilesForSelectedElement(
     10,
   );
 
-  // Debug: Write retrieved files to JSON (excluding embedding fields)
-  const debugDir =
-    '/Users/juliangoetze/Arbeit/stagewise/stagewise-repos/stagewise/agent/retrieved-files';
-
-  // Generate timestamp filename (YYYY-MM-DD-HH-mm-ss format sorts newest first alphabetically)
-  const now = new Date();
-  const timestamp = now
-    .toISOString()
-    .replace(/:/g, '-')
-    .replace(/\..+/, '')
-    .replace('T', '-');
-  const debugPath = path.join(debugDir, `${timestamp}.json`);
-
-  try {
-    if (!fs.existsSync(debugDir)) {
-      fs.mkdirSync(debugDir, { recursive: true });
-    }
-    const filesWithoutEmbeddings = retrievedFiles.map((file) => {
-      // biome-ignore lint/correctness/noUnusedVariables: embedding is intentionally excluded
-      const { embedding, ...rest } = file;
-      return rest;
-    });
-    const debugData = {
-      query: elementDescription.text,
-      retrievedFiles: filesWithoutEmbeddings,
-    };
-    fs.writeFileSync(debugPath, JSON.stringify(debugData, null, 2));
-  } catch (_err) {}
-
   return { retrievedFiles, elementDescription: elementDescription.text };
 }
 
@@ -119,6 +90,7 @@ async function pickCorrectFileSnippetFromSnippets(
     startLine: number;
     endLine: number;
   }[] = [];
+
   for (const snippet of snippets) {
     const _startLine = snippet.startLine - 500;
     const _endLine = snippet.endLine + 500;

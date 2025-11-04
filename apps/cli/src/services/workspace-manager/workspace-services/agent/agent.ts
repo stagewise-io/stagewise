@@ -1,4 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import { resolve } from 'node:path';
 import { isContextLimitError } from '@stagewise/agent-utils';
 import type { KartonService } from '../../../karton';
 import type { Logger } from '../../../logger';
@@ -76,7 +77,7 @@ export class AgentService {
   private kartonService: KartonService;
   private authService: AuthService;
   private workspaceSetupService: WorkspaceSetupService;
-  private workspaceDataPath: string;
+  private workspaceDataPath: string | null = null;
   private clientRuntime: ClientRuntime;
   private apiKey: string | null = null;
 
@@ -105,7 +106,7 @@ export class AgentService {
     authService: AuthService,
     clientRuntime: ClientRuntime,
     workspaceSetupService: WorkspaceSetupService,
-    workspaceDataPath: string,
+    workspaceDataPath: string | null,
   ) {
     this.logger = logger;
     this.telemetryService = telemetryService;
@@ -113,7 +114,7 @@ export class AgentService {
     this.authService = authService;
     this.clientRuntime = clientRuntime;
     this.workspaceSetupService = workspaceSetupService;
-    this.workspaceDataPath = workspaceDataPath;
+    this.workspaceDataPath = workspaceDataPath ?? null;
     this.kartonService.setState((draft) => {
       if (!draft.workspace?.agentChat) {
         draft.workspace!.agentChat = {
@@ -162,7 +163,9 @@ export class AgentService {
               appPort: params.appPort,
               appPath: params.appPath,
             });
-            // TODO: Call GlobalService
+            this.clientRuntime.fileSystem.setCurrentWorkingDirectory(
+              resolve(params.appPath, params.agentAccessPath),
+            );
           },
         });
       case MainTab.DEV_APP_PREVIEW:
@@ -660,7 +663,7 @@ export class AgentService {
           const file = await getContextFileFromSelectedElement(
             element,
             this.apiKey!,
-            this.workspaceDataPath,
+            this.workspaceDataPath!, // Is only called when the workspace is loaded
             this.telemetryService.withTracing(
               this.litellm('gemini-2.5-flash-lite'),
               {
@@ -1119,6 +1122,10 @@ export class AgentService {
     this.logger.debug('[AgentService] Shutdown complete');
   }
 
+  public setWorkspaceDataPath(workspaceDataPath: string | null) {
+    this.workspaceDataPath = workspaceDataPath;
+  }
+
   public static async create(
     logger: Logger,
     telemetryService: TelemetryService,
@@ -1126,7 +1133,7 @@ export class AgentService {
     authService: AuthService,
     clientRuntime: ClientRuntime,
     workspaceSetupService: WorkspaceSetupService,
-    workspaceDataPath: string,
+    workspaceDataPath: string | null,
   ) {
     const instance = new AgentService(
       logger,

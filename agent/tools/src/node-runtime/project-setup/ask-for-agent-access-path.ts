@@ -13,6 +13,9 @@ export const askForAgentAccessPathParamsSchema = z.object({
         'The relative project root path that the USER should confirm. Relative to the app path (e.g. "../..", or ".").',
       ),
   }),
+  selectedAppPath: z
+    .string()
+    .describe('The app path that the USER picked before.'),
 });
 
 export const askForAgentAccessPathOutputSchema = z.object({

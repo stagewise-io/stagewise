@@ -54,6 +54,7 @@ export const AskForAgentAccessPathToolPartContent = memo(
         try {
           const absolutePath = await resolveRelativePathToAbsolutePath(
             toolPart.input?.userInput.suggestedPath,
+            toolPart.input?.selectedAppPath,
           );
           setDisplayPath(
             absolutePath ?? toolPart.input?.userInput.suggestedPath,
@@ -100,7 +101,7 @@ export const AskForAgentAccessPathToolPartContent = memo(
                   size="xs"
                   onClick={() => {
                     onSubmit({
-                      path: displayPath || '',
+                      path: toolPart.input?.userInput.suggestedPath ?? '',
                       type: 'askForAgentAccessPathTool',
                     });
                   }}

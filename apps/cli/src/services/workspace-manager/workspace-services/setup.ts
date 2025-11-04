@@ -76,8 +76,11 @@ export class WorkspaceSetupService {
     );
     this.kartonService.registerServerProcedureHandler(
       'workspace.setup.resolveRelativePathToAbsolutePath',
-      async (relativePath: string) => {
-        return await this.handleResolveRelativePathToAbsolutePath(relativePath);
+      async (relativePath: string, basePath?: string) => {
+        return await this.handleResolveRelativePathToAbsolutePath(
+          relativePath,
+          basePath,
+        );
       },
     );
 
@@ -136,9 +139,7 @@ export class WorkspaceSetupService {
 
     // Update the karton state to reflect the new config
     this.kartonService.setState((draft) => {
-      if (draft.workspace) {
-        draft.workspace.setupActive = false;
-      }
+      if (draft.workspace) draft.workspace.setupActive = false;
     });
 
     this.logger.debug(
@@ -152,9 +153,10 @@ export class WorkspaceSetupService {
 
   private async handleResolveRelativePathToAbsolutePath(
     relativePath: string,
+    basePath?: string,
   ): Promise<string | null> {
     try {
-      return resolve(this.workspacePath, relativePath);
+      return resolve(basePath ?? this.workspacePath, relativePath);
     } catch {
       return null;
     }

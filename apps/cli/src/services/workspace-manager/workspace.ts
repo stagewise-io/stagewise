@@ -73,19 +73,13 @@ export class WorkspaceService {
   public async initialize() {
     this.logger.debug('[WorkspaceService] Initializing...');
 
-    this.workspacePathsService = await WorkspacePathsService.create(
-      this.logger,
-      this.globalDataPathService,
-      this.workspacePath,
-    );
-
     this.kartonService.setState((draft) => {
       draft.workspace = {
         path: this.workspacePath,
         paths: {
-          data: this.workspacePathsService!.workspaceDataPath,
-          cache: this.workspacePathsService!.workspaceCachePath,
-          temp: this.workspacePathsService!.workspaceTempPath,
+          data: '',
+          cache: '', // TODO: Find a way to initialize these -> Datapaths are only initialized after workspace setup.
+          temp: '',
         },
         inspirationComponents: [],
         agentChat: null,
@@ -103,12 +97,29 @@ export class WorkspaceService {
       };
     });
 
-    // Start all child services of the workspace. All regular services should only be staarted if the setup service is done.
+    // Start all child services of the workspace. All regular services should only be started if the setup service is done.
     this.workspaceSetupService = await WorkspaceSetupService.create(
       this.logger,
       this.kartonService,
       this.workspacePath,
       async (setupConfig) => {
+        this.workspacePath = setupConfig?.appPath ?? this.workspacePath;
+        await this.workspacePathsService?.teardown();
+        this.workspacePathsService = await WorkspacePathsService.create(
+          this.logger,
+          this.globalDataPathService,
+          this.workspacePath,
+        );
+        this.kartonService.setState((draft) => {
+          draft.workspace!.path = this.workspacePath;
+          draft.workspace!.paths.data =
+            this.workspacePathsService!.workspaceDataPath;
+          draft.workspace!.paths.cache =
+            this.workspacePathsService!.workspaceCachePath;
+          draft.workspace!.paths.temp =
+            this.workspacePathsService!.workspaceTempPath;
+        });
+        // TODO: Start everything with the right appPath!! (Not the initial workspace path)
         this.workspaceConfigService = await WorkspaceConfigService.create(
           this.logger,
           this.kartonService,
@@ -158,6 +169,10 @@ export class WorkspaceService {
             this.workspacePath,
             this.wrappedCommand,
           );
+
+        this._agentService?.setWorkspaceDataPath(
+          this.workspacePathsService?.workspaceDataPath ?? null,
+        );
 
         this.ragService =
           (await RagService.create(
@@ -216,7 +231,7 @@ export class WorkspaceService {
         this.authService,
         clientRuntime,
         this.workspaceSetupService,
-        this.workspacePathsService!.workspaceDataPath,
+        this.workspacePathsService?.workspaceDataPath ?? null,
       ).catch((error) => {
         this.telemetryService.captureException(error as Error);
         this.logger.error(`[WorkspaceService] Failed to create agent service`, {

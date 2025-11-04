@@ -54,6 +54,7 @@ export const workspaceConfigSchema = z
     eddyMode: z.enum(['flappy']).optional(),
     autoPlugins: z.boolean().optional(),
     plugins: z.array(pluginSchema).optional(),
+    appPath: z.string().describe('The app path'),
   })
   .loose();
 
