@@ -857,10 +857,10 @@ export class AgentService {
             this.getTools(),
             messages,
             (result) => {
-              if (result && hasUndoMetadata(result)) {
+              if ('result' in result && hasUndoMetadata(result.result)) {
                 this.undoToolCallStack.get(chatId)?.push({
                   toolCallId: result.toolCallId,
-                  undoExecute: result.hiddenMetadata.undoExecute,
+                  undoExecute: result.result.hiddenMetadata.undoExecute,
                 });
               }
               attachToolOutputToMessage(
