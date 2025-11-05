@@ -229,9 +229,9 @@ export async function queryRagWithoutRerank(
   );
   // generateEmbedding returns an array of embeddings, get the first one for the query
   const queryEmbedding = embeddings[0];
-  if (!queryEmbedding) {
+  if (!queryEmbedding)
     throw new Error('Failed to generate embedding for query');
-  }
+
   const table = await connectToDatabase(workspaceDataPath);
   const results = await searchSimilarFiles(table, queryEmbedding, limit);
   await table.checkoutLatest();

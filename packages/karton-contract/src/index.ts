@@ -291,14 +291,13 @@ export type KartonContract = {
         chatId: string,
       ) => Promise<boolean>;
       contextElementsChanged: (elements: SelectedElement[]) => Promise<void>; // Notifies when selected context elements change in the toolbar
-      getContextElementFile: (element: SelectedElement) => Promise<
-        | {
-            relativePath: string;
-            startLine: number;
-            endLine: number;
-            content?: string;
-          }
-        | { error: string }
+      getContextElementFiles: (element: SelectedElement) => Promise<
+        {
+          relativePath: string;
+          startLine: number;
+          endLine: number;
+          content?: string;
+        }[]
       >;
     };
     userAccount: {

@@ -414,7 +414,7 @@ export const getSelectedElementInfo = (
     relativePath: string;
     startLine: number;
     endLine: number;
-  } | null,
+  }[],
   mode: 'originalElement' | 'children' | 'parents' = 'originalElement',
   callDepth?: number,
   childrenCount?: number,
@@ -475,7 +475,7 @@ export const getSelectedElementInfo = (
               return getSelectedElementInfo(
                 generateId(),
                 c as HTMLElement,
-                null,
+                [],
                 'children',
                 undefined,
                 (childrenCount ?? 0) + 1,
@@ -496,7 +496,7 @@ export const getSelectedElementInfo = (
           )
         : undefined,
     pluginInfo: truncatePluginInfo([]),
-    codeMetadata: codeMetadata || undefined,
+    codeMetadata: codeMetadata,
   };
 };
 

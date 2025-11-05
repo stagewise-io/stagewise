@@ -42,7 +42,8 @@ interface ChatContext {
       relativePath: string;
       startLine: number;
       endLine: number;
-    } | null;
+      content?: string;
+    }[];
     element: HTMLElement;
     pluginContext: {
       pluginName: string;
@@ -104,7 +105,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         startLine: number;
         endLine: number;
         content?: string;
-      } | null;
+      }[];
       pluginContext: {
         pluginName: string;
         context: any;
@@ -123,8 +124,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     (p) => p.agentChat.contextElementsChanged,
   );
 
-  const getContextElementFile = useKartonProcedure(
-    (p) => p.agentChat.getContextElementFile,
+  const getContextElementFiles = useKartonProcedure(
+    (p) => p.agentChat.getContextElementFiles,
   );
 
   const addFileAttachment = useCallback((file: File) => {
@@ -173,7 +174,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
           pluginName: plugin.pluginName,
           context: plugin.onContextElementSelect?.(element),
         })),
-        codeMetadata: null,
+        codeMetadata: [],
       };
 
       setDomContextElements((prev) => {
@@ -198,25 +199,21 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
         newElement.codeMetadata,
       );
 
-      getContextElementFile(selectedElement)
-        .then((file) => {
-          if (!('error' in file)) {
-            setDomContextElements((prev) => {
-              return prev.map((item) => {
-                if (item.stagewiseId === newElement.stagewiseId) {
-                  item.codeMetadata = {
-                    relativePath: file.relativePath,
-                    startLine: file.startLine,
-                    endLine: file.endLine,
-                    content: file.content,
-                  };
-                }
-                return item;
-              });
+      getContextElementFiles(selectedElement)
+        .then((files) => {
+          setDomContextElements((prev) => {
+            return prev.map((item) => {
+              if (item.stagewiseId === newElement.stagewiseId) {
+                item.codeMetadata = files.map((file) => ({
+                  relativePath: file.relativePath,
+                  startLine: file.startLine,
+                  endLine: file.endLine,
+                  content: file.content,
+                }));
+              }
+              return item;
             });
-          } else {
-            posthog.captureException(new Error(file.error));
-          }
+          });
         })
         .catch((error) => {
           posthog.captureException(error);

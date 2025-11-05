@@ -73,6 +73,12 @@ export class WorkspaceService {
   public async initialize() {
     this.logger.debug('[WorkspaceService] Initializing...');
 
+    this.workspacePathsService = await WorkspacePathsService.create(
+      this.logger,
+      this.globalDataPathService,
+      this.workspacePath,
+    );
+
     this.kartonService.setState((draft) => {
       draft.workspace = {
         path: this.workspacePath,
@@ -170,10 +176,6 @@ export class WorkspaceService {
             this.wrappedCommand,
           );
 
-        this._agentService?.setWorkspaceDataPath(
-          this.workspacePathsService?.workspaceDataPath ?? null,
-        );
-
         this.ragService =
           (await RagService.create(
             this.logger,
@@ -231,7 +233,6 @@ export class WorkspaceService {
         this.authService,
         clientRuntime,
         this.workspaceSetupService,
-        this.workspacePathsService?.workspaceDataPath ?? null,
       ).catch((error) => {
         this.telemetryService.captureException(error as Error);
         this.logger.error(`[WorkspaceService] Failed to create agent service`, {

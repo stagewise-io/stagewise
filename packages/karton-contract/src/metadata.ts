@@ -124,14 +124,14 @@ export const baseSelectedElementSchema = z.object({
       content: z.string().max(4096),
     }),
   ),
-  codeMetadata: z
-    .object({
+  codeMetadata: z.array(
+    z.object({
       relativePath: z.string().max(1024),
       startLine: z.number(),
       endLine: z.number(),
       content: z.string().max(100000).optional(),
-    })
-    .optional(),
+    }),
+  ),
 });
 
 export type SelectedElement = z.infer<typeof baseSelectedElementSchema> & {

@@ -68,13 +68,13 @@ async function retrieveFilesForSelectedElement(
     elementDescription.text,
     workspaceDataPath,
     apiKey,
-    10,
+    20,
   );
 
   return { retrievedFiles, elementDescription: elementDescription.text };
 }
 
-async function pickCorrectFileSnippetFromSnippets(
+async function pickCorrectFileSnippetsFromSnippets(
   element: SelectedElement,
   clientRuntime: ClientRuntime,
   snippets: RetrievalResult[],
@@ -118,7 +118,46 @@ async function pickCorrectFileSnippetFromSnippets(
     });
   }
 
-  const snippetsWithLineNumbers = cleanedSnippets.map((s) => {
+  // Merge multiple chunks from the same file into one entry
+  const fileToChunks = new Map<
+    string,
+    Array<{
+      relativePath: string;
+      content: string;
+      startLine: number;
+      endLine: number;
+    }>
+  >();
+
+  for (const snippet of cleanedSnippets) {
+    if (!fileToChunks.has(snippet.relativePath))
+      fileToChunks.set(snippet.relativePath, []);
+
+    fileToChunks.get(snippet.relativePath)!.push(snippet);
+  }
+
+  const mergedSnippets = Array.from(fileToChunks.entries()).map(
+    ([relativePath, chunks]) => {
+      if (chunks.length === 1) return chunks[0]!;
+
+      // Sort chunks by line number
+      const sortedChunks = chunks.sort((a, b) => a.startLine - b.startLine);
+
+      // Merge content with clear separation
+      const mergedContent = sortedChunks
+        .map((c) => c.content)
+        .join('\n\n[...more content from same file...]\n\n');
+
+      return {
+        relativePath,
+        content: mergedContent,
+        startLine: Math.min(...chunks.map((c) => c.startLine)),
+        endLine: Math.max(...chunks.map((c) => c.endLine)),
+      };
+    },
+  );
+
+  const snippetsWithLineNumbers = mergedSnippets.map((s) => {
     const lines = s.content.split('\n');
     let codeStartIndex = -1;
 
@@ -148,15 +187,15 @@ async function pickCorrectFileSnippetFromSnippets(
 
   const fileSelectionPrompt = `You are a helpful assistant that receives an excerpt of HTML ELements from a Browser DOM, as well as various file snippets that are potential candidates to be the source code of these HTML elements.
 
-  YOUR_TASK: Pick the right file snippet that is most likely to be the source code of the included HTML Elements.
+  YOUR_TASK: Pick ALL relevant file snippets that are related to the source code of the included HTML Elements. This includes the main component/page file as well as any child components, utilities, or dependencies used within the selected element.
 
-  OUTPUT_REQUIREMENTS: Output the following content to describe the picked file: filePath, startLine, endLine. If you cannot find the right file snippet or no file snippets are present, return an error message in the error field.
+  OUTPUT_REQUIREMENTS: Output an array of all relevant file snippets. For each file, include: filePath, startLine, endLine. Return multiple files when appropriate (e.g., both the main page/component and any child components or utilities it uses). If you cannot find any relevant file snippets, return an empty array.
   
   Here is an example for how you should complete a task:
   - user:
     This is the natural language description of the selected element:
         ---
-        A pricing page with a title and a description.
+        A pricing page with a title and a description, wrapped in a ScrollReveal animation component.
         ---
     This is the selected element:
         ---
@@ -164,7 +203,7 @@ async function pickCorrectFileSnippetFromSnippets(
               Simple, transparent pricing
             </h1>
         ---
-    These are the file snippets you should pick the right one from:
+    These are the file snippets you should pick all relevant ones from (note: multiple chunks from the same file have been merged):
       {
         relativePath: apps/website/src/app/(home)/pricing/page.tsx,
         content: "FRONTEND FILE\nA .tsx file with the name page.tsx from the file apps/website/src/app/(home)/pricing/page.tsx.\n\nCode:
@@ -189,7 +228,26 @@ async function pickCorrectFileSnippetFromSnippets(
         ---,
         startLine: 0,
         endLine: 17,
-      }, 
+      },
+      {
+        relativePath: apps/website/src/components/scroll-reveal.tsx,
+        content: "FRONTEND FILE\nA .tsx file with the name scroll-reveal.tsx from the file apps/website/src/components/scroll-reveal.tsx.\n\nCode:
+        ---
+          export function ScrollReveal({ children }: { children: React.ReactNode }) {
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+              >
+                {children}
+              </motion.div>
+            );
+          }
+        ---,
+        startLine: 0,
+        endLine: 12,
+      },
       {
         relativePath: apps/website/src/app/page.tsx,
         content: "FRONTEND FILE\nA .tsx file with the name page.tsx from the file apps/website/src/app/page.tsx.\n\nCode:
@@ -212,12 +270,31 @@ async function pickCorrectFileSnippetFromSnippets(
       }
 
   - assistant:
-    relativePath: apps/website/src/app/(home)/pricing/page.tsx
-    startLine: 0
-    endLine: 17
+    [
+      {
+        relativePath: apps/website/src/app/(home)/pricing/page.tsx,
+        startLine: 0,
+        endLine: 17,
+      },
+      {
+        relativePath: apps/website/src/components/scroll-reveal.tsx,
+        startLine: 0,
+        endLine: 12,
+      },
+    ]
 
+    IMPORTANT: Be selective and strategic about which files to return.
 
-    IMPORTANT: Prefer selecting code snippets that are more specific to the selected element, over general code snippets that are more likely to be a component library.
+    PRIORITIZATION RULES:
+    1. PRIMARY FILES (highest priority):
+       - The main component/page file that directly renders the selected element
+       - Child components explicitly visible in the selected element's markup
+
+    2. SECONDARY FILES (include only when directly impactful):
+       - Utility functions or hooks actively called within the primary component
+       - Shared layout components that wrap the main component
+
+    NOTE: When you see multiple chunks from the same file, they have already been merged - return ONE entry per file with the appropriate line range covering all relevant sections.
   `;
 
   const prompt = {
@@ -225,7 +302,7 @@ async function pickCorrectFileSnippetFromSnippets(
     content: [
       {
         type: 'text',
-        text: `This is the natural language description of the selected element:\n\t---\n\t${elementDescription}\n\t---\n\nThis is the selected element:\n\t---\n\t${JSON.stringify(element)}\n\t---\n\nThese are the file snippets you should pick the right one from:\n\t${JSON.stringify(
+        text: `This is the natural language description of the selected element:\n\t---\n\t${elementDescription}\n\t---\n\nThis is the selected element:\n\t---\n\t${JSON.stringify(element)}\n\t---\n\nThese are the file snippets you should pick all relevant ones from (note: multiple chunks from the same file have been merged):\n\t${JSON.stringify(
           snippetsWithLineNumbers.map((s) => ({
             relativePath: s.relativePath,
             content: s.content,
@@ -240,46 +317,40 @@ async function pickCorrectFileSnippetFromSnippets(
   try {
     const response = await generateObject({
       schema: z.object({
-        relativePath: z.string(),
-        startLine: z.number(),
-        endLine: z.number(),
-        error: z
-          .string()
-          .describe(
-            'The error message if no file was found, otherwise undefined',
-          )
-          .optional(),
+        elements: z.array(
+          z.object({
+            relativePath: z.string(),
+            startLine: z.number(),
+            endLine: z.number(),
+          }),
+        ),
       }),
       model,
       messages: [{ role: 'system', content: fileSelectionPrompt }, prompt],
       temperature: 0.1,
     });
-    return response.object;
-  } catch (e) {
-    return {
-      error: `Failed to pick correct file snippet from snippets: ${e}`,
-    };
+    return response.object.elements;
+  } catch (_e) {
+    onError?.(`Failed to pick correct file snippets from snippets: ${_e}`);
+    return [];
   }
 }
 
 /**
- * Retrieves the context file from the selected element.
- * @param element The element to get the context file from.
+ * Retrieves the context files from the selected element.
+ * @param element The element to get the context files from.
  * @param apiKey The API key to use for the LLM.
  * @param workspaceDataPath The path to the workspace data.
- * @returns The context file.
+ * @returns An array of context files with their file paths and line number ranges.
  */
-export async function getContextFileFromSelectedElement(
+export async function getContextFilesFromSelectedElement(
   element: SelectedElement,
   apiKey: string,
   workspaceDataPath: string,
   model: LanguageModelV2,
   clientRuntime: ClientRuntime,
   onError?: (error: string) => void,
-): Promise<
-  | { relativePath: string; startLine: number; endLine: number }
-  | { error: string }
-> {
+): Promise<{ relativePath: string; startLine: number; endLine: number }[]> {
   try {
     const { retrievedFiles, elementDescription } =
       await retrieveFilesForSelectedElement(
@@ -289,7 +360,7 @@ export async function getContextFileFromSelectedElement(
         apiKey,
       );
 
-    const correctFileSnippet = await pickCorrectFileSnippetFromSnippets(
+    const correctFileSnippets = await pickCorrectFileSnippetsFromSnippets(
       element,
       clientRuntime,
       retrievedFiles.map((f) => ({
@@ -303,17 +374,9 @@ export async function getContextFileFromSelectedElement(
       onError,
     );
 
-    if ('error' in correctFileSnippet && correctFileSnippet.error) {
-      return { error: correctFileSnippet.error };
-    }
-    if ('relativePath' in correctFileSnippet) {
-      return {
-        relativePath: correctFileSnippet.relativePath,
-        startLine: correctFileSnippet.startLine,
-        endLine: correctFileSnippet.endLine,
-      };
-    } else return { error: correctFileSnippet.error };
-  } catch (e) {
-    return { error: `Failed to get file snippet from selected element: ${e}` };
+    return correctFileSnippets;
+  } catch (_e) {
+    onError?.(`Failed to get context files from selected element: ${_e}`);
+    return [];
   }
 }

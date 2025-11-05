@@ -159,7 +159,7 @@ export function htmlElementToContextSnippet(
     These are the code snippets that belong to the HTML elements that the user has selected before making the request.
     </description>
     <content>
-      ${elements.map((element) => `<relative-path>${element?.codeMetadata?.relativePath}</relative-path>\n<start-line>${element?.codeMetadata?.startLine}</start-line>\n<end-line>${element?.codeMetadata?.endLine}</end-line>${element?.codeMetadata?.content ? `<content>${element?.codeMetadata?.content}</content>` : ''}`).join('\n\n')}
+      ${codeMetadataToContextSnippet(elements.flatMap((element) => element.codeMetadata))}
     </content>
   </code-metadata>
   `
@@ -167,6 +167,22 @@ export function htmlElementToContextSnippet(
   }
   `;
   return result;
+}
+
+function codeMetadataToContextSnippet(
+  codeMetadata: {
+    relativePath: string;
+    startLine: number;
+    endLine: number;
+    content?: string;
+  }[],
+): string {
+  return codeMetadata
+    .map(
+      (m) =>
+        `<relative-path>${m.relativePath}</relative-path>\n<start-line>${m.startLine}</start-line>\n<end-line>${m.endLine}</end-line>${m.content ? `<content>${m.content}</content>` : ''}`,
+    )
+    .join('\n\n');
 }
 
 /**

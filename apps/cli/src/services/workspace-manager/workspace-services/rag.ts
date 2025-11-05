@@ -1,6 +1,10 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { initializeRag, getRagMetadata } from '@stagewise/agent-rag';
-import { isAuthenticationError } from '@stagewise/agent-utils';
+import {
+  getContextFilesFromSelectedElement,
+  isAuthenticationError,
+} from '@stagewise/agent-utils';
 import type { KartonService } from '../../karton';
 import type { Logger } from '../../logger';
 import type { TelemetryService } from '../../telemetry';
@@ -16,6 +20,8 @@ export class RagService {
   private updateRagInterval: NodeJS.Timeout | null = null;
   private authRetryCount = 0;
   private maxAuthRetries = 2;
+  private litellm!: ReturnType<typeof createGoogleGenerativeAI>;
+  private apiKey!: string;
 
   private constructor(
     logger: Logger,
@@ -54,14 +60,14 @@ export class RagService {
     });
   }
 
-  private async updateRag(apiKey: string) {
+  private async updateRag() {
     this.logger.debug('[RagService] Starting RAG update');
     let total = 0;
     try {
       for await (const update of initializeRag(
         this.workspaceDataPath,
         this.clientRuntime,
-        apiKey,
+        this.apiKey,
         (error) => {
           // Check if this is an auth error - if so, throw to interrupt iteration
           if (isAuthenticationError(error)) {
@@ -105,18 +111,9 @@ export class RagService {
 
           // Refresh auth tokens
           await this.authService.refreshAuthData();
-          const tokens = await this.authService.getToken();
-
-          if (!tokens) {
-            this.authRetryCount = 0;
-            this.resetRagStatusWithError(
-              'Authentication failed - failed to refresh tokens',
-            );
-            return;
-          }
-
+          await this.initializeLitellm();
           // Retry with fresh token
-          await this.updateRag(tokens.accessToken);
+          await this.updateRag();
           return;
         } else {
           // Exceeded max retries
@@ -133,17 +130,17 @@ export class RagService {
     }
   }
 
-  private periodicallyUpdateRag(apiKey: string) {
+  private periodicallyUpdateRag() {
     this.updateRagInterval = setInterval(async () => {
       try {
         if (this.kartonService.state.workspace?.rag?.statusInfo?.isIndexing) {
           if (this.updateRagInterval) clearInterval(this.updateRagInterval);
           this.updateRagInterval = null;
-          this.periodicallyUpdateRag(apiKey);
+          this.periodicallyUpdateRag();
           return;
         }
 
-        await this.updateRag(apiKey);
+        await this.updateRag();
       } catch (error) {
         this.telemetryService.captureException(error as Error);
         this.logger.error(
@@ -156,19 +153,28 @@ export class RagService {
         );
         if (this.updateRagInterval) clearInterval(this.updateRagInterval);
         this.updateRagInterval = null;
-        this.periodicallyUpdateRag(apiKey);
+        this.periodicallyUpdateRag();
       }
     }, 60 * 1000); // 60 seconds
   }
 
+  private async initializeLitellm() {
+    const LLM_PROXY_URL =
+      process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
+    const tokens = await this.authService.getToken();
+    if (!tokens) {
+      throw new Error('No authentication tokens available');
+    }
+    this.apiKey = tokens.accessToken;
+    this.litellm = createGoogleGenerativeAI({
+      baseURL: `${LLM_PROXY_URL}`,
+      apiKey: this.apiKey,
+    });
+  }
+
   public async initialize() {
     try {
-      const tokens = await this.authService.getToken();
-      const apiKey = tokens?.accessToken;
-      if (!apiKey) {
-        this.logger.debug('[RagService] No authentication tokens available');
-        return;
-      }
+      await this.initializeLitellm();
 
       this.logger.debug('[RagService] Initializing...');
 
@@ -176,10 +182,10 @@ export class RagService {
       this.registerProcedureHandlers();
 
       // Immediately run RAG update on creation
-      void this.updateRag(apiKey);
+      void this.updateRag();
 
       // Then periodically update RAG
-      this.periodicallyUpdateRag(apiKey);
+      this.periodicallyUpdateRag();
 
       this.logger.debug('[RagService] Initialized');
     } catch (error) {
@@ -193,10 +199,54 @@ export class RagService {
   }
 
   private registerProcedureHandlers() {
+    this.kartonService.registerServerProcedureHandler(
+      'agentChat.getContextElementFiles',
+      async (element) => {
+        const files = await getContextFilesFromSelectedElement(
+          element,
+          this.apiKey!,
+          this.workspaceDataPath!, // Is only called when the workspace is loaded
+          this.telemetryService.withTracing(
+            this.litellm('gemini-2.5-flash-lite'),
+            {
+              posthogProperties: {
+                $ai_span_name: 'get-context-element-file',
+              },
+            },
+          ),
+          this.clientRuntime,
+          (error) => {
+            this.logger.error(
+              `[AgentService] Failed to get context element file: ${error}`,
+            );
+          },
+        );
+        if (files.length === 0) return files;
+        this.logger.debug(
+          `[AgentService] Get context element files: ${files.map((file) => `${file.relativePath} - ${file.startLine} - ${file.endLine}`).join(', ')}`,
+        );
+
+        const fileContents = await Promise.all(
+          files.map((file) =>
+            this.clientRuntime.fileSystem.readFile(file.relativePath),
+          ),
+        );
+        return fileContents.map((fileContent, index) => ({
+          relativePath: files[index]!.relativePath,
+          startLine: files[index]!.startLine,
+          endLine: files[index]!.endLine,
+          content: fileContent.content,
+        }));
+      },
+    );
     // implement procedure handlers (such as 're-index codebase') here once needed
   }
 
-  private removeServerProcedureHandlers() {}
+  private removeServerProcedureHandlers() {
+    this.kartonService.removeServerProcedureHandler(
+      'agentChat.getContextElementFiles',
+    );
+  }
 
   /**
    * Teardown the RAG service

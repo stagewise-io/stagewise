@@ -22,7 +22,6 @@ import {
   type PlanLimitsExceededError,
   createAuthenticatedClient,
   type KartonStateProvider,
-  getContextFileFromSelectedElement,
   extractDetailsFromError,
 } from '@stagewise/agent-utils';
 import { hasUndoMetadata, hasDiffMetadata } from '@stagewise/agent-types';
@@ -77,7 +76,6 @@ export class AgentService {
   private kartonService: KartonService;
   private authService: AuthService;
   private workspaceSetupService: WorkspaceSetupService;
-  private workspaceDataPath: string | null = null;
   private clientRuntime: ClientRuntime;
   private apiKey: string | null = null;
 
@@ -106,7 +104,6 @@ export class AgentService {
     authService: AuthService,
     clientRuntime: ClientRuntime,
     workspaceSetupService: WorkspaceSetupService,
-    workspaceDataPath: string | null,
   ) {
     this.logger = logger;
     this.telemetryService = telemetryService;
@@ -114,7 +111,6 @@ export class AgentService {
     this.authService = authService;
     this.clientRuntime = clientRuntime;
     this.workspaceSetupService = workspaceSetupService;
-    this.workspaceDataPath = workspaceDataPath ?? null;
     this.kartonService.setState((draft) => {
       if (!draft.workspace?.agentChat) {
         draft.workspace!.agentChat = {
@@ -658,45 +654,6 @@ export class AgentService {
       );
 
       this.kartonService.registerServerProcedureHandler(
-        'agentChat.getContextElementFile',
-        async (element) => {
-          const file = await getContextFileFromSelectedElement(
-            element,
-            this.apiKey!,
-            this.workspaceDataPath!, // Is only called when the workspace is loaded
-            this.telemetryService.withTracing(
-              this.litellm('gemini-2.5-flash-lite'),
-              {
-                posthogProperties: {
-                  $ai_span_name: 'get-context-element-file',
-                },
-              },
-            ),
-            this.clientRuntime,
-            (error) => {
-              this.logger.error(
-                `[AgentService] Failed to get context element file: ${error}`,
-              );
-            },
-          );
-          if ('error' in file) return file;
-          this.logger.debug(
-            `[AgentService] Get context element file: ${file.relativePath} - ${file.startLine} - ${file.endLine}`,
-          );
-
-          const fileContent = await this.clientRuntime.fileSystem.readFile(
-            file.relativePath,
-          );
-          return {
-            relativePath: file.relativePath,
-            startLine: file.startLine,
-            endLine: file.endLine,
-            content: fileContent.content,
-          };
-        },
-      );
-
-      this.kartonService.registerServerProcedureHandler(
         'userAccount.refreshSubscription',
         async () => {
           await this.fetchSubscription();
@@ -1122,10 +1079,6 @@ export class AgentService {
     this.logger.debug('[AgentService] Shutdown complete');
   }
 
-  public setWorkspaceDataPath(workspaceDataPath: string | null) {
-    this.workspaceDataPath = workspaceDataPath;
-  }
-
   public static async create(
     logger: Logger,
     telemetryService: TelemetryService,
@@ -1133,7 +1086,6 @@ export class AgentService {
     authService: AuthService,
     clientRuntime: ClientRuntime,
     workspaceSetupService: WorkspaceSetupService,
-    workspaceDataPath: string | null,
   ) {
     const instance = new AgentService(
       logger,
@@ -1142,7 +1094,6 @@ export class AgentService {
       authService,
       clientRuntime,
       workspaceSetupService,
-      workspaceDataPath,
     );
     await instance.initialize();
     logger.debug('[AgentService] Created service');

@@ -21,7 +21,7 @@ interface ContextElementsChipsProps {
       startLine: number;
       endLine: number;
       content?: string;
-    } | null;
+    }[];
   }[];
   removeChatDomContext: (element: HTMLElement) => void;
 }
@@ -64,7 +64,7 @@ interface ContextElementChipProps {
     startLine: number;
     endLine: number;
     content?: string;
-  } | null;
+  }[];
   onDelete: () => void;
   onHover: (element: HTMLElement) => void;
   onUnhover: () => void;
@@ -125,10 +125,10 @@ function ContextElementChip({
         <PopoverTitle>Code Metadata</PopoverTitle>
         <div className="flex flex-col gap-2">
           <p className="text-foreground/70 text-sm">
-            {codeMetadata?.relativePath}
+            {codeMetadata.map((metadata) => metadata.relativePath).join(', ')}
           </p>
           <p className="text-foreground/70 text-sm">
-            {codeMetadata?.startLine}
+            {codeMetadata.map((metadata) => metadata.startLine).join(', ')}
           </p>
         </div>
       </PopoverContent>
