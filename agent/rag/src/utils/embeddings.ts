@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import { generateFileEmbeddingsParallel } from './parallel-embeddings.js';
 import { EXPECTED_EMBEDDING_DIM } from '../index.js';
 import path from 'node:path';
 
@@ -178,16 +179,35 @@ export const callEmbeddingApi = async <T extends string | string[]>(
 
 /**
  * Generates embeddings for multiple files in batches
+ * @param config - Embedding configuration
+ * @param relativePaths - Array of file paths to process
+ * @param clientRuntime - Runtime for file system operations
+ * @param onError - Optional error callback
+ * @param concurrency - Number of parallel workers (default 1 for sequential processing)
  */
 export async function* generateFileEmbeddings(
   config: EmbeddingConfig,
   relativePaths: string[],
   clientRuntime: ClientRuntime,
   onError?: (error: unknown) => void,
+  concurrency?: number,
 ): AsyncGenerator<FileEmbedding> {
+  // Use parallel implementation if concurrency > 1
+  if (concurrency && concurrency > 1) {
+    yield* generateFileEmbeddingsParallel(
+      config,
+      relativePaths,
+      clientRuntime,
+      concurrency,
+      onError,
+    );
+    return;
+  }
+
+  // Sequential implementation (default)
   const client = createEmbeddingClient(config);
   const model = config.model || 'gemini-embedding-001';
-  const batchSize = config.batchSize || 100;
+  const batchSize = config.batchSize || 250;
 
   for (let i = 0; i < relativePaths.length; i += batchSize) {
     const batch = relativePaths.slice(i, i + batchSize);
@@ -233,7 +253,7 @@ export async function* generateFileEmbeddings(
     }
 
     // Process chunks in embedding batches
-    const embeddingBatchSize = 100; // Max number of texts to embed at once
+    const embeddingBatchSize = 250; // Max number of texts to embed at once
 
     // Skip embedding generation if there are no chunks to process
     if (chunkInfoList.length === 0) continue;
@@ -243,7 +263,9 @@ export async function* generateFileEmbeddings(
       const texts = chunkBatch.map((info) => info.chunk.text);
 
       // Batch embed all texts at once
+      console.log('Calling embedding API with so many texts', texts.length);
       const embeddings = await callEmbeddingApi(client, texts, model);
+      console.log('Got embeddings', embeddings.length);
 
       // Yield FileEmbedding for each chunk with its corresponding embedding
       for (let k = 0; k < chunkBatch.length; k++) {
@@ -273,16 +295,6 @@ export async function* generateFileEmbeddings(
           );
         }
       }
-
-      // Add a small delay between embedding batches to avoid rate limiting
-      if (j + embeddingBatchSize < chunkInfoList.length) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
-
-    // Add a small delay between file batches to avoid rate limiting
-    if (i + batchSize < relativePaths.length) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
 }

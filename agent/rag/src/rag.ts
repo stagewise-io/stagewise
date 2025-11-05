@@ -13,10 +13,12 @@ import {
 import {
   connectToDatabase,
   deleteFileRecords,
-  addFileRecord,
+  addFileRecordsBatch,
+  createFileRecord,
   getAllIndexedFilePaths,
   searchSimilarFiles,
   getRagMetadata as getRagMetadataFromDb,
+  type FileEmbeddingRecord,
 } from './utils/rag-db.js';
 
 import { LevelDb, RAG_VERSION } from './index.js';
@@ -246,6 +248,9 @@ async function* embedFiles(
   apiKey: string,
 ): AsyncGenerator<FileEmbedding> {
   const table = await connectToDatabase(workspaceDataPath);
+  const BATCH_SIZE = 250; // Accumulate 250 records before writing to reduce fragment creation
+  let recordBuffer: FileEmbeddingRecord[] = [];
+
   try {
     const embeddings = generateFileEmbeddings(
       {
@@ -254,10 +259,13 @@ async function* embedFiles(
       },
       relativePaths,
       clientRuntime,
+      undefined, // onError
+      10, // concurrency - use 10 parallel workers
     );
+
     for await (const embedding of embeddings) {
-      await addFileRecord(
-        table,
+      // Create record and add to buffer
+      const record = createFileRecord(
         {
           absolutePath: clientRuntime.fileSystem.resolvePath(
             embedding.relativePath,
@@ -266,8 +274,21 @@ async function* embedFiles(
         },
         embedding,
       );
+      recordBuffer.push(record);
+
+      // Batch write when buffer is full
+      if (recordBuffer.length >= BATCH_SIZE) {
+        await addFileRecordsBatch(table, recordBuffer);
+        recordBuffer = [];
+        // Checkout latest after batch write to see the new data
+        await table.checkoutLatest();
+      }
+
       yield embedding;
     }
+
+    // Flush remaining records in buffer
+    if (recordBuffer.length > 0) await addFileRecordsBatch(table, recordBuffer);
   } finally {
     // Ensure all writes are flushed and visible before closing
     await table.checkoutLatest();

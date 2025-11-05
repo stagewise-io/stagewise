@@ -173,6 +173,21 @@ export async function addFileRecord(
 }
 
 /**
+ * Inserts multiple file records in a single batch operation.
+ * This is much more efficient than calling addFileRecord() multiple times,
+ * as it creates a single LanceDB fragment instead of one per record.
+ */
+export async function addFileRecordsBatch(
+  table: Table,
+  records: FileEmbeddingRecord[],
+): Promise<void> {
+  if (!table) throw new Error('Table not initialized');
+  if (records.length === 0) return;
+
+  await table.add(records as any);
+}
+
+/**
  * Deletes a file record by relative path
  */
 export async function deleteFileRecords(
