@@ -118,6 +118,9 @@ export class WorkspaceSetupService {
       'workspace.setup.checkForActiveAppOnPort',
     );
     this.kartonService.removeServerProcedureHandler('workspace.setup.submit');
+    this.kartonService.removeServerProcedureHandler(
+      'workspace.setup.resolveRelativePathToAbsolutePath',
+    );
 
     this.kartonService.setState((draft) => {
       if (draft.workspace) {
