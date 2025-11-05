@@ -165,7 +165,12 @@ export class AuthService {
       await this.serverInterop
         .refreshToken(this.tokenStore.tokenData.refreshToken)
         .then((tokenData) => {
-          this.tokenStore.tokenData = tokenData;
+          this.tokenStore.tokenData = {
+            accessToken: tokenData.accessToken,
+            refreshToken: tokenData.refreshToken,
+            expiresAt: new Date(tokenData.expiresAt),
+            refreshExpiresAt: new Date(tokenData.refreshExpiresAt),
+          };
         })
         .catch((err) => {
           this.notificationService.showNotification({
@@ -209,6 +214,14 @@ export class AuthService {
       void this.logout();
       return;
     }
+
+    this.kartonService.setState((draft) => {
+      draft.userAccount = {
+        ...draft.userAccount,
+        status: 'authenticated',
+        machineId: this.identifierService.getMachineId(),
+      };
+    });
 
     // We also fetch user subscription information from the server.
     const subscriptionData = await this.serverInterop.getSubscription(
@@ -311,7 +324,12 @@ export class AuthService {
       const handleAuthCodeExchange = async () => {
         try {
           const tokenData = await this.serverInterop.exchangeToken(authCode);
-          this.tokenStore.tokenData = tokenData;
+          this.tokenStore.tokenData = {
+            accessToken: tokenData.accessToken,
+            refreshToken: tokenData.refreshToken,
+            expiresAt: new Date(tokenData.expiresAt),
+            refreshExpiresAt: new Date(tokenData.refreshExpiresAt),
+          };
         } catch (err) {
           this.logger.error(`[AuthService] Failed to exchange token: ${err}`);
           void this.logout();
