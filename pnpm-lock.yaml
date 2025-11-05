@@ -384,6 +384,9 @@ importers:
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
+      superjson:
+        specifier: 2.2.2
+        version: 2.2.2
       ws:
         specifier: ^8.18.3
         version: 8.18.3
