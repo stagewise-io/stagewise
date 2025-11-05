@@ -52,12 +52,12 @@ export async function main({
     logger,
     kartonService,
   );
-  const authService = AuthService.create(
+  const authService = await AuthService.create(
     globalDataPathService,
     identifierService,
-    logger,
     kartonService,
     notificationService,
+    logger,
   );
   const workspaceManagerService = await WorkspaceManagerService.create(
     logger,

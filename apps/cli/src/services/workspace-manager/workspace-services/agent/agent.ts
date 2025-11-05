@@ -219,27 +219,27 @@ export class AgentService {
     const LLM_PROXY_URL =
       process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
-    const tokens = await this.authService.getToken();
-    if (!tokens) {
+    const accessToken = await this.authService.accessToken;
+    if (accessToken) {
       throw new Error('No authentication tokens available');
     }
 
-    this.apiKey = tokens.accessToken;
+    this.apiKey = accessToken ?? null;
 
     this.litellm = createAnthropic({
       baseURL: `${LLM_PROXY_URL}/v1`,
-      apiKey: tokens.accessToken,
+      apiKey: accessToken,
     });
   }
 
   private async initializeClient() {
-    await this.authService.refreshAuthData();
-    const tokens = await this.authService.getToken();
-    if (!tokens) {
+    await this.authService.refreshAuthState();
+    const accessToken = await this.authService.accessToken;
+    if (!accessToken) {
       throw new Error('No authentication tokens available');
     }
 
-    this.client = createAuthenticatedClient(tokens.accessToken);
+    this.client = createAuthenticatedClient(accessToken);
   }
 
   private setAgentWorking(isWorking: boolean): void {

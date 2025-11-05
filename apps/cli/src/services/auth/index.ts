@@ -1,0 +1,385 @@
+import type { KartonContract } from '@stagewise/karton-contract';
+import type { GlobalDataPathService } from '../global-data-path';
+import type { KartonService } from '../karton';
+import type { Logger } from '../logger';
+import { AuthServerInterop, consoleUrl } from './server-interop';
+import { AuthTokenStore } from './token-store';
+import { stagewiseAppPrefix } from '../ui-server/shared';
+import type { NotificationService } from '../notification';
+import type { IdentifierService } from '../identifier';
+
+export type AuthState = KartonContract['state']['userAccount'];
+
+const ACCESS_TOKEN_EXPIRATION_BUFFER_TIME = 10 * 60 * 1000; // We refresh the token 10 minutes before it expires to avoid any issues
+
+export class AuthService {
+  private globalDataPathService: GlobalDataPathService;
+  private identifierService: IdentifierService;
+  private kartonService: KartonService;
+  private notificationService: NotificationService;
+  private logger: Logger;
+  private tokenStore!: AuthTokenStore;
+  private serverInterop: AuthServerInterop;
+  private _authStateCheckInterval: NodeJS.Timeout | null = null;
+
+  private constructor(
+    globalDataPathService: GlobalDataPathService,
+    identifierService: IdentifierService,
+    kartonService: KartonService,
+    notificationService: NotificationService,
+    logger: Logger,
+  ) {
+    this.globalDataPathService = globalDataPathService;
+    this.identifierService = identifierService;
+    this.kartonService = kartonService;
+    this.notificationService = notificationService;
+    this.logger = logger;
+    this.serverInterop = new AuthServerInterop(logger);
+  }
+
+  private async initialize(): Promise<void> {
+    this.tokenStore = await AuthTokenStore.create(
+      this.globalDataPathService,
+      this.logger,
+    );
+
+    // We do the initial auth state asynchronously.
+    void this.checkAuthState();
+    this._authStateCheckInterval = setInterval(
+      () => {
+        void this.checkAuthState();
+      },
+      10 * 60 * 1000,
+    ); // 10 minutes
+
+    // Register all procedure handlers for the user account
+    this.kartonService.registerServerProcedureHandler(
+      'userAccount.logout',
+      async () => {
+        await this.logout();
+      },
+    );
+
+    this.kartonService.registerServerProcedureHandler(
+      'userAccount.startLogin',
+      async () => {
+        await this.startLogin();
+      },
+    );
+
+    this.kartonService.registerServerProcedureHandler(
+      'userAccount.abortLogin',
+      async () => {
+        await this.abortLogin();
+      },
+    );
+
+    this.kartonService.registerServerProcedureHandler(
+      'userAccount.refreshStatus',
+      async () => {
+        await this.checkAuthState();
+      },
+    );
+
+    this.kartonService.registerServerProcedureHandler(
+      'userAccount.refreshSubscription',
+      async () => {
+        await this.checkAuthState();
+      },
+    );
+
+    this.kartonService.setState((draft) => {
+      draft.userAccount.status = 'server_unreachable';
+    });
+
+    // Check if we have any tokens stored in
+    this.logger.debug('[AuthService] Initialized');
+  }
+
+  public static async create(
+    globalDataPathService: GlobalDataPathService,
+    identifierService: IdentifierService,
+    kartonService: KartonService,
+    notificationService: NotificationService,
+    logger: Logger,
+  ): Promise<AuthService> {
+    const authService = new AuthService(
+      globalDataPathService,
+      identifierService,
+      kartonService,
+      notificationService,
+      logger,
+    );
+    await authService.initialize();
+    return authService;
+  }
+
+  public tearDown(): void {
+    clearInterval(this._authStateCheckInterval!);
+
+    this.kartonService.removeServerProcedureHandler('userAccount.logout');
+    this.kartonService.removeServerProcedureHandler('userAccount.startLogin');
+    this.kartonService.removeServerProcedureHandler('userAccount.abortLogin');
+    this.kartonService.removeServerProcedureHandler(
+      'userAccount.refreshStatus',
+    );
+    this.kartonService.removeServerProcedureHandler(
+      'userAccount.refreshSubscription',
+    );
+
+    this.logger.debug('[AuthService] Teared down auth service');
+  }
+
+  // Regularly callable function that checks, if auth if configured and valid.
+  // Will be called every 10 minutes by default, but this function can also be call as soon as we think there may be some issue with auth.
+  // It updates the karton state with latest information on auth.
+  private async checkAuthState(): Promise<void> {
+    // Check if we have token data stored
+    if (!this.tokenStore.tokenData?.accessToken) {
+      // early exit, since there's no token stored anyway
+      this.kartonService.setState((draft) => {
+        draft.userAccount = {
+          status: 'unauthenticated',
+          loginDialog: null,
+          machineId: this.identifierService.getMachineId(),
+        };
+      });
+      return;
+    }
+
+    // If yes, we check if the token needs to be refreshed. (look at expiration date)
+    if (
+      this.tokenStore.tokenData.expiresAt &&
+      this.tokenStore.tokenData.expiresAt <
+        new Date(Date.now() + ACCESS_TOKEN_EXPIRATION_BUFFER_TIME)
+    ) {
+      // We check if the refresh token is still valid. If no, we simply logout.
+      if (
+        this.tokenStore.tokenData.refreshExpiresAt &&
+        this.tokenStore.tokenData.refreshExpiresAt < new Date()
+      ) {
+        await this.logout();
+        return;
+      }
+
+      await this.serverInterop
+        .refreshToken(this.tokenStore.tokenData.refreshToken)
+        .then((tokenData) => {
+          this.tokenStore.tokenData = tokenData;
+        })
+        .catch((err) => {
+          this.notificationService.showNotification({
+            title: 'Failed to refresh authentication token',
+            message: 'Please sign in again.',
+            type: 'error',
+            duration: 5000,
+            actions: [],
+          });
+          this.logger.error(
+            `[AuthService] Failed to refresh token. Error: ${err}`,
+          );
+          void this.logout();
+          return;
+        });
+    }
+
+    // We fetch the user session data from the server and update the user state if we get valid data.
+    const sessionData = await this.serverInterop
+      .getSession(this.tokenStore.tokenData.accessToken)
+      .catch((err) => {
+        this.kartonService.setState((draft) => {
+          draft.userAccount.status = 'server_unreachable';
+        });
+
+        this.logger.error(`[AuthService] Failed to get session: ${err}`);
+        return null;
+      });
+    if (!sessionData) {
+      this.logger.error(
+        `[AuthService] Returned session is empty. Logging out.`,
+      );
+      void this.logout();
+      return;
+    }
+
+    if (!sessionData.valid) {
+      this.logger.error(
+        `[AuthService] Returned session is not valid. Logging out.`,
+      );
+      void this.logout();
+      return;
+    }
+
+    // We also fetch user subscription information from the server.
+    const subscriptionData = await this.serverInterop.getSubscription(
+      this.tokenStore.tokenData.accessToken,
+    );
+
+    this.kartonService.setState((draft) => {
+      draft.userAccount = {
+        ...draft.userAccount,
+        status: 'authenticated',
+        machineId: this.identifierService.getMachineId(),
+        user: {
+          id: sessionData.userId,
+          email: sessionData.userEmail,
+        },
+        subscription: {
+          active: subscriptionData?.hasSubscription || false,
+          plan: subscriptionData?.subscription?.priceId || undefined,
+          expiresAt:
+            subscriptionData?.subscription?.currentPeriodEnd?.toISOString() ||
+            undefined,
+        },
+      };
+    });
+  }
+
+  public async logout(): Promise<void> {
+    if (!this.tokenStore.tokenData?.accessToken) {
+      // early exit, since there's no token stored anyway
+      return;
+    }
+    // Clear the stored token data
+    await this.serverInterop
+      .revokeToken(this.tokenStore.tokenData?.accessToken)
+      .catch((err) => {
+        this.logger.error(
+          `[AuthService] Failed to revoke token on server side. Logging out anyway. Error: ${err}`,
+        );
+      });
+    this.tokenStore.tokenData = null;
+
+    this.notificationService.showNotification({
+      title: 'Logged out',
+      message: 'You have been logged out of stagewise.',
+      type: 'info',
+      duration: 5000,
+      actions: [],
+    });
+
+    void this.checkAuthState();
+    this.logger.debug('[AuthService] Logged out');
+  }
+
+  public async startLogin(): Promise<void> {
+    // If the user is already authenticated, we just early exit
+    if (this.authState.status !== 'unauthenticated') {
+      return;
+    }
+
+    this.kartonService.setState((draft) => {
+      draft.userAccount = {
+        ...draft.userAccount,
+        machineId: this.identifierService.getMachineId(),
+        loginDialog: {
+          startUrl: this.getAuthUrl(),
+        },
+      };
+    });
+  }
+
+  public async abortLogin(): Promise<void> {
+    this.kartonService.setState((draft) => {
+      draft.userAccount = {
+        ...draft.userAccount,
+        loginDialog: null,
+      };
+    });
+  }
+
+  // This function should only be called by the web server that the CLI hosts and that receives the auth code from the user.
+  public async handleAuthCodeExchange(
+    authCode: string | undefined,
+    error: string | undefined,
+  ): Promise<void> {
+    this.kartonService.setState((draft) => {
+      draft.userAccount = {
+        ...draft.userAccount,
+        loginDialog: null,
+      };
+    });
+    if (error) {
+      this.logger.error(`[AuthService] Failed to exchange token: ${error}`);
+    }
+    if (!authCode) {
+      this.logger.error(`[AuthService] No auth code provided`);
+      return;
+    }
+    try {
+      // This function is executed if the user approves the sign in.
+      const handleAuthCodeExchange = async () => {
+        try {
+          const tokenData = await this.serverInterop.exchangeToken(authCode);
+          this.tokenStore.tokenData = tokenData;
+        } catch (err) {
+          this.logger.error(`[AuthService] Failed to exchange token: ${err}`);
+          void this.logout();
+        }
+      };
+
+      // We ask the user if they actually just signed up into stagewise. If yes, we will proceed with the token exchange.
+      const result = await new Promise((resolve, reject) => {
+        this.notificationService.showNotification({
+          title: 'New user authentication',
+          message: 'Please confirm that you just signed up into stagewise.',
+          type: 'info',
+          actions: [
+            {
+              label: 'Confirm',
+              onClick: () => {
+                void handleAuthCodeExchange()
+                  .then(() => resolve(true))
+                  .catch(() => reject(new Error('Authentication cancelled')));
+              },
+              type: 'primary',
+            },
+            {
+              label: 'Cancel',
+              onClick: () => {
+                resolve(false);
+              },
+              type: 'secondary',
+            },
+          ],
+        });
+      }).catch((err) => {
+        this.logger.error(`[AuthService] Failed to show notification: ${err}`);
+        return false;
+      });
+
+      if (result) {
+        // After the token exchange, we immediately check the auth data which leads to a state update.
+        await this.checkAuthState();
+      } else {
+        this.logger.debug('[AuthService] User cancelled authentication');
+        return;
+      }
+    } catch (err) {
+      this.logger.error(`[AuthService] Failed to exchange token: ${err}`);
+      void this.logout();
+      return;
+    }
+  }
+
+  public get authState(): AuthState {
+    // We store everything in karton and just report it here. Makes it easier and reduces redundancy...
+    return this.kartonService.state.userAccount;
+  }
+
+  public get accessToken(): string | undefined {
+    return this.tokenStore.tokenData?.accessToken;
+  }
+
+  public async refreshAuthState(): Promise<AuthState> {
+    await this.checkAuthState();
+    return this.authState;
+  }
+
+  private getAuthUrl(): string {
+    const runningPort = this.kartonService.state.appInfo.runningOnPort;
+    const callbackUrl = `http://localhost:${runningPort}${stagewiseAppPrefix}/auth/callback`;
+
+    return `${consoleUrl}/authenticate-ide?ide=cli&redirect_uri=${encodeURIComponent(callbackUrl)}`;
+  }
+}

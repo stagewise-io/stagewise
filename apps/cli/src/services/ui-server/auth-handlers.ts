@@ -21,7 +21,7 @@ export async function setupAuthRoutes(
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
 
-    await authService.handleAuthCallback(
+    await authService.handleAuthCodeExchange(
       authCode as string | undefined,
       error as string | undefined,
     );

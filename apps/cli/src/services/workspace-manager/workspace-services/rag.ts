@@ -110,7 +110,7 @@ export class RagService {
           );
 
           // Refresh auth tokens
-          await this.authService.refreshAuthData();
+          await this.authService.refreshAuthState();
           await this.initializeLitellm();
           // Retry with fresh token
           await this.updateRag();
@@ -161,11 +161,11 @@ export class RagService {
   private async initializeLitellm() {
     const LLM_PROXY_URL =
       process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
-    const tokens = await this.authService.getToken();
-    if (!tokens) {
+    const accessToken = await this.authService.accessToken;
+    if (!accessToken) {
       throw new Error('No authentication tokens available');
     }
-    this.apiKey = tokens.accessToken;
+    this.apiKey = accessToken;
     this.litellm = createGoogleGenerativeAI({
       baseURL: `${LLM_PROXY_URL}`,
       apiKey: this.apiKey,
