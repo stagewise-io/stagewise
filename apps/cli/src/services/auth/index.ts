@@ -43,6 +43,10 @@ export class AuthService {
       this.logger,
     );
 
+    this.kartonService.setState((draft) => {
+      draft.userAccount.status = 'server_unreachable';
+    });
+
     // We do the initial auth state asynchronously.
     void this.checkAuthState();
     this._authStateCheckInterval = setInterval(
@@ -87,10 +91,6 @@ export class AuthService {
         await this.checkAuthState();
       },
     );
-
-    this.kartonService.setState((draft) => {
-      draft.userAccount.status = 'server_unreachable';
-    });
 
     // Check if we have any tokens stored in
     this.logger.debug('[AuthService] Initialized');

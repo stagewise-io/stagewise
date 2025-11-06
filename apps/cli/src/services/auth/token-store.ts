@@ -74,7 +74,7 @@ export class AuthTokenStore {
         return parsedTokenData.data;
       })
       .catch((err) => {
-        this.logger.error(
+        this.logger.debug(
           `[AuthTokenStore] Failed to read token data. Error: ${err}, File path: ${this.getTokenDataPath()}`,
         );
         return null;
@@ -83,11 +83,23 @@ export class AuthTokenStore {
   }
 
   private async storeTokenData(): Promise<void> {
+    // If the path to the file doesn't exist, it will be created.
+    await fs
+      .mkdir(path.dirname(this.getTokenDataPath()), { recursive: true })
+      .catch((err) => {
+        this.logger.error(
+          `[AuthTokenStore] Failed to create directory for token data. Error: ${err}, File path: ${this.getTokenDataPath()}`,
+        );
+      });
+
     await fs
       .writeFile(
         this.getTokenDataPath(),
         superjson.stringify(this._tokenData),
-        'utf-8',
+        {
+          flush: true,
+          encoding: 'utf-8',
+        },
       )
       .catch((err) => {
         this.logger.error(
