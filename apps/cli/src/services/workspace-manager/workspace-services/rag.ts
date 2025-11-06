@@ -221,7 +221,7 @@ export class RagService {
             );
           },
         );
-        if (files.length === 0) return files;
+        if (files.length === 0) return [];
         this.logger.debug(
           `[AgentService] Get context element files: ${files.map((file) => `${file.relativePath} - ${file.startLine} - ${file.endLine}`).join(', ')}`,
         );
@@ -235,7 +235,7 @@ export class RagService {
           relativePath: files[index]!.relativePath,
           startLine: files[index]!.startLine,
           endLine: files[index]!.endLine,
-          content: fileContent.content,
+          content: fileContent.content || 'Failed to read file content',
         }));
       },
     );
