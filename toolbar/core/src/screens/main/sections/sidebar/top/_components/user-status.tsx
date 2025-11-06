@@ -48,7 +48,9 @@ export function UserStatusArea() {
       <PopoverContent align="end">
         <PopoverTitle>User Account</PopoverTitle>
         <PopoverDescription>
-          {userAccount.user?.email ?? 'Unknown email'}
+          {userAccount.status === 'server_unreachable'
+            ? 'Service unavailable'
+            : (userAccount.user?.email ?? 'Unknown email')}
         </PopoverDescription>
         {userAccount.subscription && (
           <div className="flex flex-col items-stretch gap-4">
@@ -56,7 +58,7 @@ export function UserStatusArea() {
               <p className="font-medium text-base">Subscription information</p>
               <div className="flex flex-row items-center justify-between gap-4">
                 <p className="text-muted-foreground text-sm">Plan (ID)</p>
-                <p className="text-sm">
+                <p className="truncate text-sm">
                   {userAccount.subscription?.plan ?? 'Free'}
                 </p>
               </div>

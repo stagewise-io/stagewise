@@ -5,7 +5,7 @@ import {
   InfoIcon,
   XIcon,
   WrenchIcon,
-  ChevronRightIcon,
+  ChevronUpIcon,
 } from 'lucide-react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
@@ -74,13 +74,13 @@ export function ToolPartUIBase({
         <div className="flex-1" />
         {(part.state === 'input-available' ||
           part.state === 'input-streaming') && (
-          <CogIcon className="size-3 animate-spin text-blue-600" />
+          <CogIcon className="size-3 shrink-0 animate-spin text-blue-600" />
         )}
         {part.state === 'output-available' && (
-          <CheckIcon className="size-3 text-green-600" />
+          <CheckIcon className="size-3 shrink-0 text-green-600" />
         )}
         {part.state === 'output-error' && (
-          <XIcon className="size-3 text-rose-600" />
+          <XIcon className="size-3 shrink-0 text-rose-600" />
         )}
       </div>
       {part.state === 'output-error' && (
@@ -107,9 +107,9 @@ export function ToolPartUIBase({
             className="h-fit cursor-pointer gap-1 rounded-xl px-2.5 text-foreground"
           >
             {toolTitleContent}
-            <ChevronRightIcon
+            <ChevronUpIcon
               className={cn(
-                'size-3 transition-transform duration-150 group-data-open/collapsible:rotate-90',
+                'size-3 transition-transform duration-150 group-data-open/collapsible:rotate-180',
               )}
             />
           </CollapsibleTrigger>
