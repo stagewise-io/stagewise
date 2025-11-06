@@ -189,63 +189,64 @@ export class AuthService {
     }
 
     // We fetch the user session data from the server and update the user state if we get valid data.
-    const sessionData = await this.serverInterop
+    const _sessionData = await this.serverInterop
       .getSession(this.tokenStore.tokenData.accessToken)
+      .then(async (sessionData) => {
+        if (!sessionData) {
+          this.logger.error(
+            `[AuthService] Returned session is empty. Logging out.`,
+          );
+          void this.logout();
+          return;
+        }
+
+        if (!sessionData.valid) {
+          this.logger.error(
+            `[AuthService] Returned session is not valid. Logging out.`,
+          );
+          void this.logout();
+          return;
+        }
+
+        this.kartonService.setState((draft) => {
+          draft.userAccount = {
+            ...draft.userAccount,
+            status: 'authenticated',
+            machineId: this.identifierService.getMachineId(),
+          };
+        });
+
+        // We also fetch user subscription information from the server.
+        const subscriptionData = await this.serverInterop.getSubscription(
+          this.tokenStore.tokenData!.accessToken,
+        );
+
+        this.kartonService.setState((draft) => {
+          draft.userAccount = {
+            ...draft.userAccount,
+            status: 'authenticated',
+            machineId: this.identifierService.getMachineId(),
+            user: {
+              id: sessionData.userId,
+              email: sessionData.userEmail,
+            },
+            subscription: {
+              active: subscriptionData?.hasSubscription || false,
+              plan: subscriptionData?.subscription?.priceId || undefined,
+              expiresAt:
+                subscriptionData?.subscription?.currentPeriodEnd?.toISOString() ||
+                undefined,
+            },
+          };
+        });
+      })
       .catch((err) => {
         this.kartonService.setState((draft) => {
           draft.userAccount.status = 'server_unreachable';
         });
 
         this.logger.error(`[AuthService] Failed to get session: ${err}`);
-        return null;
       });
-    if (!sessionData) {
-      this.logger.error(
-        `[AuthService] Returned session is empty. Logging out.`,
-      );
-      void this.logout();
-      return;
-    }
-
-    if (!sessionData.valid) {
-      this.logger.error(
-        `[AuthService] Returned session is not valid. Logging out.`,
-      );
-      void this.logout();
-      return;
-    }
-
-    this.kartonService.setState((draft) => {
-      draft.userAccount = {
-        ...draft.userAccount,
-        status: 'authenticated',
-        machineId: this.identifierService.getMachineId(),
-      };
-    });
-
-    // We also fetch user subscription information from the server.
-    const subscriptionData = await this.serverInterop.getSubscription(
-      this.tokenStore.tokenData.accessToken,
-    );
-
-    this.kartonService.setState((draft) => {
-      draft.userAccount = {
-        ...draft.userAccount,
-        status: 'authenticated',
-        machineId: this.identifierService.getMachineId(),
-        user: {
-          id: sessionData.userId,
-          email: sessionData.userEmail,
-        },
-        subscription: {
-          active: subscriptionData?.hasSubscription || false,
-          plan: subscriptionData?.subscription?.priceId || undefined,
-          expiresAt:
-            subscriptionData?.subscription?.currentPeriodEnd?.toISOString() ||
-            undefined,
-        },
-      };
-    });
   }
 
   public async logout(): Promise<void> {
