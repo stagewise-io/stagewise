@@ -1327,6 +1327,9 @@ importers:
       '@trpc/client':
         specifier: 11.4.3
         version: 11.4.3(@trpc/server@11.4.4(typescript@5.9.3))(typescript@5.9.3)
+      '@types/hast':
+        specifier: ^3.0.4
+        version: 3.0.4
       '@types/node':
         specifier: 22.15.2
         version: 22.15.2
