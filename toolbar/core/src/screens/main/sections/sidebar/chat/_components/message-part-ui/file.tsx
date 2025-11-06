@@ -1,4 +1,4 @@
-import { FileIcon, ImageIcon, ChevronRightIcon } from 'lucide-react';
+import { FileIcon, ImageIcon, ExternalLinkIcon } from 'lucide-react';
 import { openFileUrl } from '@/utils';
 import type { FileUIPart } from '@stagewise/karton-contract';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -26,7 +26,7 @@ export const FilePart = ({ part }: { part: FileUIPart }) => {
           <span className="flex-1 text-start text-xs">
             {part.filename ?? 'Generated file'}
           </span>
-          <ChevronRightIcon className="size-3 text-muted-foreground group-hover/file-part:text-foreground" />
+          <ExternalLinkIcon className="size-3 text-muted-foreground group-hover/file-part:text-foreground" />
         </div>
         {isImage && (
           <img

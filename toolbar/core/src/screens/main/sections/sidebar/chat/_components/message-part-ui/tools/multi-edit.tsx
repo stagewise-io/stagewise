@@ -36,22 +36,24 @@ export const MultiEditToolPart = ({
       toolIcon={<PencilIcon className="size-3" />}
       toolName={`Editing file...`}
       toolSubtitle={
-        <div className="flex flex-row items-center justify-between gap-3">
-          <span className="truncate">
-            {getTruncatedFileUrl(part.input?.file_path ?? '')}
-          </span>
+        <div className="flex flex-row items-center justify-start gap-3">
+          <span>{getTruncatedFileUrl(part.input?.file_path ?? '')}</span>
           <div className="flex shrink-0 flex-row items-center gap-2 font-medium text-xs">
-            <span className="shrink-0 text-green-600">+{newLineCount}</span>
-            <span className="shrink-0 text-rose-600">-{deletedLineCount}</span>
+            {diff && (
+              <>
+                <span className="shrink-0 text-green-600">+{newLineCount}</span>
+                <span className="shrink-0 text-rose-600">
+                  -{deletedLineCount}
+                </span>
+              </>
+            )}
           </div>
         </div>
       }
       collapsedContent={
         diff ? (
           <DiffPreview diff={diff} filePath={part.input?.file_path ?? ''} />
-        ) : (
-          <span>Diff view not available (not ready or too large)</span>
-        )
+        ) : undefined
       }
     />
   );

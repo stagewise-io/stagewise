@@ -5,7 +5,7 @@ import {
   InfoIcon,
   XIcon,
   WrenchIcon,
-  ChevronUpIcon,
+  ChevronDownIcon,
 } from 'lucide-react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
@@ -46,32 +46,34 @@ export function ToolPartUIBase({
   const toolTitleContent = (
     <div className="flex w-full flex-col gap-1">
       <div className="flex w-full flex-row items-center gap-1.5">
-        {toolIcon ?? <WrenchIcon className="size-3" />}
-        <div className="flex flex-col items-start gap-0">
-          {toolName && <div className="text-start text-xs">{toolName}</div>}
+        <div className="size-3 shrink-0">{toolIcon ?? <WrenchIcon />}</div>
+        <div className="flex flex-1 flex-col items-stretch gap-0">
+          <div className="flex flex-row items-center justify-start gap-1 text-start text-xs">
+            {toolName}
+            {toolDescription && (
+              <Popover>
+                <PopoverTrigger>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="-ml-1 size-4 shrink-0 p-0"
+                  >
+                    <InfoIcon className="size-3 text-primary" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="px-3 py-1.5 text-sm">
+                  {toolDescription}
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
           {toolSubtitle && (
-            <div className="truncate text-start text-muted-foreground text-xs">
+            <div className="text-start text-muted-foreground text-xs">
               {toolSubtitle}
             </div>
           )}
         </div>
-        {toolDescription && (
-          <Popover>
-            <PopoverTrigger>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="-ml-1 size-4 p-0"
-              >
-                <InfoIcon className="size-3 text-primary" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="px-3 py-1.5 text-sm">
-              {toolDescription}
-            </PopoverContent>
-          </Popover>
-        )}
-        <div className="flex-1" />
+
         {(part.state === 'input-available' ||
           part.state === 'input-streaming') && (
           <CogIcon className="size-3 shrink-0 animate-spin text-blue-600" />
@@ -107,7 +109,7 @@ export function ToolPartUIBase({
             className="h-fit cursor-pointer gap-1 rounded-xl px-2.5 text-foreground"
           >
             {toolTitleContent}
-            <ChevronUpIcon
+            <ChevronDownIcon
               className={cn(
                 'size-3 transition-transform duration-150 group-data-open/collapsible:rotate-180',
               )}

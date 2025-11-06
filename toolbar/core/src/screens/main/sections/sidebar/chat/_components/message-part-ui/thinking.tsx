@@ -6,8 +6,7 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from '@stagewise/stage-ui/components/collapsible';
-import { BrainIcon } from 'lucide-react';
-import { ChevronRightIcon } from 'lucide-react';
+import { BrainIcon, ChevronDownIcon } from 'lucide-react';
 import { Streamdown } from '@/components/streamdown';
 import { useTypeWriterText } from '@/hooks/use-type-writer-text';
 
@@ -127,10 +126,10 @@ export const ThinkingPart = ({
           <span className="flex-1 text-start text-xs group-data-[state=streaming]/thinking-part:animate-thinking-part-brain-pulse">
             {part.state === 'streaming' ? 'Thinking...' : 'Thought'}
           </span>
-          <ChevronRightIcon
+          <ChevronDownIcon
             className={cn(
               'size-3 transition-transform duration-150',
-              isExpanded && 'rotate-90',
+              isExpanded && 'rotate-180',
             )}
           />
         </CollapsibleTrigger>

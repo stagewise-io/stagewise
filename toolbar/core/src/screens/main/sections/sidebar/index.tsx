@@ -35,14 +35,14 @@ export function Sidebar() {
       id="sidebar-panel"
       order={1}
       defaultSize={30}
-      minSize={25}
-      maxSize={50}
+      minSize={5}
+      maxSize={80}
       collapsible
       collapsedSize={4}
       onCollapse={() => setIsCollapsed(true)}
       onExpand={() => setIsCollapsed(false)}
       data-collapsed={isCollapsed}
-      className="group flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-muted-foreground/5 data-[collapsed=true]:w-16 data-[collapsed=false]:min-w-64 data-[collapsed=true]:min-w-16 data-[collapsed=true]:max-w-16"
+      className="group flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-muted-foreground/5 data-[collapsed=true]:w-16 data-[collapsed=false]:min-w-64 data-[collapsed=true]:min-w-16 data-[collapsed=false]:max-w-2xl data-[collapsed=true]:max-w-16"
     >
       <SidebarTopSection isCollapsed={isCollapsed} />
 

@@ -223,3 +223,20 @@ body {
 @utility code-block-diff-remove {
   @apply bg-rose-600/10 dark:bg-rose-400/10 -m-px p-px;
 }
+
+@utility code-line-collapsed {
+  @apply block size-0 select-none invisible;
+  &:has(+ :not(.code-line-collapsed)) {
+    @apply mb-5 relative;
+  }
+  &:has(+ :not(.code-line-collapsed))::after {
+    @apply absolute top-0 pl-1 pr-6 flex items-center w-max h-5 content-["Hidden_code"] text-muted-foreground bg-black/5 dark:bg-white/5 italic visible;
+  }
+}
+
+@utility code-line-number-collapsed {
+  @apply block size-0 select-none invisible;
+  &:has(+ :not(.code-line-number-collapsed)) {
+    @apply mb-5;
+  }
+}

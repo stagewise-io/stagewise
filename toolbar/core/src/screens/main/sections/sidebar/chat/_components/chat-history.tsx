@@ -4,7 +4,6 @@ import { Loader2Icon, SparklesIcon } from 'lucide-react';
 import { useComparingSelector, useKartonState } from '@/hooks/use-karton';
 import { cn } from '@/utils';
 import { ChatErrorBubble } from './chat-error-bubble';
-import { uiDebugMessage } from './ui-debug-message';
 
 export const ChatHistory = () => {
   const wasAtBottomRef = useRef(true);
@@ -81,12 +80,11 @@ export const ChatHistory = () => {
   const renderedMessages = useMemo(() => {
     if (!activeChat?.messages) return [];
 
-    return [
-      uiDebugMessage,
-      ...(activeChat?.messages.filter((message) => {
+    return (
+      activeChat?.messages.filter((message) => {
         return message.role === 'user' || message.role === 'assistant';
-      }) ?? []),
-    ];
+      }) ?? []
+    );
   }, [activeChat]);
 
   /* We're adding a bg color on hover because there's a brower bug

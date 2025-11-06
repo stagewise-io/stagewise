@@ -161,7 +161,6 @@ const CodeComponent = ({
         data-streamdown="code-block"
         language={language}
         hideActionButtons={isStreaming}
-        preClassName="overflow-x-auto font-mono text-xs p-4"
       />
     </div>
   );

@@ -121,9 +121,9 @@ export const uiDebugMessage: ChatMessage = {
           diff: {
             path: 'dummy-path.tsx',
             before:
-              'import React from "react";\n\nconst App = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App;\n',
+              'import React from "react";\nimport Button from "button";\nconst App = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App;\n',
             after:
-              'import React from "react";\n\nconst App2 = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App2;\n',
+              'import React from "react";\nimport Button from "button";\nconst App2 = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App2;\n',
           },
         },
       },
@@ -335,9 +335,9 @@ export const uiDebugMessage: ChatMessage = {
           diff: {
             path: 'dummy-path.js',
             before:
-              'import React from "react";\n\nconst App = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App;\n',
+              'import React from "react";\nimport Button from "button";\nconst App = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App;\n',
             after:
-              'import React from "react";\n\nconst App2 = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App2;\n',
+              'import React from "react";\nimport Button from "button";\nconst App2 = () => {\n  return <div>Hello, world!</div>;\n};\n\nexport default App2;\n',
           },
         },
       },
