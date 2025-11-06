@@ -21,6 +21,7 @@ export class AuthService {
   private tokenStore!: AuthTokenStore;
   private serverInterop: AuthServerInterop;
   private _authStateCheckInterval: NodeJS.Timeout | null = null;
+  private authChangeCallbacks: ((newAuthState: AuthState) => void)[] = [];
 
   private constructor(
     globalDataPathService: GlobalDataPathService,
@@ -85,13 +86,6 @@ export class AuthService {
       },
     );
 
-    this.kartonService.registerServerProcedureHandler(
-      'userAccount.refreshSubscription',
-      async () => {
-        await this.checkAuthState();
-      },
-    );
-
     // Check if we have any tokens stored in
     this.logger.debug('[AuthService] Initialized');
   }
@@ -123,9 +117,7 @@ export class AuthService {
     this.kartonService.removeServerProcedureHandler(
       'userAccount.refreshStatus',
     );
-    this.kartonService.removeServerProcedureHandler(
-      'userAccount.refreshSubscription',
-    );
+    this.authChangeCallbacks = [];
 
     this.logger.debug('[AuthService] Teared down auth service');
   }
@@ -137,7 +129,7 @@ export class AuthService {
     // Check if we have token data stored
     if (!this.tokenStore.tokenData?.accessToken) {
       // early exit, since there's no token stored anyway
-      this.kartonService.setState((draft) => {
+      this.updateAuthState((draft) => {
         draft.userAccount = {
           status: 'unauthenticated',
           loginDialog: null,
@@ -208,7 +200,7 @@ export class AuthService {
           return;
         }
 
-        this.kartonService.setState((draft) => {
+        this.updateAuthState((draft) => {
           draft.userAccount = {
             ...draft.userAccount,
             status: 'authenticated',
@@ -221,7 +213,7 @@ export class AuthService {
           this.tokenStore.tokenData!.accessToken,
         );
 
-        this.kartonService.setState((draft) => {
+        this.updateAuthState((draft) => {
           draft.userAccount = {
             ...draft.userAccount,
             status: 'authenticated',
@@ -241,7 +233,7 @@ export class AuthService {
         });
       })
       .catch((err) => {
-        this.kartonService.setState((draft) => {
+        this.updateAuthState((draft) => {
           draft.userAccount.status = 'server_unreachable';
         });
 
@@ -282,7 +274,7 @@ export class AuthService {
       return;
     }
 
-    this.kartonService.setState((draft) => {
+    this.updateAuthState((draft) => {
       draft.userAccount = {
         ...draft.userAccount,
         machineId: this.identifierService.getMachineId(),
@@ -294,7 +286,7 @@ export class AuthService {
   }
 
   public async abortLogin(): Promise<void> {
-    this.kartonService.setState((draft) => {
+    this.updateAuthState((draft) => {
       draft.userAccount = {
         ...draft.userAccount,
         loginDialog: null,
@@ -307,7 +299,7 @@ export class AuthService {
     authCode: string | undefined,
     error: string | undefined,
   ): Promise<void> {
-    this.kartonService.setState((draft) => {
+    this.updateAuthState((draft) => {
       draft.userAccount = {
         ...draft.userAccount,
         loginDialog: null,
@@ -400,5 +392,30 @@ export class AuthService {
     const callbackUrl = `http://localhost:${runningPort}${stagewiseAppPrefix}/auth/callback`;
 
     return `${consoleUrl}/authenticate-ide?ide=cli&redirect_uri=${encodeURIComponent(callbackUrl)}`;
+  }
+
+  private updateAuthState(
+    draft: Parameters<typeof this.kartonService.setState>[0],
+  ): void {
+    const oldState = structuredClone(this.kartonService.state.userAccount);
+    this.kartonService.setState(draft);
+    const newState = this.kartonService.state.userAccount;
+    if (JSON.stringify(oldState.status) !== JSON.stringify(newState.status)) {
+      this.authChangeCallbacks.forEach((callback) => callback(newState));
+    }
+  }
+
+  public registerAuthStateChangeCallback(
+    callback: (newAuthState: AuthState) => void,
+  ): void {
+    this.authChangeCallbacks.push(callback);
+  }
+
+  public unregisterAuthStateChangeCallback(
+    callback: (newAuthState: AuthState) => void,
+  ): void {
+    this.authChangeCallbacks = this.authChangeCallbacks.filter(
+      (c) => c !== callback,
+    );
   }
 }

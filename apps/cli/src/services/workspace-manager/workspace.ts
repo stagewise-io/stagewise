@@ -235,9 +235,9 @@ export class WorkspaceService {
         this.workspaceSetupService,
       ).catch((error) => {
         this.telemetryService.captureException(error as Error);
-        this.logger.error(`[WorkspaceService] Failed to create agent service`, {
-          cause: error,
-        });
+        this.logger.error(
+          `[WorkspaceService] Failed to create agent service. Error: ${error}`,
+        );
       })) ?? null;
   }
 

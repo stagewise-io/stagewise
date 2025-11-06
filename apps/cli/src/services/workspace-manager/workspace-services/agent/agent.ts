@@ -220,7 +220,7 @@ export class AgentService {
       process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
     const accessToken = await this.authService.accessToken;
-    if (accessToken) {
+    if (!accessToken) {
       throw new Error('No authentication tokens available');
     }
 
