@@ -1,9 +1,10 @@
 import type { ToolPart } from '@stagewise/karton-contract';
 import { DiffPreview, ToolPartUIBase } from './_shared';
-import { PencilIcon } from 'lucide-react';
+import { MaximizeIcon, MinimizeIcon, PencilIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
 import { diffLines } from 'diff';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Button } from '@stagewise/stage-ui/components/button';
 
 export const MultiEditToolPart = ({
   part,
@@ -30,6 +31,8 @@ export const MultiEditToolPart = ({
     [diff],
   );
 
+  const [collapsedDiffView, setCollapsedDiffView] = useState(true);
+
   return (
     <ToolPartUIBase
       part={part}
@@ -41,10 +44,8 @@ export const MultiEditToolPart = ({
           <div className="flex shrink-0 flex-row items-center gap-2 font-medium text-xs">
             {diff && (
               <>
-                <span className="shrink-0 text-green-600">+{newLineCount}</span>
-                <span className="shrink-0 text-rose-600">
-                  -{deletedLineCount}
-                </span>
+                <span className="shrink-0 text-success">+{newLineCount}</span>
+                <span className="shrink-0 text-error">-{deletedLineCount}</span>
               </>
             )}
           </div>
@@ -52,7 +53,25 @@ export const MultiEditToolPart = ({
       }
       collapsedContent={
         diff ? (
-          <DiffPreview diff={diff} filePath={part.input?.file_path ?? ''} />
+          <div className="flex max-h-64 flex-col items-end gap-0.5">
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => setCollapsedDiffView(!collapsedDiffView)}
+            >
+              {collapsedDiffView ? (
+                <MaximizeIcon className="size-3" />
+              ) : (
+                <MinimizeIcon className="size-3" />
+              )}
+              {collapsedDiffView ? 'Show all lines' : 'Show changes only'}
+            </Button>
+            <DiffPreview
+              diff={diff}
+              filePath={part.input?.file_path ?? ''}
+              collapsed={collapsedDiffView}
+            />
+          </div>
         ) : undefined
       }
     />

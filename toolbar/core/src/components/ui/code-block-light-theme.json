@@ -6,7 +6,7 @@
     "diffEditor.unchangedRegionBackground": "#f8f8f800",
     "diffEditor.insertedTextBackground": "#e6ffe680",
     "diffEditor.deletedTextBackground": "#ffe6e680",
-    "editor.background": "#FFFFFF20",
+    "editor.background": "#FFFFFF00",
     "editor.foreground": "#000000",
     "editor.inactiveSelectionBackground": "#E5EBF1",
     "editor.selectionHighlightBackground": "#ADD6FF80",

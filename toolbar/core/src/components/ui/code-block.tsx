@@ -114,6 +114,7 @@ class HighlighterManager {
     code: string,
     language: BundledLanguage,
     preClassName?: string,
+    compactDiff?: boolean,
   ): Promise<[string, string]> {
     // Ensure only one initialization happens at a time
     if (this.initializationPromise) {
@@ -135,7 +136,10 @@ class HighlighterManager {
       transformers: [
         shikiDiffNotation(),
         shikiCodeLineNumbers({}),
-        shikiDiffCollapse({ enabled: true, includeSurroundingLines: 2 }),
+        shikiDiffCollapse({
+          enabled: compactDiff ?? false,
+          includeSurroundingLines: 2,
+        }),
       ],
     });
 
@@ -145,7 +149,10 @@ class HighlighterManager {
       transformers: [
         shikiDiffNotation(),
         shikiCodeLineNumbers({}),
-        shikiDiffCollapse({ enabled: false, includeSurroundingLines: 2 }),
+        shikiDiffCollapse({
+          enabled: compactDiff ?? false,
+          includeSurroundingLines: 2,
+        }),
       ],
     });
 
@@ -167,7 +174,7 @@ export const CodeBlock = ({
   code,
   language,
   className,
-  preClassName = 'flex flex-row gap-1.5 overflow-x-auto font-mono text-xs p-2',
+  preClassName = 'flex flex-row gap-2 font-mono text-xs',
   hideActionButtons,
   compactDiff,
   ...rest
@@ -180,7 +187,7 @@ export const CodeBlock = ({
     mounted.current = true;
 
     highlighterManager
-      .highlightCode(code, language, preClassName)
+      .highlightCode(code, language, preClassName, compactDiff)
       .then(([light, dark]) => {
         if (mounted.current) {
           setHtml(light);
@@ -191,30 +198,31 @@ export const CodeBlock = ({
     return () => {
       mounted.current = false;
     };
-  }, [code, language, preClassName]);
+  }, [code, language, preClassName, compactDiff]);
 
   return (
     <div
       data-code-block-container
       data-language={language}
-      className="w-full overflow-hidden rounded-lg border border-black/5 dark:border-white/5"
+      className="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-black/30 w-full overflow-auto overscroll-contain rounded-lg border border-foreground/5 bg-background/10"
     >
-      <div className="min-w-full">
-        <div
-          className={cn('overflow-x-auto dark:hidden', className)}
-          dangerouslySetInnerHTML={{ __html: html }}
-          data-code-block
-          data-language={language}
-          {...rest}
-        />
-        <div
-          className={cn('hidden overflow-x-auto dark:block', className)}
-          dangerouslySetInnerHTML={{ __html: darkHtml }}
-          data-code-block
-          data-language={language}
-          {...rest}
-        />
-      </div>
+      <div
+        className={cn('group/chat-bubble-user:hidden dark:hidden', className)}
+        dangerouslySetInnerHTML={{ __html: html }}
+        data-code-block
+        data-language={language}
+        {...rest}
+      />
+      <div
+        className={cn(
+          'hidden group/chat-bubble-user:block dark:block',
+          className,
+        )}
+        dangerouslySetInnerHTML={{ __html: darkHtml }}
+        data-code-block
+        data-language={language}
+        {...rest}
+      />
     </div>
   );
 };
@@ -255,7 +263,6 @@ function shikiCodeLineNumbers({
   return {
     name: 'shiki-code-line-numbers',
     pre(node) {
-      console.log(node);
       const lineElements = Array.from(
         (
           node.children.find(
@@ -308,15 +315,7 @@ function shikiCodeLineNumbers({
         type: 'element',
         tagName: 'div',
         properties: {
-          class: [
-            'line-numbers-container',
-            'flex',
-            'flex-col',
-            'items-end',
-            'justify-start',
-            'text-muted-foreground',
-            'select-none',
-          ],
+          class: ['line-numbers-container'],
         },
         children: lineNumberElements.map(({ element }) => element),
       });
@@ -338,8 +337,6 @@ function shikiDiffCollapse({
       // If this feature is enabled (according to the config), we collapse everything aroung the diffs (remove the lines and prevent them from being rendered).
       // We may include lines before and after the diffs if configured to do so.
       // We need to watch out that in the code block, after every "line" element, there is a text with the content "\n". This should be omitted as well if we should collapse those lines.
-
-      console.log('Node: ', node);
 
       const codeElement = node.children.find(
         (node) => node.type === 'element' && node.tagName === 'code',
@@ -364,14 +361,6 @@ function shikiDiffCollapse({
               node.properties.class.includes('line'))),
       ) as Element[];
 
-      console.log('Line elements: ', lineElements);
-
-      const lineNumberElements = Array.from(
-        lineNumbersContainer?.children ?? [],
-      );
-
-      console.log('Line number elements: ', lineNumberElements);
-
       // First, we create an array of all line numbers that are diff lines. (The lines listed here can be unrelated to the actual line of code, it's the index in the array of line elements)
       const diffLineIndexes = lineElements.reduce<number[]>(
         (acc, element, index) => {
@@ -387,8 +376,6 @@ function shikiDiffCollapse({
         },
         [],
       );
-
-      console.log('Diff line indexes: ', diffLineIndexes);
 
       const displayedLinesMask = new Array(lineElements.length).fill(false);
       diffLineIndexes.forEach((index) => {
@@ -420,27 +407,30 @@ function shikiDiffCollapse({
         }
       }
 
-      console.log('Displayed lines mask: ', displayedLinesMask);
-
       // Now that we now which lines should be rendered and which shouldn't, we go over the line numb er elements and the line elements and remove the ones that shouldn't be rendered.
       // We go reverse over the entries because removing entries will shift the indices of the remaining entries so we have to do the stuff reverse.
+      // Also, we delete the line break after the last line element that's not hidden. (We go reverse, so we delete the line after the first non-hidden line element.)
+      let clearedLastDisplayLineBreak = false;
       displayedLinesMask
         .reverse()
         .forEach((shouldRenderIndex, revserseIndex) => {
           const index = displayedLinesMask.length - revserseIndex - 1;
+
           if (!shouldRenderIndex) {
             this.addClassToHast(
               codeElement.children[index * 2] as unknown as Element,
               'code-line-collapsed',
             );
-            // We remove the line break that follows after every line element in the code element.
+
             codeElement.children.splice(index * 2 + 1, 1);
+
             this.addClassToHast(
               lineNumbersContainer?.children[index] as unknown as Element,
               'code-line-number-collapsed',
             );
-            // codeElement.children.splice(index * 2, 2); // We multiply by two because after every line entry, there is a line break text entry in this children array. We also remove two entries because we don't want there to be an unused line break.
-            // lineNumbersContainer?.children.splice(index, 1);
+          } else if (!clearedLastDisplayLineBreak) {
+            clearedLastDisplayLineBreak = true;
+            codeElement.children.splice(index * 2 + 1, 1);
           }
         });
     },

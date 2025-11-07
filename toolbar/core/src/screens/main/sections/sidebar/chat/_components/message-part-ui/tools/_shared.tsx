@@ -76,17 +76,17 @@ export function ToolPartUIBase({
 
         {(part.state === 'input-available' ||
           part.state === 'input-streaming') && (
-          <CogIcon className="size-3 shrink-0 animate-spin text-blue-600" />
+          <CogIcon className="size-3 shrink-0 animate-spin text-busy" />
         )}
         {part.state === 'output-available' && (
-          <CheckIcon className="size-3 shrink-0 text-green-600" />
+          <CheckIcon className="size-3 shrink-0 text-success" />
         )}
         {part.state === 'output-error' && (
-          <XIcon className="size-3 shrink-0 text-rose-600" />
+          <XIcon className="size-3 shrink-0 text-error" />
         )}
       </div>
       {part.state === 'output-error' && (
-        <span className="ml-4.5 text-start font-normal text-rose-600 text-xs">
+        <span className="ml-4.5 text-start font-normal text-error text-xs">
           {part.errorText}
         </span>
       )}
@@ -96,7 +96,7 @@ export function ToolPartUIBase({
   return (
     <div
       data-state={part.state}
-      className="-mx-1 group/item-part block min-w-32 rounded-xl border-border/20 bg-zinc-500/5 font-medium text-foreground"
+      className="-mx-1 group/item-part block min-w-32 rounded-xl border-border/20 bg-muted-foreground/5 font-medium text-foreground"
     >
       {collapsedContent ? (
         <Collapsible
@@ -115,10 +115,8 @@ export function ToolPartUIBase({
               )}
             />
           </CollapsibleTrigger>
-          <CollapsibleContent className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%_-_8px),transparent)] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-black/30 block max-h-40 overflow-y-auto overscroll-y-none pt-1.5 pb-0.5 pl-3">
-            <div className="pt-2 pb-1 font-normal text-xs">
-              {collapsedContent}
-            </div>
+          <CollapsibleContent className="block px-2 pt-0.5 pb-2 font-normal text-xs">
+            {collapsedContent}
           </CollapsibleContent>
         </Collapsible>
       ) : (
@@ -133,9 +131,11 @@ export function ToolPartUIBase({
 export function DiffPreview({
   diff,
   filePath,
+  collapsed = false,
 }: {
   diff: ChangeObject<string>[];
   filePath: string;
+  collapsed?: boolean;
 }) {
   const diffContent = useMemo(() => {
     return diff.reduce((acc, line) => {
@@ -156,6 +156,11 @@ export function DiffPreview({
   }, [filePath]);
 
   return (
-    <CodeBlock code={diffContent} language={fileLanguage} hideActionButtons />
+    <CodeBlock
+      code={diffContent}
+      language={fileLanguage}
+      hideActionButtons
+      compactDiff={collapsed}
+    />
   );
 }

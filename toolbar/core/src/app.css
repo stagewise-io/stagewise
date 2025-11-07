@@ -169,6 +169,11 @@ body {
   --color-muted-foreground: var(--color-zinc-700);
   --color-border: var(--color-zinc-500);
   
+
+  --color-success: var(--color-green-600);
+  --color-error: var(--color-rose-600);
+  --color-busy: var(--color-blue-600);
+  
   --shadow-glass: var(--shadow-lg), 0px -48px 48px -48px rgba(0, 0, 0, 0.05) inset, 0 5px 42px -5px rgba(255, 255, 255, 0.25) inset;
   --ease-spring: linear(0.00, -0.00946, 0.0219, 0.0793, 0.152, 0.237, 0.326, 0.419, 0.509, 0.597, 0.680, 0.755, 0.823, 0.882, 0.933, 0.976, 1.01, 1.04, 1.06, 1.07, 1.08, 1.09, 1.09, 1.09, 1.09, 1.08, 1.07, 1.07, 1.06, 1.05, 1.04, 1.03, 1.03, 1.02, 1.01, 1.01, 1.00, 1.00, 0.998, 0.996, 0.994, 0.993, 0.992, 0.992, 0.992, 0.992, 0.992, 0.993, 0.994, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 0.999, 0.999, 1.00);
   --ease-spring-soft: linear(0.00, -0.0531, 0.117, 0.293, 0.460, 0.610, 0.738, 0.838, 0.913, 0.965, 1.00, 1.02, 1.03, 1.03, 1.03, 1.03, 1.03, 1.02, 1.01, 1.01, 1.01, 1.00, 1.00, 1.00, 1.00);
@@ -226,17 +231,21 @@ body {
 
 @utility code-line-collapsed {
   @apply block size-0 select-none invisible;
-  &:has(+ :not(.code-line-collapsed)) {
-    @apply mb-5 relative;
+  &:has(+ :not(.code-line-collapsed)), &:last-child {
+    @apply mb-6 relative;
   }
-  &:has(+ :not(.code-line-collapsed))::after {
-    @apply absolute top-0 pl-1 pr-6 flex items-center w-max h-5 content-["Hidden_code"] text-muted-foreground bg-black/5 dark:bg-white/5 italic visible;
+  &:has(+ :not(.code-line-collapsed))::after, &:last-child::after {
+    @apply absolute top-1 pl-2 pr-2 flex items-center w-max h-4 content-["Hidden_code"] text-muted-foreground bg-black/5 dark:bg-white/5 italic visible rounded-full font-medium text-xs;
   }
+}
+
+@utility line-numbers-container {
+  @apply bg-muted-foreground/5 pl-2 pr-1 flex flex-col items-end text-muted-foreground;
 }
 
 @utility code-line-number-collapsed {
   @apply block size-0 select-none invisible;
   &:has(+ :not(.code-line-number-collapsed)) {
-    @apply mb-5;
+    @apply mb-6;
   }
 }

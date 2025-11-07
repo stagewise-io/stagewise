@@ -80,10 +80,8 @@ export const ChatHistory = () => {
   const renderedMessages = useMemo(() => {
     if (!activeChat?.messages) return [];
 
-    return (
-      activeChat?.messages.filter((message) => {
-        return message.role === 'user' || message.role === 'assistant';
-      }) ?? []
+    return activeChat?.messages.filter(
+      (message) => message.role === 'user' || message.role === 'assistant',
     );
   }, [activeChat]);
 

@@ -183,6 +183,11 @@ export function ChatBubble({
                 ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 pl-4 text-zinc-950 dark:bg-zinc-800/60 dark:text-zinc-50'
                 : 'origin-bottom-right rounded-br-xs bg-blue-600/90 pr-4 text-white',
               msg.parts.length > 1 && 'w-full',
+              msg.role === 'user' &&
+                '[--color-background:var(--color-blue-600)] [--color-busy:var(--color-blue-200)] [--color-error:var(--color-rose-200)] [--color-foreground:var(--color-white)] [--color-muted-background:var(--color-blue-500)] [--color-muted-foreground:var(--color-blue-200)] [--color-primary:var(--color-blue-200)] [--color-success:var(--color-green-200)]',
+              msg.role === 'user'
+                ? 'group/chat-bubble-user'
+                : 'group/chat-bubble-assistant',
             )}
           >
             <div
@@ -191,7 +196,18 @@ export function ChatBubble({
                 msg.role === 'assistant' ? 'left-1' : 'right-1',
               )}
             >
-              <TimeAgo date={msg.metadata?.createdAt ?? new Date()} />
+              {(() => {
+                const createdAt = msg.metadata?.createdAt
+                  ? new Date(msg.metadata.createdAt)
+                  : new Date();
+                const now = new Date();
+                const diffMs = now.getTime() - createdAt.getTime();
+                const diffMins = diffMs / 60000;
+                if (diffMins >= 1) {
+                  return <TimeAgo date={createdAt} />;
+                }
+                return 'Just now';
+              })()}
             </div>
             {(() => {
               const typeCounters: Record<string, number> = {};

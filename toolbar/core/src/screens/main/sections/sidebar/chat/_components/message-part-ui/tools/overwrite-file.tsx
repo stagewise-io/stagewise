@@ -1,9 +1,10 @@
 import type { ToolPart } from '@stagewise/karton-contract';
 import { DiffPreview, ToolPartUIBase } from './_shared';
-import { PencilIcon } from 'lucide-react';
+import { MinimizeIcon, MaximizeIcon, PencilIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { diffLines } from 'diff';
+import { Button } from '@stagewise/stage-ui/components/button';
 
 export const OverwriteFileToolPart = ({
   part,
@@ -30,6 +31,8 @@ export const OverwriteFileToolPart = ({
     [diff],
   );
 
+  const [collapsedDiffView, setCollapsedDiffView] = useState(true);
+
   return (
     <ToolPartUIBase
       part={part}
@@ -52,7 +55,25 @@ export const OverwriteFileToolPart = ({
       }
       collapsedContent={
         diff ? (
-          <DiffPreview diff={diff} filePath={part.input?.path ?? ''} />
+          <div className="flex max-h-64 flex-col items-end gap-0.5">
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => setCollapsedDiffView(!collapsedDiffView)}
+            >
+              {collapsedDiffView ? (
+                <MaximizeIcon className="size-3" />
+              ) : (
+                <MinimizeIcon className="size-3" />
+              )}
+              {collapsedDiffView ? 'Show all lines' : 'Show changes only'}
+            </Button>
+            <DiffPreview
+              diff={diff}
+              filePath={part.input?.path ?? ''}
+              collapsed={collapsedDiffView}
+            />
+          </div>
         ) : undefined
       }
     />

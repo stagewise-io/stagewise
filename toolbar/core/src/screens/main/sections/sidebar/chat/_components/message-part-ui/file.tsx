@@ -7,7 +7,7 @@ export const FilePart = ({ part }: { part: FileUIPart }) => {
   const isImage = part.mediaType.startsWith('image/');
 
   return (
-    <div className="-mx-1 rounded-xl bg-zinc-500/5">
+    <div className="-mx-1 rounded-xl bg-muted-foreground/5">
       <Button
         variant="ghost"
         size="xs"

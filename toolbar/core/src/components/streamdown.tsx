@@ -76,8 +76,6 @@ const CodeComponent = ({
   ExtraProps) => {
   const { isStreaming } = useContext(StreamdownContext);
 
-  console.log(JSON.parse(JSON.stringify(node)));
-
   const inline = node?.position?.start.line === node?.position?.end.line;
 
   if (inline) {
@@ -112,39 +110,16 @@ const CodeComponent = ({
     code = children;
   }
 
-  if (language === 'mermaid') {
-    return (
-      <div
-        className={cn(
-          'group relative my-4 flex h-auto flex-col rounded-2xl bg-zinc-500/5 p-2',
-          className,
-        )}
-        data-streamdown="mermaid-block"
-      >
-        {!isStreaming && (
-          <div className="flex items-center justify-end gap-2">
-            <CodeBlockCopyButton code={code} />
-          </div>
-        )}
-        <Mermaid
-          chart={code}
-          config={{
-            theme: 'default',
-          }}
-        />
-      </div>
-    );
-  }
-
   return (
     <div
       className={cn(
         'group relative my-4 flex h-auto flex-col gap-1 rounded-2xl bg-zinc-500/5 p-2',
+        language === 'mermaid' ? 'max-h-96' : 'max-h-64',
         className,
       )}
-      data-streamdown="code-block"
+      data-streamdown={language === 'mermaid' ? 'mermaid-block' : 'code-block'}
     >
-      <div className="flex flex-row items-center justify-between">
+      <div className="flex shrink-0 flex-row items-center justify-between">
         <span className="ml-1.5 font-medium font-mono text-muted-foreground text-sm lowercase">
           {language}
         </span>
@@ -154,14 +129,25 @@ const CodeComponent = ({
           </div>
         )}
       </div>
-      <CodeBlock
-        className={cn('overflow-x-auto', className)}
-        code={code}
-        data-language={language}
-        data-streamdown="code-block"
-        language={language}
-        hideActionButtons={isStreaming}
-      />
+      {language === 'mermaid' ? (
+        <div className="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-black/30 max-h-96 overflow-auto overscroll-contain rounded-lg border border-foreground/5 bg-background/10 p-2">
+          <Mermaid
+            chart={code}
+            config={{
+              theme: 'default',
+            }}
+            className="size-max min-h-full min-w-full"
+          />
+        </div>
+      ) : (
+        <CodeBlock
+          code={code}
+          data-language={language}
+          data-streamdown="code-block"
+          language={language}
+          hideActionButtons={isStreaming}
+        />
+      )}
     </div>
   );
 };

@@ -115,7 +115,7 @@ export const ThinkingPart = ({
   return (
     <div
       data-state={part.state}
-      className="-mx-1 group/thinking-part block min-w-32 rounded-xl border-border/20 bg-zinc-500/5"
+      className="-mx-1 group/thinking-part block min-w-32 rounded-xl border-border/20 bg-muted-foreground/5"
     >
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CollapsibleTrigger
@@ -134,7 +134,7 @@ export const ThinkingPart = ({
           />
         </CollapsibleTrigger>
         <CollapsibleContent className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%_-_8px),transparent)] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-black/30 block max-h-32 overflow-y-auto overscroll-y-none pt-1.5 pb-0.5 pl-2.5 text-[0.8rem]">
-          <div ref={setContentWrapperRef} className="pt-2 pb-1 opacity-75">
+          <div ref={setContentWrapperRef} className="pt-2 pb-1 opacity-60">
             <Streamdown isAnimating={part.state === 'streaming'}>
               {displayedText}
             </Streamdown>
