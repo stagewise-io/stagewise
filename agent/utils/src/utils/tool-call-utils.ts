@@ -6,7 +6,9 @@ interface ToolCallContext<T extends StaticToolCall<AllTools>> {
   toolCall: T;
   tool: AllTools[T['toolName']];
   messages: History;
-  onToolCallComplete?: (result: ToolCallProcessingResult<T>) => void;
+  onToolCallComplete?: (
+    result: ToolCallProcessingResult<T>,
+  ) => void | Promise<void>;
 }
 
 export type ToolCallProcessingResult<T extends StaticToolCall<AllTools>> =
@@ -33,17 +35,21 @@ export async function processClientSideToolCall<
   const startTime = Date.now();
 
   if (tool.stagewiseMetadata?.requiresUserInteraction) {
-    return {
+    const result = {
       toolCallId: toolCall.toolCallId,
       duration: 0,
       userInteractionrequired: true,
-    };
+    } as const;
+    await onToolCallComplete?.(result);
+    return result;
   } else if (!tool.execute) {
-    return {
+    const result = {
       toolCallId: toolCall.toolCallId,
       duration: 0,
       error: { message: 'Issue with the tool - no handler found' },
     };
+    await onToolCallComplete?.(result);
+    return result;
   } else {
     try {
       // Execute the tool
@@ -55,29 +61,27 @@ export async function processClientSideToolCall<
         messages: [], // TODO: Fix the AIConversion error (tool state input-available not supported)!
       });
 
-      onToolCallComplete?.({
-        toolCallId: toolCall.toolCallId,
-        duration: Date.now() - startTime,
-        result: executeResult as ReturnType<
-          NonNullable<AllTools[T['toolName']]['execute']>
-        >,
-      });
-
-      return {
+      const result = {
         toolCallId: toolCall.toolCallId,
         duration: Date.now() - startTime,
         result: executeResult as ReturnType<
           NonNullable<AllTools[T['toolName']]['execute']>
         >,
       };
+
+      await onToolCallComplete?.(result);
+
+      return result;
     } catch (error) {
-      return {
+      const result = {
         toolCallId: toolCall.toolCallId,
         duration: Date.now() - startTime,
         error: {
           message: error instanceof Error ? error.message : 'Unknown error',
         },
       };
+      await onToolCallComplete?.(result);
+      return result;
     }
   }
 }
@@ -98,32 +102,40 @@ export async function processToolCalls(
   messages: History,
   onToolCallComplete?: (
     result: ToolCallProcessingResult<StaticToolCall<AllTools>>,
-  ) => void,
+  ) => void | Promise<void>,
 ): Promise<ToolCallProcessingResult<StaticToolCall<AllTools>>[]> {
   // Process client-side tools in parallel
   const clientPromises = toolCalls.map(async (tc) => {
     if (tc.invalid) {
-      return {
+      const result = {
         toolCallId: tc.toolCallId,
         duration: 0,
         error: { message: tc instanceof Error ? tc.message : 'Unknown error' },
       };
+      await onToolCallComplete?.(result);
+      return result;
     }
-    if (tc.dynamic)
-      return {
+    if (tc.dynamic) {
+      const result = {
         toolCallId: tc.toolCallId,
         duration: 0,
         error: { message: 'Dynamic tool calls are not supported yet.' },
       };
+      await onToolCallComplete?.(result);
+      return result;
+    }
 
     const tool = tools[tc.toolName];
 
-    if (!tool)
-      return {
+    if (!tool) {
+      const result = {
         toolCallId: tc.toolCallId,
         duration: 0,
         error: { message: `Tool ${tc.toolName} not found in provided tools.` },
       };
+      await onToolCallComplete?.(result);
+      return result;
+    }
 
     const context = {
       toolCall: tc,
