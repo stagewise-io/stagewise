@@ -21,7 +21,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "ai": "5.0.9"
+    "ai": "5.0.52"
   },
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",

@@ -21,7 +21,7 @@
     "@stagewise/agent-types": "workspace:*",
     "@stagewise/karton": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
-    "ai": "5.0.9",
+    "ai": "5.0.52",
     "zod": "4.0.17"
   },
   "devDependencies": {
