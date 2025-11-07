@@ -10,7 +10,7 @@ interface TextPartProps {
 export const TextPart = memo(({ part }: TextPartProps) => {
   const displayedText = useTypeWriterText(part.text, {
     charsPerInterval: 2,
-    msPerInterval: 100,
+    msPerInterval: 50,
     showAllOnFirstRender: true,
     animateOnIncreaseOnly: true,
   });

@@ -107,7 +107,7 @@ export const ThinkingPart = ({
 
   const displayedText = useTypeWriterText(part.text, {
     charsPerInterval: 2,
-    framesPerInterval: 1,
+    msPerInterval: 50,
     showAllOnFirstRender: true,
     animateOnIncreaseOnly: true,
   });
@@ -122,8 +122,8 @@ export const ThinkingPart = ({
           size="condensed"
           className="h-6 cursor-pointer gap-1.5 rounded-full px-2.5 text-muted-foreground"
         >
-          <BrainIcon className="size-3 group-data-[state=streaming]/thinking-part:animate-thinking-part-brain-pulse" />
-          <span className="flex-1 text-start text-xs group-data-[state=streaming]/thinking-part:animate-thinking-part-brain-pulse">
+          <BrainIcon className="size-3 group-data-[state=streaming]/thinking-part:animate-thinking-part-brain-pulse group-data-[state=streaming]/thinking-part:text-primary" />
+          <span className="group-data-[state=streaming]/thinking-part:shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 flex-1 text-start text-xs">
             {part.state === 'streaming' ? 'Thinking...' : 'Thought'}
           </span>
           <ChevronDownIcon
@@ -134,7 +134,10 @@ export const ThinkingPart = ({
           />
         </CollapsibleTrigger>
         <CollapsibleContent className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%_-_8px),transparent)] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-black/30 block max-h-32 overflow-y-auto overscroll-y-none pt-1.5 pb-0.5 pl-2.5 text-[0.8rem]">
-          <div ref={setContentWrapperRef} className="pt-2 pb-1 opacity-60">
+          <div
+            ref={setContentWrapperRef}
+            className="pt-2 pb-1 opacity-60 group-data-[state=streaming]/thinking-part:opacity-90"
+          >
             <Streamdown isAnimating={part.state === 'streaming'}>
               {displayedText}
             </Streamdown>
