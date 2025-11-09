@@ -5,9 +5,10 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Popover,
   PopoverContent,
-  PopoverTitle,
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
+import { getIDEFileUrl, getXPathForElement } from '@/utils';
+import { useKartonState } from '@/hooks/use-karton';
 
 interface ContextElementsChipsProps {
   domContextElements: {
@@ -70,6 +71,25 @@ interface ContextElementChipProps {
   onUnhover: () => void;
 }
 
+const displayedAttributes = [
+  'id',
+  'class',
+  'name',
+  'type',
+  'href',
+  'src',
+  'alt',
+  'placeholder',
+  'title',
+  'aria-label',
+  'aria-role',
+  'aria-description',
+  'aria-hidden',
+  'aria-disabled',
+  'aria-expanded',
+  'aria-selected',
+];
+
 function ContextElementChip({
   element,
   pluginContext,
@@ -93,6 +113,10 @@ function ContextElementChip({
     const id = element.id ? `#${element.id}` : '';
     return `${tagName}${id}`;
   }, [element, pluginContext]);
+
+  const workspacePath = useKartonState((s) => s.workspace?.path);
+
+  const openInIdeChoice = useKartonState((s) => s.globalConfig.openFilesInIde);
 
   return (
     <Popover>
@@ -122,14 +146,82 @@ function ContextElementChip({
         </Button>
       </PopoverTrigger>
       <PopoverContent>
-        <PopoverTitle>Code Metadata</PopoverTitle>
-        <div className="flex flex-col gap-2">
-          <p className="text-foreground/70 text-sm">
-            {codeMetadata.map((metadata) => metadata.relativePath).join(', ')}
-          </p>
-          <p className="text-foreground/70 text-sm">
-            {codeMetadata.map((metadata) => metadata.startLine).join(', ')}
-          </p>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col items-stretch justify-start gap-1">
+            <p className="font-medium text-foreground text-sm">XPath</p>
+            <div className="glass-inset w-full break-all rounded-lg px-1.5 py-1 font-mono text-foreground/70 text-sm">
+              {getXPathForElement(element, true)}
+            </div>
+          </div>
+          <div className="flex flex-col items-stretch justify-start gap-1">
+            <p className="font-medium text-foreground text-sm">Attributes</p>
+            <div className="flex w-full flex-col items-stretch gap-0.5">
+              {displayedAttributes
+                .filter(
+                  (attribute) =>
+                    element.getAttribute(attribute) !== null &&
+                    element.getAttribute(attribute) !== '' &&
+                    element.getAttribute(attribute) !== undefined,
+                )
+                .map((attribute) => (
+                  <div
+                    key={attribute}
+                    className="flex flex-row items-start justify-start gap-1"
+                  >
+                    <p className="basis-1/3 font-medium text-muted-foreground text-sm">
+                      {attribute}
+                    </p>
+                    <p className="basis-2/3 font-mono text-muted-foreground text-xs">
+                      {element.getAttribute(attribute)}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {codeMetadata.length > 0 && (
+            <div className="flex flex-col items-stretch justify-start gap-1">
+              <div className="flex flex-row items-start justify-between gap-3">
+                <p className="basis-3/4 font-medium text-foreground text-sm">
+                  Related source files
+                </p>
+                <p className="basis-1/4 text-end font-medium text-muted-foreground text-sm">
+                  Lines
+                </p>
+              </div>
+              <div className="flex w-full flex-col items-stretch gap-0.5">
+                {codeMetadata.map((metadata) => (
+                  <div
+                    key={
+                      metadata.relativePath +
+                      '|' +
+                      metadata.startLine +
+                      '|' +
+                      metadata.endLine
+                    }
+                    className="flex flex-row items-start justify-start gap-1"
+                  >
+                    <a
+                      href={getIDEFileUrl(
+                        workspacePath!.replace('\\', '/') +
+                          '/' +
+                          metadata.relativePath.replace('\\', '/'),
+                        openInIdeChoice,
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="basis-3/4 font-medium text-muted-foreground text-sm"
+                    >
+                      {metadata.relativePath}
+                    </a>
+                    <p className="basis-1/4 text-end font-mono text-muted-foreground text-sm">
+                      {metadata.startLine} - {metadata.endLine}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>
