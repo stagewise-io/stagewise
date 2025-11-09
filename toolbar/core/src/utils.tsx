@@ -782,3 +782,26 @@ export const getTruncatedFileUrl = (
 
   return `${leadingSep || ''}${truncatedPath}`;
 };
+
+export const IDE_SELECTION_ITEMS = {
+  vscode: 'VS Code',
+  cursor: 'Cursor',
+  windsurf: 'Windsurf',
+  trae: 'Trae',
+};
+
+export const getIDEFileUrl = (
+  absFilePath: string,
+  ide: keyof typeof IDE_SELECTION_ITEMS,
+) => {
+  switch (ide) {
+    case 'vscode':
+      return `vscode://file/${absFilePath}`;
+    case 'cursor':
+      return `cursor://file/${absFilePath}`;
+    case 'windsurf':
+      return `windsurf://file/${absFilePath}`;
+    case 'trae':
+      return `trae://file/${absFilePath}`;
+  }
+};

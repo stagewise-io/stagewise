@@ -4,7 +4,9 @@ import { MaximizeIcon, MinimizeIcon, PencilIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
 import { diffLines } from 'diff';
 import { useMemo, useState } from 'react';
-import { Button } from '@stagewise/stage-ui/components/button';
+import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
+import { useKartonState } from '@/hooks/use-karton';
+import { IDE_SELECTION_ITEMS, getIDEFileUrl } from '@/utils';
 
 export const MultiEditToolPart = ({
   part,
@@ -33,6 +35,20 @@ export const MultiEditToolPart = ({
 
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);
 
+  const openInIdeSelection = useKartonState(
+    (s) => s.globalConfig.openFilesInIde,
+  );
+
+  const workspacePath = useKartonState((s) => s.workspace?.path);
+
+  const absFilePath = useMemo(() => {
+    return (
+      (workspacePath?.replace('\\', '/') ?? '') +
+      '/' +
+      (part.input?.file_path?.replace('\\', '/') ?? '')
+    );
+  }, [workspacePath, part.input?.file_path]);
+
   return (
     <ToolPartUIBase
       part={part}
@@ -54,18 +70,28 @@ export const MultiEditToolPart = ({
       collapsedContent={
         diff ? (
           <div className="flex max-h-64 flex-col items-end gap-0.5">
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={() => setCollapsedDiffView(!collapsedDiffView)}
-            >
-              {collapsedDiffView ? (
-                <MaximizeIcon className="size-3" />
-              ) : (
-                <MinimizeIcon className="size-3" />
-              )}
-              {collapsedDiffView ? 'Show all lines' : 'Show changes only'}
-            </Button>
+            <div className="flex shrink-0 flex-row items-center justify-end gap-0.5">
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => setCollapsedDiffView(!collapsedDiffView)}
+              >
+                {collapsedDiffView ? (
+                  <MaximizeIcon className="size-3" />
+                ) : (
+                  <MinimizeIcon className="size-3" />
+                )}
+                {collapsedDiffView ? 'Show all lines' : 'Show changes only'}
+              </Button>
+              <a
+                href={getIDEFileUrl(absFilePath, openInIdeSelection)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonVariants({ size: 'xs', variant: 'ghost' })}
+              >
+                Open in {IDE_SELECTION_ITEMS[openInIdeSelection]}
+              </a>
+            </div>
             <DiffPreview
               diff={diff}
               filePath={part.input?.file_path ?? ''}

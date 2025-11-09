@@ -7,6 +7,9 @@ import { z } from 'zod';
 export const globalConfigSchema = z
   .object({
     telemetryLevel: z.enum(['off', 'anonymous', 'full']).default('anonymous'),
+    openFilesInIde: z
+      .enum(['vscode', 'cursor', 'windsurf', 'trae'])
+      .default('cursor'),
   })
   .loose();
 

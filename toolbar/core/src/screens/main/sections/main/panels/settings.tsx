@@ -28,6 +28,7 @@ import {
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { cn } from '@stagewise/stage-ui/lib/utils';
+import { Select } from '@stagewise/stage-ui/components/select';
 
 export const SettingsPanel = () => {
   const workspaceLoaded = useKartonState((s) => s.workspaceStatus === 'open');
@@ -162,7 +163,7 @@ export const WorkspaceSettingsTabContent = () => {
             type="text"
             id="workspace-agent-access-path"
             className="min-w-80 lg:w-min"
-            defaultValue={config.agentAccessPath}
+            value={config.agentAccessPath}
             onValueChange={(value) => setConfig({ agentAccessPath: value })}
             debounce={200}
           />
@@ -180,7 +181,7 @@ export const WorkspaceSettingsTabContent = () => {
             type="number"
             id="dev-application-port"
             className="w-28"
-            defaultValue={config.appPort}
+            value={config.appPort}
             onValueChange={(value) =>
               setConfig({ appPort: Number.parseInt(value) })
             }
@@ -236,7 +237,7 @@ export const WorkspaceSettingsTabContent = () => {
             type="text"
             id="dev-application-command"
             className="min-w-80 font-mono lg:w-min"
-            defaultValue={config.appExecutionCommand ?? ''}
+            value={config.appExecutionCommand ?? ''}
             onValueChange={(value) =>
               setConfig({
                 appExecutionCommand:
@@ -256,7 +257,7 @@ export const WorkspaceSettingsTabContent = () => {
               This path is used to store persistent data for the workspace.
             </FormFieldDescription>
           </div>
-          <p className="text-end font-medium font-mono text-muted-foreground text-sm">
+          <p className="max-w-1/2 text-end font-medium font-mono text-muted-foreground text-sm">
             {workspaceDataPath}
           </p>
         </FormField>
@@ -268,7 +269,7 @@ export const WorkspaceSettingsTabContent = () => {
               This path is used to store cached data for the workspace.
             </FormFieldDescription>
           </div>
-          <p className="text-end font-medium font-mono text-muted-foreground text-sm">
+          <p className="max-w-1/2 text-end font-medium font-mono text-muted-foreground text-sm">
             {workspaceCachePath}
           </p>
         </FormField>
@@ -280,7 +281,7 @@ export const WorkspaceSettingsTabContent = () => {
               This path is used to store temporary data for the workspace.
             </FormFieldDescription>
           </div>
-          <p className="text-end font-medium font-mono text-muted-foreground text-sm">
+          <p className="max-w-1/2 text-end font-medium font-mono text-muted-foreground text-sm">
             {workspaceTempPath}
           </p>
         </FormField>
@@ -316,6 +317,34 @@ export const GlobalSettingsTabContent = () => {
       value="global"
       className="-mr-4 h-fit w-full overflow-y-auto p-1 pr-3 pb-16"
     >
+      <FormFieldset title="IDE Integrations">
+        <FormField className="lg:flex-row">
+          <div className="flex flex-1 flex-col items-start gap-2">
+            <FormFieldLabel>Open files in IDE</FormFieldLabel>
+            <FormFieldDescription>
+              Select the IDE you want to open source files in.
+            </FormFieldDescription>
+          </div>
+          <Select
+            onValueChange={(value) => {
+              setConfig({
+                openFilesInIde: value as GlobalConfig['openFilesInIde'],
+              });
+            }}
+            value={config.openFilesInIde}
+            items={[
+              {
+                value: 'vscode',
+                label: 'VS Code',
+              },
+              { value: 'cursor', label: 'Cursor' },
+              { value: 'windsurf', label: 'Windsurf' },
+              { value: 'trae', label: 'Trae' },
+            ]}
+            triggerClassName="min-w-48"
+          />
+        </FormField>
+      </FormFieldset>
       <FormFieldset title="Telemetry">
         <FormField className="w-full flex-col items-stretch">
           <div className="flex flex-1 flex-col items-start gap-2">
@@ -331,7 +360,7 @@ export const GlobalSettingsTabContent = () => {
                 telemetryLevel: value as GlobalConfig['telemetryLevel'],
               })
             }
-            defaultValue={config.telemetryLevel}
+            value={config.telemetryLevel}
           >
             <FormFieldLabel
               htmlFor="telemetry-level-off"

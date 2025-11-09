@@ -40,16 +40,16 @@ export class GlobalConfigService {
       );
       return '{}';
     });
-    const storedConfig = globalConfigSchema.parse(JSON.parse(configFile));
 
     // Now, we validate the loaded config and set that as the current config in this service.
     // If the config is invalid, we throw an error.
-    const parsedConfig = globalConfigSchema.safeParse(storedConfig);
+    const parsedConfig = globalConfigSchema.safeParse(
+      safeParseJSON(configFile, {}),
+    );
     if (!parsedConfig.success) {
-      this.logger.error('The global config file is invalid.', {
-        cause: parsedConfig.error,
-        path: configPath,
-      });
+      this.logger.error(
+        `The global config file is invalid. Error: ${parsedConfig.error.message} Path: ${configPath}`,
+      );
       throw new Error('Invalid global config');
     }
     this.config = parsedConfig.data;
@@ -145,3 +145,11 @@ export class GlobalConfigService {
     );
   }
 }
+
+const safeParseJSON = <T>(json: string, fallback: T): T => {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return fallback;
+  }
+};

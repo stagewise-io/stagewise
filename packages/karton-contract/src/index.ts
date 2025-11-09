@@ -191,9 +191,7 @@ export type AppState = {
     startedInPath: string; // Working directory in which the app was started.
   };
   // The global configuration of the CLI.
-  globalConfig: {
-    telemetryLevel: 'off' | 'anonymous' | 'full';
-  };
+  globalConfig: GlobalConfig;
   // State of the current user experience (getting started etc.)
   userExperience:
     | {
@@ -385,6 +383,7 @@ export const defaultState: KartonContract['state'] = {
   },
   globalConfig: {
     telemetryLevel: 'off',
+    openFilesInIde: 'cursor',
   },
   userExperience: {
     activeLayout: Layout.SIGNIN,
