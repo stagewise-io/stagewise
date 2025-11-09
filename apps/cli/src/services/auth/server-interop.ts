@@ -49,7 +49,7 @@ export class AuthServerInterop {
       this.logger.error(
         `[AuthServerInterop] Failed to get session: ${response.statusText}`,
       );
-      return null;
+      throw new Error(`Failed to get session: ${response.statusText}`);
     }
     try {
       const sessionResponse = SessionResponseSchema.parse(
@@ -60,7 +60,7 @@ export class AuthServerInterop {
       this.logger.error(
         `[AuthServerInterop] Failed to parse session response: ${err}`,
       );
-      return null;
+      throw new Error(`Failed to parse session response: ${err}`);
     }
   }
 

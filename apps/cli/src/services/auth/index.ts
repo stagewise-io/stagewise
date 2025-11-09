@@ -181,7 +181,7 @@ export class AuthService {
     }
 
     // We fetch the user session data from the server and update the user state if we get valid data.
-    const _sessionData = await this.serverInterop
+    await this.serverInterop
       .getSession(this.tokenStore.tokenData.accessToken)
       .then(async (sessionData) => {
         if (!sessionData) {
