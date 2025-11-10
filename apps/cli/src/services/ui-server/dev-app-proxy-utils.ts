@@ -36,9 +36,10 @@ export const getProxyMiddleware = (
     router: () => {
       const useAutoFoundAppPort =
         workspaceManager.workspace?.configService?.get().useAutoFoundAppPort;
-      const targetPort = useAutoFoundAppPort
-        ? workspaceManager.workspace?.devAppStateService?.getPort()
-        : workspaceManager.workspace?.configService?.get().appPort;
+      const targetPort =
+        useAutoFoundAppPort && workspaceManager.workspace?.devAppStateService
+          ? workspaceManager.workspace.devAppStateService.getPort()
+          : workspaceManager.workspace?.configService?.get().appPort;
       if (!targetPort) {
         throw new Error(
           "[DevAppProxy] Proxy request received while no app port is configured. This shouldn't happen...",

@@ -60,7 +60,7 @@ export class WorkspaceSetupService {
           '[WorkspaceSetupService] Config file is valid. Setting setup completed to true..',
         );
         this._setupCompleted = true;
-        this.onSetupCompleted?.(null);
+        await this.onSetupCompleted?.(null);
         return;
       }
     }
@@ -151,7 +151,7 @@ export class WorkspaceSetupService {
 
     // Notify the listeners
     this._setupCompleted = true;
-    this.onSetupCompleted?.(validatedConfig.data);
+    await this.onSetupCompleted?.(validatedConfig.data);
   }
 
   private async handleResolveRelativePathToAbsolutePath(
