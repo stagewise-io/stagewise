@@ -10,7 +10,7 @@ export const DESCRIPTION =
   'Overwrite the entire content of a file. Creates the file if it does not exist, along with any necessary directories.';
 
 export const overwriteFileParamsSchema = z.object({
-  path: z.string().describe('Relative file path'),
+  relative_path: z.string().describe('Relative file path'),
   content: z.string(),
 });
 
@@ -25,10 +25,10 @@ export async function overwriteFileToolExecute(
   params: OverwriteFileParams,
   clientRuntime: ClientRuntime,
 ) {
-  const { path: relPath, content } = params;
+  const { relative_path, content } = params;
 
   try {
-    const absolutePath = clientRuntime.fileSystem.resolvePath(relPath);
+    const absolutePath = clientRuntime.fileSystem.resolvePath(relative_path);
 
     // Check if file exists and read original content for undo capability
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
@@ -39,7 +39,7 @@ export async function overwriteFileToolExecute(
       const readResult = await clientRuntime.fileSystem.readFile(absolutePath);
       if (!readResult.success || readResult.content === undefined)
         throw new Error(
-          `Failed to read existing file: ${relPath} - ${readResult.message} - ${readResult.error || ''}`,
+          `Failed to read existing file: ${relative_path} - ${readResult.message} - ${readResult.error || ''}`,
         );
 
       originalContent = readResult.content;
@@ -80,7 +80,7 @@ export async function overwriteFileToolExecute(
     );
     if (!writeResult.success)
       throw new Error(
-        `Failed to write file: ${relPath} - ${writeResult.message} - ${writeResult.error || ''}`,
+        `Failed to write file: ${relative_path} - ${writeResult.message} - ${writeResult.error || ''}`,
       );
 
     // Create the undo function
@@ -94,7 +94,7 @@ export async function overwriteFileToolExecute(
 
         if (!restoreResult.success) {
           throw new Error(
-            `Failed to restore original content for file: ${relPath} - ${restoreResult.message} - ${restoreResult.error || ''}`,
+            `Failed to restore original content for file: ${relative_path} - ${restoreResult.message} - ${restoreResult.error || ''}`,
           );
         }
       } else {
@@ -104,14 +104,14 @@ export async function overwriteFileToolExecute(
 
         if (!deleteResult.success)
           throw new Error(
-            `Failed to delete newly created file: ${relPath} - ${deleteResult.message} - ${deleteResult.error || ''}`,
+            `Failed to delete newly created file: ${relative_path} - ${deleteResult.message} - ${deleteResult.error || ''}`,
           );
       }
     };
 
     // Build success message
     const action = fileExists ? 'updated' : 'created';
-    const message = `Successfully ${action} file: ${relPath}`;
+    const message = `Successfully ${action} file: ${relative_path}`;
 
     // Prepare content for diff (check for binary/large files)
     const afterPrepared = await prepareDiffContent(
@@ -127,7 +127,7 @@ export async function overwriteFileToolExecute(
       // FileModifyDiff - handle 4 cases based on omitted flags
       if (beforePrepared && !beforePrepared.omitted && !afterPrepared.omitted) {
         diff = {
-          path: relPath,
+          path: relative_path,
           before: beforePrepared.content!,
           after: afterPrepared.content!,
         };
@@ -137,19 +137,19 @@ export async function overwriteFileToolExecute(
         afterPrepared.omitted
       ) {
         diff = {
-          path: relPath,
+          path: relative_path,
           before: beforePrepared.content!,
           after: null,
         };
       } else if (beforePrepared?.omitted && !afterPrepared.omitted) {
         diff = {
-          path: relPath,
+          path: relative_path,
           before: null,
           after: afterPrepared.content!,
         };
       } else {
         diff = {
-          path: relPath,
+          path: relative_path,
           before: null,
           after: null,
         };
@@ -158,12 +158,12 @@ export async function overwriteFileToolExecute(
       // FileCreateDiff - handle 2 cases based on omitted flag
       diff = afterPrepared.omitted
         ? {
-            path: relPath,
+            path: relative_path,
             before: null,
             after: null,
           }
         : {
-            path: relPath,
+            path: relative_path,
             before: null,
             after: afterPrepared.content!,
           };

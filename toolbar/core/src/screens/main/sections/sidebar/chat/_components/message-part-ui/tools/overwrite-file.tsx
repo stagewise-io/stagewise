@@ -1,4 +1,5 @@
 import type { ToolPart } from '@stagewise/karton-contract';
+import { useFileHref } from '@/hooks/use-file-href';
 import { DiffPreview, ToolPartUIBase } from './_shared';
 import { MinimizeIcon, MaximizeIcon, PencilIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
@@ -6,7 +7,7 @@ import { useMemo, useState } from 'react';
 import { diffLines } from 'diff';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 
-import { IDE_SELECTION_ITEMS, getIDEFileUrl } from '@/utils';
+import { IDE_SELECTION_ITEMS } from '@/utils';
 import { useKartonState } from '@/hooks/use-karton';
 
 export const OverwriteFileToolPart = ({
@@ -14,6 +15,7 @@ export const OverwriteFileToolPart = ({
 }: {
   part: Extract<ToolPart, { type: 'tool-overwriteFileTool' }>;
 }) => {
+  const { getFileHref } = useFileHref();
   const diff = useMemo(
     () =>
       part.output?.hiddenMetadata
@@ -40,16 +42,6 @@ export const OverwriteFileToolPart = ({
     (s) => s.globalConfig.openFilesInIde,
   );
 
-  const workspacePath = useKartonState((s) => s.workspace?.path);
-
-  const absFilePath = useMemo(() => {
-    return (
-      (workspacePath?.replace('\\', '/') ?? '') +
-      '/' +
-      (part.input?.path?.replace('\\', '/') ?? '')
-    );
-  }, [workspacePath, part.input?.path]);
-
   return (
     <ToolPartUIBase
       part={part}
@@ -57,7 +49,7 @@ export const OverwriteFileToolPart = ({
       toolName={`Overwriting file...`}
       toolSubtitle={
         <div className="flex flex-row items-center justify-start gap-3">
-          <span>{getTruncatedFileUrl(part.input?.path ?? '')}</span>
+          <span>{getTruncatedFileUrl(part.input?.relative_path ?? '')}</span>
           <div className="flex shrink-0 flex-row items-center gap-2 font-medium text-xs">
             {diff && (
               <>
@@ -87,7 +79,7 @@ export const OverwriteFileToolPart = ({
                 {collapsedDiffView ? 'Show all lines' : 'Show changes only'}
               </Button>
               <a
-                href={getIDEFileUrl(absFilePath, openInIdeSelection)}
+                href={getFileHref(part.input?.relative_path ?? '')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={buttonVariants({ size: 'xs', variant: 'ghost' })}
@@ -97,7 +89,7 @@ export const OverwriteFileToolPart = ({
             </div>
             <DiffPreview
               diff={diff}
-              filePath={part.input?.path ?? ''}
+              filePath={part.input?.relative_path ?? ''}
               collapsed={collapsedDiffView}
             />
           </div>

@@ -14,7 +14,8 @@ export const ListFilesToolPart = ({
       toolIcon={<ListIcon className="size-3" />}
       toolName={`Listing ${part.input ? (part.input.includeDirectories ? 'directories' : 'files') : ''}...`}
       toolSubtitle={
-        part.input?.path && `Looking in ${getTruncatedFileUrl(part.input.path)}`
+        part.input?.relative_path &&
+        `Looking in ${getTruncatedFileUrl(part.input.relative_path)}`
       }
     />
   );

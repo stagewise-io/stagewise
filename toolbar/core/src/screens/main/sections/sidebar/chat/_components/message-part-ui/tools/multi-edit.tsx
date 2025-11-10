@@ -2,17 +2,19 @@ import type { ToolPart } from '@stagewise/karton-contract';
 import { DiffPreview, ToolPartUIBase } from './_shared';
 import { MaximizeIcon, MinimizeIcon, PencilIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
+import { useFileHref } from '@/hooks/use-file-href';
 import { diffLines } from 'diff';
 import { useMemo, useState } from 'react';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { useKartonState } from '@/hooks/use-karton';
-import { IDE_SELECTION_ITEMS, getIDEFileUrl } from '@/utils';
+import { IDE_SELECTION_ITEMS } from '@/utils';
 
 export const MultiEditToolPart = ({
   part,
 }: {
   part: Extract<ToolPart, { type: 'tool-multiEditTool' }>;
 }) => {
+  const { getFileHref } = useFileHref();
   const diff = useMemo(
     () =>
       part.output?.hiddenMetadata?.diff
@@ -39,16 +41,6 @@ export const MultiEditToolPart = ({
     (s) => s.globalConfig.openFilesInIde,
   );
 
-  const workspacePath = useKartonState((s) => s.workspace?.path);
-
-  const absFilePath = useMemo(() => {
-    return (
-      (workspacePath?.replace('\\', '/') ?? '') +
-      '/' +
-      (part.input?.file_path?.replace('\\', '/') ?? '')
-    );
-  }, [workspacePath, part.input?.file_path]);
-
   return (
     <ToolPartUIBase
       part={part}
@@ -56,7 +48,7 @@ export const MultiEditToolPart = ({
       toolName={`Editing file...`}
       toolSubtitle={
         <div className="flex flex-row items-center justify-start gap-3">
-          <span>{getTruncatedFileUrl(part.input?.file_path ?? '')}</span>
+          <span>{getTruncatedFileUrl(part.input?.relative_path ?? '')}</span>
           <div className="flex shrink-0 flex-row items-center gap-2 font-medium text-xs">
             {diff && (
               <>
@@ -84,7 +76,7 @@ export const MultiEditToolPart = ({
                 {collapsedDiffView ? 'Show all lines' : 'Show changes only'}
               </Button>
               <a
-                href={getIDEFileUrl(absFilePath, openInIdeSelection)}
+                href={getFileHref(part.input?.relative_path ?? '')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={buttonVariants({ size: 'xs', variant: 'ghost' })}
@@ -94,7 +86,7 @@ export const MultiEditToolPart = ({
             </div>
             <DiffPreview
               diff={diff}
-              filePath={part.input?.file_path ?? ''}
+              filePath={part.input?.relative_path ?? ''}
               collapsed={collapsedDiffView}
             />
           </div>

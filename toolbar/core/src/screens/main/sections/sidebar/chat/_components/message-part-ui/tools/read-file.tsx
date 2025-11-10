@@ -13,7 +13,7 @@ export const ReadFileToolPart = ({
       part={part}
       toolIcon={<EyeIcon className="size-3" />}
       toolName={`Reading file...`}
-      toolSubtitle={getTruncatedFileUrl(part.input?.target_file ?? '')}
+      toolSubtitle={getTruncatedFileUrl(part.input?.relative_path ?? '')}
     />
   );
 };

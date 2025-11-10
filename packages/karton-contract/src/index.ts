@@ -308,6 +308,7 @@ export type KartonContract = {
     workspace: {
       open: (path: string) => Promise<void>;
       close: () => Promise<void>;
+      getAbsoluteAgentAccessPath: () => Promise<string>;
       setup: {
         submit: (config: WorkspaceConfig) => Promise<void>;
         checkForActiveAppOnPort: (port: number) => Promise<boolean>;

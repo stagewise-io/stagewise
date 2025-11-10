@@ -2,13 +2,13 @@ import { useContextChipHover } from '@/hooks/use-context-chip-hover';
 import { XIcon, SquareDashedMousePointer } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { useFileHref } from '@/hooks/use-file-href';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
-import { getIDEFileUrl, getXPathForElement } from '@/utils';
-import { useKartonState } from '@/hooks/use-karton';
+import { getXPathForElement } from '@/utils';
 
 interface ContextElementsChipsProps {
   domContextElements: {
@@ -98,6 +98,7 @@ function ContextElementChip({
   onHover,
   onUnhover,
 }: ContextElementChipProps) {
+  const { getFileHref } = useFileHref();
   const chipLabel = useMemo(() => {
     // First try to get label from plugin context
     const firstAnnotation = pluginContext.find(
@@ -113,10 +114,6 @@ function ContextElementChip({
     const id = element.id ? `#${element.id}` : '';
     return `${tagName}${id}`;
   }, [element, pluginContext]);
-
-  const workspacePath = useKartonState((s) => s.workspace?.path);
-
-  const openInIdeChoice = useKartonState((s) => s.globalConfig.openFilesInIde);
 
   return (
     <Popover>
@@ -182,9 +179,7 @@ function ContextElementChip({
           {codeMetadata.length > 0 && (
             <div className="flex flex-col items-stretch justify-start gap-1">
               <div className="flex flex-row items-start justify-between gap-3">
-                <p className="basis-3/4 font-medium text-foreground text-sm">
-                  Related source files
-                </p>
+                <p className="basis-3/4 font-medium text-foreground text-sm" />
                 <p className="basis-1/4 text-end font-medium text-muted-foreground text-xs">
                   Lines
                 </p>
@@ -202,12 +197,7 @@ function ContextElementChip({
                     className="flex flex-row items-start justify-start gap-1"
                   >
                     <a
-                      href={getIDEFileUrl(
-                        workspacePath!.replace('\\', '/') +
-                          '/' +
-                          metadata.relativePath.replace('\\', '/'),
-                        openInIdeChoice,
-                      )}
+                      href={getFileHref(metadata.relativePath)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="basis-4/5 font-medium text-muted-foreground text-sm hover:text-primary"

@@ -96,7 +96,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'delete-file-tool-call-id-1',
     state: 'input-streaming',
     input: {
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
     },
   },
   {
@@ -104,7 +104,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'delete-file-tool-call-id-2',
     state: 'input-available',
     input: {
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
     },
   },
   {
@@ -112,7 +112,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'delete-file-tool-call-id-3',
     state: 'output-available',
     input: {
-      path: 'dummy-path.tsx',
+      relative_path: 'dummy-path.tsx',
     },
     output: {
       message: 'File deleted successfully.',
@@ -133,7 +133,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'delete-file-tool-call-id-4',
     state: 'output-error',
     input: {
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
     },
     errorText: 'This is a dummy tool error.',
   },
@@ -143,7 +143,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     state: 'input-available',
     input: {
       pattern: 'dummy-pattern.txt',
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
     },
   },
   {
@@ -152,7 +152,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     state: 'output-available',
     input: {
       pattern: 'dummy-pattern.txt',
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
     },
     output: {
       message: 'File globbed successfully.',
@@ -170,7 +170,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     state: 'output-error',
     input: {
       pattern: 'dummy-pattern.txt',
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
     },
     errorText: 'This is a dummy tool error.',
   },
@@ -228,7 +228,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'list-files-tool-call-id-1',
     state: 'input-available',
     input: {
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
       recursive: true,
       maxDepth: 10,
       pattern: 'dummy-pattern.txt',
@@ -241,7 +241,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'list-files-tool-call-id-2',
     state: 'output-available',
     input: {
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
       recursive: true,
       maxDepth: 10,
       pattern: 'dummy-pattern.txt',
@@ -279,7 +279,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'list-files-tool-call-id-3',
     state: 'output-error',
     input: {
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
       recursive: true,
       maxDepth: 10,
       pattern: 'dummy-pattern.txt',
@@ -294,7 +294,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'multi-edit-tool-call-id-1',
     state: 'input-streaming',
     input: {
-      file_path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
       edits: [
         {
           old_string: 'dummy-old-string',
@@ -308,7 +308,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'multi-edit-tool-call-id-2',
     state: 'input-available',
     input: {
-      file_path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
       edits: [
         {
           old_string: 'dummy-old-string',
@@ -322,7 +322,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'multi-edit-tool-call-id-3',
     state: 'output-available',
     input: {
-      file_path: 'dummy-path.js',
+      relative_path: 'dummy-path.js',
       edits: [
         {
           old_string: 'dummy-old-string',
@@ -352,7 +352,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'multi-edit-tool-call-id-4',
     state: 'output-error',
     input: {
-      file_path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
       edits: [
         {
           old_string: 'dummy-old-string',
@@ -367,7 +367,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'overwrite-file-tool-call-id-1',
     state: 'input-streaming',
     input: {
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
       content: 'dummy-content.txt',
     },
   },
@@ -376,7 +376,7 @@ const uiDebugParts: ChatMessage['parts'] = [
     toolCallId: 'overwrite-file-tool-call-id-2',
     state: 'input-available',
     input: {
-      path: 'dummy-path.txt',
+      relative_path: 'dummy-path.txt',
       content: 'dummy-content.txt',
     },
   },

@@ -8,7 +8,7 @@ import { prepareDiffContent } from '../../utils/file';
 export const DESCRIPTION = 'Delete a file from the file system';
 
 export const deleteFileParamsSchema = z.object({
-  path: z.string().describe('Relative file path to delete'),
+  relative_path: z.string().describe('Relative file path to delete'),
 });
 
 export type DeleteFileParams = z.infer<typeof deleteFileParamsSchema>;
@@ -22,21 +22,21 @@ export async function deleteFileToolExecute(
   params: DeleteFileParams,
   clientRuntime: ClientRuntime,
 ) {
-  const { path: relPath } = params;
+  const { relative_path } = params;
 
   try {
-    const absolutePath = clientRuntime.fileSystem.resolvePath(relPath);
+    const absolutePath = clientRuntime.fileSystem.resolvePath(relative_path);
 
     // Check if file exists
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
-    if (!fileExists) throw new Error(`File not found: ${relPath}`);
+    if (!fileExists) throw new Error(`File not found: ${relative_path}`);
 
     // Read the file content before deletion for undo capability
     const originalContent =
       await clientRuntime.fileSystem.readFile(absolutePath);
     if (!originalContent.success || originalContent.content === undefined)
       throw new Error(
-        `Failed to read file before deletion: ${relPath} - ${originalContent.message} - ${originalContent.error || ''}`,
+        `Failed to read file before deletion: ${relative_path} - ${originalContent.message} - ${originalContent.error || ''}`,
       );
 
     // Store the original content for undo
@@ -54,7 +54,7 @@ export async function deleteFileToolExecute(
       await clientRuntime.fileSystem.deleteFile(absolutePath);
     if (!deleteResult.success)
       throw new Error(
-        `Failed to delete file: ${relPath} - ${deleteResult.message} - ${deleteResult.error || ''}`,
+        `Failed to delete file: ${relative_path} - ${deleteResult.message} - ${deleteResult.error || ''}`,
       );
 
     // Create the undo function
@@ -71,25 +71,25 @@ export async function deleteFileToolExecute(
 
       if (!restoreResult.success)
         throw new Error(
-          `Failed to restore deleted file: ${relPath} - ${restoreResult.message} - ${restoreResult.error || ''}`,
+          `Failed to restore deleted file: ${relative_path} - ${restoreResult.message} - ${restoreResult.error || ''}`,
         );
     };
 
     // Create diff data based on discriminated union
     const diff: FileDiff = preparedContent.omitted
       ? {
-          path: relPath,
+          path: relative_path,
           before: null,
           after: null,
         }
       : {
-          path: relPath,
+          path: relative_path,
           before: preparedContent.content!,
           after: null,
         };
 
     return {
-      message: `Successfully deleted file: ${relPath}`,
+      message: `Successfully deleted file: ${relative_path}`,
       hiddenMetadata: {
         undoExecute,
         diff,

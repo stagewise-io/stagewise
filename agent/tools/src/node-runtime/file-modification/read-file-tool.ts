@@ -10,7 +10,7 @@ export const DESCRIPTION =
   'Read the contents of a file with line-by-line control';
 
 export const readFileParamsSchema = z.object({
-  target_file: z.string().describe('Relative path of the file to read'),
+  relative_path: z.string().describe('Relative path of the file to read'),
   start_line: z
     .number()
     .int()
@@ -44,7 +44,7 @@ export async function readFileToolExecute(
   params: ReadFileParams,
   clientRuntime: ClientRuntime,
 ) {
-  const { target_file, start_line, end_line } = params;
+  const { relative_path, start_line, end_line } = params;
 
   // Validate line range when not reading entire file
   if (
@@ -55,11 +55,11 @@ export async function readFileToolExecute(
     throw new Error(`end_line must be equal or larger than start_line`);
 
   try {
-    const absolutePath = clientRuntime.fileSystem.resolvePath(target_file);
+    const absolutePath = clientRuntime.fileSystem.resolvePath(relative_path);
 
     // Check if file exists
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
-    if (!fileExists) throw new Error(`File does not exist: ${target_file}`);
+    if (!fileExists) throw new Error(`File does not exist: ${relative_path}`);
 
     // Check file size before reading (only when reading entire file)
     if (start_line === undefined && end_line === undefined) {
@@ -71,7 +71,7 @@ export async function readFileToolExecute(
 
       if (!sizeCheck.isWithinLimit)
         throw new Error(
-          `File is too large to read: ${target_file} - ${sizeCheck.error || ''}`,
+          `File is too large to read: ${relative_path} - ${sizeCheck.error || ''}`,
         );
     }
 
@@ -88,7 +88,7 @@ export async function readFileToolExecute(
 
     if (!readResult.success)
       throw new Error(
-        `Failed to read file: ${target_file} - ${readResult.message} - ${readResult.error || ''}`,
+        `Failed to read file: ${relative_path} - ${readResult.message} - ${readResult.error || ''}`,
       );
 
     const content = readResult.content;
@@ -114,7 +114,7 @@ export async function readFileToolExecute(
     };
 
     // Format the success message
-    let message = `Successfully read lines ${start_line || 1}-${end_line || totalLines} from file: ${target_file} (${linesRead} lines of ${totalLines} total)`;
+    let message = `Successfully read lines ${start_line || 1}-${end_line || totalLines} from file: ${relative_path} (${linesRead} lines of ${totalLines} total)`;
 
     // Add truncation message if content was capped
     if (cappedResult.truncated) {

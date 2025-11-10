@@ -12,7 +12,7 @@ export const DESCRIPTION =
   "List files and directories in a path (like 'ls' or 'tree' command). Use when exploring directory structure or checking what's in a specific folder. Supports recursive listing with maxDepth control, filtering by includeFiles/includeDirectories flags, and returns detailed file metadata (type, size). Optimal for understanding project layout or navigating unfamiliar codebases.";
 
 export const listFilesParamsSchema = z.object({
-  path: z.string().optional(),
+  relative_path: z.string().optional(),
   recursive: z.boolean().optional(), // Whether to list files recursively
   maxDepth: z.number().min(0).optional(), // Maximum recursion depth (default: unlimited)
   pattern: z.string().optional(), // File extension (e.g., ".ts") or glob-like pattern
@@ -34,7 +34,7 @@ export async function listFilesToolExecute(
   clientRuntime: ClientRuntime,
 ) {
   const {
-    path: relPath = '.',
+    relative_path: relPath = '.',
     recursive = false,
     maxDepth,
     pattern,

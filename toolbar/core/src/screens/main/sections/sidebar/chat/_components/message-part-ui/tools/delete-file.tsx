@@ -12,7 +12,7 @@ export const DeleteFileToolPart = ({
       part={part}
       toolIcon={<TrashIcon className="size-3" />}
       toolName={`Deleting file...`}
-      toolSubtitle={part.input?.path}
+      toolSubtitle={part.input?.relative_path}
     />
   );
 };

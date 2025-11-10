@@ -18,7 +18,7 @@ const editSchema = z.object({
 });
 
 export const multiEditParamsSchema = z.object({
-  file_path: z.string().describe('Relative file path'),
+  relative_path: z.string().describe('Relative file path'),
   edits: z.array(editSchema).min(1).describe('Array of edit objects'),
 });
 
@@ -35,7 +35,7 @@ export async function multiEditToolExecute(
   params: MultiEditParams,
   clientRuntime: ClientRuntime,
 ) {
-  const { file_path, edits } = params;
+  const { relative_path, edits } = params;
 
   if (edits.length === 0)
     throw new Error(
@@ -43,17 +43,17 @@ export async function multiEditToolExecute(
     );
 
   try {
-    const absolutePath = clientRuntime.fileSystem.resolvePath(file_path);
+    const absolutePath = clientRuntime.fileSystem.resolvePath(relative_path);
 
     // Check if file exists
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
-    if (!fileExists) throw new Error(`File does not exist: ${file_path}`);
+    if (!fileExists) throw new Error(`File does not exist: ${relative_path}`);
 
     // Read the current file content
     const readResult = await clientRuntime.fileSystem.readFile(absolutePath);
     if (!readResult.success || !readResult.content)
       throw new Error(
-        `Failed to read file before edit: ${file_path} - ${readResult.message} - ${readResult.error || ''}`,
+        `Failed to read file before edit: ${relative_path} - ${readResult.message} - ${readResult.error || ''}`,
       );
 
     // Store the original content for undo capability
@@ -95,7 +95,7 @@ export async function multiEditToolExecute(
     // Write the modified content back to the file
     if (totalEditsApplied === 0)
       return {
-        message: `Applied 0 edits to ${file_path}.`,
+        message: `Applied 0 edits to ${relative_path}.`,
         result: {
           editsApplied: totalEditsApplied,
         },
@@ -111,7 +111,7 @@ export async function multiEditToolExecute(
     );
     if (!writeResult.success)
       throw new Error(
-        `Failed to write file: ${file_path} - ${writeResult.message} - ${writeResult.error || ''}`,
+        `Failed to write file: ${relative_path} - ${writeResult.message} - ${writeResult.error || ''}`,
       );
 
     // Create the undo function to restore the original content
@@ -123,7 +123,7 @@ export async function multiEditToolExecute(
 
       if (!restoreResult.success)
         throw new Error(
-          `Failed to restore original content for file: ${file_path} - ${restoreResult.message} - ${restoreResult.error || ''}`,
+          `Failed to restore original content for file: ${relative_path} - ${restoreResult.message} - ${restoreResult.error || ''}`,
         );
     };
 
@@ -143,32 +143,32 @@ export async function multiEditToolExecute(
     let diff: FileDiff;
     if (!beforePrepared.omitted && !afterPrepared.omitted) {
       diff = {
-        path: file_path,
+        path: relative_path,
         before: beforePrepared.content!,
         after: afterPrepared.content!,
       };
     } else if (!beforePrepared.omitted && afterPrepared.omitted) {
       diff = {
-        path: file_path,
+        path: relative_path,
         before: beforePrepared.content!,
         after: null,
       };
     } else if (beforePrepared.omitted && !afterPrepared.omitted) {
       diff = {
-        path: file_path,
+        path: relative_path,
         before: null,
         after: afterPrepared.content!,
       };
     } else {
       diff = {
-        path: file_path,
+        path: relative_path,
         before: null,
         after: null,
       };
     }
 
     return {
-      message: `Successfully applied ${totalEditsApplied} edits to ${file_path}`,
+      message: `Successfully applied ${totalEditsApplied} edits to ${relative_path}`,
       result: { editsApplied: totalEditsApplied },
       hiddenMetadata: {
         undoExecute,

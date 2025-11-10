@@ -13,7 +13,10 @@ export const DESCRIPTION =
 
 export const globParamsSchema = z.object({
   pattern: z.string().describe('Glob pattern (e.g., "**/*.js")'),
-  path: z.string().optional().describe('Relative directory path to search in'),
+  relative_path: z
+    .string()
+    .optional()
+    .describe('Relative directory path to search in'),
 });
 
 export type GlobParams = z.infer<typeof globParamsSchema>;
@@ -29,11 +32,11 @@ export async function globToolExecute(
   params: GlobParams,
   clientRuntime: ClientRuntime,
 ) {
-  const { pattern, path } = params;
+  const { pattern, relative_path } = params;
 
   try {
     // Use the provided path as the search directory, or fall back to cwd
-    const searchPath = path || undefined;
+    const searchPath = relative_path || undefined;
 
     // Perform the glob search
     const globResult = await clientRuntime.fileSystem.glob(pattern, {
@@ -68,7 +71,9 @@ export async function globToolExecute(
     };
 
     // Format the success message
-    const searchLocation = path ? ` in "${path}"` : ' in current directory';
+    const searchLocation = relative_path
+      ? ` in "${relative_path}"`
+      : ' in current directory';
     let message = `Found ${globResult.totalMatches || 0} matches for pattern "${pattern}"${searchLocation}`;
 
     // Add truncation message with helpful suggestions if results were capped

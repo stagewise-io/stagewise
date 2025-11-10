@@ -103,6 +103,13 @@ export class WorkspaceService {
       };
     });
 
+    this.kartonService.registerServerProcedureHandler(
+      'workspace.getAbsoluteAgentAccessPath',
+      async () => {
+        return this.getAbsoluteAgentAccessPath();
+      },
+    );
+
     // Start all child services of the workspace. All regular services should only be started if the setup service is done.
     this.workspaceSetupService = await WorkspaceSetupService.create(
       this.logger,
@@ -284,6 +291,10 @@ export class WorkspaceService {
     await this.workspaceConfigService?.teardown();
     await this.staticAnalysisService?.teardown();
     await this.workspacePathsService?.teardown();
+
+    this.kartonService.removeServerProcedureHandler(
+      'workspace.getAbsoluteAgentAccessPath',
+    );
 
     this.kartonService.setState((draft) => {
       draft.workspace = null;
