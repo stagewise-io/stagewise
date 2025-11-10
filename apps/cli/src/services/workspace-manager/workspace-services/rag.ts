@@ -122,10 +122,11 @@ export class RagService {
           );
           return;
         }
+      } else {
+        this.resetRagStatusWithError(
+          "Failed to update the codebase index - we'll try again later.",
+        );
       }
-
-      // Re-throw non-auth errors to be handled by caller
-      throw error;
     }
   }
 
