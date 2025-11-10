@@ -1,6 +1,7 @@
 import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
 import { FileAttachmentChips } from '@/components/file-attachment-chips';
 import { TextSlideshow } from '@/components/ui/text-slideshow';
+import { ContextUsageRing } from './context-usage-ring';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn, HotkeyActions } from '@/utils';
@@ -52,7 +53,6 @@ const chatTextSlideshowTexts: Record<MainTab | 'fallback', string[]> = {
 };
 export function ChatPanelFooter() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
   const openTab = useKartonState((s) =>
     s.userExperience.activeLayout === Layout.MAIN
       ? s.userExperience.activeMainTab
@@ -80,11 +80,12 @@ export function ChatPanelFooter() {
 
   const [isComposing, setIsComposing] = useState(false);
 
+  const isVerboseMode = useKartonState((s) => s.appInfo.verbose);
+
   const enableInputField = useMemo(() => {
     // Disable input if agent is not connected
-    if (!isConnected) {
-      return false;
-    }
+    if (!isConnected) return false;
+
     return !isWorking;
   }, [isWorking, isConnected]);
 
@@ -147,6 +148,15 @@ export function ChatPanelFooter() {
   const handleCompositionEnd = useCallback(() => {
     setIsComposing(false);
   }, []);
+
+  const contextUsed = useMemo(() => {
+    const used = activeChat?.usage.usedContextWindowSize ?? 0;
+    const max = activeChat?.usage.maxContextWindowSize ?? 1;
+    return Math.min(100, Math.round((used / max) * 100));
+  }, [
+    activeChat?.usage.usedContextWindowSize,
+    activeChat?.usage.maxContextWindowSize,
+  ]);
 
   const showTextSlideshow = useMemo(() => {
     return (
@@ -270,6 +280,13 @@ export function ChatPanelFooter() {
 
           {/* Other attachments area */}
           <div className="flex flex-row flex-wrap items-center justify-start gap-1 *:shrink-0">
+            {activeChat && isVerboseMode && (
+              <ContextUsageRing
+                percentage={contextUsed}
+                usedKb={activeChat.usage.usedContextWindowSize}
+                maxKb={activeChat.usage.maxContextWindowSize}
+              />
+            )}
             <FileAttachmentChips
               fileAttachments={chatState.fileAttachments}
               removeFileAttachment={chatState.removeFileAttachment}
