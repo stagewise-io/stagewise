@@ -41,7 +41,8 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "vscode-ripgrep"
     ],
     "ignoredBuiltDependencies": [
       "keytar"

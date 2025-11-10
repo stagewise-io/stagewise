@@ -1,51 +1,52 @@
 import { useContextChipHover } from '@/hooks/use-context-chip-hover';
-import { XIcon, SquareDashedMousePointer } from 'lucide-react';
+import {
+  XIcon,
+  SquareDashedMousePointer,
+  AtomIcon,
+  ChevronLeft,
+} from 'lucide-react';
 import { useMemo } from 'react';
-import { Button } from '@stagewise/stage-ui/components/button';
 import { useFileHref } from '@/hooks/use-file-href';
+import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
-import { getXPathForElement } from '@/utils';
+import { getIDEFileUrl } from '@/utils';
+import { useKartonState } from '@/hooks/use-karton';
+import { cn } from '@stagewise/stage-ui/lib/utils';
+import type { SelectedElement } from '@stagewise/karton-contract';
 
 interface ContextElementsChipsProps {
-  domContextElements: {
-    element: HTMLElement;
-    pluginContext: {
-      pluginName: string;
-      context: any;
-    }[];
-    codeMetadata: {
-      relativePath: string;
-      startLine: number;
-      endLine: number;
-      content?: string;
-    }[];
+  selectedElements: {
+    domElement?: HTMLElement;
+    selectedElement: SelectedElement;
   }[];
-  removeChatDomContext: (element: HTMLElement) => void;
+  removeSelectedElement: (element: HTMLElement) => void;
 }
 
 export function ContextElementsChipsFlexible({
-  domContextElements,
-  removeChatDomContext,
+  selectedElements,
+  removeSelectedElement,
 }: ContextElementsChipsProps) {
   const { setHoveredElement } = useContextChipHover();
 
-  if (domContextElements.length === 0) {
+  if (selectedElements.length === 0) {
     return null;
   }
 
   return (
     <>
-      {domContextElements.map((contextElement, index) => (
+      {selectedElements.map((selectedElement) => (
         <ContextElementChip
-          key={`${contextElement.element.tagName}-${index}`}
-          element={contextElement.element}
-          pluginContext={contextElement.pluginContext}
-          codeMetadata={contextElement.codeMetadata}
-          onDelete={() => removeChatDomContext(contextElement.element)}
+          key={`${selectedElement.selectedElement.stagewiseId}`}
+          element={selectedElement.domElement}
+          selectedElement={selectedElement.selectedElement}
+          onDelete={() =>
+            selectedElement.domElement &&
+            removeSelectedElement(selectedElement.domElement)
+          }
           onHover={setHoveredElement}
           onUnhover={() => setHoveredElement(null)}
         />
@@ -55,18 +56,9 @@ export function ContextElementsChipsFlexible({
 }
 
 interface ContextElementChipProps {
-  element: HTMLElement;
-  pluginContext: {
-    pluginName: string;
-    context: any;
-  }[];
-  codeMetadata: {
-    relativePath: string;
-    startLine: number;
-    endLine: number;
-    content?: string;
-  }[];
-  onDelete: () => void;
+  element?: HTMLElement;
+  selectedElement: SelectedElement;
+  onDelete?: () => void;
   onHover: (element: HTMLElement) => void;
   onUnhover: () => void;
 }
@@ -92,28 +84,40 @@ const displayedAttributes = [
 
 function ContextElementChip({
   element,
-  pluginContext,
-  codeMetadata,
+  selectedElement,
   onDelete,
   onHover,
   onUnhover,
 }: ContextElementChipProps) {
   const { getFileHref } = useFileHref();
   const chipLabel = useMemo(() => {
-    // First try to get label from plugin context
-    const firstAnnotation = pluginContext.find(
-      (plugin) => plugin.context?.annotation,
-    )?.context?.annotation;
+    // We first try to get the component name from the framework info and then fallback to the element tag name
+    const reactComponentName =
+      selectedElement.frameworkInfo?.react?.componentName;
 
-    if (firstAnnotation) {
-      return firstAnnotation;
+    if (reactComponentName) {
+      return reactComponentName;
     }
 
-    // Fallback to element tag name
-    const tagName = element.tagName.toLowerCase();
-    const id = element.id ? `#${element.id}` : '';
+    const tagName = selectedElement.nodeType.toLowerCase();
+    const id = selectedElement.attributes.id
+      ? `#${selectedElement.attributes.id}`
+      : '';
     return `${tagName}${id}`;
-  }, [element, pluginContext]);
+  }, [selectedElement]);
+
+  const openInIdeChoice = useKartonState((s) => s.globalConfig.openFilesInIde);
+
+  const flattenedReactComponentTree = useMemo(() => {
+    // Return the flattened component tree as a list of components. Limit to first 3 components.
+    const flattenedComponents = [];
+    let currentComponent = selectedElement.frameworkInfo.react;
+    while (currentComponent && flattenedComponents.length < 5) {
+      flattenedComponents.push(currentComponent);
+      currentComponent = currentComponent.parent;
+    }
+    return flattenedComponents;
+  }, [selectedElement.frameworkInfo.react]);
 
   return (
     <Popover>
@@ -121,7 +125,7 @@ function ContextElementChip({
         <Button
           size="xs"
           variant="secondary"
-          onMouseEnter={() => onHover(element)}
+          onMouseEnter={() => element && onHover(element)}
           onMouseLeave={() => onUnhover()}
           className="pr-0"
         >
@@ -129,84 +133,112 @@ function ContextElementChip({
           <span className="max-w-24 truncate font-medium text-foreground/80">
             {chipLabel}
           </span>
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="text-muted-foreground transition-colors hover:text-red-500"
-          >
-            <XIcon className="size-3" />
-          </Button>
+          {onDelete && (
+            <div
+              role="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className={cn(
+                buttonVariants({ variant: 'ghost', size: 'icon-xs' }),
+                'text-muted-foreground transition-colors hover:text-red-500',
+              )}
+            >
+              <XIcon className="size-3" />
+            </div>
+          )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent>
-        <div className="scrollbar-thin scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/30 flex max-h-[35vh] max-w-72 flex-col gap-4 overflow-y-auto overflow-x-hidden pr-0.5 *:shrink-0">
-          <div className="flex flex-col items-stretch justify-start gap-1">
+      <PopoverContent className="pr-2">
+        <div className="scrollbar-thin scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/30 flex max-h-[35vh] max-w-72 flex-col gap-5 overflow-y-auto overflow-x-hidden pr-0.5 *:shrink-0">
+          <div className="flex flex-col items-stretch justify-start gap-1.5">
             <p className="font-medium text-foreground text-sm">XPath</p>
             <div className="w-full font-mono text-muted-foreground text-xs">
-              {getXPathForElement(element, true)}
+              {selectedElement.xpath}
             </div>
           </div>
-          <div className="flex flex-col items-stretch justify-start gap-1">
+          <div className="flex flex-col items-stretch justify-start gap-1.5">
             <p className="font-medium text-foreground text-sm">Attributes</p>
             <div className="flex w-full flex-col items-stretch gap-0.5">
               {displayedAttributes
                 .filter(
                   (attribute) =>
-                    element.getAttribute(attribute) !== null &&
-                    element.getAttribute(attribute) !== '' &&
-                    element.getAttribute(attribute) !== undefined,
+                    selectedElement.attributes[attribute] !== null &&
+                    selectedElement.attributes[attribute] !== '' &&
+                    selectedElement.attributes[attribute] !== undefined,
                 )
                 .map((attribute) => (
                   <div
                     key={attribute}
                     className="flex flex-row items-start justify-start gap-1"
                   >
-                    <p className="basis-1/3 font-medium text-muted-foreground text-sm">
+                    <p className="max-w-1/3 shrink-0 basis-1/4 break-all text-foreground text-sm">
                       {attribute}
                     </p>
-                    <p className="basis-2/3 font-mono text-muted-foreground text-xs">
-                      {element.getAttribute(attribute)}
+                    <p className="shrink basis-3/4 font-mono text-muted-foreground text-xs">
+                      {selectedElement.attributes[attribute]}
                     </p>
                   </div>
                 ))}
             </div>
           </div>
 
-          {codeMetadata.length > 0 && (
-            <div className="flex flex-col items-stretch justify-start gap-1">
-              <div className="flex flex-row items-start justify-between gap-3">
-                <p className="basis-3/4 font-medium text-foreground text-sm" />
-                <p className="basis-1/4 text-end font-medium text-muted-foreground text-xs">
-                  Lines
+          {selectedElement.frameworkInfo.react &&
+            flattenedReactComponentTree.length > 0 && (
+              <div className="flex flex-col items-stretch justify-start gap-1.5">
+                <p className="font-medium text-foreground text-sm">
+                  <AtomIcon className="mb-px inline size-4" /> React Component
+                  Tree
                 </p>
+                <div>
+                  {flattenedReactComponentTree.map((component, index) => {
+                    return (
+                      <>
+                        <span
+                          className={cn(
+                            'font-mono text-foreground text-xs',
+                            index === 0 && 'font-semibold text-primary',
+                            index > 1 && 'text-muted-foreground',
+                          )}
+                        >
+                          {component.componentName}
+                        </span>
+                        {index < flattenedReactComponentTree.length - 1 && (
+                          <ChevronLeft className="inline-block size-3.5 text-muted-foreground" />
+                        )}
+                      </>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex w-full flex-col items-stretch gap-1">
-                {codeMetadata.map((metadata) => (
+            )}
+
+          {selectedElement.codeMetadata.length > 0 && (
+            <div className="flex flex-col items-stretch justify-start gap-1.5">
+              <p className="w-full font-medium text-foreground text-sm">
+                Related source files
+              </p>
+              <div className="flex w-full flex-col items-stretch gap-2">
+                {selectedElement.codeMetadata.map((metadata) => (
                   <div
-                    key={
-                      metadata.relativePath +
-                      '|' +
-                      metadata.startLine +
-                      '|' +
-                      metadata.endLine
-                    }
-                    className="flex flex-row items-start justify-start gap-1"
+                    key={`${metadata.relativePath}|${metadata.startLine}`}
+                    className="flex flex-col items-stretch"
                   >
                     <a
-                      href={getFileHref(metadata.relativePath)}
+                      href={getIDEFileUrl(
+                        getFileHref(metadata.relativePath),
+                        openInIdeChoice,
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="basis-4/5 font-medium text-muted-foreground text-sm hover:text-primary"
+                      className="shrink basis-4/5 break-all text-foreground text-sm hover:text-primary"
                     >
                       {metadata.relativePath}
                     </a>
-                    <p className="basis-1/5 text-end font-mono text-muted-foreground text-xs">
-                      {metadata.startLine}-{metadata.endLine}
-                    </p>
+                    <span className="text-start text-muted-foreground text-xs">
+                      {metadata.relation}
+                    </span>
                   </div>
                 ))}
               </div>

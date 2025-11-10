@@ -187,6 +187,7 @@ export const hotkeyActionDefinitions: Record<
 
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';
+import { getSelectedElementReactInfo } from './utils/element-analysis/react';
 
 const customTwMerge = extendTailwindMerge({
   extend: {
@@ -398,7 +399,7 @@ const truncateValue = (
   return value;
 };
 
-const truncatePluginInfo = (
+const _truncatePluginInfo = (
   pluginInfo: Array<{ pluginName: string; content: string }>,
 ): Array<{ pluginName: string; content: string }> => {
   return pluginInfo.map((plugin) => ({
@@ -410,11 +411,6 @@ const truncatePluginInfo = (
 export const getSelectedElementInfo = (
   stagewiseId: string,
   element: HTMLElement,
-  codeMetadata: {
-    relativePath: string;
-    startLine: number;
-    endLine: number;
-  }[],
   mode: 'originalElement' | 'children' | 'parents' = 'originalElement',
   callDepth?: number,
   childrenCount?: number,
@@ -475,7 +471,6 @@ export const getSelectedElementInfo = (
               return getSelectedElementInfo(
                 generateId(),
                 c as HTMLElement,
-                [],
                 'children',
                 undefined,
                 (childrenCount ?? 0) + 1,
@@ -489,14 +484,18 @@ export const getSelectedElementInfo = (
         ? getSelectedElementInfo(
             stagewiseId,
             element.parentElement,
-            codeMetadata,
             'parents',
             (callDepth ?? 0) + 1,
             undefined,
           )
         : undefined,
-    pluginInfo: truncatePluginInfo([]),
-    codeMetadata: codeMetadata,
+    frameworkInfo: {
+      react:
+        mode === 'originalElement'
+          ? getSelectedElementReactInfo(element)
+          : undefined,
+    },
+    codeMetadata: [],
   };
 };
 

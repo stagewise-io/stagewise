@@ -9,7 +9,10 @@ import type { KartonService } from '../../karton';
 import type { Logger } from '../../logger';
 import type { TelemetryService } from '../../telemetry';
 import type { AuthService } from '../../auth';
-
+import type {
+  ReactSelectedElementInfo,
+  SelectedElement,
+} from '@stagewise/karton-contract';
 export class RagService {
   private logger: Logger;
   private telemetryService: TelemetryService;
@@ -200,43 +203,14 @@ export class RagService {
 
   private registerProcedureHandlers() {
     this.kartonService.registerServerProcedureHandler(
-      'agentChat.getContextElementFiles',
+      'agentChat.enrichSelectedElement',
       async (element) => {
-        const files = await getContextFilesFromSelectedElement(
-          element,
-          this.apiKey!,
-          this.workspaceDataPath!, // Is only called when the workspace is loaded
-          this.telemetryService.withTracing(
-            this.litellm('gemini-2.5-flash-lite'),
-            {
-              posthogProperties: {
-                $ai_span_name: 'get-context-element-file',
-              },
-            },
-          ),
-          this.clientRuntime,
-          (error) => {
-            this.logger.error(
-              `[AgentService] Failed to get context element file: ${error}`,
-            );
-          },
-        );
-        if (files.length === 0) return [];
-        this.logger.debug(
-          `[AgentService] Get context element files: ${files.map((file) => `${file.relativePath} - ${file.startLine} - ${file.endLine}`).join(', ')}`,
-        );
+        const codeMetadata =
+          await this.getRelatedContextFilesForSelectedElement(element);
 
-        const fileContents = await Promise.all(
-          files.map((file) =>
-            this.clientRuntime.fileSystem.readFile(file.relativePath),
-          ),
-        );
-        return fileContents.map((fileContent, index) => ({
-          relativePath: files[index]!.relativePath,
-          startLine: files[index]!.startLine,
-          endLine: files[index]!.endLine,
-          content: fileContent.content || 'Failed to read file content',
-        }));
+        // If the utility returned info for react, we filter the component name tree to only include the components that were found in the code base
+
+        return { ...element, codeMetadata };
       },
     );
     // implement procedure handlers (such as 're-index codebase') here once needed
@@ -244,8 +218,106 @@ export class RagService {
 
   private removeServerProcedureHandlers() {
     this.kartonService.removeServerProcedureHandler(
-      'agentChat.getContextElementFiles',
+      'agentChat.enrichSelectedElement',
     );
+  }
+
+  private async getRelatedContextFilesForSelectedElement(
+    element: SelectedElement,
+  ): Promise<SelectedElement['codeMetadata']> {
+    // TODO!!!!!!!!!!!!
+    let codeMetadata: SelectedElement['codeMetadata'] = [];
+
+    // We check if framework-specific info exists that may help us. If yes, we can statically infer fitting files and line numbers.
+    if (element.frameworkInfo?.react) {
+      this.logger.debug(
+        '[RagService] Getting context files for selected react component',
+      );
+      const results = await getFilePathsForReactComponentInfo(
+        element.frameworkInfo.react,
+        this.clientRuntime,
+      );
+
+      codeMetadata = results.codeMetadata;
+
+      // Extend codeMetadata with file content
+      codeMetadata = await Promise.all(
+        codeMetadata.map(async (entry) => {
+          return {
+            ...entry,
+            content: await this.clientRuntime.fileSystem
+              .readFile(entry.relativePath)
+              .then((result) =>
+                result.success
+                  ? (result.content ?? '[FILE_CONTENT_UNAVAILABLE]')
+                  : '[FILE_CONTENT_UNAVAILABLE]',
+              )
+              .catch(() => '[FILE_CONTENT_UNAVAILABLE]'),
+          };
+        }),
+      );
+
+      this.logger.debug(
+        `[RagService] Found react component context files: ${JSON.stringify(
+          codeMetadata.map((entry) => entry.relativePath),
+          null,
+          2,
+        )}`,
+      );
+
+      // We don't need additional files if we have at least 2 covered levels of information about the component structure
+      if (results.coveredLevels >= 2) return codeMetadata;
+      this.logger.debug(
+        '[RagService] No context files found for selected react component',
+      );
+    }
+
+    this.logger.debug(
+      '[RagService] Getting context files for selected element through RAG',
+    );
+
+    // If no framework-specific info exists, we need to query the RAG index for the most relevant files and line numbers.
+    const files = await getContextFilesFromSelectedElement(
+      element,
+      this.apiKey!,
+      this.workspaceDataPath!, // Is only called when the workspace is loaded
+      this.telemetryService.withTracing(this.litellm('gemini-2.5-flash-lite'), {
+        posthogProperties: {
+          $ai_span_name: 'get-context-element-file',
+        },
+      }),
+      this.clientRuntime,
+      (error) => {
+        this.logger.error(
+          `[AgentService] Failed to get context element file: ${error}`,
+        );
+      },
+    ).catch((error) => {
+      this.logger.error(
+        `[AgentService] Failed to get context element file: ${error}`,
+      );
+    });
+    if (!files || files.length === 0) return codeMetadata;
+    this.logger.debug(
+      `[AgentService] Get context element files: ${files.map((file) => `${file.relativePath} - ${file.startLine} - ${file.endLine}`).join(', ')}`,
+    );
+
+    const fileContents = await Promise.all(
+      files.map((file) =>
+        this.clientRuntime.fileSystem.readFile(file.relativePath),
+      ),
+    );
+    codeMetadata.concat(
+      fileContents.map((fileContent, index) => ({
+        relation: 'potentially relevant file',
+        relativePath: files[index]!.relativePath,
+        startLine: files[index]!.startLine,
+        endLine: files[index]!.endLine,
+        content: fileContent.content || 'Failed to read file content',
+      })),
+    );
+
+    return codeMetadata;
   }
 
   /**
@@ -287,3 +359,90 @@ export class RagService {
     return instance;
   }
 }
+
+const getFilePathsForReactComponentInfo = async (
+  componentInfo: ReactSelectedElementInfo,
+  clientRuntime: ClientRuntime,
+): Promise<{
+  codeMetadata: SelectedElement['codeMetadata'];
+  coveredLevels: number;
+}> => {
+  const componentNames: string[] = [];
+  let currentComponent = componentInfo;
+  while (currentComponent && componentNames.length < 20) {
+    componentNames.push(currentComponent.componentName);
+    currentComponent = currentComponent.parent ?? null;
+  }
+
+  // For every component name, we now collect the grep results
+  const rgResults = await Promise.all(
+    componentNames.map(async (componentName) => {
+      return await clientRuntime.fileSystem.grep(
+        '.',
+        `\\b(?:function\\s+${componentName}\\b|(?:const|let|var)\\s+${componentName}\\s*=\\s*(?:async\\s*)?\\(.*\\)\\s*=>|${componentName}\\s*:\\s*(?:async\\s*)?\\(.*\\)\\s*=>)`,
+        {
+          recursive: true,
+          filePattern: `*.tsx`,
+          respectGitignore: true,
+          maxMatches: 3,
+        },
+      );
+    }),
+  );
+
+  // Stores the amount of found files for every components level (index 0 = first component name)
+  const coveredLevels: number[] = rgResults.map((result) =>
+    result.success ? (result.totalMatches ?? 0) : 0,
+  );
+
+  const foundFiles: { path: string; relationGrades: number[] }[] =
+    rgResults.reduce<{ path: string; relationGrades: number[] }[]>(
+      (curr, acc, index) => {
+        // Iterate over every match and add the path to the current object. If the object already exists, we add the relation grade to the existing object. If the relation grade also already exists, we do nothing.
+        if (!acc.success) return curr;
+        if (!acc.matches || acc.matches.length === 0) return curr;
+
+        acc.matches.forEach((match) => {
+          const existingFile = curr.find(
+            (file) => file.path === match.relativePath,
+          );
+          if (existingFile) {
+            const existingIndex = existingFile.relationGrades.indexOf(index);
+            if (existingIndex !== -1) return;
+            existingFile.relationGrades.push(index);
+          } else {
+            curr.push({ path: match.relativePath, relationGrades: [index] });
+          }
+        });
+        return curr;
+      },
+      [],
+    );
+
+  const results: SelectedElement['codeMetadata'] = foundFiles.map((file) => {
+    const relationTextParts = file.relationGrades.map((grade, index) => {
+      return `${coveredLevels[grade]! > 1 && grade === 0 ? 'potentially ' : ''}${index === 0 ? 'contains' : ''} ${grade === 0 ? 'implementation' : `${grade}${grade === 1 ? 'st' : grade === 2 ? 'nd' : grade === 3 ? 'rd' : 'th'} grade${index === (file.relationGrades.length - 1) ? ' parent' : ''}`}`;
+    });
+
+    // Join all parts with "," unless the last part which should be joined with "and"
+    const relationText = `${
+      relationTextParts.length > 1
+        ? relationTextParts.slice(0, -1).join(', ') +
+          ' and ' +
+          relationTextParts[relationTextParts.length - 1]
+        : relationTextParts[0]
+    } of component`;
+
+    return {
+      relativePath: file.path,
+      startLine: 0,
+      content: '',
+      relation: relationText,
+    };
+  });
+
+  return {
+    codeMetadata: results,
+    coveredLevels: coveredLevels.filter((l) => l > 0).length,
+  };
+};

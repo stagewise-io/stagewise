@@ -36,22 +36,15 @@ interface ChatContext {
   // Chat content operations
   chatInput: string;
   setChatInput: (value: string) => void;
-  domContextElements: {
-    stagewiseId: string;
-    codeMetadata: {
-      relativePath: string;
-      startLine: number;
-      endLine: number;
-      content?: string;
-    }[];
-    element: HTMLElement;
-    pluginContext: {
-      pluginName: string;
-      context: any;
-    }[];
+
+  // Selected elements operations (we should just transform this into custom data parts in a refactoring...)
+  selectedElements: {
+    selectedElement: SelectedElement;
+    domElement: HTMLElement;
   }[];
-  addChatDomContext: (element: HTMLElement) => void;
-  removeChatDomContext: (element: HTMLElement) => void;
+  addSelectedElement: (domElement: HTMLElement) => void;
+  removeSelectedElement: (domElement: HTMLElement) => void;
+  clearSelectedElements: () => void;
   sendMessage: () => void;
 
   // File attachments
@@ -70,9 +63,10 @@ interface ChatContext {
 const ChatHistoryContext = createContext<ChatContext>({
   chatInput: '',
   setChatInput: () => {},
-  domContextElements: [],
-  addChatDomContext: () => {},
-  removeChatDomContext: () => {},
+  selectedElements: [],
+  addSelectedElement: () => {},
+  removeSelectedElement: () => {},
+  clearSelectedElements: () => {},
   sendMessage: () => {},
   fileAttachments: [],
   addFileAttachment: () => {},
@@ -96,22 +90,13 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const [isContextSelectorMode, setIsContextSelectorMode] =
     useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
-  const [domContextElements, setDomContextElements] = useState<
+  const [selectedElements, setSelectedElements] = useState<
     {
-      element: HTMLElement;
-      stagewiseId: string;
-      codeMetadata: {
-        relativePath: string;
-        startLine: number;
-        endLine: number;
-        content?: string;
-      }[];
-      pluginContext: {
-        pluginName: string;
-        context: any;
-      }[];
+      selectedElement: SelectedElement;
+      domElement: HTMLElement;
     }[]
   >([]);
+
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
 
   const { plugins } = usePlugins();
@@ -120,12 +105,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     (p) => p.agentChat.sendUserMessage,
   );
 
-  const notifyContextElementsChanged = useKartonProcedure(
-    (p) => p.agentChat.contextElementsChanged,
-  );
-
-  const getContextElementFiles = useKartonProcedure(
-    (p) => p.agentChat.getContextElementFiles,
+  const enrichSelectedElement = useKartonProcedure(
+    (p) => p.agentChat.enrichSelectedElement,
   );
 
   const addFileAttachment = useCallback((file: File) => {
@@ -161,87 +142,52 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     setIsContextSelectorMode(false);
   }, []);
 
-  const addChatDomContext = useCallback(
+  const addSelectedElement = useCallback(
     (element: HTMLElement) => {
-      const pluginsWithContextGetters = plugins.filter(
-        (plugin) => plugin.onContextElementSelect,
-      );
+      const newSelectedElement = getSelectedElementInfo(generateId(), element);
 
-      const newElement = {
-        stagewiseId: generateId(),
-        element,
-        pluginContext: pluginsWithContextGetters.map((plugin) => ({
-          pluginName: plugin.pluginName,
-          context: plugin.onContextElementSelect?.(element),
-        })),
-        codeMetadata: [],
-      };
+      setSelectedElements((prev) => {
+        const newContextElements = [
+          ...prev,
+          { selectedElement: newSelectedElement, domElement: element },
+        ];
 
-      setDomContextElements((prev) => {
-        const newElements = [...prev, newElement];
-
-        const selectedElements: SelectedElement[] = newElements.map((item) =>
-          getSelectedElementInfo(
-            item.stagewiseId,
-            item.element,
-            item.codeMetadata,
-          ),
-        );
-        // Notify CLI about the change
-        notifyContextElementsChanged(selectedElements);
-
-        return newElements;
+        return newContextElements;
       });
 
-      const selectedElement = getSelectedElementInfo(
-        newElement.stagewiseId,
-        newElement.element,
-        newElement.codeMetadata,
-      );
-
-      getContextElementFiles(selectedElement)
-        .then((files) => {
-          setDomContextElements((prev) => {
-            return prev.map((item) => {
-              if (item.stagewiseId === newElement.stagewiseId) {
-                item.codeMetadata = files.map((file) => ({
-                  relativePath: file.relativePath,
-                  startLine: file.startLine,
-                  endLine: file.endLine,
-                  content: file.content,
-                }));
+      // Now, we make a fetch to the CLI to let it enrich the selected Element with even more context information (related source files etc.).
+      enrichSelectedElement(newSelectedElement)
+        .then((enrichedSelectedElement) => {
+          setSelectedElements((prev) => {
+            const newContextElements = prev.map((item) => {
+              if (
+                item.selectedElement.stagewiseId ===
+                newSelectedElement.stagewiseId
+              ) {
+                return { ...item, selectedElement: enrichedSelectedElement };
               }
               return item;
             });
+            return newContextElements;
           });
         })
         .catch((error) => {
+          console.error(error);
           posthog.captureException(error);
         });
     },
-    [plugins, notifyContextElementsChanged],
+    [enrichSelectedElement],
   );
 
-  const removeChatDomContext = useCallback(
-    (element: HTMLElement) => {
-      setDomContextElements((prev) => {
-        const newElements = prev.filter((item) => item.element !== element);
+  const removeSelectedElement = useCallback((element: HTMLElement) => {
+    setSelectedElements((prev) =>
+      prev.filter((item) => item.domElement !== element),
+    );
+  }, []);
 
-        // Notify CLI about the change
-        const selectedElements: SelectedElement[] = newElements.map((item) =>
-          getSelectedElementInfo(
-            item.stagewiseId,
-            item.element,
-            item.codeMetadata,
-          ),
-        );
-        notifyContextElementsChanged(selectedElements);
-
-        return newElements;
-      });
-    },
-    [notifyContextElementsChanged],
-  );
+  const clearSelectedElements = useCallback(() => {
+    setSelectedElements([]);
+  }, []);
 
   const sendMessage = useCallback(async () => {
     if (!chatInput.trim()) return;
@@ -266,13 +212,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       // Collect metadata for selected elements
       const metadata = collectUserMessageMetadata(
-        domContextElements.map((item) =>
-          getSelectedElementInfo(
-            item.stagewiseId,
-            item.element,
-            item.codeMetadata,
-          ),
-        ),
+        selectedElements.map((item) => item.selectedElement),
         false,
       );
 
@@ -288,11 +228,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       // Reset state after sending
       setChatInput('');
-      setDomContextElements([]);
+      clearSelectedElements();
       clearFileAttachments();
-
-      // Notify CLI that context elements are cleared
-      notifyContextElementsChanged([]);
 
       // Send the message using the chat capability
       await sendChatMessage(message);
@@ -301,20 +238,21 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     }
   }, [
     chatInput,
-    domContextElements,
+    selectedElements,
     fileAttachments,
     plugins,
     sendChatMessage,
     clearFileAttachments,
-    notifyContextElementsChanged,
+    clearSelectedElements,
   ]);
 
   const value: ChatContext = {
     chatInput,
     setChatInput,
-    domContextElements,
-    addChatDomContext,
-    removeChatDomContext,
+    selectedElements,
+    addSelectedElement,
+    removeSelectedElement,
+    clearSelectedElements,
     sendMessage,
     fileAttachments,
     addFileAttachment,

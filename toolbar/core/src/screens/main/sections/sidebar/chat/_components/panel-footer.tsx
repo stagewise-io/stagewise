@@ -292,11 +292,11 @@ export function ChatPanelFooter() {
               removeFileAttachment={chatState.removeFileAttachment}
             />
             <ContextElementsChipsFlexible
-              domContextElements={chatState.domContextElements}
-              removeChatDomContext={chatState.removeChatDomContext}
+              selectedElements={chatState.selectedElements}
+              removeSelectedElement={chatState.removeSelectedElement}
             />
             {chatState.fileAttachments.length +
-              chatState.domContextElements.length >
+              chatState.selectedElements.length >
               1 && (
               <Button
                 size="xs"
@@ -304,9 +304,7 @@ export function ChatPanelFooter() {
                 className="text-muted-foreground"
                 onClick={() => {
                   chatState.clearFileAttachments();
-                  chatState.domContextElements.forEach((element) => {
-                    chatState.removeChatDomContext(element.element);
-                  });
+                  chatState.clearSelectedElements();
                 }}
               >
                 Clear all

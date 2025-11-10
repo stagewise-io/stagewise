@@ -18,10 +18,10 @@ export function DOMContextSelector({
   ref?: React.RefObject<HTMLDivElement>;
 }) {
   const {
-    domContextElements,
-    addChatDomContext,
+    selectedElements,
+    addSelectedElement,
     isContextSelectorActive,
-    removeChatDomContext,
+    removeSelectedElement,
   } = useChatState();
 
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(
@@ -33,8 +33,8 @@ export function DOMContextSelector({
   const handleElementSelected = useCallback(
     (el: HTMLElement) => {
       // Check if element is already selected
-      const existingElement = domContextElements.find(
-        (contextEl) => contextEl.element === el,
+      const existingElement = selectedElements.find(
+        (selectedElement) => selectedElement.domElement === el,
       );
 
       if (existingElement) {
@@ -42,20 +42,24 @@ export function DOMContextSelector({
         return; // The SelectedItem component handles deletion via click
       } else {
         // If not selected, add it
-        addChatDomContext(el);
+        addSelectedElement(el);
       }
     },
-    [addChatDomContext, domContextElements],
+    [addSelectedElement, selectedElements],
   );
 
   // Check if the hovered element is already selected
   const hoveredSelectedElement = hoveredElement
-    ? domContextElements.find((el) => el.element === hoveredElement)
+    ? selectedElements.find(
+        (selectedElement) => selectedElement.domElement === hoveredElement,
+      )
     : null;
 
   const selectedItems = useMemo(() => {
-    return domContextElements.map((el) => el.element);
-  }, [domContextElements]);
+    return selectedElements.map(
+      (selectedElement) => selectedElement.domElement,
+    );
+  }, [selectedElements]);
 
   const lastHoveredElement = useRef<HTMLElement | null>(null);
   const mouseState = useRef<{
@@ -186,12 +190,14 @@ export function DOMContextSelector({
         <HoveredItem refElement={hoveredElement} />
       )}
 
-      {domContextElements.map((el) => (
+      {selectedElements.map((selectedElement) => (
         <SelectedItem
-          key={getXPathForElement(el.element, true)}
-          refElement={el.element}
-          isChipHovered={chipHoveredElement === el.element}
-          onRemoveClick={() => removeChatDomContext(el.element)}
+          key={getXPathForElement(selectedElement.domElement, true)}
+          refElement={selectedElement.domElement}
+          isChipHovered={chipHoveredElement === selectedElement.domElement}
+          onRemoveClick={() =>
+            removeSelectedElement(selectedElement.domElement)
+          }
         />
       ))}
     </div>

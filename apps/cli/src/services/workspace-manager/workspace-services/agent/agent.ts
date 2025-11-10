@@ -696,9 +696,6 @@ export class AgentService {
       'agentChat.assistantMadeCodeChangesUntilLatestUserMessage',
     );
     this.kartonService.removeServerProcedureHandler(
-      'agentChat.contextElementsChanged',
-    );
-    this.kartonService.removeServerProcedureHandler(
       'userAccount.refreshSubscription',
     );
   }

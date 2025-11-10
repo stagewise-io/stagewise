@@ -24,19 +24,19 @@ export function ContextChipHoverProvider({
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(
     null,
   );
-  const { domContextElements } = useChatState();
+  const { selectedElements } = useChatState();
 
   // Clear hover state if the hovered element is no longer in the context
   useEffect(() => {
     if (hoveredElement) {
-      const isElementStillInContext = domContextElements.some(
-        (contextEl) => contextEl.element === hoveredElement,
+      const isElementStillInContext = selectedElements.some(
+        (selectedElement) => selectedElement.domElement === hoveredElement,
       );
       if (!isElementStillInContext) {
         setHoveredElement(null);
       }
     }
-  }, [hoveredElement, domContextElements]);
+  }, [hoveredElement, selectedElements]);
 
   return (
     <ContextChipHoverContext.Provider

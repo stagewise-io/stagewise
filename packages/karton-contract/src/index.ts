@@ -9,6 +9,7 @@ import type {
   UserMessageMetadata,
   SelectedElement,
   BrowserData,
+  ReactSelectedElementInfo,
 } from './metadata.js';
 import type {
   UIMessage,
@@ -24,7 +25,12 @@ import type {
 } from './shared-types.js';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
-export type { UserMessageMetadata, SelectedElement, BrowserData };
+export type {
+  UserMessageMetadata,
+  SelectedElement,
+  BrowserData,
+  ReactSelectedElementInfo,
+};
 export type UIMessagePart = AIMessagePart<UIDataTypes, UITools>;
 
 export type { FileDiff };
@@ -288,15 +294,9 @@ export type KartonContract = {
       assistantMadeCodeChangesUntilLatestUserMessage: (
         chatId: string,
       ) => Promise<boolean>;
-      contextElementsChanged: (elements: SelectedElement[]) => Promise<void>; // Notifies when selected context elements change in the toolbar
-      getContextElementFiles: (element: SelectedElement) => Promise<
-        {
-          relativePath: string;
-          startLine: number;
-          endLine: number;
-          content: string;
-        }[]
-      >;
+      enrichSelectedElement: (
+        element: SelectedElement,
+      ) => Promise<SelectedElement>; // Returns the same selected element but with additional context information (related source files etc.).
     };
     userAccount: {
       refreshStatus: () => Promise<void>;

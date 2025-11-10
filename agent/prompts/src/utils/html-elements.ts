@@ -1,4 +1,7 @@
-import type { SelectedElement } from '@stagewise/karton-contract';
+import type {
+  ReactSelectedElementInfo,
+  SelectedElement,
+} from '@stagewise/karton-contract';
 
 type ElementRole = 'parent' | 'selected-element' | 'sibling' | 'child';
 
@@ -79,6 +82,8 @@ function serializeElement(
   element: SelectedElement,
   role: ElementRole,
   depth: number,
+  codeMetadata: SelectedElement['codeMetadata'],
+  reactInfo?: ReactSelectedElementInfo,
   isSelected = false,
 ): string {
   const elementType = element.nodeType.toLowerCase();
@@ -130,8 +135,43 @@ function serializeElement(
   openingTag += ` xpath="${element.xpath}"`;
   openingTag += '>';
 
-  return `${openingTag}\n${htmlString.trim()}\n</html-element>`;
+  const reactInfoTag = reactInfo
+    ? `<react-info>\n<component-tree>${serializeComponentTree(reactInfo)}</component-tree>\n</react-info>\n`
+    : '';
+
+  const relatedFilesTag =
+    codeMetadata.length > 0
+      ? `<related-files>\n${serializeRelatedFiles(codeMetadata)}\n</related-files>\n`
+      : '';
+
+  return `${openingTag}\n${htmlString.trim()}\n${reactInfoTag}${relatedFilesTag}</html-element>`;
 }
+
+const serializeComponentTree = (
+  reactInfo: ReactSelectedElementInfo,
+  maxDepth = 5,
+): string => {
+  const names: string[] = [];
+  let curr = reactInfo;
+  let depth = 0;
+  while (curr?.componentName && depth < maxDepth) {
+    names.push(curr.componentName);
+    curr = curr.parent || null;
+    depth++;
+  }
+  return `<component-tree>\n${names.join(' < ')}\n</component-tree>\n`;
+};
+
+const serializeRelatedFiles = (
+  codeMetadata: SelectedElement['codeMetadata'],
+): string => {
+  return codeMetadata
+    .map(
+      (file) =>
+        `<file path="${file.relativePath}" relation="${file.relation}" />`,
+    )
+    .join('\n');
+};
 
 /**
  * Converts a list of DOM elements to an LLM-readable string with DOM element context.
@@ -159,7 +199,7 @@ export function htmlElementToContextSnippet(
     These are the code snippets that belong to the HTML elements that the user has selected before making the request.
     </description>
     <content>
-      ${codeMetadataToContextSnippet(elements.flatMap((element) => element.codeMetadata))}
+      ${codeMetadataToContextSnippet(elements.flatMap((element) => element.codeMetadata).reduce<SelectedElement['codeMetadata']>((acc, curr) => (acc.find((m) => m.relativePath === curr.relativePath) ? acc : acc.concat(curr)), []))}
     </content>
   </code-metadata>
   `
@@ -172,15 +212,16 @@ export function htmlElementToContextSnippet(
 function codeMetadataToContextSnippet(
   codeMetadata: {
     relativePath: string;
-    startLine: number;
-    endLine: number;
+    startLine?: number;
+    endLine?: number;
     content?: string;
+    relation?: string;
   }[],
 ): string {
   return codeMetadata
     .map(
       (m) =>
-        `<relative-path>${m.relativePath}</relative-path>\n<start-line>${m.startLine}</start-line>\n<end-line>${m.endLine}</end-line>${m.content ? `<content>${m.content}</content>` : ''}`,
+        `<relative-path>${m.relativePath}</relative-path>\n${m.startLine ? `<start-line>${m.startLine}</start-line>\n` : ''}${m.endLine ? `<end-line>${m.endLine}</end-line>\n` : ''}${m.content ? `<content>${m.content}</content>` : ''}`,
     )
     .join('\n\n');
 }
@@ -195,7 +236,7 @@ function codeMetadataToContextSnippet(
  */
 export function htmlElementsToContextSnippet(
   element: SelectedElement,
-  maxCharacterAmount = 10000,
+  maxCharacterAmount = 2000,
 ): string {
   if (!element) {
     throw new Error('Element cannot be null or undefined');
@@ -225,6 +266,8 @@ export function htmlElementsToContextSnippet(
         item.element,
         item.role,
         item.depth,
+        item.element.codeMetadata,
+        item.element.frameworkInfo?.react,
         item.role === 'selected-element',
       ),
     );
@@ -251,6 +294,8 @@ export function htmlElementsToContextSnippet(
               item.element,
               item.role,
               item.depth,
+              item.element.codeMetadata,
+              item.element.frameworkInfo?.react,
               item.role === 'selected-element',
             ),
           );
@@ -272,6 +317,8 @@ export function htmlElementsToContextSnippet(
               item.element,
               item.role,
               item.depth,
+              item.element.codeMetadata,
+              item.element.frameworkInfo?.react,
               item.role === 'selected-element',
             ),
           );
@@ -293,6 +340,8 @@ export function htmlElementsToContextSnippet(
               item.element,
               item.role,
               item.depth,
+              item.element.codeMetadata,
+              item.element.frameworkInfo?.react,
               item.role === 'selected-element',
             ),
           );

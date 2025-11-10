@@ -17,7 +17,9 @@ function createSelectedElement(
     textContent: '',
     ownProperties: {},
     boundingClientRect: { top: 0, left: 0, width: 0, height: 0 },
-    pluginInfo: [],
+    frameworkInfo: {
+      react: null,
+    },
     codeMetadata: [],
     ...partial,
   };
