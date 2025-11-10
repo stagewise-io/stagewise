@@ -36,6 +36,7 @@ export async function* initializeRag(
 ): AsyncGenerator<RagUpdate> {
   // Detect orphaned embeddings and add them to the removal queue
   let orphanedEmbeddings: string[] = [];
+  const db = LevelDb.getInstance(workspaceDataPath);
   const _createManifest = async (relativePath: string) => {
     await createStoredFileManifest(
       workspaceDataPath,
@@ -49,14 +50,9 @@ export async function* initializeRag(
     await table.checkoutLatest();
     table.close();
     // Get all manifest keys from LevelDB
-    const db = LevelDb.getInstance(workspaceDataPath);
     await db.open();
     const manifestPaths = new Set<string>();
-    try {
-      for await (const key of db.manifests.keys()) manifestPaths.add(key);
-    } finally {
-      await db.close();
-    }
+    for await (const key of db.manifests.keys()) manifestPaths.add(key);
 
     // Find embeddings that don't have corresponding manifests (orphans)
     orphanedEmbeddings = [...indexedPaths].filter(
@@ -64,11 +60,10 @@ export async function* initializeRag(
     );
   } catch (error) {
     // Don't fail the whole process if orphan detection fails
-    onError?.(
-      new Error(
-        `Failed to detect orphaned embeddings: ${(error as Error).message}`,
-      ),
-    );
+    onError?.(new Error(`Failed to initialize RAG: ${error}`));
+    throw error;
+  } finally {
+    await db.close();
   }
 
   let { toAdd, toUpdate, toRemove } = await getRagFilesDiff(
@@ -123,6 +118,7 @@ export async function* initializeRag(
       await _createManifest(relativePathOfLastEmbedded);
   } catch (error) {
     onError?.(error as Error);
+    throw error;
   }
 
   // Process files to update - delete old records first, then insert new ones
@@ -141,6 +137,7 @@ export async function* initializeRag(
             `Failed to delete old records for ${filePath}: ${(error as Error).message}`,
           ),
         );
+        throw error;
       }
     }
     await table.checkoutLatest();
@@ -171,7 +168,8 @@ export async function* initializeRag(
     if (relativePathOfLastEmbedded)
       await _createManifest(relativePathOfLastEmbedded);
   } catch (error) {
-    onError?.(error as Error);
+    onError?.(new Error(`Failed to update embeddings: ${error}`));
+    throw error;
   }
 
   // Process files to remove - transactional deletion
@@ -190,6 +188,7 @@ export async function* initializeRag(
             `Failed to delete embeddings for ${filePath}: ${(error as Error).message}`,
           ),
         );
+        throw error;
       }
     }
     await table.checkoutLatest();
@@ -211,6 +210,7 @@ export async function* initializeRag(
     }
   } catch (error) {
     onError?.(error as Error);
+    throw error;
   }
 }
 
@@ -246,6 +246,7 @@ async function* embedFiles(
   clientRuntime: ClientRuntime,
   workspaceDataPath: string,
   apiKey: string,
+  onError?: (error: Error) => void,
 ): AsyncGenerator<FileEmbedding> {
   const table = await connectToDatabase(workspaceDataPath);
   const BATCH_SIZE = 250; // Accumulate 250 records before writing to reduce fragment creation
@@ -289,6 +290,9 @@ async function* embedFiles(
 
     // Flush remaining records in buffer
     if (recordBuffer.length > 0) await addFileRecordsBatch(table, recordBuffer);
+  } catch (error) {
+    onError?.(new Error(`Failed to embed files: ${error}`));
+    throw error;
   } finally {
     // Ensure all writes are flushed and visible before closing
     await table.checkoutLatest();

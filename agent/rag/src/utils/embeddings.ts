@@ -230,6 +230,7 @@ export async function* generateFileEmbeddings(
         fileChunksData.push({ relativePath, chunks: nonEmptyChunks });
       } catch (error) {
         onError?.(new Error(`Error processing file ${relativePath}: ${error}`));
+        throw error;
       }
     }
 

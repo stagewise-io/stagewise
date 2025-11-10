@@ -39,7 +39,7 @@ export async function* generateFileEmbeddingsParallel(
   relativePaths: string[],
   clientRuntime: ClientRuntime,
   concurrency = 10,
-  onError?: (error: unknown) => void,
+  onLogError?: (error: unknown) => void,
 ): AsyncGenerator<FileEmbedding> {
   if (relativePaths.length === 0) return;
 
@@ -72,7 +72,8 @@ export async function* generateFileEmbeddingsParallel(
         });
       }
     } catch (error) {
-      onError?.(new Error(`Error chunking file ${relativePath}: ${error}`));
+      onLogError?.(new Error(`Error chunking file ${relativePath}: ${error}`));
+      throw error;
     }
   }
 
@@ -134,10 +135,12 @@ export async function* generateFileEmbeddingsParallel(
           const embedding = embeddingVectors[j];
 
           if (!chunk) {
-            onError?.(
+            onLogError?.(
               new Error(`Missing chunk at index ${j} in batch ${item.batchId}`),
             );
-            continue;
+            throw new Error(
+              `Missing chunk at index ${j} in batch ${item.batchId}`,
+            );
           }
 
           if (embedding && embedding.length === EXPECTED_EMBEDDING_DIM) {
@@ -162,23 +165,27 @@ export async function* generateFileEmbeddingsParallel(
               embedding: embedding,
             });
           } else {
-            onError?.(
+            onLogError?.(
               new Error(
                 `Invalid embedding for ${chunk.relativePath} chunk ${chunk.chunkIndex}`,
               ),
+            );
+            throw new Error(
+              `Invalid embedding for ${chunk.relativePath} chunk ${chunk.chunkIndex}`,
             );
           }
         }
 
         completedCount++;
       } catch (error) {
-        onError?.(
+        onLogError?.(
           new Error(
             `Worker ${workerId} error for batch ${item.batchId}: ${error}`,
           ),
         );
         // Still increment completed count to avoid hanging
         completedCount++;
+        throw error;
       }
     }
   };
@@ -190,8 +197,17 @@ export async function* generateFileEmbeddingsParallel(
   );
   const workerPromise = Promise.all(workers);
 
+  // Track worker errors to prevent unhandled rejections
+  let workerError: Error | null = null;
+  workerPromise.catch((error) => {
+    workerError = error as Error;
+  });
+
   // Phase 5: Yield results in original file order
   while (nextFileToYield < totalFiles) {
+    // Check for worker errors and fail fast
+    if (workerError) throw workerError;
+
     // Wait for next file's result to be available
     while (!resultMap.has(nextFileToYield)) {
       // Check if all workers are done but we still don't have this result
@@ -217,6 +233,9 @@ export async function* generateFileEmbeddingsParallel(
       nextFileToYield++;
     }
   }
+
+  // Final check for worker errors after loop completes
+  if (workerError) throw workerError;
 
   // Ensure all workers complete
   await workerPromise;

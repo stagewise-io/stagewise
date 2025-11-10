@@ -70,9 +70,8 @@ export class RagService {
         this.apiKey,
         (error) => {
           // Check if this is an auth error - if so, throw to interrupt iteration
-          if (isAuthenticationError(error)) {
-            throw error;
-          }
+          if (isAuthenticationError(error)) throw error;
+
           // Non-auth errors are logged but don't interrupt the process
           this.telemetryService.captureException(error);
           this.logger.error('[RagService] Failed to initialize RAG', error);
