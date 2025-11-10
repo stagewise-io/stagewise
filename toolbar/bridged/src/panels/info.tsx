@@ -136,7 +136,7 @@ export function InfoPanel() {
           To connect your agent, simply install the stagewise extension.
         </p>
 
-        <div className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent max-h-48 overflow-hidden overflow-y-auto rounded-2xl border border-zinc-200 bg-white">
+        <div className="scrollbar-thin scrollbar-thumb-foreground/15 scrollbar-track-transparent max-h-48 overflow-hidden overflow-y-auto rounded-2xl border border-zinc-200 bg-white">
           {agents.map((agent, index) => (
             <div
               key={agent.id}

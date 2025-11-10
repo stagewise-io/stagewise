@@ -4,6 +4,7 @@ import { Loader2Icon, SparklesIcon } from 'lucide-react';
 import { useComparingSelector, useKartonState } from '@/hooks/use-karton';
 import { cn } from '@/utils';
 import { ChatErrorBubble } from './chat-error-bubble';
+import type { History } from '@stagewise/karton-contract';
 
 export const ChatHistory = () => {
   const wasAtBottomRef = useRef(true);
@@ -80,9 +81,25 @@ export const ChatHistory = () => {
   const renderedMessages = useMemo(() => {
     if (!activeChat?.messages) return [];
 
-    return activeChat?.messages.filter(
-      (message) => message.role === 'user' || message.role === 'assistant',
-    );
+    return activeChat?.messages
+      .filter(
+        (message) => message.role === 'user' || message.role === 'assistant',
+      )
+      .reduce<History>((curr, message) => {
+        // If the last message is the same role as the current message and the role is 'assistant, we append the parts to the previous message instead of pushing the new message to the array.
+        const lastMessage = curr[curr.length - 1];
+        if (!lastMessage) {
+          curr.push(structuredClone(message));
+          return curr;
+        }
+
+        if (lastMessage.role === message.role && message.role === 'assistant') {
+          lastMessage.parts = [...lastMessage.parts, ...message.parts];
+        } else {
+          curr.push(structuredClone(message));
+        }
+        return curr;
+      }, []);
   }, [activeChat]);
 
   /* We're adding a bg color on hover because there's a brower bug
@@ -93,7 +110,7 @@ export const ChatHistory = () => {
     <section
       ref={ref}
       aria-label="Agent message display"
-      className="scrollbar-thin scrollbar-thumb-black/15 scrollbar-track-transparent pointer-events-auto mr-1.5 block h-full min-h-[inherit] overflow-y-scroll overscroll-contain py-4 pt-16 pb-4 pl-1.5 text-foreground text-sm focus-within:outline-none focus:outline-none"
+      className="scrollbar-thin scrollbar-thumb-foreground/15 scrollbar-track-transparent pointer-events-auto mr-1.5 block h-full min-h-[inherit] overflow-y-scroll overscroll-contain py-4 pt-16 pb-4 pl-1.5 text-foreground text-sm focus-within:outline-none focus:outline-none"
       onScroll={handleScroll}
     >
       {renderedMessages.map((message, index) => {

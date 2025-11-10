@@ -146,10 +146,10 @@ function ContextElementChip({
         </Button>
       </PopoverTrigger>
       <PopoverContent>
-        <div className="flex flex-col gap-3">
+        <div className="scrollbar-thin scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/30 flex max-h-[35vh] max-w-72 flex-col gap-4 overflow-y-auto overflow-x-hidden pr-0.5 *:shrink-0">
           <div className="flex flex-col items-stretch justify-start gap-1">
             <p className="font-medium text-foreground text-sm">XPath</p>
-            <div className="glass-inset w-full break-all rounded-lg px-1.5 py-1 font-mono text-foreground/70 text-sm">
+            <div className="w-full font-mono text-muted-foreground text-xs">
               {getXPathForElement(element, true)}
             </div>
           </div>
@@ -185,11 +185,11 @@ function ContextElementChip({
                 <p className="basis-3/4 font-medium text-foreground text-sm">
                   Related source files
                 </p>
-                <p className="basis-1/4 text-end font-medium text-muted-foreground text-sm">
+                <p className="basis-1/4 text-end font-medium text-muted-foreground text-xs">
                   Lines
                 </p>
               </div>
-              <div className="flex w-full flex-col items-stretch gap-0.5">
+              <div className="flex w-full flex-col items-stretch gap-1">
                 {codeMetadata.map((metadata) => (
                   <div
                     key={
@@ -210,12 +210,12 @@ function ContextElementChip({
                       )}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="basis-3/4 font-medium text-muted-foreground text-sm"
+                      className="basis-4/5 font-medium text-muted-foreground text-sm hover:text-primary"
                     >
                       {metadata.relativePath}
                     </a>
-                    <p className="basis-1/4 text-end font-mono text-muted-foreground text-sm">
-                      {metadata.startLine} - {metadata.endLine}
+                    <p className="basis-1/5 text-end font-mono text-muted-foreground text-xs">
+                      {metadata.startLine}-{metadata.endLine}
                     </p>
                   </div>
                 ))}

@@ -107,7 +107,7 @@ export const ThinkingPart = ({
 
   const displayedText = useTypeWriterText(part.text, {
     charsPerInterval: 2,
-    msPerInterval: 50,
+    framesPerInterval: 1,
     showAllOnFirstRender: true,
     animateOnIncreaseOnly: true,
   });
@@ -133,7 +133,7 @@ export const ThinkingPart = ({
             )}
           />
         </CollapsibleTrigger>
-        <CollapsibleContent className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%_-_8px),transparent)] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-black/30 block max-h-32 overflow-y-auto overscroll-y-none pt-1.5 pb-0.5 pl-2.5 text-[0.8rem]">
+        <CollapsibleContent className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%_-_8px),transparent)] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/30 block max-h-32 overflow-y-auto overscroll-y-none pt-1.5 pb-0.5 pl-2.5 text-[0.8rem]">
           <div
             ref={setContentWrapperRef}
             className="pt-2 pb-1 opacity-60 group-data-[state=streaming]/thinking-part:opacity-90"

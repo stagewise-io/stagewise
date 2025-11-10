@@ -252,7 +252,7 @@ export function ChatPanelFooter() {
               disabled={!enableInputField}
               className={cn(
                 GlassyTextInputClassNames,
-                'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent z-10 h-28 w-full resize-none border-none bg-transparent px-2 py-1 text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out placeholder:text-muted-foreground focus:outline-none disabled:bg-transparent',
+                'scrollbar-thin scrollbar-thumb-foreground/20 scrollbar-track-transparent z-10 h-28 w-full resize-none border-none bg-transparent px-2 py-1 text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out placeholder:text-muted-foreground focus:outline-none disabled:bg-transparent',
               )}
               placeholder={!showTextSlideshow ? 'Type a message...' : undefined}
             />
