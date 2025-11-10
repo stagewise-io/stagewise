@@ -21,7 +21,11 @@ import {
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useState, useMemo } from 'react';
 import type { ChangeObject } from 'diff';
-import { CodeBlock } from '@/components/ui/code-block';
+import {
+  CodeBlock,
+  lineAddedDiffMarker,
+  lineRemovedDiffMarker,
+} from '@/components/ui/code-block';
 import type { BundledLanguage } from 'shiki';
 
 export function ToolPartUIBase({
@@ -140,9 +144,9 @@ export function DiffPreview({
   const diffContent = useMemo(() => {
     return diff.reduce((acc, line) => {
       const newLine = line.added
-        ? `+${line.value}`
+        ? `${lineAddedDiffMarker}${line.value}`
         : line.removed
-          ? `-${line.value}`
+          ? `${lineRemovedDiffMarker}${line.value}`
           : line.value;
       return `${acc}${newLine}`;
     }, '');

@@ -68,7 +68,7 @@ export const MultiEditToolPart = ({
         </div>
       }
       collapsedContent={
-        diff ? (
+        diff && (deletedLineCount > 0 || newLineCount > 0) ? (
           <div className="flex max-h-64 flex-col items-end gap-0.5">
             <div className="flex shrink-0 flex-row items-center justify-end gap-0.5">
               <Button
@@ -100,6 +100,7 @@ export const MultiEditToolPart = ({
           </div>
         ) : undefined
       }
+      defaultExpanded
     />
   );
 };

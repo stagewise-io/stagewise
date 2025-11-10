@@ -170,6 +170,10 @@ class HighlighterManager {
 // Create a singleton instance of the highlighter manager
 const highlighterManager = new HighlighterManager();
 
+// We use custom notation for diff s in the code block to prevent any confusion with the actual code
+export const lineAddedDiffMarker = '/*>> STAGEWISE_ADDED_LINE <<*/';
+export const lineRemovedDiffMarker = '/*>> STAGEWISE_REMOVED_LINE <<*/';
+
 export const CodeBlock = ({
   code,
   language,
@@ -237,23 +241,93 @@ function shikiDiffNotation(): ShikiTransformer {
       // if (!this.options.meta?.diff) return;
       const lines = node.children.filter((node) => node.type === 'element');
       lines.forEach((line) => {
-        for (const child of line.children) {
-          if (child.type !== 'element') continue;
-          const text = child.children[0];
-          if (text?.type !== 'text') continue;
-          if (text.value.startsWith('+')) {
-            text.value = text.value.slice(1);
-            this.addClassToHast(line, classLineAdd);
-          }
-          if (text.value.startsWith('-')) {
-            text.value = text.value.slice(1);
-            this.addClassToHast(line, classLineRemove);
-          }
+        if (lineStartsWith(line, lineAddedDiffMarker)) {
+          lineSlice(line, lineAddedDiffMarker.length);
+          this.addClassToHast(line, classLineAdd);
+        }
+        if (lineStartsWith(line, lineRemovedDiffMarker)) {
+          lineSlice(line, lineRemovedDiffMarker.length);
+          this.addClassToHast(line, classLineRemove);
         }
       });
     },
   };
 }
+
+const lineStartsWith = (line: Element, marker: string) => {
+  const lineText = line.children.reduce<string>(
+    (curr, node) =>
+      curr +
+      (node.type === 'element' && node.children[0]?.type === 'text'
+        ? node.children[0].value
+        : ''),
+    '',
+  );
+  return lineText.startsWith(marker);
+};
+
+/** Iterates over the children of the line, performing a "slice" over all text from start to end.
+ * Mutates the line's children so only the text within [start, end) remains.
+ * We change the line element in place.
+ **/
+const lineSlice = (line: Element, start?: number, end?: number) => {
+  if (start === undefined && end === undefined) return line;
+
+  const sliceStart = start ?? 0;
+  const sliceEnd = end ?? Number.POSITIVE_INFINITY;
+
+  let currentIndex = line.children.reduce<number>(
+    (curr, node) =>
+      curr +
+      (node.type === 'element' && node.children[0]?.type === 'text'
+        ? node.children[0].value.length
+        : 0),
+    0,
+  );
+
+  for (let i = line.children.length - 1; i >= 0; i--) {
+    const child = line.children[i];
+    if (
+      child?.type !== 'element' ||
+      !child.children[0] ||
+      child.children[0].type !== 'text'
+    ) {
+      continue;
+    }
+    const textNode = child.children[0];
+    const textValue = textNode.value;
+    const textLen = textValue.length;
+
+    currentIndex -= textLen;
+
+    const childStart = currentIndex;
+    const childEnd = childStart + textLen;
+
+    // If this entire child is outside of the slice range, remove it
+    if (childEnd <= sliceStart || childStart >= sliceEnd) {
+      line.children.splice(i, 1);
+    } else {
+      // This child is (partially) within range
+      // Figure out the slice to cut into this chunk
+      const cutStart = Math.max(0, sliceStart - childStart);
+      const cutEnd = Math.min(textLen, sliceEnd - childStart);
+      textNode.value = textValue.slice(cutStart, cutEnd);
+    }
+  }
+
+  // After splicing, could be empty elements, so filter out children with empty text
+  line.children = line.children.filter(
+    (child) =>
+      !(
+        child.type === 'element' &&
+        child.children[0] &&
+        child.children[0].type === 'text' &&
+        child.children[0].value.length === 0
+      ),
+  );
+
+  return line;
+};
 
 function shikiCodeLineNumbers({
   startLine,
