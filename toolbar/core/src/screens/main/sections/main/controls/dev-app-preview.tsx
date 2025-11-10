@@ -446,7 +446,7 @@ export function DevAppStateInfo() {
               onClick={() => startApp()}
               disabled={!canStartApp}
             >
-              <PlayIcon className="size-4" />
+              <PlayIcon className="ml-px size-3.5 fill-current" />
             </Button>
             <Button
               variant="primary"
