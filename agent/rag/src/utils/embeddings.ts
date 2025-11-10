@@ -263,9 +263,7 @@ export async function* generateFileEmbeddings(
       const texts = chunkBatch.map((info) => info.chunk.text);
 
       // Batch embed all texts at once
-      console.log('Calling embedding API with so many texts', texts.length);
       const embeddings = await callEmbeddingApi(client, texts, model);
-      console.log('Got embeddings', embeddings.length);
 
       // Yield FileEmbedding for each chunk with its corresponding embedding
       for (let k = 0; k < chunkBatch.length; k++) {
