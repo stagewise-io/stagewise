@@ -1,4 +1,6 @@
 import { dirname, resolve, join, relative, extname } from 'node:path';
+import { grep } from './grep/index.js';
+import { glob } from './glob/index.js';
 import { promises as fs } from 'node:fs';
 import { minimatch } from 'minimatch';
 import ignore from 'ignore';
@@ -7,32 +9,13 @@ import {
   BaseFileSystemProvider,
   type ClientRuntime,
   type FileChangeEvent,
-  type GrepMatch,
   type GrepResult,
   type GlobResult,
   type SearchReplaceMatch,
   type SearchReplaceResult,
 } from '@stagewise/agent-runtime-interface';
+import { BINARY_DETECTION } from './shared.js';
 
-/**
- * Binary file detection settings
- * Following ripgrep's approach of checking for NUL bytes
- */
-const BINARY_DETECTION = {
-  /**
-   * Number of bytes to check at the beginning of a file for binary detection
-   * 8KB is sufficient to catch most binary files while being efficient
-   */
-  CHECK_BUFFER_SIZE: 1024, // 1KB
-};
-
-/**
- * Node.js implementation of the file system provider
- * Uses Node.js fs API for file operations
- *
- * IMPORTANT: All path parameters are expected to be relative paths.
- * The resolvePath method converts them to absolute paths using the working directory.
- */
 interface GitignoreInfo {
   ignore: ReturnType<typeof ignore>;
   directory: string;
@@ -42,6 +25,8 @@ interface GitignoreInfo {
 export class NodeFileSystemProvider extends BaseFileSystemProvider {
   private gitignoreMap: Map<string, GitignoreInfo> = new Map();
   private gitignoreInitialized = false;
+  /** Hot-path cache: gitignore entries sorted by directory depth (deep → shallow) */
+  private sortedGitignoreEntries: GitignoreInfo[] = [];
 
   getCurrentWorkingDirectory(): string {
     return this.config.workingDirectory;
@@ -49,6 +34,10 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
 
   setCurrentWorkingDirectory(dir: string) {
     this.config.workingDirectory = dir;
+    // Changing CWD invalidates ignore caches
+    this.gitignoreInitialized = false;
+    this.gitignoreMap.clear();
+    this.sortedGitignoreEntries = [];
   }
 
   async readFile(
@@ -62,16 +51,14 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       const totalLines = lines.length;
 
       if (options?.startLine !== undefined) {
-        if (options.startLine > totalLines) {
+        if (options.startLine > totalLines)
           return {
             success: false,
             message: `startLine ${options.startLine} exceeds file length (${totalLines} lines)`,
             error: 'LINE_OUT_OF_RANGE',
           };
-        }
 
         const requestedEndLine = options.endLine ?? totalLines;
-        // Cap endLine to totalLines if it exceeds the file length
         const effectiveEndLine = Math.min(requestedEndLine, totalLines);
 
         const selectedLines = lines.slice(
@@ -104,11 +91,8 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
   async writeFile(relativePath: string, content: string) {
     try {
       const fullPath = this.resolvePath(relativePath);
-
-      // Create directory if it doesn't exist
       await this.createDirectory(dirname(fullPath));
       await fs.writeFile(fullPath, content, 'utf-8');
-
       return {
         success: true,
         message: `Successfully wrote file: ${relativePath}`,
@@ -133,27 +117,28 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       const fileContent = await fs.readFile(fullPath, 'utf-8');
       const lines = fileContent.split('\n');
 
-      if (startLine > lines.length || endLine > lines.length) {
+      if (startLine > lines.length || endLine > lines.length)
         return {
           success: false,
           message: `Line range ${startLine}-${endLine} exceeds file length (${lines.length} lines)`,
           error: 'LINE_OUT_OF_RANGE',
         };
-      }
 
-      if (startLine < 1 || endLine < startLine) {
+      if (startLine < 1 || endLine < startLine)
         return {
           success: false,
           message: `Invalid line range ${startLine}-${endLine}`,
           error: 'INVALID_RANGE',
         };
-      }
 
-      const beforeLines = lines.slice(0, startLine - 1);
-      const afterLines = lines.slice(endLine);
+      const before = lines.slice(0, startLine - 1);
+      const after = lines.slice(endLine);
       const contentLines = content.split('\n');
-      const newLines = [...beforeLines, ...contentLines, ...afterLines];
-      await fs.writeFile(fullPath, newLines.join('\n'), 'utf-8');
+      await fs.writeFile(
+        fullPath,
+        [...before, ...contentLines, ...after].join('\n'),
+        'utf-8',
+      );
 
       return {
         success: true,
@@ -209,27 +194,25 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       let totalDirectories = 0;
 
       const listRecursive = async (dirPath: string, depth: number) => {
-        if (options?.maxDepth !== undefined && depth > options.maxDepth) {
-          return;
-        }
+        if (options?.maxDepth !== undefined && depth > options.maxDepth) return;
 
         const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
         for (const entry of entries) {
           const entryPath = join(dirPath, entry.name);
-          const relativePath = relative(fullPath, entryPath);
+          const relativePathFromRoot = relative(fullPath, entryPath);
 
-          // Apply pattern filter if specified
-          if (options?.pattern && !minimatch(relativePath, options.pattern)) {
+          if (
+            options?.pattern &&
+            !minimatch(relativePathFromRoot, options.pattern)
+          )
             continue;
-          }
 
-          // Check gitignore if enabled (default true)
-          if (options?.respectGitignore !== false) {
-            if (await this.isIgnored(entryPath)) {
-              continue;
-            }
-          }
+          if (
+            options?.respectGitignore !== false &&
+            this.isIgnoredSync(entryPath)
+          )
+            continue;
 
           if (entry.isDirectory()) {
             totalDirectories++;
@@ -237,13 +220,11 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
               files.push({
                 relativePath: relative(this.config.workingDirectory, entryPath),
                 name: entry.name,
-                type: 'directory' as const,
+                type: 'directory',
                 depth,
               });
             }
-            if (options?.recursive) {
-              await listRecursive(entryPath, depth + 1);
-            }
+            if (options?.recursive) await listRecursive(entryPath, depth + 1);
           } else if (entry.isFile()) {
             totalFiles++;
             if (options?.includeFiles !== false) {
@@ -251,7 +232,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
               files.push({
                 relativePath: relative(this.config.workingDirectory, entryPath),
                 name: entry.name,
-                type: 'file' as const,
+                type: 'file',
                 size: stat.size,
                 depth,
               });
@@ -284,185 +265,14 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     options?: {
       recursive?: boolean;
       maxDepth?: number;
-      filePattern?: string;
-      caseSensitive?: boolean;
       maxMatches?: number;
       excludePatterns?: string[];
       respectGitignore?: boolean;
-      searchBinaryFiles?: boolean;
+      caseSensitive?: boolean;
+      filePattern?: string;
     },
   ): Promise<GrepResult> {
-    try {
-      const regex = new RegExp(pattern, options?.caseSensitive ? 'g' : 'gi');
-      const matches: GrepMatch[] = [];
-      let filesSearched = 0;
-      let totalOutputSize = 0;
-      const basePath = this.resolvePath(relativePath);
-      const MAX_OUTPUT_SIZE = 1 * 1024 * 1024; // 1MB limit for total output
-
-      const searchFile = async (filePath: string) => {
-        if (options?.maxMatches && matches.length >= options.maxMatches) {
-          return;
-        }
-
-        // Check if we've exceeded the output size limit before reading the file
-        if (totalOutputSize >= MAX_OUTPUT_SIZE) {
-          return;
-        }
-
-        try {
-          // Check for binary files unless explicitly told to search them
-          if (!options?.searchBinaryFiles) {
-            // Read a small buffer to check for NUL bytes (following ripgrep's approach)
-            const stats = await fs.stat(filePath);
-            const bytesToRead = Math.min(
-              stats.size,
-              BINARY_DETECTION.CHECK_BUFFER_SIZE,
-            );
-
-            if (bytesToRead > 0) {
-              const fileHandle = await fs.open(filePath, 'r');
-              try {
-                const buffer = Buffer.alloc(bytesToRead);
-                await fileHandle.read(buffer, 0, bytesToRead, 0);
-
-                // Check for NUL bytes (0x00) which indicate binary content
-                if (buffer.includes(0x00)) {
-                  // Skip binary file silently (like ripgrep does by default)
-                  return;
-                }
-              } finally {
-                await fileHandle.close();
-              }
-            }
-          }
-
-          const content = await fs.readFile(filePath, 'utf-8');
-          const lines = content.split('\n');
-          filesSearched++;
-
-          for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            if (!line) continue;
-            let match: RegExpExecArray | null = null;
-            regex.lastIndex = 0; // Reset regex state
-
-            while (true) {
-              match = regex.exec(line);
-              if (!match) break;
-              if (options?.maxMatches && matches.length >= options.maxMatches) {
-                return;
-              }
-
-              // Extract context: 5 lines before and 5 lines after the match
-              const contextBefore = 5;
-              const contextAfter = 5;
-              const startLine = Math.max(0, i - contextBefore);
-              const endLine = Math.min(lines.length - 1, i + contextAfter);
-              const contextLines = lines.slice(startLine, endLine + 1);
-              const preview = contextLines.join('\n');
-
-              // Note: We don't truncate preview length here to preserve full context
-              // The total output size is still limited by MAX_OUTPUT_SIZE check below
-
-              const matchEntry: GrepMatch = {
-                relativePath: relative(this.config.workingDirectory, filePath),
-                line: i + 1,
-                column: match.index + 1,
-                match: match[0],
-                preview,
-              };
-
-              // Estimate the size of this match entry when serialized
-              const estimatedSize = JSON.stringify(matchEntry).length;
-
-              // Check if adding this match would exceed the output size limit
-              if (totalOutputSize + estimatedSize > MAX_OUTPUT_SIZE) {
-                // Stop collecting matches if we're about to exceed the size limit
-                return;
-              }
-
-              matches.push(matchEntry);
-              totalOutputSize += estimatedSize;
-            }
-          }
-        } catch (_error) {
-          // Skip files that can't be read (binary files, etc.)
-        }
-      };
-
-      const searchDirectory = async (dirPath: string, depth: number) => {
-        if (options?.maxDepth !== undefined && depth > options.maxDepth) {
-          return;
-        }
-
-        const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
-        for (const entry of entries) {
-          const fullPath = join(dirPath, entry.name);
-          const relativePath = relative(basePath, fullPath);
-
-          // Check exclude patterns
-          if (
-            options?.excludePatterns?.some((p) => minimatch(relativePath, p))
-          ) {
-            continue;
-          }
-
-          // Check gitignore if enabled (default true)
-          if (options?.respectGitignore !== false) {
-            if (await this.isIgnored(fullPath)) {
-              continue;
-            }
-          }
-
-          if (entry.isFile()) {
-            // Check file pattern
-            if (
-              options?.filePattern &&
-              !minimatch(entry.name, options.filePattern)
-            ) {
-              continue;
-            }
-            await searchFile(fullPath);
-          } else if (entry.isDirectory() && options?.recursive) {
-            await searchDirectory(fullPath, depth + 1);
-          }
-        }
-      };
-
-      if (await this.isDirectory(relativePath)) {
-        await searchDirectory(basePath, 0);
-      } else {
-        await searchFile(basePath);
-      }
-
-      // Check if we potentially truncated results due to size
-      const wasTruncatedBySize = totalOutputSize >= MAX_OUTPUT_SIZE;
-      const wasTruncatedByCount =
-        options?.maxMatches && matches.length >= options.maxMatches;
-
-      let message = `Found ${matches.length} matches in ${filesSearched} files`;
-      if (wasTruncatedBySize) {
-        message += ' (truncated due to output size limit)';
-      } else if (wasTruncatedByCount) {
-        message += ' (truncated due to match limit)';
-      }
-
-      return {
-        success: true,
-        message,
-        matches,
-        totalMatches: matches.length,
-        filesSearched,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Failed to search: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
+    return grep(this, relativePath, pattern, options);
   }
 
   async glob(
@@ -470,70 +280,11 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     options?: {
       cwd?: string;
       absolute?: boolean;
-      includeDirectories?: boolean;
       excludePatterns?: string[];
       respectGitignore?: boolean;
     },
   ): Promise<GlobResult> {
-    try {
-      const paths: string[] = [];
-      const basePath = options?.cwd
-        ? this.resolvePath(options.cwd)
-        : this.config.workingDirectory;
-
-      const searchDirectory = async (dirPath: string) => {
-        const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
-        for (const entry of entries) {
-          const fullPath = join(dirPath, entry.name);
-          const relativePath = relative(basePath, fullPath);
-
-          // Check exclude patterns
-          if (
-            options?.excludePatterns?.some((p) => minimatch(relativePath, p))
-          ) {
-            continue;
-          }
-
-          // Check gitignore if enabled (default true)
-          if (options?.respectGitignore !== false) {
-            if (await this.isIgnored(fullPath)) {
-              continue;
-            }
-          }
-
-          // Check if path matches the glob pattern
-          if (minimatch(relativePath, pattern)) {
-            if (
-              entry.isFile() ||
-              (entry.isDirectory() && options?.includeDirectories)
-            ) {
-              paths.push(options?.absolute ? fullPath : relativePath);
-            }
-          }
-
-          // Continue searching in subdirectories if pattern might match deeper
-          if (entry.isDirectory() && pattern.includes('**')) {
-            await searchDirectory(fullPath);
-          }
-        }
-      };
-
-      await searchDirectory(basePath);
-
-      return {
-        success: true,
-        message: `Found ${paths.length} matching paths`,
-        relativePaths: paths,
-        totalMatches: paths.length,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Failed to glob: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
+    return glob(this, pattern, options);
   }
 
   async searchAndReplace(
@@ -571,98 +322,77 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
         }
         searchPattern = new RegExp(
           pattern,
-          options?.caseSensitive !== false ? 'g' : 'gi',
+          options?.caseSensitive ? 'g' : 'gi',
         );
       }
 
-      // Process each line
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line === undefined) {
-          newLines.push('');
-          continue;
-        }
-        let modifiedLine = line;
-        // biome-ignore lint/correctness/noUnusedVariables: It is actually used
-        let lineReplacements = 0;
+        const line = lines[i] ?? '';
+        let modified = line;
 
-        // Find all matches in the current line
-        let match: RegExpExecArray | null = null;
+        // Find all matches in current line
+        let match: RegExpExecArray | null;
         const lineMatches: Array<{
           index: number;
           length: number;
           text: string;
         }> = [];
-        searchPattern.lastIndex = 0; // Reset regex state
+        searchPattern.lastIndex = 0;
 
-        while (true) {
-          match = searchPattern.exec(line);
-          if (!match) break;
+        match = searchPattern.exec(line);
+        while (match) {
           lineMatches.push({
             index: match.index,
             length: match[0].length,
             text: match[0],
           });
-
           if (
             options?.maxReplacements &&
             totalReplacements + lineMatches.length >= options.maxReplacements
-          ) {
+          )
             break;
-          }
+          match = searchPattern.exec(line);
         }
 
         // Process matches in reverse order to maintain indices
         for (let j = lineMatches.length - 1; j >= 0; j--) {
-          const matchInfo = lineMatches[j];
-          if (!matchInfo) continue;
-
+          const m = lineMatches[j];
+          if (!m) continue;
           let replacement = replaceString;
+          if (options?.preserveCase && !options?.regex)
+            replacement = this.preserveCase(m.text, replacement);
 
-          // Handle case preservation if requested
-          if (options?.preserveCase && !options?.regex) {
-            replacement = this.preserveCase(matchInfo.text, replacement);
-          }
-
-          // Record the replacement
           replacements.push({
             line: i + 1,
-            column: matchInfo.index + 1,
-            oldText: matchInfo.text,
+            column: m.index + 1,
+            oldText: m.text,
             newText: replacement,
             lineContent: line.trim(),
           });
 
-          // Apply the replacement
-          modifiedLine =
-            modifiedLine.substring(0, matchInfo.index) +
+          modified =
+            modified.slice(0, m.index) +
             replacement +
-            modifiedLine.substring(matchInfo.index + matchInfo.length);
-
-          lineReplacements++;
+            modified.slice(m.index + m.length);
           totalReplacements++;
-
           if (
             options?.maxReplacements &&
             totalReplacements >= options.maxReplacements
-          ) {
+          )
             break;
-          }
         }
 
-        newLines.push(modifiedLine);
+        newLines.push(modified);
 
         if (
           options?.maxReplacements &&
-          totalReplacements >= options.maxReplacements
+          totalReplacements >= options?.maxReplacements
         ) {
-          // Add remaining lines unchanged
           newLines.push(...lines.slice(i + 1));
           break;
         }
       }
 
-      // Write the file if not a dry run and there were replacements
       const fileModified = totalReplacements > 0 && !options?.dryRun;
       if (fileModified) {
         await fs.writeFile(fullPath, newLines.join('\n'), 'utf-8');
@@ -687,29 +417,15 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
   }
 
   private preserveCase(original: string, replacement: string): string {
-    if (!original || !replacement) {
-      return replacement || '';
-    }
-
-    // If original is all uppercase, make replacement uppercase
-    if (original === original.toUpperCase()) {
-      return replacement.toUpperCase();
-    }
-
-    // If original is all lowercase, make replacement lowercase
-    if (original === original.toLowerCase()) {
-      return replacement.toLowerCase();
-    }
-
-    // If original starts with uppercase, capitalize replacement
-    const firstChar = original.charAt(0);
-    if (firstChar && firstChar === firstChar.toUpperCase()) {
+    if (!original || !replacement) return replacement || '';
+    if (original === original.toUpperCase()) return replacement.toUpperCase();
+    if (original === original.toLowerCase()) return replacement.toLowerCase();
+    const first = original.charAt(0);
+    if (first && first === first.toUpperCase()) {
       return (
         replacement.charAt(0).toUpperCase() + replacement.slice(1).toLowerCase()
       );
     }
-
-    // Otherwise, return replacement as-is
     return replacement;
   }
 
@@ -734,11 +450,8 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     try {
       const sourcePath = this.resolvePath(source);
       const destPath = this.resolvePath(destination);
-
-      // Create destination directory if needed
       await this.createDirectory(dirname(destPath));
       await fs.copyFile(sourcePath, destPath);
-
       return {
         success: true,
         message: `Successfully copied ${source} to ${destination}`,
@@ -756,11 +469,8 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     try {
       const sourcePath = this.resolvePath(source);
       const destPath = this.resolvePath(destination);
-
-      // Create destination directory if needed
       await this.createDirectory(dirname(destPath));
       await fs.rename(sourcePath, destPath);
-
       return {
         success: true,
         message: `Successfully moved ${source} to ${destination}`,
@@ -797,66 +507,45 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
   async getFileStats(relativePath: string) {
     const fullPath = this.resolvePath(relativePath);
     const stat = await fs.stat(fullPath);
-    return {
-      size: stat.size,
-      modifiedTime: stat.mtime,
-    };
+    return { size: stat.size, modifiedTime: stat.mtime };
   }
 
-  // Path operations using Node.js path module
+  // Path operations
   resolvePath(relativePath: string): string {
-    // If path is already absolute, return it as-is
-    if (resolve(relativePath) === relativePath) {
-      return relativePath;
-    }
-    // Otherwise resolve it relative to the working directory
+    if (resolve(relativePath) === relativePath) return relativePath;
     return resolve(this.config.workingDirectory, relativePath);
   }
-
   getDirectoryName(relativePath: string): string {
     return dirname(relativePath);
   }
-
   joinPaths(...relativePaths: string[]): string {
     return join(...relativePaths);
   }
-
   getRelativePath(from: string, to: string): string {
     return relative(from, to);
   }
-
   getFileExtension(relativePath: string): string {
     return extname(relativePath);
   }
 
   async getGitignorePatterns(): Promise<string[]> {
     await this.ensureGitignoreInitialized();
-    // Return all patterns from all gitignore files
-    const allPatterns: string[] = [];
-    for (const info of this.gitignoreMap.values()) {
-      allPatterns.push(...info.patterns);
-    }
-    return allPatterns;
+    const all: string[] = [];
+    for (const info of this.gitignoreMap.values()) all.push(...info.patterns);
+    return all;
   }
 
   async isIgnored(relativePath: string): Promise<boolean> {
     await this.ensureGitignoreInitialized();
-
     return this.isIgnoredSync(relativePath);
   }
 
   /**
-   * Synchronous version of isIgnored for use with chokidar and other sync APIs
-   * Note: This assumes gitignore has already been initialized
+   * Synchronous ignore check using a pre-sorted array (deepest → shallowest).
    */
   isIgnoredSync(relativePath: string): boolean {
-    // Handle empty or undefined paths
-    if (!relativePath || relativePath === '') {
-      return false;
-    }
+    if (!relativePath) return false;
 
-    // Skip glob patterns - these are not actual paths
-    // Chokidar passes patterns like "**/*.ts", "**", etc.
     if (
       relativePath.includes('*') ||
       relativePath.includes('?') ||
@@ -865,83 +554,41 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     ) {
       return false;
     }
+    if (relativePath === '.' || relativePath === '..') return false;
+    if (!this.gitignoreInitialized) return false;
 
-    // Handle special paths - don't ignore current and parent directory references
-    if (relativePath === '.' || relativePath === '..') {
-      return false;
-    }
-
-    // If gitignore is not initialized, we can't check synchronously
-    // so we conservatively return false to avoid blocking
-    if (!this.gitignoreInitialized) {
-      return false;
-    }
-
-    // Convert path to absolute if it isn't already
     const absolutePath = this.resolvePath(relativePath);
 
-    // Check each gitignore file from most specific (deepest) to least specific
-    const sortedGitignores = Array.from(this.gitignoreMap.values()).sort(
-      (a, b) => b.directory.length - a.directory.length,
-    );
-
-    for (const gitignoreInfo of sortedGitignores) {
-      // Check if this gitignore applies to the path
+    for (const gitignoreInfo of this.sortedGitignoreEntries) {
       if (absolutePath.startsWith(gitignoreInfo.directory)) {
-        // Get path relative to the gitignore's directory
-        const relativePath = relative(gitignoreInfo.directory, absolutePath);
-        // Skip if path equals the gitignore directory itself
-        // (a directory shouldn't be ignored by its own gitignore)
-        if (relativePath === '') {
-          continue;
-        }
-        if (gitignoreInfo.ignore.ignores(relativePath)) {
-          return true;
-        }
+        const rel = relative(gitignoreInfo.directory, absolutePath);
+        if (rel === '') continue;
+        if (gitignoreInfo.ignore.ignores(rel)) return true;
       }
     }
-
     return false;
   }
 
   async isBinary(relativePath: string): Promise<boolean> {
     try {
       const fullPath = this.resolvePath(relativePath);
-      const stats = await fs.stat(fullPath);
-      const bytesToRead = Math.min(
-        stats.size,
-        BINARY_DETECTION.CHECK_BUFFER_SIZE,
-      );
-
-      if (bytesToRead === 0) {
-        // Empty files are not binary
-        return false;
-      }
-
-      const fileHandle = await fs.open(fullPath, 'r');
+      const fh = await fs.open(fullPath, 'r');
       try {
-        const buffer = Buffer.alloc(bytesToRead);
-        await fileHandle.read(buffer, 0, bytesToRead, 0);
-
-        // Check for NUL bytes (0x00) which indicate binary content
-        return buffer.includes(0x00);
+        const buf = Buffer.allocUnsafe(BINARY_DETECTION.CHECK_BUFFER_SIZE);
+        const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+        if (bytesRead === 0) return false;
+        return buf.subarray(0, bytesRead).includes(0x00);
       } finally {
-        await fileHandle.close();
+        await fh.close();
       }
-    } catch (_error) {
-      // If we can't read the file, assume it's not binary
-      // TODO: add client-side logging
-      // console.warn(`[isBinary] Error checking file ${path}:`, error);
+    } catch {
       return false;
     }
   }
 
   private async ensureGitignoreInitialized(): Promise<void> {
-    if (this.gitignoreInitialized) {
-      return;
-    }
+    if (this.gitignoreInitialized) return;
 
-    // Default ignores that apply everywhere
     const defaultIgnores = [
       '.git',
       'node_modules',
@@ -959,13 +606,11 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       'Thumbs.db',
     ];
 
-    // Recursively find all .gitignore files
     await this.findAndLoadGitignoreFiles(
       this.config.workingDirectory,
       defaultIgnores,
     );
 
-    // If no .gitignore files were found, add default ignores at root level
     if (this.gitignoreMap.size === 0) {
       const rootIgnore = ignore().add(defaultIgnores);
       this.gitignoreMap.set(this.config.workingDirectory, {
@@ -975,7 +620,11 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       });
     }
 
-    // Only set the flag after all patterns are actually loaded
+    // Precompute a sorted array for hot-path lookups
+    this.sortedGitignoreEntries = Array.from(this.gitignoreMap.values()).sort(
+      (a, b) => b.directory.length - a.directory.length,
+    );
+
     this.gitignoreInitialized = true;
   }
 
@@ -983,14 +632,11 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     directory: string,
     defaultIgnores: string[],
     depth = 0,
-    maxDepth = 50, // Prevent infinite recursion
+    maxDepth = 50,
   ): Promise<void> {
-    if (depth > maxDepth) {
-      return;
-    }
+    if (depth > maxDepth) return;
 
     try {
-      // Check if .gitignore exists in this directory
       const gitignorePath = join(directory, '.gitignore');
       let patterns: string[] = [];
       let hasGitignore = false;
@@ -1003,18 +649,14 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
           .filter((line) => line && !line.startsWith('#'));
         patterns = filePatterns;
         hasGitignore = true;
-      } catch (_error) {
-        // No .gitignore in this directory, that's fine
+      } catch {
+        // no .gitignore here
       }
 
-      // If we found a .gitignore or we're at the root, create an ignore instance
       if (hasGitignore || directory === this.config.workingDirectory) {
         const allPatterns = [...patterns];
-        // Add default ignores to root directory's gitignore
-        if (directory === this.config.workingDirectory) {
+        if (directory === this.config.workingDirectory)
           allPatterns.push(...defaultIgnores);
-        }
-
         if (allPatterns.length > 0) {
           const ignoreInstance = ignore().add(allPatterns);
           this.gitignoreMap.set(directory, {
@@ -1025,14 +667,10 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
         }
       }
 
-      // Recursively search subdirectories
       const entries = await fs.readdir(directory, { withFileTypes: true });
-
       for (const entry of entries) {
         if (entry.isDirectory()) {
-          const subdirPath = join(directory, entry.name);
-
-          // Skip directories that should always be ignored
+          const subdir = join(directory, entry.name);
           if (
             defaultIgnores.includes(entry.name) ||
             entry.name === '.git' ||
@@ -1040,15 +678,13 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
           ) {
             continue;
           }
-
-          // Check if this directory is ignored by parent gitignores
           const shouldSkip = await this.isDirectoryIgnoredByParent(
-            subdirPath,
+            subdir,
             directory,
           );
           if (!shouldSkip) {
             await this.findAndLoadGitignoreFiles(
-              subdirPath,
+              subdir,
               defaultIgnores,
               depth + 1,
               maxDepth,
@@ -1056,8 +692,8 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
           }
         }
       }
-    } catch (_error) {
-      // Error reading directory, skip it
+    } catch {
+      // ignore unreadable dirs
     }
   }
 
@@ -1065,13 +701,10 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     dirPath: string,
     parentDir: string,
   ): Promise<boolean> {
-    // Check if parent directories have gitignore rules that would exclude this directory
     for (const [gitDir, gitInfo] of this.gitignoreMap.entries()) {
       if (gitDir === parentDir || dirPath.startsWith(gitDir)) {
-        const relativePath = relative(gitDir, dirPath);
-        if (gitInfo.ignore.ignores(relativePath)) {
-          return true;
-        }
+        const rel = relative(gitDir, dirPath);
+        if (gitInfo.ignore.ignores(rel)) return true;
       }
     }
     return false;
@@ -1081,7 +714,6 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     relativePath: string,
     onFileChange: (event: FileChangeEvent) => void,
   ): Promise<() => Promise<void>> {
-    // Ensure gitignore is fully initialized before creating the watcher
     await this.ensureGitignoreInitialized();
 
     const watcher = chokidar.watch(this.resolvePath(relativePath), {
@@ -1095,14 +727,12 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
         file: { absolutePath: path, relativePath: path },
       });
     });
-
     watcher.on('change', (path) => {
       onFileChange({
         type: 'update',
         file: { absolutePath: path, relativePath: path },
       });
     });
-
     watcher.on('unlink', (path) => {
       onFileChange({
         type: 'delete',

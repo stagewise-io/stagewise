@@ -2,9 +2,14 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { tool } from 'ai';
 import { validateToolOutput } from '../..';
 import { z } from 'zod';
+import { TOOL_OUTPUT_LIMITS } from '../../constants.js';
+import {
+  capToolOutput,
+  formatTruncationMessage,
+} from '../../utils/tool-output-capper.js';
 
 export const DESCRIPTION =
-  'List files and directories in a path (defaults to current directory). Use "recursive" to include subdirectories, "pattern" to filter by file extension or glob pattern, and "maxDepth" to limit recursion depth.';
+  "List files and directories in a path (like 'ls' or 'tree' command). Use when exploring directory structure or checking what's in a specific folder. Supports recursive listing with maxDepth control, filtering by includeFiles/includeDirectories flags, and returns detailed file metadata (type, size). Optimal for understanding project layout or navigating unfamiliar codebases.";
 
 export const listFilesParamsSchema = z.object({
   path: z.string().optional(),
@@ -69,8 +74,15 @@ export async function listFilesToolExecute(
         `Failed to list files in: ${relPath} - ${result.message} - ${result.error || ''}`,
       );
 
+    // Apply output capping to prevent LLM context bloat
+    const cappedFiles = capToolOutput(result.files || [], {
+      maxBytes: TOOL_OUTPUT_LIMITS.LIST_FILES.MAX_TOTAL_OUTPUT_SIZE,
+      maxItems: TOOL_OUTPUT_LIMITS.LIST_FILES.MAX_RESULTS,
+    });
+
     // Build success message
-    let message = `Successfully listed ${result.files?.length || 0} items in: ${relPath}`;
+    const totalItems = result.files?.length || 0;
+    let message = `Successfully listed ${totalItems} items in: ${relPath}`;
     if (recursive) {
       message += ` (recursive${maxDepth !== undefined ? `, max depth ${maxDepth}` : ''})`;
     }
@@ -79,12 +91,47 @@ export async function listFilesToolExecute(
     }
     message += ` - ${result.totalFiles || 0} files, ${result.totalDirectories || 0} directories`;
 
+    // Add truncation message with helpful suggestions if results were capped
+    if (cappedFiles.truncated) {
+      const suggestions = [];
+      if (recursive)
+        suggestions.push(
+          'Use recursive: false to list only the immediate directory',
+        );
+
+      if (!pattern)
+        suggestions.push(
+          'Use pattern parameter to filter specific file types (e.g., "*.ts")',
+        );
+
+      if (maxDepth === undefined && recursive)
+        suggestions.push(
+          'Use maxDepth parameter to limit recursion depth (e.g., maxDepth: 2)',
+        );
+
+      suggestions.push('Search in a subdirectory instead of the root');
+
+      if (cappedFiles.itemsRemoved)
+        message += formatTruncationMessage(
+          cappedFiles.itemsRemoved,
+          totalItems,
+          suggestions,
+        );
+      else {
+        message += TOOL_OUTPUT_LIMITS.DEFAULT_TRUNCATION_MESSAGE;
+        message += '\nSuggestions:\n';
+        message += suggestions.map((s) => `  - ${s}`).join('\n');
+      }
+    }
+
     return {
       message,
       result: {
-        files: result.files,
+        files: cappedFiles.result,
         totalFiles: result.totalFiles,
         totalDirectories: result.totalDirectories,
+        truncated: cappedFiles.truncated,
+        itemsRemoved: cappedFiles.itemsRemoved,
       },
     };
   } catch (error) {

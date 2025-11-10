@@ -2,8 +2,14 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { tool } from 'ai';
 import { validateToolOutput } from '../..';
 import { z } from 'zod';
+import { TOOL_OUTPUT_LIMITS } from '../../constants.js';
+import {
+  capToolOutput,
+  formatTruncationMessage,
+} from '../../utils/tool-output-capper.js';
 
-export const DESCRIPTION = 'Find files and directories matching a glob pattern';
+export const DESCRIPTION =
+  "Search for files matching a pattern across the project (like 'find' command). Use when you know what you're looking for by name or type (e.g., '**/*.test.ts' for test files, 'src/**/config.json' for configs). Returns matching file paths.";
 
 export const globParamsSchema = z.object({
   pattern: z.string().describe('Glob pattern (e.g., "**/*.js")'),
@@ -42,15 +48,55 @@ export async function globToolExecute(
         `Glob search failed: ${globResult.error}: ${globResult.message} - ${globResult.error || ''}`,
       );
 
+    // Build initial result object
+    const resultData = {
+      relativePaths: globResult.relativePaths,
+      totalMatches: globResult.totalMatches,
+    };
+
+    // Apply output capping to prevent LLM context bloat
+    const cappedPaths = capToolOutput(resultData.relativePaths, {
+      maxBytes: TOOL_OUTPUT_LIMITS.GLOB.MAX_TOTAL_OUTPUT_SIZE,
+      maxItems: TOOL_OUTPUT_LIMITS.GLOB.MAX_RESULTS,
+    });
+
+    const cappedOutput = {
+      totalMatches: resultData.totalMatches,
+      relativePaths: cappedPaths.result,
+      truncated: cappedPaths.truncated,
+      itemsRemoved: cappedPaths.itemsRemoved,
+    };
+
     // Format the success message
     const searchLocation = path ? ` in "${path}"` : ' in current directory';
-    const message = `Found ${globResult.totalMatches || 0} matches for pattern "${pattern}"${searchLocation}`;
+    let message = `Found ${globResult.totalMatches || 0} matches for pattern "${pattern}"${searchLocation}`;
+
+    // Add truncation message with helpful suggestions if results were capped
+    if (cappedOutput.truncated) {
+      const originalCount = globResult.totalMatches || 0;
+      const suggestions = [
+        'Use a more specific glob pattern (e.g., "src/**/*.ts" instead of "**/*.ts")',
+        'Search in a subdirectory by specifying the path parameter',
+        'Break down your search into multiple smaller queries',
+      ];
+
+      if (cappedOutput.itemsRemoved) {
+        message += formatTruncationMessage(
+          cappedOutput.itemsRemoved,
+          originalCount,
+          suggestions,
+        );
+      } else {
+        message += TOOL_OUTPUT_LIMITS.DEFAULT_TRUNCATION_MESSAGE;
+        message += '\nSuggestions:\n';
+        message += suggestions.map((s) => `  - ${s}`).join('\n');
+      }
+    }
 
     return {
       message,
       result: {
-        relativePaths: globResult.relativePaths,
-        totalMatches: globResult.totalMatches,
+        ...cappedOutput,
       },
     };
   } catch (error) {

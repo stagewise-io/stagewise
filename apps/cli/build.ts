@@ -58,6 +58,7 @@ async function buildCLI() {
       '@lancedb/lancedb', // Native bindings
       'level', // Native bindings
       'chokidar', // Native bindings
+      'vscode-ripgrep', // Native bindings
     ];
 
     // Build the CLI bundling most dependencies

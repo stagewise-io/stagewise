@@ -3,7 +3,8 @@ import { tool } from 'ai';
 import { validateToolOutput } from '../..';
 import { z } from 'zod';
 import { checkFileSize } from '../../utils/file';
-import { FILE_SIZE_LIMITS } from '../../constants';
+import { FILE_SIZE_LIMITS, TOOL_OUTPUT_LIMITS } from '../../constants';
+import { capToolOutput } from '../../utils/tool-output-capper';
 
 export const DESCRIPTION =
   'Read the contents of a file with line-by-line control';
@@ -92,17 +93,47 @@ export async function readFileToolExecute(
 
     const content = readResult.content;
     const totalLines = readResult.totalLines || content?.split('\n').length;
-
     const linesRead = content?.split('\n').length || 0;
-    const message = `Successfully read lines ${start_line}-${end_line} from file: ${target_file} (${linesRead} lines of ${totalLines} total)`;
+
+    // Prepare result data
+    const resultData = {
+      content,
+      totalLines,
+    };
+
+    // Apply output capping to prevent LLM context bloat
+    const cappedResult = capToolOutput(resultData, {
+      maxBytes: TOOL_OUTPUT_LIMITS.READ_FILE.MAX_TOTAL_OUTPUT_SIZE,
+    });
+
+    const cappedOutput = {
+      ...cappedResult.result,
+      truncated: cappedResult.truncated,
+      originalSize: cappedResult.originalSize,
+      cappedSize: cappedResult.cappedSize,
+    };
+
+    // Format the success message
+    let message = `Successfully read lines ${start_line || 1}-${end_line || totalLines} from file: ${target_file} (${linesRead} lines of ${totalLines} total)`;
+
+    // Add truncation message if content was capped
+    if (cappedResult.truncated) {
+      const suggestions = [
+        'Use start_line and end_line parameters to read specific sections of the file',
+        'Read the file in multiple smaller chunks',
+        'Consider using grep to find specific content first',
+      ];
+
+      message += '\n[Content truncated due to size limits]';
+      message += `\nOriginal size: ${Math.round(cappedResult.originalSize / 1024)}KB, Capped size: ${Math.round(cappedResult.cappedSize / 1024)}KB`;
+      message += '\nTo see all content, try:';
+      message += `\n${suggestions.map((s) => `  - ${s}`).join('\n')}`;
+    }
 
     return {
       success: true,
       message,
-      result: {
-        content,
-        totalLines,
-      },
+      result: cappedOutput,
     };
   } catch (error) {
     if (error instanceof Error) throw error;

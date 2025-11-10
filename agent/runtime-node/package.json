@@ -20,20 +20,26 @@
     "dev": "tsx build.ts --watch",
     "clean": "rimraf dist",
     "lint": "biome check .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "chokidar": "^4.0.3",
     "ignore": "^7.0.5",
-    "minimatch": "^9.0.5"
+    "minimatch": "^9.0.5",
+    "vscode-ripgrep": "^1.13.2"
   },
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@types/express": "^5.0.3",
     "@types/node": "^20.0.0",
     "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^3.2.4",
     "esbuild": "0.25.9",
     "rimraf": "^5.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
   }
 }

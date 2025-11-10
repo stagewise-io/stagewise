@@ -2,7 +2,12 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { tool } from 'ai';
 import { validateToolOutput } from '../..';
 import { z } from 'zod';
-import { GREP_LIMITS } from '../../constants.js';
+import { TOOL_OUTPUT_LIMITS } from '../../constants.js';
+import {
+  capToolOutput,
+  truncatePreview,
+  formatTruncationMessage,
+} from '../../utils/tool-output-capper.js';
 
 export const DESCRIPTION =
   'Fast, exact regex searches over text files using ripgrep. Use this tool to search for the right files in the project.';
@@ -20,13 +25,13 @@ export const grepSearchParamsSchema = z.object({
   exclude_file_pattern: z
     .string()
     .optional()
-    .describe('Glob pattern for files to exclude'),
+    .describe('Glob pattern for files to exclude (e.g., "**/test-*.js")'),
   max_matches: z
     .number()
     .optional()
-    .default(GREP_LIMITS.DEFAULT_MAX_MATCHES)
+    .default(15)
     .describe(
-      `Maximum number of matches to return (default: ${GREP_LIMITS.DEFAULT_MAX_MATCHES}). Results may be truncated if this limit is exceeded.`,
+      `Maximum number of matches to return (default: 15). Results may be truncated if this limit is exceeded. Not more than ${TOOL_OUTPUT_LIMITS.GREP.MAX_MATCHES} are allowed.`,
     ),
   explanation: z
     .string()
@@ -51,7 +56,7 @@ export async function grepSearchToolExecute(
     case_sensitive,
     include_file_pattern,
     exclude_file_pattern,
-    max_matches = GREP_LIMITS.DEFAULT_MAX_MATCHES,
+    max_matches = TOOL_OUTPUT_LIMITS.GREP.MAX_MATCHES,
     explanation: _explanation,
   } = params;
 
@@ -81,12 +86,47 @@ export async function grepSearchToolExecute(
         `Grep search failed: ${grepResult.message} - ${grepResult.error || ''}`,
       );
 
-    // Check if results were truncated
-    const wasTruncated = grepResult.totalMatches === max_matches;
+    // Truncate each match preview to prevent context bloat
+    const truncatedMatches = (grepResult.matches || []).map((match) => ({
+      ...match,
+      preview: truncatePreview(
+        match.preview,
+        TOOL_OUTPUT_LIMITS.GREP.MAX_MATCH_PREVIEW_LENGTH,
+      ),
+    }));
+
+    // Build initial result object
+    const resultData = {
+      matches: truncatedMatches,
+      totalMatches: grepResult.totalMatches,
+      filesSearched: grepResult.filesSearched,
+    };
+
+    // Apply output capping to prevent LLM context bloat
+    const cappedMatches = capToolOutput(resultData.matches, {
+      maxBytes: TOOL_OUTPUT_LIMITS.GREP.MAX_TOTAL_OUTPUT_SIZE,
+      maxItems: Math.min(
+        params.max_matches,
+        TOOL_OUTPUT_LIMITS.GREP.MAX_MATCHES,
+      ),
+    });
+
+    const cappedOutput = {
+      totalMatches: resultData.totalMatches,
+      filesSearched: resultData.filesSearched,
+      matches: cappedMatches.result,
+      truncated: cappedMatches.truncated,
+      itemsRemoved: cappedMatches.itemsRemoved,
+    };
+
+    // Check if results were truncated by match limit OR output capping
+    const matchCountTruncated = grepResult.totalMatches === max_matches;
+    const sizeTruncated = cappedOutput.truncated;
+    const wasTruncated = matchCountTruncated || sizeTruncated;
 
     // Format the success message
     let message = `Found ${grepResult.totalMatches || 0} matches`;
-    if (wasTruncated)
+    if (matchCountTruncated)
       message = `Found ${max_matches}+ matches (showing first ${max_matches})`;
 
     if (grepResult.filesSearched !== undefined)
@@ -96,14 +136,39 @@ export async function grepSearchToolExecute(
 
     if (exclude_file_pattern) message += ` (excluded: ${exclude_file_pattern})`;
 
-    if (wasTruncated) message += GREP_LIMITS.TRUNCATION_MESSAGE;
+    // Add truncation message with helpful suggestions
+    if (wasTruncated) {
+      const suggestions = [];
+      if (!include_file_pattern) {
+        suggestions.push(
+          'Use include_file_pattern to search specific file types (e.g., "*.ts")',
+        );
+      }
+      if (!exclude_file_pattern) {
+        suggestions.push(
+          'Use exclude_file_pattern to skip irrelevant directories (e.g., "node_modules")',
+        );
+      }
+      suggestions.push('Use a more specific regex pattern');
+      suggestions.push('Search in a subdirectory instead of the root');
+
+      if (cappedOutput.itemsRemoved) {
+        message += formatTruncationMessage(
+          cappedOutput.itemsRemoved,
+          grepResult.totalMatches || 0,
+          suggestions,
+        );
+      } else {
+        message += TOOL_OUTPUT_LIMITS.DEFAULT_TRUNCATION_MESSAGE;
+        message += '\nSuggestions:\n';
+        message += suggestions.map((s) => `  - ${s}`).join('\n');
+      }
+    }
 
     return {
       message,
       result: {
-        matches: grepResult.matches,
-        totalMatches: grepResult.totalMatches,
-        filesSearched: grepResult.filesSearched,
+        ...cappedOutput,
         truncated: wasTruncated,
       },
     };

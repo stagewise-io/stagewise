@@ -199,8 +199,9 @@ export interface IFileSystemProvider {
   ): Promise<GrepResult>;
 
   /**
-   * Finds files and directories matching a glob pattern.
+   * Finds files matching a glob pattern.
    * Supports standard glob syntax (*, **, ?, [abc], etc.)
+   * Note: Only returns files, not directories (matching ripgrep's behavior)
    * @param pattern - Glob pattern to match (e.g., "\*\*\/*.ts", "src\\**\\test-*.js")
    * @param options - Glob configuration options
    * @returns List of matching file paths
@@ -210,7 +211,6 @@ export interface IFileSystemProvider {
     options?: {
       cwd?: string; // Base directory for relative patterns (relative to working directory)
       absolute?: boolean; // Return absolute paths
-      includeDirectories?: boolean;
       excludePatterns?: string[]; // Patterns to exclude
       respectGitignore?: boolean; // Whether to respect .gitignore patterns (default: true)
     },

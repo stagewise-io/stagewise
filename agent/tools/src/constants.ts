@@ -45,38 +45,55 @@ export const FILE_SIZE_LIMITS = {
 };
 
 /**
- * Grep search limits to prevent excessive output that could cause API errors
+ * Tool output limits to prevent LLM context bloat
+ * These limits apply to the serialized JSON output of tools
  */
-export const GREP_LIMITS = {
+export const TOOL_OUTPUT_LIMITS = {
   /**
-   * Default maximum number of matches to return if not specified
-   * 500 matches provides good coverage without overwhelming the API
+   * Grep search tool limits
    */
-  DEFAULT_MAX_MATCHES: 200,
+  GREP: {
+    /** Maximum number of matches to return */
+    MAX_MATCHES: 50,
+    /** Maximum character length for each match preview */
+    MAX_MATCH_PREVIEW_LENGTH: 500,
+    /** Maximum total output size in bytes (serialized JSON) */
+    MAX_TOTAL_OUTPUT_SIZE: 40 * 1024, // 40KB, ~ 10k tokens at 4 chars per token
+  },
 
   /**
-   * Maximum total output size for grep results
-   * 1MB - prevents "Request Entity Too Large" errors
+   * Glob tool limits
    */
-  MAX_TOTAL_OUTPUT_SIZE: 1 * 1024 * 1024, // 1MB
+  GLOB: {
+    /** Maximum number of file paths to return */
+    MAX_RESULTS: 50,
+    /** Maximum total output size in bytes (serialized JSON) */
+    MAX_TOTAL_OUTPUT_SIZE: 40 * 1024, // 40KB, ~ 10k tokens at 4 chars per token
+  },
 
   /**
-   * Message to append when grep results are truncated
+   * List files tool limits
    */
-  TRUNCATION_MESSAGE:
-    '\n[Results truncated due to size limits. Use more specific patterns or file filters to narrow your search.]',
-};
+  LIST_FILES: {
+    /** Maximum number of file/directory entries to return */
+    MAX_RESULTS: 50,
+    /** Maximum total output size in bytes (serialized JSON) */
+    MAX_TOTAL_OUTPUT_SIZE: 40 * 1024, // 40KB, ~ 10k tokens at 4 chars per token
+  },
 
-/**
- * Binary file detection settings
- * Following ripgrep's approach of checking for NUL bytes
- */
-export const BINARY_DETECTION = {
   /**
-   * Number of bytes to check at the beginning of a file for binary detection
-   * 8KB is sufficient to catch most binary files while being efficient
+   * Read file tool limits
    */
-  CHECK_BUFFER_SIZE: 1024, // 1KB
+  READ_FILE: {
+    /** Maximum total output size in bytes (serialized JSON) */
+    MAX_TOTAL_OUTPUT_SIZE: 200 * 1024, // 200KB ~ 50k tokens at 4 chars per token -> ~6k lines of code
+  },
+
+  /**
+   * Default truncation message for all tools
+   */
+  DEFAULT_TRUNCATION_MESSAGE:
+    '\n[Results truncated due to size limits. Use more specific patterns or filters to narrow your search.]',
 };
 
 /**

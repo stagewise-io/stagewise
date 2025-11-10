@@ -10,7 +10,11 @@ const buildOptions: BuildOptions = {
   format: 'esm',
   platform: 'node',
   target: 'node16',
-  external: ['vscode'], // VSCode extension API should always be external
+  external: [
+    'vscode', // VSCode extension API should always be external
+    'vscode-ripgrep', // Native bindings - must be external
+    'chokidar', // Native bindings - must be external
+  ],
   sourcemap: false, // Disable source maps for security
   minify: true, // Always minify for published packages
   treeShaking: true,
