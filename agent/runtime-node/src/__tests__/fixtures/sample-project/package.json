@@ -1,0 +1,10 @@
+{
+  "name": "test-project",
+  "version": "1.0.0",
+  "description": "A sample project for testing",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest"
+  }
+}
