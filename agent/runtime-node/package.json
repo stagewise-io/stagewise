@@ -29,7 +29,7 @@
     "chokidar": "^4.0.3",
     "ignore": "^7.0.5",
     "minimatch": "^9.0.5",
-    "vscode-ripgrep": "^1.13.2"
+    "@vscode/ripgrep": "1.17.0"
   },
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",

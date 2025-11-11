@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { rgPath } from 'vscode-ripgrep';
+import { rgPath } from '@vscode/ripgrep';
+import { existsSync } from 'node:fs';
 import type { Readable } from 'node:stream';
 import type {
   GrepMatch,
@@ -324,6 +325,9 @@ export async function grepWithRipgrep(
   onError?: (error: Error) => void,
 ): Promise<GrepResult | null> {
   try {
+    // Check if ripgrep executable exists
+    if (!rgPath || !existsSync(rgPath)) return null;
+
     const searchPath = fileSystem.resolvePath(relativePath);
     const execution = await executeRipgrep(
       rgPath,

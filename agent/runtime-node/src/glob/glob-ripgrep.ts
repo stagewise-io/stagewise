@@ -2,7 +2,8 @@ import type {
   BaseFileSystemProvider,
   GlobResult,
 } from '@stagewise/agent-runtime-interface';
-import { rgPath } from 'vscode-ripgrep';
+import { rgPath } from '@vscode/ripgrep';
+import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { relative } from 'node:path';
@@ -117,6 +118,9 @@ export async function globRipgrep(
   options?: RipgrepGlobOptions,
 ): Promise<GlobResult | null> {
   try {
+    // Check if ripgrep executable exists
+    if (!rgPath || !existsSync(rgPath)) return null;
+
     // Determine search path
     const searchPath = options?.cwd
       ? fileSystem.resolvePath(options.cwd)
@@ -142,11 +146,8 @@ export async function globRipgrep(
     );
 
     return result;
-  } catch (error) {
+  } catch {
     // Any error during ripgrep execution - return null for fallback
-    console.error(
-      `Ripgrep glob execution failed, falling back to Node.js implementation: ${error}`,
-    );
     return null;
   }
 }

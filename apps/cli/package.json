@@ -81,6 +81,6 @@
     "prompts": "^2.4.2",
     "ws": "^8.18.3",
     "chokidar": "^4.0.3",
-    "vscode-ripgrep": "^1.13.2"
+    "@vscode/ripgrep": "1.17.0"
   }
 }

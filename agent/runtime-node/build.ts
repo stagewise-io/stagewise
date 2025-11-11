@@ -12,7 +12,7 @@ const buildOptions: BuildOptions = {
   target: 'node16',
   external: [
     'vscode', // VSCode extension API should always be external
-    'vscode-ripgrep', // Native bindings - must be external
+    '@vscode/ripgrep', // Native bindings - must be external
     'chokidar', // Native bindings - must be external
   ],
   sourcemap: false, // Disable source maps for security
