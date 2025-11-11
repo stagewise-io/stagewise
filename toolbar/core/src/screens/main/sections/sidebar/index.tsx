@@ -4,7 +4,6 @@ import {
   type ImperativePanelHandle,
 } from '@stagewise/stage-ui/components/resizable';
 import { SidebarTopSection } from './top';
-import { SidebarSubsystemStatusSection } from './subsystem-status';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useEventListener } from '@/hooks/use-event-listener';
 
@@ -45,16 +44,7 @@ export function Sidebar() {
       className="group flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-muted-foreground/5 data-[collapsed=true]:w-16 data-[collapsed=false]:min-w-64 data-[collapsed=true]:min-w-16 data-[collapsed=false]:max-w-2xl data-[collapsed=true]:max-w-16"
     >
       <SidebarTopSection isCollapsed={isCollapsed} />
-
-      {/* Subsystem status area */}
-      {!isCollapsed && (
-        <>
-          <hr className="mx-4 h-px border-none bg-zinc-500/10" />
-          <SidebarSubsystemStatusSection />
-        </>
-      )}
-
-      <hr className="h-px border-none bg-zinc-500/20" />
+      <hr className="mx-4 h-px border-none bg-zinc-500/10" />
 
       {/* Chat area */}
       <SidebarChatSection openChatPanel={openChatPanel} />

@@ -8,7 +8,7 @@ export function SidebarChatSection({
   openChatPanel: () => void;
 }) {
   return (
-    <div className="relative size-full p-3">
+    <div className="relative size-full p-4">
       <div className="size-full group-data-[collapsed=true]:hidden">
         <ChatPanel />
       </div>

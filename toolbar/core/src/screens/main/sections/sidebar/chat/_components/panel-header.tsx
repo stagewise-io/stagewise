@@ -56,7 +56,7 @@ export function ChatPanelHeader({
   return (
     <PanelHeader
       className={cn(
-        '-inset-3 pointer-events-none absolute z-20 origin-bottom p-2 transition-all duration-300 ease-out *:pointer-events-auto',
+        '-inset-3 pointer-events-none absolute z-20 origin-bottom p-4 transition-all duration-300 ease-out *:pointer-events-auto',
         chatListOpen
           ? 'rounded-[inherit] backdrop-blur-lg'
           : '!h-[calc-size(auto,size)] h-auto',

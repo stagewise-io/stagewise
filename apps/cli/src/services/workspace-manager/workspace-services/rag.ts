@@ -1,10 +1,7 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { initializeRag, getRagMetadata } from '@stagewise/agent-rag';
-import {
-  getContextFilesFromSelectedElement,
-  isAuthenticationError,
-} from '@stagewise/agent-utils';
+import { isAuthenticationError } from '@stagewise/agent-utils';
 import type { KartonService } from '../../karton';
 import type { Logger } from '../../logger';
 import type { TelemetryService } from '../../telemetry';
@@ -184,11 +181,11 @@ export class RagService {
       // Register all karton procedure handlers
       this.registerProcedureHandlers();
 
-      // Immediately run RAG update on creation
-      void this.updateRag();
+      // Immediately run RAG update on creation // TODO: Enable again when needed
+      // void this.updateRag();
 
-      // Then periodically update RAG
-      this.periodicallyUpdateRag();
+      // Then periodically update RAG // TODO: Enable again when needed
+      // this.periodicallyUpdateRag();
 
       this.logger.debug('[RagService] Initialized');
     } catch (error) {
@@ -225,7 +222,6 @@ export class RagService {
   private async getRelatedContextFilesForSelectedElement(
     element: SelectedElement,
   ): Promise<SelectedElement['codeMetadata']> {
-    // TODO!!!!!!!!!!!!
     let codeMetadata: SelectedElement['codeMetadata'] = [];
 
     // We check if framework-specific info exists that may help us. If yes, we can statically infer fitting files and line numbers.
@@ -267,55 +263,13 @@ export class RagService {
 
       // We don't need additional files if we have at least 2 covered levels of information about the component structure
       if (results.coveredLevels >= 2) return codeMetadata;
+
       this.logger.debug(
         '[RagService] No context files found for selected react component',
       );
+    } else {
+      // TODO: Implement other framework-specific retrieval logic here, fall back to RAG when RAG is enabled again
     }
-
-    this.logger.debug(
-      '[RagService] Getting context files for selected element through RAG',
-    );
-
-    // If no framework-specific info exists, we need to query the RAG index for the most relevant files and line numbers.
-    const files = await getContextFilesFromSelectedElement(
-      element,
-      this.apiKey!,
-      this.workspaceDataPath!, // Is only called when the workspace is loaded
-      this.telemetryService.withTracing(this.litellm('gemini-2.5-flash-lite'), {
-        posthogProperties: {
-          $ai_span_name: 'get-context-element-file',
-        },
-      }),
-      this.clientRuntime,
-      (error) => {
-        this.logger.error(
-          `[AgentService] Failed to get context element file: ${error}`,
-        );
-      },
-    ).catch((error) => {
-      this.logger.error(
-        `[AgentService] Failed to get context element file: ${error}`,
-      );
-    });
-    if (!files || files.length === 0) return codeMetadata;
-    this.logger.debug(
-      `[AgentService] Get context element files: ${files.map((file) => `${file.relativePath} - ${file.startLine} - ${file.endLine}`).join(', ')}`,
-    );
-
-    const fileContents = await Promise.all(
-      files.map((file) =>
-        this.clientRuntime.fileSystem.readFile(file.relativePath),
-      ),
-    );
-    codeMetadata.concat(
-      fileContents.map((fileContent, index) => ({
-        relation: 'potentially relevant file',
-        relativePath: files[index]!.relativePath,
-        startLine: files[index]!.startLine,
-        endLine: files[index]!.endLine,
-        content: fileContent.content || 'Failed to read file content',
-      })),
-    );
 
     return codeMetadata;
   }
