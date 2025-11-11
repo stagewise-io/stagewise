@@ -2,7 +2,7 @@ import type { ToolPart } from '@stagewise/karton-contract';
 import { DiffPreview, ToolPartUIBase } from './_shared';
 import { MaximizeIcon, MinimizeIcon, PencilIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
-import { useFileHref } from '@/hooks/use-file-href';
+import { useFileIDEHref } from '@/hooks/use-file-ide-href';
 import { diffLines } from 'diff';
 import { useMemo, useState } from 'react';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
@@ -14,7 +14,7 @@ export const MultiEditToolPart = ({
 }: {
   part: Extract<ToolPart, { type: 'tool-multiEditTool' }>;
 }) => {
-  const { getFileHref } = useFileHref();
+  const { getFileIDEHref } = useFileIDEHref();
   const diff = useMemo(
     () =>
       part.output?.hiddenMetadata?.diff
@@ -82,7 +82,7 @@ export const MultiEditToolPart = ({
                 {collapsedDiffView ? 'Show all lines' : 'Show changes only'}
               </Button>
               <a
-                href={getFileHref(part.input?.relative_path ?? '')}
+                href={getFileIDEHref(part.input?.relative_path ?? '')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={buttonVariants({ size: 'xs', variant: 'ghost' })}

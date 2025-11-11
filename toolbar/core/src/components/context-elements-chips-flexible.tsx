@@ -6,15 +6,14 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { useMemo } from 'react';
-import { useFileHref } from '@/hooks/use-file-href';
+import { useFileIDEHref } from '@/hooks/use-file-ide-href';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
-import { getIDEFileUrl, getTruncatedFileUrl } from '@/utils';
-import { useKartonState } from '@/hooks/use-karton';
+import { getTruncatedFileUrl } from '@/utils';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import type { SelectedElement } from '@stagewise/karton-contract';
 import {
@@ -95,7 +94,7 @@ function ContextElementChip({
   onHover,
   onUnhover,
 }: ContextElementChipProps) {
-  const { getFileHref } = useFileHref();
+  const { getFileIDEHref } = useFileIDEHref();
   const chipLabel = useMemo(() => {
     // We first try to get the component name from the framework info and then fallback to the element tag name
     const reactComponentName =
@@ -111,8 +110,6 @@ function ContextElementChip({
       : '';
     return `${tagName}${id}`;
   }, [selectedElement]);
-
-  const openInIdeChoice = useKartonState((s) => s.globalConfig.openFilesInIde);
 
   const flattenedReactComponentTree = useMemo(() => {
     // Return the flattened component tree as a list of components. Limit to first 3 components.
@@ -232,10 +229,7 @@ function ContextElementChip({
                     <Tooltip>
                       <TooltipTrigger>
                         <a
-                          href={getIDEFileUrl(
-                            getFileHref(metadata.relativePath),
-                            openInIdeChoice,
-                          )}
+                          href={getFileIDEHref(metadata.relativePath)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="shrink basis-4/5 break-all text-foreground text-sm hover:text-primary"

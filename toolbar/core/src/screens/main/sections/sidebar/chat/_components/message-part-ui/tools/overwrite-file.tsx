@@ -1,5 +1,5 @@
 import type { ToolPart } from '@stagewise/karton-contract';
-import { useFileHref } from '@/hooks/use-file-href';
+import { useFileIDEHref } from '@/hooks/use-file-ide-href';
 import { DiffPreview, ToolPartUIBase } from './_shared';
 import { MinimizeIcon, MaximizeIcon, PencilIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
@@ -15,7 +15,7 @@ export const OverwriteFileToolPart = ({
 }: {
   part: Extract<ToolPart, { type: 'tool-overwriteFileTool' }>;
 }) => {
-  const { getFileHref } = useFileHref();
+  const { getFileIDEHref } = useFileIDEHref();
   const diff = useMemo(
     () =>
       part.output?.hiddenMetadata
@@ -85,7 +85,7 @@ export const OverwriteFileToolPart = ({
                 {collapsedDiffView ? 'Show all lines' : 'Show changes only'}
               </Button>
               <a
-                href={getFileHref(part.input?.relative_path ?? '')}
+                href={getFileIDEHref(part.input?.relative_path ?? '')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={buttonVariants({ size: 'xs', variant: 'ghost' })}

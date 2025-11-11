@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useKartonProcedure, useKartonState } from './use-karton';
 import { getIDEFileUrl } from '@/utils';
 
-export function useFileHref() {
+export function useFileIDEHref() {
   const getAbsoluteAgentAccessPath = useKartonProcedure(
     (p) => p.workspace.getAbsoluteAgentAccessPath,
   );
@@ -19,7 +19,7 @@ export function useFileHref() {
     });
   }, [getAbsoluteAgentAccessPath]);
 
-  const getFileHref = useCallback(
+  const getFileIDEHref = useCallback(
     (relativeFilePath: string) => {
       if (!absoluteAccessPath) return '#';
       return getIDEFileUrl(
@@ -33,6 +33,6 @@ export function useFileHref() {
   );
 
   return {
-    getFileHref,
+    getFileIDEHref,
   };
 }
