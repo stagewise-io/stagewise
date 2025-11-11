@@ -46,7 +46,12 @@ import {
   type AllTools,
   type InspirationComponent,
 } from '@stagewise/agent-tools';
-import { streamText, generateId, readUIMessageStream } from 'ai';
+import {
+  streamText,
+  generateId,
+  readUIMessageStream,
+  NoSuchToolError,
+} from 'ai';
 import { XMLPrompts } from '@stagewise/agent-prompts';
 import type { PromptSnippet } from '@stagewise/agent-types';
 import type { AppRouter, TRPCClient } from '@stagewise/api-client';
@@ -502,12 +507,6 @@ export class AgentService {
             this.kartonService as KartonStateProvider<KartonContract['state']>,
             activeChatId,
           );
-          const codeMetadata = message.metadata?.selectedPreviewElements?.map(
-            (element) => element.codeMetadata,
-          );
-          this.logger.debug(
-            `[AgentService] Code metadata: ${JSON.stringify(codeMetadata)}`,
-          );
           // User-Interaction tool calls could still have open inputs - cancel them
           if (pendingToolCalls.length > 0) {
             pendingToolCalls.forEach(({ toolCallId }) => {
@@ -817,6 +816,9 @@ export class AgentService {
         },
       );
 
+      // Get the tools based on the agent mode
+      const tools = toolsWithoutExecute(this.getTools());
+
       const stream = streamText({
         model,
         abortSignal: this.abortController.signal,
@@ -833,11 +835,32 @@ export class AgentService {
         onError: async (error) => {
           await this.handleStreamingError(error, chatId, promptSnippets);
         },
-        // Get the tools based on the agent mode
-        tools: toolsWithoutExecute(this.getTools()),
+        tools,
         onAbort: () => {
           this.authRetryCount = 0;
           this.cleanupPendingOperations('Agent call aborted');
+        },
+        experimental_repairToolCall: async (r) => {
+          // Haiku often returns the tool input as string instead of object - we try to parse it as object
+          // If the parsing fails, we simply return an invalid tool call
+          this.logger.error('repairing tool call', r.error);
+          this.telemetryService.captureException(r.error);
+          if (NoSuchToolError.isInstance(r.error)) return null;
+
+          const tool = tools[r.toolCall.toolName as keyof AllTools];
+          if (!tool) return null;
+
+          try {
+            const input = JSON.parse(r.toolCall.input);
+            if (typeof input === 'string') {
+              const objectInput = JSON.parse(input); // Try to parse the input as object
+              if (typeof objectInput === 'object' && objectInput !== null)
+                return { ...r.toolCall, input: JSON.stringify(objectInput) };
+            } else return null; // If not a string, it already failed the initial parsing check, so we return null
+          } catch {
+            return null;
+          }
+          return null;
         },
         onFinish: async (r) => {
           this.authRetryCount = 0;
@@ -863,6 +886,10 @@ export class AgentService {
                 [result],
                 this.lastMessageId!,
               );
+            },
+            (error) => {
+              this.logger.error('Agent failed', error);
+              this.telemetryService.captureException(error as Error);
             },
           );
 

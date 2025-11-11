@@ -29,7 +29,10 @@ export type ToolCallProcessingResult<T extends StaticToolCall<AllTools>> =
  */
 export async function processClientSideToolCall<
   T extends StaticToolCall<AllTools>,
->(context: ToolCallContext<T>): Promise<ToolCallProcessingResult<T>> {
+>(
+  context: ToolCallContext<T>,
+  onError?: (error: Error) => void,
+): Promise<ToolCallProcessingResult<T>> {
   const { tool, toolCall, onToolCallComplete } = context;
 
   const startTime = Date.now();
@@ -73,6 +76,7 @@ export async function processClientSideToolCall<
 
       return result;
     } catch (error) {
+      onError?.(error as Error);
       const result = {
         toolCallId: toolCall.toolCallId,
         duration: Date.now() - startTime,
@@ -103,14 +107,28 @@ export async function processToolCalls(
   onToolCallComplete?: (
     result: ToolCallProcessingResult<StaticToolCall<AllTools>>,
   ) => void | Promise<void>,
+  onError?: (error: Error) => void,
 ): Promise<ToolCallProcessingResult<StaticToolCall<AllTools>>[]> {
   // Process client-side tools in parallel
   const clientPromises = toolCalls.map(async (tc) => {
     if (tc.invalid) {
+      const errorMessage =
+        tc.error instanceof Error
+          ? tc.error.message
+          : JSON.stringify(tc.error, null, 2);
+
+      // Truncate the error message to 1000 characters
+      const message =
+        errorMessage.length > 1000
+          ? `${errorMessage.slice(0, 1000)}...`
+          : errorMessage;
+
       const result = {
         toolCallId: tc.toolCallId,
         duration: 0,
-        error: { message: tc instanceof Error ? tc.message : 'Unknown error' },
+        error: {
+          message,
+        },
       };
       await onToolCallComplete?.(result);
       return result;
@@ -133,6 +151,7 @@ export async function processToolCalls(
         duration: 0,
         error: { message: `Tool ${tc.toolName} not found in provided tools.` },
       };
+      onError?.(new Error(`Tool ${tc.toolName} not found in provided tools.`));
       await onToolCallComplete?.(result);
       return result;
     }
@@ -144,7 +163,7 @@ export async function processToolCalls(
       onToolCallComplete,
     };
 
-    return await processClientSideToolCall(context);
+    return await processClientSideToolCall(context, onError);
   });
 
   // Wait for all client-side tools to complete
