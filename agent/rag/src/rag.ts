@@ -222,7 +222,7 @@ export async function queryRagWithoutRerank(
 ) {
   const openai = new OpenAI({
     apiKey,
-    baseURL: process.env.LLM_PROXY_URL || 'http://localhost:3002',
+    baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
   });
   const embeddings = await callEmbeddingApi(
     openai,
@@ -256,7 +256,7 @@ async function* embedFiles(
     const embeddings = generateFileEmbeddings(
       {
         apiKey,
-        baseUrl: process.env.LLM_PROXY_URL || 'http://localhost:3002',
+        baseUrl: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
       },
       relativePaths,
       clientRuntime,
