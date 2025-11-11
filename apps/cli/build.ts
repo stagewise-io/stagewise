@@ -132,9 +132,6 @@ const import_meta_url = require('url').pathToFileURL(__filename).href;
     await Promise.all([
       // Copy toolbar dist to CLI dist
       copyToolbarDist(),
-
-      // Copy bundled plugins to CLI dist
-      copyBundledPlugins(),
     ]);
 
     console.log('Build completed successfully!');
@@ -165,38 +162,6 @@ async function copyToolbarDist() {
   await cp(toolbarDistPath, targetPath, { recursive: true });
 
   console.log('Copied toolbar dist to dist/toolbar-app');
-}
-
-async function copyBundledPlugins() {
-  const bundledPlugins = ['react', 'angular', 'vue'];
-  const pluginsTargetPath = resolve(__dirname, 'dist/plugins');
-
-  // Create plugins directory
-  await mkdir(pluginsTargetPath, { recursive: true });
-
-  // Copy each bundled plugin
-  for (const pluginName of bundledPlugins) {
-    const pluginSourcePath = resolve(
-      __dirname,
-      `../../plugins/${pluginName}/dist`,
-    );
-    const pluginTargetPath = resolve(pluginsTargetPath, pluginName);
-
-    // Check if plugin dist exists
-    if (!existsSync(pluginSourcePath)) {
-      throw new Error(
-        `Plugin ${pluginName} dist not found at ${pluginSourcePath}. Make sure to build @stagewise-plugins/${pluginName} first.`,
-      );
-    }
-
-    // Create target directory for this plugin
-    await mkdir(pluginTargetPath, { recursive: true });
-
-    // Copy plugin dist contents
-    await cp(pluginSourcePath, pluginTargetPath, { recursive: true });
-
-    console.log(`Copied ${pluginName} plugin to dist/plugins/${pluginName}`);
-  }
 }
 
 buildCLI();

@@ -9,7 +9,7 @@ import type { KartonService } from '@/services/karton';
 import type { WorkspaceConfigService } from './config';
 import type { KartonContract } from '@stagewise/karton-contract';
 import { existsSync } from 'node:fs';
-import path, { resolve } from 'node:path';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { StaticAnalysisService } from './static-analysis';
 import type { NotificationService } from '@/services/notification';
@@ -31,7 +31,7 @@ type BuiltInPlugin = {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// TODO
+/*
 const BuiltInPlugins: BuiltInPlugin[] = [
   {
     name: 'react',
@@ -75,6 +75,7 @@ const BuiltInPlugins: BuiltInPlugin[] = [
     },
   },
 ];
+*/
 
 export class WorkspacePluginService {
   private logger: Logger;
@@ -235,8 +236,9 @@ export class WorkspacePluginService {
     const recommendedPlugins: BuiltInPlugin[] = [];
 
     // package.json heuristic: combine all dependnencies of all package.json files in the the workspace and check if some plugins match these dependencies
+    /*
     const allDependencies = this.staticAnalysisService.nodeDependencies;
-
+    
     for (const plugin of BuiltInPlugins) {
       if (plugin.dependencyMatcher.packageJson) {
         if (
@@ -253,6 +255,8 @@ export class WorkspacePluginService {
       '[WorkspacePluginService] Recommended bundled plugins: ',
       BuiltInPlugins,
     );
+    */
+
     return recommendedPlugins;
   }
 

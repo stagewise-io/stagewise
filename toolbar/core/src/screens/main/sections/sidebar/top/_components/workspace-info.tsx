@@ -91,7 +91,7 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
             {workspace?.config?.appPort ?? 'unknown'}
           </p>
         </div>
-
+        {/*
         <div className="flex flex-col gap-0">
           <h3 className="font-medium text-sm">
             Loaded Plugins{' '}
@@ -104,6 +104,7 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
             {workspace?.plugins?.length === 0 && 'No plugins loaded'}
           </p>
         </div>
+        */}
         <div className="grid grid-cols-2 gap-2">
           <Tooltip>
             <TooltipTrigger>

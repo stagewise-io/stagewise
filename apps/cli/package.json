@@ -33,9 +33,6 @@
   },
   "devDependencies": {
     "@inquirer/prompts": "^7.0.0",
-    "@stagewise-plugins/angular": "workspace:*",
-    "@stagewise-plugins/react": "workspace:*",
-    "@stagewise-plugins/vue": "workspace:*",
     "@stagewise/agent-prompt-snippets": "workspace:*",
     "@stagewise/agent-prompts": "workspace:*",
     "@stagewise/agent-rag": "workspace:*",

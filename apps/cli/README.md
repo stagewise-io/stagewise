@@ -21,7 +21,6 @@ Welcome to **stagewise** —  The frontend coding agent for production codebases
 ## Features
 
 - ⚡ Works out of the box
-- 🧩 Customize and extend functionality with Plugins
 - 📖 Open source
 - ⛓️ Compatible with all kinds of frameworks
 - 🧠 Use our dedicated frontend agent - or any other compatible agent through our open agent interface!
