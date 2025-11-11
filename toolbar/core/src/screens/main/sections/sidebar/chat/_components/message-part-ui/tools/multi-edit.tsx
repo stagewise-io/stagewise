@@ -27,11 +27,17 @@ export const MultiEditToolPart = ({
   );
 
   const newLineCount = useMemo(
-    () => diff?.filter((line) => line.added).length ?? 0,
+    () =>
+      diff
+        ?.filter((line) => line.added)
+        .reduce((acc, line) => acc + (line.count ?? 0), 0) ?? 0,
     [diff],
   );
   const deletedLineCount = useMemo(
-    () => diff?.filter((line) => line.removed).length ?? 0,
+    () =>
+      diff
+        ?.filter((line) => line.removed)
+        .reduce((acc, line) => acc + (line.count ?? 0), 0) ?? 0,
     [diff],
   );
 

@@ -142,13 +142,22 @@ export function DiffPreview({
   collapsed?: boolean;
 }) {
   const diffContent = useMemo(() => {
-    return diff.reduce((acc, line) => {
-      const newLine = line.added
-        ? `${lineAddedDiffMarker}${line.value}`
-        : line.removed
-          ? `${lineRemovedDiffMarker}${line.value}`
-          : line.value;
-      return `${acc}${newLine}`;
+    return diff.reduce((acc, lines) => {
+      const splitLines = lines.value.split('\n');
+      const modifiedLines = splitLines
+        .map((line, index) => {
+          if (index === splitLines.length - 1 && line.length === 0) {
+            // The last line should not be modified if it's empty
+            return line;
+          }
+          return lines.added
+            ? `${lineAddedDiffMarker}${line}`
+            : lines.removed
+              ? `${lineRemovedDiffMarker}${line}`
+              : line;
+        })
+        .join('\n');
+      return `${acc}${modifiedLines}`;
     }, '');
   }, [diff]);
 
