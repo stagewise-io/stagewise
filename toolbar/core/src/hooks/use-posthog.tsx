@@ -63,9 +63,14 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
     if (!posthog) return;
     const telemetryLevel = globalConfig.telemetryLevel;
     if (telemetryLevel === 'off') {
-      posthog.stopSessionRecording();
-      posthog.consent.optInOut(false);
-      posthog.opt_out_capturing();
+      try {
+        posthog.stopSessionRecording();
+        posthog.consent.optInOut(false);
+        posthog.opt_out_capturing();
+      } catch (e) {
+        console.warn('Failed to stop session recording', e);
+      }
+      return;
     }
 
     // Set user properties based on karton state
