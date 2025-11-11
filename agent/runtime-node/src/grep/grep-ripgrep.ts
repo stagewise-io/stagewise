@@ -7,6 +7,7 @@ import type {
   BaseFileSystemProvider,
 } from '@stagewise/agent-runtime-interface';
 import { createInterface } from 'node:readline';
+import { relative } from 'node:path';
 
 /**
  * Options for executing ripgrep, matching the grep function's options
@@ -198,6 +199,7 @@ const MAX_LINE_SIZE = 10 * 1024 * 1024; // 10MB
  */
 async function parseRipgrepGrepOutput(
   stdout: Readable,
+  workingDirectory: string,
   onError?: (error: Error) => void,
 ): Promise<GrepResult> {
   const matches: GrepMatch[] = [];
@@ -250,7 +252,7 @@ async function parseRipgrepGrepOutput(
           // Process each submatch in the line
           for (const submatch of matchData.submatches) {
             matches.push({
-              relativePath: matchData.path.text,
+              relativePath: relative(workingDirectory, matchData.path.text),
               line: matchData.line_number,
               column: submatch.start + 1, // Convert 0-based to 1-based
               match: submatch.match.text,
@@ -331,7 +333,11 @@ export async function grepWithRipgrep(
     );
     if (!execution) return null;
 
-    const result = await parseRipgrepGrepOutput(execution.stdout, onError);
+    const result = await parseRipgrepGrepOutput(
+      execution.stdout,
+      fileSystem.getCurrentWorkingDirectory(),
+      onError,
+    );
 
     return result;
   } catch (error) {

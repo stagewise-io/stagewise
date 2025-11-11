@@ -724,19 +724,28 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     watcher.on('add', (path) => {
       onFileChange({
         type: 'create',
-        file: { absolutePath: path, relativePath: path },
+        file: {
+          absolutePath: path,
+          relativePath: relative(this.config.workingDirectory, path),
+        },
       });
     });
     watcher.on('change', (path) => {
       onFileChange({
         type: 'update',
-        file: { absolutePath: path, relativePath: path },
+        file: {
+          absolutePath: path,
+          relativePath: relative(this.config.workingDirectory, path),
+        },
       });
     });
     watcher.on('unlink', (path) => {
       onFileChange({
         type: 'delete',
-        file: { absolutePath: path, relativePath: path },
+        file: {
+          absolutePath: path,
+          relativePath: relative(this.config.workingDirectory, path),
+        },
       });
     });
 
