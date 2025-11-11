@@ -39,6 +39,7 @@ import { ListFilesToolPart } from './message-part-ui/tools/list-files';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
 import { OverwriteFileToolPart } from './message-part-ui/tools/overwrite-file';
 import { ReadFileToolPart } from './message-part-ui/tools/read-file';
+import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
 
 function isToolPart(part: UIMessagePart): part is ToolPart {
   return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
@@ -165,6 +166,13 @@ export function ChatBubble({
     // TODO: restore selected elements
   }, [activeChatId, setChatInput, undoToolCallsUntilLatestUserMessage]);
 
+  const selectedPreviewElements = useMemo(() => {
+    return msg.metadata?.selectedPreviewElements ?? [];
+  }, [msg.metadata?.selectedPreviewElements]);
+  const fileAttachments = useMemo(() => {
+    return msg.parts.filter((part) => part.type === 'file') as FileUIPart[];
+  }, [msg.parts]);
+
   if (isEmptyMessage) return null; // Message parts start long before the message is sent - bubble should only show after the first chunk is received
 
   return (
@@ -263,6 +271,18 @@ export function ChatBubble({
                 }
               });
             })()}
+            {(fileAttachments.length > 0 ||
+              selectedPreviewElements.length > 0) && (
+              <div className="flex flex-row gap-2">
+                <ContextElementsChipsFlexible
+                  selectedElements={selectedPreviewElements.map(
+                    (selectedPreviewElement) => ({
+                      selectedElement: selectedPreviewElement,
+                    }),
+                  )}
+                />
+              </div>
+            )}
           </div>
           {msg.role === 'assistant' &&
             isLastMessage &&

@@ -13,17 +13,22 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
-import { getIDEFileUrl } from '@/utils';
+import { getIDEFileUrl, getTruncatedFileUrl } from '@/utils';
 import { useKartonState } from '@/hooks/use-karton';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import type { SelectedElement } from '@stagewise/karton-contract';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@stagewise/stage-ui/components/tooltip';
 
 interface ContextElementsChipsProps {
   selectedElements: {
     domElement?: HTMLElement;
     selectedElement: SelectedElement;
   }[];
-  removeSelectedElement: (element: HTMLElement) => void;
+  removeSelectedElement?: (element: HTMLElement) => void;
 }
 
 export function ContextElementsChipsFlexible({
@@ -43,9 +48,10 @@ export function ContextElementsChipsFlexible({
           key={`${selectedElement.selectedElement.stagewiseId}`}
           element={selectedElement.domElement}
           selectedElement={selectedElement.selectedElement}
-          onDelete={() =>
-            selectedElement.domElement &&
-            removeSelectedElement(selectedElement.domElement)
+          onDelete={
+            removeSelectedElement && selectedElement.domElement
+              ? () => removeSelectedElement?.(selectedElement.domElement!)
+              : undefined
           }
           onHover={setHoveredElement}
           onUnhover={() => setHoveredElement(null)}
@@ -127,12 +133,10 @@ function ContextElementChip({
           variant="secondary"
           onMouseEnter={() => element && onHover(element)}
           onMouseLeave={() => onUnhover()}
-          className="pr-0"
+          className="bg-muted/10 text-foreground"
         >
-          <SquareDashedMousePointer className="size-3 text-foreground/60" />
-          <span className="max-w-24 truncate font-medium text-foreground/80">
-            {chipLabel}
-          </span>
+          <SquareDashedMousePointer className="size-3" />
+          <span className="max-w-24 truncate font-medium">{chipLabel}</span>
           {onDelete && (
             <div
               role="button"
@@ -142,7 +146,7 @@ function ContextElementChip({
               }}
               className={cn(
                 buttonVariants({ variant: 'ghost', size: 'icon-xs' }),
-                'text-muted-foreground transition-colors hover:text-red-500',
+                '-mr-2 text-muted-foreground transition-colors hover:text-red-500',
               )}
             >
               <XIcon className="size-3" />
@@ -225,20 +229,22 @@ function ContextElementChip({
                     key={`${metadata.relativePath}|${metadata.startLine}`}
                     className="flex flex-col items-stretch"
                   >
-                    <a
-                      href={getIDEFileUrl(
-                        getFileHref(metadata.relativePath),
-                        openInIdeChoice,
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink basis-4/5 break-all text-foreground text-sm hover:text-primary"
-                    >
-                      {metadata.relativePath}
-                    </a>
-                    <span className="text-start text-muted-foreground text-xs">
-                      {metadata.relation}
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <a
+                          href={getIDEFileUrl(
+                            getFileHref(metadata.relativePath),
+                            openInIdeChoice,
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink basis-4/5 break-all text-foreground text-sm hover:text-primary"
+                        >
+                          {getTruncatedFileUrl(metadata.relativePath)}
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>{metadata.relation}</TooltipContent>
+                    </Tooltip>
                   </div>
                 ))}
               </div>
