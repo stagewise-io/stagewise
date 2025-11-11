@@ -62,7 +62,11 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
   useEffect(() => {
     if (!posthog) return;
     const telemetryLevel = globalConfig.telemetryLevel;
-    if (telemetryLevel === 'off') return;
+    if (telemetryLevel === 'off') {
+      posthog.stopSessionRecording();
+      posthog.consent.optInOut(false);
+      posthog.opt_out_capturing();
+    }
 
     // Set user properties based on karton state
     if (userAccount?.user && internalData.posthog?.apiKey) {
@@ -80,7 +84,15 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
         capture_pageview: false, // We capture pageviews manually
         capture_pageleave: true, // Enable pageleave capture
         debug: process.env.NODE_ENV === 'development',
+        session_recording: {
+          blockSelector: '#user-app-iframe',
+          compress_events: true,
+          recordCrossOriginIframes: false,
+          recordHeaders: false,
+        },
       });
+      posthog.consent.optInOut(true);
+      posthog.opt_in_capturing();
     }
   }, [userAccount, globalConfig]);
 
