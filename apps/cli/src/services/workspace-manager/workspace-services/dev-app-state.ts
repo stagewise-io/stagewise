@@ -38,6 +38,8 @@ export class WorkspaceDevAppStateService {
   private childProcessOwnedPorts: number[] = [];
   private pidFilePath: string;
   private shutdownHandlersRegistered = false;
+  private isShuttingDown = false;
+  private isStoppingChild = false;
 
   private constructor(
     logger: Logger,
@@ -147,7 +149,14 @@ export class WorkspaceDevAppStateService {
     if (!this.childProcess) return;
     this.logger.debug('[WorkspaceDevAppStateService] Stopping app');
 
-    await this.killProcess(this.childProcess);
+    this.isStoppingChild = true;
+    await this.killProcess(this.childProcess)
+      .then(() => {
+        this.isStoppingChild = false;
+      })
+      .catch(() => {
+        this.isStoppingChild = false;
+      });
     this.childProcess = null;
     this.childProcessOwnedPorts = [];
     this.lastError = null;
@@ -218,7 +227,7 @@ export class WorkspaceDevAppStateService {
     }
 
     // Handle process events
-    this.childProcess.on('exit', (code) => {
+    this.childProcess.on('exit', (code, signal) => {
       if (code && code !== 0) {
         this.lastError = {
           message: `Process exited with code ${code}`,
@@ -229,6 +238,25 @@ export class WorkspaceDevAppStateService {
       this.childProcessOwnedPorts = [];
       this.removePidFile().catch(() => {}); // Clean up PID file
       this.updateKartonState();
+
+      // If we're wrapping a dev command and the child exited on its own (not due to our own stop/shutdown),
+      // forward the child's exit code (or signal-derived exit code) and terminate this process.
+      if (
+        this.wrappedCommand &&
+        !this.isStoppingChild &&
+        !this.isShuttingDown
+      ) {
+        const forwardedExitCode =
+          typeof code === 'number'
+            ? code
+            : signal
+              ? this.getExitCodeForSignal(signal)
+              : 0;
+        this.logger.info(
+          `Wrapped child process exited; exiting with code ${forwardedExitCode}`,
+        );
+        process.exit(forwardedExitCode);
+      }
     });
 
     this.childProcess.on('error', (err) => {
@@ -327,6 +355,44 @@ export class WorkspaceDevAppStateService {
 
     checkPort(); // Initial check
     this.portCheckInterval = setInterval(checkPort, PORT_CHECK_INTERVAL_MS);
+  }
+
+  // Map signals to conventional Unix exit codes (128 + signal number)
+  private getExitCodeForSignal(signal: NodeJS.Signals): number {
+    switch (signal) {
+      case 'SIGHUP':
+        return 129;
+      case 'SIGINT':
+        return 130;
+      case 'SIGQUIT':
+        return 131;
+      case 'SIGILL':
+        return 132;
+      case 'SIGTRAP':
+        return 133;
+      case 'SIGABRT':
+        return 134;
+      case 'SIGBUS':
+        return 135;
+      case 'SIGFPE':
+        return 136;
+      case 'SIGKILL':
+        return 137;
+      case 'SIGUSR1':
+        return 138;
+      case 'SIGSEGV':
+        return 139;
+      case 'SIGUSR2':
+        return 140;
+      case 'SIGPIPE':
+        return 141;
+      case 'SIGALRM':
+        return 142;
+      case 'SIGTERM':
+        return 143;
+      default:
+        return 0;
+    }
   }
 
   // Config management
@@ -489,20 +555,49 @@ export class WorkspaceDevAppStateService {
     };
 
     // Handle various shutdown signals
-    process.on('SIGINT', cleanup);
-    process.on('SIGTERM', cleanup);
-    process.on('exit', cleanup);
+    const handleSignal = async (signal: NodeJS.Signals) => {
+      if (this.isShuttingDown) return;
+      this.isShuttingDown = true;
+      await cleanup();
+      // Exit with conventional codes for signals: 130 for SIGINT, 143 for SIGTERM
+      const exitCode =
+        signal === 'SIGINT' ? 130 : signal === 'SIGTERM' ? 143 : 0;
+      process.exit(exitCode);
+    };
+
+    process.on('SIGINT', () => {
+      void handleSignal('SIGINT');
+    });
+    process.on('SIGTERM', () => {
+      void handleSignal('SIGTERM');
+    });
+    // Also handle other common termination-related signals
+    process.on('SIGQUIT', () => {
+      void handleSignal('SIGQUIT');
+    });
+    process.on('SIGHUP', () => {
+      void handleSignal('SIGHUP');
+    });
+    process.on('exit', () => {
+      void cleanup();
+    });
 
     // Handle uncaught exceptions and unhandled rejections
     process.on('uncaughtException', async (error) => {
       this.logger.error('Uncaught exception:', error);
-      await cleanup();
+      if (!this.isShuttingDown) {
+        this.isShuttingDown = true;
+        await cleanup();
+      }
       process.exit(1);
     });
 
     process.on('unhandledRejection', async (reason) => {
       this.logger.error('Unhandled rejection:', reason);
-      await cleanup();
+      if (!this.isShuttingDown) {
+        this.isShuttingDown = true;
+        await cleanup();
+      }
       process.exit(1);
     });
 
