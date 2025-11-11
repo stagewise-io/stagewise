@@ -188,9 +188,7 @@ export class WorkspaceService {
             this.logger,
             this.telemetryService,
             this.kartonService,
-            this.authService,
             clientRuntime,
-            this.workspacePathsService!.workspaceDataPath,
           ).catch((error) => {
             this.telemetryService.captureException(error as Error);
             this.logger.error(

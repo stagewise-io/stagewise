@@ -10,4 +10,3 @@ export * from './utils/is-plan-limit-error.js';
 export * from './utils/is-authentication-error.js';
 export * from './utils/is-abort-error.js';
 export * from './utils/create-authenticated-client.js';
-export * from './utils/get-context-file-from-selected-element.js';

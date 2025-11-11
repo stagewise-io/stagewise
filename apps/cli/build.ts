@@ -55,10 +55,8 @@ async function buildCLI() {
 
     // Only keep external the packages that have issues with bundling
     const externalPackages: string[] = [
-      '@lancedb/lancedb', // Native bindings
-      'level', // Native bindings
       'chokidar', // Native bindings
-      'vscode-ripgrep', // Native bindings
+      'vscode-ripgrep', // Post-install script
     ];
 
     // Build the CLI bundling most dependencies

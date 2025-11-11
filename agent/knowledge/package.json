@@ -1,5 +1,5 @@
 {
-  "name": "@stagewise/agent-rag",
+  "name": "@stagewise/agent-knowledge",
   "private": true,
   "type": "module",
   "main": "./dist/index.cjs",
@@ -31,19 +31,14 @@
   "dependencies": {
     "@ai-sdk/anthropic": "2.0.9",
     "@ai-sdk/provider": "^2.0.0",
-    "@lancedb/lancedb": "0.22.2",
-    "@stagewise/agent-prompt-snippets": "workspace:*",
-    "@stagewise/agent-runtime-interface": "workspace:*",
-    "@stagewise/agent-runtime-node": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
-    "abstract-level": "^3.1.0",
     "ai": "5.0.9",
-    "level": "^10.0.0",
+    "@stagewise/agent-prompt-snippets": "workspace:*",
     "openai": "^5.20.2",
     "zod": "4.0.17"
   },
   "devDependencies": {
-    "@stagewise/agent-runtime-mock": "workspace:*",
+    "@stagewise/agent-runtime-interface": "workspace:*",
     "esbuild": "0.25.9",
     "rimraf": "^5.0.0",
     "tsx": "^4.7.1",

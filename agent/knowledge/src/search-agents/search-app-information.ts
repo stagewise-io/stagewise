@@ -1,11 +1,12 @@
 import { codingAgentTools } from '@stagewise/agent-tools';
 import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
-import { LevelDb } from '../utils/typed-db.js';
 import { z } from 'zod';
 import { stepCountIs, tool } from 'ai';
 import { streamText, type ModelMessage } from 'ai';
 import type { LanguageModelV2 } from '@ai-sdk/provider';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+
+function dummySaveAppInformation(_args: Omit<AppInformation, 'createdAt'>) {}
 
 async function getSystemPrompt(clientRuntime: ClientRuntime) {
   const projectInfo = await getProjectInfo(clientRuntime);
@@ -61,7 +62,7 @@ export type AppInformation = z.infer<typeof appInformationSchema>;
 export async function searchAndSaveAppInformationFromProject(
   model: LanguageModelV2,
   clientRuntime: ClientRuntime,
-  workspaceDataPath: string,
+  _workspaceDataPath: string,
   appName = 'website',
 ): Promise<{ success: boolean; message: string }> {
   const system = await getSystemPrompt(clientRuntime);
@@ -70,13 +71,7 @@ export async function searchAndSaveAppInformationFromProject(
     description: 'Save the app information to the database.',
     inputSchema: appInformationToolSchema,
     execute: async (args) => {
-      const db = LevelDb.getInstance(workspaceDataPath);
-      await db.open();
-      await db.app.put(`${args.app}:${args.path}`, {
-        ...args,
-        createdAt: Date.now(),
-      });
-      await db.close();
+      dummySaveAppInformation(args);
       return { success: true, message: 'App information saved' };
     },
   });

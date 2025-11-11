@@ -2,7 +2,7 @@
   "name": "stagewise",
   "module": "src/index.ts",
   "type": "module",
-  "version": "0.12.0-beta.0",
+  "version": "0.12.0-beta.2",
   "description": "Stagewise CLI",
   "author": "stagewise GmbH",
   "license": "AGPL-3.0-only",
@@ -35,7 +35,7 @@
     "@inquirer/prompts": "^7.0.0",
     "@stagewise/agent-prompt-snippets": "workspace:*",
     "@stagewise/agent-prompts": "workspace:*",
-    "@stagewise/agent-rag": "workspace:*",
+    "@stagewise/agent-knowledge": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-runtime-node": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
@@ -79,6 +79,8 @@
     "esbuild": "0.25.9",
     "node-fetch": "^3.3.2",
     "prompts": "^2.4.2",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "chokidar": "^4.0.3",
+    "vscode-ripgrep": "^1.13.2"
   }
 }

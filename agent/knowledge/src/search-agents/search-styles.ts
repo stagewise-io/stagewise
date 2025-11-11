@@ -1,11 +1,14 @@
 import { codingAgentTools } from '@stagewise/agent-tools';
 import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
-import { LevelDb } from '../utils/typed-db.js';
 import { z } from 'zod';
 import { stepCountIs, tool } from 'ai';
 import { streamText, type ModelMessage } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { LanguageModelV2 } from '@ai-sdk/provider';
+
+function dummySaveStyleInformation(
+  _args: Omit<StyleInformation, 'createdAt'>,
+) {}
 
 async function getSystemPrompt(clientRuntime: ClientRuntime) {
   const projectInfo = await getProjectInfo(clientRuntime);
@@ -88,7 +91,7 @@ export type StyleInformation = z.infer<typeof styleInformationSchema>;
 export async function searchAndSaveStyleInformationFromProject(
   model: LanguageModelV2,
   clientRuntime: ClientRuntime,
-  workspaceDataPath: string,
+  _workspaceDataPath: string,
   appName = 'website',
 ): Promise<{ success: boolean; message: string }> {
   const system = await getSystemPrompt(clientRuntime);
@@ -98,10 +101,7 @@ export async function searchAndSaveStyleInformationFromProject(
       'Save the style file information to the database. You can use this tool multiple times to save information about multiple style resources.',
     inputSchema: styleInformationToolSchema,
     execute: async (args) => {
-      const db = LevelDb.getInstance(workspaceDataPath);
-      await db.open();
-      await db.style.put(`${args.app}`, { ...args, createdAt: Date.now() });
-      await db.close();
+      dummySaveStyleInformation(args);
       return { success: true, message: 'Style information saved' };
     },
   });
