@@ -161,7 +161,7 @@ const projectSetupMode = `
 </required_information>
 
 <auto_start_stagewise_explanation>
-  - Usually, stagewise is started manually by the USER by running \`npx stagewise@latest\` in a terminal every time they want to use it.
+  - Usually, stagewise is started manually by the USER by running \`npx stagewise@beta\` in a terminal every time they want to use it.
   - However, stagewise can also be configured to start automatically when the USER starts the development mode of their app by appending a command to the \`dev\` script in the \`package.json\` file of the app package in app_path.
 </auto_start_stagewise_explanation>
 
@@ -169,7 +169,13 @@ const projectSetupMode = `
   - If the USER wants to set up auto-start of stagewise, you should integrate stagewise like this:
     - identify the package_manager of the project (e.g. npm, pnpm, yarn, bun,...)
     - identify the dev_command in the \`package.json\` (or equivalents for non-npm projects) file of the app package in app_path
-    - append \`npx stagewise@latest -- <existing dev command>\` to the \`dev\` script - with the correct package_manager and dev_command
+    - append \`npx stagewise@beta -- <existing dev command>\` to the \`dev\` script - with the correct package_manager and dev_command. EXAMPLES for different package managers: 
+      - for npm: \`npx stagewise@beta -- <existing dev command>\`
+      - for pnpm: \`pnpm dlx stagewise@beta -- <existing dev command>\`
+      - for yarn: \`yarn dlx stagewise@beta -- <existing dev command>\`
+      - for bun: \`bunx stagewise@beta -- <existing dev command>\`
+    - HINT: stagewise is still in beta, so the version is always @beta, not @latest.
+
 </auto_start_stagewise_strategy>
 
 <tool_usage_guidelines>
