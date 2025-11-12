@@ -53,7 +53,7 @@ export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
             <DialogDescription>
               The given workspace is not setup yet - but don't worry:
               <br />
-              We will guide you through the setup in a few seconds!
+              We will guide you through the setup!
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

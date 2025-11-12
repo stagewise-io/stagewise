@@ -50,7 +50,7 @@ export const OpenWorkspaceScreen = ({ show }: { show: boolean }) => {
         </div>
         <h1 className="text-start font-medium text-3xl">Open workspace</h1>
         <p className="mb-8 text-start text-muted-foreground">
-          Workspaces are the root folders of your app under development.
+          Workspaces are the folders that contain your app under development.
         </p>
 
         <DialogFooter>
