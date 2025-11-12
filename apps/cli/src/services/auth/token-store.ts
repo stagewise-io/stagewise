@@ -3,6 +3,7 @@ import type { GlobalDataPathService } from '../global-data-path';
 import { z } from 'zod';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import superjson from 'superjson';
 
 export const tokenDataSchema = z.looseObject({
@@ -92,19 +93,31 @@ export class AuthTokenStore {
         );
       });
 
-    await fs
-      .writeFile(
-        this.getTokenDataPath(),
-        superjson.stringify(this._tokenData),
-        {
-          flush: true,
-          encoding: 'utf-8',
-        },
-      )
-      .catch((err) => {
+    // if the tokenData is null, we should remove the file (if it exists)
+    if (
+      this._tokenData === null &&
+      fsSync.existsSync(this.getTokenDataPath())
+    ) {
+      await fs.rm(this.getTokenDataPath()).catch((err) => {
         this.logger.error(
-          `[AuthTokenStore] Failed to store token data. Error: ${err}, File path: ${this.getTokenDataPath()}`,
+          `[AuthTokenStore] Failed to remove token data file. Error: ${err}, File path: ${this.getTokenDataPath()}`,
         );
       });
+    } else {
+      await fs
+        .writeFile(
+          this.getTokenDataPath(),
+          superjson.stringify(this._tokenData),
+          {
+            flush: true,
+            encoding: 'utf-8',
+          },
+        )
+        .catch((err) => {
+          this.logger.error(
+            `[AuthTokenStore] Failed to store token data. Error: ${err}, File path: ${this.getTokenDataPath()}`,
+          );
+        });
+    }
   }
 }

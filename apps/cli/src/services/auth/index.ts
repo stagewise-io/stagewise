@@ -154,7 +154,7 @@ export class AuthService {
         return;
       }
 
-      await this.serverInterop
+      const refreshSuccessful = await this.serverInterop
         .refreshToken(this.tokenStore.tokenData.refreshToken)
         .then((tokenData) => {
           this.tokenStore.tokenData = {
@@ -163,6 +163,7 @@ export class AuthService {
             expiresAt: new Date(tokenData.expiresAt),
             refreshExpiresAt: new Date(tokenData.refreshExpiresAt),
           };
+          return true;
         })
         .catch((err) => {
           this.notificationService.showNotification({
@@ -176,8 +177,13 @@ export class AuthService {
             `[AuthService] Failed to refresh token. Error: ${err}`,
           );
           void this.logout();
-          return;
+          return false;
         });
+
+      if (!refreshSuccessful) {
+        // we can make an early exit here
+        return;
+      }
     }
 
     // We fetch the user session data from the server and update the user state if we get valid data.
@@ -401,7 +407,13 @@ export class AuthService {
     this.kartonService.setState(draft);
     const newState = this.kartonService.state.userAccount;
     if (JSON.stringify(oldState.status) !== JSON.stringify(newState.status)) {
-      this.authChangeCallbacks.forEach((callback) => callback(newState));
+      this.authChangeCallbacks.forEach((callback) => {
+        try {
+          callback(newState);
+        } catch {
+          // NO-OP
+        }
+      });
     }
   }
 
