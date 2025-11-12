@@ -9,6 +9,7 @@ export async function grep(
   fileSystem: BaseFileSystemProvider,
   relativePath: string,
   pattern: string,
+  basePath: string,
   options?: {
     recursive?: boolean;
     maxDepth?: number;
@@ -24,6 +25,7 @@ export async function grep(
     fileSystem,
     relativePath,
     pattern,
+    basePath,
     options,
   );
   if (ripgrepResult !== null) return ripgrepResult;

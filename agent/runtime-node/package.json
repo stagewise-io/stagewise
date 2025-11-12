@@ -27,15 +27,19 @@
   },
   "dependencies": {
     "chokidar": "^4.0.3",
+    "https-proxy-agent": "^7.0.6",
     "ignore": "^7.0.5",
     "minimatch": "^9.0.5",
-    "@vscode/ripgrep": "1.17.0"
+    "proxy-from-env": "^1.1.0",
+    "yauzl": "^3.2.0"
   },
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@types/express": "^5.0.3",
     "@types/node": "^20.0.0",
+    "@types/proxy-from-env": "^1.0.4",
     "@types/ws": "^8.18.1",
+    "@types/yauzl": "^2.10.3",
     "@vitest/coverage-v8": "^3.2.4",
     "esbuild": "0.25.9",
     "rimraf": "^5.0.0",

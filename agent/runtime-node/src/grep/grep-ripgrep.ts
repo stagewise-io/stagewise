@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { rgPath } from '@vscode/ripgrep';
 import { existsSync } from 'node:fs';
 import type { Readable } from 'node:stream';
 import type {
@@ -9,6 +8,7 @@ import type {
 } from '@stagewise/agent-runtime-interface';
 import { createInterface } from 'node:readline';
 import { relative } from 'node:path';
+import { getRipgrepPath } from '../vscode-ripgrep/get-path.js';
 
 /**
  * Options for executing ripgrep, matching the grep function's options
@@ -305,6 +305,7 @@ async function parseRipgrepGrepOutput(
  * @param fileSystem - File system provider for path resolution
  * @param relativePath - Path to search (file or directory)
  * @param pattern - Search pattern (regex)
+ * @param basePath - Base directory where ripgrep binary is installed
  * @param options - Search options
  * @returns GrepResult if successful, null if ripgrep unavailable/failed
  */
@@ -312,6 +313,7 @@ export async function grepWithRipgrep(
   fileSystem: BaseFileSystemProvider,
   relativePath: string,
   pattern: string,
+  basePath: string,
   options?: {
     recursive?: boolean;
     maxDepth?: number;
@@ -325,6 +327,8 @@ export async function grepWithRipgrep(
   onError?: (error: Error) => void,
 ): Promise<GrepResult | null> {
   try {
+    const rgPath = getRipgrepPath(basePath);
+
     // Check if ripgrep executable exists
     if (!rgPath || !existsSync(rgPath)) return null;
 

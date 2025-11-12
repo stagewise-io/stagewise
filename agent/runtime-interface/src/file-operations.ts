@@ -370,6 +370,7 @@ export interface IFileSystemProvider {
  */
 export interface FileSystemProviderConfig {
   workingDirectory: string;
+  ripgrepBasePath: string;
 }
 
 /**

@@ -37,6 +37,7 @@ async function example1_BasicUsage() {
   const mockRuntime = new ClientRuntimeMock({
     workingDirectory: '/my-project',
     initialFiles,
+    ripgrepBasePath: '',
   });
 
   // Test that we can read files
@@ -82,6 +83,7 @@ async function example2_ComplexSetup() {
   const mockRuntime = new ClientRuntimeMock({
     workingDirectory: '/complex-project',
     initialFiles: complexFiles,
+    ripgrepBasePath: '',
   });
 
   // Test file listing
@@ -150,6 +152,7 @@ async function example3_ProjectStructures() {
   const nodeRuntime = new ClientRuntimeMock({
     workingDirectory: '/my-node-app',
     initialFiles: nodeFiles,
+    ripgrepBasePath: '',
   });
 
   console.log('🟢 Node.js project created');
@@ -225,6 +228,7 @@ async function example3_ProjectStructures() {
   const reactRuntime = new ClientRuntimeMock({
     workingDirectory: '/my-react-app',
     initialFiles: reactFiles,
+    ripgrepBasePath: '',
   });
 
   console.log('⚛️ React project created');
@@ -240,6 +244,7 @@ async function example5_SearchOperations() {
 
   const mockRuntime = new ClientRuntimeMock({
     workingDirectory: '/search-test',
+    ripgrepBasePath: '',
     initialFiles: {
       'src/utils/logger.ts':
         'export function log(message: string) {\n  console.log(message);\n}',
@@ -289,6 +294,7 @@ async function example6_GetProjectPathTest() {
       name: 'Node.js project',
       runtime: new ClientRuntimeMock({
         workingDirectory: '/test',
+        ripgrepBasePath: '',
         initialFiles: {
           'package.json': JSON.stringify(
             {
@@ -324,6 +330,7 @@ async function example6_GetProjectPathTest() {
       name: 'React project',
       runtime: new ClientRuntimeMock({
         workingDirectory: '/test',
+        ripgrepBasePath: '',
         initialFiles: {
           'package.json': JSON.stringify(
             {
@@ -351,6 +358,7 @@ async function example6_GetProjectPathTest() {
       name: 'Custom project',
       runtime: new ClientRuntimeMock({
         workingDirectory: '/custom/project/path',
+        ripgrepBasePath: '',
         initialFiles: {
           'main.py': 'print("Hello Python")',
         },

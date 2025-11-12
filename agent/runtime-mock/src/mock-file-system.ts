@@ -36,7 +36,12 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
   private volume: Volume;
   private gitignorePatterns: string[] = [];
 
-  constructor(config: MockFileSystemConfig = { workingDirectory: '/test' }) {
+  constructor(
+    config: MockFileSystemConfig = {
+      workingDirectory: '/test',
+      ripgrepBasePath: '',
+    },
+  ) {
     super(config);
     this.gitignorePatterns = config.gitignorePatterns || [];
 

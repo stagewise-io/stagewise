@@ -5,6 +5,7 @@ import { Logger } from './services/logger';
 import { TelemetryService } from './services/telemetry';
 import { GlobalConfigService } from './services/global-config';
 import { NotificationService } from './services/notification';
+import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
 
 export type GlobalServicesBootstrapParameters = {
   verbose?: boolean;
@@ -24,12 +25,33 @@ export async function bootstrapGlobalServices({
   verbose = false,
 }: GlobalServicesBootstrapParameters): Promise<GlobalServices> {
   const logger = new Logger(verbose);
+
   const kartonService = await KartonService.create(logger);
   const notificationService = await NotificationService.create(
     logger,
     kartonService,
   );
   const globalDataPathService = await GlobalDataPathService.create(logger);
+
+  // Ensure ripgrep is installed for improved grep/glob performance
+  // If installation fails, the app will continue with Node.js fallback implementations
+  ensureRipgrepInstalled({
+    basePath: globalDataPathService.globalDataPath,
+    onLog: logger.info,
+  })
+    .then((result) => {
+      if (!result.success)
+        logger.warn(
+          `Ripgrep installation failed: ${result.error}. Grep/glob operations will use slower Node.js implementations.`,
+        );
+      else if (verbose)
+        logger.info('Ripgrep is available for grep/glob operations');
+    })
+    .catch((error) => {
+      logger.warn(
+        `Ripgrep installation failed: ${error}. Grep/glob operations will use slower Node.js implementations.`,
+      );
+    });
   const identifierService = await IdentifierService.create(
     globalDataPathService,
     logger,

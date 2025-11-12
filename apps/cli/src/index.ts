@@ -3,7 +3,7 @@
  *
  * It exposes the parsed arguments as a single object.
  *
- * If subcommands are exexcuted by the user, this file will also trigger the execution of the subcommand.
+ * If subcommands are executed by the user, this file will also trigger the execution of the subcommand.
  */
 
 import { Command, InvalidArgumentError } from 'commander';

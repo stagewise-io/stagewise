@@ -272,7 +272,13 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       filePattern?: string;
     },
   ): Promise<GrepResult> {
-    return grep(this, relativePath, pattern, options);
+    return grep(
+      this,
+      relativePath,
+      pattern,
+      this.config.ripgrepBasePath,
+      options,
+    );
   }
 
   async glob(
@@ -284,7 +290,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       respectGitignore?: boolean;
     },
   ): Promise<GlobResult> {
-    return glob(this, pattern, options);
+    return glob(this, pattern, this.config.ripgrepBasePath, options);
   }
 
   async searchAndReplace(
@@ -755,6 +761,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
 
 export interface ClientRuntimeNodeConfig {
   workingDirectory: string;
+  ripgrepBasePath: string;
 }
 
 export class ClientRuntimeNode implements ClientRuntime {
@@ -763,9 +770,18 @@ export class ClientRuntimeNode implements ClientRuntime {
   constructor(config: ClientRuntimeNodeConfig) {
     this.fileSystem = new NodeFileSystemProvider({
       workingDirectory: config.workingDirectory,
+      ripgrepBasePath: config.ripgrepBasePath,
     });
   }
 
   updateWorkingDirectory = (dir: string) =>
     this.fileSystem.setCurrentWorkingDirectory(dir);
 }
+
+// Re-export ripgrep installation utilities
+export { ensureRipgrepInstalled } from './vscode-ripgrep/ensure-ripgrep.js';
+export type {
+  EnsureRipgrepResult,
+  EnsureRipgrepOptions,
+} from './vscode-ripgrep/ensure-ripgrep.js';
+export { getRipgrepPath, getRipgrepBinDir } from './vscode-ripgrep/get-path.js';

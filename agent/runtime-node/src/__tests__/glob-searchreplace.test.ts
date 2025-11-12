@@ -15,7 +15,10 @@ describe('glob', () => {
   beforeEach(() => {
     testDir = createTempDir('glob-test-');
     cleanup.register(testDir);
-    fileSystem = new NodeFileSystemProvider({ workingDirectory: testDir });
+    fileSystem = new NodeFileSystemProvider({
+      workingDirectory: testDir,
+      ripgrepBasePath: testDir,
+    });
   });
 
   afterEach(async () => {
@@ -169,7 +172,10 @@ describe('searchAndReplace', () => {
   beforeEach(() => {
     testDir = createTempDir('search-replace-test-');
     cleanup.register(testDir);
-    fileSystem = new NodeFileSystemProvider({ workingDirectory: testDir });
+    fileSystem = new NodeFileSystemProvider({
+      workingDirectory: testDir,
+      ripgrepBasePath: testDir,
+    });
   });
 
   afterEach(async () => {

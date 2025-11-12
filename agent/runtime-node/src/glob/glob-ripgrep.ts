@@ -2,11 +2,11 @@ import type {
   BaseFileSystemProvider,
   GlobResult,
 } from '@stagewise/agent-runtime-interface';
-import { rgPath } from '@vscode/ripgrep';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { relative } from 'node:path';
+import { getRipgrepPath } from '../vscode-ripgrep/get-path.js';
 
 /**
  * Options for executing ripgrep glob, matching the glob function's options
@@ -109,15 +109,19 @@ async function parseRipgrepGlobOutput(
  *
  * @param fileSystem - File system provider for path resolution
  * @param pattern - Glob pattern (e.g., "src/*.ts" or recursive patterns)
+ * @param basePath - Base directory where ripgrep binary is installed
  * @param options - Glob options
  * @returns GlobResult if successful, null if ripgrep unavailable/failed
  */
 export async function globRipgrep(
   fileSystem: BaseFileSystemProvider,
   pattern: string,
+  basePath: string,
   options?: RipgrepGlobOptions,
 ): Promise<GlobResult | null> {
   try {
+    const rgPath = getRipgrepPath(basePath);
+
     // Check if ripgrep executable exists
     if (!rgPath || !existsSync(rgPath)) return null;
 
