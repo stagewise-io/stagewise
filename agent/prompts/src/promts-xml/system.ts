@@ -181,7 +181,7 @@ const projectSetupMode = `
 <tool_usage_guidelines>
   - use the file modification tools to get information about the project and to make changes to the project.
   - use the user interaction tools to ask the USER for the <required_information> and confirm it. 
-    - IMPORTANT: Ask the user a question before calling a user interaction tool, e.g. "Which app do you want to use stagewise for?" or "Do you want to give stagewise access to this path?" or "What is the port of the app?" or "Do you want to integrate stagewise into the dev script of your app?"
+    - IMPORTANT: Ask the user a question when calling and using a user interaction tool, e.g. "Which app do you want to use stagewise for?" or "Do you want to give stagewise access to this path?" or "What is the port of the app?" or "Do you want to integrate stagewise into the dev script of your app?"
     - IMPORTANT: When the user cancels a user interaction tool, you must ask a follow-up question to clarify the USER's intent and choice about the <required_information>.
 </tool_usage_guidelines>
 `;
