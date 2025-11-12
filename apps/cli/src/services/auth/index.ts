@@ -22,6 +22,8 @@ export class AuthService {
   private serverInterop: AuthServerInterop;
   private _authStateCheckInterval: NodeJS.Timeout | null = null;
   private authChangeCallbacks: ((newAuthState: AuthState) => void)[] = [];
+  private authenticationConirmationCallback: (() => Promise<void>) | null =
+    null;
 
   private constructor(
     globalDataPathService: GlobalDataPathService,
@@ -86,6 +88,20 @@ export class AuthService {
       },
     );
 
+    this.kartonService.registerServerProcedureHandler(
+      'userAccount.confirmAuthenticationConfirmation',
+      async () => {
+        await this.confirmAuthenticationConfirmation();
+      },
+    );
+
+    this.kartonService.registerServerProcedureHandler(
+      'userAccount.cancelAuthenticationConfirmation',
+      async () => {
+        await this.cancelAuthenticationConfirmation();
+      },
+    );
+
     // Check if we have any tokens stored in
     this.logger.debug('[AuthService] Initialized');
   }
@@ -116,6 +132,12 @@ export class AuthService {
     this.kartonService.removeServerProcedureHandler('userAccount.abortLogin');
     this.kartonService.removeServerProcedureHandler(
       'userAccount.refreshStatus',
+    );
+    this.kartonService.removeServerProcedureHandler(
+      'userAccount.confirmAuthenticationConfirmation',
+    );
+    this.kartonService.removeServerProcedureHandler(
+      'userAccount.cancelAuthenticationConfirmation',
     );
     this.authChangeCallbacks = [];
 
@@ -318,65 +340,52 @@ export class AuthService {
       this.logger.error(`[AuthService] No auth code provided`);
       return;
     }
-    try {
-      // This function is executed if the user approves the sign in.
-      const handleAuthCodeExchange = async () => {
-        try {
-          const tokenData = await this.serverInterop.exchangeToken(authCode);
-          this.tokenStore.tokenData = {
-            accessToken: tokenData.accessToken,
-            refreshToken: tokenData.refreshToken,
-            expiresAt: new Date(tokenData.expiresAt),
-            refreshExpiresAt: new Date(tokenData.refreshExpiresAt),
-          };
-        } catch (err) {
-          this.logger.error(`[AuthService] Failed to exchange token: ${err}`);
-          void this.logout();
-        }
+    this.updateAuthState((draft) => {
+      draft.userAccount = {
+        ...draft.userAccount,
+        pendingAuthenticationConfirmation: true,
       };
+    });
+    // This function is executed if the user approves the sign in.
+    this.authenticationConirmationCallback = async () => {
+      const tokenData = await this.serverInterop.exchangeToken(authCode);
+      this.tokenStore.tokenData = {
+        accessToken: tokenData.accessToken,
+        refreshToken: tokenData.refreshToken,
+        expiresAt: new Date(tokenData.expiresAt),
+        refreshExpiresAt: new Date(tokenData.refreshExpiresAt),
+      };
+    };
+  }
 
-      // We ask the user if they actually just signed up into stagewise. If yes, we will proceed with the token exchange.
-      const result = await new Promise((resolve, reject) => {
-        this.notificationService.showNotification({
-          title: 'New user authentication',
-          message: 'Please confirm that you just signed up into stagewise.',
-          type: 'info',
-          actions: [
-            {
-              label: 'Confirm',
-              onClick: () => {
-                void handleAuthCodeExchange()
-                  .then(() => resolve(true))
-                  .catch(() => reject(new Error('Authentication cancelled')));
-              },
-              type: 'primary',
-            },
-            {
-              label: 'Cancel',
-              onClick: () => {
-                resolve(false);
-              },
-              type: 'secondary',
-            },
-          ],
-        });
-      }).catch((err) => {
-        this.logger.error(`[AuthService] Failed to show notification: ${err}`);
-        return false;
-      });
-
-      if (result) {
-        // After the token exchange, we immediately check the auth data which leads to a state update.
-        await this.checkAuthState();
-      } else {
-        this.logger.debug('[AuthService] User cancelled authentication');
-        return;
-      }
+  private async confirmAuthenticationConfirmation(): Promise<void> {
+    this.logger.debug('[AuthService] User confirmed authentication');
+    try {
+      await this.authenticationConirmationCallback?.();
+      await this.checkAuthState();
     } catch (err) {
       this.logger.error(`[AuthService] Failed to exchange token: ${err}`);
       void this.logout();
-      return;
+    } finally {
+      this.updateAuthState((draft) => {
+        draft.userAccount = {
+          ...draft.userAccount,
+          pendingAuthenticationConfirmation: false,
+        };
+      });
+      this.authenticationConirmationCallback = null;
     }
+  }
+
+  private async cancelAuthenticationConfirmation(): Promise<void> {
+    this.logger.debug('[AuthService] User cancelled authentication');
+    this.authenticationConirmationCallback = null;
+    this.updateAuthState((draft) => {
+      draft.userAccount = {
+        ...draft.userAccount,
+        pendingAuthenticationConfirmation: false,
+      };
+    });
   }
 
   public get authState(): AuthState {

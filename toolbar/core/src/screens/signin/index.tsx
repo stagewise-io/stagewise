@@ -8,11 +8,31 @@ import {
   DialogContent,
   DialogFooter,
 } from '@stagewise/stage-ui/components/dialog';
+import { useCallback, useState } from 'react';
 
 export const SignInScreen = ({ show }: { show: boolean }) => {
   const startAuth = useKartonProcedure((p) => p.userAccount.startLogin);
+  const confirmAuthenticationConfirmation = useKartonProcedure(
+    (p) => p.userAccount.confirmAuthenticationConfirmation,
+  );
+  const cancelAuthenticationConfirmation = useKartonProcedure(
+    (p) => p.userAccount.cancelAuthenticationConfirmation,
+  );
+  const authInProgress = useKartonState((s) => !!s.userAccount?.loginDialog);
+  const pendingAuthenticationConfirmation = useKartonState(
+    (s) => s.userAccount?.pendingAuthenticationConfirmation,
+  );
 
-  const authInProgress = useKartonState((s) => s.userAccount?.loginDialog);
+  const [confirmationInProgress, setConfirmationInProgress] = useState(false);
+
+  const confirmAuthentication = useCallback(async () => {
+    setConfirmationInProgress(true);
+    try {
+      await confirmAuthenticationConfirmation();
+    } finally {
+      setConfirmationInProgress(false);
+    }
+  }, [confirmAuthenticationConfirmation]);
 
   return (
     <Dialog open={show} dismissible={false}>
@@ -25,25 +45,54 @@ export const SignInScreen = ({ show }: { show: boolean }) => {
           />
         </div>
         <h1 className="text-start font-medium text-3xl">
-          Welcome to stagewise
+          {!pendingAuthenticationConfirmation
+            ? 'Welcome to stagewise'
+            : 'Confirm authentication'}
         </h1>
         <p className="mb-8 text-start text-muted-foreground">
-          Create or sign in to your stagewise account to get started.
+          {!pendingAuthenticationConfirmation
+            ? 'Create or sign in to your stagewise account to get started.'
+            : 'Please confirm your authentication with stagewise to continue.'}
         </p>
 
         <DialogFooter>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => void startAuth()}
-            disabled={authInProgress !== null}
-          >
-            {authInProgress !== null && (
-              <Loader2Icon className="size-5 animate-spin" />
-            )}
-            Get started
-            <ArrowRightIcon className="size-5" />
-          </Button>
+          {!pendingAuthenticationConfirmation && (
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => void startAuth()}
+              disabled={authInProgress}
+            >
+              {authInProgress && (
+                <Loader2Icon className="size-5 animate-spin" />
+              )}
+              Get started
+              <ArrowRightIcon className="size-5" />
+            </Button>
+          )}
+          {pendingAuthenticationConfirmation && (
+            <>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={confirmAuthentication}
+                disabled={confirmationInProgress}
+              >
+                {confirmationInProgress && (
+                  <Loader2Icon className="size-5 animate-spin" />
+                )}
+                Confirm
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => void cancelAuthenticationConfirmation()}
+                disabled={confirmationInProgress}
+              >
+                Cancel
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

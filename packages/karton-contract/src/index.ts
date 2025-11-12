@@ -172,6 +172,7 @@ export type AppState = {
   userAccount: {
     status: AuthStatus;
     machineId?: string;
+    pendingAuthenticationConfirmation?: boolean;
     user?: {
       id: string;
       email: string;
@@ -304,6 +305,8 @@ export type KartonContract = {
       logout: () => Promise<void>;
       startLogin: () => Promise<void>;
       abortLogin: () => Promise<void>;
+      confirmAuthenticationConfirmation: () => Promise<void>;
+      cancelAuthenticationConfirmation: () => Promise<void>;
     };
     workspace: {
       open: (path: string) => Promise<void>;

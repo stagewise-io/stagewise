@@ -350,7 +350,7 @@ export const GlobalSettingsTabContent = () => {
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel>Active Telemetry level</FormFieldLabel>
             <FormFieldDescription>
-              Configure, how much data you are willing to send to stagewise.
+              Configure how much data you are willing to send to stagewise.
             </FormFieldDescription>
           </div>
           <RadioGroup
