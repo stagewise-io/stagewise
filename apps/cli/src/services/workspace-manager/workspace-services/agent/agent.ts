@@ -4,7 +4,7 @@ import { isContextLimitError } from '@stagewise/agent-utils';
 import type { KartonService } from '../../../karton';
 import type { Logger } from '../../../logger';
 import type { TelemetryService } from '../../../telemetry';
-import type { AuthService } from '../../../auth';
+import type { AuthService, AuthState } from '../../../auth';
 import {
   TimeoutManager,
   isAbortError,
@@ -149,7 +149,7 @@ export class AgentService {
     );
   }
 
-  private getTools(): AllTools {
+  private getTools(): AllTools | null {
     const currentTab = this.getCurrentTab();
     switch (currentTab) {
       case Layout.SETUP_WORKSPACE:
@@ -172,7 +172,7 @@ export class AgentService {
       case MainTab.DEV_APP_PREVIEW:
         return codingAgentTools(this.clientRuntime);
       case MainTab.IDEATION_CANVAS: {
-        if (!this.apiKey) throw new Error('No API key available');
+        if (!this.apiKey) return null;
         return inspirationAgentTools(
           this.clientRuntime,
           this.telemetryService.withTracing(this.litellm('claude-haiku-4-5'), {
@@ -225,7 +225,12 @@ export class AgentService {
       process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
     const accessToken = this.authService.accessToken;
-    if (!accessToken) throw new Error('No authentication tokens available');
+    if (!accessToken) {
+      this.logger.error(
+        '[AgentService] No authentication tokens available. Initializing litellm failed, please sign in before using the agent.',
+      );
+      return;
+    }
 
     this.apiKey = accessToken;
 
@@ -236,9 +241,14 @@ export class AgentService {
   }
 
   private async initializeClient() {
-    await this.authService.refreshAuthState();
+    // await this.authService.refreshAuthState();
     const accessToken = this.authService.accessToken;
-    if (!accessToken) throw new Error('No authentication tokens available');
+    if (!accessToken) {
+      this.logger.error(
+        '[AgentService] No authentication tokens available. Initializing client failed, please sign in before using the agent.',
+      );
+      return;
+    }
 
     this.client = createAuthenticatedClient(accessToken);
   }
@@ -310,12 +320,24 @@ export class AgentService {
     this.setAgentWorking(false);
   }
 
+  private onAuthStateChange = ((newAuthState: AuthState) => {
+    if (newAuthState.status === 'authenticated') {
+      this.logger.debug(
+        '[AgentService] Auth state changed to authenticated, initializing client and litellm...',
+      );
+      this.initializeClient();
+      this.initializeLitellm();
+    }
+  }).bind(this);
+
   public async initialize() {
     this.logger.debug('[AgentService] Initializing...');
 
     // Initialize client and litellm
     await this.initializeClient();
     await this.initializeLitellm();
+
+    this.authService.registerAuthStateChangeCallback(this.onAuthStateChange);
 
     // Register all karton procedure handlers
     this.registerProcedureHandlers();
@@ -737,6 +759,21 @@ export class AgentService {
     clientRuntime: ClientRuntime;
     promptSnippets?: PromptSnippet[];
   }): Promise<void> {
+    if (!this.apiKey) {
+      this.logger.error(
+        '[AgentService] No API key available. Agent call failed, please sign in before using the agent.',
+      );
+      return;
+    }
+
+    const toolsWithExecute = this.getTools();
+    if (!toolsWithExecute) {
+      this.logger.error(
+        '[AgentService] Error getting tools. Agent call failed, please check if you are signed in and try again.',
+      );
+      return;
+    }
+
     if (!this.undoToolCallStack.has(chatId))
       this.undoToolCallStack.set(chatId, []);
 
@@ -817,7 +854,7 @@ export class AgentService {
       );
 
       // Get the tools based on the agent mode
-      const tools = toolsWithoutExecute(this.getTools());
+      const tools = toolsWithoutExecute(toolsWithExecute);
 
       const stream = streamText({
         model,
@@ -843,7 +880,7 @@ export class AgentService {
         experimental_repairToolCall: async (r) => {
           // Haiku often returns the tool input as string instead of object - we try to parse it as object
           // If the parsing fails, we simply return an invalid tool call
-          this.logger.error('repairing tool call', r.error);
+          this.logger.error('[AgentService] Repairing tool call', r.error);
           this.telemetryService.captureException(r.error);
           if (NoSuchToolError.isInstance(r.error)) return null;
 
@@ -870,7 +907,7 @@ export class AgentService {
 
           const toolResults = await processToolCalls(
             r.toolCalls,
-            this.getTools(),
+            this.getTools()!,
             messages,
             (result) => {
               if ('result' in result && hasUndoMetadata(result.result)) {
@@ -888,7 +925,7 @@ export class AgentService {
               );
             },
             (error) => {
-              this.logger.error('Agent failed', error);
+              this.logger.error('[AgentService] Agent failed', error);
               this.telemetryService.captureException(error as Error);
             },
           );
@@ -934,7 +971,7 @@ export class AgentService {
         this.lastMessageId = messageId;
       });
     } catch (error) {
-      this.logger.error('Agent failed', error);
+      this.logger.error('[AgentService] Agent failed', error);
       this.telemetryService.captureException(error as Error);
       const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
@@ -1095,6 +1132,7 @@ export class AgentService {
 
   public teardown() {
     this.removeServerProcedureHandlers();
+    this.authService.unregisterAuthStateChangeCallback(this.onAuthStateChange);
     this.cleanupPendingOperations('Agent teardown');
     this.logger.debug('[AgentService] Shutdown complete');
   }
@@ -1166,10 +1204,7 @@ export class AgentService {
       isAuthenticationError(error.error) &&
       this.authRetryCount < this.maxAuthRetries
     ) {
-      this.logger.log(
-        'error',
-        `[Agent Service Authentication]: Error, ${error.error}`,
-      );
+      this.logger.error('[Agent Service]: Error', error.error);
       this.authRetryCount++;
 
       // Auth service will handle token refresh internally
