@@ -35,14 +35,19 @@ function sanitizeErrorMessage(message: string): string {
 function extractErrorMessage(error: unknown): string {
   if (!error) return 'Unknown error';
 
+  const consoleUrl =
+    process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
+  const discordLink =
+    process.env.DISCORD_INVITE_LINK || 'https://discord.gg/gkdGsDYaKA';
+
   if (isTRPCClientError(error)) {
     if (isCustomTRPCError(error)) {
       const customErrorData = getCustomErrorData(error);
       switch (customErrorData?.code) {
         case 'INSUFFICIENT_CREDITS':
-          return `Insufficient credits. Visit https://console.stagewise.io to buy more credits.`;
+          return `Insufficient credits. Visit ${consoleUrl}/billing/checkout-extra-credits to buy more credits.`;
         case 'RATE_LIMIT_EXCEEDED':
-          return `Rate limit exceeded. Please reach out to https://discord.gg/gkdGsDYaKA to resolve this issue.`;
+          return `Rate limit exceeded. Please reach out to ${discordLink} to resolve this issue.`;
         default:
           return error.message;
       }

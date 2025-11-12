@@ -41,7 +41,10 @@ export function LogoMenu() {
             Read the docs
           </MenuItem>
         </a>
-        <a href="https://discord.gg/gkdGsDYaKA" target="_blank">
+        <a
+          href={`${process.env.DISCORD_INVITE_LINK || 'https://discord.gg/gkdGsDYaKA'}`}
+          target="_blank"
+        >
           <MenuItem>
             <img src={DiscordLogo} alt="Discord" className="size-4" />
             Join the community
