@@ -13,7 +13,7 @@ import { getRipgrepPath } from '../vscode-ripgrep/get-path.js';
 /**
  * Options for executing ripgrep, matching the grep function's options
  */
-export interface RipgrepOptions {
+export interface RipgrepGrepOptions {
   recursive?: boolean;
   maxDepth?: number;
   filePattern?: string;
@@ -35,7 +35,7 @@ export interface RipgrepOptions {
 function buildRipgrepGrepArgs(
   pattern: string,
   searchPath: string,
-  options?: RipgrepOptions,
+  options?: RipgrepGrepOptions,
 ): string[] {
   const args: string[] = [];
   // Always use JSON output for structured parsing
@@ -68,48 +68,6 @@ function buildRipgrepGrepArgs(
   // Search path
   args.push(searchPath);
   return args;
-}
-
-/**
- * Executes ripgrep with the given options and returns the process and stdout stream.
- *
- * @param binaryPath - Absolute path to ripgrep binary
- * @param pattern - Search pattern
- * @param searchPath - Path to search in
- * @param options - Search options
- * @returns Promise resolving to execution result, or null if spawn fails
- */
-export async function executeRipgrep(
-  binaryPath: string,
-  pattern: string,
-  searchPath: string,
-  options?: RipgrepOptions,
-  onError?: (error: Error) => void,
-) {
-  try {
-    const args = buildRipgrepGrepArgs(pattern, searchPath, options);
-
-    const process = spawn(binaryPath, args, {
-      stdio: ['ignore', 'pipe', 'pipe'], // stdin ignored, stdout/stderr piped
-      windowsHide: true, // Don't show console window on Windows
-    });
-
-    // Check if the process spawned successfully
-    if (!process.stdout) return null;
-
-    // Handle process errors
-    process.on('error', (error) => {
-      onError?.(new Error(`Ripgrep process error: ${error}`));
-    });
-
-    return {
-      stdout: process.stdout,
-      process,
-    };
-  } catch (error) {
-    onError?.(new Error(`Failed to execute ripgrep: ${error}`));
-    return null;
-  }
 }
 
 /**
@@ -333,16 +291,27 @@ export async function grepWithRipgrep(
     if (!rgPath || !existsSync(rgPath)) return null;
 
     const searchPath = fileSystem.resolvePath(relativePath);
-    const execution = await executeRipgrep(
-      rgPath,
-      pattern,
-      searchPath,
-      options,
-    );
-    if (!execution) return null;
 
+    // Build ripgrep arguments
+    const args = buildRipgrepGrepArgs(pattern, searchPath, options);
+
+    // Spawn ripgrep process
+    const process = spawn(rgPath, args, {
+      stdio: ['ignore', 'pipe', 'pipe'], // stdin ignored, stdout/stderr piped
+      windowsHide: true, // Don't show console window on Windows
+    });
+
+    // Check if the process spawned successfully
+    if (!process.stdout) return null;
+
+    // Handle process errors
+    process.on('error', (error) => {
+      onError?.(new Error(`Ripgrep process error: ${error}`));
+    });
+
+    // Parse the output
     const result = await parseRipgrepGrepOutput(
-      execution.stdout,
+      process.stdout,
       fileSystem.getCurrentWorkingDirectory(),
       onError,
     );

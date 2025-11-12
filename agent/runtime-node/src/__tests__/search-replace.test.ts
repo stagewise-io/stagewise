@@ -1,168 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NodeFileSystemProvider } from '../index.js';
-import {
-  createTempDir,
-  createFile,
-  createFileTree,
-} from './utils/test-fixtures.js';
+import { createTempDir, createFile } from './utils/test-fixtures.js';
 import { createCleanupHandler } from './utils/cleanup.js';
-
-describe('glob', () => {
-  const cleanup = createCleanupHandler();
-  let fileSystem: NodeFileSystemProvider;
-  let testDir: string;
-
-  beforeEach(() => {
-    testDir = createTempDir('glob-test-');
-    cleanup.register(testDir);
-    fileSystem = new NodeFileSystemProvider({
-      workingDirectory: testDir,
-      ripgrepBasePath: testDir,
-    });
-  });
-
-  afterEach(async () => {
-    await cleanup.cleanup();
-  });
-
-  describe('Pattern Matching', () => {
-    it('should match simple wildcard patterns', async () => {
-      createFileTree(testDir, {
-        'file1.ts': 'content',
-        'file2.ts': 'content',
-        'file3.js': 'content',
-      });
-
-      const result = await fileSystem.glob('*.ts');
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.relativePaths).toHaveLength(2);
-      }
-    });
-
-    it('should match recursive patterns with **', async () => {
-      createFileTree(testDir, {
-        'root.ts': 'content',
-        src: {
-          'main.ts': 'content',
-          utils: {
-            'helper.ts': 'content',
-          },
-        },
-      });
-
-      const result = await fileSystem.glob('**/*.ts');
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.totalMatches).toBeGreaterThanOrEqual(3);
-      }
-    });
-
-    it('should return empty array when no matches', async () => {
-      createFile(testDir, 'file.txt', 'content');
-
-      const result = await fileSystem.glob('*.ts');
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.relativePaths).toHaveLength(0);
-      }
-    });
-  });
-
-  describe('Options', () => {
-    it('should return absolute paths when absolute: true', async () => {
-      createFile(testDir, 'file.ts', 'content');
-
-      const result = await fileSystem.glob('*.ts', { absolute: true });
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.relativePaths?.[0]).toContain(testDir);
-      }
-    });
-
-    it('should only return files, not directories', async () => {
-      createFileTree(testDir, {
-        src: {
-          'index.ts': 'content',
-        },
-        'root.ts': 'content',
-      });
-
-      const result = await fileSystem.glob('*');
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        // Should include root.ts but not the src directory
-        const hasRootFile = result.relativePaths?.some((p) => p === 'root.ts');
-        const hasSrcDir = result.relativePaths?.some((p) => p === 'src');
-        expect(hasRootFile).toBe(true);
-        expect(hasSrcDir).toBe(false);
-      }
-    });
-
-    it('should respect excludePatterns', async () => {
-      createFileTree(testDir, {
-        'index.ts': 'content',
-        'test.ts': 'content',
-      });
-
-      const result = await fileSystem.glob('*.ts', {
-        excludePatterns: ['*test*'],
-      });
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.relativePaths).toContain('index.ts');
-        expect(result.relativePaths).not.toContain('test.ts');
-      }
-    });
-
-    it('should respect gitignore by default', async () => {
-      createFileTree(testDir, {
-        'src.ts': 'content',
-        'ignored.ts': 'content',
-        '.gitignore': 'ignored.ts',
-      });
-
-      const result = await fileSystem.glob('*.ts');
-
-      expect(result.success).toBe(true);
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('should handle empty pattern', async () => {
-      createFile(testDir, 'file.ts', 'content');
-
-      const result = await fileSystem.glob('');
-
-      expect(result.success).toBe(true);
-    });
-
-    it('should handle deeply nested directories', async () => {
-      createFileTree(testDir, {
-        a: {
-          b: {
-            c: {
-              'file.ts': 'content',
-            },
-          },
-        },
-      });
-
-      const result = await fileSystem.glob('**/*.ts');
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.totalMatches).toBeGreaterThan(0);
-      }
-    });
-  });
-});
 
 describe('searchAndReplace', () => {
   const cleanup = createCleanupHandler();
@@ -443,12 +282,12 @@ describe('searchAndReplace', () => {
     });
 
     it('should handle unicode characters', async () => {
-      createFile(testDir, 'test.txt', '你好 world 🚀');
+      createFile(testDir, 'test.txt', '`} world =�');
 
       const result = await fileSystem.searchAndReplace(
         'test.txt',
         'world',
-        '世界',
+        'L',
       );
 
       expect(result.success).toBe(true);

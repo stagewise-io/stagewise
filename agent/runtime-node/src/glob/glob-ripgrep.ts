@@ -67,36 +67,55 @@ function buildRipgrepGlobArgs(
  * @param stdout - Readable stream from ripgrep
  * @param workingDirectory - Working directory for relative path calculation
  * @param absolute - Whether to return absolute paths
+ * @param onError - Optional error callback
  * @returns Promise resolving to GlobResult
  */
 async function parseRipgrepGlobOutput(
   stdout: NodeJS.ReadableStream,
   workingDirectory: string,
   absolute: boolean,
+  onError?: (error: Error) => void,
 ): Promise<GlobResult> {
   const paths: string[] = [];
 
-  const rl = createInterface({
-    input: stdout,
-    crlfDelay: Number.POSITIVE_INFINITY,
+  return new Promise((resolve) => {
+    const rl = createInterface({
+      input: stdout,
+      crlfDelay: Number.POSITIVE_INFINITY,
+    });
+
+    rl.on('line', (line: string) => {
+      if (!line.trim()) return;
+
+      try {
+        // Ripgrep returns paths relative to the search directory
+        // If absolute is requested, keep as-is (ripgrep gives absolute paths)
+        // Otherwise, make relative to working directory
+        const path = absolute ? line : relative(workingDirectory, line);
+        paths.push(path);
+      } catch (error) {
+        onError?.(new Error(`Failed to process ripgrep output line: ${error}`));
+      }
+    });
+
+    rl.on('close', () => {
+      resolve({
+        success: true,
+        message: `Found ${paths.length} matching paths`,
+        relativePaths: paths,
+        totalMatches: paths.length,
+      });
+    });
+
+    rl.on('error', (error) => {
+      onError?.(new Error(`Error reading ripgrep output: ${error}`));
+      resolve({
+        success: false,
+        message: `Failed to parse ripgrep output: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    });
   });
-
-  for await (const line of rl) {
-    if (!line.trim()) continue;
-
-    // Ripgrep returns paths relative to the search directory
-    // If absolute is requested, keep as-is (ripgrep gives absolute paths)
-    // Otherwise, make relative to working directory
-    const path = absolute ? line : relative(workingDirectory, line);
-    paths.push(path);
-  }
-
-  return {
-    success: true,
-    message: `Found ${paths.length} matching paths`,
-    relativePaths: paths,
-    totalMatches: paths.length,
-  };
 }
 
 /**
@@ -113,11 +132,12 @@ async function parseRipgrepGlobOutput(
  * @param options - Glob options
  * @returns GlobResult if successful, null if ripgrep unavailable/failed
  */
-export async function globRipgrep(
+export async function globWithRipgrep(
   fileSystem: BaseFileSystemProvider,
   pattern: string,
   basePath: string,
   options?: RipgrepGlobOptions,
+  onError?: (error: Error) => void,
 ): Promise<GlobResult | null> {
   try {
     const rgPath = getRipgrepPath(basePath);
@@ -142,16 +162,27 @@ export async function globRipgrep(
     // Check if the process spawned successfully
     if (!process.stdout) return null;
 
+    // Handle process errors
+    process.on('error', (error) => {
+      onError?.(new Error(`Ripgrep process error: ${error}`));
+    });
+
     // Parse the output
     const result = await parseRipgrepGlobOutput(
       process.stdout,
       fileSystem.getCurrentWorkingDirectory(),
       options?.absolute ?? false,
+      onError,
     );
 
     return result;
-  } catch {
-    // Any error during ripgrep execution - return null for fallback
+  } catch (error) {
+    // Any error during ripgrep execution - log and return null for fallback
+    onError?.(
+      new Error(
+        `Ripgrep execution failed, falling back to Node.js implementation: ${error}`,
+      ),
+    );
     return null;
   }
 }

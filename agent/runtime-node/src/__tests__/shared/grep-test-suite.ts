@@ -1,40 +1,33 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { NodeFileSystemProvider } from '../index.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import type { NodeFileSystemProvider } from '../../index.js';
 import {
-  createTempDir,
   createFile,
   createFileTree,
   createGitignore,
   createLargeFile,
   createBinaryFile,
-} from './utils/test-fixtures.js';
+} from '../utils/test-fixtures.js';
 import {
   expectGrepSuccess,
   expectGrepMatchCount,
   expectNoGrepMatchInFile,
-} from './utils/assertions.js';
-import { createCleanupHandler } from './utils/cleanup.js';
+} from '../utils/assertions.js';
 
-describe('grep', () => {
-  const cleanupHandler = createCleanupHandler();
-  let testDir: string;
-  let fileSystem: NodeFileSystemProvider;
-
-  beforeEach(() => {
-    testDir = createTempDir('grep-test-');
-    cleanupHandler.register(testDir);
-    fileSystem = new NodeFileSystemProvider({
-      workingDirectory: testDir,
-      ripgrepBasePath: testDir,
-    });
-  });
-
-  afterEach(() => {
-    cleanupHandler.cleanup();
-  });
-
+/**
+ * Shared grep test suite that can be run with different file system providers.
+ * This allows testing both ripgrep and Node.js fallback implementations with the same test cases.
+ *
+ * @param getFileSystem - Function that returns a configured NodeFileSystemProvider instance
+ * @param getTestDir - Function that returns the current test directory
+ */
+export function runGrepTestSuite(
+  getFileSystem: () => NodeFileSystemProvider,
+  getTestDir: () => string,
+) {
   describe('Pattern Matching', () => {
     it('should find simple string literals', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'Hello World\nGoodbye World\n');
 
       const result = await fileSystem.grep('.', 'World', {
@@ -46,6 +39,8 @@ describe('grep', () => {
     });
 
     it('should respect case sensitivity', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'Hello WORLD\nHello world\n');
 
       // Case insensitive (default)
@@ -62,6 +57,8 @@ describe('grep', () => {
     });
 
     it('should match regex patterns with special chars', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(
         testDir,
         'test.txt',
@@ -78,6 +75,8 @@ describe('grep', () => {
     });
 
     it('should match patterns with anchors', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(
         testDir,
         'test.txt',
@@ -96,6 +95,8 @@ describe('grep', () => {
     });
 
     it('should match patterns with character classes', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'abc\ndef\nghi\n123\n');
 
       // Match lines with digits
@@ -105,6 +106,8 @@ describe('grep', () => {
     });
 
     it('should match patterns with quantifiers', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'a\naa\naaa\naaaa\n');
 
       // Match 2 or more a's
@@ -114,6 +117,8 @@ describe('grep', () => {
     });
 
     it('should match unicode patterns', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'Hello 世界\nこんにちは\n🚀 Rocket\n');
 
       const result = await fileSystem.grep('.', '世界');
@@ -122,6 +127,8 @@ describe('grep', () => {
     });
 
     it('should match patterns with word boundaries', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'hello\nhello world\nothello\n');
 
       // Match "hello" as a whole word
@@ -131,6 +138,8 @@ describe('grep', () => {
     });
 
     it('should handle empty patterns gracefully', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'test content');
 
       const result = await fileSystem.grep('.', '');
@@ -139,6 +148,8 @@ describe('grep', () => {
     });
 
     it('should handle invalid regex patterns', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'test content');
 
       // Invalid regex: unmatched parenthesis
@@ -154,6 +165,7 @@ describe('grep', () => {
 
   describe('Search Options', () => {
     beforeEach(() => {
+      const testDir = getTestDir();
       // Create a nested file structure
       createFileTree(testDir, {
         'root.txt': 'Root file with ERROR',
@@ -168,6 +180,7 @@ describe('grep', () => {
     });
 
     it('should support recursive search', async () => {
+      const fileSystem = getFileSystem();
       const result = await fileSystem.grep('.', 'ERROR', {
         recursive: true,
       });
@@ -177,6 +190,7 @@ describe('grep', () => {
     });
 
     it('should support non-recursive search', async () => {
+      const fileSystem = getFileSystem();
       const result = await fileSystem.grep('.', 'ERROR', {
         recursive: false,
       });
@@ -192,6 +206,7 @@ describe('grep', () => {
     });
 
     it('should respect maxDepth', async () => {
+      const fileSystem = getFileSystem();
       const result = await fileSystem.grep('.', 'file', {
         recursive: true,
         maxDepth: 1,
@@ -203,6 +218,7 @@ describe('grep', () => {
     });
 
     it('should filter by filePattern', async () => {
+      const fileSystem = getFileSystem();
       const result = await fileSystem.grep('.', 'file', {
         recursive: true,
         filePattern: '*.ts',
@@ -214,6 +230,7 @@ describe('grep', () => {
     });
 
     it('should support multiple exclude patterns', async () => {
+      const fileSystem = getFileSystem();
       const result = await fileSystem.grep('.', 'file', {
         recursive: true,
         excludePatterns: ['**/lib/**', '*.txt'],
@@ -225,6 +242,8 @@ describe('grep', () => {
     });
 
     it('should limit matches with maxMatches', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(
         testDir,
         'many.txt',
@@ -243,6 +262,8 @@ describe('grep', () => {
     });
 
     it('should skip binary files by default', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'text.txt', 'This is text');
       createBinaryFile(testDir, 'binary.bin', 1024);
 
@@ -255,6 +276,8 @@ describe('grep', () => {
     });
 
     it('should search binary files when explicitly requested', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       const binaryContent = Buffer.from('test\x00text\x00');
       createFile(testDir, 'binary.dat', binaryContent.toString());
 
@@ -268,6 +291,7 @@ describe('grep', () => {
 
   describe('Gitignore Integration', () => {
     beforeEach(() => {
+      const testDir = getTestDir();
       // Initialize git repository so ripgrep respects .gitignore
       const { execSync } = require('node:child_process');
       execSync('git init', { cwd: testDir, stdio: 'ignore' });
@@ -287,6 +311,7 @@ describe('grep', () => {
     });
 
     it('should respect gitignore by default', async () => {
+      const fileSystem = getFileSystem();
       const result = await fileSystem.grep('.', 'ERROR', {
         recursive: true,
       });
@@ -305,6 +330,7 @@ describe('grep', () => {
     });
 
     it('should support disabling gitignore', async () => {
+      const fileSystem = getFileSystem();
       const result = await fileSystem.grep('.', 'ERROR', {
         recursive: true,
         respectGitignore: false,
@@ -328,6 +354,8 @@ describe('grep', () => {
     });
 
     it('should respect nested gitignore files', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       // Initialize git repository so ripgrep respects .gitignore
       const { execSync } = require('node:child_process');
       execSync('git init', { cwd: testDir, stdio: 'ignore' });
@@ -355,6 +383,8 @@ describe('grep', () => {
     });
 
     it('should apply default ignore patterns', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       // node_modules, .git, dist are ignored by default
       // Initialize git repository
       const { execSync } = require('node:child_process');
@@ -382,6 +412,8 @@ describe('grep', () => {
 
   describe('Output Format', () => {
     it('should provide match with correct line and column numbers', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'line 1\nline 2 ERROR here\nline 3\n');
 
       const result = await fileSystem.grep('.', 'ERROR');
@@ -399,6 +431,8 @@ describe('grep', () => {
     });
 
     it('should provide context in preview', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       const lines = ['line 1', 'line 2', 'line 3 MATCH', 'line 4', 'line 5'];
       createFile(testDir, 'test.txt', lines.join('\n'));
 
@@ -417,6 +451,8 @@ describe('grep', () => {
     });
 
     it('should provide relative paths', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFileTree(testDir, {
         src: {
           lib: {
@@ -441,6 +477,8 @@ describe('grep', () => {
     });
 
     it('should report totalMatches and filesSearched', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFileTree(testDir, {
         'file1.txt': 'ERROR',
         'file2.txt': 'ERROR\nERROR',
@@ -459,6 +497,8 @@ describe('grep', () => {
 
   describe('Edge Cases', () => {
     it('should handle empty files', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'empty.txt', '');
 
       const result = await fileSystem.grep('.', 'test');
@@ -468,6 +508,8 @@ describe('grep', () => {
     });
 
     it('should handle files with no newline at EOF', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'no-newline.txt', 'line without newline');
 
       const result = await fileSystem.grep('.', 'newline');
@@ -477,6 +519,8 @@ describe('grep', () => {
     });
 
     it('should handle very long lines', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       const longLine = 'x'.repeat(20000) + 'MATCH' + 'y'.repeat(20000);
       createFile(testDir, 'long.txt', longLine);
 
@@ -487,6 +531,8 @@ describe('grep', () => {
     });
 
     it('should handle large files', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createLargeFile(testDir, 'large.txt', 10000, 'Line {line} with MATCH');
 
       const result = await fileSystem.grep('.', 'MATCH', {
@@ -501,6 +547,8 @@ describe('grep', () => {
     });
 
     it('should handle multiple matches per line', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'ERROR ERROR ERROR\n');
 
       const result = await fileSystem.grep('.', 'ERROR');
@@ -510,6 +558,8 @@ describe('grep', () => {
     });
 
     it('should handle mixed line endings', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       // File with CRLF and LF line endings
       createFile(testDir, 'mixed.txt', 'line1\r\nline2\nline3\r\n');
 
@@ -520,6 +570,8 @@ describe('grep', () => {
     });
 
     it('should handle special characters in filenames', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'file (with) [special] chars.txt', 'MATCH');
 
       const result = await fileSystem.grep('.', 'MATCH', {
@@ -531,6 +583,8 @@ describe('grep', () => {
     });
 
     it('should handle searching in single file', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(testDir, 'single.txt', 'MATCH');
 
       const result = await fileSystem.grep('single.txt', 'MATCH');
@@ -540,6 +594,7 @@ describe('grep', () => {
     });
 
     it('should handle non-existent path', async () => {
+      const fileSystem = getFileSystem();
       const result = await fileSystem.grep('nonexistent', 'test');
 
       // Should either fail gracefully or return no matches
@@ -547,6 +602,8 @@ describe('grep', () => {
     });
 
     it('should handle directory without matches', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFileTree(testDir, {
         'file1.txt': 'no match here',
         'file2.txt': 'nothing to find',
@@ -561,6 +618,8 @@ describe('grep', () => {
 
   describe('Performance', () => {
     it('should handle searching many files reasonably fast', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       // Create 100 files
       for (let i = 0; i < 100; i++) {
         createFile(testDir, `file${i}.txt`, `Content ${i} with ERROR`);
@@ -578,6 +637,8 @@ describe('grep', () => {
     });
 
     it('should not timeout with complex regex', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
       createFile(
         testDir,
         'test.txt',
@@ -595,4 +656,4 @@ describe('grep', () => {
       expect(duration).toBeLessThan(1000);
     });
   });
-});
+}
