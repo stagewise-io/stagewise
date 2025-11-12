@@ -11,13 +11,13 @@
 }
 
 .dark {
-  --color-background: var(--color-white);
-  --color-foreground: var(--color-zinc-950);
-  --color-muted: var(--color-zinc-50);
-  --color-muted-foreground: var(--color-zinc-600);
+  --color-background: var(--color-black);
+  --color-foreground: var(--color-zinc-50);
+  --color-muted: var(--color-zinc-950);
+  --color-muted-foreground: var(--color-zinc-400);
 
-  --color-primary: var(--color-blue-600);
-  --color-primary-foreground: var(--color-blue-50);
+  --color-primary: var(--color-blue-800);
+  --color-primary-foreground: var(--color-blue-100);
 }
 
 @media (prefers-color-scheme: dark) {

@@ -135,8 +135,8 @@ export const ChatHistory = () => {
       </div>
 
       {renderedMessages.length === 0 && (
-        <div className="absolute inset-0 flex size-full flex-col items-center justify-center gap-3 px-4 py-2 text-black/30 text-sm">
-          <SparklesIcon className="size-8 stroke-black opacity-10" />
+        <div className="absolute inset-0 flex size-full flex-col items-center justify-center gap-3 px-4 py-2 text-black/30 text-sm dark:text-white/30">
+          <SparklesIcon className="size-8 stroke-black opacity-10 dark:stroke-white" />
           <span>Start by writing a message</span>
         </div>
       )}

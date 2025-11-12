@@ -38,7 +38,7 @@ export const Select = ({ items, triggerClassName, ...props }: SelectProps) => {
     >
       <SelectBase.Trigger
         className={cn(
-          'glass-inset flex h-8 min-w-32 max-w-lg flex-row items-center justify-between gap-4 rounded-lg pr-1.5 pl-2 has-disabled:before:bg-transparent has-disabled:before:opacity-50',
+          'glass-inset flex h-8 min-w-32 max-w-lg flex-row items-center justify-between gap-4 rounded-lg pr-1.5 pl-2 text-foreground has-disabled:before:bg-transparent has-disabled:before:opacity-50',
           triggerClassName,
         )}
       >
@@ -55,7 +55,7 @@ export const Select = ({ items, triggerClassName, ...props }: SelectProps) => {
               <SelectBase.Item
                 key={item.value}
                 value={item.value}
-                className="grid w-full min-w-24 min-w-[var(--anchor-width)] cursor-default grid-cols-[0.75rem_1fr] flex-row items-center justify-start gap-2 rounded-md px-2 py-1.5 text-sm transition-all duration-150 ease-out hover:bg-black/5 hover:pr-1.75 hover:pl-2.25 group-data-[side=none]:min-w-[calc(var(--anchor-width)+1rem)] group-data-[side=none]:pr-12 group-data-[side=none]:text-base group-data-[side=none]:leading-4 dark:hover:bg-white/5"
+                className="grid w-full min-w-24 min-w-[var(--anchor-width)] cursor-default grid-cols-[0.75rem_1fr] flex-row items-center justify-start gap-2 rounded-md px-2 py-1.5 text-foreground text-sm transition-all duration-150 ease-out hover:bg-black/5 hover:pr-1.75 hover:pl-2.25 group-data-[side=none]:min-w-[calc(var(--anchor-width)+1rem)] group-data-[side=none]:pr-12 group-data-[side=none]:text-base group-data-[side=none]:leading-4 dark:hover:bg-white/5"
               >
                 <SelectBase.ItemIndicator className="col-start-1 shrink-0">
                   <CheckIcon className="w-full text-muted-foreground" />

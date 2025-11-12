@@ -53,7 +53,7 @@ export function UserStatusArea() {
             : (userAccount.user?.email ?? 'Unknown email')}
         </PopoverDescription>
         {userAccount.subscription && (
-          <div className="flex flex-col items-stretch gap-4">
+          <div className="flex flex-col items-stretch gap-4 text-foreground">
             <div className="flex flex-col items-stretch gap-2">
               <p className="font-medium text-base">Subscription information</p>
               <div className="flex flex-row items-center justify-between gap-4">
