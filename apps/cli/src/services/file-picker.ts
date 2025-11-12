@@ -94,7 +94,7 @@ export class FilePickerService {
     request: FilePickerRequest,
     abortSignal?: AbortSignal,
   ): Promise<string[]> {
-    this.logger.info(
+    this.logger.debug(
       `Creating file picker request: ${JSON.stringify({ ...request, id: undefined })}`,
     );
 

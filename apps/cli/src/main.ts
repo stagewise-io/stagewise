@@ -117,7 +117,7 @@ export async function main({
     logger.debug('[Main] Initial workspace loaded');
   }
 
-  logger.info(
+  logger.debug(
     `Opening browser to stagewise hosted on port ${uiServerService.port}`,
   );
   open(`http://localhost:${uiServerService.port}`);

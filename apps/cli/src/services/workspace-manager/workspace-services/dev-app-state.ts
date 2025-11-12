@@ -501,7 +501,7 @@ export class WorkspaceDevAppStateService {
       const pid = Number.parseInt(pidStr.trim(), 10);
 
       if (!Number.isNaN(pid)) {
-        this.logger.info(
+        this.logger.debug(
           `Found orphan process PID: ${pid}, attempting cleanup...`,
         );
 
@@ -530,7 +530,7 @@ export class WorkspaceDevAppStateService {
             process.kill(pid, 'SIGTERM');
           }
 
-          this.logger.info('Orphan process cleaned up successfully');
+          this.logger.debug('Orphan process cleaned up successfully');
         } catch {
           // Process doesn't exist, which is fine
           this.logger.debug('Orphan process no longer exists');

@@ -125,7 +125,7 @@ export class UIServerService {
     );
 
     this._server.listen(this._port, () => {
-      this._logger.info(`UI server listening on port ${this._port}`);
+      this._logger.info(`✓ stagewise ready on http://localhost:${this._port}`);
       this._logger.debug(`[UIServerService] Server started`);
     });
   }

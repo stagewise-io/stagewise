@@ -37,7 +37,7 @@ export async function bootstrapGlobalServices({
   // If installation fails, the app will continue with Node.js fallback implementations
   ensureRipgrepInstalled({
     basePath: globalDataPathService.globalDataPath,
-    onLog: logger.info,
+    onLog: logger.debug,
   })
     .then((result) => {
       if (!result.success)
@@ -45,7 +45,7 @@ export async function bootstrapGlobalServices({
           `Ripgrep installation failed: ${result.error}. Grep/glob operations will use slower Node.js implementations.`,
         );
       else if (verbose)
-        logger.info('Ripgrep is available for grep/glob operations');
+        logger.debug('Ripgrep is available for grep/glob operations');
     })
     .catch((error) => {
       logger.warn(
