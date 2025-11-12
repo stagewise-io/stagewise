@@ -1,5 +1,6 @@
 import { AnimatedGradientBackground } from '@/components/ui/animated-gradient-background';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import { Logo } from '@/components/ui/logo';
 import { ArrowRightIcon, Loader2Icon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
@@ -8,7 +9,7 @@ import {
   DialogContent,
   DialogFooter,
 } from '@stagewise/stage-ui/components/dialog';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export const SignInScreen = ({ show }: { show: boolean }) => {
   const startAuth = useKartonProcedure((p) => p.userAccount.startLogin);
@@ -24,6 +25,13 @@ export const SignInScreen = ({ show }: { show: boolean }) => {
   );
 
   const [confirmationInProgress, setConfirmationInProgress] = useState(false);
+  const [telemetryConsent, setTelemetryConsent] = useState(false);
+
+  useEffect(() => {
+    if (pendingAuthenticationConfirmation) {
+      setTelemetryConsent(false);
+    }
+  }, [pendingAuthenticationConfirmation]);
 
   const confirmAuthentication = useCallback(async () => {
     setConfirmationInProgress(true);
@@ -55,6 +63,47 @@ export const SignInScreen = ({ show }: { show: boolean }) => {
             : 'Please confirm your authentication with stagewise to continue.'}
         </p>
 
+        {pendingAuthenticationConfirmation && (
+          <div className="mb-6 space-y-3">
+            <p className="text-start text-muted-foreground text-sm">
+              We collect telemetry data on free accounts to help us improve
+              stagewise, fix bugs faster, and enhance your experience. Paid
+              users can opt out in settings.{' '}
+              <a
+                href="https://stagewise.io/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline hover:text-blue-700"
+              >
+                Learn more
+              </a>
+            </p>
+            <div
+              className="flex cursor-pointer items-center gap-3"
+              onClick={() => setTelemetryConsent(!telemetryConsent)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setTelemetryConsent(!telemetryConsent);
+                }
+              }}
+              role="checkbox"
+              aria-checked={telemetryConsent}
+              tabIndex={0}
+            >
+              <Checkbox
+                checked={telemetryConsent}
+                onCheckedChange={(checked) =>
+                  setTelemetryConsent(checked === true)
+                }
+              />
+              <span className="text-muted-foreground text-sm">
+                I accept the telemetry data policy
+              </span>
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
           {!pendingAuthenticationConfirmation && (
             <Button
@@ -76,7 +125,7 @@ export const SignInScreen = ({ show }: { show: boolean }) => {
                 variant="primary"
                 size="md"
                 onClick={confirmAuthentication}
-                disabled={confirmationInProgress}
+                disabled={confirmationInProgress || !telemetryConsent}
               >
                 {confirmationInProgress && (
                   <Loader2Icon className="size-5 animate-spin" />

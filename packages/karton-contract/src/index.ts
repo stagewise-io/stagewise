@@ -386,7 +386,7 @@ export const defaultState: KartonContract['state'] = {
     startedInPath: '',
   },
   globalConfig: {
-    telemetryLevel: 'off',
+    telemetryLevel: 'full',
     openFilesInIde: 'cursor',
   },
   userExperience: {

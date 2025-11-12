@@ -29,6 +29,11 @@ import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Select } from '@stagewise/stage-ui/components/select';
+import {
+  TooltipContent,
+  Tooltip,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 
 export const SettingsPanel = () => {
   const workspaceLoaded = useKartonState((s) => s.workspaceStatus === 'open');
@@ -293,6 +298,7 @@ export const WorkspaceSettingsTabContent = () => {
 export const GlobalSettingsTabContent = () => {
   const _globalConfig = useKartonState((s) => s.globalConfig);
   const _setGlobalConfig = useKartonProcedure((p) => p.config.set);
+  const isPaidUser = useKartonState((s) => s.userAccount?.subscription?.active);
 
   const [config, setConfigOptimistic] = useOptimistic<
     GlobalConfig,
@@ -350,7 +356,15 @@ export const GlobalSettingsTabContent = () => {
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel>Active Telemetry level</FormFieldLabel>
             <FormFieldDescription>
-              Configure how much data you are willing to send to stagewise.
+              Configure how much data you are willing to send to stagewise.{' '}
+              <a
+                href="https://stagewise.io/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline hover:text-blue-700"
+              >
+                Learn more
+              </a>
             </FormFieldDescription>
           </div>
           <RadioGroup
@@ -362,18 +376,50 @@ export const GlobalSettingsTabContent = () => {
             }
             value={config.telemetryLevel}
           >
-            <FormFieldLabel
-              htmlFor="telemetry-level-off"
-              className="glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive col-span-1 flex h-full flex-row items-center gap-3 rounded-xl p-3"
-            >
-              <div className="flex flex-1 flex-col items-start gap-2">
-                <FormFieldTitle>Off</FormFieldTitle>
-                <FormFieldDescription>
-                  Disable any sending of telemetry data.
-                </FormFieldDescription>
-              </div>
-              <Radio value="off" id="telemetry-level-off" />
-            </FormFieldLabel>
+            {isPaidUser && (
+              <FormFieldLabel
+                htmlFor="telemetry-level-off"
+                className={`glass-body glass-body-motion glass-body-motion-interactive col-span-1 flex h-full flex-row items-center gap-3 rounded-xl p-3`}
+              >
+                <div className="flex flex-1 flex-col items-start gap-2">
+                  <FormFieldTitle>Off</FormFieldTitle>
+                  <FormFieldDescription>
+                    Disable any sending of telemetry data.
+                  </FormFieldDescription>
+                </div>
+                <Radio value="off" id="telemetry-level-off" />
+              </FormFieldLabel>
+            )}
+
+            {!isPaidUser && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <FormFieldLabel
+                    htmlFor="telemetry-level-off"
+                    className={`glass-body col-span-1 flex h-full cursor-not-allowed flex-row items-center gap-3 rounded-xl p-3 opacity-50`}
+                  >
+                    <div className="flex flex-1 flex-col items-start gap-2">
+                      <FormFieldTitle>Off</FormFieldTitle>
+                      <FormFieldDescription>
+                        Disable any sending of telemetry data.
+                      </FormFieldDescription>
+                    </div>
+                    <Radio value="off" id="telemetry-level-off" disabled />
+                  </FormFieldLabel>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Only paid users can disable telemetry. Upgrade your plan
+                  <a
+                    href={`${process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io'}/billing/checkout`}
+                    className="text-blue-600 underline hover:text-blue-700"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    here
+                  </a>
+                </TooltipContent>
+              </Tooltip>
+            )}
             <FormFieldLabel
               htmlFor="telemetry-level-anonymous"
               className="glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive col-span-1 flex h-full flex-row items-center gap-3 rounded-xl p-3"
