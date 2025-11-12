@@ -280,7 +280,7 @@ export function ChatPanelFooter() {
 
           {/* Other attachments area */}
           <div className="flex flex-row flex-wrap items-center justify-start gap-1 *:shrink-0">
-            {activeChat && isVerboseMode && (
+            {activeChat && (isVerboseMode || contextUsed > 80) && (
               <ContextUsageRing
                 percentage={contextUsed}
                 usedKb={activeChat.usage.usedContextWindowSize}
