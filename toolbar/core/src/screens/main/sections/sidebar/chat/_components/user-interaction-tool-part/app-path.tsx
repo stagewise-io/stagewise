@@ -36,9 +36,6 @@ export const AskForAppPathToolPartContent = memo(
 
     return (
       <div className="relative flex w-full flex-col gap-2">
-        <h3 className={isDisabled ? 'opacity-50' : ''}>
-          Which app do you want to use stagewise for?
-        </h3>
         <RadioGroup
           className="bg-transparent"
           value={selectedPath}

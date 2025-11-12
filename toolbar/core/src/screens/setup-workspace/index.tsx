@@ -49,9 +49,9 @@ export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
       <Dialog open={show && !hasChatMessage} dismissible={false}>
         <DialogContent className="gap-3 delay-150 duration-300">
           <DialogHeader>
-            <DialogTitle>Setup workspace</DialogTitle>
+            <DialogTitle>Set up workspace</DialogTitle>
             <DialogDescription>
-              The given workspace is not setup yet - but don't worry:
+              The given workspace is not set up yet - but don't worry:
               <br />
               We will guide you through the setup!
             </DialogDescription>
@@ -86,7 +86,7 @@ export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
         <DialogContent className="gap-3 delay-150 duration-300 sm:h-4/6 sm:max-h-[512px] sm:min-h-96 sm:w-4/6 sm:min-w-96 sm:max-w-xl md:p-6">
           <div className="flex flex-row items-start justify-between gap-4">
             <DialogHeader>
-              <DialogTitle>Setup workspace</DialogTitle>
+              <DialogTitle>Set up workspace</DialogTitle>
             </DialogHeader>
             <Button
               variant="secondary"

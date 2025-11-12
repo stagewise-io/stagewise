@@ -74,9 +74,6 @@ export const AskForAgentAccessPathToolPartContent = memo(
 
     return (
       <div className="flex w-full flex-col gap-2">
-        <span className={isError || isOutputAvailable ? 'opacity-50' : ''}>
-          Do you want to give stagewise access to this path?
-        </span>
         {isLoadingPath ? (
           <Skeleton variant="text" size="sm" className="w-full" />
         ) : (

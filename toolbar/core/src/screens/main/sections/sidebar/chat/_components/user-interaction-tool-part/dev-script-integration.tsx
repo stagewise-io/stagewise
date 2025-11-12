@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react';
 import { diffLines } from 'diff';
 import { Button } from '@stagewise/stage-ui/components/button';
 import type { PickToolPart } from './index.js';
-import { CheckIcon, XIcon } from 'lucide-react';
+import { CheckIcon, InfoIcon, XIcon } from 'lucide-react';
 
 export const AskForDevScriptIntegrationToolPartContent = memo(
   ({
@@ -43,11 +43,6 @@ export const AskForDevScriptIntegrationToolPartContent = memo(
     return (
       <div className="flex w-full flex-col gap-2">
         <div
-          className={`text-sm ${isError || isOutputAvailable ? 'opacity-50' : ''}`}
-        >
-          Do you want to integrate stagewise into the dev script of your app?
-        </div>
-        <div
           className={`rounded border border-black/10 bg-black/5 p-3 font-mono text-xs ${isError || isOutputAvailable ? 'opacity-50' : ''}`}
         >
           <div className="mb-2 flex items-center gap-2">
@@ -73,33 +68,40 @@ export const AskForDevScriptIntegrationToolPartContent = memo(
           </div>
         </div>
         {(isInputAvailable || isError || isOutputAvailable) && (
-          <div className="flex w-full flex-row items-center justify-end gap-2">
-            {isInputAvailable && (
-              <>
-                <Button
-                  variant="secondary"
-                  size="xs"
-                  onClick={onCancel}
-                  disabled={isError || isOutputAvailable}
-                >
-                  Don't integrate
-                </Button>
-                <Button
-                  variant="primary"
-                  size="xs"
-                  onClick={() => {
-                    onSubmit({
-                      shouldIntegrate: true,
-                      type: 'askForDevScriptIntegrationTool',
-                    });
-                  }}
-                  disabled={isError || isOutputAvailable}
-                >
-                  Confirm Integration
-                </Button>
-              </>
-            )}
-          </div>
+          <>
+            <div className="flex w-full flex-row items-center justify-start gap-2 text-muted-foreground text-xs">
+              <InfoIcon className="size-3 shrink-0 text-muted-foreground" />
+              You can also start stagewise manually by running npx
+              stagewise@beta anywhere in your terminal.
+            </div>
+            <div className="flex w-full flex-row items-center justify-end gap-2">
+              {isInputAvailable && (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    onClick={onCancel}
+                    disabled={isError || isOutputAvailable}
+                  >
+                    Don't integrate
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="xs"
+                    onClick={() => {
+                      onSubmit({
+                        shouldIntegrate: true,
+                        type: 'askForDevScriptIntegrationTool',
+                      });
+                    }}
+                    disabled={isError || isOutputAvailable}
+                  >
+                    Confirm Integration
+                  </Button>
+                </>
+              )}
+            </div>
+          </>
         )}
         {isOutputAvailable && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
