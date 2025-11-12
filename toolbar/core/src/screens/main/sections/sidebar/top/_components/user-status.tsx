@@ -8,7 +8,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
-import { LogOutIcon, TerminalIcon } from 'lucide-react';
+import { ExternalLinkIcon, LogOutIcon } from 'lucide-react';
 
 export function UserStatusArea() {
   const userAccount = useKartonState((s) => s.userAccount);
@@ -91,7 +91,7 @@ export function UserStatusArea() {
             target="_blank"
             className={buttonVariants({ variant: 'primary', size: 'sm' })}
           >
-            <TerminalIcon className="size-4" />
+            <ExternalLinkIcon className="size-4" />
             Open console
           </a>
           <Button variant="secondary" onClick={() => void logout()} size="sm">
