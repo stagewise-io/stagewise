@@ -408,7 +408,7 @@ export const GlobalSettingsTabContent = () => {
                   </FormFieldLabel>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Only paid users can disable telemetry. Upgrade your plan
+                  Only paid users can disable telemetry. Upgrade your plan{' '}
                   <a
                     href={`${process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io'}/billing/checkout`}
                     className="text-blue-600 underline hover:text-blue-700"
