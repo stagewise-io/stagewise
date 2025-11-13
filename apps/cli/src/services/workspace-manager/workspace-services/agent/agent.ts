@@ -840,11 +840,10 @@ export class AgentService {
       }
 
       const prompts = new XMLPrompts();
-      const systemPrompt = prompts.getSystemPrompt({
-        userMessageMetadata: lastMessageMetadata.message?.metadata,
-        currentTab: this.getCurrentTab(),
-        promptSnippets,
-      });
+      const systemPrompt = await prompts.getSystemPrompt(
+        this.clientRuntime,
+        this.kartonService.state,
+      );
 
       const model = this.telemetryService.withTracing(
         this.litellm('claude-sonnet-4-5'),
