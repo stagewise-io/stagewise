@@ -260,7 +260,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
   }
 
   async grep(
-    relativePath: string,
+    searchPath: string,
     pattern: string,
     options?: {
       recursive?: boolean;
@@ -270,11 +270,13 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       respectGitignore?: boolean;
       caseSensitive?: boolean;
       filePattern?: string;
+      absoluteSearchPath?: boolean;
+      absoluteSearchResults?: boolean;
     },
   ): Promise<GrepResult> {
     return grep(
       this,
-      relativePath,
+      searchPath,
       pattern,
       this.config.ripgrepBasePath,
       options,
@@ -284,10 +286,12 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
   async glob(
     pattern: string,
     options?: {
-      cwd?: string;
+      searchPath?: string;
       absolute?: boolean;
       excludePatterns?: string[];
       respectGitignore?: boolean;
+      absoluteSearchPath?: boolean;
+      absoluteSearchResults?: boolean;
     },
   ): Promise<GlobResult> {
     return glob(this, pattern, this.config.ripgrepBasePath, options);

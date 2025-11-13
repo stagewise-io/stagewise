@@ -40,10 +40,11 @@ export async function globToolExecute(
 
     // Perform the glob search
     const globResult = await clientRuntime.fileSystem.glob(pattern, {
-      cwd: searchPath,
-      absolute: false, // Return relative paths by default
+      searchPath,
       includeDirectories: true, // Include both files and directories
       respectGitignore: true, // Respect .gitignore by default
+      absoluteSearchPath: false, // The agent is always relative to it's cwd
+      absoluteSearchResults: false,
     });
 
     if (!globResult.success)

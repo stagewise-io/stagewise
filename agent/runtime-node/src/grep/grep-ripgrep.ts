@@ -22,6 +22,8 @@ export interface RipgrepGrepOptions {
   excludePatterns?: string[];
   respectGitignore?: boolean;
   searchBinaryFiles?: boolean;
+  absoluteSearchPath?: boolean;
+  absoluteSearchResults?: boolean;
 }
 
 /**
@@ -261,17 +263,17 @@ async function parseRipgrepGrepOutput(
  * allow fallback to the Node.js implementation.
  *
  * @param fileSystem - File system provider for path resolution
- * @param relativePath - Path to search (file or directory)
+ * @param searchPath - Path to search (file or directory)
  * @param pattern - Search pattern (regex)
- * @param basePath - Base directory where ripgrep binary is installed
+ * @param rgBinaryBasePath - Base directory where ripgrep binary is installed
  * @param options - Search options
  * @returns GrepResult if successful, null if ripgrep unavailable/failed
  */
 export async function grepWithRipgrep(
   fileSystem: BaseFileSystemProvider,
-  relativePath: string,
+  searchPath: string,
   pattern: string,
-  basePath: string,
+  rgBinaryBasePath: string,
   options?: {
     recursive?: boolean;
     maxDepth?: number;
@@ -281,19 +283,21 @@ export async function grepWithRipgrep(
     excludePatterns?: string[];
     respectGitignore?: boolean;
     searchBinaryFiles?: boolean;
+    absoluteSearchPath?: boolean;
+    absoluteSearchResults?: boolean;
   },
   onError?: (error: Error) => void,
 ): Promise<GrepResult | null> {
   try {
-    const rgPath = getRipgrepPath(basePath);
+    const rgPath = getRipgrepPath(rgBinaryBasePath);
 
     // Check if ripgrep executable exists
     if (!rgPath || !existsSync(rgPath)) return null;
 
-    const searchPath = fileSystem.resolvePath(relativePath);
+    const resolvedSearchPath = fileSystem.resolvePath(searchPath);
 
     // Build ripgrep arguments
-    const args = buildRipgrepGrepArgs(pattern, searchPath, options);
+    const args = buildRipgrepGrepArgs(pattern, resolvedSearchPath, options);
 
     // Spawn ripgrep process
     const process = spawn(rgPath, args, {

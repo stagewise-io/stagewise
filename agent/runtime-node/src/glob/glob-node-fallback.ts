@@ -1,25 +1,30 @@
 import { promises as fs, type Dirent } from 'node:fs';
-import { join, relative } from 'node:path';
+import path, { join } from 'node:path';
 import type {
   BaseFileSystemProvider,
   GlobResult,
 } from '@stagewise/agent-runtime-interface';
 import { makeRe as makeGlobRe, minimatch } from 'minimatch';
+import nodeProcess from 'node:process';
 
 export async function globNodeFallback(
   pattern: string,
   fileSystem: BaseFileSystemProvider,
   options?: {
-    cwd?: string;
-    absolute?: boolean;
+    searchPath?: string;
+    includeDirectories?: boolean;
     excludePatterns?: string[];
     respectGitignore?: boolean;
+    absoluteSearchPath?: boolean;
+    absoluteSearchResults?: boolean;
   },
 ): Promise<GlobResult> {
   try {
     const paths: string[] = [];
-    const basePath = options?.cwd
-      ? fileSystem.resolvePath(options.cwd)
+    const basePath = options?.searchPath
+      ? options.absoluteSearchPath
+        ? path.resolve(path.parse(nodeProcess.cwd()).root, options.searchPath)
+        : path.join(fileSystem.getCurrentWorkingDirectory(), options.searchPath)
       : fileSystem.getCurrentWorkingDirectory();
 
     const excludeRes = (options?.excludePatterns ?? []).map((p) =>
@@ -40,7 +45,10 @@ export async function globNodeFallback(
           [];
         for await (const dirent of dirHandle) {
           const full = join(dir, dirent.name);
-          const rel = relative(basePath, full);
+          const rel =
+            options?.absoluteSearchResults || options?.absoluteSearchPath
+              ? full
+              : path.relative(fileSystem.getCurrentWorkingDirectory(), full);
           entries.push({ dirent, full, rel });
         }
         // Note: for await automatically closes the directory handle
@@ -54,8 +62,18 @@ export async function globNodeFallback(
             continue;
           if (shouldSkipRel(rel)) continue;
 
-          if (minimatch(rel, pattern) && dirent.isFile())
-            paths.push(options?.absolute ? full : rel);
+          const matches = minimatch(rel, pattern);
+
+          if (
+            matches &&
+            (dirent.isFile() ||
+              (options?.includeDirectories && dirent.isDirectory()))
+          )
+            paths.push(
+              options?.absoluteSearchResults || options?.absoluteSearchPath
+                ? full
+                : rel,
+            );
 
           if (dirent.isDirectory() && pattern.includes('**'))
             walkQueue.push(full);

@@ -179,13 +179,13 @@ export interface IFileSystemProvider {
   /**
    * Searches for content patterns across files in a directory.
    * Similar to the Unix grep command.
-   * @param relativePath - The relative directory path to search in
+   * @param searchPath - The path to search in. Results will be returned relative to this path. By default, this path is relative to the current working directory of the client runtime.
    * @param pattern - Regular expression pattern to search for
    * @param options - Search configuration options
    * @returns Matching results with file paths and line information
    */
   grep(
-    relativePath: string,
+    searchPath: string,
     pattern: string,
     options?: {
       recursive?: boolean;
@@ -195,6 +195,8 @@ export interface IFileSystemProvider {
       maxMatches?: number; // Limit total matches
       excludePatterns?: string[]; // Patterns to exclude from search
       respectGitignore?: boolean; // Whether to respect .gitignore patterns (default: true)
+      absoluteSearchPath?: boolean; // If true, the search path will not be relative to the current working directory of the client runtime but instead absolute to the users machine.
+      absoluteSearchResults?: boolean; // If true, the search results will be returned as absolute paths. If false, results will be relative to runtime working directory. If "searchPathisAbsolute" is true, this will be ignored and always true.
     },
   ): Promise<GrepResult>;
 
@@ -209,10 +211,11 @@ export interface IFileSystemProvider {
   glob(
     pattern: string,
     options?: {
-      cwd?: string; // Base directory for relative patterns (relative to working directory)
-      absolute?: boolean; // Return absolute paths
+      searchPath?: string; // Base directory for search. By default, the search will happen in the current working directory.
       excludePatterns?: string[]; // Patterns to exclude
       respectGitignore?: boolean; // Whether to respect .gitignore patterns (default: true)
+      absoluteSearchPath?: boolean; // If true, the search path will not be relative to the current working directory of the client runtime but instead absolute to the users machine.
+      absoluteSearchResults?: boolean; // If true, the search results will be returned as absolute paths. If false, results will be relative to runtime working directory. If "searchPathisAbsolute" is true, this will be ignored and always true.
     },
   ): Promise<GlobResult>;
 
@@ -410,7 +413,7 @@ export abstract class BaseFileSystemProvider implements IFileSystemProvider {
     },
   ): Promise<DirectoryListResult>;
   abstract grep(
-    relativePath: string,
+    searchPath: string,
     pattern: string,
     options?: {
       recursive?: boolean;
@@ -420,16 +423,19 @@ export abstract class BaseFileSystemProvider implements IFileSystemProvider {
       maxMatches?: number;
       excludePatterns?: string[];
       respectGitignore?: boolean;
+      absoluteSearchPath?: boolean;
+      absoluteSearchResults?: boolean;
     },
   ): Promise<GrepResult>;
   abstract glob(
     pattern: string,
     options?: {
-      cwd?: string;
-      absolute?: boolean;
+      searchPath?: string;
       includeDirectories?: boolean;
       excludePatterns?: string[];
       respectGitignore?: boolean;
+      absoluteSearchPath?: boolean;
+      absoluteSearchResults?: boolean;
     },
   ): Promise<GlobResult>;
   abstract searchAndReplace(

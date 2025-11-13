@@ -5,12 +5,13 @@ import type {
   GrepResult,
 } from '@stagewise/agent-runtime-interface';
 import { promises as fs } from 'node:fs';
-import { join, relative } from 'node:path';
+import path from 'node:path';
+import nodeProcess from 'node:process';
 import { minimatch } from 'minimatch';
 
 export async function grepNodeFallback(
   fileSystem: BaseFileSystemProvider,
-  relativePath: string,
+  searchPath: string,
   pattern: string,
   options?: {
     recursive?: boolean;
@@ -21,6 +22,8 @@ export async function grepNodeFallback(
     excludePatterns?: string[];
     respectGitignore?: boolean;
     searchBinaryFiles?: boolean;
+    absoluteSearchPath?: boolean;
+    absoluteSearchResults?: boolean;
   },
 ): Promise<GrepResult> {
   // Fallback to Node.js implementation if ripgrep is unavailable or failed
@@ -29,7 +32,9 @@ export async function grepNodeFallback(
     const matches: GrepMatch[] = [];
     let filesSearched = 0;
     let totalOutputSize = 0;
-    const basePath = fileSystem.resolvePath(relativePath);
+    const basePath = options?.absoluteSearchPath
+      ? path.resolve(path.parse(nodeProcess.cwd()).root, searchPath)
+      : fileSystem.resolvePath(searchPath);
     const MAX_OUTPUT_SIZE = 1 * 1024 * 1024; // 1MB limit for total output
 
     const searchFile = async (filePath: string) => {
@@ -89,10 +94,13 @@ export async function grepNodeFallback(
             // The total output size is still limited by MAX_OUTPUT_SIZE check below
 
             const matchEntry: GrepMatch = {
-              relativePath: relative(
-                fileSystem.getCurrentWorkingDirectory(),
-                filePath,
-              ),
+              relativePath:
+                options?.absoluteSearchResults || options?.absoluteSearchPath
+                  ? filePath
+                  : path.relative(
+                      fileSystem.getCurrentWorkingDirectory(),
+                      filePath,
+                    ),
               line: i + 1,
               column: match.index + 1,
               match: match[0],
@@ -121,8 +129,8 @@ export async function grepNodeFallback(
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
       for (const entry of entries) {
-        const fullPath = join(dirPath, entry.name);
-        const relativePath = relative(basePath, fullPath);
+        const fullPath = path.join(dirPath, entry.name);
+        const relativePath = path.relative(basePath, fullPath);
 
         // Check exclude patterns
         if (options?.excludePatterns?.some((p) => minimatch(relativePath, p)))
@@ -150,7 +158,7 @@ export async function grepNodeFallback(
       }
     };
 
-    if (await fileSystem.isDirectory(relativePath))
+    if (await fileSystem.isDirectory(searchPath))
       await searchDirectory(basePath, 0);
     else await searchFile(basePath);
 

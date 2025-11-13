@@ -5,17 +5,19 @@ import type {
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { relative } from 'node:path';
+import path, { relative } from 'node:path';
 import { getRipgrepPath } from '../vscode-ripgrep/get-path.js';
 
 /**
  * Options for executing ripgrep glob, matching the glob function's options
  */
 export interface RipgrepGlobOptions {
-  cwd?: string;
-  absolute?: boolean;
+  searchPath?: string;
+  includeDirectories?: boolean;
   excludePatterns?: string[];
   respectGitignore?: boolean;
+  absoluteSearchPath?: boolean;
+  absoluteSearchResults?: boolean;
 }
 
 /**
@@ -128,26 +130,28 @@ async function parseRipgrepGlobOutput(
  *
  * @param fileSystem - File system provider for path resolution
  * @param pattern - Glob pattern (e.g., "src/*.ts" or recursive patterns)
- * @param basePath - Base directory where ripgrep binary is installed
+ * @param rgBinaryBasePath - Base directory where ripgrep binary is installed
  * @param options - Glob options
  * @returns GlobResult if successful, null if ripgrep unavailable/failed
  */
 export async function globWithRipgrep(
   fileSystem: BaseFileSystemProvider,
   pattern: string,
-  basePath: string,
+  rgBinaryBasePath: string,
   options?: RipgrepGlobOptions,
   onError?: (error: Error) => void,
 ): Promise<GlobResult | null> {
   try {
-    const rgPath = getRipgrepPath(basePath);
+    const rgPath = getRipgrepPath(rgBinaryBasePath);
 
     // Check if ripgrep executable exists
     if (!rgPath || !existsSync(rgPath)) return null;
 
     // Determine search path
-    const searchPath = options?.cwd
-      ? fileSystem.resolvePath(options.cwd)
+    const searchPath = options?.searchPath
+      ? options.absoluteSearchPath
+        ? options.searchPath
+        : path.join(fileSystem.getCurrentWorkingDirectory(), options.searchPath)
       : fileSystem.getCurrentWorkingDirectory();
 
     // Build ripgrep arguments
@@ -171,7 +175,7 @@ export async function globWithRipgrep(
     const result = await parseRipgrepGlobOutput(
       process.stdout,
       fileSystem.getCurrentWorkingDirectory(),
-      options?.absolute ?? false,
+      options?.absoluteSearchResults ?? options?.absoluteSearchPath ?? false,
       onError,
     );
 

@@ -8,18 +8,20 @@ import { globNodeFallback } from './glob-node-fallback.js';
 export async function glob(
   fileSystem: BaseFileSystemProvider,
   pattern: string,
-  basePath: string,
+  rgBinaryBasePath: string,
   options?: {
-    cwd?: string;
-    absolute?: boolean;
+    searchPath?: string;
+    includeDirectories?: boolean;
     excludePatterns?: string[];
     respectGitignore?: boolean;
+    absoluteSearchPath?: boolean;
+    absoluteSearchResults?: boolean;
   },
 ): Promise<GlobResult> {
   const ripgrepResult = await globWithRipgrep(
     fileSystem,
     pattern,
-    basePath,
+    rgBinaryBasePath,
     options,
   );
   if (ripgrepResult !== null) return ripgrepResult;

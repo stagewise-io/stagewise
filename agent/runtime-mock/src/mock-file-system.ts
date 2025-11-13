@@ -281,7 +281,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
 
   // Search operations
   async grep(
-    relativePath: string,
+    searchPath: string,
     pattern: string,
     options: {
       recursive?: boolean;
@@ -291,6 +291,8 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
       maxMatches?: number;
       excludePatterns?: string[];
       respectGitignore?: boolean;
+      absoluteSearchPath?: boolean;
+      absoluteSearchResults?: boolean;
     } = {},
   ): Promise<GrepResult> {
     try {
@@ -311,7 +313,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
       let filesSearched = 0;
 
       // Get files to search
-      const listResult = await this.listDirectory(relativePath, {
+      const listResult = await this.listDirectory(searchPath, {
         recursive,
         maxDepth,
         pattern: filePattern,
@@ -401,16 +403,18 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
   async glob(
     pattern: string,
     options: {
-      cwd?: string;
+      searchPath?: string;
       absolute?: boolean;
       includeDirectories?: boolean;
       excludePatterns?: string[];
       respectGitignore?: boolean;
+      absoluteSearchPath?: boolean;
+      absoluteSearchResults?: boolean;
     } = {},
   ): Promise<GlobResult> {
     try {
       const {
-        cwd = '.',
+        searchPath = '.',
         absolute = false,
         includeDirectories = true,
         excludePatterns = [],
@@ -431,7 +435,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
 
       const regex = globToRegex(pattern);
 
-      const listResult = await this.listDirectory(cwd, {
+      const listResult = await this.listDirectory(searchPath, {
         recursive: true,
         includeFiles: true,
         includeDirectories,

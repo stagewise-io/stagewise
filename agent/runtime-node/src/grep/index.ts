@@ -7,9 +7,9 @@ import { grepWithRipgrep } from './grep-ripgrep.js';
 
 export async function grep(
   fileSystem: BaseFileSystemProvider,
-  relativePath: string,
+  searchPath: string,
   pattern: string,
-  basePath: string,
+  rgBinaryBasePath: string,
   options?: {
     recursive?: boolean;
     maxDepth?: number;
@@ -19,15 +19,17 @@ export async function grep(
     excludePatterns?: string[];
     respectGitignore?: boolean;
     searchBinaryFiles?: boolean;
+    absoluteSearchPath?: boolean;
+    absoluteSearchResults?: boolean;
   },
 ): Promise<GrepResult> {
   const ripgrepResult = await grepWithRipgrep(
     fileSystem,
-    relativePath,
+    searchPath,
     pattern,
-    basePath,
+    rgBinaryBasePath,
     options,
   );
   if (ripgrepResult !== null) return ripgrepResult;
-  return grepNodeFallback(fileSystem, relativePath, pattern, options);
+  return grepNodeFallback(fileSystem, searchPath, pattern, options);
 }
