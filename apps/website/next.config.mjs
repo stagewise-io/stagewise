@@ -47,6 +47,18 @@ const config = {
         source: '/imprint',
         destination: '/legal-notice',
       },
+      {
+        source: '/socials/x',
+        destination: 'https://x.com/stagewise_io',
+      },
+      {
+        source: '/socials/discord',
+        destination: 'https://discord.gg/gkdGsDYaKA',
+      },
+      {
+        source: '/socials/linkedin',
+        destination: 'https://www.linkedin.com/company/stagewise-io/',
+      },
     ];
   },
   // This is required to support PostHog trailing slash API requests
