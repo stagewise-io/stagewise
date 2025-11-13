@@ -9,7 +9,6 @@ import {
   ArrowUpIcon,
   SquareIcon,
   SquareDashedMousePointerIcon,
-  PaperclipIcon,
   ImageUpIcon,
 } from 'lucide-react';
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
@@ -26,12 +25,6 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { HotkeyComboText } from '@/components/hotkey-combo-text';
 import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
-import {
-  Menu,
-  MenuContent,
-  MenuItem,
-  MenuTrigger,
-} from '@stagewise/stage-ui/components/menu';
 import { Layout, MainTab } from '@stagewise/karton-contract';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { usePostHog } from 'posthog-js/react';
@@ -381,41 +374,20 @@ export function ChatPanelFooter() {
                   </TooltipContent>
                 </Tooltip>
               )}
-              <Menu
-                onOpenChangeComplete={(open) => {
-                  if (!open && chatInputActive) {
-                    void inputRef.current?.focus();
-                  }
-                }}
-              >
-                <Tooltip>
-                  <TooltipTrigger>
-                    <MenuTrigger>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label="Add additional attachments"
-                        className="mb-1 text-muted-foreground"
-                      >
-                        <PaperclipIcon className="size-4" />
-                      </Button>
-                    </MenuTrigger>
-                  </TooltipTrigger>
-
-                  <TooltipContent>Add additional attachments</TooltipContent>
-                </Tooltip>
-                <MenuContent
-                  id="chat-file-attachment-menu-content"
-                  side="right"
-                >
-                  <input
-                    type="file"
-                    multiple
-                    className="hidden"
-                    accept="image/png, image/jpeg, image/gif, image/webp"
-                    id="chat-file-attachment-input-file"
-                  />
-                  <MenuItem
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                accept="image/png, image/jpeg, image/gif, image/webp"
+                id="chat-file-attachment-input-file"
+              />
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Upload image"
+                    className="mb-1 text-muted-foreground"
                     onClick={() => {
                       const input = document.getElementById(
                         'chat-file-attachment-input-file',
@@ -436,10 +408,10 @@ export function ChatPanelFooter() {
                     }}
                   >
                     <ImageUpIcon className="size-4" />
-                    Upload image
-                  </MenuItem>
-                </MenuContent>
-              </Menu>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Upload image</TooltipContent>
+              </Tooltip>
             </>
           )}
           <Tooltip>
