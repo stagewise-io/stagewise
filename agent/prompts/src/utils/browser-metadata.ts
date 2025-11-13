@@ -1,51 +1,45 @@
 import type { BrowserData } from '@stagewise/karton-contract';
+import xml from 'xml';
+import specialTokens from './special-tokens';
 
-function escapeXml(str: string | null | undefined): string {
-  if (!str) return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-export function browserMetadataToContextSnippet(
-  browserData: BrowserData | undefined,
-): string | null {
-  if (!browserData) return null;
-  return `
-  <browser-metadata>
-    <description>
-      This is the current browser metadata of the USER.
-    </description>
-    <content>
-      <current-url>
-        ${escapeXml(browserData.currentUrl)}
-      </current-url>
-
-      <current-title>
-        ${escapeXml(browserData.currentTitle)}
-      </current-title>
-
-      <viewport>
-        <width>${browserData.viewport.width}</width>
-        <height>${browserData.viewport.height}</height>
-        <device-pixel-ratio>${browserData.viewport.dpr}</device-pixel-ratio>
-      </viewport>
-
-      <prefers-dark-mode>
-        ${browserData.prefersDarkMode}
-      </prefers-dark-mode>
-
-      <user-agent>
-        ${escapeXml(browserData.userAgent)}
-      </user-agent>
-
-      <locale>
-        ${escapeXml(browserData.locale)}
-      </locale>
-    </content>
-  </browser-metadata>
-  `;
+export function browserMetadataToContextSnippet(browserData: BrowserData) {
+  return xml({
+    [specialTokens.userMsgAttachmentXmlTag]: [
+      {
+        _attr: {
+          type: 'browser-metadata',
+        },
+      },
+      {
+        window: {
+          _attr: {
+            title: browserData.currentTitle,
+            url: browserData.currentUrl,
+          },
+        },
+      },
+      {
+        userAgent: {
+          _cdata: browserData.userAgent,
+        },
+      },
+      {
+        viewport: {
+          _attr: {
+            width: browserData.viewport.width,
+            height: browserData.viewport.height,
+            dpr: browserData.viewport.dpr,
+          },
+        },
+      },
+      {
+        preferences: {
+          _attr: {
+            locale: browserData.locale,
+            'prefers-dark-mode': browserData.prefersDarkMode,
+          },
+        },
+      },
+    ],
+  });
 }

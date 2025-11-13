@@ -56,6 +56,8 @@ async function buildCLI() {
     // Only keep external the packages that have issues with bundling
     const externalPackages: string[] = [
       'chokidar', // Native bindings
+      '@vscode/ripgrep', // Uses a post-install script
+      'xml',
     ];
 
     // Build the CLI bundling most dependencies

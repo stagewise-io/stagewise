@@ -155,7 +155,7 @@ function ContextElementChip({
         <div className="scrollbar-thin scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/30 flex max-h-[35vh] max-w-72 flex-col gap-5 overflow-y-auto overflow-x-hidden pr-0.5 *:shrink-0">
           <div className="flex flex-col items-stretch justify-start gap-1.5">
             <p className="font-medium text-foreground text-sm">XPath</p>
-            <div className="w-full font-mono text-muted-foreground text-xs">
+            <div className="w-full break-all font-mono text-muted-foreground text-xs">
               {selectedElement.xpath}
             </div>
           </div>

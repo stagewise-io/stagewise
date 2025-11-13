@@ -2,65 +2,8 @@ import type {
   ReactSelectedElementInfo,
   SelectedElement,
 } from '@stagewise/karton-contract';
-
-type ElementRole = 'parent' | 'selected-element' | 'sibling' | 'child';
-
-interface CollectedElement {
-  element: SelectedElement;
-  role: ElementRole;
-  depth: number;
-}
-
-/**
- * Collects parent elements up to maxDepth levels
- */
-function collectParents(
-  element: SelectedElement,
-  maxDepth: number,
-): CollectedElement[] {
-  const parents: CollectedElement[] = [];
-  let current = element.parent;
-  let depth = -1;
-
-  while (current && parents.length < maxDepth) {
-    parents.unshift({
-      element: current,
-      role: 'parent',
-      depth: depth--,
-    });
-    current = current.parent;
-  }
-
-  return parents;
-}
-
-/**
- * Recursively collects children up to maxDepth levels
- */
-function collectChildren(
-  element: SelectedElement,
-  maxDepth: number,
-  currentDepth = 1,
-): CollectedElement[] {
-  if (currentDepth > maxDepth || !element.children?.length) {
-    return [];
-  }
-
-  const collected: CollectedElement[] = [];
-
-  for (const child of element.children) {
-    collected.push({
-      element: child,
-      role: 'child',
-      depth: currentDepth,
-    });
-
-    // Recursively collect deeper children
-    collected.push(...collectChildren(child, maxDepth, currentDepth + 1));
-  }
-
-  return collected;
-}
+import xml from 'xml';
+import specialTokens from './special-tokens';
 
 /**
  * Gets siblings of the selected element from its parent
@@ -75,79 +18,7 @@ function getSiblings(element: SelectedElement): SelectedElement[] {
   );
 }
 
-/**
- * Serializes a single element with role and depth metadata
- */
-function serializeElement(
-  element: SelectedElement,
-  role: ElementRole,
-  depth: number,
-  codeMetadata: SelectedElement['codeMetadata'],
-  reactInfo?: ReactSelectedElementInfo,
-  isSelected = false,
-): string {
-  const elementType = element.nodeType.toLowerCase();
-  let selector: string | undefined;
-
-  // Construct selector from attributes if available
-  if (element.attributes.id) {
-    selector = `#${element.attributes.id}`;
-  } else if (element.attributes.class) {
-    selector = `.${element.attributes.class.split(' ').join('.')}`;
-  }
-
-  // Construct HTML representation
-  let htmlString = `<${elementType}`;
-
-  // Add attributes
-  Object.entries(element.attributes).forEach(([key, value]) => {
-    htmlString += ` ${key}="${value}"`;
-  });
-
-  htmlString += '>';
-
-  // Add text content if present
-  if (element.textContent) {
-    htmlString += element.textContent;
-  }
-
-  htmlString += `</${elementType}>`;
-
-  // Build opening tag with metadata
-  let openingTag = '<html-element';
-
-  if (elementType) {
-    openingTag += ` type="${elementType}"`;
-  }
-
-  openingTag += ` role="${role}"`;
-
-  if (isSelected) {
-    openingTag += ' selected="true"';
-  }
-
-  openingTag += ` depth="${depth}"`;
-
-  if (selector) {
-    openingTag += ` selector="${selector}"`;
-  }
-
-  openingTag += ` xpath="${element.xpath}"`;
-  openingTag += '>';
-
-  const reactInfoTag = reactInfo
-    ? `<react-info>\n<component-tree>${serializeComponentTree(reactInfo)}</component-tree>\n</react-info>\n`
-    : '';
-
-  const relatedFilesTag =
-    codeMetadata.length > 0
-      ? `<related-files>\n${serializeRelatedFiles(codeMetadata)}\n</related-files>\n`
-      : '';
-
-  return `${openingTag}\n${htmlString.trim()}\n${reactInfoTag}${relatedFilesTag}</html-element>`;
-}
-
-const serializeComponentTree = (
+const serializeReactComponentTree = (
   reactInfo: ReactSelectedElementInfo,
   maxDepth = 5,
 ): string => {
@@ -155,75 +26,57 @@ const serializeComponentTree = (
   let curr = reactInfo;
   let depth = 0;
   while (curr?.componentName && depth < maxDepth) {
-    names.push(curr.componentName);
+    names.push(
+      `[${curr.componentName}${depth === 0 ? ' (containing selected element)' : ''}${curr.isRSC ? ' (RSC)' : ''}]`,
+    );
     curr = curr.parent || null;
     depth++;
   }
-  return `<component-tree>\n${names.join(' < ')}\n</component-tree>\n`;
+  return `${names.join(' child of ')}`;
 };
 
-const serializeRelatedFiles = (
-  codeMetadata: SelectedElement['codeMetadata'],
-): string => {
-  return codeMetadata
-    .map(
-      (file) =>
-        `<file path="${file.relativePath}" relation="${file.relation}" />`,
-    )
-    .join('\n');
-};
-
-/**
- * Converts a list of DOM elements to an LLM-readable string with DOM element context.
- *
- * @param elements - List of DOM elements to convert
- * @returns Formatted string with DOM element context that the LLM can parse
- */
-export function htmlElementToContextSnippet(
-  elements: SelectedElement[],
+export function serializeRelevantCodebaseFiles(
+  selectedElements: SelectedElement[],
+  maxFileCount = 20,
+  maxFilesPerSelectedElement = 2,
 ): string {
-  const hasCodeMetadata = elements.some((element) => element?.codeMetadata);
-  const result = `
-  <dom-elements>
-    <description> These are the elements that the user has selected before making the request: </description>
-    <content>
-      ${elements.map((element) => htmlElementsToContextSnippet(element)).join('\n\n')}
-    </content>
-  </dom-elements>
-
-  ${
-    hasCodeMetadata
-      ? `
-  <code-metadata>
-    <description>
-    These are the code snippets that belong to the HTML elements that the user has selected before making the request.
-    </description>
-    <content>
-      ${codeMetadataToContextSnippet(elements.flatMap((element) => element.codeMetadata).reduce<SelectedElement['codeMetadata']>((acc, curr) => (acc.find((m) => m.relativePath === curr.relativePath) ? acc : acc.concat(curr)), []))}
-    </content>
-  </code-metadata>
-  `
-      : ''
+  // We don't simply flatten the code metadata for every element because that would overly focus the files of the first selected elements.
+  // Instead, we interleave and then deduplicate to can as many relevant files as possible.
+  const interleavedCodeMetadata: SelectedElement['codeMetadata'] = [];
+  for (let index = 0; index < maxFilesPerSelectedElement; index++) {
+    for (const element of selectedElements) {
+      const metadata = element.codeMetadata[index];
+      if (metadata) {
+        interleavedCodeMetadata.push(metadata);
+      }
+    }
   }
-  `;
-  return result;
-}
 
-function codeMetadataToContextSnippet(
-  codeMetadata: {
-    relativePath: string;
-    startLine?: number;
-    endLine?: number;
-    content?: string;
-    relation?: string;
-  }[],
-): string {
-  return codeMetadata
-    .map(
-      (m) =>
-        `<relative-path>${m.relativePath}</relative-path>\n${m.startLine ? `<start-line>${m.startLine}</start-line>\n` : ''}${m.endLine ? `<end-line>${m.endLine}</end-line>\n` : ''}${m.content ? `<content>${m.content}</content>` : ''}`,
+  const combinedDedupedCodeMetadata = interleavedCodeMetadata
+    .reduce<SelectedElement['codeMetadata']>(
+      (acc, curr) =>
+        acc.find((m) => m.relativePath === curr.relativePath)
+          ? acc
+          : acc.concat(curr),
+      [],
     )
-    .join('\n\n');
+    .slice(0, maxFileCount);
+
+  if (combinedDedupedCodeMetadata.length === 0) {
+    return '';
+  }
+
+  return xml(
+    combinedDedupedCodeMetadata.map((file) => ({
+      [specialTokens.userMsgAttachmentXmlTag]: {
+        _attr: {
+          type: 'codebase-file',
+          path: file.relativePath,
+        },
+        _cdata: file.content,
+      },
+    })),
+  );
 }
 
 /**
@@ -234,131 +87,170 @@ function codeMetadataToContextSnippet(
  * @param maxCharacterAmount - Optional maximum number of characters to include
  * @returns Formatted XML-style string that the LLM can parse
  */
-export function htmlElementsToContextSnippet(
-  element: SelectedElement,
-  maxCharacterAmount = 2000,
-): string {
+export function serializeSelectedElement(element: SelectedElement): string {
   if (!element) {
     throw new Error('Element cannot be null or undefined');
   }
 
-  try {
-    // Collect all elements in the hierarchy
-    const parents = collectParents(element, 2);
-    const siblings = getSiblings(element);
-    const children = collectChildren(element, 4);
+  const xmlResult = xml({
+    [specialTokens.userMsgAttachmentXmlTag]: [
+      {
+        _attr: {
+          type: 'selected-dom-element',
+        },
+      },
+      serializeSelectedElementPart(element),
+    ],
+  });
 
-    // Build the full hierarchy as a flat list
-    const allElements: CollectedElement[] = [
-      ...parents,
-      { element, role: 'selected-element', depth: 0 },
-      ...siblings.map((sibling) => ({
-        element: sibling,
-        role: 'sibling' as ElementRole,
-        depth: 0,
-      })),
-      ...children,
-    ];
+  return xmlResult;
+}
 
-    // Serialize all elements
-    let serializedElements = allElements.map((item) =>
-      serializeElement(
-        item.element,
-        item.role,
-        item.depth,
-        item.element.codeMetadata,
-        item.element.frameworkInfo?.react,
-        item.role === 'selected-element',
-      ),
-    );
+const minSerializationDepth = -1; // level of parents that are included
+const maxSerializationDepth = 2; // level of children that are included
+const minUntruncatedDepth = -1; // parent level where we start truncating to minimize size
+const maxUntruncatedDepth = 1; // child level where we start truncating to minimize size
 
-    // Apply character limit by truncating from deepest children upward
-    let result = serializedElements.join('\n\n');
+const importantAttributes: Set<string> = new Set([
+  'class',
+  'id',
+  'style',
+  'name',
+  'role',
+  'href',
+  'for',
+]);
 
-    if (maxCharacterAmount && result.length > maxCharacterAmount) {
-      // Start removing deepest children first
-      let currentMaxDepth = 4;
+function serializeSelectedElementPart(
+  element: SelectedElement,
+  depth = 0,
+): xml.XmlObject {
+  const truncateParent = depth < minSerializationDepth;
+  const truncateChildren = depth > maxSerializationDepth;
+  const minimizeContent =
+    depth > maxUntruncatedDepth || depth < minUntruncatedDepth;
 
-      while (result.length > maxCharacterAmount && currentMaxDepth > 0) {
-        // Filter out elements at the current max depth
-        serializedElements = allElements
-          .filter((item) => {
-            // Keep everything except children at or beyond current max depth
-            if (item.role === 'child') {
-              return item.depth < currentMaxDepth;
-            }
-            return true;
-          })
-          .map((item) =>
-            serializeElement(
-              item.element,
-              item.role,
-              item.depth,
-              item.element.codeMetadata,
-              item.element.frameworkInfo?.react,
-              item.role === 'selected-element',
+  // Create all different types of child nodes
+  const attributeChildNode = {
+    _attr: {},
+  };
+  const xpathChildNode = depth === 0 ? { xpath: element.xpath } : {}; // only relevant for the reference element, everything is redundant
+
+  const positionChildNode = {
+    position: {
+      _attr: {
+        x: `${Math.round(element.boundingClientRect.left)}px`,
+        y: `${Math.round(element.boundingClientRect.top)}px`,
+        width: `${Math.round(element.boundingClientRect.width)}px`,
+        height: `${Math.round(element.boundingClientRect.height)}px`,
+      },
+    },
+  };
+
+  const attributesChildNodes: xml.XmlObject[] = Object.entries(
+    element.attributes,
+  )
+    .filter(([key]) => !minimizeContent || importantAttributes.has(key))
+    .sort((a, _) => (importantAttributes.has(a[0]) ? -1 : 1)) // We should make sure that important attributes are never cut off
+    .slice(0, 12)
+    .map(([key, value]) => ({
+      attr: {
+        _attr: { name: key },
+        _cdata: truncateTextContent(
+          JSON.stringify(value),
+          importantAttributes.has(key) ? 128 : 64,
+        ),
+      },
+    }));
+
+  const ownPropertiesChildNodes: xml.XmlObject[] = !minimizeContent
+    ? Object.entries(element.ownProperties)
+        .slice(0, 10)
+        .map(([key, value]) => ({
+          'own-prop': {
+            _attr: { name: key },
+            _cdata: truncateTextContent(JSON.stringify(value), 24),
+          },
+        }))
+    : [];
+
+  const textContentChildNode: xml.XmlObject =
+    element.textContent &&
+    depth >= 0 &&
+    !element.children?.some(
+      (child) => child.textContent && child.textContent.length > 0, // We only show text content if no children have text content
+    )
+      ? {
+          textContent: {
+            _cdata: truncateTextContent(
+              element.textContent,
+              minimizeContent ? 32 : 128,
             ),
-          );
+          },
+        }
+      : {};
 
-        result = serializedElements.join('\n\n');
-        currentMaxDepth--;
-      }
+  const parentChildNode: xml.XmlObject =
+    !truncateParent && depth <= 0 && element.parent
+      ? {
+          parent: [serializeSelectedElementPart(element.parent, depth - 1)],
+        }
+      : {};
 
-      // If still too long, start removing siblings
-      if (result.length > maxCharacterAmount) {
-        serializedElements = allElements
-          .filter(
-            (item) =>
-              item.role !== 'sibling' &&
-              (item.role !== 'child' || item.depth < currentMaxDepth),
-          )
-          .map((item) =>
-            serializeElement(
-              item.element,
-              item.role,
-              item.depth,
-              item.element.codeMetadata,
-              item.element.frameworkInfo?.react,
-              item.role === 'selected-element',
-            ),
-          );
+  const siblingChildNodes: xml.XmlObject[] =
+    depth === 0
+      ? getSiblings(element).map((sibling) => ({
+          sibling: serializeSelectedElementPart(sibling, maxSerializationDepth),
+        }))
+      : [];
 
-        result = serializedElements.join('\n\n');
-      }
+  const childrenChildNodes: xml.XmlObject[] =
+    !truncateChildren && depth >= 0 && element.children
+      ? element.children.slice(0, 3).map((child) => ({
+          child: [serializeSelectedElementPart(child, depth + 1)],
+        }))
+      : [];
 
-      // If still too long, start removing parents from oldest
-      if (result.length > maxCharacterAmount) {
-        serializedElements = allElements
-          .filter(
-            (item) =>
-              (item.role === 'parent' && item.depth > -2) ||
-              item.role === 'selected-element' ||
-              (item.role === 'child' && item.depth < currentMaxDepth),
-          )
-          .map((item) =>
-            serializeElement(
-              item.element,
-              item.role,
-              item.depth,
-              item.element.codeMetadata,
-              item.element.frameworkInfo?.react,
-              item.role === 'selected-element',
-            ),
-          );
+  const relatedFileChildNodes: xml.XmlObject[] = !minimizeContent
+    ? element.codeMetadata.map((file) => ({
+        'file-ref': {
+          _attr: {
+            path: file.relativePath,
+            relation: file.relation.length > 0 ? file.relation : undefined,
+            startLine: file.startLine !== 0 ? file.startLine : undefined,
+          },
+        },
+      }))
+    : [];
 
-        result = serializedElements.join('\n\n');
-      }
+  const reactComponentTreeChildNode: xml.XmlObject =
+    element.frameworkInfo?.react && depth === 0
+      ? {
+          'react-component-tree': {
+            _cdata: serializeReactComponentTree(element.frameworkInfo.react),
+          },
+        }
+      : {};
 
-      // Final truncation if still over limit (truncate selected element content)
-      if (result.length > maxCharacterAmount) {
-        result = result.substring(0, maxCharacterAmount);
-      }
-    }
+  return {
+    [element.nodeType.toLowerCase()]: [
+      attributeChildNode,
+      xpathChildNode,
+      positionChildNode,
+      ...ownPropertiesChildNodes,
+      ...attributesChildNodes,
+      textContentChildNode,
+      parentChildNode,
+      ...siblingChildNodes,
+      ...childrenChildNodes,
+      ...relatedFileChildNodes,
+      reactComponentTreeChildNode,
+    ],
+  };
+}
 
-    return result;
-  } catch (error) {
-    throw new Error(
-      `Error processing HTML element: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+function truncateTextContent(textContent: string, maxLength: number): string {
+  return textContent.length > maxLength
+    ? `${textContent.slice(0, maxLength)}...${specialTokens.truncated}`
+    : textContent;
 }

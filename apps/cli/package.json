@@ -33,9 +33,9 @@
   },
   "devDependencies": {
     "@inquirer/prompts": "^7.0.0",
+    "@stagewise/agent-knowledge": "workspace:*",
     "@stagewise/agent-prompt-snippets": "workspace:*",
     "@stagewise/agent-prompts": "workspace:*",
-    "@stagewise/agent-knowledge": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-runtime-node": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
@@ -68,18 +68,21 @@
     "zod": "4.0.17"
   },
   "dependencies": {
-    "superjson": "2.2.2",
     "@ai-sdk/anthropic": "2.0.9",
     "@ai-sdk/google": "2.0.11",
     "@ai-sdk/openai": "^2.0.23",
     "@ai-sdk/provider": "^2.0.0",
     "@posthog/ai": "^6.4.3",
     "ai": "5.0.9",
+    "chokidar": "^4.0.3",
     "diff": "^8.0.2",
     "esbuild": "0.25.9",
     "node-fetch": "^3.3.2",
     "prompts": "^2.4.2",
+    "superjson": "2.2.2",
+    "vscode-ripgrep": "^1.13.2",
     "ws": "^8.18.3",
-    "chokidar": "^4.0.3"
+    "@vscode/ripgrep": "1.17.0",
+    "xml": "^1.0.1"
   }
 }

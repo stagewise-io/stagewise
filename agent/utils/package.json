@@ -33,9 +33,10 @@
     "@ai-sdk/provider": "^2.0.0",
     "@stagewise/agent-knowledge": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",
-    "@stagewise/api-client": "1.4.0",
     "@stagewise/agent-tools": "workspace:*",
+    "@stagewise/api-client": "1.4.0",
     "ai": "5.0.9",
+    "xml": "^1.0.1",
     "zod": "4.0.17"
   },
   "devDependencies": {

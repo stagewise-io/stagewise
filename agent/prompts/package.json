@@ -22,11 +22,15 @@
     "test": "vitest"
   },
   "dependencies": {
-    "ai": "5.0.9"
+    "@types/xml": "^1.0.11",
+    "ai": "5.0.9",
+    "xml": "^1.0.1"
   },
   "devDependencies": {
     "@stagewise/agent-types": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
+    "@stagewise/agent-runtime-interface": "workspace:*",
+    "@stagewise/agent-project-information": "workspace:*",
     "esbuild": "0.25.9",
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0",

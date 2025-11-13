@@ -9,7 +9,7 @@ const baseOptions: BuildOptions = {
   bundle: true,
   platform: 'node',
   target: 'es2020',
-  external: ['@stagewise/karton', '@stagewise/agent-runtime-interface'],
+  external: ['@stagewise/karton', '@stagewise/agent-runtime-interface', 'xml'],
   sourcemap: false,
   minify: true,
   treeShaking: true,

@@ -16,6 +16,7 @@ const buildOptions: BuildOptions = {
     // Keep workspace dependencies as external since they'll be bundled separately
     '@stagewise/interface-client-runtime',
     '@stagewise/types',
+    'xml',
   ],
 };
 

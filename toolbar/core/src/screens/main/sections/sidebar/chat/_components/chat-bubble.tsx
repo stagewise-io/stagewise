@@ -273,7 +273,7 @@ export function ChatBubble({
             })()}
             {(fileAttachments.length > 0 ||
               selectedPreviewElements.length > 0) && (
-              <div className="flex flex-row gap-2">
+              <div className="flex flex-row flex-wrap gap-2">
                 <ContextElementsChipsFlexible
                   selectedElements={selectedPreviewElements.map(
                     (selectedPreviewElement) => ({

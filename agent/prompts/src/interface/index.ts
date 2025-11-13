@@ -1,6 +1,12 @@
 import type { SystemModelMessage, UserModelMessage } from 'ai';
-import type { ChatMessage, MainTab, Layout } from '@stagewise/karton-contract';
+import type {
+  ChatMessage,
+  MainTab,
+  Layout,
+  KartonContract,
+} from '@stagewise/karton-contract';
 import type { PromptSnippet } from '@stagewise/agent-types';
+import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 
 export type SystemPromptConfig = (
   | {
@@ -25,7 +31,10 @@ export type UserMessagePromptConfig = {
 };
 
 export abstract class Prompts {
-  abstract getSystemPrompt(config: SystemPromptConfig): SystemModelMessage;
+  abstract getSystemPrompt(
+    clientRuntime: ClientRuntime,
+    kartonState: KartonContract['state'],
+  ): Promise<SystemModelMessage>;
   abstract getUserMessagePrompt(
     config: UserMessagePromptConfig,
   ): UserModelMessage;

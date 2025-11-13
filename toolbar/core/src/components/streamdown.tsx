@@ -272,7 +272,7 @@ const AnchorComponent = ({
     const isFile = href?.startsWith(encodeURIComponent('{{FILE_PATH_PREFIX}}'));
     const replacedHref = href
       .replaceAll(encodeURIComponent('{{CONVERSATION_ID}}'), conversationId)
-      .replaceAll(encodeURIComponent('{{FILE_PATH_PREFIX}}') + '/', '') // We also remove the variant with trailing slash because this could also happen
+      .replaceAll(`${encodeURIComponent('{{FILE_PATH_PREFIX}}')}/`, '') // We also remove the variant with trailing slash because this could also happen
       .replaceAll(encodeURIComponent('{{FILE_PATH_PREFIX}}'), '');
 
     if (isFile) {

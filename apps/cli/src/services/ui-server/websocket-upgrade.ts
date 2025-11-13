@@ -28,6 +28,9 @@ export const configureWebSocketUpgrade = (
         console.error(
           "[WebSocketUpgrade] Proxy request received while no app port is configured. This shouldn't happen...",
         );
+        // Ensure we don't leave the WebSocket connection hanging
+        socket.destroy();
+        return;
       } else {
         proxyUpgradeHandler(request, socket as any, head);
       }

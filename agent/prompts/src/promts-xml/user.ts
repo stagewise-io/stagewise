@@ -1,79 +1,83 @@
 import type { UserMessagePromptConfig } from '../interface/index.js';
 import { browserMetadataToContextSnippet } from '../utils/browser-metadata.js';
 import { convertToModelMessages, type UserModelMessage } from 'ai';
-import { htmlElementToContextSnippet } from '../utils/html-elements.js';
+import {
+  serializeRelevantCodebaseFiles,
+  serializeSelectedElement,
+} from '../utils/html-elements.js';
+import specialTokens from '../utils/special-tokens.js';
+import xml from 'xml';
 
 export function getUserMessagePrompt(
   config: UserMessagePromptConfig,
 ): UserModelMessage {
   // convert file parts and text to model messages (without metadata) to ensure correct mapping of ui parts to model content
-  const convertedMessage = convertToModelMessages([config.userMessage]);
+  const convertedMessage: UserModelMessage = convertToModelMessages([
+    config.userMessage,
+  ])[0]! as UserModelMessage;
 
-  const content: UserModelMessage['content'] = [];
-
-  // exactly 1 message is the expected case, the latter is for unexpected conversion behavior of the ai library
-  if (convertedMessage.length === 1) {
-    const message = convertedMessage[0]! as UserModelMessage;
-    if (typeof message.content === 'string') {
-      content.push({
+  // If the content is a string, we convert it to a single text part because we always want a parts array as content.
+  if (typeof convertedMessage.content === 'string') {
+    convertedMessage.content = [
+      {
         type: 'text',
-        text: message.content,
+        text: convertedMessage.content,
+      },
+    ];
+  }
+
+  // We convert the text content of every user message to a XML-entry with CDATA in order to prevent stupid accidents due to weird user message content.
+  convertedMessage.content.forEach((part) => {
+    if (part.type === 'text') {
+      part.text = xml({ 'user-msg': { _cdata: part.text } });
+    }
+  });
+
+  const systemAttachmentTextPart: string[] = [];
+
+  if (config.userMessage?.metadata?.currentTab) {
+    systemAttachmentTextPart.push(
+      `<${specialTokens.userMsgAttachmentXmlTag} type="displayed-ui" value="${config.userMessage?.metadata?.currentTab}"/>`,
+    );
+  }
+
+  if (config.userMessage?.metadata?.browserData) {
+    systemAttachmentTextPart.push(
+      browserMetadataToContextSnippet(config.userMessage.metadata.browserData),
+    );
+  }
+
+  if (
+    config.userMessage?.metadata?.selectedPreviewElements &&
+    config.userMessage.metadata.selectedPreviewElements.length > 0
+  ) {
+    // We add max 5 context elements to the system attachment to avoid overwhelming the model with too much information.
+    // TODO: Add this limitation to the UI as well as to not introduce situations where the user expects the LLM to see more.
+    config.userMessage.metadata.selectedPreviewElements
+      .slice(0, 5)
+      .forEach((element) => {
+        systemAttachmentTextPart.push(serializeSelectedElement(element));
       });
-    } else {
-      for (const part of message.content) content.push(part);
-    }
-  } else {
-    // add content of all messages to the content array and pass it to user message
-    for (const message of convertedMessage) {
-      for (const c of (message as UserModelMessage).content) {
-        if (typeof c === 'string')
-          content.push({
-            type: 'text',
-            text: c,
-          });
-        else content.push(c);
-      }
-    }
+
+    // We add the relevant codebase files to the system attachment to provide the LLM with the codebase context.
+    // We limit this to max 3 files to avoid overwhelming the model with too much information.
+    systemAttachmentTextPart.push(
+      serializeRelevantCodebaseFiles(
+        config.userMessage.metadata?.selectedPreviewElements ?? [],
+        3,
+      ),
+    );
   }
 
-  const tabMetadataSnippet = config.userMessage?.metadata?.currentTab
-    ? `<agent_mode>This message was sent in the ${config.userMessage?.metadata?.currentTab} mode.</agent_mode>`
-    : null;
-
-  const browserMetadataSnippet = config.userMessage?.metadata?.browserData
-    ? browserMetadataToContextSnippet(config.userMessage?.metadata?.browserData)
-    : null;
-
-  if (browserMetadataSnippet) {
-    content.push({
+  if (systemAttachmentTextPart.length > 0) {
+    convertedMessage.content.push({
       type: 'text',
-      text: browserMetadataSnippet,
-    });
-  }
-
-  const selectedElementsSnippet =
-    (config.userMessage.metadata?.selectedPreviewElements?.length || 0) > 0
-      ? htmlElementToContextSnippet(
-          config.userMessage.metadata?.selectedPreviewElements ?? [],
-        )
-      : undefined;
-
-  if (tabMetadataSnippet) {
-    content.push({
-      type: 'text',
-      text: tabMetadataSnippet,
-    });
-  }
-
-  if (selectedElementsSnippet) {
-    content.push({
-      type: 'text',
-      text: selectedElementsSnippet,
+      text: systemAttachmentTextPart.join('\n'),
     });
   }
 
   return {
     role: 'user',
-    content,
+    content: convertedMessage.content,
   };
 }
