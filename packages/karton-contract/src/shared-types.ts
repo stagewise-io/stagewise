@@ -42,7 +42,13 @@ export const workspaceConfigSchema = z
       .default('{GIT_REPO_ROOT}'),
     appPort: z
       .number()
-      .describe('The port on which the app dev server serves the app preview'),
+      .min(0)
+      .max(65536)
+      .describe('The port on which the app dev server serves the app preview')
+      .catch((val) => {
+        if (typeof val !== 'number') return 0;
+        return Math.max(0, Math.min(65536, val));
+      }),
     useAutoFoundAppPort: z
       .boolean()
       .optional()
