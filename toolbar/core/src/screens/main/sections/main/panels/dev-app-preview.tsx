@@ -83,13 +83,20 @@ export const DevAppPreviewPanel = () => {
 
   // If the app state change to be running (or the port changes), we should reload the iframe
   const lastAppRunningState = useRef<boolean>(false);
-  const lastAppPort = useRef<number>(0);
+  const lastAppPort = useRef<number | undefined>(undefined);
   const appRunningState = useKartonState(
     (s) => s.workspace?.devAppStatus?.childProcessRunning ?? false,
   );
   const appPort = useKartonState(
-    (s) => s.workspace?.devAppStatus?.childProcessOwnedPorts[0] ?? 0,
+    (s) => s.workspace?.devAppStatus?.childProcessOwnedPorts[0],
   );
+
+  const configuredAppPort = useKartonState((s) => s.workspace?.config?.appPort);
+
+  const workspaceFullyOpened = useKartonState(
+    (s) => s.workspaceStatus === 'open',
+  );
+
   useEffect(() => {
     if (
       (appRunningState !== lastAppRunningState.current ||
@@ -121,23 +128,29 @@ export const DevAppPreviewPanel = () => {
       )}
       onClick={() => stopFullScreen()}
     >
-      <iframe
-        ref={iframeRef}
-        src="/"
-        title="Main user app"
-        className={cn(
-          'size-full overflow-hidden rounded-xl p-0',
-          size && 'rounded-2xl ring-8 ring-black',
-        )}
-        style={{
-          width: size?.width ?? '100%',
-          height: size?.height ?? '100%',
-        }}
-        id="user-app-iframe"
-      />
-      <DOMContextSelector
-        ref={selectorCanvasRef as React.RefObject<HTMLDivElement>}
-      />
+      {workspaceFullyOpened && (appPort || configuredAppPort) ? (
+        <>
+          <iframe
+            ref={iframeRef}
+            src="/"
+            title="Main user app"
+            className={cn(
+              'size-full overflow-hidden rounded-xl p-0',
+              size && 'rounded-2xl ring-8 ring-black',
+            )}
+            style={{
+              width: size?.width ?? '100%',
+              height: size?.height ?? '100%',
+            }}
+            id="user-app-iframe"
+          />
+          <DOMContextSelector
+            ref={selectorCanvasRef as React.RefObject<HTMLDivElement>}
+          />
+        </>
+      ) : (
+        <Loader2Icon className="size-10 animate-spin text-blue-600" />
+      )}
     </div>
   );
 };
