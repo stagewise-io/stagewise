@@ -9,6 +9,7 @@ import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 
 import { IDE_SELECTION_ITEMS } from '@/utils';
 import { useKartonState } from '@/hooks/use-karton';
+import { usePostHog } from 'posthog-js/react';
 
 export const OverwriteFileToolPart = ({
   part,
@@ -16,6 +17,7 @@ export const OverwriteFileToolPart = ({
   part: Extract<ToolPart, { type: 'tool-overwriteFileTool' }>;
 }) => {
   const { getFileIDEHref } = useFileIDEHref();
+  const posthog = usePostHog();
   const diff = useMemo(
     () =>
       part.output?.hiddenMetadata
@@ -89,6 +91,15 @@ export const OverwriteFileToolPart = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 className={buttonVariants({ size: 'xs', variant: 'ghost' })}
+                onClick={() => {
+                  posthog.capture(
+                    'agent-file-opened-in-ide-via-overwrite-file-tool',
+                    {
+                      file_path: part.input?.relative_path ?? '',
+                      ide: openInIdeSelection,
+                    },
+                  );
+                }}
               >
                 Open in {IDE_SELECTION_ITEMS[openInIdeSelection]}
               </a>

@@ -21,6 +21,8 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
+import { usePostHog } from 'posthog-js/react';
+import { useKartonState } from '@/hooks/use-karton';
 
 interface ContextElementsChipsProps {
   selectedElements: {
@@ -94,6 +96,10 @@ function ContextElementChip({
   onHover,
   onUnhover,
 }: ContextElementChipProps) {
+  const posthog = usePostHog();
+  const openInIdeSelection = useKartonState(
+    (s) => s.globalConfig.openFilesInIde,
+  );
   const { getFileIDEHref } = useFileIDEHref();
   const chipLabel = useMemo(() => {
     // We first try to get the component name from the framework info and then fallback to the element tag name
@@ -236,6 +242,16 @@ function ContextElementChip({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="shrink basis-4/5 break-all text-foreground text-sm hover:text-primary"
+                          onClick={() => {
+                            posthog.capture(
+                              'agent-file-opened-in-ide-via-element-context',
+                              {
+                                file_path: metadata.relativePath,
+                                ide: openInIdeSelection,
+                                line_number: metadata.startLine,
+                              },
+                            );
+                          }}
                         >
                           {getTruncatedFileUrl(metadata.relativePath)}
                         </a>

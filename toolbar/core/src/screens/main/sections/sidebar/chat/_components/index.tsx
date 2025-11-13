@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ChatHistory } from './chat-history';
 import { ChatPanelFooter } from './panel-footer';
 import { ChatPanelHeader } from './panel-header';
+import { usePostHog } from 'posthog-js/react';
 import {
   useComparingSelector,
   useKartonConnected,
@@ -16,6 +17,7 @@ export function ChatPanel({
 }: {
   multiChatControls?: boolean;
 }) {
+  const posthog = usePostHog();
   const chatState = useChatState();
   const [isDragging, setIsDragging] = useState(false);
   const isWorking = useKartonState(
@@ -50,6 +52,10 @@ export function ChatPanel({
       const files = Array.from(e.dataTransfer.files);
       files.forEach((file) => {
         chatState.addFileAttachment(file);
+        posthog.capture('agent-file-uploaded', {
+          file_type: file.type,
+          method: 'chat-drop-zone',
+        });
       });
 
       // Focus the input field

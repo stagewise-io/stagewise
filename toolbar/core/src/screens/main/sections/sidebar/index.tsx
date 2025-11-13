@@ -6,10 +6,12 @@ import {
 import { SidebarTopSection } from './top';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useEventListener } from '@/hooks/use-event-listener';
+import { usePostHog } from 'posthog-js/react';
 
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const panelRef = useRef<ImperativePanelHandle>(null);
+  const posthog = usePostHog();
 
   const openChatPanel = useCallback(() => {
     panelRef.current?.expand();
@@ -38,8 +40,14 @@ export function Sidebar() {
       maxSize={80}
       collapsible
       collapsedSize={4}
-      onCollapse={() => setIsCollapsed(true)}
-      onExpand={() => setIsCollapsed(false)}
+      onCollapse={() => {
+        setIsCollapsed(true);
+        posthog?.capture('sidebar_collapsed');
+      }}
+      onExpand={() => {
+        setIsCollapsed(false);
+        posthog?.capture('sidebar_expanded');
+      }}
       data-collapsed={isCollapsed}
       className="group flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-muted-foreground/5 data-[collapsed=true]:w-16 data-[collapsed=false]:min-w-64 data-[collapsed=true]:min-w-16 data-[collapsed=false]:max-w-2xl data-[collapsed=true]:max-w-16"
     >

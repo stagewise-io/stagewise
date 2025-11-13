@@ -98,6 +98,7 @@ export class AgentService {
     ChatId,
     {
       toolCallId: string;
+      toolName: string; // used for telemetry
       undoExecute?: () => Promise<void>;
     }[]
   > = new Map();
@@ -155,6 +156,10 @@ export class AgentService {
       case Layout.SETUP_WORKSPACE:
         return setupAgentTools(this.clientRuntime, {
           onSaveInformation: async (params) => {
+            this.telemetryService.capture('workspace-setup-information-saved', {
+              agent_access_path: params.agentAccessPath,
+              app_port: params.appPort,
+            });
             this.logger.debug(
               '[AgentService] Saving information for workspace setup',
             );
@@ -913,6 +918,10 @@ export class AgentService {
               if ('result' in result && hasUndoMetadata(result.result)) {
                 this.undoToolCallStack.get(chatId)?.push({
                   toolCallId: result.toolCallId,
+                  toolName:
+                    r.toolCalls.find(
+                      (tc) => tc.toolCallId === result.toolCallId,
+                    )?.toolName ?? '',
                   undoExecute: result.result.hiddenMetadata.undoExecute,
                 });
               }
@@ -923,6 +932,18 @@ export class AgentService {
                 [result],
                 this.lastMessageId!,
               );
+              this.telemetryService.capture('agent-tool-call-completed', {
+                chat_id: chatId,
+                message_id: this.lastMessageId!,
+                tool_name:
+                  r.toolCalls.find((tc) => tc.toolCallId === result.toolCallId)
+                    ?.toolName ?? '',
+                success: 'result' in result,
+                duration: result.duration,
+                tool_call_id: result.toolCallId,
+                error_message:
+                  'error' in result ? result.error.message : undefined,
+              });
             },
             (error) => {
               this.logger.error('[AgentService] Agent failed', error);
@@ -1080,6 +1101,7 @@ export class AgentService {
     await this.undoToolCallsUntilUserMessage(
       reversedHistory[userMessageIndex]!.id,
       chatId,
+      'undo-changes',
     );
     return latestUserMessage;
   }
@@ -1087,6 +1109,7 @@ export class AgentService {
   private async undoToolCallsUntilUserMessage(
     userMessageId: string,
     chatId: string,
+    type: 'restore-checkpoint' | 'undo-changes' = 'restore-checkpoint',
   ): Promise<void> {
     if (!this.undoToolCallStack.has(chatId)) return;
 
@@ -1099,9 +1122,12 @@ export class AgentService {
     const messagesAfterUserMessage =
       userMessageIndex !== -1 ? history.slice(userMessageIndex + 1) : [];
 
+    const assistantMessagesAfterUserMessage = messagesAfterUserMessage.filter(
+      (m) => m.role === 'assistant',
+    );
+
     const toolCallIdsAfterUserMessage: string[] = [];
-    for (const message of messagesAfterUserMessage) {
-      if (message.role !== 'assistant') continue;
+    for (const message of assistantMessagesAfterUserMessage) {
       for (const content of message.parts) {
         if (isToolCallType(content.type)) {
           toolCallIdsAfterUserMessage.push((content as ToolUIPart).toolCallId);
@@ -1110,6 +1136,7 @@ export class AgentService {
     }
 
     const idsAfter = new Set(toolCallIdsAfterUserMessage);
+    const toolCallsUndone: Map<string, number> = new Map();
 
     while (
       this.undoToolCallStack.get(chatId)?.at(-1)?.toolCallId &&
@@ -1117,6 +1144,10 @@ export class AgentService {
     ) {
       const undo = this.undoToolCallStack.get(chatId)?.pop();
       if (!undo) break;
+      toolCallsUndone.set(
+        undo.toolName,
+        (toolCallsUndone.get(undo.toolName) ?? 0) + 1,
+      );
       await undo.undoExecute?.();
     }
 
@@ -1127,6 +1158,17 @@ export class AgentService {
           chat.messages = history.slice(0, userMessageIndex) as any;
         }
       }
+    });
+
+    this.telemetryService.capture('agent-undo-tool-calls', {
+      chat_id: chatId,
+      message_id: userMessageId,
+      messages_undone_amount: {
+        assistant: assistantMessagesAfterUserMessage.length,
+        total: messagesAfterUserMessage.length,
+      },
+      tool_calls_undone_amount: Object.fromEntries(toolCallsUndone),
+      type,
     });
   }
 

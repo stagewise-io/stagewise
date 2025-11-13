@@ -34,6 +34,7 @@ import {
 } from '@stagewise/stage-ui/components/form';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { Layout, MainTab } from '@stagewise/karton-contract';
+import { usePostHog } from 'posthog-js/react';
 
 export function DevAppPreviewControls() {
   const isFullScreen = useKartonState(
@@ -229,6 +230,7 @@ export function ScreenSizeControl() {
       ? s.userExperience.devAppPreview.customScreenSize
       : null,
   );
+  const posthog = usePostHog();
   const setScreenSize = useKartonProcedure(
     (p) =>
       p.userExperience.mainLayout.mainLayout.devAppPreview.changeScreenSize,
@@ -268,7 +270,12 @@ export function ScreenSizeControl() {
               ([_, value]) => value?.presetName === screenSize?.presetName,
             )?.[0] ?? 'full-screen'
           }
-          onValueChange={(value) => onValueChange(value as string | null)}
+          onValueChange={(value) => {
+            onValueChange(value as string | null);
+            posthog.capture('dev-app-preview-screen-size-changed', {
+              screen_size: value,
+            });
+          }}
         >
           {Object.entries(screenSizes).map(([key, value]) => (
             <FormField>

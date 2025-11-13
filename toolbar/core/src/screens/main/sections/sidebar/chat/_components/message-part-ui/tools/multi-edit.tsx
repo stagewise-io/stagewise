@@ -1,5 +1,6 @@
 import type { ToolPart } from '@stagewise/karton-contract';
 import { DiffPreview, ToolPartUIBase } from './_shared';
+import { usePostHog } from 'posthog-js/react';
 import { MaximizeIcon, MinimizeIcon, PencilIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
 import { useFileIDEHref } from '@/hooks/use-file-ide-href';
@@ -25,6 +26,8 @@ export const MultiEditToolPart = ({
         : null,
     [part.output?.hiddenMetadata],
   );
+
+  const posthog = usePostHog();
 
   const newLineCount = useMemo(
     () =>
@@ -98,6 +101,15 @@ export const MultiEditToolPart = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 className={buttonVariants({ size: 'xs', variant: 'ghost' })}
+                onClick={() => {
+                  posthog.capture(
+                    'agent-file-opened-in-ide-via-multi-edit-tool',
+                    {
+                      file_path: part.input?.relative_path ?? '',
+                      ide: IDE_SELECTION_ITEMS[openInIdeSelection],
+                    },
+                  );
+                }}
               >
                 Open in {IDE_SELECTION_ITEMS[openInIdeSelection]}
               </a>

@@ -34,6 +34,7 @@ import {
 } from '@stagewise/stage-ui/components/menu';
 import { Layout, MainTab } from '@stagewise/karton-contract';
 import { useEventListener } from '@/hooks/use-event-listener';
+import { usePostHog } from 'posthog-js/react';
 
 const GlassyTextInputClassNames =
   'origin-center rounded-xl border border-black/10 ring-1 ring-white/20 transition-all duration-150 ease-out after:absolute after:inset-0 after:size-full after:content-normal after:rounded-[inherit] after:bg-gradient-to-b after:from-white/5 after:to-white/0 after:transition-colors after:duration-150 after:ease-out disabled:pointer-events-none disabled:bg-black/5 disabled:text-foreground/60 disabled:opacity-30';
@@ -70,6 +71,7 @@ export function ChatPanelFooter() {
   const stopAgent = useKartonProcedure((p) => p.agentChat.abortAgentCall);
   const canStop = isWorking;
   const isConnected = useKartonConnected();
+  const posthog = usePostHog();
 
   const abortAgent = useCallback(() => {
     stopAgent();
@@ -133,6 +135,10 @@ export function ChatPanelFooter() {
         e.preventDefault();
         files.forEach((file) => {
           chatState.addFileAttachment(file);
+          posthog.capture('agent-file-uploaded', {
+            file_type: file.type,
+            method: 'chat-paste',
+          });
         });
 
         // Start prompt creation if not already active
@@ -421,6 +427,10 @@ export function ChatPanelFooter() {
                           (e.target as HTMLInputElement).files ?? [],
                         ).forEach((file) => {
                           chatState.addFileAttachment(file);
+                          posthog.capture('agent-file-uploaded', {
+                            file_type: file.type,
+                            method: 'chat-file-attachment-menu',
+                          });
                         });
                       };
                     }}

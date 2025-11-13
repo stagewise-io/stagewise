@@ -30,6 +30,10 @@ export interface EventProperties {
       | 'on_start_with_arg'
       | 'at_runtime_by_user_action';
   };
+  'workspace-setup-information-saved': {
+    agent_access_path: string;
+    app_port: number;
+  };
   'cli-stored-config-json': undefined;
   'cli-found-config-json': undefined;
   'cli-send-prompt': undefined;
@@ -47,6 +51,25 @@ export interface EventProperties {
   };
   'cli-telemetry-config-set': {
     configured_level: 'off' | 'anonymous' | 'full';
+  };
+  'agent-tool-call-completed': {
+    chat_id: string;
+    message_id: string;
+    tool_name: string;
+    success: boolean;
+    error_message?: string;
+    duration: number;
+    tool_call_id: string;
+  };
+  'agent-undo-tool-calls': {
+    chat_id: string;
+    message_id: string;
+    messages_undone_amount: {
+      assistant: number;
+      total: number;
+    };
+    tool_calls_undone_amount: Record<string, number>;
+    type: 'restore-checkpoint' | 'undo-changes';
   };
   'agent-state-changed': {
     isWorking: boolean;
