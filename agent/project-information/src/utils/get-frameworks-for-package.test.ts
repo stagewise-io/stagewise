@@ -9,7 +9,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect Next.js framework with React', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/nextjs-app',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/nextjs-app/package.json': JSON.stringify({
           name: 'nextjs-app',
@@ -48,7 +48,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect Angular framework', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/angular-app',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/angular-app/package.json': JSON.stringify({
           name: 'angular-app',
@@ -87,7 +87,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect Vue.js with Vite', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/vue-app',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/vue-app/package.json': JSON.stringify({
           name: 'vue-app',
@@ -122,7 +122,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect Nuxt.js with Vue.js listed separately', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/nuxt-app',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/nuxt-app/package.json': JSON.stringify({
           name: 'nuxt-app',
@@ -158,7 +158,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect SvelteKit with Svelte', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/sveltekit-app',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/sveltekit-app/package.json': JSON.stringify({
           name: 'sveltekit-app',
@@ -190,7 +190,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect SolidStart with Solid.js', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/solid-app',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/solid-app/package.json': JSON.stringify({
           name: 'solid-app',
@@ -221,7 +221,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect React with Vite and Jest', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/react-app',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/react-app/package.json': JSON.stringify({
           name: 'react-app',
@@ -259,7 +259,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect Express backend', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/express-api',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/express-api/package.json': JSON.stringify({
           name: 'express-api',
@@ -293,7 +293,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect NestJS backend', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/nestjs-api',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/nestjs-api/package.json': JSON.stringify({
           name: 'nestjs-api',
@@ -324,7 +324,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect only build tools when no frameworks present', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/build-only',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/build-only/package.json': JSON.stringify({
           name: 'build-only',
@@ -353,7 +353,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect only testing frameworks', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/test-only',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/test-only/package.json': JSON.stringify({
           name: 'test-only',
@@ -381,7 +381,7 @@ describe('getFrameworksForPackage', () => {
   it('should handle projects without package.json', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/no-package',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/no-package/README.md': '# No package.json here',
       },
@@ -403,7 +403,7 @@ describe('getFrameworksForPackage', () => {
   it('should handle malformed package.json gracefully', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/malformed',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/malformed/package.json': '{invalid json}',
       },
@@ -426,7 +426,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect multiple frameworks in same category', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/multi-same-category',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/multi-same-category/package.json': JSON.stringify({
           name: 'multi-same-category',
@@ -478,7 +478,7 @@ describe('getFrameworksForPackage', () => {
   it('should handle version cleaning correctly', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/version-test',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/version-test/package.json': JSON.stringify({
           name: 'version-test',
@@ -506,7 +506,7 @@ describe('getFrameworksForPackage', () => {
   it('should handle framework detection with scripts only', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/scripts-only',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/scripts-only/package.json': JSON.stringify({
           name: 'scripts-only',
@@ -534,7 +534,7 @@ describe('getFrameworksForPackage', () => {
   it('should handle empty package.json', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/empty',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/empty/package.json': JSON.stringify({
           name: 'empty-project',
@@ -555,7 +555,7 @@ describe('getFrameworksForPackage', () => {
   it('should handle co-existing frameworks in different categories', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/full-stack',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/full-stack/package.json': JSON.stringify({
           name: 'full-stack',
@@ -605,7 +605,7 @@ describe('getFrameworksForPackage', () => {
   it('should detect frameworks from peerDependencies', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/peer-deps',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/peer-deps/package.json': JSON.stringify({
           name: 'peer-deps-package',
@@ -641,7 +641,7 @@ describe('getFrameworksForPackage', () => {
   it('should merge foundIn sources when framework appears in multiple places', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/project/multiple-sources',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/project/multiple-sources/package.json': JSON.stringify({
           name: 'multiple-sources',

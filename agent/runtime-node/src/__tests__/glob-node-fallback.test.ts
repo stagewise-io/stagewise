@@ -13,11 +13,11 @@ describe('glob with Node.js fallback', () => {
   beforeEach(() => {
     testDir = createTempDir('glob-fallback-test-');
     cleanupHandler.register(testDir);
-    // Use testDir as ripgrepBasePath - ripgrep binary won't exist there
+    // Use testDir as rgBinaryBasePath - ripgrep binary won't exist there
     // This forces fallback to Node.js implementation
     fileSystem = new NodeFileSystemProvider({
       workingDirectory: testDir,
-      ripgrepBasePath: testDir, // Invalid path - no binary here!
+      rgBinaryBasePath: testDir, // Invalid path - no binary here!
     });
   });
 

@@ -13,7 +13,7 @@ describe('searchAndReplace', () => {
     cleanup.register(testDir);
     fileSystem = new NodeFileSystemProvider({
       workingDirectory: testDir,
-      ripgrepBasePath: testDir,
+      rgBinaryBasePath: testDir,
     });
   });
 
@@ -282,7 +282,7 @@ describe('searchAndReplace', () => {
     });
 
     it('should handle unicode characters', async () => {
-      createFile(testDir, 'test.txt', '`} world =€');
+      createFile(testDir, 'test.txt', '`} world =ï¿½');
 
       const result = await fileSystem.searchAndReplace(
         'test.txt',

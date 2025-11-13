@@ -4,7 +4,7 @@ import path from 'node:path';
 /**
  * Determines the ripgrep binary path based on a base directory and platform.
  *
- * @param basePath - Base directory where ripgrep should be stored (e.g., ~/.stagewise)
+ * @param rgBinaryBasePath - Base directory where ripgrep should be stored (e.g., ~/.stagewise)
  * @returns Full path to the ripgrep binary
  *
  * @example
@@ -14,8 +14,8 @@ import path from 'node:path';
  * // Returns: 'C:\\Users\\user\\.stagewise\\bin\\rg.exe' on Windows
  * ```
  */
-export function getRipgrepPath(basePath: string): string {
-  const binDir = path.join(basePath, 'bin', 'ripgrep');
+export function getRipgrepPath(rgBinaryBasePath: string): string {
+  const binDir = path.join(rgBinaryBasePath, 'bin', 'ripgrep');
   const binaryName = os.platform() === 'win32' ? 'rg.exe' : 'rg';
   return path.join(binDir, binaryName);
 }
@@ -23,9 +23,9 @@ export function getRipgrepPath(basePath: string): string {
 /**
  * Gets the directory where the ripgrep binary should be stored.
  *
- * @param basePath - Base directory where ripgrep should be stored
+ * @param rgBinaryBasePath - Base directory where ripgrep should be stored
  * @returns Directory path for the ripgrep binary
  */
-export function getRipgrepBinDir(basePath: string): string {
-  return path.join(basePath, 'bin', 'ripgrep');
+export function getRipgrepBinDir(rgBinaryBasePath: string): string {
+  return path.join(rgBinaryBasePath, 'bin', 'ripgrep');
 }

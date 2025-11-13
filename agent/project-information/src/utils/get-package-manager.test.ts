@@ -6,7 +6,7 @@ describe('getPackageManager', () => {
   it('should detect pnpm from packageManager field with version', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -27,7 +27,7 @@ describe('getPackageManager', () => {
   it('should detect yarn from packageManager field without version', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -47,7 +47,7 @@ describe('getPackageManager', () => {
   it('should prioritize packageManager field over lock files', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -70,7 +70,7 @@ describe('getPackageManager', () => {
   it('should detect pnpm from lock file', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -90,7 +90,7 @@ describe('getPackageManager', () => {
   it('should detect yarn from lock file', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -110,7 +110,7 @@ describe('getPackageManager', () => {
   it('should detect bun from lock file', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -130,7 +130,7 @@ describe('getPackageManager', () => {
   it('should detect npm from lock file', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -154,7 +154,7 @@ describe('getPackageManager', () => {
   it('should detect pnpm from workspace configuration file', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -174,7 +174,7 @@ describe('getPackageManager', () => {
   it('should detect yarn from .yarnrc.yml file', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -194,7 +194,7 @@ describe('getPackageManager', () => {
   it('should detect yarn from legacy .yarnrc file', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -214,7 +214,7 @@ describe('getPackageManager', () => {
   it('should detect npm from workspaces field when no lock file exists', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -234,7 +234,7 @@ describe('getPackageManager', () => {
   it('should return null when no package manager can be detected', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -251,7 +251,7 @@ describe('getPackageManager', () => {
   it('should return null when no package.json exists', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'README.md': '# Project without package.json',
       },
@@ -265,7 +265,7 @@ describe('getPackageManager', () => {
   it('should handle invalid packageManager field gracefully', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',
@@ -287,7 +287,7 @@ describe('getPackageManager', () => {
   it('should handle malformed package.json gracefully', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': '{ invalid json',
         'yarn.lock': '# yarn lockfile v1',
@@ -305,7 +305,7 @@ describe('getPackageManager', () => {
   it('should detect from parent directory in monorepo structure', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/workspace/monorepo/packages/my-package/src',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         '/workspace/monorepo/package.json': JSON.stringify({
           name: 'monorepo',
@@ -331,7 +331,7 @@ describe('getPackageManager', () => {
   it('should respect detection priority order for lock files', async () => {
     const mockRuntime = new ClientRuntimeMock({
       workingDirectory: '/test/project',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
       initialFiles: {
         'package.json': JSON.stringify({
           name: 'my-project',

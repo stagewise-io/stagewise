@@ -8,7 +8,7 @@ describe('getProjectPackages', () => {
     it('should detect pnpm workspace monorepo with resolved packages', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/monorepo',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/monorepo/package.json': JSON.stringify({
             name: 'monorepo',
@@ -70,7 +70,7 @@ describe('getProjectPackages', () => {
     it('should detect pnpm + turbo monorepo with multiple tools', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/stagewise',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/stagewise/package.json': JSON.stringify({
             name: 'stagewise',
@@ -122,7 +122,7 @@ describe('getProjectPackages', () => {
     it('should detect lerna monorepo with scoped packages', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/lerna-repo',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/lerna-repo/package.json': JSON.stringify({
             name: 'lerna-monorepo',
@@ -167,7 +167,7 @@ describe('getProjectPackages', () => {
     it('should detect nx monorepo with custom layout', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/nx-repo',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/nx-repo/package.json': JSON.stringify({
             name: 'nx-workspace',
@@ -212,7 +212,7 @@ describe('getProjectPackages', () => {
     it('should detect rush monorepo with explicit projects', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/rush-repo',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/rush-repo/package.json': JSON.stringify({
             name: 'rush-monorepo',
@@ -262,7 +262,7 @@ describe('getProjectPackages', () => {
     it('should handle npm workspaces with nested structure', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/npm-workspace',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/npm-workspace/package.json': JSON.stringify({
             name: 'npm-workspace',
@@ -299,7 +299,7 @@ describe('getProjectPackages', () => {
     it('should handle yarn workspaces with array format', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/yarn-workspace',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/yarn-workspace/package.json': JSON.stringify({
             name: 'yarn-workspace',
@@ -330,7 +330,7 @@ describe('getProjectPackages', () => {
     it('should handle bun workspaces', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/bun-workspace',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/bun-workspace/package.json': JSON.stringify({
             name: 'bun-workspace',
@@ -358,7 +358,7 @@ describe('getProjectPackages', () => {
     it('should handle direct package paths (no wildcards)', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/direct',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/direct/package.json': JSON.stringify({
             name: 'direct-workspace',
@@ -395,7 +395,7 @@ describe('getProjectPackages', () => {
     it('should handle deep glob patterns with **', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/deep',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/deep/package.json': JSON.stringify({
             name: 'deep-workspace',
@@ -439,7 +439,7 @@ describe('getProjectPackages', () => {
     it('should handle non-monorepo project', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/project/single-package',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/project/single-package/package.json': JSON.stringify({
             name: 'single-package',
@@ -460,7 +460,7 @@ describe('getProjectPackages', () => {
     it('should handle project with no package.json', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/project/no-package',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/project/no-package/README.md': '# Just a regular directory',
         },
@@ -477,7 +477,7 @@ describe('getProjectPackages', () => {
     it('should handle workspace patterns with no actual packages', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/empty',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/empty/package.json': JSON.stringify({
             name: 'empty-workspace',
@@ -499,7 +499,7 @@ describe('getProjectPackages', () => {
     it('should handle packages without package.json files', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/missing-pkgjson',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/missing-pkgjson/package.json': JSON.stringify({
             name: 'workspace',
@@ -527,7 +527,7 @@ describe('getProjectPackages', () => {
     it('should handle packages with missing or invalid names', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/invalid-names',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/invalid-names/package.json': JSON.stringify({
             name: 'workspace',
@@ -561,7 +561,7 @@ describe('getProjectPackages', () => {
     it('should handle malformed configuration files gracefully', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/malformed',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/malformed/package.json': JSON.stringify({
             name: 'malformed-config',
@@ -596,7 +596,7 @@ describe('getProjectPackages', () => {
     it('should deduplicate packages from multiple workspace sources', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/combined',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/combined/package.json': JSON.stringify({
             name: 'combined-workspace',
@@ -644,7 +644,7 @@ describe('getProjectPackages', () => {
     it('should handle complex pnpm-workspace.yaml with comments and quotes', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/complex-pnpm',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/complex-pnpm/package.json': JSON.stringify({
             name: 'complex-pnpm',
@@ -701,7 +701,7 @@ catalog: {}`,
     it('should handle Nx monorepo with default layout', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/nx-default',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/nx-default/package.json': JSON.stringify({
             name: 'nx-workspace',
@@ -737,7 +737,7 @@ catalog: {}`,
     it('should handle lage monorepo', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/lage-repo',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/lage-repo/package.json': JSON.stringify({
             name: 'lage-monorepo',
@@ -772,7 +772,7 @@ catalog: {}`,
     it('should handle monorepo with mixed tool configurations', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/mixed',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/mixed/package.json': JSON.stringify({
             name: 'mixed-tools',
@@ -840,7 +840,7 @@ catalog: {}`,
 
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/large',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: files,
       });
 
@@ -860,7 +860,7 @@ catalog: {}`,
     it('should handle monorepo with version-less packages', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/no-versions',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/no-versions/package.json': JSON.stringify({
             name: 'no-versions-workspace',
@@ -894,7 +894,7 @@ catalog: {}`,
     it('should only return detected tools, not all possible tools', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/simple',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/simple/package.json': JSON.stringify({
             name: 'simple-project',
@@ -918,7 +918,7 @@ catalog: {}`,
     it('should handle workspace patterns pointing to non-existent directories', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/missing-dirs',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/missing-dirs/package.json': JSON.stringify({
             name: 'missing-dirs',
@@ -944,7 +944,7 @@ catalog: {}`,
     it('should handle deeply nested monorepo structures', async () => {
       const mockRuntime = new ClientRuntimeMock({
         workingDirectory: '/workspace/nested',
-        ripgrepBasePath: '',
+        rgBinaryBasePath: '',
         initialFiles: {
           '/workspace/nested/package.json': JSON.stringify({
             name: 'nested-workspace',

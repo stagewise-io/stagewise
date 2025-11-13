@@ -23,7 +23,7 @@ describe('File Operations', () => {
     cleanupHandler.register(testDir);
     fileSystem = new NodeFileSystemProvider({
       workingDirectory: testDir,
-      ripgrepBasePath: testDir,
+      rgBinaryBasePath: testDir,
     });
   });
 

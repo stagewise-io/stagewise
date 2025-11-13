@@ -8,16 +8,16 @@ import { runGlobTestSuite } from './shared/glob-test-suite.js';
 
 describe('glob with ripgrep', () => {
   const cleanupHandler = createCleanupHandler();
-  let ripgrepBasePath: string;
+  let rgBinaryBasePath: string;
   let testDir: string;
   let fileSystem: NodeFileSystemProvider;
 
   beforeAll(async () => {
     // Download ripgrep ONCE to temp directory
-    ripgrepBasePath = createTempDir('ripgrep-install-');
+    rgBinaryBasePath = createTempDir('ripgrep-install-');
 
     const result = await ensureRipgrepInstalled({
-      basePath: ripgrepBasePath,
+      rgBinaryBasePath,
       onLog: (msg) => console.log(`[ripgrep-install] ${msg}`),
     });
 
@@ -36,7 +36,7 @@ describe('glob with ripgrep', () => {
     cleanupHandler.register(testDir);
     fileSystem = new NodeFileSystemProvider({
       workingDirectory: testDir,
-      ripgrepBasePath, // Use the downloaded ripgrep binary
+      rgBinaryBasePath, // Use the downloaded ripgrep binary
     });
   });
 
@@ -45,7 +45,7 @@ describe('glob with ripgrep', () => {
   });
 
   afterAll(() => {
-    cleanupTestDir(ripgrepBasePath);
+    cleanupTestDir(rgBinaryBasePath);
   });
 
   it('should verify ripgrep binary is available and returns results', async () => {
@@ -56,7 +56,7 @@ describe('glob with ripgrep', () => {
     const result = await globWithRipgrep(
       fileSystem,
       '*.ts',
-      ripgrepBasePath,
+      rgBinaryBasePath,
     );
 
     // Ripgrep should be available and return a valid result

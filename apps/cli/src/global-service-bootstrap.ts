@@ -36,7 +36,7 @@ export async function bootstrapGlobalServices({
   // Ensure ripgrep is installed for improved grep/glob performance
   // If installation fails, the app will continue with Node.js fallback implementations
   ensureRipgrepInstalled({
-    basePath: globalDataPathService.globalDataPath,
+    rgBinaryBasePath: globalDataPathService.globalDataPath,
     onLog: logger.debug,
   })
     .then((result) => {

@@ -24,7 +24,7 @@ describe('grep - Node.js Fallback', () => {
     cleanupHandler.register(testDir);
     fileSystem = new NodeFileSystemProvider({
       workingDirectory: testDir,
-      ripgrepBasePath: testDir,
+      rgBinaryBasePath: testDir,
     });
   });
 

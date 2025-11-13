@@ -45,10 +45,10 @@ export async function globNodeFallback(
           [];
         for await (const dirent of dirHandle) {
           const full = join(dir, dirent.name);
-          const rel =
-            options?.absoluteSearchResults || options?.absoluteSearchPath
-              ? full
-              : path.relative(fileSystem.getCurrentWorkingDirectory(), full);
+          const rel = path.relative(
+            fileSystem.getCurrentWorkingDirectory(),
+            full,
+          );
           entries.push({ dirent, full, rel });
         }
         // Note: for await automatically closes the directory handle
@@ -62,18 +62,21 @@ export async function globNodeFallback(
             continue;
           if (shouldSkipRel(rel)) continue;
 
+          // Always match against relative path for pattern matching
           const matches = minimatch(rel, pattern);
 
           if (
             matches &&
             (dirent.isFile() ||
               (options?.includeDirectories && dirent.isDirectory()))
-          )
-            paths.push(
+          ) {
+            // Only convert to absolute path for the results if requested
+            const resultPath =
               options?.absoluteSearchResults || options?.absoluteSearchPath
                 ? full
-                : rel,
-            );
+                : rel;
+            paths.push(resultPath);
+          }
 
           if (dirent.isDirectory() && pattern.includes('**'))
             walkQueue.push(full);

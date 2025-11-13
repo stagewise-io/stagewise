@@ -156,7 +156,7 @@ export class WorkspaceService {
 
         const clientRuntime = new ClientRuntimeNode({
           workingDirectory: this.getAbsoluteAgentAccessPath(),
-          ripgrepBasePath: this.globalDataPathService.globalDataPath,
+          rgBinaryBasePath: this.globalDataPathService.globalDataPath,
         });
         this.kartonService.setState((draft) => {
           draft.workspace!.agent = {
@@ -229,7 +229,7 @@ export class WorkspaceService {
 
     const clientRuntime = new ClientRuntimeNode({
       workingDirectory: this.getAbsoluteAgentAccessPath(),
-      ripgrepBasePath: this.globalDataPathService.globalDataPath,
+      rgBinaryBasePath: this.globalDataPathService.globalDataPath,
     });
 
     this._agentService =

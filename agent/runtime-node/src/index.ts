@@ -278,7 +278,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       this,
       searchPath,
       pattern,
-      this.config.ripgrepBasePath,
+      this.config.rgBinaryBasePath,
       options,
     );
   }
@@ -294,7 +294,13 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
       absoluteSearchResults?: boolean;
     },
   ): Promise<GlobResult> {
-    return glob(this, pattern, this.config.ripgrepBasePath, options);
+    // Map the "absolute" convenience option to "absoluteSearchResults"
+    const effectiveOptions = {
+      ...options,
+      absoluteSearchResults:
+        options?.absolute ?? options?.absoluteSearchResults,
+    };
+    return glob(this, pattern, this.config.rgBinaryBasePath, effectiveOptions);
   }
 
   async searchAndReplace(
@@ -765,7 +771,7 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
 
 export interface ClientRuntimeNodeConfig {
   workingDirectory: string;
-  ripgrepBasePath: string;
+  rgBinaryBasePath: string;
 }
 
 export class ClientRuntimeNode implements ClientRuntime {
@@ -774,7 +780,7 @@ export class ClientRuntimeNode implements ClientRuntime {
   constructor(config: ClientRuntimeNodeConfig) {
     this.fileSystem = new NodeFileSystemProvider({
       workingDirectory: config.workingDirectory,
-      ripgrepBasePath: config.ripgrepBasePath,
+      rgBinaryBasePath: config.rgBinaryBasePath,
     });
   }
 

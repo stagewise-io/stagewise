@@ -212,6 +212,7 @@ export interface IFileSystemProvider {
     pattern: string,
     options?: {
       searchPath?: string; // Base directory for search. By default, the search will happen in the current working directory.
+      absolute?: boolean; // Convenience option for absoluteSearchResults. If true, results will be absolute paths.
       excludePatterns?: string[]; // Patterns to exclude
       respectGitignore?: boolean; // Whether to respect .gitignore patterns (default: true)
       absoluteSearchPath?: boolean; // If true, the search path will not be relative to the current working directory of the client runtime but instead absolute to the users machine.
@@ -373,7 +374,7 @@ export interface IFileSystemProvider {
  */
 export interface FileSystemProviderConfig {
   workingDirectory: string;
-  ripgrepBasePath: string;
+  rgBinaryBasePath: string;
 }
 
 /**

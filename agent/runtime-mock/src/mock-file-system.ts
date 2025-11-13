@@ -39,7 +39,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
   constructor(
     config: MockFileSystemConfig = {
       workingDirectory: '/test',
-      ripgrepBasePath: '',
+      rgBinaryBasePath: '',
     },
   ) {
     super(config);
@@ -419,7 +419,13 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
         includeDirectories = true,
         excludePatterns = [],
         respectGitignore = true,
+        absoluteSearchPath = false,
+        absoluteSearchResults = false,
       } = options;
+
+      // Map the "absolute" convenience option to "absoluteSearchResults"
+      const shouldReturnAbsolute =
+        absolute || absoluteSearchResults || absoluteSearchPath;
 
       const paths: string[] = [];
 
@@ -461,7 +467,7 @@ export class MockFileSystemProvider extends BaseFileSystemProvider {
         }
 
         if (regex.test(file.relativePath)) {
-          const resultPath = absolute
+          const resultPath = shouldReturnAbsolute
             ? this.resolvePath(file.relativePath)
             : file.relativePath;
           paths.push(resultPath);

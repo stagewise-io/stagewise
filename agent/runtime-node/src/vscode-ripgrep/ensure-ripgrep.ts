@@ -94,7 +94,7 @@ export type EnsureRipgrepResult = {
 };
 
 export type EnsureRipgrepOptions = {
-  basePath: string;
+  rgBinaryBasePath: string;
   force?: boolean;
   onLog?: (message: string) => void;
 };
@@ -103,7 +103,7 @@ export type EnsureRipgrepOptions = {
  * Ensures ripgrep binary is installed and available.
  * This function can be called from application code to ensure ripgrep is available.
  *
- * @param options.basePath - Base directory where ripgrep should be installed (e.g., ~/.stagewise)
+ * @param options.rgBinaryBasePath - Base directory where ripgrep should be installed (e.g., ~/.stagewise)
  * @param options.force - Force reinstallation even if binary exists
  * @param options.onLog - Optional logging callback
  * @returns Result object with success status, path to ripgrep binary, and optional error message
@@ -111,11 +111,11 @@ export type EnsureRipgrepOptions = {
 export async function ensureRipgrepInstalled(
   options: EnsureRipgrepOptions,
 ): Promise<EnsureRipgrepResult> {
-  const { basePath, force = false, onLog = () => {} } = options;
+  const { rgBinaryBasePath, force = false, onLog = () => {} } = options;
 
   try {
-    const binDir = getRipgrepBinDir(basePath);
-    const rgPath = getRipgrepPath(basePath);
+    const binDir = getRipgrepBinDir(rgBinaryBasePath);
+    const rgPath = getRipgrepPath(rgBinaryBasePath);
 
     // Check if binary already exists
     const binExists = await fsExists(binDir);
