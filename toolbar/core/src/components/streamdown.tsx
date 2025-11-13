@@ -1,4 +1,5 @@
-import { Streamdown as StreamdownBase } from 'streamdown';
+import { defaultRehypePlugins, Streamdown as StreamdownBase } from 'streamdown';
+import { FileIcon } from 'lucide-react';
 import { CodeBlock } from './ui/code-block';
 import { Mermaid } from './ui/mermaid';
 import {
@@ -11,12 +12,22 @@ import {
   useContext,
   createContext,
   useRef,
+  type AnchorHTMLAttributes,
+  useMemo,
 } from 'react';
 import { cn } from '@/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { CopyCheckIcon, CopyIcon } from 'lucide-react';
 import type { BundledLanguage } from 'shiki';
 import type { ExtraProps } from 'react-markdown';
+import { useKartonState } from '@/hooks/use-karton';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
+import { getTruncatedFileUrl } from '@/utils';
+import { useFileIDEHref } from '@/hooks/use-file-ide-href';
 
 const LANGUAGE_REGEX = /language-([^\s]+)/;
 
@@ -59,7 +70,9 @@ export const Streamdown = ({
         }}
         components={{
           code: MemoCode,
+          a: MemoAnchor,
         }}
+        rehypePlugins={[defaultRehypePlugins.raw!, defaultRehypePlugins.katex!]}
       >
         {children}
       </StreamdownBase>
@@ -218,3 +231,89 @@ const CodeBlockCopyButton = ({ code }: { code: string }) => {
     </Button>
   );
 };
+
+const AnchorComponent = ({
+  href,
+  className,
+  ...props
+}: DetailedHTMLProps<
+  AnchorHTMLAttributes<HTMLAnchorElement>,
+  HTMLAnchorElement
+> &
+  ExtraProps) => {
+  const filePathLabel = useMemo(() => {
+    if (!href) return null;
+    if (!href.startsWith(encodeURIComponent('{{FILE_PATH_PREFIX}}'))) {
+      return null;
+    }
+    const filePath = href.replaceAll(
+      encodeURIComponent('{{FILE_PATH_PREFIX}}'),
+      '',
+    );
+
+    const truncatedFilePath = getTruncatedFileUrl(
+      filePath.split(':')[0]!,
+      3,
+      128,
+    );
+    const lineNumber = filePath.split(':')[1];
+
+    return `${truncatedFilePath}${lineNumber ? ` (Line ${lineNumber})` : ''}`;
+  }, [href]);
+
+  const conversationId = useKartonState(
+    (s) => s.workspace?.agentChat?.activeChatId ?? 'unknown',
+  );
+
+  const filePathTools = useFileIDEHref();
+
+  const processedHref = useMemo(() => {
+    if (!href) return '';
+    const isFile = href?.startsWith(encodeURIComponent('{{FILE_PATH_PREFIX}}'));
+    const replacedHref = href
+      .replaceAll(encodeURIComponent('{{CONVERSATION_ID}}'), conversationId)
+      .replaceAll(encodeURIComponent('{{FILE_PATH_PREFIX}}') + '/', '') // We also remove the variant with trailing slash because this could also happen
+      .replaceAll(encodeURIComponent('{{FILE_PATH_PREFIX}}'), '');
+
+    if (isFile) {
+      return filePathTools.getFileIDEHref(replacedHref);
+    }
+    return replacedHref;
+  }, [conversationId, filePathTools]);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger>
+        <a
+          href={processedHref}
+          className={cn(
+            'inline-flex items-baseline justify-start gap-0.5 font-medium text-primary hover:opacity-80',
+            className,
+          )}
+          {...props}
+        >
+          {filePathLabel && (
+            <FileIcon className="inline size-3.5 self-center" />
+          )}
+          {filePathLabel ?? props.children}
+        </a>
+      </TooltipTrigger>
+      <TooltipContent>{processedHref}</TooltipContent>
+    </Tooltip>
+  );
+};
+
+const MemoAnchor = memo<
+  DetailedHTMLProps<
+    AnchorHTMLAttributes<HTMLAnchorElement>,
+    HTMLAnchorElement
+  > &
+    ExtraProps
+>(
+  AnchorComponent,
+  (p, n) =>
+    p.href === n.href &&
+    p.className === n.className &&
+    p.children === n.children,
+);
+MemoAnchor.displayName = 'MarkdownAnchor';
