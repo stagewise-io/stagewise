@@ -121,13 +121,20 @@ export class TelemetryService {
     this.userProperties = { ...this.userProperties, ...properties };
   }
 
+  private getDistinctId(): string {
+    return this.globalConfigService.get().telemetryLevel === 'full' &&
+      this.userProperties.user_id
+      ? this.userProperties.user_id
+      : this.identifierService.getMachineId();
+  }
+
   identifyUser() {
-    this.logger.debug('[TelemetryService] Identifying user...');
     if (
       this.userProperties.user_id &&
       this.userProperties.user_email &&
       this.globalConfigService.get().telemetryLevel === 'full'
     ) {
+      this.logger.debug('[TelemetryService] Identifying user...');
       this.posthogClient.identify({
         distinctId: this.userProperties.user_id,
         properties: {
@@ -135,11 +142,14 @@ export class TelemetryService {
         },
       });
       this.posthogClient.alias({
-        distinctId: this.userProperties.user_id,
-        alias: this.identifierService.getMachineId(),
+        alias: this.userProperties.user_id,
+        distinctId: this.identifierService.getMachineId(),
       });
+    } else {
+      this.logger.debug(
+        '[TelemetryService] Not identifying user, missing user properties or telemetry level is not "full"',
+      );
     }
-    this.logger.debug('[TelemetryService] User identified');
   }
 
   public withTracing(
@@ -149,10 +159,10 @@ export class TelemetryService {
     const telemetryLevel = this.globalConfigService.get().telemetryLevel;
     if (telemetryLevel === 'off') return model;
 
-    const machineId = this.identifierService.getMachineId();
+    const distinctId = this.getDistinctId();
 
     return withTracing(model, this.posthogClient, {
-      posthogDistinctId: machineId,
+      posthogDistinctId: distinctId,
       ...properties,
       posthogProperties: {
         telemetry_level: telemetryLevel,
@@ -183,7 +193,7 @@ export class TelemetryService {
         return;
       }
 
-      const machineId = this.identifierService.getMachineId();
+      const distinctId = this.getDistinctId();
 
       const finalProperties = {
         ...properties,
@@ -192,7 +202,7 @@ export class TelemetryService {
       };
 
       this.posthogClient.capture({
-        distinctId: machineId, // Consistently use machineId as distinctId
+        distinctId,
         event: eventName as string,
         properties: finalProperties,
       });
@@ -209,10 +219,7 @@ export class TelemetryService {
   ): void {
     const telemetryLevel = this.globalConfigService.get().telemetryLevel;
     if (telemetryLevel === 'off') return;
-    const distinctId =
-      telemetryLevel === 'full'
-        ? this.userProperties.user_id
-        : this.identifierService.getMachineId();
+    const distinctId = this.getDistinctId();
 
     this.posthogClient.captureException(error, distinctId, {
       properties: {

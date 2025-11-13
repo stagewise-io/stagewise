@@ -415,7 +415,7 @@ export class AuthService {
     const oldState = structuredClone(this.kartonService.state.userAccount);
     this.kartonService.setState(draft);
     const newState = this.kartonService.state.userAccount;
-    if (JSON.stringify(oldState.status) !== JSON.stringify(newState.status)) {
+    if (JSON.stringify(oldState) !== JSON.stringify(newState)) {
       this.authChangeCallbacks.forEach((callback) => {
         try {
           callback(newState);

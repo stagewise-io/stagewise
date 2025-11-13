@@ -103,18 +103,23 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
 
   useEffect(() => {
     const telemetryLevel = globalConfig.telemetryLevel;
-    if (telemetryLevel === 'off') return;
-
-    if (telemetryLevel === 'anonymous' && userAccount?.machineId) {
-      posthog.identify(userAccount.machineId, {
+    if (
+      telemetryLevel === 'full' &&
+      userAccount?.user?.id &&
+      !posthog._isIdentified()
+    ) {
+      posthog.identify(userAccount.user.id, {
         telemetryLevel: globalConfig.telemetryLevel,
-      });
-    } else {
-      posthog.identify(userAccount?.user?.id, {
-        telemetryLevel: globalConfig.telemetryLevel,
+        email: userAccount.user.email,
+        machineId: userAccount.machineId,
       });
       if (userAccount?.user?.id && userAccount?.machineId)
-        posthog.alias(userAccount.machineId, userAccount.user.id);
+        posthog.alias(userAccount.user.id, userAccount.machineId);
+    } else if (
+      telemetryLevel === 'off' ||
+      userAccount?.status !== 'authenticated'
+    ) {
+      posthog.reset();
     }
   }, [globalConfig, userAccount]);
 

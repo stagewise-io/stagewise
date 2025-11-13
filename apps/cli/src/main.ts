@@ -80,6 +80,21 @@ export async function main({
     port,
   );
 
+  // No need to unregister this callback, as it will be destroyed when the main app shuts down
+  authService.registerAuthStateChangeCallback((newAuthState) => {
+    if (newAuthState.user) {
+      logger.debug(
+        '[Main] User logged in, identifying user and setting user properties...',
+      );
+      telemetryService.setUserProperties({
+        user_id: newAuthState.user?.id,
+        user_email: newAuthState.user?.email,
+      });
+      telemetryService.identifyUser();
+    } else
+      logger.debug('[Main] No user data available, not identifying user...');
+  });
+
   logger.debug('[Main] Normal operation services bootstrapped');
 
   // Set initial app info into the karton service.
