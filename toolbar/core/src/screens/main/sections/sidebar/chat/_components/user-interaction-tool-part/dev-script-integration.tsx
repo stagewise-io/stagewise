@@ -71,6 +71,7 @@ export const AskForDevScriptIntegrationToolPartContent = memo(
           <>
             <div className="flex w-full flex-row items-center justify-start gap-2 text-muted-foreground text-xs">
               <InfoIcon className="size-3 shrink-0 text-muted-foreground" />
+              This will automatically start stagewise when you start your app.
               You can also start stagewise manually by running npx
               stagewise@beta anywhere in your terminal.
             </div>
