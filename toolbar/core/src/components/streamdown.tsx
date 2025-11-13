@@ -235,31 +235,35 @@ const CodeBlockCopyButton = ({ code }: { code: string }) => {
 const AnchorComponent = ({
   href,
   className,
+  children,
   ...props
 }: DetailedHTMLProps<
   AnchorHTMLAttributes<HTMLAnchorElement>,
   HTMLAnchorElement
 > &
   ExtraProps) => {
-  const filePathLabel = useMemo(() => {
-    if (!href) return null;
-    if (!href.startsWith(encodeURIComponent('{{FILE_PATH_PREFIX}}'))) {
-      return null;
-    }
-    const filePath = href.replaceAll(
-      encodeURIComponent('{{FILE_PATH_PREFIX}}'),
-      '',
-    );
-
-    const truncatedFilePath = getTruncatedFileUrl(
-      filePath.split(':')[0]!,
-      3,
-      128,
-    );
-    const lineNumber = filePath.split(':')[1];
-
-    return `${truncatedFilePath}${lineNumber ? ` (Line ${lineNumber})` : ''}`;
+  const isFileLink = useMemo(() => {
+    return href?.startsWith('wsfile:');
   }, [href]);
+
+  const linkLabel = useMemo(() => {
+    if (!href) return null;
+
+    if (href.startsWith('wsfile:')) {
+      const filePath = href.slice('wsfile:'.length);
+
+      const truncatedFilePath = getTruncatedFileUrl(
+        filePath.split(':')[0]!,
+        3,
+        128,
+      );
+      const lineNumber = filePath.split(':')[1];
+
+      return `${truncatedFilePath}${lineNumber ? ` (Line ${lineNumber})` : ''}`;
+    }
+
+    return children;
+  }, [href, children]);
 
   const conversationId = useKartonState(
     (s) => s.workspace?.agentChat?.activeChatId ?? 'unknown',
@@ -269,16 +273,19 @@ const AnchorComponent = ({
 
   const processedHref = useMemo(() => {
     if (!href) return '';
-    const isFile = href?.startsWith(encodeURIComponent('{{FILE_PATH_PREFIX}}'));
-    const replacedHref = href
-      .replaceAll(encodeURIComponent('{{CONVERSATION_ID}}'), conversationId)
-      .replaceAll(`${encodeURIComponent('{{FILE_PATH_PREFIX}}')}/`, '') // We also remove the variant with trailing slash because this could also happen
-      .replaceAll(encodeURIComponent('{{FILE_PATH_PREFIX}}'), '');
 
-    if (isFile) {
-      return filePathTools.getFileIDEHref(replacedHref);
+    let finalHref = href;
+
+    if (href.startsWith('wsfile:')) {
+      finalHref = filePathTools.getFileIDEHref(href.slice('wsfile:'.length));
     }
-    return replacedHref;
+
+    finalHref = finalHref.replaceAll(
+      encodeURIComponent('{{CONVERSATION_ID}}'),
+      conversationId,
+    );
+
+    return finalHref;
   }, [conversationId, filePathTools]);
 
   return (
@@ -292,10 +299,8 @@ const AnchorComponent = ({
           )}
           {...props}
         >
-          {filePathLabel && (
-            <FileIcon className="inline size-3.5 self-center" />
-          )}
-          {filePathLabel ?? props.children}
+          {isFileLink && <FileIcon className="inline size-3.5 self-center" />}
+          {linkLabel}
         </a>
       </TooltipTrigger>
       <TooltipContent>{processedHref}</TooltipContent>
