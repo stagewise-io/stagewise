@@ -6,6 +6,7 @@ export function Input({
   className,
   inputClassName,
   onValueChange,
+  value: controlledValue,
   debounce,
   ...props
 }: React.ComponentProps<typeof InputBase> & {
@@ -15,11 +16,19 @@ export function Input({
   const valueChangeTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+
+  const [optimisticLocalValue, setOptimisticLocalValue] =
+    React.useState<typeof controlledValue>(undefined);
+  React.useEffect(() => {
+    setOptimisticLocalValue(controlledValue);
+  }, [controlledValue]);
+
   const valueChangeCallback = React.useCallback<
     NonNullable<typeof onValueChange>
   >(
     (...args) => {
       if (debounce && debounce >= 0) {
+        setOptimisticLocalValue(args[0]);
         if (valueChangeTimeout.current)
           clearTimeout(valueChangeTimeout.current);
         valueChangeTimeout.current = setTimeout(
@@ -47,6 +56,7 @@ export function Input({
         )}
         onValueChange={onValueChange ? valueChangeCallback : undefined}
         {...props}
+        value={optimisticLocalValue}
       />
     </div>
   );
