@@ -82,7 +82,9 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
 
         <div className="flex flex-col gap-0">
           <h3 className="font-medium text-sm">Path</h3>
-          <p className="text-foreground/70 text-sm">{workspace?.path}</p>
+          <p className="break-all text-foreground/70 text-sm">
+            {workspace?.path}
+          </p>
         </div>
 
         <div className="flex flex-col gap-0">

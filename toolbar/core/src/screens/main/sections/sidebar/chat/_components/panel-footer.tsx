@@ -40,14 +40,15 @@ const GlassyTextInputClassNames =
 
 const chatTextSlideshowTexts: Record<MainTab | 'fallback', string[]> = {
   [MainTab.DEV_APP_PREVIEW]: [
-    'Try: Add a new button into the top right corner',
-    'Try: Convert these cards into accordions',
-    'Try: Add a gradient to the background',
+    'Try: Turn this card into a reusable component',
+    'Try: Do they have the same border radius?',
+    'Try: Make this badge use our design system',
+    'Try: Does this card use a reusable component?',
+    'Try: Show me where this header is implemented',
+    "Try: Let's try a different icon for this button",
+    'Try: Make the press animation of the component more subtle',
   ],
-  [MainTab.IDEATION_CANVAS]: [
-    'Try: Build a new prototype button',
-    'Try: Build a form field with my design system',
-  ],
+  [MainTab.IDEATION_CANVAS]: ['Try: Build a form field with my design system'],
   [MainTab.SETTINGS]: ['Ask stage any question...'],
   fallback: ['Ask stage any question...'],
 };
