@@ -229,7 +229,10 @@ function ContextElementChip({
                     <Tooltip>
                       <TooltipTrigger>
                         <a
-                          href={getFileIDEHref(metadata.relativePath)}
+                          href={getFileIDEHref(
+                            metadata.relativePath,
+                            metadata.startLine,
+                          )}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="shrink basis-4/5 break-all text-foreground text-sm hover:text-primary"

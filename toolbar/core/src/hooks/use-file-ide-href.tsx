@@ -20,13 +20,14 @@ export function useFileIDEHref() {
   }, [getAbsoluteAgentAccessPath]);
 
   const getFileIDEHref = useCallback(
-    (relativeFilePath: string) => {
+    (relativeFilePath: string, lineNumber?: number) => {
       if (!absoluteAccessPath) return '#';
       return getIDEFileUrl(
         absoluteAccessPath.replace('\\', '/') +
           '/' +
           relativeFilePath.replace('\\', '/'),
         openInIdeChoice,
+        lineNumber,
       );
     },
     [absoluteAccessPath, openInIdeChoice],

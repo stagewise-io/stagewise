@@ -792,15 +792,24 @@ export const IDE_SELECTION_ITEMS = {
 export const getIDEFileUrl = (
   absFilePath: string,
   ide: keyof typeof IDE_SELECTION_ITEMS,
+  lineNumber?: number,
 ) => {
+  let url: string;
   switch (ide) {
     case 'vscode':
-      return `vscode://file/${absFilePath}`;
+      url = `vscode://file/${absFilePath}`;
+      break;
     case 'cursor':
-      return `cursor://file/${absFilePath}`;
+      url = `cursor://file/${absFilePath}`;
+      break;
     case 'windsurf':
-      return `windsurf://file/${absFilePath}`;
+      url = `windsurf://file/${absFilePath}`;
+      break;
     case 'trae':
-      return `trae://file/${absFilePath}`;
+      url = `trae://file/${absFilePath}`;
+      break;
   }
+  if (lineNumber) url += `:${lineNumber}`;
+
+  return url;
 };

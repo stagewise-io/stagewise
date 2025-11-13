@@ -41,6 +41,15 @@ export const MultiEditToolPart = ({
     [diff],
   );
 
+  const startLineWithDiff = useMemo(() => {
+    let startLine = 1;
+    for (const line of diff ?? []) {
+      if (line.added || line.removed) return startLine;
+      startLine += line.count;
+    }
+    return startLine;
+  }, [diff]);
+
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);
 
   const openInIdeSelection = useKartonState(
@@ -82,7 +91,10 @@ export const MultiEditToolPart = ({
                 {collapsedDiffView ? 'Show all lines' : 'Show changes only'}
               </Button>
               <a
-                href={getFileIDEHref(part.input?.relative_path ?? '')}
+                href={getFileIDEHref(
+                  part.input?.relative_path ?? '',
+                  startLineWithDiff,
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={buttonVariants({ size: 'xs', variant: 'ghost' })}
