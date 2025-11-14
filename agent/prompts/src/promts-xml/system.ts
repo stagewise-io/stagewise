@@ -8,6 +8,7 @@ import xml from 'xml';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import specialTokens from '../utils/special-tokens.js';
 import { getWorkspaceInfo } from '../utils/project-info.js';
+import path from 'node:path';
 
 /**
  * The (system) prompt design we implement right now follows the following rules:
@@ -516,49 +517,31 @@ const workspaceInformation = async (
           ...(workspaceInfo.packagesInRepo.length > 0
             ? [
                 {
-                  'packages-in-repo': workspaceInfo.packagesInRepo.map(
-                    (pkg) => ({
-                      package: [
+                  'packages-in-repo': [
+                    {
+                      _attr: {
+                        description:
+                          'A list of JS packages found inside the git repo. Including package name, package path (relative to repo root), version, and (not all, but only relevant) dependencies that the package uses.',
+                      },
+                    },
+                    ...workspaceInfo.packagesInRepo.map((pkg) => ({
+                      pkg: [
                         {
                           _attr: {
                             name: pkg.name,
-                            path: pkg.path,
-                            version: pkg.version,
+                            path: workspaceInfo.gitRepoRoot
+                              ? path.relative(
+                                  workspaceInfo.gitRepoRoot,
+                                  pkg.path,
+                                )
+                              : pkg.path,
+                            ver: pkg.version ?? 'undefined',
+                            deps: `[${Array.from(new Set([...pkg.dependencies, ...pkg.devDependencies, ...pkg.peerDependencies].map((dep) => dep.name))).join(',')}]`,
                           },
-                          ...pkg.dependencies.map((dep) => ({
-                            dependency: [
-                              {
-                                _attr: {
-                                  name: dep.name,
-                                  version: dep.version,
-                                },
-                              },
-                            ],
-                          })),
-                          ...pkg.devDependencies.map((dep) => ({
-                            dependency: [
-                              {
-                                _attr: {
-                                  name: dep.name,
-                                  version: dep.version,
-                                },
-                              },
-                            ],
-                          })),
-                          ...pkg.peerDependencies.map((dep) => ({
-                            dependency: [
-                              {
-                                _attr: {
-                                  name: dep.name,
-                                  version: dep.version,
-                                },
-                              },
-                            ],
-                          })),
                         },
                       ],
-                    }),
-                  ),
+                    })),
+                  ],
                 },
               ]
             : []),

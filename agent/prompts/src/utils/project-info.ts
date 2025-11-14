@@ -41,20 +41,24 @@ export async function getWorkspaceInfo(
   // We search forp packages either based on the root of a git repo or the highest directory level that contains a package.json
   const searchRoot = gitRepoRoot ?? (await findProjectRoot(clientRuntime));
 
-  const repoPackages: Package[] = filterNonWhitelistedDependencies(
-    await getPackagesInPath(clientRuntime, gitRepoRoot),
-  );
+  const repoPackages: Package[] = filterPackagesWithoutRelevance(
+    filterNonWhitelistedDependencies(
+      await getPackagesInPath(clientRuntime, gitRepoRoot),
+    ),
+  ).slice(0, 20); // We only keep the top 20 packages with the most relevant dependencies. To prevent crazy pollution.
 
   const repoLikelyIsMonorepo = isLikelyAMonorepo(searchRoot, repoPackages);
 
   const packageManager = await getPackageManager(clientRuntime);
 
-  return {
+  const info: WorkspaceInfo = {
     gitRepoRoot,
     isLikelyMonorepo: repoLikelyIsMonorepo,
     packagesInRepo: repoPackages,
     packageManager: packageManager?.name ?? null,
   };
+
+  return info;
 }
 
 /**
@@ -76,6 +80,14 @@ const getRepoRootForPath = (path: string) => {
   }
 };
 
+const packageJsonSchema = z.looseObject({
+  name: z.string(),
+  version: z.string().optional(),
+  dependencies: z.record(z.string(), z.string()).optional(),
+  devDependencies: z.record(z.string(), z.string()).optional(),
+  peerDependencies: z.record(z.string(), z.string()).optional(),
+});
+
 /**
  * Recursively travels through all paths in the given path and returns all paths where a package was found (plus the name of the package, it's version and it's dependencies).
  * The returned dependencies are a unified (and de-duped) list of all dependencies, devDependencies and peerDependencies.
@@ -84,59 +96,69 @@ const getPackagesInPath = async (
   clientRuntime: ClientRuntime,
   rootPath: string,
 ): Promise<Package[]> => {
-  const allPackageJsons = await clientRuntime.fileSystem.glob('**/*.json', {
+  const allPackageJsons = await clientRuntime.fileSystem.glob('package.json', {
     searchPath: rootPath,
     absoluteSearchPath: true,
     absoluteSearchResults: true,
+    excludePatterns: [
+      '**/test/',
+      '**/tests/',
+      '**/output/',
+      '**/dist/',
+      '**/node_modules/',
+      '**/coverage/',
+      '**/build/',
+      '**/binaries/',
+      '**/bin/',
+    ],
   });
 
-  const packages: Package[] = allPackageJsons.relativePaths
-    ? (
-        await Promise.all(
-          allPackageJsons.relativePaths?.map(async (path) => {
-            try {
-              const packageJson = await readFile(path, 'utf-8');
-              const parsedPackageJson = JSON.parse(packageJson).catch(
-                () => null,
-              );
+  const packages: Package[] = (
+    allPackageJsons.relativePaths
+      ? (
+          await Promise.all(
+            allPackageJsons.relativePaths.map(async (path) => {
+              try {
+                const packageJson = await readFile(path, 'utf-8');
+                const parsed = packageJsonSchema.parse(JSON.parse(packageJson));
 
-              const pkgName = z.string().parse(parsedPackageJson?.name);
-              const pkgVersion = z.string().parse(parsedPackageJson?.version);
-              const unparsedPkgDependencies = z
-                .record(z.string(), z.string())
-                .parse(parsedPackageJson?.dependencies);
-              const unparsedPkgDevDependencies = z
-                .record(z.string(), z.string())
-                .parse(parsedPackageJson?.devDependencies);
-              const unparsedPkgPeerDependencies = z
-                .record(z.string(), z.string())
-                .parse(parsedPackageJson?.peerDependencies);
+                const dependencies: Dependency[] = Object.entries(
+                  parsed.dependencies ?? {},
+                ).map(([name, version]) => ({ name, version }));
+                const devDependencies: Dependency[] = Object.entries(
+                  parsed.devDependencies ?? {},
+                ).map(([name, version]) => ({ name, version }));
+                const peerDependencies: Dependency[] = Object.entries(
+                  parsed.peerDependencies ?? {},
+                ).map(([name, version]) => ({ name, version }));
 
-              const dependencies: Dependency[] = Object.entries(
-                unparsedPkgDependencies,
-              ).map(([name, version]) => ({ name, version }));
-              const devDependencies: Dependency[] = Object.entries(
-                unparsedPkgDevDependencies,
-              ).map(([name, version]) => ({ name, version }));
-              const peerDependencies: Dependency[] = Object.entries(
-                unparsedPkgPeerDependencies,
-              ).map(([name, version]) => ({ name, version }));
+                return {
+                  name: parsed.name,
+                  path: path,
+                  version: parsed.version,
+                  dependencies: dependencies,
+                  devDependencies: devDependencies,
+                  peerDependencies: peerDependencies,
+                };
+              } catch (err) {
+                console.error('Error parsing package JSON: ', path, err);
+                return null;
+              }
+            }),
+          )
+        ).filter((val) => val !== null)
+      : []
+  ).sort(
+    (a, b) =>
+      b.dependencies.length +
+      b.devDependencies.length +
+      b.peerDependencies.length -
+      (a.dependencies.length +
+        a.devDependencies.length +
+        a.peerDependencies.length),
+  );
 
-              return {
-                name: pkgName,
-                path: path,
-                version: pkgVersion,
-                dependencies: dependencies,
-                devDependencies: devDependencies,
-                peerDependencies: peerDependencies,
-              };
-            } catch {
-              return null;
-            }
-          }),
-        )
-      ).filter((val) => val !== null)
-    : [];
+  // We sort the packages with the highest amount of relevant dependencies first.
 
   return packages;
 };
@@ -153,19 +175,75 @@ const filterNonWhitelistedDependencies = (packages: Package[]): Package[] => {
         dependencyWhitelist.includes(dep.name) ||
         newPackages.some((p) => p.name === dep.name),
     );
+    pkg.devDependencies = pkg.devDependencies.filter(
+      (dep) =>
+        dependencyWhitelist.includes(dep.name) ||
+        newPackages.some((p) => p.name === dep.name),
+    );
+    pkg.peerDependencies = pkg.peerDependencies.filter(
+      (dep) =>
+        dependencyWhitelist.includes(dep.name) ||
+        newPackages.some((p) => p.name === dep.name),
+    );
   }
 
   return newPackages;
 };
 
+const isPackageIncludingDependency = (
+  pkg: Package,
+  depName: string,
+): boolean => {
+  return (
+    pkg.dependencies.some((dep) => dep.name === depName) ||
+    pkg.devDependencies.some((dep) => dep.name === depName) ||
+    pkg.peerDependencies.some((dep) => dep.name === depName)
+  );
+};
+
+// Here,we take a list of packages, and if it's larger than 5 packages, we filter out packages, that:
+// - have no relevant dependency
+// - are not the dependency of any other package
+// - are not the dependency of any other package
+const filterPackagesWithoutRelevance = (packages: Package[]): Package[] => {
+  if (packages.length <= 5) return packages;
+
+  const newPackages = structuredClone(packages);
+
+  newPackages.filter((pkg) => {
+    const depsContainsRelevantDependency =
+      pkg.dependencies.some((dep) => dependencyWhitelist.includes(dep.name)) ||
+      pkg.devDependencies.some((dep) =>
+        dependencyWhitelist.includes(dep.name),
+      ) ||
+      pkg.peerDependencies.some((dep) =>
+        dependencyWhitelist.includes(dep.name),
+      );
+
+    if (depsContainsRelevantDependency) return true;
+
+    const pkgIsDependencyOfAnyOtherPackage = newPackages.some((p) =>
+      isPackageIncludingDependency(p, pkg.name),
+    );
+
+    if (pkgIsDependencyOfAnyOtherPackage) return true;
+
+    return false;
+  });
+
+  return newPackages;
+};
+
 const dependencyWhitelist = [
-  'nextjs',
-  'nuxtjs',
-  'sveltekit',
-  'solid-start',
-  'remix',
+  'next',
+  'nuxt',
+  'svelte',
+  'solid-js',
+  '@remix-run/server-runtime',
+  '@remix-run/node',
+  '@remix-run/react',
+  '@remix-run/dev',
   'astro',
-  'qwik',
   'gatsby',
 
   // Frontend Frameworks
@@ -173,10 +251,9 @@ const dependencyWhitelist = [
   'vue',
   'angular',
   'svelte',
-  'solid',
   'preact',
   'lit',
-  'alpine',
+  'alpinejs',
 
   // Backend Frameworks
   'express',
@@ -198,6 +275,14 @@ const dependencyWhitelist = [
   'cypress',
   'playwright',
   'mocha',
+
+  // Other typical utilities
+  'tailwindcss',
+  'postcss',
+  'graphql',
+  'bootstrap',
+  'framer-motion',
+  'lucide-react',
 ];
 
 // A list of files typically found in monorepo projects
