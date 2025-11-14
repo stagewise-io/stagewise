@@ -82,26 +82,18 @@ const import_meta_url = require('url').pathToFileURL(__filename).href;
       ],
       // Define environment variables
       define: {
-        'process.env.NODE_ENV': JSON.stringify(
-          process.env.NODE_ENV || 'production',
-        ),
+        'process.env': JSON.stringify({
+          NODE_ENV: process.env.NODE_ENV || 'production',
+          POSTHOG_API_KEY: process.env.POSTHOG_API_KEY,
+          POSTHOG_HOST: process.env.POSTHOG_HOST ?? 'https://eu.i.posthog.com',
+          STAGEWISE_CONSOLE_URL:
+            process.env.STAGEWISE_CONSOLE_URL ?? 'https://console.stagewise.io',
+          API_URL: process.env.API_URL ?? 'https://v1.api.stagewise.io',
+          LLM_PROXY_URL:
+            process.env.LLM_PROXY_URL ?? 'https://llm.stagewise.io',
+          CLI_VERSION: version,
+        }),
         'import.meta.url': `import_meta_url`,
-        'process.env.CLI_VERSION': JSON.stringify(version),
-        'process.env.POSTHOG_API_KEY': JSON.stringify(
-          process.env.POSTHOG_API_KEY,
-        ),
-        'process.env.POSTHOG_HOST': JSON.stringify(
-          process.env.POSTHOG_HOST ?? 'https://eu.i.posthog.com',
-        ),
-        'process.env.STAGEWISE_CONSOLE_URL': JSON.stringify(
-          process.env.STAGEWISE_CONSOLE_URL ?? 'https://console.stagewise.io',
-        ),
-        'process.env.API_URL': JSON.stringify(
-          process.env.API_URL ?? 'https://v1.api.stagewise.io',
-        ),
-        'process.env.LLM_PROXY_URL': JSON.stringify(
-          process.env.LLM_PROXY_URL ?? 'https://llm.stagewise.io',
-        ),
       },
       sourcemap: true,
       minify: process.env.NODE_ENV === 'production',
