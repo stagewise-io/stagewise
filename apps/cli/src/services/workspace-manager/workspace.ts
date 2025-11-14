@@ -104,9 +104,9 @@ export class WorkspaceService {
     });
 
     this.kartonService.registerServerProcedureHandler(
-      'workspace.getAbsoluteAgentAccessPath',
+      'workspace.getGitRepoRoot',
       async () => {
-        return this.getAbsoluteAgentAccessPath();
+        return getRepoRootForPath(this.workspacePath);
       },
     );
 
@@ -288,9 +288,7 @@ export class WorkspaceService {
     await this.staticAnalysisService?.teardown();
     await this.workspacePathsService?.teardown();
 
-    this.kartonService.removeServerProcedureHandler(
-      'workspace.getAbsoluteAgentAccessPath',
-    );
+    this.kartonService.removeServerProcedureHandler('workspace.getGitRepoRoot');
 
     this.kartonService.setState((draft) => {
       draft.workspace = null;

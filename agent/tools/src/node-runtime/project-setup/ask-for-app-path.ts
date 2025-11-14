@@ -3,7 +3,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 
 export const DESCRIPTION = `Ask the [USER] to pick the app path from the open project by providing a list of all apps and their paths in the project. 
-IMPORTANT: When using this tool, ask the [USER] a question (e.g. "Which app do you want to use stagewise for? ...[generating the tool input list of apps for the USER]...").
+IMPORTANT: When using this tool, ask the [USER] a question (e.g. "Which app do you want to use stagewise for? ...[calling askForAppPathTool]...").
 
 Parameters:
 - suggestedPaths (array, REQUIRED): List of all apps and their paths in the project. Each entry contains:

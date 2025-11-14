@@ -20,6 +20,15 @@ export const AskForAgentAccessPathToolPartContent = memo(
     }) => void;
     onCancel: () => void;
   }) => {
+    const repoRootResolver = useCallback(
+      (p: KartonServerProcedures<KartonContract>) => {
+        return p.workspace.getGitRepoRoot;
+      },
+      [],
+    );
+
+    const getGitRepoRoot = useKartonProcedure(repoRootResolver);
+
     const selectResolver = useCallback(
       (p: KartonServerProcedures<KartonContract>) =>
         p.workspace.setup.resolveRelativePathToAbsolutePath,
@@ -27,10 +36,6 @@ export const AskForAgentAccessPathToolPartContent = memo(
     );
     const resolveRelativePathToAbsolutePath =
       useKartonProcedure(selectResolver);
-
-    const getAbsoluteAgentAccessPath = useKartonProcedure(
-      (p) => p.workspace.getAbsoluteAgentAccessPath,
-    );
 
     const isError = useMemo(() => {
       return toolPart.state === 'output-error';
@@ -59,7 +64,7 @@ export const AskForAgentAccessPathToolPartContent = memo(
         try {
           let absolutePath: string | null = null;
           if (toolPart.input?.userInput.suggestedPath === '{GIT_REPO_ROOT}') {
-            absolutePath = await getAbsoluteAgentAccessPath(); // Returns git repo root if no access path is yet configured
+            absolutePath = await getGitRepoRoot();
           } else {
             absolutePath = await resolveRelativePathToAbsolutePath(
               toolPart.input?.userInput.suggestedPath,

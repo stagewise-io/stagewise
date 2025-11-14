@@ -1,36 +1,23 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useKartonProcedure, useKartonState } from './use-karton';
+import { useCallback } from 'react';
+import { useKartonState } from './use-karton';
 import { getIDEFileUrl } from '@/utils';
 
 export function useFileIDEHref() {
-  const getAbsoluteAgentAccessPath = useKartonProcedure(
-    (p) => p.workspace.getAbsoluteAgentAccessPath,
-  );
-
+  const accessPath = useKartonState((s) => s.workspace?.agent?.accessPath);
   const openInIdeChoice = useKartonState((s) => s.globalConfig.openFilesInIde);
-
-  const [absoluteAccessPath, setAbsoluteAccessPath] = useState<string | null>(
-    null,
-  );
-
-  useEffect(() => {
-    getAbsoluteAgentAccessPath().then((path) => {
-      setAbsoluteAccessPath(path);
-    });
-  }, [getAbsoluteAgentAccessPath]);
 
   const getFileIDEHref = useCallback(
     (relativeFilePath: string, lineNumber?: number) => {
-      if (!absoluteAccessPath) return '#';
+      if (!accessPath) return '#';
       return getIDEFileUrl(
-        absoluteAccessPath.replace('\\', '/') +
+        accessPath.replace('\\', '/') +
           '/' +
           relativeFilePath.replace('\\', '/'),
         openInIdeChoice,
         lineNumber,
       );
     },
-    [absoluteAccessPath, openInIdeChoice],
+    [accessPath, openInIdeChoice],
   );
 
   return {

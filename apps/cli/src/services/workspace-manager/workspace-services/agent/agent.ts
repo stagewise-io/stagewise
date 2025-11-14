@@ -62,6 +62,7 @@ import {
 import type { AsyncIterableStream, InferUIMessageChunk, ToolUIPart } from 'ai';
 import type { WorkspaceSetupService } from '../setup';
 import { compileInspirationComponent } from './utils/compile-inspiration-component';
+import { getRepoRootForPath } from '@/utils/git-tools';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -169,8 +170,13 @@ export class AgentService {
               appPort: params.appPort,
               appPath: params.appPath,
             });
+            const absoluteAgentAccessPath =
+              params.agentAccessPath === '{GIT_REPO_ROOT}'
+                ? getRepoRootForPath(params.appPath)
+                : resolve(params.appPath, params.agentAccessPath);
+
             this.clientRuntime.fileSystem.setCurrentWorkingDirectory(
-              resolve(params.appPath, params.agentAccessPath),
+              absoluteAgentAccessPath,
             );
           },
         });
