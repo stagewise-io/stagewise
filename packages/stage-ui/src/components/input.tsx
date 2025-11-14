@@ -18,7 +18,7 @@ export function Input({
   );
 
   const [optimisticLocalValue, setOptimisticLocalValue] =
-    React.useState<typeof controlledValue>(undefined);
+    React.useState<typeof controlledValue>(controlledValue);
   React.useEffect(() => {
     setOptimisticLocalValue(controlledValue);
   }, [controlledValue]);
