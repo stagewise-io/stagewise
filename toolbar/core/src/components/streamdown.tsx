@@ -302,7 +302,9 @@ const AnchorComponent = ({
           )}
           {...props}
         >
-          {isFileLink && <FileIcon className="inline size-3.5 self-center" />}
+          {isFileLink && (
+            <FileIcon className="inline size-3.5 shrink-0 self-center" />
+          )}
           {linkLabel}
         </a>
       </TooltipTrigger>
