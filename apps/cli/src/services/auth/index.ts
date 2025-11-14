@@ -406,7 +406,7 @@ export class AuthService {
     const runningPort = this.kartonService.state.appInfo.runningOnPort;
     const callbackUrl = `http://localhost:${runningPort}${stagewiseAppPrefix}/auth/callback`;
 
-    return `${consoleUrl}/authenticate-ide?ide=cli&redirect_uri=${encodeURIComponent(callbackUrl)}`;
+    return `${consoleUrl}/authenticate-ide?ide=cli&redirect_uri=${encodeURIComponent(callbackUrl)}&no-cookie-banner=true`;
   }
 
   private updateAuthState(

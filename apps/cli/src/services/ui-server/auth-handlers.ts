@@ -26,6 +26,10 @@ export async function setupAuthRoutes(
       error as string | undefined,
     );
 
-    res.status(200).send('Authentication callback received');
+    res
+      .status(200)
+      .send(
+        'Authentication successful. You can close this window now and return to the stagewise app.',
+      );
   });
 }
