@@ -115,11 +115,6 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
       });
       if (userAccount?.user?.id && userAccount?.machineId)
         posthog.alias(userAccount.user.id, userAccount.machineId);
-    } else if (
-      telemetryLevel === 'off' ||
-      userAccount?.status !== 'authenticated'
-    ) {
-      posthog.reset();
     }
   }, [globalConfig, userAccount]);
 

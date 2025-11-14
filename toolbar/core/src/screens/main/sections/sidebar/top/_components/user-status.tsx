@@ -1,5 +1,6 @@
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { cn } from '@/utils';
+import { usePostHog } from 'posthog-js/react';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import {
   Popover,
@@ -13,6 +14,7 @@ import { ExternalLinkIcon, LogOutIcon } from 'lucide-react';
 export function UserStatusArea() {
   const userAccount = useKartonState((s) => s.userAccount);
   const logout = useKartonProcedure((p) => p.userAccount.logout);
+  const posthog = usePostHog();
 
   // If the user isn't authenticated, we show a primary button that leads to a login session.
   // If the user is already logged in, we show a small button that simply reports the user's email.
@@ -21,9 +23,7 @@ export function UserStatusArea() {
   // show a button that leads to the billing page where users can pay for the subscription
   // to get more access
 
-  if (!userAccount || userAccount.status === 'unauthenticated') {
-    return null;
-  }
+  if (!userAccount || userAccount.status === 'unauthenticated') return null;
 
   return (
     <Popover>
@@ -94,7 +94,14 @@ export function UserStatusArea() {
             <ExternalLinkIcon className="size-4" />
             Open console
           </a>
-          <Button variant="secondary" onClick={() => void logout()} size="sm">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void logout();
+              posthog?.reset();
+            }}
+            size="sm"
+          >
             <LogOutIcon className="size-4" />
             Logout
           </Button>
