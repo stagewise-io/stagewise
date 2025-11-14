@@ -2,20 +2,27 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { tool } from 'ai';
 import { z } from 'zod';
 
-export const DESCRIPTION =
-  'Ask the user to confirm the path that the agent should have access to. Pick the project root path. Relative to the app path (e.g. "../..", or ".").';
+export const DESCRIPTION = `Ask the [USER] to confirm the scope of file access for the agent. Determines what portion of the codebase the agent can read/write. When using this tool, ask the [USER] a question (e.g. "Do you want to give stagewise access to the whole project?").
+
+Parameters:
+- suggestedPath (string, REQUIRED): Relative path from selected app to desired access root. Always pick the project root path. Examples: "." restricts to app directory only, "../.." navigates up two levels, "{GIT_REPO_ROOT}" gives access to entire parent git repository (recommended default). Must be valid relative path or special token.
+- selectedAppPath (string, REQUIRED): Absolute path of app previously selected via askForAppPathTool (e.g., "/Users/user/project/apps/website"). Used as reference point for relative path calculation.
+
+Behavior: User provides or confirms the path.`;
 
 export const askForAgentAccessPathParamsSchema = z.object({
   userInput: z.object({
     suggestedPath: z
       .string()
       .describe(
-        'The relative project root path that the USER should confirm. Relative to the app path (e.g. "../..", or ".").',
+        'Relative path from selected app to desired access root. Always pick the project root path. Examples: "." restricts to app directory only, "../.." navigates up two levels, "{GIT_REPO_ROOT}" gives access to entire parent git repository (recommended default). Must be valid relative path or special token.',
       ),
   }),
   selectedAppPath: z
     .string()
-    .describe('The app path that the USER picked before.'),
+    .describe(
+      'Absolute path of app previously selected via askForAppPathTool (e.g., "/Users/user/project/apps/website"). Used as reference point for relative path calculation.',
+    ),
 });
 
 export const askForAgentAccessPathOutputSchema = z.object({

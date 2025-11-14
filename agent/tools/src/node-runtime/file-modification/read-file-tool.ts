@@ -5,19 +5,23 @@ import { z } from 'zod';
 import { checkFileSize } from '../../utils/file';
 import { FILE_SIZE_LIMITS, TOOL_OUTPUT_LIMITS } from '../../constants';
 import { capToolOutput } from '../../utils/tool-output-capper';
+import { rethrowCappedToolOutputError } from '../../utils/error';
 
-export const DESCRIPTION =
-  'Read the contents of a file with line-by-line control';
+export const DESCRIPTION = `Read file contents with optional line range control. Line numbers are 1-indexed (first line is 1, not 0).
+
+Behavior: Returns content with totalLines count. Output capped at 200KB (~50k tokens, ~6k lines of code). If truncated, suggests reading in chunks using line ranges. Respects .gitignore.`;
 
 export const readFileParamsSchema = z.object({
-  relative_path: z.string().describe('Relative path of the file to read'),
+  relative_path: z
+    .string()
+    .describe('Relative path of file to read. File must exist.'),
   start_line: z
     .number()
     .int()
     .min(1)
     .optional()
     .describe(
-      'Starting line number (first file line is value 1). Omit if tool should read from file start.',
+      'Starting line number (1-indexed, INCLUSIVE). Must be >= 1. Omit to read from beginning.',
     ),
   end_line: z
     .number()
@@ -25,11 +29,11 @@ export const readFileParamsSchema = z.object({
     .min(1)
     .optional()
     .describe(
-      'Ending line number (first file line is value 1). Must be larger than `start_line`. Includes the last line. Omit if tool should read to file end.',
+      'Ending line number (1-indexed, INCLUSIVE). Must be >= start_line. Omit to read to end.',
     ),
   explanation: z
     .string()
-    .describe('One sentence explanation of why this tool is being used'),
+    .describe('One sentence explaining why this tool is being used.'),
 });
 
 export type ReadFileParams = z.infer<typeof readFileParamsSchema>;
@@ -136,8 +140,7 @@ export async function readFileToolExecute(
       result: cappedOutput,
     };
   } catch (error) {
-    if (error instanceof Error) throw error;
-    else throw new Error(`Unknown Error`);
+    rethrowCappedToolOutputError(error);
   }
 }
 

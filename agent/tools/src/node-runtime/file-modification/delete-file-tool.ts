@@ -1,14 +1,22 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import { rethrowCappedToolOutputError } from '../../utils/error';
 import type { FileDiff } from '@stagewise/agent-types';
 import { tool } from 'ai';
 import { validateToolOutput } from '../..';
 import { z } from 'zod';
 import { prepareDiffContent } from '../../utils/file';
 
-export const DESCRIPTION = 'Delete a file from the file system';
+export const DESCRIPTION = `Delete a file from the file system with undo capability.
+
+Parameters:
+- relative_path (string, REQUIRED): Relative file path to delete. Must be an existing file.
+
+Behavior: Respects .gitignore. Throws error if file doesn't exist.`;
 
 export const deleteFileParamsSchema = z.object({
-  relative_path: z.string().describe('Relative file path to delete'),
+  relative_path: z
+    .string()
+    .describe('Relative file path to delete. Must be an existing file.'),
 });
 
 export type DeleteFileParams = z.infer<typeof deleteFileParamsSchema>;
@@ -96,8 +104,7 @@ export async function deleteFileToolExecute(
       },
     };
   } catch (e) {
-    if (e instanceof Error) throw e;
-    else throw new Error('Unknown error');
+    rethrowCappedToolOutputError(e);
   }
 }
 

@@ -7,17 +7,50 @@ import {
   capToolOutput,
   formatTruncationMessage,
 } from '../../utils/tool-output-capper.js';
+import { rethrowCappedToolOutputError } from '../../utils/error';
 
-export const DESCRIPTION =
-  "List files and directories in a path (like 'ls' or 'tree' command). Use when exploring directory structure or checking what's in a specific folder. Supports recursive listing with maxDepth control, filtering by includeFiles/includeDirectories flags, and returns detailed file metadata (type, size). Optimal for understanding project layout or navigating unfamiliar codebases.";
+export const DESCRIPTION = `List files and directories in a path (like 'ls' or 'tree' command). Use when exploring directory structure.
+  
+  Parameters:
+  - relative_path (string, OPTIONAL): Path to list. Defaults to current directory ('.').
+  - recursive (boolean, OPTIONAL): Whether to list recursively. Defaults to false.
+  - maxDepth (number, OPTIONAL): Maximum recursion depth (must be >= 0). Defaults to unlimited. Depth is 0-indexed from starting directory.
+  - pattern (string, OPTIONAL): File extension or glob pattern to filter results. Examples: '.ts', '*.js'.
+  - includeDirectories (boolean, OPTIONAL): Include directories in results. Defaults to true.
+  - includeFiles (boolean, OPTIONAL): Include files in results. Defaults to true.
+  
+  Behavior: At least one of includeFiles or includeDirectories must be true. Respects .gitignore by default. Returns file/directory objects with relativePath, name, type, size (files only), and depth. Output capped at 50 items and 40KB total. Path must exist and be a directory, otherwise an error is thrown.`;
 
 export const listFilesParamsSchema = z.object({
-  relative_path: z.string().optional(),
-  recursive: z.boolean().optional(), // Whether to list files recursively
-  maxDepth: z.number().min(0).optional(), // Maximum recursion depth (default: unlimited)
-  pattern: z.string().optional(), // File extension (e.g., ".ts") or glob-like pattern
-  includeDirectories: z.boolean().optional(), // Whether to include directories in results (default: true)
-  includeFiles: z.boolean().optional(), // Whether to include files in results (default: true)
+  relative_path: z
+    .string()
+    .optional()
+    .describe("Path to list. Defaults to current directory ('.')."),
+  recursive: z
+    .boolean()
+    .optional()
+    .describe('Whether to list recursively. Defaults to false.'),
+  maxDepth: z
+    .number()
+    .min(0)
+    .optional()
+    .describe(
+      'Maximum recursion depth (must be >= 0). Defaults to unlimited. Depth is 0-indexed from starting directory.',
+    ),
+  pattern: z
+    .string()
+    .optional()
+    .describe(
+      "File extension or glob pattern to filter results. Examples: '.ts', '*.js'.",
+    ),
+  includeDirectories: z
+    .boolean()
+    .optional()
+    .describe('Include directories in results. Defaults to true.'),
+  includeFiles: z
+    .boolean()
+    .optional()
+    .describe('Include files in results. Defaults to true.'),
 });
 
 export type ListFilesParams = z.infer<typeof listFilesParamsSchema>;
@@ -135,8 +168,7 @@ export async function listFilesToolExecute(
       },
     };
   } catch (error) {
-    if (error instanceof Error) throw error;
-    else throw new Error(`Unknown Error`);
+    rethrowCappedToolOutputError(error);
   }
 }
 

@@ -4,7 +4,7 @@ import type { LanguageModelV2 } from '@ai-sdk/provider';
 import { z } from 'zod';
 
 export const DESCRIPTION =
-  "Generate a component design for the current project based on the user's prompt. Always export the top level of the generated component as a default export.";
+  "Generate a component design for the current project based on the [USER]'s prompt. Always export the top level of the generated component as a default export.";
 
 const examplePrompt = `Generate a glassy blue button with the primary color #2563eb, the secondary color #dbeafe, Inter font, a border radius of 12px and subtle hover animations`;
 const exampleComponent = `export default function GlassyButton() {

@@ -2,24 +2,35 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { tool } from 'ai';
 import { z } from 'zod';
 
-export const DESCRIPTION =
-  'Ask the user to pick the app path from the open project. Will be open_path if the project is not a monorepo, otherwise it will be the paths of the apps in the monorepo';
+export const DESCRIPTION = `Ask the [USER] to pick the app path from the open project by providing a list of all apps and their paths in the project. When using this tool, ask the [USER] a question (e.g. "Which app do you want to use stagewise for?").
+
+Parameters:
+- suggestedPaths (array, REQUIRED): List of all apps and their paths in the project. Each entry contains:
+  - absolutePath (string, REQUIRED): Absolute filesystem path to app directory (e.g., "/Users/user/project/apps/website").
+  - displayName (string, REQUIRED): Short user-friendly name for the app (e.g., "apps/website", "apps/docs", "workspace-path").
+  Minimum 1 entry required. For non-monorepos: single entry with the name of the app and workspace-path (the root of the project) as path. For monorepos: multiple entries for each frontend package/ app.
+
+Behavior: User provides or confirms the path.`;
 
 export const askForAppPathParamsSchema = z.object({
   userInput: z.object({
     suggestedPaths: z
       .array(
         z.object({
-          absolutePath: z.string(),
+          absolutePath: z
+            .string()
+            .describe(
+              'Absolute filesystem path to app directory (e.g., "/Users/user/project/apps/website").',
+            ),
           displayName: z
             .string()
             .describe(
-              'A short name for the app, e.g., "apps/website", "apps/docs"',
+              'Short user-friendly name for the app (e.g., "apps/website", "apps/docs", "workspace-path").',
             ),
         }),
       )
       .describe(
-        'The app paths the USER can pick from - will be open_path if the project is not a monorepo. The display name is a short name for the app, e.g., "apps/website", "apps/docs" and will be displayed to the user.',
+        'List of all apps and their paths in the project. Minimum 1 entry required. For non-monorepos: single entry with displayName "workspace-path". For monorepos: multiple entries for each frontend package.',
       )
       .min(1),
   }),

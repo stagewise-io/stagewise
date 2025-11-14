@@ -7,16 +7,28 @@ import {
   capToolOutput,
   formatTruncationMessage,
 } from '../../utils/tool-output-capper.js';
+import { rethrowCappedToolOutputError } from '../../utils/error';
 
-export const DESCRIPTION =
-  "Search for files matching a pattern across the project (like 'find' command). Use when you know what you're looking for by name or type (e.g., '**/*.test.ts' for test files, 'src/**/config.json' for configs). Returns matching file paths.";
+export const DESCRIPTION = `Search for files and directories matching a glob pattern (like 'find' command). Use when searching by name or file type patterns.
+
+Parameters:
+- pattern (string, REQUIRED): Glob pattern supporting standard syntax (*, **, ?, [abc]). Examples: '**/*.test.ts' for test files, 'src/**/config.json' for configs.
+- relative_path (string, OPTIONAL): Relative directory path to search in. Defaults to current working directory if omitted.
+
+Behavior: Respects .gitignore by default. Returns relative file paths sorted by modification time. Output capped at 50 results and 40KB total.`;
 
 export const globParamsSchema = z.object({
-  pattern: z.string().describe('Glob pattern (e.g., "**/*.js")'),
+  pattern: z
+    .string()
+    .describe(
+      "Glob pattern supporting standard syntax (*, **, ?, [abc]). Examples: '**/*.test.ts' for test files, 'src/**/config.json' for configs.",
+    ),
   relative_path: z
     .string()
     .optional()
-    .describe('Relative directory path to search in'),
+    .describe(
+      'Relative directory path to search in. Defaults to current working directory if omitted.',
+    ),
 });
 
 export type GlobParams = z.infer<typeof globParamsSchema>;
@@ -106,8 +118,7 @@ export async function globToolExecute(
       },
     };
   } catch (error) {
-    if (error instanceof Error) throw error;
-    else throw new Error('Unknown Error');
+    rethrowCappedToolOutputError(error);
   }
 }
 

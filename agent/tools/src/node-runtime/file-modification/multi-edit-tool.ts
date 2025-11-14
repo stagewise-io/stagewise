@@ -4,22 +4,38 @@ import { tool } from 'ai';
 import { validateToolOutput } from '../..';
 import { z } from 'zod';
 import { prepareDiffContent } from '../../utils/file';
+import { rethrowCappedToolOutputError } from '../../utils/error';
 
-export const DESCRIPTION =
-  'Make multiple edits to a single file in one operation';
+export const DESCRIPTION = `Make multiple find-and-replace edits to a single file in one operation. CRITICAL: Edits are applied SEQUENTIALLY - each edit sees the results of previous edits.
+
+Parameters:
+- relative_path (string, REQUIRED): Relative file path to edit. File must exist.
+- edits (array, REQUIRED): Array of edit objects (minimum 1 edit). Each edit contains:
+  - old_string (string, REQUIRED): Text to find and replace.
+  - new_string (string, REQUIRED): Text to replace it with.
+  - replace_all (boolean, OPTIONAL): If true, replaces all occurrences. If false (default), replaces only FIRST occurrence in current content.
+      
+Behavior: Edits applied in array order. Edit 2 operates on results of edit 1, edit 3 on results of edit 2, etc. If old_string not found in current content, that edit is skipped. Returns total number of individual replacements made.`;
 
 const editSchema = z.object({
-  old_string: z.string().describe('The text to replace'),
-  new_string: z.string().describe('The text to replace it with'),
+  old_string: z.string().describe('Text to find and replace.'),
+  new_string: z.string().describe('Text to replace it with.'),
   replace_all: z
     .boolean()
     .optional()
-    .describe('Replace all occurrences (default: false)'),
+    .describe(
+      'If true, replaces all occurrences. If false (default), replaces only FIRST occurrence in current content.',
+    ),
 });
 
 export const multiEditParamsSchema = z.object({
-  relative_path: z.string().describe('Relative file path'),
-  edits: z.array(editSchema).min(1).describe('Array of edit objects'),
+  relative_path: z
+    .string()
+    .describe('Relative file path to edit. File must exist.'),
+  edits: z
+    .array(editSchema)
+    .min(1)
+    .describe('Array of edit objects (minimum 1 edit).'),
 });
 
 export type MultiEditParams = z.infer<typeof multiEditParamsSchema>;
@@ -176,8 +192,7 @@ export async function multiEditToolExecute(
       },
     };
   } catch (error) {
-    if (error instanceof Error) throw error;
-    else throw new Error('Unknown Error');
+    rethrowCappedToolOutputError(error);
   }
 }
 

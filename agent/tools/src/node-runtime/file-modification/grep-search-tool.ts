@@ -8,34 +8,54 @@ import {
   truncatePreview,
   formatTruncationMessage,
 } from '../../utils/tool-output-capper.js';
+import { rethrowCappedToolOutputError } from '../../utils/error';
 
-export const DESCRIPTION =
-  'Fast, exact regex searches over text files using ripgrep. Use this tool to search for the right files in the project.';
+export const DESCRIPTION = `Fast regex search across text files using ripgrep. Use to find code patterns, function definitions, or specific text.
+
+Parameters:
+- query (string, REQUIRED): Regex pattern using ripgrep syntax (similar to PCRE). Search for exact code strings or patterns.
+- case_sensitive (boolean, OPTIONAL): Whether search is case sensitive. Defaults to false (case insensitive).
+- include_file_pattern (string, OPTIONAL): Glob pattern for files to include. Examples: "*.ts", "**/*.tsx", "src/**/*.js".
+- exclude_file_pattern (string, OPTIONAL): Glob pattern for files to exclude. Examples: "**/test-*.js", "metadata/**".
+- max_matches (number, OPTIONAL): Maximum matches to return. Defaults to 15, maximum allowed is 50.
+- explanation (string, REQUIRED): One sentence explaining why this tool is being used.
+
+Behavior: Searches recursively from current directory. Respects .gitignore by default. Returns matches with file paths, line numbers (1-indexed), and previews (max 500 chars each). Output capped at 50 matches and 40KB total. Binary files automatically skipped.`;
 
 export const grepSearchParamsSchema = z.object({
-  query: z.string().describe('The regex pattern to search for'),
+  query: z
+    .string()
+    .describe(
+      'Regex pattern using ripgrep syntax (similar to PCRE). Search for exact code strings or patterns.',
+    ),
   case_sensitive: z
     .boolean()
     .optional()
-    .describe('Whether the search should be case sensitive'),
+    .describe(
+      'Whether search is case sensitive. Defaults to false (case insensitive).',
+    ),
   include_file_pattern: z
     .string()
     .optional()
-    .describe('Glob pattern for files to include (e.g., "*.ts", "**/*.ts")'),
+    .describe(
+      'Glob pattern for files to include. Examples: "*.ts", "**/*.tsx", "src/**/*.js".',
+    ),
   exclude_file_pattern: z
     .string()
     .optional()
-    .describe('Glob pattern for files to exclude (e.g., "**/test-*.js")'),
+    .describe(
+      'Glob pattern for files to exclude. Examples: "**/test-*.js", "metadata/**".',
+    ),
   max_matches: z
     .number()
     .optional()
     .default(15)
     .describe(
-      `Maximum number of matches to return (default: 15). Results may be truncated if this limit is exceeded. Not more than ${TOOL_OUTPUT_LIMITS.GREP.MAX_MATCHES} are allowed.`,
+      `Maximum matches to return. Defaults to 15, maximum allowed is ${TOOL_OUTPUT_LIMITS.GREP.MAX_MATCHES}.`,
     ),
   explanation: z
     .string()
-    .describe('One sentence explanation of why this tool is being used'),
+    .describe('One sentence explaining why this tool is being used.'),
 });
 
 export type GrepSearchParams = z.infer<typeof grepSearchParamsSchema>;
@@ -146,7 +166,7 @@ export async function grepSearchToolExecute(
       }
       if (!exclude_file_pattern) {
         suggestions.push(
-          'Use exclude_file_pattern to skip irrelevant directories (e.g., "node_modules")',
+          'Use exclude_file_pattern to skip irrelevant directories (e.g., "metadata/**")',
         );
       }
       suggestions.push('Use a more specific regex pattern');
@@ -173,8 +193,7 @@ export async function grepSearchToolExecute(
       },
     };
   } catch (error) {
-    if (error instanceof Error) throw error;
-    else throw new Error(`Unknown Error`);
+    rethrowCappedToolOutputError(error);
   }
 }
 

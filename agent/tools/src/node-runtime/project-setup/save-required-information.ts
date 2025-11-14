@@ -1,18 +1,33 @@
 import { tool } from 'ai';
 import { validateToolOutput } from '../..';
 import { z } from 'zod';
+import { rethrowCappedToolOutputError } from '../../utils/error';
 
-export const DESCRIPTION =
-  'Save the required information for the project setup';
+export const DESCRIPTION = `Save workspace configuration to persist setup. Final step in setup process. IMPORTANT: MUST only be called after all required information is gathered.
+
+Parameters:
+- agentAccessPath (string, REQUIRED): Relative path defining agent's file access scope, relative to appPath. Values: "." for app-only access, "../.." to navigate up levels, "{GIT_REPO_ROOT}" for full git repository access (recommended). Must be valid relative path or special token.
+- appPath (string, REQUIRED): Absolute filesystem path to the specific app/package directory (e.g., "/Users/user/project/apps/website"). In non-monorepos, typically equals workspace root. In monorepos, points to specific package directory. Must be valid absolute path.
+- appPort (number, REQUIRED): Local development server port (e.g., 3000, 5173, 8080). Must be valid port number (1-65535).
+
+Behavior: Persists configuration to workspace settings. Call only when setup is complete and all values validated.`;
 
 export const saveRequiredInformationParamsSchema = z.object({
   agentAccessPath: z
     .string()
     .describe(
-      "The relative path to which the agent should have access. In monorepos, this could be a relative path that moves up one or more levels. The alias '{GIT_REPO_ROOT}' is the reocmmended default value and simply gives the agent access to the whole parent git repository.",
+      'Relative path defining agent\'s file access scope, relative to appPath. Values: "." for app-only access, "../.." to navigate up levels, "{GIT_REPO_ROOT}" for full git repository access (recommended). Must be valid relative path or special token.',
     ),
-  appPath: z.string().describe('The app path'),
-  appPort: z.number().describe('The app port'),
+  appPath: z
+    .string()
+    .describe(
+      'Absolute filesystem path to the specific app/package directory (e.g., "/Users/user/project/apps/website"). In non-monorepos, typically equals workspace root. In monorepos, points to specific package directory. Must be valid absolute path.',
+    ),
+  appPort: z
+    .number()
+    .describe(
+      'Local development server port (e.g., 3000, 5173, 8080). Must be valid port number (1-65535).',
+    ),
 });
 
 export type SaveRequiredInformationParams = z.infer<
@@ -28,16 +43,20 @@ export async function saveRequiredInformationToolExecute(
   params: SaveRequiredInformationParams,
   onSaveInformation: (params: SaveRequiredInformationParams) => Promise<void>,
 ) {
-  await onSaveInformation(params);
-  return {
-    success: true,
-    message: `Required information saved`,
-    result: {
-      agentAccessPath: params.agentAccessPath,
-      appPath: params.appPath,
-      appPort: params.appPort,
-    },
-  };
+  try {
+    await onSaveInformation(params);
+    return {
+      success: true,
+      message: `Required information saved`,
+      result: {
+        agentAccessPath: params.agentAccessPath,
+        appPath: params.appPath,
+        appPort: params.appPort,
+      },
+    };
+  } catch (error) {
+    rethrowCappedToolOutputError(error);
+  }
 }
 
 export const saveRequiredInformationTool = (

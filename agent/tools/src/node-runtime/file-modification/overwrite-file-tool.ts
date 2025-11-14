@@ -1,4 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import { rethrowCappedToolOutputError } from '../../utils/error';
 import { tool } from 'ai';
 import { validateToolOutput } from '../..';
 import type { FileDiff } from '@stagewise/agent-types';
@@ -6,12 +7,23 @@ import { z } from 'zod';
 import { prepareDiffContent } from '../../utils/file';
 import type { PreparedDiffContent } from '../../utils/file';
 
-export const DESCRIPTION =
-  'Overwrite the entire content of a file. Creates the file if it does not exist, along with any necessary directories.';
+export const DESCRIPTION = `Overwrite entire file content, creating the file if it does not exist.
+
+Parameters:
+- relative_path (string, REQUIRED): Relative file path to overwrite or create.
+- content (string, REQUIRED): New content for the file. Leading/trailing markdown code block markers (\`\`\`) are automatically removed.
+
+Behavior: Creates parent directories if needed. No size limit on file write itself.`;
 
 export const overwriteFileParamsSchema = z.object({
-  relative_path: z.string().describe('Relative file path'),
-  content: z.string(),
+  relative_path: z
+    .string()
+    .describe('Relative file path to overwrite or create.'),
+  content: z
+    .string()
+    .describe(
+      'New content for the file. Leading/trailing markdown code block markers (```) are automatically removed.',
+    ),
 });
 
 export type OverwriteFileParams = z.infer<typeof overwriteFileParamsSchema>;
@@ -177,8 +189,7 @@ export async function overwriteFileToolExecute(
       },
     };
   } catch (error) {
-    if (error instanceof Error) throw error;
-    else throw new Error(`Unknown Error`);
+    rethrowCappedToolOutputError(error);
   }
 }
 

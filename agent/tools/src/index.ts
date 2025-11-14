@@ -124,14 +124,16 @@ type _ToolSet = { [key: string]: Tool<any, any> };
  * properties for each tool, omitting the 'execute' function.
  *
  * @param tools - The original tools object with 'execute' and other properties.
- * @returns A new object containing only 'description' and 'inputSchema' for each tool.
+ * @returns A new object containing all properties except 'execute' for each tool.
  */
 export function toolsWithoutExecute<T extends _ToolSet>(tools: T): T {
   const out = {} as T;
   for (const key in tools) {
     const k = key as keyof T;
-    const { description, inputSchema } = tools[k]!;
-    (out as any)[k] = { description, inputSchema };
+    // Copy all properties except 'execute'
+    const tool = tools[k]!;
+    const { execute: _execute, ...rest } = tool;
+    (out as any)[k] = { ...rest };
   }
   return out;
 }
