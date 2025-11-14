@@ -4,6 +4,7 @@
 
 import { AgentService } from '@/services/workspace-manager/workspace-services/agent/agent';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
+import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
@@ -100,6 +101,7 @@ export class WorkspaceService {
           statusInfo: { isIndexing: false },
         },
         loadedOnStart: this.loadedOnStart,
+        childWorkspacePaths: [],
       };
     });
 
@@ -113,6 +115,24 @@ export class WorkspaceService {
     const clientRuntime = new ClientRuntimeNode({
       workingDirectory: this.getAbsoluteAgentAccessPath(),
       rgBinaryBasePath: this.globalDataPathService.globalDataPath,
+    });
+
+    // We immediately make a search for configures workspaces in child paths in order to show this to the user if necessary.
+    const childWorkspacePaths = await searchForChildWorkspacePaths(
+      clientRuntime,
+      this.workspacePath,
+    );
+    this.kartonService.setState((draft) => {
+      draft.workspace!.childWorkspacePaths = childWorkspacePaths;
+    });
+    const isOwnInChildWorkspaces = childWorkspacePaths.includes(
+      this.workspacePath,
+    );
+    const childWorkspaceCount =
+      childWorkspacePaths.length - (isOwnInChildWorkspaces ? 1 : 0);
+    this.telemetryService.capture('workspace-with-child-workspaces-opened', {
+      child_workspace_count: childWorkspaceCount,
+      includes_itself: isOwnInChildWorkspaces,
     });
 
     // Start all child services of the workspace. All regular services should only be started if the setup service is done.
@@ -334,3 +354,28 @@ export class WorkspaceService {
     return this.workspaceDevAppStateService!;
   }
 }
+
+const searchForChildWorkspacePaths = async (
+  clientRuntime: ClientRuntime,
+  workspacePath: string,
+): Promise<string[]> => {
+  // Search for files called "stagewise.json" inside the cwd
+
+  const result = await clientRuntime.fileSystem.glob('stagewise.json', {
+    searchPath: workspacePath,
+    absoluteSearchPath: true,
+    absoluteSearchResults: true,
+    respectGitignore: true,
+    excludePatterns: [
+      '**/node_modules/',
+      '**/dist/',
+      '**/build/',
+      '**/binaries/',
+      '**/bin/',
+    ],
+  });
+
+  const paths = result.relativePaths?.map((res) => path.dirname(res)) ?? [];
+
+  return paths;
+};

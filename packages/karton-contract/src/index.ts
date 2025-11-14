@@ -167,8 +167,10 @@ export type AppState = {
         | { isIndexing: false; hasError: true; error: string };
     };
     loadedOnStart: boolean;
+    childWorkspacePaths: string[]; // List of paths that are child paths of the currently opened workspace.
   } | null;
   workspaceStatus: WorkspaceStatus;
+  recentWorkspaces: string[]; // List of paths to recent workspaces.
   userAccount: {
     status: AuthStatus;
     machineId?: string;
@@ -373,6 +375,7 @@ export const defaultState: KartonContract['state'] = {
   },
   workspace: null,
   workspaceStatus: 'closed',
+  recentWorkspaces: [],
   userAccount: {
     status: 'unauthenticated',
     loginDialog: null,

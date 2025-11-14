@@ -30,6 +30,10 @@ export interface EventProperties {
       | 'on_start_with_arg'
       | 'at_runtime_by_user_action';
   };
+  'workspace-with-child-workspaces-opened': {
+    child_workspace_count: number; // Amount of workspace configs found (except for own if there's one).
+    includes_itself: boolean; // If true, this means that there are child workspaces, but the opened path itself also has a config.
+  };
   'workspace-setup-information-saved': {
     agent_access_path: string;
     app_port: number;

@@ -57,18 +57,18 @@ export const OpenWorkspaceScreen = ({ show }: { show: boolean }) => {
           <Button
             variant="primary"
             className="shrink-0"
-            onClick={selectFolderAndOpenWorkspace}
+            onClick={openWorkspaceInCurrentDirectory}
           >
-            Select workspace
+            Create in current directory
             <ArrowRightIcon className="size-4" />
           </Button>
 
           <Button
             variant="secondary"
             className="shrink-0"
-            onClick={openWorkspaceInCurrentDirectory}
+            onClick={selectFolderAndOpenWorkspace}
           >
-            Create in current directory
+            Select workspace
             <ArrowRightIcon className="size-4" />
           </Button>
         </DialogFooter>
