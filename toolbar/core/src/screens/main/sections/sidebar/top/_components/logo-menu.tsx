@@ -8,7 +8,7 @@ import {
   MenuTrigger,
 } from '@stagewise/stage-ui/components/menu';
 import { Logo } from '@/components/ui/logo';
-import { BookIcon, ExternalLinkIcon } from 'lucide-react';
+import { BookIcon, ExternalLinkIcon, TriangleAlertIcon } from 'lucide-react';
 import DiscordLogo from './discord.svg';
 
 export function LogoMenu() {
@@ -35,6 +35,15 @@ export function LogoMenu() {
           </MenuItem>
         </a>
         <MenuSeparator orientation="horizontal" />
+        <a
+          href="https://github.com/stagewise-io/stagewise/issues/new"
+          target="_blank"
+        >
+          <MenuItem>
+            <TriangleAlertIcon className="size-4" />
+            Report an issue
+          </MenuItem>
+        </a>
         <a href="https://stagewise.io/docs" target="_blank">
           <MenuItem>
             <BookIcon className="size-4" />
