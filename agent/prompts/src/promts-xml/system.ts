@@ -482,13 +482,8 @@ const workspaceInformation = async (
             'Description of knowledge specific to open [WORKSPACE] that [STAGE] MUST use (if relevant) to generate good and correct code, answer questions of [USER], and assist with best practice suggestions.',
           'workspace-path': kartonState.workspace?.path ?? 'unknown',
           'package-manager': workspaceInfo.packageManager ?? 'unknown',
-          // Only include agent-access-path if we're not in setup-workspace - in setup-workspace, agent-access-path is yet to be determined.
-          ...(kartonState.userExperience.activeLayout !== Layout.SETUP_WORKSPACE
-            ? {
-                'agent-access-path':
-                  clientRuntime.fileSystem.getCurrentWorkingDirectory(),
-              }
-            : {}),
+          'current-working-directory':
+            clientRuntime.fileSystem.getCurrentWorkingDirectory(),
         },
       },
       {
@@ -676,6 +671,7 @@ Answer questions of [USER] about coding and ${productName}.
     - for yarn: \`yarn dlx stagewise@beta -- <existing dev command>\`
     - for bun: \`bunx stagewise@beta -- <existing dev command>\`
   - HINT: ${productName} is still in beta, so version is always @beta, not @latest.
+- If [USER] doesn't want to integrate ${productName} into dev script of their app, [STAGE] must respond with a brief confirmation (e.g. "Alright, you can always start ${productName} manually by running \`npx stagewise@beta\` in a terminal.") and continue with setup process.
 
 # Tool usage
 - Use file modification tools to get information about [WORKSPACE] and to make changes to [WORKSPACE].

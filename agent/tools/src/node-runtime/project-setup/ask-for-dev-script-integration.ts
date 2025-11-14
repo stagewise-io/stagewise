@@ -14,7 +14,7 @@ Parameters:
     - bun: "bunx stagewise@beta -- next dev"
   Note: Always use @beta version tag, not @latest.
 
-Behavior: User confirms or rejects integration. If confirmed, agent modifies package.json.`;
+Behavior: User confirms or rejects integration. If confirmed, agent modifies package.json. If rejected, agent doesn't modify package.json and MUST go on with the setup process.`;
 
 export const askForDevScriptIntegrationParamsSchema = z.object({
   userInput: z.object({
