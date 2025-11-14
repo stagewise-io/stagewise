@@ -227,7 +227,7 @@ function ContextElementChip({
                 Related source files
               </p>
               <div className="flex w-full flex-col items-stretch gap-2">
-                {selectedElement.codeMetadata.map((metadata) => (
+                {selectedElement.codeMetadata.slice(0,10).map((metadata) => (
                   <div
                     key={`${metadata.relativePath}|${metadata.startLine}`}
                     className="flex flex-col items-stretch"
