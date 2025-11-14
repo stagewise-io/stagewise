@@ -482,7 +482,7 @@ const workspaceInformation = async (
             'Description of knowledge specific to open [WORKSPACE] that [STAGE] MUST use (if relevant) to generate good and correct code, answer questions of [USER], and assist with best practice suggestions.',
           'workspace-path': kartonState.workspace?.path ?? 'unknown',
           'package-manager': workspaceInfo.packageManager ?? 'unknown',
-          'current-working-directory':
+          'agent-access-path':
             clientRuntime.fileSystem.getCurrentWorkingDirectory(),
         },
       },
