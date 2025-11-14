@@ -134,6 +134,30 @@ export function useTypeWriterText(
     animateOnIncreaseOnly,
   ]);
 
+  // When returning to a visible tab, immediately reveal full text and stop animation
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const fullLength = targetLengthRef.current;
+        displayedLengthRef.current = fullLength;
+        targetLengthRef.current = fullLength;
+        previousTextLengthRef.current = fullLength;
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = undefined;
+        }
+        lastFrameTimeRef.current = null;
+        timeAccumulatorRef.current = 0;
+        setDisplayedLength(fullLength);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
