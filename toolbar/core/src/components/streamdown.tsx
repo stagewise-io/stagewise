@@ -73,6 +73,9 @@ export const Streamdown = ({
           a: MemoAnchor,
         }}
         rehypePlugins={[defaultRehypePlugins.raw!, defaultRehypePlugins.katex!]}
+        urlTransform={(url) => {
+          return url;
+        }}
       >
         {children}
       </StreamdownBase>
