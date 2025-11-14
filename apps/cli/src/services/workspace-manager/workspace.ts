@@ -110,6 +110,11 @@ export class WorkspaceService {
       },
     );
 
+    const clientRuntime = new ClientRuntimeNode({
+      workingDirectory: this.getAbsoluteAgentAccessPath(),
+      rgBinaryBasePath: this.globalDataPathService.globalDataPath,
+    });
+
     // Start all child services of the workspace. All regular services should only be started if the setup service is done.
     this.workspaceSetupService = await WorkspaceSetupService.create(
       this.logger,
@@ -154,10 +159,6 @@ export class WorkspaceService {
           this.notificationService,
         );
 
-        const clientRuntime = new ClientRuntimeNode({
-          workingDirectory: this.getAbsoluteAgentAccessPath(),
-          rgBinaryBasePath: this.globalDataPathService.globalDataPath,
-        });
         this.kartonService.setState((draft) => {
           draft.workspace!.agent = {
             accessPath: clientRuntime.fileSystem.getCurrentWorkingDirectory(),
@@ -226,11 +227,6 @@ export class WorkspaceService {
         });
       },
     );
-
-    const clientRuntime = new ClientRuntimeNode({
-      workingDirectory: this.getAbsoluteAgentAccessPath(),
-      rgBinaryBasePath: this.globalDataPathService.globalDataPath,
-    });
 
     this._agentService =
       (await AgentService.create(
