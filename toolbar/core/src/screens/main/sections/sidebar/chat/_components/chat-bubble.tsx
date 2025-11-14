@@ -242,6 +242,7 @@ export function ChatBubble({
                     return (
                       <ThinkingPart
                         key={stableKey}
+                        thinkingDuration={msg.metadata?.thinkingDuration}
                         part={part as ReasoningUIPart}
                         isLastPart={index === msg.parts.length - 1}
                       />

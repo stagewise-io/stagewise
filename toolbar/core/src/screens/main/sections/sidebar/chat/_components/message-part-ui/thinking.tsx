@@ -1,6 +1,6 @@
 import { cn } from '@/utils';
 import type { ReasoningUIPart } from '@stagewise/karton-contract';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -13,14 +13,21 @@ import { useTypeWriterText } from '@/hooks/use-type-writer-text';
 export const ThinkingPart = ({
   part,
   isLastPart,
+  thinkingDuration,
 }: {
   part: ReasoningUIPart;
   isLastPart: boolean;
+  thinkingDuration?: number;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [containerReady, setContainerReady] = useState(false);
   const scrollContainerRef = useRef<HTMLElement>(null);
   const isUserScrolledRef = useRef(false);
+  const formattedThinkingDuration = useMemo(() => {
+    if (!thinkingDuration) return null;
+    // thinkingDuration is ms, convert to s without decimals
+    return `${Math.round(thinkingDuration / 1000)}s`;
+  }, [thinkingDuration]);
 
   useEffect(() => {
     setIsExpanded(isLastPart);
@@ -124,7 +131,13 @@ export const ThinkingPart = ({
         >
           <BrainIcon className="size-3 group-data-[state=streaming]/thinking-part:animate-thinking-part-brain-pulse group-data-[state=streaming]/thinking-part:text-primary" />
           <span className="group-data-[state=streaming]/thinking-part:shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 flex-1 text-start text-xs">
-            {part.state === 'streaming' ? 'Thinking...' : 'Thought'}
+            {part.state === 'streaming' && 'Thinking...'}
+            {part.state === 'done' && formattedThinkingDuration && (
+              <span>Thought for {formattedThinkingDuration}</span>
+            )}
+            {part.state === 'done' && !formattedThinkingDuration && (
+              <span>Thought</span>
+            )}
           </span>
           <ChevronDownIcon
             className={cn(

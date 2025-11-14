@@ -1018,9 +1018,29 @@ export class AgentService {
       this.kartonService.state.workspace?.agentChat?.activeChatId;
     if (!activeChatId) return;
 
+    let thinkingStartTime: number | null = null;
+    let thinkingDuration: number | null = null;
+
     for await (const uiMessage of readUIMessageStream<ChatMessage>({
       stream: uiStream,
     })) {
+      if (
+        uiMessage.parts.some(
+          (p) => p.type === 'reasoning' && p.state === 'streaming',
+        ) &&
+        thinkingStartTime === null
+      ) {
+        thinkingStartTime = Date.now();
+      }
+      if (
+        uiMessage.parts.some(
+          (p) => p.type === 'reasoning' && p.state === 'done',
+        ) &&
+        thinkingStartTime !== null
+      ) {
+        thinkingDuration = Date.now() - thinkingStartTime;
+        thinkingStartTime = null;
+      }
       const chat =
         this.kartonService.state.workspace?.agentChat?.chats[activeChatId];
       const messageExists = chat?.messages.find((m) => m.id === uiMessage.id);
@@ -1029,6 +1049,7 @@ export class AgentService {
         ...uiMessage,
         metadata: {
           ...(uiMessage.metadata ?? {}),
+          ...(thinkingDuration ? { thinkingDuration } : {}),
           createdAt: new Date(),
         },
       };
