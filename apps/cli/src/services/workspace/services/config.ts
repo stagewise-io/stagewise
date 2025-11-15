@@ -8,7 +8,7 @@ import type { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { WorkspaceLoadingOverrides } from '../loading-overrides';
+import type { WorkspaceLoadingOverrides } from './loading-overrides';
 import {
   type WorkspaceConfig,
   workspaceConfigSchema,

@@ -5,14 +5,14 @@
  */
 
 import { WorkspaceService } from './workspace';
-import type { Logger } from '../logger';
-import type { FilePickerService } from '../file-picker';
-import type { TelemetryService } from '../telemetry';
-import type { KartonService } from '../karton';
-import type { WorkspaceLoadingOverrides } from './loading-overrides';
-import type { AuthService } from '../auth';
-import type { GlobalDataPathService } from '../global-data-path';
-import type { NotificationService } from '../notification';
+import type { Logger } from './logger';
+import type { FilePickerService } from './file-picker';
+import type { TelemetryService } from './telemetry';
+import type { KartonService } from './karton';
+import type { WorkspaceLoadingOverrides } from './workspace/services/loading-overrides';
+import type { AuthService } from './auth';
+import type { GlobalDataPathService } from './global-data-path';
+import type { NotificationService } from './notification';
 
 export class WorkspaceManagerService {
   private currentWorkspace: WorkspaceService | null = null;

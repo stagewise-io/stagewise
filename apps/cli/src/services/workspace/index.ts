@@ -2,25 +2,25 @@
  * This file contains the workspace service class that is responsible for loading and unloading all the functionality surrounding a workspace.
  */
 
-import { AgentService } from '@/services/workspace-manager/workspace-services/agent/agent';
+import { AgentService } from '@/services/workspace/services/agent/agent';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
-import type { WorkspaceLoadingOverrides } from './loading-overrides';
-import { WorkspaceConfigService } from './workspace-services/config';
-import { WorkspacePluginService } from './workspace-services/plugin';
-import { WorkspaceSetupService } from './workspace-services/setup';
+import type { WorkspaceLoadingOverrides } from './services/loading-overrides';
+import { WorkspaceConfigService } from './services/config';
+import { WorkspacePluginService } from './services/plugin';
+import { WorkspaceSetupService } from './services/setup';
 import type { AuthService } from '../auth';
-import { RagService } from './workspace-services/rag';
-import { StaticAnalysisService } from './workspace-services/static-analysis';
-import { WorkspacePathsService } from './workspace-services/paths';
+import { RagService } from './services/rag';
+import { StaticAnalysisService } from './services/static-analysis';
+import { WorkspacePathsService } from './services/paths';
 import type { GlobalDataPathService } from '@/services/global-data-path';
 import type { NotificationService } from '../notification';
 import path from 'node:path';
 import { getRepoRootForPath } from '@/utils/git-tools';
-import { WorkspaceDevAppStateService } from './workspace-services/dev-app-state';
+import { WorkspaceDevAppStateService } from './services/dev-app-state';
 
 export class WorkspaceService {
   private logger: Logger;
