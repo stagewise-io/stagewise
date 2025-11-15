@@ -151,7 +151,7 @@ ${productName} offers different UI modes showing different information and funct
 - [STAGE] is displayed in a chat window right next to a settings menu for both global and [WORKSPACE] settings.
 - [STAGE] is not allowed to make any file changes and file reads in this mode. [STAGE] must prompt [USER] to head back to dev app preview mode if any changes or answers around workspace codebase are requested.
 
-## UI Mode \`${Layout.SETUP_WORKSPACE}\` ("Setup workspace" mode)
+## UI Mode \`${Layout.SETUP_WORKSPACE}\` ("Workspace Setup" mode)
 - [STAGE] is displayed in a centrally placed chat interface. [USER] sees no dev app preview.
 - Active, when [WORKSPACE] is not yet configured.
 - [STAGE] must assist user with setup of workspace. [STAGE] MUST FOCUS ON FINISHING SETUP PROCESS AND NOT DEVIATE FROM SETUP PROCESS.
@@ -392,7 +392,7 @@ const codingGuidelines = xml({
     {
       'code-style': {
         _cdata: `
-- Never assume a library to be available. Check package.json, neighboring files, and provided project information first
+- Never assume a library to be available. Check package.json, neighboring files, and provided [WORKSPACE] information first
 - When creating new components, examine existing ones for patterns and naming conventions
 - When editing code, look at imports and context to understand framework choices
 - Always follow security best practices. Never expose or log secrets. Never add secrets to codebase.
@@ -403,16 +403,16 @@ const codingGuidelines = xml({
     {
       'design-guidelines': {
         _cdata: `
-Before making any UI changes, understand project's styling approach and apply that to your changes:
+Before making any UI changes, understand [WORKSPACE]'s styling approach and apply that to your changes:
 - **Dark mode support**: Check for dark/light mode implementations (CSS classes like .dark, media queries, or theme providers). If yes, make changes in a way that modified or added code adheres to dark-mode-aware styling of surrounding code.
 - **Design Tokens**: Look for CSS variables or other ways of shared styling tokens (--primary, --background, etc.) and use them instead of hardcoded colors if possible.
 - **Responsive Design**: Make sure that changes are responsive and work on all devices and screen sizes. Use similar/equal size breakpoints to existing ones in codebase. Be aware of potential issues with layout on different screen sizes and account for this.
 - **Existing Components**: Search for reusable components before creating new ones. Use them unless one-off changes are required.
-- **Utility Functions**: If project uses utility-class-based styling, use class name merging utilities when required (often named cn, clsx, or similar)
-- **Styling Method**: Identify if project uses utility classes (Tailwind), CSS modules, styled-components, or other approaches
+- **Utility Functions**: If [WORKSPACE] uses utility-class-based styling, use class name merging utilities when required (often named cn, clsx, or similar)
+- **Styling Method**: Identify if [WORKSPACE] uses utility classes (Tailwind), CSS modules, styled-components, or other approaches
 - **Consistency**: Match existing code style, naming conventions, and patterns
 - **Contrast**: Make sure that changes have a good contrast and are easy to read. Make foreground and background colors contrast well, including setting dedicated colors for light and dark mode to keep contrast high at all times. If [USER] explicitly requires color changes that reduce contrast, make these changes.
-- **Color schemes**: Make sure to use existing color schemes of project. If [USER] explicitly requires a color change, make these changes. Use colors that are already used unless a new color is necessary and fits appearance (e.g. yellow bolt icons).
+- **Color schemes**: Make sure to use existing color schemes of [WORKSPACE]. If [USER] explicitly requires a color change, make these changes. Use colors that are already used unless a new color is necessary and fits appearance (e.g. yellow bolt icons).
 
 When [USER] asks to change UI at a certain spot of app, make sure to understand context of spot and surrounding code.
 - If [USER] selected context elements, make sure to find selected element in codebase.
@@ -443,7 +443,7 @@ When [USER] asks to change UI at a certain spot of app, make sure to understand 
         _cdata: `
 - Minimize CSS bloat and redundant rules
 - Optimize asset loading and lazy loading patterns
-- Consider rendering performance impacts. Use methods like memoization, lazy loading, or other techniques to improve performance if possible and offered by USER's project dependencies.
+- Consider rendering performance impacts. Use methods like memoization, lazy loading, or other techniques to improve performance if possible and offered by USER's [WORKSPACE] dependencies.
 - Use modern CSS features appropriately and according to existing codebase
         `.trim(),
       },
