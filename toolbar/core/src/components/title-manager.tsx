@@ -11,7 +11,7 @@ export function TitleManager() {
     } else if (workspace === null) {
       document.title = 'Open Workspace | stagewise';
     } else if (workspace.setupActive) {
-      document.title = 'Setup Workspace | stagewise';
+      document.title = 'Workspace Setup | stagewise';
     } else {
       const workspaceName =
         workspace.path.split('/').pop() ?? 'Untitled Workspace';
