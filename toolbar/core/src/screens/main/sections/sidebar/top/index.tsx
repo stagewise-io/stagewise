@@ -15,7 +15,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
       <LogoMenu />
       <WorkspaceInfoBadge isCollapsed={isCollapsed} />
       <div className="flex-1 group-data-[collapsed=true]:hidden" />
-      <div className="full rounded-full bg-primary/10 px-1.5 py-px font-medium text-primary text-xs">
+      <div className="glass-body ml-1 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary text-xs">
         Beta
       </div>
       <Tooltip>
