@@ -1,5 +1,4 @@
 import { defaultRehypePlugins, Streamdown as StreamdownBase } from 'streamdown';
-import { FileIcon } from 'lucide-react';
 import { CodeBlock } from './ui/code-block';
 import { Mermaid } from './ui/mermaid';
 import {
@@ -15,9 +14,9 @@ import {
   type AnchorHTMLAttributes,
   useMemo,
 } from 'react';
-import { cn } from '@/utils';
+import { cn, IDE_SELECTION_ITEMS } from '@/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { CopyCheckIcon, CopyIcon } from 'lucide-react';
+import { CopyCheckIcon, CopyIcon, ExternalLinkIcon } from 'lucide-react';
 import type { BundledLanguage } from 'shiki';
 import type { ExtraProps } from 'react-markdown';
 import { useKartonState } from '@/hooks/use-karton';
@@ -28,6 +27,7 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { getTruncatedFileUrl } from '@/utils';
 import { useFileIDEHref } from '@/hooks/use-file-ide-href';
+import { usePostHog } from 'posthog-js/react';
 
 const LANGUAGE_REGEX = /language-([^\s]+)/;
 
@@ -48,6 +48,29 @@ const StreamdownProvider = ({
     <StreamdownContext.Provider value={{ isStreaming }}>
       {children}
     </StreamdownContext.Provider>
+  );
+};
+
+/**
+ * Preprocesses markdown to handle incomplete wsfile: links during streaming
+ * Converts incomplete markdown like [](wsfile:/path without closing ) to valid markdown
+ *
+ * Note: This runs on every render because it's called in JSX (line 105). However, once
+ * the markdown is complete with a closing ), the regex won't match anymore, so the
+ * function efficiently returns the input unchanged.
+ */
+const preprocessMarkdown = (markdown: string): string => {
+  // Detect incomplete wsfile: links at the end of the string
+  // Pattern: [any-text](wsfile:... without closing )
+  const incompleteWsfileLinkRegex = /\[([^\]]*)\]\(wsfile:([^)]*?)$/;
+
+  return markdown.replace(
+    incompleteWsfileLinkRegex,
+    (_match, linkText, partialPath) => {
+      // Convert to complete markdown with special incomplete prefix
+      const displayText = linkText || '...';
+      return `[${displayText}](wsfile:incomplete:${partialPath})`;
+    },
   );
 };
 
@@ -77,7 +100,7 @@ export const Streamdown = ({
           return url;
         }}
       >
-        {children}
+        {preprocessMarkdown(children)}
       </StreamdownBase>
     </StreamdownProvider>
   );
@@ -206,17 +229,19 @@ type MarkdownNode = {
 
 const CodeBlockCopyButton = ({ code }: { code: string }) => {
   const [hasCopied, setHasCopied] = useState(false);
-  const logoResetTiemoutRef = useRef<number | null>(null);
+  const logoResetTimeoutRef = useRef<number | null>(null);
+  const posthog = usePostHog();
   const copyToClipboard = () => {
     navigator.clipboard.writeText(code);
     setHasCopied(true);
-    if (logoResetTiemoutRef.current) {
-      clearTimeout(logoResetTiemoutRef.current);
+    if (logoResetTimeoutRef.current) {
+      clearTimeout(logoResetTimeoutRef.current);
     }
-    logoResetTiemoutRef.current = setTimeout(
+    logoResetTimeoutRef.current = setTimeout(
       () => setHasCopied(false),
       2000,
     ) as unknown as number;
+    posthog?.capture('agent_copied_code_to_clipboard');
   };
 
   return (
@@ -235,6 +260,71 @@ const CodeBlockCopyButton = ({ code }: { code: string }) => {
   );
 };
 
+const FileLink = ({
+  filePath,
+  lineNumber,
+  href,
+  ideKey,
+  ideName,
+}: {
+  filePath: string;
+  lineNumber?: string;
+  href: string;
+  ideName: string;
+  ideKey: keyof typeof IDE_SELECTION_ITEMS;
+}) => {
+  const posthog = usePostHog();
+  return (
+    <Tooltip>
+      <TooltipTrigger>
+        <a
+          href={href}
+          onClick={() =>
+            posthog?.capture('agent_file_opened_in_ide_via_chat_link', {
+              file_path: filePath,
+              ide: ideKey,
+            })
+          }
+          className={cn(
+            'inline-flex items-center',
+            'max-w-full',
+            'transition-all duration-200',
+            'hover:opacity-95',
+            'active:opacity-90',
+            'text-primary text-sm',
+            'hover:text-primary/80',
+            'align-baseline',
+          )}
+        >
+          <span
+            className="relative min-w-0 max-w-[30ch] overflow-hidden"
+            style={{ direction: 'rtl' }}
+          >
+            <span
+              className="inline-block whitespace-nowrap"
+              style={{ direction: 'ltr', unicodeBidi: 'embed' }}
+            >
+              {filePath}
+            </span>
+          </span>
+          {lineNumber && (
+            <span className="shrink-0 text-sm opacity-70">:{lineNumber}</span>
+          )}
+          <ExternalLinkIcon className="ml-1 size-3 shrink-0" />
+        </a>
+      </TooltipTrigger>
+      <TooltipContent>
+        <div className="flex flex-col gap-1">
+          <div className="font-mono text-xs">{href}</div>
+          <div className="text-muted-foreground text-xs">
+            Click to open in {ideName}
+          </div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
 const AnchorComponent = ({
   href,
   className,
@@ -249,30 +339,35 @@ const AnchorComponent = ({
     return href?.startsWith('wsfile:');
   }, [href]);
 
-  const linkLabel = useMemo(() => {
-    if (!href) return null;
-
-    if (href.startsWith('wsfile:')) {
-      const filePath = href.slice('wsfile:'.length);
-
-      const truncatedFilePath = getTruncatedFileUrl(
-        filePath.split(':')[0]!,
-        3,
-        128,
-      );
-      const lineNumber = filePath.split(':')[1];
-
-      return `${truncatedFilePath}${lineNumber ? ` (Line ${lineNumber})` : ''}`;
-    }
-
-    return children;
-  }, [href, children]);
+  // Detect incomplete file links during streaming
+  // Our preprocessing converts incomplete wsfile: URLs to "wsfile:incomplete:..." format
+  const isIncompleteFileLink = useMemo(() => {
+    return href?.startsWith('wsfile:incomplete:') ?? false;
+  }, [href]);
 
   const conversationId = useKartonState(
     (s) => s.workspace?.agentChat?.activeChatId ?? 'unknown',
   );
 
+  const openInIdeChoice = useKartonState((s) => s.globalConfig.openFilesInIde);
+  const ideName = IDE_SELECTION_ITEMS[openInIdeChoice];
+
   const filePathTools = useFileIDEHref();
+
+  const { filePath, lineNumber } = useMemo(() => {
+    if (!href?.startsWith('wsfile:'))
+      return { filePath: null, lineNumber: null };
+
+    // Handle both complete and incomplete wsfile links
+    const prefix = href.startsWith('wsfile:incomplete:')
+      ? 'wsfile:incomplete:'
+      : 'wsfile:';
+    const path = href.slice(prefix.length);
+    const [file, line] = path.split(':');
+    const truncated = getTruncatedFileUrl(file!, 3, 128);
+
+    return { filePath: truncated, lineNumber: line };
+  }, [href]);
 
   const processedHref = useMemo(() => {
     if (!href) return '';
@@ -280,7 +375,11 @@ const AnchorComponent = ({
     let finalHref = href;
 
     if (href.startsWith('wsfile:')) {
-      finalHref = filePathTools.getFileIDEHref(href.slice('wsfile:'.length));
+      // Remove the wsfile: (or wsfile:incomplete:) prefix before processing
+      const prefix = href.startsWith('wsfile:incomplete:')
+        ? 'wsfile:incomplete:'
+        : 'wsfile:';
+      finalHref = filePathTools.getFileIDEHref(href.slice(prefix.length));
     }
 
     finalHref = finalHref.replaceAll(
@@ -289,8 +388,23 @@ const AnchorComponent = ({
     );
 
     return finalHref;
-  }, [conversationId, filePathTools]);
+  }, [conversationId, filePathTools, href]);
 
+  // Render file link bubble for wsfile: links or incomplete file links
+  if (isFileLink || isIncompleteFileLink) {
+    // Show complete link bubble for all other cases (valid markdown with extracted path)
+    return (
+      <FileLink
+        filePath={filePath ?? '...'}
+        lineNumber={lineNumber ?? undefined}
+        href={processedHref}
+        ideName={ideName}
+        ideKey={openInIdeChoice}
+      />
+    );
+  }
+
+  // Regular link rendering
   return (
     <Tooltip>
       <TooltipTrigger>
@@ -302,10 +416,7 @@ const AnchorComponent = ({
           )}
           {...props}
         >
-          {isFileLink && (
-            <FileIcon className="inline size-3.5 shrink-0 self-center" />
-          )}
-          {linkLabel}
+          {children}
         </a>
       </TooltipTrigger>
       <TooltipContent>{processedHref}</TooltipContent>
