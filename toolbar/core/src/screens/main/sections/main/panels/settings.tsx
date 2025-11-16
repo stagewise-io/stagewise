@@ -1,3 +1,4 @@
+import { IDE_LOGOS } from '@/assets/ide-logos';
 import {
   FormField,
   FormFieldDescription,
@@ -340,12 +341,57 @@ export const GlobalSettingsTabContent = () => {
             value={config.openFilesInIde}
             items={[
               {
+                value: 'cursor',
+                label: 'Cursor',
+                icon: (
+                  <img src={IDE_LOGOS.cursor} alt="Cursor" className="size-4" />
+                ),
+              },
+              {
                 value: 'vscode',
                 label: 'VS Code',
+                icon: (
+                  <img
+                    src={IDE_LOGOS.vscode}
+                    alt="VS Code"
+                    className="size-4"
+                  />
+                ),
               },
-              { value: 'cursor', label: 'Cursor' },
-              { value: 'windsurf', label: 'Windsurf' },
-              { value: 'trae', label: 'Trae' },
+              {
+                value: 'zed',
+                label: 'Zed',
+                icon: <img src={IDE_LOGOS.zed} alt="Zed" className="size-4" />,
+              },
+              {
+                value: 'kiro',
+                label: 'Kiro',
+                icon: (
+                  <img src={IDE_LOGOS.kiro} alt="Kiro" className="size-4" />
+                ),
+              },
+              {
+                value: 'windsurf',
+                label: 'Windsurf',
+                icon: (
+                  <img
+                    src={IDE_LOGOS.windsurf}
+                    alt="Windsurf"
+                    className="size-4"
+                  />
+                ),
+              },
+              {
+                value: 'trae',
+                label: 'Trae',
+                icon: (
+                  <img src={IDE_LOGOS.trae} alt="Trae" className="size-4" />
+                ),
+              },
+              {
+                value: 'other',
+                label: 'Other',
+              },
             ]}
             triggerClassName="min-w-48"
           />

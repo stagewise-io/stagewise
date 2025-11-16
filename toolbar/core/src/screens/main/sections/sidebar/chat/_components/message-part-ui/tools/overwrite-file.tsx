@@ -1,7 +1,8 @@
 import type { ToolPart } from '@stagewise/karton-contract';
+import { IDE_LOGOS } from '@/assets/ide-logos';
 import { useFileIDEHref } from '@/hooks/use-file-ide-href';
 import { DiffPreview, ToolPartUIBase } from './_shared';
-import { MinimizeIcon, MaximizeIcon, PencilIcon } from 'lucide-react';
+import { MinimizeIcon, MaximizeIcon, PencilIcon, FileIcon } from 'lucide-react';
 import { getTruncatedFileUrl } from '@/utils';
 import { useMemo, useState } from 'react';
 import { diffLines } from 'diff';
@@ -101,7 +102,16 @@ export const OverwriteFileToolPart = ({
                   );
                 }}
               >
-                Open in {IDE_SELECTION_ITEMS[openInIdeSelection]}
+                {openInIdeSelection !== 'other' ? (
+                  <img
+                    src={IDE_LOGOS[openInIdeSelection]}
+                    alt={IDE_SELECTION_ITEMS[openInIdeSelection]}
+                    className="size-3 shrink-0"
+                  />
+                ) : (
+                  <FileIcon className="size-3 shrink-0" />
+                )}
+                Open file
               </a>
             </div>
             <DiffPreview

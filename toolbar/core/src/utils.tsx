@@ -188,6 +188,7 @@ export const hotkeyActionDefinitions: Record<
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';
 import { getSelectedElementReactInfo } from './utils/element-analysis/react';
+import type { OpenFilesInIde } from '@stagewise/karton-contract/shared-types';
 
 const customTwMerge = extendTailwindMerge({
   extend: {
@@ -782,16 +783,19 @@ export const getTruncatedFileUrl = (
   return `${leadingSep || ''}${truncatedPath}`;
 };
 
-export const IDE_SELECTION_ITEMS = {
+export const IDE_SELECTION_ITEMS: Record<OpenFilesInIde, string> = {
   vscode: 'VS Code',
   cursor: 'Cursor',
   windsurf: 'Windsurf',
   trae: 'Trae',
+  zed: 'Zed',
+  kiro: 'Kiro',
+  other: 'Other',
 };
 
 export const getIDEFileUrl = (
   absFilePath: string,
-  ide: keyof typeof IDE_SELECTION_ITEMS,
+  ide: OpenFilesInIde,
   lineNumber?: number,
 ) => {
   let url: string;
@@ -807,6 +811,15 @@ export const getIDEFileUrl = (
       break;
     case 'trae':
       url = `trae://file/${absFilePath}`;
+      break;
+    case 'zed':
+      url = `zed://file/${absFilePath}`;
+      break;
+    case 'kiro':
+      url = `kiro://file/${absFilePath}`;
+      break;
+    case 'other':
+      url = `file://${absFilePath}`;
       break;
   }
   if (lineNumber) url += `:${lineNumber}`;

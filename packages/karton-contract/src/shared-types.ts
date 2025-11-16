@@ -4,12 +4,22 @@ import { z } from 'zod';
  * GLOBAL CONFIG CAPABILITIES
  */
 
+export const openFilesInIdeSchema = z.enum([
+  'vscode',
+  'cursor',
+  'zed',
+  'windsurf',
+  'trae',
+  'kiro',
+  'other',
+]);
+
+export type OpenFilesInIde = z.infer<typeof openFilesInIdeSchema>;
+
 export const globalConfigSchema = z
   .object({
     telemetryLevel: z.enum(['off', 'anonymous', 'full']).default('anonymous'),
-    openFilesInIde: z
-      .enum(['vscode', 'cursor', 'windsurf', 'trae'])
-      .default('cursor'),
+    openFilesInIde: openFilesInIdeSchema.default('other'),
   })
   .loose();
 

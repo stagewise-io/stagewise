@@ -1,9 +1,11 @@
 import { useContextChipHover } from '@/hooks/use-context-chip-hover';
+import { getTruncatedFileUrl } from '@/utils';
 import {
   XIcon,
   SquareDashedMousePointer,
   AtomIcon,
   ChevronLeft,
+  FileIcon,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { useFileIDEHref } from '@/hooks/use-file-ide-href';
@@ -13,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
-import { getTruncatedFileUrl } from '@/utils';
+import { IDE_SELECTION_ITEMS } from '@/utils';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import type { SelectedElement } from '@stagewise/karton-contract';
 import {
@@ -23,6 +25,7 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { usePostHog } from 'posthog-js/react';
 import { useKartonState } from '@/hooks/use-karton';
+import { IDE_LOGOS } from '@/assets/ide-logos';
 
 interface ContextElementsChipsProps {
   selectedElements: {
@@ -227,7 +230,7 @@ function ContextElementChip({
                 Related source files
               </p>
               <div className="flex w-full flex-col items-stretch gap-2">
-                {selectedElement.codeMetadata.slice(0,10).map((metadata) => (
+                {selectedElement.codeMetadata.slice(0, 10).map((metadata) => (
                   <div
                     key={`${metadata.relativePath}|${metadata.startLine}`}
                     className="flex flex-col items-stretch"
@@ -241,7 +244,7 @@ function ContextElementChip({
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="shrink basis-4/5 break-all text-foreground text-sm hover:text-primary"
+                          className="flex shrink basis-4/5 gap-1 break-all text-foreground text-sm hover:text-primary"
                           onClick={() => {
                             posthog.capture(
                               'agent-file-opened-in-ide-via-element-context',
@@ -253,6 +256,15 @@ function ContextElementChip({
                             );
                           }}
                         >
+                          {openInIdeSelection !== 'other' ? (
+                            <img
+                              src={IDE_LOGOS[openInIdeSelection]}
+                              alt={IDE_SELECTION_ITEMS[openInIdeSelection]}
+                              className="size-3 shrink-0"
+                            />
+                          ) : (
+                            <FileIcon className="size-3 shrink-0" />
+                          )}
                           {getTruncatedFileUrl(metadata.relativePath)}
                         </a>
                       </TooltipTrigger>
