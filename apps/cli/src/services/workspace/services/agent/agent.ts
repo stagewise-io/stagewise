@@ -103,6 +103,7 @@ export class AgentService {
       undoExecute?: () => Promise<void>;
     }[]
   > = new Map();
+  private thinkingEnabled = true;
 
   private constructor(
     logger: Logger,
@@ -356,6 +357,11 @@ export class AgentService {
     // Fetch subscription
     await this.fetchSubscription();
 
+    // Warm-up LLM proxy cache for minimizing latency
+    void this.warmUpLLMProxyCache().then(() => {
+      this.logger.debug('[AgentService] LLM proxy cache warmed up');
+    });
+
     // Set initial state
     this.setAgentWorking(false);
     createAndActivateNewChat(
@@ -536,6 +542,13 @@ export class AgentService {
           const activeChatId =
             this.kartonService.state.workspace?.agentChat?.activeChatId;
           if (!activeChatId) return;
+          // Set thinking 'enabled' in main layout. IMPORTANT: Thinking mode must not be switched immediately after tool-responses!
+          const layout = this.kartonService.state.userExperience.activeLayout;
+          if (layout === Layout.MAIN && this.thinkingEnabled === false)
+            this.thinkingEnabled = true;
+          else if (layout === Layout.SETUP_WORKSPACE)
+            this.thinkingEnabled = false;
+
           const pendingToolCalls = findPendingToolCalls(
             this.kartonService as KartonStateProvider<KartonContract['state']>,
             activeChatId,
@@ -851,8 +864,14 @@ export class AgentService {
         this.kartonService.state,
       );
 
+      const isSetupMode =
+        this.kartonService.state.userExperience.activeLayout ===
+        Layout.SETUP_WORKSPACE;
+
       const model = this.telemetryService.withTracing(
-        this.litellm('claude-sonnet-4-5'),
+        isSetupMode
+          ? this.litellm('claude-haiku-4-5')
+          : this.litellm('claude-sonnet-4-5'),
         {
           posthogTraceId: chatId,
           posthogProperties: {
@@ -874,7 +893,9 @@ export class AgentService {
         maxRetries: 0,
         providerOptions: {
           anthropic: {
-            thinking: { type: 'enabled', budgetTokens: 10000 },
+            thinking: this.thinkingEnabled
+              ? { type: 'enabled', budgetTokens: 10000 }
+              : { type: 'disabled' },
           } satisfies AnthropicProviderOptions,
           openai: {},
         },
@@ -974,6 +995,7 @@ export class AgentService {
             const updatedMessages =
               this.kartonService.state.workspace?.agentChat?.chats[chatId]
                 ?.messages;
+
             return this.callAgent({
               chatId,
               history: updatedMessages,
@@ -1230,6 +1252,37 @@ export class AgentService {
     return this.kartonService.state.workspace?.inspirationComponents ?? [];
   }
 
+  /**
+   * Performs a warm-up request to the LLM to ensure the cache is seeded and latency is minimized.
+   * @returns The response from the warm-up request.
+   */
+  private async warmUpLLMProxyCache() {
+    return generateText({
+      model: this.telemetryService.withTracing(
+        this.litellm('claude-haiku-4-5'),
+        {
+          posthogTraceId: 'warm-up-request',
+          posthogProperties: {
+            $ai_span_name: 'warm-up-request',
+          },
+        },
+      ),
+      temperature: 0.1,
+      maxOutputTokens: 100,
+      providerOptions: {
+        anthropic: {
+          thinking: {
+            type: 'disabled',
+          },
+        } satisfies AnthropicProviderOptions,
+      },
+      messages: [
+        { role: 'system', content: 'Respond with "Hey there!"' },
+        { role: 'user', content: 'Hey bud!' },
+      ],
+    });
+  }
+
   private async handleStreamingError(
     error: { error: unknown },
     chatId: string,
@@ -1323,7 +1376,7 @@ export class AgentService {
     } else {
       const errorDetails = extractDetailsFromError(error.error);
       this.logger.error(
-        `[Agent Service] Agent failed with error ${errorDetails?.message}`,
+        `[Agent Service] Agent failed with error ${JSON.stringify(error)}`,
       );
       this.telemetryService.captureException(error.error as Error);
       const errorDesc = formatErrorDescription('Agent failed', errorDetails);
