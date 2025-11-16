@@ -9,8 +9,11 @@ Parameters:
 - agentAccessPath (string, REQUIRED): Relative path defining agent's file access scope, relative to appPath. Values: "." for app-only access, "../.." to navigate up levels, "{GIT_REPO_ROOT}" for full git repository access (recommended). Must be valid relative path or special token.
 - appPath (string, REQUIRED): Absolute filesystem path to the specific app/package directory (e.g., "/Users/user/project/apps/website"). In non-monorepos, typically equals workspace root. In monorepos, points to specific package directory. Must be valid absolute path.
 - appPort (number, REQUIRED): Local development server port (e.g., 3000, 5173, 8080). Must be valid port number (1-65535).
+- ide (string, OPTIONAL): The IDE that the USER picked. Does not need to be provided if the user has already picked the IDE.
 
-Behavior: Persists configuration to workspace settings. Call only when setup is complete and all values validated.`;
+Visual behavior of the tool: This tool has no visual UI component. It executes silently in the background after all user interactions are complete.
+
+Outcome of the tool: The tool returns a success status with a message confirming the configuration was saved, along with the saved values (agentAccessPath, appPath, appPort). On failure, returns an error.`;
 
 export const saveRequiredInformationParamsSchema = z.object({
   agentAccessPath: z

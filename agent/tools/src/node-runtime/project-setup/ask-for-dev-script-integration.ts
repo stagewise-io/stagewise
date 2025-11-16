@@ -14,7 +14,9 @@ Parameters:
     - bun: "bunx stagewise@beta -- next dev"
   Note: Always use @beta version tag, not @latest.
 
-Behavior: User confirms or rejects integration. If confirmed, agent modifies package.json. If rejected, agent doesn't modify package.json and MUST go on with the setup process.`;
+Visual behavior of the tool: The tool displays a syntax-highlighted diff viewer showing the before/after changes to the dev script, with a change summary showing line counts (e.g., "+1 -1"). Two buttons are provided: "Don't integrate" (secondary) and "Confirm Integration" (primary).
+
+Outcome of the tool: The tool returns a boolean (shouldIntegrate) indicating whether the user wants to integrate stagewise into their dev script.`;
 
 export const askForDevScriptIntegrationParamsSchema = z.object({
   userInput: z.object({

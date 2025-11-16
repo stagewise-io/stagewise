@@ -11,7 +11,9 @@ Parameters:
   - displayName (string, REQUIRED): Short user-friendly name for the app (e.g., "apps/website", "apps/docs", "workspace-path").
   Minimum 1 entry required. For non-monorepos: single entry with the name of the app and workspace-path (the root of the project) as path. For monorepos: multiple entries for each frontend package/ app.
 
-Behavior: User provides or confirms the path.`;
+Visual behavior of the tool: The tool presents a radio group with app path options (showing displayName for each option). The first option is pre-selected by default. Below the options are two buttons: "Cancel" (secondary) and "Choose App" (primary).
+
+Outcome of the tool: The tool returns the absolute path (absolutePath) of the app that the user selected, or indicates the user cancelled the tool.`;
 
 export const askForAppPathParamsSchema = z.object({
   userInput: z.object({
