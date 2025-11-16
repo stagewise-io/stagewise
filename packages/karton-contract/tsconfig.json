@@ -1,20 +1,21 @@
 {
+  "extends": "../../packages/typescript-config/base.json",
+  "references": [
+    { "path": "../../agent/types" },
+    { "path": "../../agent/tools" }
+  ],
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "NodeNext",
-    "declaration": true,
     "outDir": "./dist",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": false,
-    "isolatedModules": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": ["node"],
+    "rootDir": "./src",
     "moduleResolution": "NodeNext",
+    "module": "NodeNext",
+    "types": ["node"],
+    "declaration": true,
+    "declarationMap": true,
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", ".turbo"]
 }

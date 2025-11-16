@@ -1,26 +1,17 @@
 {
+  "extends": "../../packages/typescript-config/base.json",
+  "references": [],
   "compilerOptions": {
+    "composite": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "target": "es2022",
-    "allowJs": true,
-    "resolveJsonModule": true,
-    "moduleDetection": "force",
-    "isolatedModules": true,
-    "verbatimModuleSyntax": false,
-    "strict": true,
-    "noUncheckedIndexedAccess": false,
-    "noImplicitOverride": true,
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
     "outDir": "dist",
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-    "lib": ["es2022", "dom"],
+    "rootDir": "src",
+    "moduleResolution": "bundler",
+    "module": "ESNext",
     "jsx": "react",
     "types": ["node"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "test", ".turbo"]
 }

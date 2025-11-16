@@ -1,23 +1,12 @@
 {
+  "extends": "../../packages/typescript-config/base.json",
+  "references": [{ "path": "../../packages/agent-interface" }],
   "compilerOptions": {
-    "module": "ES2020",
-    "target": "ES2020",
     "outDir": "out",
-    "lib": ["ES2020"],
-    "sourceMap": true,
-    "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": ["node"],
-    "baseUrl": "."
+    "baseUrl": ".",
+    "strict": false,
+    "noUncheckedIndexedAccess": false
   },
-  "watchOptions": {
-    "watchFile": "useFsEvents",
-    "watchDirectory": "useFsEvents",
-    "synchronousWatchDirectory": true
-  },
-  "include": ["src", "scripts"],
-  "exclude": ["node_modules", ".vscode-test", "out"]
+  "include": ["src"],
+  "exclude": ["node_modules", ".vscode-test", "out", ".turbo"]
 }

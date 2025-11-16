@@ -2,7 +2,7 @@ export {
   createKartonReactClient,
   type SelectorData,
   useComparingSelector,
-} from './karton-react-client';
+} from './karton-react-client.js';
 
 export type {
   KartonClient,

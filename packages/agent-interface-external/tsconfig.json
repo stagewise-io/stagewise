@@ -1,20 +1,16 @@
 {
+  "extends": "../../packages/typescript-config/base.json",
   "compilerOptions": {
-    "target": "ES2020",
+    "composite": false,
     "module": "ESNext",
-    "declaration": true,
-    "outDir": "./dist",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": false,
-    "isolatedModules": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": ["node"],
     "moduleResolution": "bundler",
+    "noEmit": false,
+    "outDir": "./dist",
+    "rootDir": "./src",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*", "test/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", ".turbo"]
 }

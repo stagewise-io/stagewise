@@ -33,6 +33,7 @@ export function generateDeclarationFile(
 
   const options: ts.CompilerOptions = {
     ...parsedConfig.options,
+    composite: false,
     declaration: true,
     emitDeclarationOnly: true,
     outDir: absoluteOutDir,

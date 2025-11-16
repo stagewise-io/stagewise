@@ -96,8 +96,8 @@ export function AnimatedBackground() {
     function connectParticles() {
       for (let a = 0; a < particlesArray.length; a++) {
         for (let b = a; b < particlesArray.length; b++) {
-          const dx = particlesArray[a].x - particlesArray[b].x;
-          const dy = particlesArray[a].y - particlesArray[b].y;
+          const dx = (particlesArray[a]?.x ?? 0) - (particlesArray[b]?.x ?? 0);
+          const dy = (particlesArray[a]?.y ?? 0) - (particlesArray[b]?.y ?? 0);
           const distance = Math.sqrt(dx * dx + dy * dy);
 
           if (distance < 200) {
@@ -108,8 +108,8 @@ export function AnimatedBackground() {
               : `rgba(100, 100, 100, ${opacity * 2})`; // Grayscale for both modes
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
-            ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+            ctx.moveTo(particlesArray[a]?.x ?? 0, particlesArray[a]?.y ?? 0);
+            ctx.lineTo(particlesArray[b]?.x ?? 0, particlesArray[b]?.y ?? 0);
             ctx.stroke();
           }
         }
@@ -121,8 +121,8 @@ export function AnimatedBackground() {
       ctx.clearRect(0, 0, canvas?.width ?? 0, canvas?.height ?? 0);
 
       for (let i = 0; i < particlesArray.length; i++) {
-        particlesArray[i].update();
-        particlesArray[i].draw();
+        particlesArray[i]?.update();
+        particlesArray[i]?.draw();
       }
 
       connectParticles();

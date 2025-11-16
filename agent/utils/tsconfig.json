@@ -1,14 +1,21 @@
 {
   "extends": "../../packages/typescript-config/base.json",
+  "references": [
+    { "path": "../../agent/prompts" },
+    { "path": "../../agent/runtime-interface" },
+    { "path": "../../agent/knowledge" },
+    { "path": "../../agent/tools" },
+    { "path": "../../agent/types" },
+    { "path": "../../packages/karton-contract" }
+  ],
   "compilerOptions": {
+    "composite": false,
+    "moduleResolution": "bundler",
+    "module": "ESNext",
     "noEmit": false,
     "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "declarationDir": "./dist",
-    "sourceMap": true,
-    "isolatedModules": true
+    "rootDir": "./src"
   },
-  "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "build.ts"]
+  "include": ["src"],
+  "exclude": ["dist", "node_modules", "build.ts", ".turbo"]
 }

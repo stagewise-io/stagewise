@@ -23,7 +23,6 @@
     "tw-animate-css": "^1.3.5"
   },
   "devDependencies": {
-    "@stagewise/typescript-config": "workspace:*",
     "@storybook/addon-docs": "^9.1.3",
     "@storybook/addon-onboarding": "9.1.3",
     "@storybook/react-vite": "^9.1.3",

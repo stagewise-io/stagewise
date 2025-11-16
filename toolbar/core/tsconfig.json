@@ -22,7 +22,10 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "outDir": "./dist",
+    "composite": true,
     "jsx": "react-jsx",
     "jsxImportSource": "react"
   },

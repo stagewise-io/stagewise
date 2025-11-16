@@ -5,8 +5,13 @@
   "type": "module",
   "private": true,
   "files": [
-    "src"
+    "src",
+    "dist"
   ],
+  "scripts": {
+    "build": "rm -f tsconfig.tsbuildinfo && tsc --build",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+  },
   "exports": {
     ".": {
       "import": "./src/index.ts",

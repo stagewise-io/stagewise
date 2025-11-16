@@ -1,15 +1,15 @@
 {
-  "extends": "@stagewise/typescript-config/react-library.json",
+  "extends": "../../packages/typescript-config/base.json",
   "compilerOptions": {
-    "incremental": true,
     "module": "preserve",
     "moduleResolution": "bundler",
-    "composite": true,
     "baseUrl": ".",
     "paths": {
       "@stagewise/stage-ui/*": ["./src/*"]
-    }
+    },
+    "jsx": "react-jsx",
+    "jsxImportSource": "react"
   },
-  "include": ["."],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", ".turbo"]
 }
