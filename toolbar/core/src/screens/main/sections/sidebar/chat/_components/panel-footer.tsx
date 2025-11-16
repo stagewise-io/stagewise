@@ -128,9 +128,9 @@ export function ChatPanelFooter() {
         e.preventDefault();
         files.forEach((file) => {
           chatState.addFileAttachment(file);
-          posthog.capture('agent-file-uploaded', {
+          posthog.capture('agent_file_uploaded', {
             file_type: file.type,
-            method: 'chat-paste',
+            method: 'chat_paste',
           });
         });
 
@@ -399,9 +399,9 @@ export function ChatPanelFooter() {
                           (e.target as HTMLInputElement).files ?? [],
                         ).forEach((file) => {
                           chatState.addFileAttachment(file);
-                          posthog.capture('agent-file-uploaded', {
+                          posthog.capture('agent_file_uploaded', {
                             file_type: file.type,
-                            method: 'chat-file-attachment-menu',
+                            method: 'chat_file_attachment_menu',
                           });
                         });
                       };

@@ -272,7 +272,7 @@ export function ScreenSizeControl() {
           }
           onValueChange={(value) => {
             onValueChange(value as string | null);
-            posthog.capture('dev-app-preview-screen-size-changed', {
+            posthog.capture('dev_app_preview_screen_size_changed', {
               screen_size: value,
             });
           }}

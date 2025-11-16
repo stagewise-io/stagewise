@@ -104,7 +104,7 @@ export const MultiEditToolPart = ({
                 className={buttonVariants({ size: 'xs', variant: 'ghost' })}
                 onClick={() => {
                   posthog.capture(
-                    'agent-file-opened-in-ide-via-multi-edit-tool',
+                    'agent_file_opened_in_ide_via_multi_edit_tool',
                     {
                       file_path: part.input?.relative_path ?? '',
                       ide: IDE_SELECTION_ITEMS[openInIdeSelection],

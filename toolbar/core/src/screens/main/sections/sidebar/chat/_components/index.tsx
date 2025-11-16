@@ -52,9 +52,9 @@ export function ChatPanel({
       const files = Array.from(e.dataTransfer.files);
       files.forEach((file) => {
         chatState.addFileAttachment(file);
-        posthog.capture('agent-file-uploaded', {
+        posthog.capture('agent_file_uploaded', {
           file_type: file.type,
-          method: 'chat-drop-zone',
+          method: 'chat_drop_zone',
         });
       });
 

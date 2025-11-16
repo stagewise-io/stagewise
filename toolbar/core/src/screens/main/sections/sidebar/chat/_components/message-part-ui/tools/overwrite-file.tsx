@@ -94,7 +94,7 @@ export const OverwriteFileToolPart = ({
                 className={buttonVariants({ size: 'xs', variant: 'ghost' })}
                 onClick={() => {
                   posthog.capture(
-                    'agent-file-opened-in-ide-via-overwrite-file-tool',
+                    'agent_file_opened_in_ide_via_overwrite_file_tool',
                     {
                       file_path: part.input?.relative_path ?? '',
                       ide: openInIdeSelection,

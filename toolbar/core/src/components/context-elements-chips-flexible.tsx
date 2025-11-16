@@ -247,7 +247,7 @@ function ContextElementChip({
                           className="flex shrink basis-4/5 gap-1 break-all text-foreground text-sm hover:text-primary"
                           onClick={() => {
                             posthog.capture(
-                              'agent-file-opened-in-ide-via-element-context',
+                              'agent_file_opened_in_ide_via_element_context',
                               {
                                 file_path: metadata.relativePath,
                                 ide: openInIdeSelection,

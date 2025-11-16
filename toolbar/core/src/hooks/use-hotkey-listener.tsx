@@ -13,7 +13,7 @@ export function useHotKeyListener(
     (ev: KeyboardEvent) => {
       // The first matching hotkey action will be executed and abort further processing of other hotkey actions.
       if (hotkeyActionDefinitions[hotKeyAction].isEventMatching(ev)) {
-        posthog.capture('toolbar-hotkey-pressed', {
+        posthog.capture('agent_select_elements_hotkey_pressed', {
           hotkey_action: hotKeyAction,
         });
         const matched = action();
