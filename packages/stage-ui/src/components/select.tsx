@@ -22,8 +22,8 @@ export const Select = ({ items, triggerClassName, ...props }: SelectProps) => {
       value: item.value as string,
       label: (
         <div className="flex flex-row items-center justify-between gap-4 text-sm">
+          {item.icon && <div className="size-4 shrink-0">{item.icon}</div>}
           <span className="truncate last:pr-4">{item.label}</span>
-          {item.icon && <div className="size-4">{item.icon}</div>}
         </div>
       ),
     })) as { value: string; label: React.ReactNode }[];
