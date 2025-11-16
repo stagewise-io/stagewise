@@ -32,9 +32,6 @@ export const AskForPortToolPartContent = memo(
 
     return (
       <div className="flex w-full flex-col gap-2">
-        <span className={isError || isOutputAvailable ? 'opacity-50' : ''}>
-          Enter the port where the app is running on:
-        </span>
         {(isInputAvailable || isError || isOutputAvailable) && (
           <div className="flex w-full flex-row items-center gap-2">
             <Input

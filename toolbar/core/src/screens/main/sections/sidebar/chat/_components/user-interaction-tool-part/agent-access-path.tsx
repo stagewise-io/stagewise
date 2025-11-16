@@ -6,6 +6,7 @@ import { CheckIcon, XIcon } from 'lucide-react';
 import { useKartonProcedure } from '@/hooks/use-karton';
 import type { KartonServerProcedures } from '@stagewise/karton/react/client';
 import type { KartonContract } from '@stagewise/karton-contract';
+import { Input } from '@stagewise/stage-ui/components/input';
 
 export const AskForAgentAccessPathToolPartContent = memo(
   ({
@@ -92,9 +93,11 @@ export const AskForAgentAccessPathToolPartContent = memo(
         {isLoadingPath ? (
           <Skeleton variant="text" size="sm" className="w-full" />
         ) : (
-          <span className={isError || isOutputAvailable ? 'opacity-50' : ''}>
-            {displayPath}
-          </span>
+          <Input
+            value={displayPath ?? ''}
+            disabled
+            className={`w-full ${isError || isOutputAvailable ? 'opacity-50' : ''}`}
+          />
         )}
         {(isInputAvailable || isError || isOutputAvailable) && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
