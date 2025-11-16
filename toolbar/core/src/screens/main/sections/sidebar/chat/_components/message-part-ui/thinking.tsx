@@ -130,7 +130,7 @@ export const ThinkingPart = ({
           className="h-6 cursor-pointer gap-1.5 rounded-full px-2.5 text-muted-foreground"
         >
           <BrainIcon className="size-3 group-data-[state=streaming]/thinking-part:animate-thinking-part-brain-pulse group-data-[state=streaming]/thinking-part:text-primary" />
-          <span className="group-data-[state=streaming]/thinking-part:shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 flex-1 text-start text-xs">
+          <span className="group-data-[state=streaming]/thinking-part:shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 flex-1 truncate text-start text-xs">
             {part.state === 'streaming' && 'Thinking...'}
             {part.state === 'done' && formattedThinkingDuration && (
               <span>Thought for {formattedThinkingDuration}</span>
