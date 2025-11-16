@@ -39,6 +39,7 @@ export async function main({
   const {
     logger,
     kartonService,
+    globalConfigService,
     notificationService,
     globalDataPathService,
     telemetryService,
@@ -64,6 +65,7 @@ export async function main({
     filePickerService,
     telemetryService,
     kartonService,
+    globalConfigService,
     authService,
     globalDataPathService,
     notificationService,

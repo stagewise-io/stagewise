@@ -8,6 +8,7 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
+import type { GlobalConfigService } from '../global-config';
 import type { WorkspaceLoadingOverrides } from './services/loading-overrides';
 import { WorkspaceConfigService } from './services/config';
 import { WorkspacePluginService } from './services/plugin';
@@ -26,6 +27,7 @@ export class WorkspaceService {
   private logger: Logger;
   private telemetryService: TelemetryService;
   private kartonService: KartonService;
+  private globalConfigService: GlobalConfigService;
   private authService: AuthService;
   private globalDataPathService: GlobalDataPathService;
   private notificationService: NotificationService;
@@ -49,6 +51,7 @@ export class WorkspaceService {
     logger: Logger,
     telemetryService: TelemetryService,
     kartonService: KartonService,
+    globalConfigService: GlobalConfigService,
     authService: AuthService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
@@ -61,6 +64,7 @@ export class WorkspaceService {
     this.logger = logger;
     this.telemetryService = telemetryService;
     this.kartonService = kartonService;
+    this.globalConfigService = globalConfigService;
     this.authService = authService;
     this.globalDataPathService = globalDataPathService;
     this.notificationService = notificationService;
@@ -253,6 +257,7 @@ export class WorkspaceService {
         this.logger,
         this.telemetryService,
         this.kartonService,
+        this.globalConfigService,
         this.authService,
         clientRuntime,
         this.workspaceSetupService,
@@ -268,6 +273,7 @@ export class WorkspaceService {
     logger: Logger,
     telemetryService: TelemetryService,
     kartonService: KartonService,
+    globalConfigService: GlobalConfigService,
     authService: AuthService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
@@ -281,6 +287,7 @@ export class WorkspaceService {
       logger,
       telemetryService,
       kartonService,
+      globalConfigService,
       authService,
       globalDataPathService,
       notificationService,

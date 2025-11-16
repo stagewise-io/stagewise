@@ -3,7 +3,10 @@ import type { LanguageModelV2 } from '@ai-sdk/provider';
 import { withTracing } from '@posthog/ai';
 import type { IdentifierService } from './identifier';
 import type { GlobalConfigService } from './global-config';
-import type { GlobalConfig } from '@stagewise/karton-contract/shared-types';
+import type {
+  GlobalConfig,
+  OpenFilesInIde,
+} from '@stagewise/karton-contract/shared-types';
 import type { Logger } from './logger';
 
 export interface EventProperties {
@@ -37,6 +40,7 @@ export interface EventProperties {
   'workspace-setup-information-saved': {
     agent_access_path: string;
     app_port: number;
+    ide?: OpenFilesInIde;
   };
   'cli-stored-config-json': undefined;
   'cli-found-config-json': undefined;

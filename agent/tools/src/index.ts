@@ -34,6 +34,11 @@ import {
   type AskForAgentAccessPathOutput,
 } from './node-runtime/project-setup/ask-for-agent-access-path.js';
 import {
+  askForIdeTool,
+  askForIdeOutputSchema,
+  type AskForIdeOutput,
+} from './node-runtime/project-setup/ask-for-ide.js';
+import {
   generateComponentTool,
   type InspirationComponent,
 } from './node-runtime/inspiration/generate-component-tool.js';
@@ -47,11 +52,14 @@ export {
   askForAppPathOutputSchema,
   askForPortOutputSchema,
   askForAgentAccessPathOutputSchema,
+  askForIdeTool,
+  askForIdeOutputSchema,
   type AskForAppPathOutput,
   type AskForPortOutput,
   type AskForAgentAccessPathOutput,
   type AskForDevScriptIntegrationOutput,
   type InspirationComponent,
+  type AskForIdeOutput,
 };
 
 // Export utilities for use by other packages if needed
@@ -148,6 +156,7 @@ export function setupAgentTools(
       askForAgentAccessPathTool(clientRuntime),
     ),
     askForAppPathTool: userInteractionTool(askForAppPathTool(clientRuntime)),
+    askForIdeTool: userInteractionTool(askForIdeTool(clientRuntime)),
     askForDevScriptIntegrationTool: userInteractionTool(
       askForDevScriptIntegrationTool(clientRuntime),
     ),

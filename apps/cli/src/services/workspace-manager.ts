@@ -13,6 +13,7 @@ import type { WorkspaceLoadingOverrides } from './workspace/services/loading-ove
 import type { AuthService } from './auth';
 import type { GlobalDataPathService } from './global-data-path';
 import type { NotificationService } from './notification';
+import type { GlobalConfigService } from './global-config';
 
 export class WorkspaceManagerService {
   private currentWorkspace: WorkspaceService | null = null;
@@ -20,6 +21,7 @@ export class WorkspaceManagerService {
   private filePickerService: FilePickerService;
   private telemetryService: TelemetryService;
   private kartonService: KartonService;
+  private globalConfigService: GlobalConfigService;
   private authService: AuthService;
   private globalDataPathService: GlobalDataPathService;
   private notificationService: NotificationService;
@@ -29,6 +31,7 @@ export class WorkspaceManagerService {
     filePickerService: FilePickerService,
     telemetryService: TelemetryService,
     kartonService: KartonService,
+    globalConfigService: GlobalConfigService,
     authService: AuthService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
@@ -37,6 +40,7 @@ export class WorkspaceManagerService {
     this.filePickerService = filePickerService;
     this.telemetryService = telemetryService;
     this.kartonService = kartonService;
+    this.globalConfigService = globalConfigService;
     this.authService = authService;
     this.globalDataPathService = globalDataPathService;
     this.notificationService = notificationService;
@@ -68,6 +72,7 @@ export class WorkspaceManagerService {
     filePickerService: FilePickerService,
     telemetryService: TelemetryService,
     kartonService: KartonService,
+    globalConfigService: GlobalConfigService,
     authService: AuthService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
@@ -77,6 +82,7 @@ export class WorkspaceManagerService {
       filePickerService,
       telemetryService,
       kartonService,
+      globalConfigService,
       authService,
       globalDataPathService,
       notificationService,
@@ -137,6 +143,7 @@ export class WorkspaceManagerService {
       this.logger,
       this.telemetryService,
       this.kartonService,
+      this.globalConfigService,
       this.authService,
       this.globalDataPathService,
       this.notificationService,

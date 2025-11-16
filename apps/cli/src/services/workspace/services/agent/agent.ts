@@ -4,6 +4,7 @@ import { isContextLimitError } from './utils/is-context-limit-error';
 import type { KartonService } from '../../../karton';
 import type { Logger } from '../../../logger';
 import type { TelemetryService } from '../../../telemetry';
+import type { GlobalConfigService } from '../../../global-config';
 import type { AuthService, AuthState } from '../../../auth';
 import { hasUndoMetadata, hasDiffMetadata } from '@stagewise/agent-types';
 import {
@@ -74,6 +75,7 @@ export class AgentService {
   private logger: Logger;
   private telemetryService: TelemetryService;
   private kartonService: KartonService;
+  private globalConfigService: GlobalConfigService;
   private authService: AuthService;
   private workspaceSetupService: WorkspaceSetupService;
   private clientRuntime: ClientRuntime;
@@ -104,6 +106,7 @@ export class AgentService {
     logger: Logger,
     telemetryService: TelemetryService,
     kartonService: KartonService,
+    globalConfigService: GlobalConfigService,
     authService: AuthService,
     clientRuntime: ClientRuntime,
     workspaceSetupService: WorkspaceSetupService,
@@ -111,6 +114,7 @@ export class AgentService {
     this.logger = logger;
     this.telemetryService = telemetryService;
     this.kartonService = kartonService;
+    this.globalConfigService = globalConfigService;
     this.authService = authService;
     this.clientRuntime = clientRuntime;
     this.workspaceSetupService = workspaceSetupService;
@@ -162,16 +166,26 @@ export class AgentService {
             this.telemetryService.capture('workspace-setup-information-saved', {
               agent_access_path: params.agentAccessPath,
               app_port: params.appPort,
+              ide: params.ide,
             });
             this.logger.debug(
               '[AgentService] Saving information for workspace setup',
             );
-            this.workspaceSetupService.handleSetupSubmission({
+
+            if (params.ide) {
+              void this.globalConfigService.set({
+                ...this.globalConfigService.get(),
+                openFilesInIde: params.ide,
+              });
+            }
+
+            await this.workspaceSetupService.handleSetupSubmission({
               agentAccessPath: params.agentAccessPath,
               useAutoFoundAppPort: true,
               appPort: params.appPort,
               appPath: params.appPath,
             });
+
             const absoluteAgentAccessPath =
               params.agentAccessPath === '{GIT_REPO_ROOT}'
                 ? getRepoRootForPath(params.appPath)
@@ -1189,6 +1203,7 @@ export class AgentService {
     logger: Logger,
     telemetryService: TelemetryService,
     kartonService: KartonService,
+    globalConfigService: GlobalConfigService,
     authService: AuthService,
     clientRuntime: ClientRuntime,
     workspaceSetupService: WorkspaceSetupService,
@@ -1197,6 +1212,7 @@ export class AgentService {
       logger,
       telemetryService,
       kartonService,
+      globalConfigService,
       authService,
       clientRuntime,
       workspaceSetupService,

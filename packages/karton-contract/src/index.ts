@@ -4,6 +4,7 @@ import type {
   AskForPortOutput,
   AskForAgentAccessPathOutput,
   InspirationComponent,
+  AskForIdeOutput,
 } from '@stagewise/agent-tools';
 import type {
   UserMessageMetadata,
@@ -284,6 +285,10 @@ export type KartonContract = {
             })
           | (AskForDevScriptIntegrationOutput & {
               type: 'askForDevScriptIntegrationTool';
+            })
+          | (AskForIdeOutput & {
+              type: 'askForIdeTool';
+              ide: AskForIdeOutput['ide'];
             }),
       ) => Promise<{ success: true } | { success: false; error: string }>; // Returns zod validation success or failure
       cancelUserInteractionToolInput: (toolCallId: string) => Promise<void>; // Cancels the user interaction tool input.
@@ -390,7 +395,7 @@ export const defaultState: KartonContract['state'] = {
   },
   globalConfig: {
     telemetryLevel: 'full',
-    openFilesInIde: 'cursor',
+    openFilesInIde: 'other',
   },
   userExperience: {
     activeLayout: Layout.SIGNIN,

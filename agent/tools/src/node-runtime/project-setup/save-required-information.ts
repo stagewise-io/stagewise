@@ -31,6 +31,12 @@ export const saveRequiredInformationParamsSchema = z.object({
     .describe(
       'Local development server port (e.g., 3000, 5173, 8080). Must be valid port number (1-65535).',
     ),
+  ide: z
+    .enum(['vscode', 'cursor', 'zed', 'kiro', 'windsurf', 'trae', 'other'])
+    .describe(
+      'The IDE that the USER picked. Does not need to be provided if the user has already picked the IDE.',
+    )
+    .optional(),
 });
 
 export type SaveRequiredInformationParams = z.infer<
@@ -55,6 +61,7 @@ export async function saveRequiredInformationToolExecute(
         agentAccessPath: params.agentAccessPath,
         appPath: params.appPath,
         appPort: params.appPort,
+        ide: params.ide,
       },
     };
   } catch (error) {
