@@ -380,7 +380,7 @@ function CompatibilitySection() {
               <div
                 className={`glass-body aspect-square w-full rounded-full p-6 text-center transition-all duration-1000 ${
                   !isTransitioning && showGlow
-                    ? `shadow-xl ${currentCombo.component1.glow}`
+                    ? `shadow-xl ${currentCombo!.component1.glow}`
                     : ''
                 }`}
               >
@@ -389,9 +389,9 @@ function CompatibilitySection() {
                     isTransitioning ? 'opacity-0' : 'opacity-100'
                   }`}
                 >
-                  {currentCombo.component1.icon}
+                  {currentCombo!.component1.icon}
                   <div className="font-medium text-base text-zinc-800/90 dark:text-zinc-200/90">
-                    {currentCombo.component1.name}
+                    {currentCombo!.component1.name}
                   </div>
                 </div>
               </div>
@@ -399,7 +399,7 @@ function CompatibilitySection() {
               <div
                 className={`glass-body aspect-square w-full rounded-full p-6 text-center transition-all duration-1000 ${
                   !isTransitioning && showGlow
-                    ? `shadow-xl ${currentCombo.component2.glow}`
+                    ? `shadow-xl ${currentCombo!.component2.glow}`
                     : ''
                 }`}
               >
@@ -408,9 +408,9 @@ function CompatibilitySection() {
                     isTransitioning ? 'opacity-0' : 'opacity-100'
                   }`}
                 >
-                  {currentCombo.component2.icon}
+                  {currentCombo!.component2.icon}
                   <div className="font-medium text-base text-zinc-800/90 dark:text-zinc-200/90">
-                    {currentCombo.component2.name}
+                    {currentCombo!.component2.name}
                   </div>
                 </div>
               </div>
@@ -418,7 +418,7 @@ function CompatibilitySection() {
               <div
                 className={`glass-body aspect-square flex-1 rounded-full p-6 text-center transition-all duration-1000 ${
                   !isTransitioning && showGlow
-                    ? `shadow-xl ${currentCombo.component3.glow}`
+                    ? `shadow-xl ${currentCombo!.component3.glow}`
                     : ''
                 }`}
               >
@@ -427,9 +427,9 @@ function CompatibilitySection() {
                     isTransitioning ? 'opacity-0' : 'opacity-100'
                   }`}
                 >
-                  {currentCombo.component3.icon}
+                  {currentCombo!.component3.icon}
                   <div className="font-medium text-base text-zinc-800/90 dark:text-zinc-200/90">
-                    {currentCombo.component3.name}
+                    {currentCombo!.component3.name}
                   </div>
                 </div>
               </div>
@@ -437,7 +437,7 @@ function CompatibilitySection() {
               <div
                 className={`glass-body aspect-square flex-1 rounded-full p-6 text-center transition-all duration-1000 ${
                   !isTransitioning && showGlow
-                    ? `shadow-xl ${currentCombo.component4.glow}`
+                    ? `shadow-xl ${currentCombo!.component4.glow}`
                     : ''
                 }`}
               >
@@ -446,9 +446,9 @@ function CompatibilitySection() {
                     isTransitioning ? 'opacity-0' : 'opacity-100'
                   }`}
                 >
-                  {currentCombo.component4.icon}
+                  {currentCombo!.component4.icon}
                   <div className="font-medium text-base text-zinc-800/90 dark:text-zinc-200/90">
-                    {currentCombo.component4.name}
+                    {currentCombo!.component4.name}
                   </div>
                 </div>
               </div>

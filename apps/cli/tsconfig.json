@@ -2,8 +2,6 @@
   "extends": "../../packages/typescript-config/base.json",
   "references": [
     { "path": "../../agent/knowledge" },
-    { "path": "../../agent/prompt-snippets" },
-    { "path": "../../agent/prompts" },
     { "path": "../../agent/runtime-interface" },
     { "path": "../../agent/runtime-node" },
     { "path": "../../agent/tools" },

@@ -1,5 +1,5 @@
 import { codingAgentTools } from '@stagewise/agent-tools';
-import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
+// import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
 import { z } from 'zod';
 import { stepCountIs, tool } from 'ai';
 import { streamText, type ModelMessage } from 'ai';
@@ -10,8 +10,11 @@ function dummySaveStyleInformation(
   _args: Omit<StyleInformation, 'createdAt'>,
 ) {}
 
-async function getSystemPrompt(clientRuntime: ClientRuntime) {
-  const projectInfo = await getProjectInfo(clientRuntime);
+async function getSystemPrompt(_clientRuntime: ClientRuntime) {
+  // const projectInfo = await getProjectInfo(clientRuntime);
+  const projectInfo = {
+    content: 'TODO', // TODO
+  };
   return `You are a code analysis agent specialized in discovering and cataloging style configurations, global styles, and color systems within web projects.
 
 Your working environment is a user's web project and you are given tools to search the codebase and save the style information.

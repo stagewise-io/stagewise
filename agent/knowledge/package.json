@@ -33,7 +33,6 @@
     "@ai-sdk/provider": "^2.0.0",
     "@stagewise/agent-tools": "workspace:*",
     "ai": "5.0.9",
-    "@stagewise/agent-prompt-snippets": "workspace:*",
     "openai": "^5.20.2",
     "zod": "4.0.17"
   },

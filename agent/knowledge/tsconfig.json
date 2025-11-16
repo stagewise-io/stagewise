@@ -1,10 +1,6 @@
 {
   "extends": "../../packages/typescript-config/base.json",
-  "references": [
-    { "path": "../tools" },
-    { "path": "../prompt-snippets" },
-    { "path": "../runtime-interface" }
-  ],
+  "references": [{ "path": "../tools" }, { "path": "../runtime-interface" }],
   "compilerOptions": {
     "noEmit": false,
     "outDir": "./dist",

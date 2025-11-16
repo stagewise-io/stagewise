@@ -33,14 +33,11 @@
   },
   "devDependencies": {
     "@inquirer/prompts": "^7.0.0",
-    "@stagewise/agent-knowledge": "workspace:*",
-    "@stagewise/agent-prompt-snippets": "workspace:*",
-    "@stagewise/agent-prompts": "workspace:*",
     "@stagewise/agent-runtime-interface": "workspace:*",
+    "@stagewise/agent-runtime-mock": "workspace:*",
     "@stagewise/agent-runtime-node": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
-    "@stagewise/agent-utils": "workspace:*",
     "@stagewise/api-client": "1.4.0",
     "@stagewise/karton": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
@@ -73,6 +70,8 @@
     "@ai-sdk/openai": "^2.0.23",
     "@ai-sdk/provider": "^2.0.0",
     "@posthog/ai": "^6.4.3",
+    "@types/xml": "^1.0.11",
+    "@vscode/ripgrep": "1.17.0",
     "ai": "5.0.9",
     "chokidar": "^4.0.3",
     "diff": "^8.0.2",
@@ -82,7 +81,6 @@
     "superjson": "2.2.2",
     "vscode-ripgrep": "^1.13.2",
     "ws": "^8.18.3",
-    "@vscode/ripgrep": "1.17.0",
     "xml": "^1.0.1"
   }
 }

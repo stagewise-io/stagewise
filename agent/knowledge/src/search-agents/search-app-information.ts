@@ -1,5 +1,4 @@
 import { codingAgentTools } from '@stagewise/agent-tools';
-import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
 import { z } from 'zod';
 import { stepCountIs, tool } from 'ai';
 import { streamText, type ModelMessage } from 'ai';
@@ -8,8 +7,11 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 
 function dummySaveAppInformation(_args: Omit<AppInformation, 'createdAt'>) {}
 
-async function getSystemPrompt(clientRuntime: ClientRuntime) {
-  const projectInfo = await getProjectInfo(clientRuntime);
+async function getSystemPrompt(_clientRuntime: ClientRuntime) {
+  // const projectInfo = await getProjectInfo(clientRuntime);
+  const projectInfo = {
+    content: 'TODO', // TODO
+  };
   return `You are a code analysis agent specialized in discovering applications in a repository (including monorepos) and summarizing their use-cases. Your working environment is a user's web project and you are given tools to search the codebase and save the app information.
 
 Your task is to:

@@ -1,29 +1,10 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { resolve } from 'node:path';
-import { isContextLimitError } from '@stagewise/agent-utils';
+import { isContextLimitError } from './utils/is-context-limit-error';
 import type { KartonService } from '../../../karton';
 import type { Logger } from '../../../logger';
 import type { TelemetryService } from '../../../telemetry';
 import type { AuthService, AuthState } from '../../../auth';
-import {
-  TimeoutManager,
-  isAbortError,
-  isAuthenticationError,
-  ErrorDescriptions,
-  formatErrorDescription,
-  attachToolOutputToMessage,
-  createAndActivateNewChat,
-  findPendingToolCalls,
-  uiMessagesToModelMessages,
-  processToolCalls,
-  type ToolCallProcessingResult,
-  generateChatTitle,
-  isPlanLimitsExceededError,
-  type PlanLimitsExceededError,
-  createAuthenticatedClient,
-  type KartonStateProvider,
-  extractDetailsFromError,
-} from '@stagewise/agent-utils';
 import { hasUndoMetadata, hasDiffMetadata } from '@stagewise/agent-types';
 import {
   type KartonContract,
@@ -51,18 +32,31 @@ import {
   generateId,
   readUIMessageStream,
   NoSuchToolError,
+  generateText,
 } from 'ai';
-import { XMLPrompts } from '@stagewise/agent-prompts';
-import type { PromptSnippet } from '@stagewise/agent-types';
 import type { AppRouter, TRPCClient } from '@stagewise/api-client';
-import {
-  getProjectInfo,
-  getProjectPath,
-} from '@stagewise/agent-prompt-snippets';
 import type { AsyncIterableStream, InferUIMessageChunk, ToolUIPart } from 'ai';
 import type { WorkspaceSetupService } from '../setup';
 import { compileInspirationComponent } from './utils/compile-inspiration-component';
 import { getRepoRootForPath } from '@/utils/git-tools';
+import { PromptBuilder } from './prompt-builder';
+import { TimeoutManager } from './utils/time-out-manager';
+import { createAuthenticatedClient } from './utils/create-authenticated-client';
+import {
+  findPendingToolCalls,
+  type KartonStateProvider,
+  attachToolOutputToMessage,
+} from './utils/karton-helpers';
+import type { ToolCallProcessingResult } from './utils/tool-call-utils';
+import { createAndActivateNewChat } from './utils/karton-helpers';
+import { ErrorDescriptions, formatErrorDescription } from './utils/error-utils';
+import { isAbortError } from './utils/is-abort-error';
+import { isPlanLimitsExceededError } from './utils/is-plan-limit-error';
+import type { PlanLimitsExceededError } from './utils/is-plan-limit-error';
+import { processToolCalls } from './utils/tool-call-utils';
+import { generateChatTitle } from './utils/generate-chat-title';
+import { isAuthenticationError } from './utils/is-authentication-error';
+import { extractDetailsFromError } from './utils/extract-details-from-error';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -84,6 +78,7 @@ export class AgentService {
   private workspaceSetupService: WorkspaceSetupService;
   private clientRuntime: ClientRuntime;
   private apiKey: string | null = null;
+  private promptBuilder: PromptBuilder;
 
   private client!: TRPCClient<AppRouter>;
   private isWorking = false;
@@ -129,6 +124,12 @@ export class AgentService {
         };
       }
     });
+
+    // Initialize prompt builder
+    this.promptBuilder = new PromptBuilder(
+      this.clientRuntime,
+      this.kartonService.state,
+    );
 
     // Initialize timeout manager
     this.timeoutManager = new TimeoutManager();
@@ -403,22 +404,12 @@ export class AgentService {
             }
           });
 
-          const promptSnippets: PromptSnippet[] = [];
-          const projectInfoPromptSnippet = await getProjectInfo(
-            this.clientRuntime,
-          );
-          if (projectInfoPromptSnippet) {
-            promptSnippets.push(projectInfoPromptSnippet);
-          }
-
           const messages =
             this.kartonService.state.workspace?.agentChat?.chats[activeChatId]
               ?.messages;
           await this.callAgent({
             chatId: activeChatId,
             history: messages,
-            clientRuntime: this.clientRuntime,
-            promptSnippets,
           });
 
           this.setAgentWorking(false);
@@ -593,28 +584,11 @@ export class AgentService {
           const messages =
             newstate?.workspace?.agentChat?.chats[activeChatId]?.messages;
 
-          const promptSnippets: PromptSnippet[] = [];
-          const projectPathPromptSnippet = await getProjectPath(
-            this.clientRuntime,
-          );
-          if (projectPathPromptSnippet) {
-            promptSnippets.push(projectPathPromptSnippet);
-          }
-
-          const projectInfoPromptSnippet = await getProjectInfo(
-            this.clientRuntime,
-          );
-          if (projectInfoPromptSnippet) {
-            promptSnippets.push(projectInfoPromptSnippet);
-          }
-
           this.logger.debug('[AgentService] Calling agent');
 
           await this.callAgent({
             chatId: activeChatId,
             history: messages,
-            clientRuntime: this.clientRuntime,
-            promptSnippets,
           });
         },
       );
@@ -648,8 +622,6 @@ export class AgentService {
               this.kartonService.state.workspace?.agentChat?.chats[
                 this.kartonService.state.workspace?.agentChat?.activeChatId!
               ]?.messages,
-            clientRuntime: this.clientRuntime,
-            promptSnippets: [],
           });
           return { success: true };
         },
@@ -679,8 +651,6 @@ export class AgentService {
               this.kartonService.state.workspace?.agentChat?.chats[
                 this.kartonService.state.workspace?.agentChat?.activeChatId!
               ]?.messages,
-            clientRuntime: this.clientRuntime,
-            promptSnippets: [],
           });
         },
       );
@@ -775,13 +745,9 @@ export class AgentService {
   private async callAgent({
     chatId,
     history,
-    clientRuntime,
-    promptSnippets,
   }: {
     chatId: string;
     history?: History;
-    clientRuntime: ClientRuntime;
-    promptSnippets?: PromptSnippet[];
   }): Promise<void> {
     if (!this.apiKey) {
       this.logger.error(
@@ -853,16 +819,8 @@ export class AgentService {
       }
 
       if (lastMessageMetadata.isUserMessage) {
-        this.telemetryService.capture('agent-prompt-triggered', {
-          snippetCount: promptSnippets?.length || 0,
-        });
+        this.telemetryService.capture('agent-prompt-triggered');
       }
-
-      const prompts = new XMLPrompts();
-      const systemPrompt = await prompts.getSystemPrompt(
-        this.clientRuntime,
-        this.kartonService.state,
-      );
 
       const isSetupMode =
         this.kartonService.state.userExperience.activeLayout ===
@@ -899,9 +857,11 @@ export class AgentService {
           } satisfies AnthropicProviderOptions,
           openai: {},
         },
-        messages: [systemPrompt, ...uiMessagesToModelMessages(history ?? [])],
+        messages: await this.promptBuilder.convertUIToModelMessages(
+          history ?? [],
+        ),
         onError: async (error) => {
-          await this.handleStreamingError(error, chatId, promptSnippets);
+          await this.handleStreamingError(error, chatId);
         },
         tools,
         onAbort: () => {
@@ -999,8 +959,6 @@ export class AgentService {
             return this.callAgent({
               chatId,
               history: updatedMessages,
-              clientRuntime,
-              promptSnippets,
             });
           }
 
@@ -1286,7 +1244,6 @@ export class AgentService {
   private async handleStreamingError(
     error: { error: unknown },
     chatId: string,
-    promptSnippets?: PromptSnippet[],
   ) {
     if (isAbortError(error.error)) {
       this.authRetryCount = 0;
@@ -1338,8 +1295,6 @@ export class AgentService {
       await this.callAgent({
         chatId,
         history: messages,
-        clientRuntime: this.clientRuntime,
-        promptSnippets,
       });
       return;
     } else if (
