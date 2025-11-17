@@ -198,8 +198,17 @@ export class AuthService {
           this.logger.error(
             `[AuthService] Failed to refresh token. Error: ${err}`,
           );
-          void this.logout();
-          return false;
+          // We log out, if the error is anything else other than an internal server error or the server is unreachable.
+          if (
+            !err.message.toLowerCase().includes('internal server error') &&
+            !err.message.toLowerCase().includes('unreachable') &&
+            err.code !== 'ECONNREFUSED' &&
+            err.code !== 'ECONNRESET' &&
+            !err.message.toLowerCase().includes('fetch failed')
+          ) {
+            void this.logout();
+          }
+          return true;
         });
 
       if (!refreshSuccessful) {
