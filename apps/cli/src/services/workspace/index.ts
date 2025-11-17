@@ -161,7 +161,7 @@ export class WorkspaceService {
           draft.workspace!.paths.temp =
             this.workspacePathsService!.workspaceTempPath;
         });
-        // TODO: Start everything with the right appPath!! (Not the initial workspace path)
+
         this.workspaceConfigService = await WorkspaceConfigService.create(
           this.logger,
           this.kartonService,
@@ -189,7 +189,7 @@ export class WorkspaceService {
           };
         });
         this.workspaceConfigService.addConfigUpdatedListener((newConfig) => {
-          clientRuntime.updateWorkingDirectory(
+          clientRuntime.fileSystem.setCurrentWorkingDirectory(
             this.getAbsoluteAgentAccessPath(newConfig.agentAccessPath),
           );
           this.kartonService.setState((draft) => {

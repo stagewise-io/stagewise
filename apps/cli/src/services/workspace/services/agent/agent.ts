@@ -197,6 +197,11 @@ export class AgentService {
             this.clientRuntime.fileSystem.setCurrentWorkingDirectory(
               absoluteAgentAccessPath,
             );
+            this.kartonService.setState((draft) => {
+              draft.workspace!.agent = {
+                accessPath: absoluteAgentAccessPath,
+              };
+            });
           },
         });
       case MainTab.DEV_APP_PREVIEW:

@@ -783,9 +783,6 @@ export class ClientRuntimeNode implements ClientRuntime {
       rgBinaryBasePath: config.rgBinaryBasePath,
     });
   }
-
-  updateWorkingDirectory = (dir: string) =>
-    this.fileSystem.setCurrentWorkingDirectory(dir);
 }
 
 // Re-export ripgrep installation utilities
