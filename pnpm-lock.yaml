@@ -266,9 +266,6 @@ importers:
       esbuild:
         specifier: 0.25.9
         version: 0.25.9
-      node-fetch:
-        specifier: ^3.3.2
-        version: 3.3.2
       prompts:
         specifier: ^2.4.2
         version: 2.4.2

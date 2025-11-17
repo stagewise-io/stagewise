@@ -77,7 +77,6 @@
     "chokidar": "^4.0.3",
     "diff": "^8.0.2",
     "esbuild": "0.25.9",
-    "node-fetch": "^3.3.2",
     "prompts": "^2.4.2",
     "superjson": "2.2.2",
     "ws": "^8.18.3",
