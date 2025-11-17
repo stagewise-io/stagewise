@@ -6,43 +6,65 @@ import type {
 
 export const companionAnchorTagName = 'stagewise-companion-anchor';
 
-export const getIFrame = () => {
-  const iframe = document.getElementById('user-app-iframe');
-  return iframe as HTMLIFrameElement | null;
+export const getIFrame = (): HTMLIFrameElement | null => {
+  const iframe = document.getElementById(
+    'user-app-iframe',
+  ) as HTMLIFrameElement | null;
+
+  try {
+    const testRes = iframe?.contentWindow?.location.href;
+    if (!testRes) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
+  return (iframe as HTMLIFrameElement | null) ?? null;
 };
 
-export const getIFrameWindow = () => {
-  return getIFrame()?.contentWindow;
+export const getIFrameWindow = (): Window | null => {
+  try {
+    return getIFrame()?.contentWindow ?? null;
+  } catch {
+    return null;
+  }
 };
 
 export function getElementAtPoint(x: number, y: number) {
-  // Validate that x and y are finite numbers to prevent crashes
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    return getIFrameWindow()?.document.body;
+  try {
+    // Validate that x and y are finite numbers to prevent crashes
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return getIFrameWindow()?.document?.body ?? null;
+    }
+
+    const iframe = getIFrame();
+    const iframeRect = getIFrame()?.getBoundingClientRect();
+    const iframeScale = iframeRect ? iframeRect.width / iframe!.offsetWidth : 1;
+
+    const elementsBelowPoint = getIFrameWindow()?.document?.elementsFromPoint(
+      (x - (iframeRect?.left ?? 0)) / iframeScale,
+      (y - (iframeRect?.top ?? 0)) / iframeScale,
+    );
+
+    const refElement =
+      (elementsBelowPoint?.find(
+        (element) =>
+          !element.closest('svg') &&
+          !element.closest('STAGEWISE-TOOLBAR') &&
+          isElementAtPoint(
+            element as HTMLElement,
+            (x - (iframeRect?.left ?? 0)) / iframeScale,
+            (y - (iframeRect?.top ?? 0)) / iframeScale,
+          ),
+      ) as HTMLElement) ||
+      getIFrameWindow()?.document?.body ||
+      null;
+
+    return refElement;
+  } catch {
+    return getIFrameWindow()?.document?.body ?? null;
   }
-
-  const iframe = getIFrame();
-  const iframeRect = getIFrame()?.getBoundingClientRect();
-  const iframeScale = iframeRect ? iframeRect.width / iframe!.offsetWidth : 1;
-
-  const elementsBelowPoint = getIFrameWindow()?.document.elementsFromPoint(
-    (x - (iframeRect?.left ?? 0)) / iframeScale,
-    (y - (iframeRect?.top ?? 0)) / iframeScale,
-  );
-
-  const refElement =
-    (elementsBelowPoint?.find(
-      (element) =>
-        !element.closest('svg') &&
-        !element.closest('STAGEWISE-TOOLBAR') &&
-        isElementAtPoint(
-          element as HTMLElement,
-          (x - (iframeRect?.left ?? 0)) / iframeScale,
-          (y - (iframeRect?.top ?? 0)) / iframeScale,
-        ),
-    ) as HTMLElement) || getIFrameWindow()?.document.body;
-
-  return refElement;
 }
 
 const isElementAtPoint = (
@@ -510,22 +532,27 @@ export async function fileToDataUrl(file: File): Promise<string> {
 }
 
 export const getBrowserData = (): BrowserData | null => {
-  const iframe = getIFrameWindow();
+  try {
+    const iframe = getIFrameWindow();
 
-  if (!iframe) return null;
+    if (!iframe) return null;
 
-  return {
-    viewport: {
-      width: iframe.innerWidth,
-      height: iframe.innerHeight,
-      dpr: iframe.devicePixelRatio,
-    },
-    currentUrl: iframe.location.href,
-    currentTitle: iframe.document.title,
-    userAgent: iframe.navigator.userAgent,
-    locale: iframe.navigator.language,
-    prefersDarkMode: iframe.matchMedia('(prefers-color-scheme: dark)').matches,
-  };
+    return {
+      viewport: {
+        width: iframe.innerWidth,
+        height: iframe.innerHeight,
+        dpr: iframe.devicePixelRatio,
+      },
+      currentUrl: iframe.location.href,
+      currentTitle: iframe.document.title,
+      userAgent: iframe.navigator.userAgent,
+      locale: iframe.navigator.language,
+      prefersDarkMode: iframe.matchMedia('(prefers-color-scheme: dark)')
+        .matches,
+    };
+  } catch {
+    return null;
+  }
 };
 
 export const collectUserMessageMetadata = (

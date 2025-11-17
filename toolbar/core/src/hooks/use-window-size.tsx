@@ -31,12 +31,20 @@ export function useWindowSize() {
     const iframe = getIFrameWindow();
     if (!iframe) return;
 
-    iframe.addEventListener('resize', handleResize);
+    try {
+      iframe.addEventListener('resize', handleResize);
+    } catch {
+      // ignore
+    }
     // Initial update
     handleResize();
 
     return () => {
-      iframe.removeEventListener('resize', handleResize);
+      try {
+        iframe.removeEventListener('resize', handleResize);
+      } catch {
+        // ignore
+      }
     };
   }, [handleResize]);
 

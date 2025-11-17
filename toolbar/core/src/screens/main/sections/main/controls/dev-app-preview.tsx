@@ -25,7 +25,7 @@ import {
   SquareIcon,
   Loader2Icon,
 } from 'lucide-react';
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useState, useMemo, useEffect } from 'react';
 import { RadioGroup, Radio } from '@stagewise/stage-ui/components/radio';
 import {
   FormField,
@@ -60,31 +60,58 @@ export function DevAppPreviewControls() {
 export function UrlControl() {
   const [url, setUrl] = useState('');
   const [isOverridingUrl, setIsOverridingUrl] = useState(false);
+  const [forceShowInput, setForceShowInput] = useState(false);
+  const [hasIFrame, setHasIFrame] = useState(true);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const syncUrl = useCallback(() => {
-    if (isOverridingUrl) return;
-    // Fetch everything in the url thats past the origin, unless the origin is different to the one of the main app.
-    const mainAppOrigin = window.location.origin;
-    const iframeOrigin = getIFrame()?.contentWindow?.location.origin;
-    if (iframeOrigin !== mainAppOrigin) {
-      setUrl(getIFrame()?.contentWindow?.location.href ?? '');
-    } else {
-      setUrl(
-        getIFrame()?.contentWindow?.location.href?.split(mainAppOrigin)[1] ??
-          '',
-      );
+    if (isOverridingUrl || isNavigating) return;
+    try {
+      // Fetch everything in the url thats past the origin, unless the origin is different to the one of the main app.
+      const mainAppOrigin = window.location.origin;
+      const iframe = getIFrame();
+      if (!iframe) {
+        setUrl('');
+        return;
+      }
+      const iframeOrigin = iframe?.contentWindow?.location.origin;
+      if (!iframeOrigin) {
+        setUrl('');
+        return;
+      }
+      if (iframeOrigin !== mainAppOrigin) {
+        setUrl(iframe?.contentWindow?.location.href ?? '');
+      } else {
+        setUrl(
+          iframe?.contentWindow?.location.href?.split(mainAppOrigin)[1] ?? '',
+        );
+      }
+    } catch {
+      setUrl('');
     }
-  }, [getIFrame, url, isOverridingUrl]);
+  }, [getIFrame, url, isOverridingUrl, isNavigating]);
 
   useCyclicUpdate(syncUrl, 10);
 
   const navigateToUrl = useCallback(() => {
-    const iframe = getIFrame();
-    if (iframe) {
-      const fulfilledUrl = new URL(url, window.location.origin).toString();
-      iframe?.contentWindow?.location.replace(fulfilledUrl);
+    try {
+      try {
+        const activeEl = document.activeElement as HTMLElement | null;
+        activeEl?.blur?.();
+      } catch {
+        // ignore
+      }
+      setIsNavigating(true);
+      setIsLoading(true);
+      setIsOverridingUrl(true);
+      const iframe = getIFrame();
+      if (iframe) {
+        const fulfilledUrl = new URL(url, window.location.origin).toString();
+        iframe?.contentWindow?.location.replace(fulfilledUrl);
+      }
+    } catch {
+      // ignore
     }
-    setIsOverridingUrl(false);
   }, [getIFrame, url]);
 
   const changeUrl = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,48 +122,149 @@ export function UrlControl() {
   }, []);
 
   const reloadIFrame = useCallback(() => {
-    const iframe = getIFrame();
-    if (iframe) {
-      iframe.contentWindow?.location.reload();
+    try {
+      setIsNavigating(true);
+      setIsLoading(true);
+      setIsOverridingUrl(true);
+      const iframe = getIFrame();
+      if (iframe) {
+        iframe.contentWindow?.location.reload();
+      }
+    } catch {
+      // ignore
     }
   }, [getIFrame]);
 
   const [canNavigateBack, setCanNavigateBack] = useState(false);
   const checkCanNavigateBack = useCallback(() => {
-    const iframe = getIFrame();
-    if (iframe) {
-      setCanNavigateBack((iframe.contentWindow?.history.length ?? 0) > 1);
+    try {
+      const iframe = getIFrame();
+      if (iframe) {
+        setCanNavigateBack((iframe.contentWindow?.history.length ?? 0) > 1);
+      } else {
+        setCanNavigateBack(false);
+      }
+    } catch {
+      setCanNavigateBack(false);
     }
   }, [getIFrame]);
   useCyclicUpdate(checkCanNavigateBack, 10);
 
   const navigateBack = useCallback(() => {
-    const iframe = getIFrame();
-    if (iframe) {
-      iframe.contentWindow?.history.back();
+    try {
+      setIsNavigating(true);
+      setIsLoading(true);
+      setIsOverridingUrl(true);
+      const iframe = getIFrame();
+      if (iframe) {
+        iframe.contentWindow?.history.back();
+      }
+    } catch {
+      // ignore
     }
   }, [getIFrame]);
 
   const stopLoading = useCallback(() => {
-    const iframe = getIFrame();
-    if (iframe) {
-      iframe.contentWindow?.stop();
+    try {
+      const iframe = getIFrame();
+      if (iframe) {
+        iframe.contentWindow?.stop();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsNavigating(false);
+      setIsLoading(false);
     }
   }, [getIFrame]);
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const checkIsLoading = useCallback(() => {
-    const iframe = getIFrame();
-    const iframeDoc = iframe
-      ? iframe.contentDocument || iframe.contentWindow!.document
-      : null;
-    if (iframeDoc && iframeDoc.readyState === 'complete') {
-      setIsLoading(false);
-    } else {
-      setIsLoading(true);
+    try {
+      if (isNavigating) {
+        setIsLoading(true);
+        return;
+      }
+      const iframe = getIFrame();
+      const iframeDoc = iframe
+        ? iframe.contentDocument || iframe.contentWindow?.document
+        : null;
+      if (iframeDoc && iframeDoc.readyState === 'complete') {
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+      }
+    } catch {
+      setIsLoading((prev) => prev || isNavigating);
+    }
+  }, [getIFrame, isNavigating]);
+  useCyclicUpdate(checkIsLoading, 10);
+
+  const checkHasIFrame = useCallback(() => {
+    try {
+      const iframe = getIFrame();
+      setHasIFrame(!!iframe);
+    } catch {
+      setHasIFrame(false);
     }
   }, [getIFrame]);
-  useCyclicUpdate(checkIsLoading, 10);
+  useCyclicUpdate(checkHasIFrame, 10);
+
+  // Listen to iframe load to finalize navigation states and allow syncing again
+  useEffect(() => {
+    try {
+      const iframe = getIFrame();
+      if (!iframe) return;
+      const onBeforeUnload = () => {
+        try {
+          setIsNavigating(true);
+          setIsLoading(true);
+          setIsOverridingUrl(true);
+        } catch {
+          // ignore
+        }
+      };
+      const onLoad = () => {
+        setIsNavigating(false);
+        setIsOverridingUrl(false);
+        setIsLoading(false);
+        // Reattach beforeunload after each load to catch subsequent navigations (same-origin only)
+        try {
+          iframe.contentWindow?.addEventListener(
+            'beforeunload',
+            onBeforeUnload,
+          );
+        } catch {
+          // ignore
+        }
+      };
+      // Try to attach beforeunload immediately (same-origin only)
+      try {
+        iframe.contentWindow?.addEventListener('beforeunload', onBeforeUnload);
+        iframe.addEventListener('load', onLoad);
+      } catch {
+        // ignore
+      }
+
+      return () => {
+        try {
+          iframe.removeEventListener('load', onLoad);
+        } catch {
+          // ignore
+        }
+        try {
+          iframe.contentWindow?.removeEventListener(
+            'beforeunload',
+            onBeforeUnload,
+          );
+        } catch {
+          // ignore
+        }
+      };
+    } catch {
+      // ignore
+    }
+  }, [getIFrame]);
 
   return (
     <div className="glass-body flex h-10 w-full flex-1 flex-row items-center gap-2 rounded-full bg-background/80 p-1 backdrop-blur-lg">
@@ -152,20 +280,45 @@ export function UrlControl() {
         <span className="-translate-y-1/2 absolute top-1/2 left-2 font-bold text-muted-foreground text-xs tracking-wide">
           URL:
         </span>
-        <Input
-          className="flex h-8 w-full max-w-none flex-1 flex-row items-center rounded-full pl-10"
-          inputClassName="pl-1.5 rounded-full outline-offset-0 h-6 mr-1"
-          type="text"
-          placeholder="URL"
-          onSubmit={navigateToUrl}
-          value={url.length > 0 ? url : '/'}
-          onChange={changeUrl}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              navigateToUrl();
-            }
-          }}
-        />
+        {hasIFrame || forceShowInput ? (
+          <Input
+            className="flex h-8 w-full max-w-none flex-1 flex-row items-center rounded-full pl-10"
+            inputClassName="pl-1.5 rounded-full outline-offset-0 h-6 mr-1"
+            type="text"
+            placeholder="URL"
+            onSubmit={navigateToUrl}
+            value={url.length > 0 ? url : '/'}
+            onChange={changeUrl}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                navigateToUrl();
+              }
+            }}
+          />
+        ) : (
+          <div
+            className="flex h-8 w-full max-w-none flex-1 cursor-pointer flex-row items-center rounded-full pl-10 text-yellow-600 dark:text-yellow-500"
+            onClick={() => {
+              setForceShowInput(true);
+              setUrl('/');
+              setIsOverridingUrl(true);
+            }}
+            role="button"
+            aria-label="Show URL input"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setForceShowInput(true);
+                setUrl('/');
+                setIsOverridingUrl(true);
+              }
+            }}
+          >
+            <span className="truncate text-xs">
+              No access to iframe. Probably not same-origin.
+            </span>
+          </div>
+        )}
       </div>
 
       <Tooltip>

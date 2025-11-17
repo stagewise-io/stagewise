@@ -269,7 +269,11 @@ export function useMetaSync() {
       setupObserver();
     };
 
-    iframe.addEventListener('load', handleIframeLoad);
+    try {
+      iframe.addEventListener('load', handleIframeLoad);
+    } catch {
+      // ignore
+    }
 
     // Try to setup immediately if iframe is already loaded
     if (iframe.contentDocument?.readyState === 'complete') {
@@ -277,7 +281,11 @@ export function useMetaSync() {
     }
 
     return () => {
-      iframe.removeEventListener('load', handleIframeLoad);
+      try {
+        iframe.removeEventListener('load', handleIframeLoad);
+      } catch {
+        // ignore
+      }
       if (observerRef.current) {
         observerRef.current.disconnect();
       }
