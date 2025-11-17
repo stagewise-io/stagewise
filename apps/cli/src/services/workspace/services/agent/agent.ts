@@ -92,6 +92,7 @@ export class AgentService {
   private abortController: AbortController;
   private lastMessageId: string | null = null;
   private litellm!: ReturnType<typeof createAnthropic>;
+  private isWarmedUp = false;
   private undoToolCallStack: Map<
     ChatId,
     {
@@ -340,20 +341,22 @@ export class AgentService {
 
     this.timeoutManager.clearAll();
 
-    if (resetRecursionDepth) {
-      this.recursionDepth = 0;
-    }
+    if (resetRecursionDepth) this.recursionDepth = 0;
 
     this.setAgentWorking(false);
   }
 
-  private onAuthStateChange = ((newAuthState: AuthState) => {
+  private onAuthStateChange = (async (newAuthState: AuthState) => {
     if (newAuthState.status === 'authenticated') {
       this.logger.debug(
         '[AgentService] Auth state changed to authenticated, initializing client and litellm...',
       );
-      this.initializeClient();
-      this.initializeLitellm();
+      await this.initializeClient();
+      await this.initializeLitellm();
+      if (!this.isWarmedUp) {
+        this.isWarmedUp = true;
+        void this.warmUpLLMProxyCache();
+      }
     }
   }).bind(this);
 
@@ -371,11 +374,6 @@ export class AgentService {
 
     // Fetch subscription
     await this.fetchSubscription();
-
-    // Warm-up LLM proxy cache for minimizing latency
-    void this.warmUpLLMProxyCache().then(() => {
-      this.logger.debug('[AgentService] LLM proxy cache warmed up');
-    });
 
     // Set initial state
     this.setAgentWorking(false);
@@ -780,6 +778,9 @@ export class AgentService {
 
     if (!this.undoToolCallStack.has(chatId))
       this.undoToolCallStack.set(chatId, []);
+
+    // If the LLM proxy cache is not warmed up yet, this agent request acts as a warm-up request
+    if (!this.isWarmedUp) this.isWarmedUp = true;
 
     if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
       const errorDesc = ErrorDescriptions.recursionDepthExceeded(
@@ -1254,6 +1255,10 @@ export class AgentService {
         { role: 'system', content: 'Respond with "Hey there!"' },
         { role: 'user', content: 'Hey bud!' },
       ],
+    }).catch((error) => {
+      this.logger.error('[AgentService] Failed to warm up LLM proxy cache', {
+        cause: error,
+      });
     });
   }
 
