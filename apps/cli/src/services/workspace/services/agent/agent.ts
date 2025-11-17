@@ -180,12 +180,14 @@ export class AgentService {
               });
             }
 
-            await this.workspaceSetupService.handleSetupSubmission({
-              agentAccessPath: params.agentAccessPath,
-              useAutoFoundAppPort: true,
-              appPort: params.appPort,
-              appPath: params.appPath,
-            });
+            await this.workspaceSetupService.handleSetupSubmission(
+              {
+                agentAccessPath: params.agentAccessPath,
+                useAutoFoundAppPort: true,
+                appPort: params.appPort,
+              },
+              params.appPath,
+            );
 
             const absoluteAgentAccessPath =
               params.agentAccessPath === '{GIT_REPO_ROOT}'

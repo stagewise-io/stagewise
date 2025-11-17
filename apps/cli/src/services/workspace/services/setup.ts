@@ -28,13 +28,19 @@ export class WorkspaceSetupService {
   private kartonService: KartonService;
   private workspacePath: string;
   private _setupCompleted = false;
-  private onSetupCompleted?: (config: WorkspaceConfig | null) => void;
+  private onSetupCompleted?: (
+    config: WorkspaceConfig | null,
+    newWorkspacePath?: string,
+  ) => Promise<void>;
 
   private constructor(
     logger: Logger,
     kartonService: KartonService,
     workspacePath: string,
-    onSetupCompleted?: (config: WorkspaceConfig | null) => void,
+    onSetupCompleted?: (
+      config: WorkspaceConfig | null,
+      newWorkspacePath?: string,
+    ) => Promise<void>,
   ) {
     this.logger = logger;
     this.kartonService = kartonService;
@@ -101,7 +107,10 @@ export class WorkspaceSetupService {
     logger: Logger,
     kartonService: KartonService,
     workspacePath: string,
-    onSetupCompleted?: (config: WorkspaceConfig | null) => void,
+    onSetupCompleted?: (
+      config: WorkspaceConfig | null,
+      newWorkspacePath?: string,
+    ) => Promise<void>,
   ): Promise<WorkspaceSetupService> {
     const instance = new WorkspaceSetupService(
       logger,
@@ -130,7 +139,10 @@ export class WorkspaceSetupService {
     this._setupCompleted = false;
   }
 
-  public async handleSetupSubmission(config: WorkspaceConfig): Promise<void> {
+  public async handleSetupSubmission(
+    config: WorkspaceConfig,
+    newWorkspacePath?: string,
+  ): Promise<void> {
     // Check if the given data is valid.
     this.logger.debug(
       `[WorkspaceSetupService] Validating config: ${JSON.stringify(config)}`,
@@ -151,7 +163,7 @@ export class WorkspaceSetupService {
 
     // Notify the listeners
     this._setupCompleted = true;
-    await this.onSetupCompleted?.(validatedConfig.data);
+    await this.onSetupCompleted?.(validatedConfig.data, newWorkspacePath);
   }
 
   private async handleResolveRelativePathToAbsolutePath(

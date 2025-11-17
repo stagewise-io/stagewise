@@ -144,8 +144,8 @@ export class WorkspaceService {
       this.logger,
       this.kartonService,
       this.workspacePath,
-      async (setupConfig) => {
-        this.workspacePath = setupConfig?.appPath ?? this.workspacePath;
+      async (setupConfig, newWorkspacePath) => {
+        if (newWorkspacePath) this.workspacePath = newWorkspacePath;
         await this.workspacePathsService?.teardown();
         this.workspacePathsService = await WorkspacePathsService.create(
           this.logger,
