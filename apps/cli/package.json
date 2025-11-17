@@ -71,7 +71,6 @@
     "@ai-sdk/provider": "^2.0.0",
     "@posthog/ai": "^6.4.3",
     "@types/xml": "^1.0.11",
-    "@vscode/ripgrep": "1.17.0",
     "ai": "5.0.9",
     "chokidar": "^4.0.3",
     "diff": "^8.0.2",
@@ -79,7 +78,6 @@
     "node-fetch": "^3.3.2",
     "prompts": "^2.4.2",
     "superjson": "2.2.2",
-    "vscode-ripgrep": "^1.13.2",
     "ws": "^8.18.3",
     "xml": "^1.0.1"
   }
