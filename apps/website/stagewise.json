@@ -1,6 +1,5 @@
 {
-  "agentAccessPath": "{GIT_REPO_ROOT}",
+  "agentAccessPath": ".",
   "appPort": 3000,
-  "useAutoFoundAppPort": true,
-  "appPath": "/Users/glenntows/stagewise/apps/website"
+  "useAutoFoundAppPort": true
 }
