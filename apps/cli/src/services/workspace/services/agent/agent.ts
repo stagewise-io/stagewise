@@ -866,7 +866,7 @@ export class AgentService {
         {
           posthogTraceId: chatId,
           posthogProperties: {
-            $ai_span_name: 'agent-chat',
+            $ai_span_name: isSetupMode ? 'agent-setup' : 'agent-chat',
             developerTag: process.env.DEVELOPER_TAG || undefined,
             currentTab: this.getCurrentTab(),
           },
