@@ -23,6 +23,12 @@ export class PromptBuilder {
     );
     const modelMessages: ModelMessage[] = [systemPrompt];
 
+    // TODO We'll cache every 5000 tokens of messages to the model.
+    // (glenn): I selected this value randomly, but I'm sure we can calculate a better threshold if we invest a bit more time. This should be better than without caching though.
+    // const cumulativeTokenCount = 0;
+    // const lastCacheTokenCount = 0;
+    // const cacheThreshold = 5000;
+
     for (const message of chatMessages) {
       switch (message.role) {
         case 'user':
@@ -78,6 +84,19 @@ export class PromptBuilder {
           modelMessages.push(...convertedMessages);
           break;
         }
+      }
+    }
+
+    // make every 10th message a cached message (super easy approach)
+    const cacheEveryNthMessage = 10;
+    for (const [index, message] of modelMessages.entries()) {
+      // Start index is 1 because the system prompt is the first message and already has a cache key with long ttl.
+      if ((index + 1) % cacheEveryNthMessage === 0) {
+        message.providerOptions = {
+          anthropic: {
+            cacheControl: { type: 'ephemeral' },
+          },
+        };
       }
     }
 

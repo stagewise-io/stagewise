@@ -41,7 +41,15 @@ export async function getSystemPrompt(
     .trim()
     .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1'); // We remove all CDATA tags because they add unnecessary tokens and we can trust the system prompt content to not do bullshit.
 
-  return { role: 'system', content: newPrompt };
+  return {
+    role: 'system',
+    content: newPrompt,
+    providerOptions: {
+      anthropic: {
+        cacheControl: { type: 'ephemeral', ttl: '1h' },
+      },
+    },
+  };
 }
 
 const agentName = 'stage';
