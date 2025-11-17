@@ -35,6 +35,22 @@ export async function bootstrapGlobalServices({
 
   // Ensure ripgrep is installed for improved grep/glob performance
   // If installation fails, the app will continue with Node.js fallback implementations
+  const identifierService = await IdentifierService.create(
+    globalDataPathService,
+    logger,
+  );
+  const globalConfigService = await GlobalConfigService.create(
+    globalDataPathService,
+    logger,
+    kartonService,
+  );
+
+  const telemetryService = new TelemetryService(
+    identifierService,
+    globalConfigService,
+    logger,
+  );
+
   ensureRipgrepInstalled({
     rgBinaryBasePath: globalDataPathService.globalDataPath,
     onLog: logger.debug,
@@ -58,21 +74,6 @@ export async function bootstrapGlobalServices({
         `Ripgrep installation failed: ${error}. Grep/glob operations will use slower Node.js implementations.`,
       );
     });
-  const identifierService = await IdentifierService.create(
-    globalDataPathService,
-    logger,
-  );
-  const globalConfigService = await GlobalConfigService.create(
-    globalDataPathService,
-    logger,
-    kartonService,
-  );
-
-  const telemetryService = new TelemetryService(
-    identifierService,
-    globalConfigService,
-    logger,
-  );
 
   return {
     logger,
