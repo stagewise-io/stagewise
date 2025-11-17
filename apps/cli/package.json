@@ -29,7 +29,9 @@
     "test:watch": "vitest watch",
     "test:ui": "vitest run --ui",
     "test:coverage": "vitest run --coverage",
-    "reset-data": "tsx reset.ts"
+    "clean-data-paths": "tsx clean-data-paths.ts dev && tsx clean-data-paths.ts prod",
+    "clean-data-paths:dev": "tsx clean-data-paths.ts dev",
+    "clean-data-paths:prod": "tsx clean-data-paths.ts prod"
   },
   "devDependencies": {
     "@inquirer/prompts": "^7.0.0",

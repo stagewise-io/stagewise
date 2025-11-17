@@ -9,6 +9,7 @@
     "build:plugins": "turbo run build --filter='./plugins/*'",
     "clean": "git clean -xdf node_modules",
     "clean:workspaces": "turbo clean",
+    "clean:data-paths": "pnpm -F stagewise clean-data-paths",
     "dev": "turbo watch dev --concurrency 20",
     "dev:playgrounds": "turbo watch dev --filter='./playgrounds/*' --concurrency 20",
     "dev:examples": "turbo watch dev --filter='./examples/*' --concurrency 20",
