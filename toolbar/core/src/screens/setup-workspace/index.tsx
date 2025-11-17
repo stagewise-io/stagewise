@@ -147,7 +147,7 @@ export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
         </DialogContent>
       </Dialog>
       <Dialog open={show && hasChatMessage} dismissible={false}>
-        <DialogContent className="gap-3 delay-150 duration-300 sm:h-4/6 sm:max-h-[512px] sm:min-h-96 sm:w-4/6 sm:min-w-96 sm:max-w-xl md:p-6">
+        <DialogContent className="gap-3 delay-150 duration-300 sm:h-4/5 sm:max-h-[600px] sm:min-h-96 sm:w-4/6 sm:min-w-96 sm:max-w-xl md:p-6">
           <div className="flex flex-row items-start justify-between gap-4">
             <DialogHeader>
               <DialogTitle>
