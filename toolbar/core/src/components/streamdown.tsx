@@ -315,7 +315,7 @@ const FileLink = ({
       </TooltipTrigger>
       <TooltipContent>
         <div className="flex flex-col gap-1">
-          <div className="font-mono text-xs">{href}</div>
+          <div className="font-mono text-xs">{decodeURI(href)}</div>
           <div className="text-muted-foreground text-xs">
             Click to open in {ideName}
           </div>
@@ -362,7 +362,7 @@ const AnchorComponent = ({
     const prefix = href.startsWith('wsfile:incomplete:')
       ? 'wsfile:incomplete:'
       : 'wsfile:';
-    const path = href.slice(prefix.length);
+    const path = decodeURI(href.slice(prefix.length));
     const [file, line] = path.split(':');
     const truncated = getTruncatedFileUrl(file!, 3, 128);
 
@@ -419,7 +419,7 @@ const AnchorComponent = ({
           {children}
         </a>
       </TooltipTrigger>
-      <TooltipContent>{processedHref}</TooltipContent>
+      <TooltipContent>{decodeURI(processedHref)}</TooltipContent>
     </Tooltip>
   );
 };
