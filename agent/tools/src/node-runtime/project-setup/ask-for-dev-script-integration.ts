@@ -6,6 +6,7 @@ export const DESCRIPTION = `Ask the [USER] if they want stagewise to auto-start 
 
 Parameters:
 - diff (object, REQUIRED): Preview of dev script changes containing:
+  - relativeFilePath (string, REQUIRED): Relative file path to package.json file.
   - before (string, REQUIRED): Current dev script command from package.json (e.g., "next dev", "vite", "npm run dev").
   - after (string, REQUIRED): Proposed wrapped command using correct package manager syntax. Examples by package manager:
     - npm: "npx stagewise@beta -- next dev"
@@ -21,6 +22,11 @@ Outcome of the tool: The tool returns a boolean (shouldIntegrate) indicating whe
 export const askForDevScriptIntegrationParamsSchema = z.object({
   userInput: z.object({
     diff: z.object({
+      relativeFilePath: z
+        .string()
+        .describe(
+          'Relative file path to package.json file. (e.g. "apps/website/package.json")',
+        ),
       before: z
         .string()
         .describe(

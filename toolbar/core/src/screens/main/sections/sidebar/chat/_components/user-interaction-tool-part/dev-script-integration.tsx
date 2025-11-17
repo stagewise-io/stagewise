@@ -3,6 +3,7 @@ import { diffLines } from 'diff';
 import { Button } from '@stagewise/stage-ui/components/button';
 import type { PickToolPart } from './index.js';
 import { CheckIcon, InfoIcon, XIcon } from 'lucide-react';
+import { getTruncatedFileUrl } from '@/utils';
 
 export const AskForDevScriptIntegrationToolPartContent = memo(
   ({
@@ -45,6 +46,13 @@ export const AskForDevScriptIntegrationToolPartContent = memo(
         <div
           className={`rounded border border-black/10 bg-black/5 p-3 font-mono text-xs ${isError || isOutputAvailable ? 'opacity-50' : ''}`}
         >
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-black/60">
+              {getTruncatedFileUrl(
+                toolPart.input?.userInput.diff.relativeFilePath ?? '',
+              )}
+            </span>
+          </div>
           <div className="mb-2 flex items-center gap-2">
             <span className="text-black/60">Changes:</span>
             <span className="text-green-600">+{newLineCount}</span>
