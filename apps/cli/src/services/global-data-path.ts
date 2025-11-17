@@ -12,9 +12,12 @@ export class GlobalDataPathService {
   private logger: Logger;
   private constructor(logger: Logger) {
     this.logger = logger;
-    this.paths = envPaths(getEnvMode() ? 'stagewise-dev' : 'stagewise', {
-      suffix: '',
-    });
+    this.paths = envPaths(
+      getEnvMode() === 'dev' ? 'stagewise-dev' : 'stagewise',
+      {
+        suffix: '',
+      },
+    );
   }
 
   public static async create(logger: Logger): Promise<GlobalDataPathService> {
