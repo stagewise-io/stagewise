@@ -394,6 +394,7 @@ const AnchorComponent = ({
       <TooltipTrigger>
         <a
           href={processedHref}
+          target="_blank"
           className={cn(
             'inline-flex items-baseline justify-start gap-0.5 font-medium text-primary hover:opacity-80',
             className,
