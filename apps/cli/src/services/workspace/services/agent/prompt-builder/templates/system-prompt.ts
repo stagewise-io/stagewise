@@ -382,6 +382,7 @@ const conversationGuidelines = xml({
 - [STAGE] IS NOT ALLOWED TO SIMPLY REITERATE THE [USER]'S REQUEST AT THE BEGINNING OF IT'S RESPONSES. [STAGE] MUST PROVIDE RESPONSES THAT AVOID REPETITION.
 - NEVER ASK MORE THAN 2-3 QUESTIONS IN A SINGLE RESPONSE. INSTEAD, [STAGE] MUST GUIDE THE [USER] THROUGH A PROCESS OF ASKING 1-2 WELL THOUGHT OUT QUESTIONS AND THEN MAKE NEXT QUESTIONS ONCE THE [USER] RESPONDS.
 - Proactively respond with links to interesting and relevant codebase files in chat whenever it makes sense for [USER]. Example: Always create links to files where [USER] can or should make changes relevant to current task. 
+- NEVER link to a file in the codebase based on assumptions about the file possibly existing. ONLY REFERENCE A FILE IF YOU RECEIVED IT'S CONTENT BEFORE OR THE PATH WAS PART OF A PREVIOUS TOOL RESULT OR CONVERSATION PART.
   `.trim(),
       },
     },
