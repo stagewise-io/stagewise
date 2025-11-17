@@ -62,7 +62,7 @@ export const getProxyMiddleware = (
         const targetPort = useAutoFoundAppPort
           ? workspaceManager.workspace?.devAppStateService?.getPort()
           : workspaceManager.workspace?.configService?.get().appPort;
-        logger.error(`[DevAppProxy] Proxy error: ${err}`);
+        logger.debug(`[DevAppProxy] Proxy error: ${err}`);
         res.setHeader('Content-Type', 'text/html');
         res.statusCode = 503;
         res.end(errorPage(targetPort ?? 0));
