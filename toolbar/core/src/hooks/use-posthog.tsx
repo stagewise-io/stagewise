@@ -67,9 +67,7 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
         posthog.stopSessionRecording();
         posthog.consent.optInOut(false);
         posthog.opt_out_capturing();
-      } catch (e) {
-        console.warn('Failed to stop session recording', e);
-      }
+      } catch (_e) {}
       return;
     }
 
@@ -79,7 +77,6 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
         before_send: (event) => {
           // Filter out user app errors - only capture toolbar errors
           if (!event || !shouldSendEvent(event)) return null; // Reject the event
-
           return event;
         },
         disable_session_recording: telemetryLevel !== 'full',
@@ -103,11 +100,15 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
 
   useEffect(() => {
     const telemetryLevel = globalConfig.telemetryLevel;
+
     if (
       telemetryLevel === 'full' &&
       userAccount?.user?.id &&
-      !posthog._isIdentified()
+      (!posthog._isIdentified() ||
+        posthog.get_distinct_id() !== userAccount.user.id)
     ) {
+      if (posthog._isIdentified()) posthog.reset();
+
       posthog.identify(userAccount.user.id, {
         telemetryLevel: globalConfig.telemetryLevel,
         email: userAccount.user.email,
