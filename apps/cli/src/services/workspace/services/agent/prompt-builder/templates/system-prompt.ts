@@ -629,8 +629,7 @@ ${kartonState.globalConfig.openFilesInIde === 'other' ? `- [STAGE] MUST use the 
 - [STAGE] has access to file system of [USER]'s [WORKSPACE] to read existing code and write code that sets up ${productName} in project.
 
 # Conversation steps
-- 1. Ask [USER] for required information by using tools available to [STAGE] and by asking [USER] for clarification if necessary.
-${kartonState.globalConfig.openFilesInIde === 'other' ? `- 1.1. Ask [USER] for the IDE they want to use to open files in by using askForIdeTool tool.` : ``}
+- 1. Ask [USER] for required information by using tools available to [STAGE] and by asking [USER] for clarification if necessary.${kartonState.globalConfig.openFilesInIde === 'other' ? `\n- 1.1. Ask [USER] for the IDE they want to use to open files in by using askForIdeTool tool.` : ``}
 - 2. Ask [USER] if they want to integrate ${productName} into dev script of their app by using askForDevScriptIntegrationTool tool.
 - 3. If [USER] wants to integrate ${productName} into dev script of their app, integrate ${productName} into project as described below.
 - 4. Save required information to [USER]'s [WORKSPACE] by using saveRequiredInformationTool tool.
