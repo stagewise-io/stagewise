@@ -201,13 +201,13 @@ export class AgentService {
         return codingAgentTools(this.clientRuntime);
       case MainTab.IDEATION_CANVAS: {
         if (!this.apiKey) {
-          this.logger.error(
+          this.logger.debug(
             '[AgentService] No API key available. Inspiration agent tools failed, please sign in before using the agent.',
           );
           return null;
         }
         if (!this.litellm) {
-          this.logger.error(
+          this.logger.debug(
             '[AgentService] No litellm available. Inspiration agent tools failed, please initialize litellm before using the agent.',
           );
           return null;
@@ -265,7 +265,7 @@ export class AgentService {
 
     const accessToken = this.authService.accessToken;
     if (!accessToken) {
-      this.logger.error(
+      this.logger.debug(
         '[AgentService] No authentication tokens available. Initializing litellm failed, please sign in before using the agent.',
       );
       return;
@@ -283,7 +283,7 @@ export class AgentService {
     // await this.authService.refreshAuthState();
     const accessToken = this.authService.accessToken;
     if (!accessToken) {
-      this.logger.error(
+      this.logger.debug(
         '[AgentService] No authentication tokens available. Initializing client failed, please sign in before using the agent.',
       );
       return;
@@ -694,7 +694,7 @@ export class AgentService {
         },
       );
     } catch (error) {
-      this.logger.error(
+      this.logger.debug(
         `[AgentService] Failed to register server procedure handlers ${error}`,
         {
           cause: error,
@@ -773,14 +773,14 @@ export class AgentService {
     history?: History;
   }): Promise<void> {
     if (!this.apiKey) {
-      this.logger.error(
+      this.logger.debug(
         '[AgentService] No API key available. Agent call failed, please sign in before using the agent.',
       );
       return;
     }
 
     if (!this.litellm) {
-      this.logger.error(
+      this.logger.debug(
         '[AgentService] No litellm available. Agent call failed, please initialize litellm before using the agent.',
       );
       return;
@@ -788,7 +788,7 @@ export class AgentService {
 
     const toolsWithExecute = this.getTools();
     if (!toolsWithExecute) {
-      this.logger.error(
+      this.logger.debug(
         '[AgentService] Error getting tools. Agent call failed, please check if you are signed in and try again.',
       );
       return;
@@ -904,7 +904,7 @@ export class AgentService {
         experimental_repairToolCall: async (r) => {
           // Haiku often returns the tool input as string instead of object - we try to parse it as object
           // If the parsing fails, we simply return an invalid tool call
-          this.logger.error('[AgentService] Repairing tool call', r.error);
+          this.logger.debug('[AgentService] Repairing tool call', r.error);
           this.telemetryService.captureException(r.error);
           if (NoSuchToolError.isInstance(r.error)) return null;
 
@@ -965,7 +965,7 @@ export class AgentService {
               });
             },
             (error) => {
-              this.logger.error('[AgentService] Agent failed', error);
+              this.logger.debug('[AgentService] Agent failed', error);
               this.telemetryService.captureException(error as Error);
             },
           );
@@ -1010,7 +1010,7 @@ export class AgentService {
         this.lastMessageId = messageId;
       });
     } catch (error) {
-      this.logger.error('[AgentService] Agent failed', error);
+      this.logger.debug('[AgentService] Agent failed', error);
       this.telemetryService.captureException(error as Error);
       const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
@@ -1251,7 +1251,7 @@ export class AgentService {
    */
   private async warmUpLLMProxyCache() {
     if (!this.litellm) {
-      this.logger.error(
+      this.logger.debug(
         '[AgentService] No litellm available. Warm up request failed, please initialize litellm before using the agent.',
       );
       return;
@@ -1280,7 +1280,7 @@ export class AgentService {
         { role: 'user', content: 'Hey bud!' },
       ],
     }).catch((error) => {
-      this.logger.error('[AgentService] Failed to warm up LLM proxy cache', {
+      this.logger.debug('[AgentService] Failed to warm up LLM proxy cache', {
         cause: error,
       });
     });
@@ -1327,7 +1327,7 @@ export class AgentService {
       isAuthenticationError(error.error) &&
       this.authRetryCount < this.maxAuthRetries
     ) {
-      this.logger.error('[Agent Service]: Error', error.error);
+      this.logger.debug('[Agent Service]: Error', error.error);
       this.authRetryCount++;
 
       // Auth service will handle token refresh internally
@@ -1375,7 +1375,7 @@ export class AgentService {
       return;
     } else {
       const errorDetails = extractDetailsFromError(error.error);
-      this.logger.error(
+      this.logger.debug(
         `[Agent Service] Agent failed with error ${JSON.stringify(error)}`,
       );
       this.telemetryService.captureException(error.error as Error);
