@@ -105,6 +105,10 @@ export interface EventProperties {
   'dev-app-stopped': {
     wrapped_command: string | null;
   };
+  'cli-ripgrep-installation-failed': {
+    error: string;
+  };
+  'cli-ripgrep-installation-succeeded': undefined;
 }
 
 export interface UserProperties {

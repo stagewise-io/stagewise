@@ -40,12 +40,18 @@ export async function bootstrapGlobalServices({
     onLog: logger.debug,
   })
     .then((result) => {
-      if (!result.success)
+      if (!result.success) {
+        telemetryService.capture('cli-ripgrep-installation-failed', {
+          error: result.error ?? 'Unknown error',
+        });
         logger.warn(
           `Ripgrep installation failed: ${result.error}. Grep/glob operations will use slower Node.js implementations.`,
         );
-      else if (verbose)
-        logger.debug('Ripgrep is available for grep/glob operations');
+      } else {
+        telemetryService.capture('cli-ripgrep-installation-succeeded');
+        if (verbose)
+          logger.debug('Ripgrep is available for grep/glob operations');
+      }
     })
     .catch((error) => {
       logger.warn(
