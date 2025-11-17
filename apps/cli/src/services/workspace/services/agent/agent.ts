@@ -91,7 +91,7 @@ export class AgentService {
   private maxAuthRetries = 2;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
-  private litellm!: ReturnType<typeof createAnthropic>;
+  private litellm: ReturnType<typeof createAnthropic> | null = null;
   private isWarmedUp = false;
   private undoToolCallStack: Map<
     ChatId,
@@ -200,7 +200,18 @@ export class AgentService {
       case MainTab.DEV_APP_PREVIEW:
         return codingAgentTools(this.clientRuntime);
       case MainTab.IDEATION_CANVAS: {
-        if (!this.apiKey) return null;
+        if (!this.apiKey) {
+          this.logger.error(
+            '[AgentService] No API key available. Inspiration agent tools failed, please sign in before using the agent.',
+          );
+          return null;
+        }
+        if (!this.litellm) {
+          this.logger.error(
+            '[AgentService] No litellm available. Inspiration agent tools failed, please initialize litellm before using the agent.',
+          );
+          return null;
+        }
         return inspirationAgentTools(
           this.clientRuntime,
           this.telemetryService.withTracing(this.litellm('claude-haiku-4-5'), {
@@ -768,6 +779,13 @@ export class AgentService {
       return;
     }
 
+    if (!this.litellm) {
+      this.logger.error(
+        '[AgentService] No litellm available. Agent call failed, please initialize litellm before using the agent.',
+      );
+      return;
+    }
+
     const toolsWithExecute = this.getTools();
     if (!toolsWithExecute) {
       this.logger.error(
@@ -1232,6 +1250,12 @@ export class AgentService {
    * @returns The response from the warm-up request.
    */
   private async warmUpLLMProxyCache() {
+    if (!this.litellm) {
+      this.logger.error(
+        '[AgentService] No litellm available. Warm up request failed, please initialize litellm before using the agent.',
+      );
+      return;
+    }
     return generateText({
       model: this.telemetryService.withTracing(
         this.litellm('claude-haiku-4-5'),
