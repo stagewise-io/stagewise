@@ -4,27 +4,28 @@ import {
   type ImperativePanelHandle,
 } from '@stagewise/stage-ui/components/resizable';
 import { SidebarTopSection } from './top';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { usePostHog } from 'posthog-js/react';
 
 export function Sidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const panelRef = useRef<ImperativePanelHandle>(null);
   const posthog = usePostHog();
+
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const openChatPanel = useCallback(() => {
     panelRef.current?.expand();
     window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
   }, []);
 
-  useEffect(() => {
+  const handleCollapseChange = useCallback((isCollapsed: boolean) => {
     if (isCollapsed) {
       window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
     } else {
       window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
     }
-  }, [isCollapsed]);
+  }, []);
 
   useEventListener('sidebar-chat-panel-focussed', () => {
     panelRef.current?.expand();
@@ -42,10 +43,12 @@ export function Sidebar() {
       collapsedSize={4}
       onCollapse={() => {
         setIsCollapsed(true);
+        handleCollapseChange(true);
         posthog?.capture('sidebar_collapsed');
       }}
       onExpand={() => {
         setIsCollapsed(false);
+        handleCollapseChange(false);
         posthog?.capture('sidebar_expanded');
       }}
       data-collapsed={isCollapsed}

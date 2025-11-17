@@ -85,8 +85,6 @@ interface ChatStateProviderProps {
 export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const posthog = usePostHog();
   const [chatInput, setChatInput] = useState<string>('');
-  const [_isPromptCreationMode, _setIsPromptCreationMode] =
-    useState<boolean>(false);
   const [isContextSelectorMode, setIsContextSelectorMode] =
     useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);

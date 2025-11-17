@@ -206,7 +206,7 @@ export function ChatPanelFooter() {
   useHotKeyListener(
     useCallback(() => {
       setChatInputActive(true);
-      chatState.startContextSelector();
+      chatState.startContextSelector(); // We trigger this here again because the user might go into context selection mode after already having the input active
       return true;
     }, [chatState]),
     HotkeyActions.CTRL_ALT_PERIOD,
