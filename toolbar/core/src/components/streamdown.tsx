@@ -286,31 +286,15 @@ const FileLink = ({
             })
           }
           className={cn(
-            'inline-flex items-center',
-            'max-w-full',
-            'transition-all duration-200',
-            'hover:opacity-95',
-            'active:opacity-90',
-            'text-primary text-sm',
-            'hover:text-primary/80',
-            'align-baseline',
+            'inline-flex items-center gap-0.5',
+            'font-medium text-primary text-sm',
+            'hover:opacity-80',
+            'transition-opacity duration-200',
           )}
         >
-          <span
-            className="relative min-w-0 max-w-[30ch] overflow-hidden"
-            style={{ direction: 'rtl' }}
-          >
-            <span
-              className="inline-block whitespace-nowrap"
-              style={{ direction: 'ltr', unicodeBidi: 'embed' }}
-            >
-              {filePath}
-            </span>
-          </span>
-          {lineNumber && (
-            <span className="shrink-0 text-sm opacity-70">:{lineNumber}</span>
-          )}
-          <ExternalLinkIcon className="ml-1 size-3 shrink-0" />
+          {filePath}
+          {lineNumber && <span className="opacity-70">:{lineNumber}</span>}
+          <ExternalLinkIcon className="size-3 shrink-0" />
         </a>
       </TooltipTrigger>
       <TooltipContent>
