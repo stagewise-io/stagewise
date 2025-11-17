@@ -188,7 +188,7 @@ export class TelemetryService {
     properties?: Parameters<typeof withTracing>[2],
   ): LanguageModelV2 {
     const telemetryLevel = this.globalConfigService.get().telemetryLevel;
-    if (telemetryLevel === 'off') return model;
+    if (telemetryLevel !== 'full') return model;
 
     const distinctId = this.getDistinctId();
 
