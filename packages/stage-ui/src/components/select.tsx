@@ -49,7 +49,7 @@ export const Select = ({ items, triggerClassName, ...props }: SelectProps) => {
       </SelectBase.Trigger>
       <SelectBase.Portal>
         <SelectBase.Positioner>
-          <SelectBase.Popup className="glass-body glass-body-motion flex origin-[var(--transform-origin)] flex-col items-stretch gap-0.5 rounded-lg bg-white/60 p-1 shadow-lg backdrop-blur-xs transition-[transform,scale,opacity] duration-150 ease-out data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/60">
+          <SelectBase.Popup className="glass-body glass-body-motion flex origin-[var(--transform-origin)] flex-col items-stretch gap-0.5 rounded-lg bg-background/80 p-1 backdrop-blur-sm transition-[transform,scale,opacity] duration-150 ease-out data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0">
             <SelectBase.ScrollUpArrow />
             {convertedItems.map((item) => (
               <SelectBase.Item

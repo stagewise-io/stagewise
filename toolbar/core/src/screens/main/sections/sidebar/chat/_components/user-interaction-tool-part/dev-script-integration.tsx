@@ -44,19 +44,23 @@ export const AskForDevScriptIntegrationToolPartContent = memo(
     return (
       <div className="flex w-full flex-col gap-2">
         <div
-          className={`rounded border border-black/10 bg-black/5 p-3 font-mono text-xs ${isError || isOutputAvailable ? 'opacity-50' : ''}`}
+          className={`rounded border border-foreground/10 bg-background/5 p-3 font-mono text-xs ${isError || isOutputAvailable ? 'opacity-50' : ''}`}
         >
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-black/60">
+            <span className="text-foreground/60">
               {getTruncatedFileUrl(
                 toolPart.input?.userInput.diff.relativeFilePath ?? '',
               )}
             </span>
           </div>
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-black/60">Changes:</span>
-            <span className="text-green-600">+{newLineCount}</span>
-            <span className="text-rose-600">-{deletedLineCount}</span>
+            <span className="text-foreground/60">Changes:</span>
+            <span className="text-green-600 dark:text-green-200">
+              +{newLineCount}
+            </span>
+            <span className="text-rose-600 dark:text-rose-200">
+              -{deletedLineCount}
+            </span>
           </div>
           <div className="flex flex-col gap-1">
             {lines.map((line, index) => (
@@ -64,10 +68,10 @@ export const AskForDevScriptIntegrationToolPartContent = memo(
                 key={`${index}-${line.value.slice(0, 20)}`}
                 className={
                   line.added
-                    ? 'bg-green-100 text-green-800'
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                     : line.removed
-                      ? 'bg-rose-100 text-rose-800'
-                      : 'text-black/60'
+                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200'
+                      : 'bg-background/5 text-foreground/60'
                 }
               >
                 {line.value}

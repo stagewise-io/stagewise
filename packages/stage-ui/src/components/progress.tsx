@@ -25,7 +25,7 @@ export function ProgressTrack({
   return (
     <ProgressBase.Track
       className={cn(
-        'glass-inset col-span-2 col-start-1 block overflow-hidden rounded-xl',
+        'glass-body col-span-2 col-start-1 block overflow-hidden rounded-xl bg-background/50',
         slim ? 'h-1.5' : 'h-4',
       )}
     >
