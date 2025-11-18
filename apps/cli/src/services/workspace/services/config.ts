@@ -61,13 +61,12 @@ export class WorkspaceConfigService {
         throw new Error('Invalid workspace config');
       }
       this.config = newConfig;
-      await this.saveConfigFile();
+      void this.saveConfigFile();
       this.kartonService.setState((draft) => {
         if (draft.workspace) {
           draft.workspace.config = parsedConfig.data;
         }
       });
-      return;
     } else {
       const configFilePath = path.join(this.workspacePath, 'stagewise.json');
       const configFile = await fs
@@ -92,6 +91,12 @@ export class WorkspaceConfigService {
       }
       this.config = parsedConfig.data;
 
+      // We also store the config once it's validated. We do that to make sure that the stored config is always aligned with the schema.
+      this.logger.debug(
+        '[WorkspaceConfigService] Saving config file after validation...',
+      );
+      void this.saveConfigFile();
+
       // If a workspace loading override was set, now is the time to override the parts of the config that were overridden.
       // We only do this once on initialization.
       if (this.workspaceLoadingOverrides) {
@@ -111,11 +116,6 @@ export class WorkspaceConfigService {
       async (config: WorkspaceConfig) => this.set(config),
     );
 
-    // We also store the config once it's validated. We do that to make sure that the stored config is always aligned with the schema.
-    this.logger.debug(
-      '[WorkspaceConfigService] Saving config file after validation...',
-    );
-    await this.saveConfigFile();
     this.logger.debug('[WorkspaceConfigService] Initialized');
   }
 
