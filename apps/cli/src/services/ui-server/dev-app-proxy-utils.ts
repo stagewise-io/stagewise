@@ -1,5 +1,5 @@
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { IncomingMessage } from 'node:http';
 import type { Logger } from '@/services/logger';
 import { stagewiseAppPrefix } from './shared';
 import type { WorkspaceManagerService } from '@/services/workspace-manager';
@@ -28,6 +28,15 @@ export const getProxyMiddleware = (
         return false;
       }
 
+      // Add client disconnect and error handlers
+      req.on('close', () => {
+        logger.debug(`[DevAppProxy] Client disconnected for: ${pathname}`);
+      });
+
+      req.on('error', (err) => {
+        logger.debug(`[DevAppProxy] Client request error: ${err}`);
+      });
+
       // Proxy all other requests
       logger.debug(`[DevAppProxy] Proxying request: ${pathname}`);
       return true;
@@ -55,21 +64,100 @@ export const getProxyMiddleware = (
     preserveHeaderKeyCase: true,
     xfwd: true,
     on: {
-      // @ts-expect-error
-      error: (err, _req, res: ServerResponse<IncomingMessage>) => {
+      error: (err, _req, res) => {
         const useAutoFoundAppPort =
           workspaceManager.workspace?.configService?.get().useAutoFoundAppPort;
         const targetPort = useAutoFoundAppPort
           ? workspaceManager.workspace?.devAppStateService?.getPort()
           : workspaceManager.workspace?.configService?.get().appPort;
+
         logger.debug(`[DevAppProxy] Proxy error: ${err}`);
-        res.setHeader('Content-Type', 'text/html');
-        res.statusCode = 503;
-        res.end(errorPage(targetPort ?? 0));
+
+        // Type guard: res can be Socket or ServerResponse
+        // If it's a Socket, we can't send HTTP response
+        if (!('socket' in res)) {
+          logger.debug(
+            `[DevAppProxy] Cannot send error response - res is not a ServerResponse`,
+          );
+          if ('destroyed' in res && !res.destroyed) res.destroy();
+
+          return;
+        }
+
+        // Now TypeScript knows res is ServerResponse
+        // Check all conditions that would prevent writing to response
+        if (
+          !res.socket ||
+          res.socket.destroyed ||
+          res.destroyed ||
+          res.writableEnded ||
+          res.headersSent
+        ) {
+          logger.debug(
+            `[DevAppProxy] Cannot send error response - connection already closed (socket: ${!res.socket ? 'missing' : res.socket.destroyed ? 'destroyed' : 'ok'}, res: ${res.destroyed ? 'destroyed' : 'ok'}, writable: ${res.writableEnded ? 'ended' : 'ok'}, headers: ${res.headersSent ? 'sent' : 'ok'})`,
+          );
+          res.socket?.destroy();
+          return;
+        }
+
+        try {
+          res.writeHead(503, { 'Content-Type': 'text/html' });
+          res.end(errorPage(targetPort ?? 0));
+        } catch (writeError) {
+          logger.error(
+            `[DevAppProxy] Failed to send error response: ${writeError}`,
+          );
+          res.socket?.destroy();
+        }
         // TODO: Forward this error to the UI or somewhere else so that the UI can render a proper fallback UI for this case
       },
-      proxyRes: (proxyRes) => {
+      proxyReq: (proxyReq, _req, res) => {
+        // Handle errors on the outgoing request to upstream server
+        proxyReq.on('error', (err) => {
+          logger.debug(`[DevAppProxy] ProxyReq error: ${err}`);
+
+          // Check all conditions that would prevent writing to response
+          if (
+            !res.socket ||
+            res.socket.destroyed ||
+            res.destroyed ||
+            res.writableEnded ||
+            res.headersSent
+          ) {
+            logger.debug(
+              `[DevAppProxy] Cannot send proxyReq error response - connection already closed`,
+            );
+            res.socket?.destroy();
+            return;
+          }
+
+          try {
+            const useAutoFoundAppPort =
+              workspaceManager.workspace?.configService?.get()
+                .useAutoFoundAppPort;
+            const targetPort = useAutoFoundAppPort
+              ? workspaceManager.workspace?.devAppStateService?.getPort()
+              : workspaceManager.workspace?.configService?.get().appPort;
+            res.writeHead(503, { 'Content-Type': 'text/html' });
+            res.end(errorPage(targetPort ?? 0));
+          } catch (e) {
+            logger.error(
+              `[DevAppProxy] Failed to send proxyReq error response: ${e}`,
+            );
+            res.socket?.destroy();
+          }
+        });
+      },
+      proxyRes: (proxyRes, _req, res) => {
         applyHeaderRewrites(proxyRes);
+
+        // Handle errors on the incoming response from upstream server
+        proxyRes.on('error', (err) => {
+          logger.debug(`[DevAppProxy] ProxyRes error: ${err}`);
+          if (!res.headersSent && !res.socket?.destroyed) {
+            res.socket?.destroy();
+          }
+        });
       },
       proxyReqWs: (_proxyReq, req, _socket, _options, _head) => {
         logger.debug(`[DevAppProxy] WebSocket proxy request: ${req.url}`);
