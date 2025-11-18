@@ -160,9 +160,9 @@ export const errorPage = (appPort: number) => `<!DOCTYPE html>
   }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg-color: #09090b;
-        --text-color: #fff;
-        --text-muted-color: #d4d4d8;
+        --bg-color: #192330;
+        --text-color: #f8fafc;
+        --text-muted-color: #94a3b8;
       }
     }
 
