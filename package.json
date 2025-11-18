@@ -42,7 +42,11 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "fs-xattr",
+      "macos-alias",
+      "electron",
+      "electron-winstaller"
     ],
     "ignoredBuiltDependencies": [
       "keytar"
