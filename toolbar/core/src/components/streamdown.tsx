@@ -169,7 +169,7 @@ const CodeComponent = ({
         )}
       </div>
       {language === 'mermaid' ? (
-        <div className="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/30 max-h-96 overflow-auto overscroll-contain rounded-lg border border-foreground/5 bg-background/10 p-2">
+        <div className="scrollbar-hover-only max-h-96 overflow-auto overscroll-contain rounded-lg border border-foreground/5 bg-background/10 p-2">
           <Mermaid
             chart={code}
             config={{

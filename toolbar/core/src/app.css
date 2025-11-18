@@ -298,3 +298,16 @@ body {
 @utility shimmer-to-* {
   --shimmer-color-2: --value(--color-*);
 }
+
+/* Scrollbar utilities */
+@utility scrollbar-subtle {
+  @apply scrollbar-thin scrollbar-thumb-foreground/15 scrollbar-track-transparent;
+}
+
+@utility scrollbar-hover-only {
+  @apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/30;
+}
+
+@utility scrollbar-visible {
+  @apply scrollbar-thin scrollbar-thumb-foreground/20 scrollbar-track-muted-foreground/10;
+}

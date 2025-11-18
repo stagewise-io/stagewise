@@ -114,7 +114,7 @@ export function ChatPanelHeader({
             </div>
           }
           {chatListOpen && (
-            <div className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%-16px),transparent_100%)] scrollbar-thin scrollbar-thumb-foreground/10 scrollbar-track-transparent absolute top-16 right-4 bottom-4 left-4 overflow-hidden overflow-y-auto rounded-md py-4">
+            <div className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%-16px),transparent_100%)] scrollbar-subtle absolute top-16 right-4 bottom-4 left-4 overflow-hidden overflow-y-auto rounded-md py-4">
               <ChatList onClose={() => setChatListOpen(false)} />
             </div>
           )}

@@ -115,7 +115,7 @@ export const WorkspaceSettingsTabContent = () => {
   return (
     <TabsContent
       value="workspace"
-      className="-mr-4 h-fit w-full overflow-y-auto p-1 pr-3 pb-16"
+      className="-mr-4 scrollbar-subtle h-fit w-full overflow-y-auto p-1 pr-3 pb-16"
     >
       <FormFieldset title="Agent configuration">
         <FormField className="lg:flex-row">
@@ -322,7 +322,7 @@ export const GlobalSettingsTabContent = () => {
   return (
     <TabsContent
       value="global"
-      className="-mr-4 h-fit w-full overflow-y-auto p-1 pr-3 pb-16"
+      className="-mr-4 scrollbar-subtle h-fit w-full overflow-y-auto p-1 pr-3 pb-16"
     >
       <FormFieldset title="IDE Integrations">
         <FormField className="lg:flex-row">

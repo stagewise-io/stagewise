@@ -94,7 +94,7 @@ export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
           {hasOtherWorkspacePaths && (
             <>
               <div className="glass-inset rounded-xl">
-                <div className="scrollbar-thin scrollbar-thumb-foreground/20 scrollbar-track-muted-foreground/10 max-h-[30vh] min-h-36 w-full items-stretch justify-start overflow-y-auto rounded-xl p-2 *:mb-2">
+                <div className="scrollbar-visible max-h-[30vh] min-h-36 w-full items-stretch justify-start overflow-y-auto rounded-xl p-2 *:mb-2">
                   {otherWorkspacePaths?.map((path) => (
                     <Button
                       key={path}

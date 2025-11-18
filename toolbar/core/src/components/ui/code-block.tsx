@@ -208,7 +208,7 @@ export const CodeBlock = ({
     <div
       data-code-block-container
       data-language={language}
-      className="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/30 w-full overflow-auto overscroll-contain rounded-lg border border-foreground/5 bg-background/10"
+      className="scrollbar-hover-only w-full overflow-auto overscroll-contain rounded-lg border border-foreground/5 bg-background/10"
     >
       <div
         className={cn('group/chat-bubble-user:hidden dark:hidden', className)}
