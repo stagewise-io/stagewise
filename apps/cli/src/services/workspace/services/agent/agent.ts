@@ -69,7 +69,7 @@ type ChatId = string;
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
-const MAX_RECURSION_DEPTH = 20;
+const MAX_RECURSION_DEPTH = 50;
 
 export class AgentService {
   private logger: Logger;
