@@ -16,7 +16,7 @@
   --color-muted: var(--color-slate-900);
   --color-muted-foreground: var(--color-slate-400);
 
-  --color-primary: var(--color-blue-800);
+  --color-primary: var(--color-blue-600);
   --color-primary-foreground: var(--color-blue-100);
 }
 
