@@ -71,8 +71,10 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
             <FolderIcon className="size-5" />
           ) : (
             <>
-              {workspaceDir ?? 'No workspace loaded'}
-              <ChevronDownIcon className="size-4" />
+              <span className="min-w-0 truncate">
+                {workspaceDir ?? 'No workspace loaded'}
+              </span>
+              <ChevronDownIcon className="size-4 shrink-0" />
             </>
           )}
         </Button>
