@@ -58,5 +58,8 @@
   "dependencies": {
     "stagewise": "link:apps/cli",
     "tsx": "^4.20.3"
+  },
+  "config": {
+    "forge": "./forge.config.mts"
   }
 }

@@ -1,17 +1,36 @@
-import { app, BrowserWindow } from 'electron';
+import unhandled from 'electron-unhandled';
+unhandled();
+
+import { app, BrowserWindow, Dialog, Event } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
 
+// Set the app name for macOS menu bar
+app.setName('stagewise');
+
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    title: 'stagewise',
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 16, y: 16 },
+    vibrancy: 'sidebar',
+    backgroundMaterial: 'mica',
+    backgroundColor: '#fafafa50',
+    transparent: true,
+    roundedCorners: true,
+    closable: true,
+    frame: false,
+
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
@@ -26,8 +45,8 @@ const createWindow = () => {
     );
   }
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // Uncomment to open the DevTools on startup.
+  // mainWindow.webContents.openDevTools();
 };
 
 // This method will be called when Electron has finished
@@ -39,18 +58,14 @@ app.on('ready', createWindow);
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
+  // macOS apps typically keep the app running when all windows are closed but I (glenn) think that is bs so we'll quit the app when all windows are closed - no matter which platform.
+  if (process.platform === 'darwin') {
+    return;
   }
+  app.quit();
 });
 
-app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
-});
+app.on('activate', () => {});
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
