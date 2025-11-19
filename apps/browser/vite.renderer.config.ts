@@ -1,30 +1,28 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { resolve } from 'node:path';
-import type { PluginOption } from 'vite';
+import path from 'node:path';
 
-// https://vitejs.dev/config
+// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react() as PluginOption, tailwindcss() as unknown as PluginOption],
+  base: './',
+  plugins: [react(), tailwindcss()],
+  define: {
+    'process.env': 'import.meta.env',
+    'process.type': JSON.stringify('renderer'),
+  },
   resolve: {
     alias: {
-      '@': resolve(process.cwd(), 'src/ui'),
+      '@': path.resolve(__dirname, './src/ui'),
     },
     mainFields: ['module', 'main'],
-    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
+    extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
+    conditions: ['module', 'import', 'browser'],
+    preserveSymlinks: false,
   },
   build: {
-    target: 'esnext',
-    lib: {
-      formats: ['es'],
-      entry: 'src/renderer.ts',
-      name: 'renderer',
-      fileName: 'renderer',
-    },
-    commonjsOptions: {
-      transformMixedEsModules: true,
-      requireReturnsDefault: 'auto',
+    rollupOptions: {
+      external: ['serialport', 'sqlite3'],
     },
   },
 });

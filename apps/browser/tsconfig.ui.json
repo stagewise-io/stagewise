@@ -6,7 +6,9 @@
     "jsx": "react-jsx",
     "paths": {
       "@/*": ["./src/ui/*"]
-    }
+    },
+    "types": ["vite/client"],
+    "skipLibCheck": true
   },
   "include": ["src/ui", "src/renderer.ts"]
 }

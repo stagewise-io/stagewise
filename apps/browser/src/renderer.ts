@@ -25,9 +25,19 @@
  *  });
  * ```
  */
-
-import './index.css';
-
-console.log(
-  '👋 This message is being logged by "renderer.ts", included via Vite',
-);
+import { createElement, StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import '@/app.css';
+import { App } from '@/app';
+// Initialize the app
+try {
+  createRoot(document.body).render(
+    createElement(
+      StrictMode,
+      null,
+      createElement(App, { plugins: [], devAppPort: 0 }),
+    ),
+  );
+} catch (error) {
+  console.error(error);
+}

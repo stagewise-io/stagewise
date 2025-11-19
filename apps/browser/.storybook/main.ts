@@ -6,8 +6,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const config: StorybookConfig = {
   stories: [
-    '../src/**/*.mdx',
-    '../src/**/*.stories.@(js|jsx|mjs|ts|tsx)',
+    '../src/ui/**/*.mdx',
+    '../src/ui/**/*.stories.@(js|jsx|mjs|ts|tsx)',
     '../../../packages/stage-ui/src/**/*.stories.@(js|jsx|mjs|ts|tsx)',
   ],
   addons: [

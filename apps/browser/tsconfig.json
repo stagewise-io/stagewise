@@ -9,8 +9,23 @@
     "sourceMap": true,
     "baseUrl": ".",
     "outDir": "dist",
+    "resolveJsonModule": true,
+
+    /* Bundler mode */
     "moduleResolution": "bundler",
-    "resolveJsonModule": true
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
   },
   "references": [{ "path": "./tsconfig.ui.json" }]
 }

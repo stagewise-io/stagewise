@@ -1,7 +1,7 @@
 import unhandled from 'electron-unhandled';
 unhandled();
 
-import { app, BrowserWindow, Dialog, Event } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
@@ -23,7 +23,7 @@ const createWindow = () => {
     title: 'stagewise',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
-    vibrancy: 'sidebar',
+    vibrancy: 'menu',
     backgroundMaterial: 'mica',
     backgroundColor: '#fafafa50',
     transparent: true,

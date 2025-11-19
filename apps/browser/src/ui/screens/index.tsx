@@ -15,7 +15,7 @@ export function ScreenRouter() {
   const displayedLayout = useKartonState((s) => s.userExperience.activeLayout);
 
   return (
-    <div className="fixed inset-0 bg-background">
+    <div className="fixed inset-0">
       {connected && displayedLayout !== Layout.MAIN && (
         <Iridescence
           className={cn(

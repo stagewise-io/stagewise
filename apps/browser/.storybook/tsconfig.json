@@ -1,16 +1,10 @@
 {
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    },
-    {
-      "path": "./tsconfig.node.json"
-    }
-  ],
   "compilerOptions": {
+    "baseUrl": ".",
+    "noEmit": true,
     "paths": {
-      "@/*": ["./src/*"],
-      "tmp/*": ["./tmp/*"]
+      "@/*": ["../src/ui/*"],
+      "tmp/*": ["../tmp/*"]
     },
     "types": ["node", "vite/client"],
     "target": "ES2020",
@@ -22,19 +16,18 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
     "jsx": "react-jsx",
     "jsxImportSource": "react"
   },
-  "basePath": ".",
-  "include": [],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "coverage",
-    "tmp",
-    ".storybook",
-    "**/*.stories.tsx",
-    "**/*.stories.ts"
-  ]
+  "include": [
+    "../src/ui/**/*.stories.tsx",
+    "../src/ui/**/*.stories.ts",
+    "decorators/**/*.ts",
+    "decorators/**/*.tsx",
+    "mocks/**/*.ts",
+    "mocks/**/*.tsx",
+    "*.ts",
+    "*.tsx"
+  ],
+  "exclude": ["node_modules", "dist", "coverage", "tmp", ".turbo"]
 }

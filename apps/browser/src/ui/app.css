@@ -1,8 +1,8 @@
 @import "tailwindcss";
-@import "../node_modules/@stagewise/stage-ui/src/style.css";
+@import "../../node_modules/@stagewise/stage-ui/src/style.css";
 
-@source "../node_modules/@stagewise/stage-ui";
-@source "../node_modules/streamdown/dist/index.js";
+@source "../../node_modules/@stagewise/stage-ui";
+@source "../../node_modules/streamdown/dist/index.js";
 
 @plugin 'tailwind-scrollbar';
 
@@ -20,6 +20,7 @@ body {
   height: 100vh;
   margin: 0;
   padding: 0;
+  app-region: drag;
 }
 
 .root {
