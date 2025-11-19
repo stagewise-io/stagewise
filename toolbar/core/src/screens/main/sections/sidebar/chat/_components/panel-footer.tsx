@@ -158,14 +158,15 @@ export function ChatPanelFooter() {
     activeChat?.usage.maxContextWindowSize,
   ]);
 
+  const [chatInputActive, setChatInputActive] = useState<boolean>(false);
+
   const showTextSlideshow = useMemo(() => {
     return (
       (activeChat?.messages.length ?? 0) === 0 &&
-      chatState.chatInput.length === 0
+      chatState.chatInput.length === 0 &&
+      !chatInputActive
     );
-  }, [activeChat?.messages.length, chatState.chatInput]);
-
-  const [chatInputActive, setChatInputActive] = useState<boolean>(false);
+  }, [activeChat?.messages.length, chatState.chatInput, chatInputActive]);
 
   useEffect(() => {
     if (chatInputActive) {
