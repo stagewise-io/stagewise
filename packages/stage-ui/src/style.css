@@ -89,6 +89,7 @@
 
   --glass-inset-border-shadow: inset 0 0 1px 0px rgba(0,0,0,0.2);
   --glass-inset-shadow: inset 0 2px 3px 1px rgba(0,0,0,0.05), inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5), inset 0 4px 24px 12px rgba(0,0,0,0.05), 0.3px 0.7px 1px 0px rgba(255,255,255,0.2);
+  --glass-inset-background: transparent;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -100,6 +101,8 @@
   
     --glass-inset-border-shadow: inset 0 0 1px 0px rgba(0,0,0,0.2);
     --glass-inset-shadow: inset 0 2px 3px 1px rgba(0,0,0,0.05), inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5), inset 0 4px 24px 12px rgba(0,0,0,0.05), 0.3px 0.7px 1px 0px rgba(255,255,255,0.2);
+    /* Slightly lighter overlay similar to bg-muted-foreground/5 */
+    --glass-inset-background: rgba(148,163,184,0.05);
   }
 }
 
@@ -120,5 +123,5 @@
 }
 
 @utility glass-inset {
-  @apply relative before:pointer-events-none before:absolute before:inset-0 before:block before:size-full before:rounded-[inherit] before:shadow-[var(--glass-inset-border-shadow),var(--glass-inset-shadow)]; 
+  @apply relative before:pointer-events-none before:absolute before:inset-0 before:block before:size-full before:rounded-[inherit] before:bg-[var(--glass-inset-background)] before:shadow-[var(--glass-inset-border-shadow),var(--glass-inset-shadow)]; 
 }
