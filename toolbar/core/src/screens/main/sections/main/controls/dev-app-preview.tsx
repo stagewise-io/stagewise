@@ -599,33 +599,48 @@ export function DevAppStateInfo() {
         </div>
         {canControlApp && (
           <div className="flex flex-row-reverse items-center justify-start gap-2">
-            <Button
-              variant="primary"
-              size="icon-sm"
-              className="bg-green-600 text-green-50 dark:bg-green-700 dark:text-green-400"
-              onClick={() => startApp()}
-              disabled={!canStartApp}
-            >
-              <PlayIcon className="ml-px size-3.5 fill-current" />
-            </Button>
-            <Button
-              variant="primary"
-              size="icon-sm"
-              className="bg-yellow-600 text-yellow-50 dark:bg-yellow-700 dark:text-yellow-400"
-              onClick={() => restartApp()}
-              disabled={!canRestartApp}
-            >
-              <RefreshCwIcon className="size-4" />
-            </Button>
-            <Button
-              variant="primary"
-              size="icon-sm"
-              className="bg-rose-600 text-rose-50 dark:bg-rose-700 dark:text-rose-400"
-              onClick={() => stopApp()}
-              disabled={!canStopApp}
-            >
-              <SquareIcon className="size-3.5 fill-current" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="secondary"
+                  size="icon-sm"
+                  // className="bg-green-600/20 text-foreground dark:bg-green-700/20"
+                  onClick={() => startApp()}
+                  disabled={!canStartApp}
+                >
+                  <PlayIcon className="ml-px size-3.5 fill-current" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Start dev server</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="secondary"
+                  size="icon-sm"
+                  // className="bg-yellow-600/20 text-foreground dark:bg-yellow-700/20"
+                  onClick={() => restartApp()}
+                  disabled={!canRestartApp}
+                >
+                  <RefreshCwIcon className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Restart dev server</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="secondary"
+                  size="icon-sm"
+                  // className="bg-rose-600/20 text-rose-50 dark:bg-rose-700/20"
+                  onClick={() => stopApp()}
+                  disabled={!canStopApp}
+                >
+                  <SquareIcon className="size-3.5 fill-current" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Stop dev server</TooltipContent>
+            </Tooltip>
           </div>
         )}
       </PopoverContent>
