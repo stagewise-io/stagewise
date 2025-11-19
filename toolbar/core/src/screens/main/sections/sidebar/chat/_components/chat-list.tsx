@@ -59,7 +59,7 @@ function ChatListEntry({
   return (
     <div className="py-0.5">
       <div
-        className="flex shrink-0 cursor-pointer flex-row items-center justify-between gap-4 px-2 py-2 transition-colors duration-150 hover:bg-zinc-500/5"
+        className="flex shrink-0 cursor-pointer flex-row items-center justify-between gap-4 rounded-lg px-2 py-2 transition-colors duration-150 hover:bg-zinc-500/5"
         role="button"
         onClick={() => {
           switchChat(chatId);
@@ -69,7 +69,7 @@ function ChatListEntry({
         <div className="flex flex-1 flex-col items-start justify-start gap-0">
           <span
             className={cn(
-              'truncate font-medium text-foreground text-sm',
+              'max-w-full truncate font-medium text-foreground text-sm',
               isActive && 'text-blue-600',
             )}
           >
@@ -81,7 +81,7 @@ function ChatListEntry({
         </div>
         <div className="flex flex-row gap-1">
           <button
-            className="pointer-cursor flex size-8 items-center justify-center rounded-full text-zinc-500 transition-all duration-150 hover:bg-rose-600/10 hover:text-rose-600"
+            className="pointer-cursor flex size-8 items-center justify-center rounded-full text-muted-foreground transition-all duration-150 hover:bg-foreground/10 hover:text-rose-600"
             type="button"
             onClick={(ev) => {
               ev.stopPropagation();
