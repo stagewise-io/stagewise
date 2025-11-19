@@ -69,13 +69,13 @@ function ChatListEntry({
         <div className="flex flex-1 flex-col items-start justify-start gap-0">
           <span
             className={cn(
-              'truncate font-medium text-sm text-zinc-950 dark:text-white',
+              'truncate font-medium text-foreground text-sm',
               isActive && 'text-blue-600',
             )}
           >
             {chat.title}
           </span>
-          <span className="text-xs text-zinc-600">
+          <span className="text-muted-foreground text-xs">
             <TimeAgo date={chat.createdAt} />
           </span>
         </div>

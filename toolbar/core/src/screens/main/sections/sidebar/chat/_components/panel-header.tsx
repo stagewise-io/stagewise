@@ -75,7 +75,7 @@ export function ChatPanelHeader({
                         chatListOpen ? 'Close chat list' : 'Open chat list'
                       }
                       variant="secondary"
-                      className="!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg hover:bg-white/60 active:bg-zinc-50/60 disabled:bg-transparent disabled:shadow-none disabled:*:stroke-zinc-500/50"
+                      className="!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg"
                       onClick={() => setChatListOpen(!chatListOpen)}
                       disabled={isWorking}
                     >
@@ -98,7 +98,7 @@ export function ChatPanelHeader({
                       aria-label="New chat"
                       variant="secondary"
                       className={cn(
-                        '!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg transition-all duration-150 ease-out hover:bg-white/60 active:bg-zinc-50/60 disabled:bg-transparent disabled:shadow-none disabled:*:stroke-zinc-500/50',
+                        '!opacity-100 z-10 size-8 cursor-pointer rounded-full p-1 backdrop-blur-lg transition-all duration-150 ease-out',
                         chatListOpen && 'w-fit px-2.5',
                       )}
                       disabled={isWorking}
