@@ -5,9 +5,10 @@ import { useTypeWriterText } from '@/hooks/use-type-writer-text';
 
 interface TextPartProps {
   part: TextUIPart;
+  role: 'user' | 'assistant' | 'system';
 }
 
-export const TextPart = memo(({ part }: TextPartProps) => {
+export const TextPart = memo(({ part, role }: TextPartProps) => {
   const displayedText = useTypeWriterText(part.text, {
     charsPerInterval: 2,
     framesPerInterval: 1,
@@ -15,9 +16,15 @@ export const TextPart = memo(({ part }: TextPartProps) => {
     animateOnIncreaseOnly: true,
   });
 
-  return (
-    <Streamdown isAnimating={part.state === 'streaming'}>
-      {displayedText}
-    </Streamdown>
-  );
+  // Only render markdown for assistant messages
+  if (role === 'assistant') {
+    return (
+      <Streamdown isAnimating={part.state === 'streaming'}>
+        {displayedText}
+      </Streamdown>
+    );
+  }
+
+  // Render plain text for user messages
+  return <span className="whitespace-pre-wrap">{displayedText}</span>;
 });

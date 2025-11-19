@@ -235,7 +235,11 @@ export function ChatBubble({
                 switch (part.type) {
                   case 'text':
                     return (
-                      <TextPart key={stableKey} part={part as TextUIPart} />
+                      <TextPart
+                        key={stableKey}
+                        part={part as TextUIPart}
+                        role={msg.role}
+                      />
                     );
                   case 'reasoning':
                     if (part.text.trim() === '') return null; // Sometimes, empty reasoning parts are returned
