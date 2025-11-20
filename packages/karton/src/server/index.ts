@@ -1,4 +1,9 @@
 export { createKartonServer } from './karton-server.js';
+export { WebSocketServerTransport } from '../transports/websocket-server.js';
+export {
+  ElectronServerTransport,
+  type ElectronServerTransportConfig,
+} from '../transports/electron-server.js';
 
 export type {
   KartonServer,

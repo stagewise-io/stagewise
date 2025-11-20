@@ -2,7 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/utils';
 
 export const buttonVariants = cva(
-  'relative block flex flex-row items-center justify-center disabled:pointer-events-none disabled:opacity-50',
+  'app-no-drag relative block flex flex-row items-center justify-center disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {

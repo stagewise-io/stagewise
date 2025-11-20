@@ -32,3 +32,9 @@ export {
   KartonRPCErrorReason,
   KartonRPCException,
 } from './types.js';
+
+export type {
+  Transport,
+  ServerTransport,
+  KartonMessage,
+} from './transport.js';

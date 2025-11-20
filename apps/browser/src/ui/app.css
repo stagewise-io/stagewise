@@ -23,6 +23,15 @@ body {
   app-region: drag;
 }
 
+@utility app-drag {
+  app-region: drag !important;
+  user-select: none !important;
+}
+
+@utility app-no-drag {
+  app-region: no-drag !important;
+}
+
 .root {
   isolation: isolate;
 }

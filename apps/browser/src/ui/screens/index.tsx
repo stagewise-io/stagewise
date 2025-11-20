@@ -19,23 +19,23 @@ export function ScreenRouter() {
       {connected && displayedLayout !== Layout.MAIN && (
         <Iridescence
           className={cn(
-            '-z-10 pointer-events-none absolute inset-0 opacity-100 duration-1000 ease-out',
+            '-z-10 app-drag pointer-events-none absolute inset-0 opacity-100 duration-1000 ease-out',
           )}
           color={[0.7, 0.9, 1]}
           speed={0.1}
         />
       )}
 
-      <div className="absolute inset-0 flex size-full flex-col items-center justify-center">
-        {!connected && (
+      {!connected && (
+        <div className="absolute inset-0 flex size-full flex-col items-center justify-center">
           <Logo
             color="white"
             className="w-1/6 max-w-12 drop-shadow-black/30 drop-shadow-lg"
             loading
             loadingSpeed="fast"
           />
-        )}
-      </div>
+        </div>
+      )}
 
       <SignInScreen show={connected && displayedLayout === Layout.SIGNIN} />
 

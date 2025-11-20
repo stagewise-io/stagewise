@@ -1,6 +1,7 @@
 import type { Draft } from 'immer';
 import type { Patch } from 'immer';
 import type { WebSocketServer } from 'ws';
+import type { Transport, ServerTransport } from './transport.js';
 
 // Deep validation helpers to ensure `state` does not contain functions or generator-like types
 type IsFunction<T> = T extends (...args: any[]) => any ? true : false;
@@ -345,6 +346,7 @@ export interface WebSocketMessage {
 export interface KartonServerConfig<T> {
   procedures?: KartonServerProcedureImplementations<T>;
   initialState: KartonState<T>;
+  transport?: ServerTransport;
 }
 
 export interface KartonServer<T> {
@@ -352,7 +354,7 @@ export interface KartonServer<T> {
   setState: (recipe: (draft: Draft<KartonState<T>>) => void) => KartonState<T>;
   clientProcedures: KartonClientProceduresWithClientId<T>;
   connectedClients: ReadonlyArray<string>;
-  wss: WebSocketServer;
+  wss: WebSocketServer | undefined;
   registerServerProcedureHandler: <
     Path extends ProcedurePaths<KartonServerProcedures<T>>,
   >(
@@ -375,7 +377,8 @@ export interface KartonServer<T> {
 }
 
 export interface KartonClientConfig<T> {
-  webSocketPath: string;
+  webSocketPath?: string;
+  transport?: Transport;
   procedures: KartonClientProcedureImplementations<T>;
   fallbackState: KartonState<T>;
   onStateChange?: () => void;

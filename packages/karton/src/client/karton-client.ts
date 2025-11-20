@@ -5,7 +5,8 @@ import type {
   KartonServerProcedures,
   KartonClientProcedureImplementations,
 } from '../shared/types.js';
-import { WebSocketConnection } from '../shared/websocket-connection.js';
+import type { Transport } from '../shared/transport.js';
+import { WebSocketTransport } from '../transports/websocket-client.js';
 import { RPCManager } from '../shared/rpc.js';
 import { ClientStateManager } from '../shared/state-sync.js';
 import {
@@ -15,8 +16,7 @@ import {
 import { KartonRPCException, KartonRPCErrorReason } from '../shared/types.js';
 
 class KartonClientImpl<T> implements KartonClient<T> {
-  private ws: WebSocket | null = null;
-  private connection: WebSocketConnection | null = null;
+  private transport: Transport | null = null;
   private rpcManager: RPCManager | null = null;
   private stateManager: ClientStateManager<KartonState<T>>;
   private clientProcedures: KartonClientProcedureImplementations<T>;
@@ -55,14 +55,25 @@ class KartonClientImpl<T> implements KartonClient<T> {
 
   private connect(): void {
     try {
-      // Create WebSocket connection
-      this.ws = new WebSocket(this.config.webSocketPath);
-      this.connection = new WebSocketConnection(this.ws);
+      // Create Transport
+      if (this.config.transport) {
+        // Use provided transport (assuming it's fresh or reusable)
+        // If it's a reconnect, we might be reusing the same instance which might be closed.
+        // But custom transports should handle their lifecycle or be provided via factory if we supported that.
+        // For now, we assume if transport is passed, we just use it.
+        this.transport = this.config.transport;
+      } else if (this.config.webSocketPath) {
+        this.transport = new WebSocketTransport(this.config.webSocketPath);
+      } else {
+        throw new Error(
+          'Either transport or webSocketPath must be provided in KartonClientConfig',
+        );
+      }
 
       // Create RPC manager
       this.rpcManager = new RPCManager((message) => {
-        if (this.connection?.isOpen()) {
-          this.connection.send(message);
+        if (this.transport?.isOpen()) {
+          this.transport.send(message);
         }
       });
 
@@ -75,7 +86,7 @@ class KartonClientImpl<T> implements KartonClient<T> {
       }
 
       // Setup message handling
-      this.connection.onMessage(async (message) => {
+      this.transport.onMessage(async (message) => {
         // Handle state messages
         this.stateManager.handleMessage(message, this.onStateChange);
 
@@ -86,26 +97,31 @@ class KartonClientImpl<T> implements KartonClient<T> {
       });
 
       // Handle connection open
-      this.connection.onOpen(() => {
+      this.transport.onOpen(() => {
         this._isConnected = true;
         this.onStateChange?.();
         this.clearReconnectTimer();
       });
 
       // Handle connection close
-      this.connection.onClose(() => {
+      this.transport.onClose(() => {
         this._isConnected = false;
         this.onStateChange?.();
-        this.scheduleReconnect();
+        // Only schedule reconnect if we are managing the transport (WebSocket mode)
+        if (this.config.webSocketPath) {
+          this.scheduleReconnect();
+        }
       });
 
       // Handle errors
-      this.connection.onError((error) => {
-        console.error('WebSocket error:', error);
+      this.transport.onError((error) => {
+        console.error('Transport error:', error);
       });
     } catch (error) {
       console.error('Failed to connect:', error);
-      this.scheduleReconnect();
+      if (this.config.webSocketPath) {
+        this.scheduleReconnect();
+      }
     }
   }
 
@@ -133,13 +149,17 @@ class KartonClientImpl<T> implements KartonClient<T> {
       this.rpcManager = null;
     }
 
-    if (this.connection) {
-      this.connection.close();
-      this.connection = null;
-    }
-
-    if (this.ws) {
-      this.ws = null;
+    if (this.transport) {
+      // Only close if we created it? Or always?
+      // If user passed transport, closing it might be side-effect.
+      // But cleanup usually means we are done or restarting.
+      // If we are restarting (reconnect), we want to close old one.
+      try {
+        this.transport.close();
+      } catch (_e) {
+        // Ignore
+      }
+      this.transport = null;
     }
   }
 

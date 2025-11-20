@@ -17,7 +17,7 @@ import { setupComponentConvasRoutes } from './component-canvas-utils';
  */
 export class UIServerService {
   private _logger: Logger;
-  private _kartonWebSocketServer: WebSocketServer;
+  private _kartonWebSocketServer: WebSocketServer | undefined;
   private _workspaceManager: WorkspaceManagerService;
   private _authService: AuthService;
   private _app: express.Application;
@@ -27,7 +27,7 @@ export class UIServerService {
 
   private constructor(
     logger: Logger,
-    kartonWebSocketServer: WebSocketServer,
+    kartonWebSocketServer: WebSocketServer | undefined,
     workspaceManager: WorkspaceManagerService,
     authService: AuthService,
     port?: number,
@@ -46,7 +46,7 @@ export class UIServerService {
 
   public static async create(
     logger: Logger,
-    kartonWebSocketServer: WebSocketServer,
+    kartonWebSocketServer: WebSocketServer | undefined,
     workspaceManager: WorkspaceManagerService,
     authService: AuthService,
     port?: number,

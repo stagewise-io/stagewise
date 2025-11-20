@@ -1,6 +1,6 @@
-import { WebSocketServer, type WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import type { Draft } from 'immer';
+import type { WebSocketServer } from 'ws';
 import type {
   KartonServer,
   KartonServerConfig,
@@ -8,14 +8,14 @@ import type {
   KartonState,
   KartonClientProceduresWithClientId,
 } from '../shared/types.js';
-import { WebSocketConnection } from '../shared/websocket-connection.js';
+import type { Transport, ServerTransport } from '../shared/transport.js';
+import { WebSocketServerTransport } from '../transports/websocket-server.js';
 import { RPCManager } from '../shared/rpc.js';
 import { StateManager } from '../shared/state-sync.js';
 import {
   createProcedureProxy,
   extractProceduresFromTree,
 } from '../shared/procedure-proxy.js';
-import { serializeMessage } from '../shared/websocket-messages.js';
 import {
   KartonRPCException,
   KartonRPCErrorReason,
@@ -24,21 +24,20 @@ import {
 
 interface ClientConnection {
   id: string;
-  ws: WebSocket;
-  connection: WebSocketConnection;
+  transport: Transport;
   rpcManager: RPCManager;
 }
 
 class KartonServerImpl<T> implements KartonServer<T> {
-  private internalWss: WebSocketServer;
+  private transport: ServerTransport;
   private clients: Map<string, ClientConnection> = new Map();
   private stateManager: StateManager<KartonState<T>>;
   private serverProcedures: Map<string, any> = new Map();
   private _clientProcedures: KartonClientProceduresWithClientId<T>;
   private changeListeners: ((state: Readonly<KartonState<T>>) => void)[] = [];
 
-  constructor(config: KartonServerConfig<T>, wss: WebSocketServer) {
-    this.internalWss = wss;
+  constructor(config: KartonServerConfig<T>, transport: ServerTransport) {
+    this.transport = transport;
 
     // Initialize procedures from config if provided
     if (config.procedures) {
@@ -87,23 +86,22 @@ class KartonServerImpl<T> implements KartonServer<T> {
       },
     ) as KartonClientProceduresWithClientId<T>;
 
-    this.setupWebSocketServer();
+    this.setupTransport();
   }
 
-  private setupWebSocketServer(): void {
-    this.internalWss.on('connection', (ws: WebSocket) => {
-      this.handleNewConnection(ws);
+  private setupTransport(): void {
+    this.transport.onConnection((clientTransport) => {
+      this.handleNewConnection(clientTransport);
     });
   }
 
-  private handleNewConnection(ws: WebSocket): void {
+  private handleNewConnection(transport: Transport): void {
     const clientId = uuidv4();
-    const connection = new WebSocketConnection(ws);
 
     // Create RPC manager for this client
     const rpcManager = new RPCManager((message) => {
-      if (connection.isOpen()) {
-        connection.send(message);
+      if (transport.isOpen()) {
+        transport.send(message);
       }
     });
 
@@ -116,41 +114,44 @@ class KartonServerImpl<T> implements KartonServer<T> {
     }
 
     // Setup message handling
-    connection.onMessage(async (message) => {
+    transport.onMessage(async (message) => {
       await rpcManager.handleMessage(message);
     });
 
     // Store client connection
     const client: ClientConnection = {
       id: clientId,
-      ws,
-      connection,
+      transport,
       rpcManager,
     };
     this.clients.set(clientId, client);
 
     // Send initial state
     const initialStateMessage = this.stateManager.getFullStateSyncMessage();
-    connection.send(initialStateMessage);
+    transport.send(initialStateMessage);
 
     // Handle disconnect
-    connection.onClose(() => {
+    transport.onClose(() => {
       this.clients.delete(clientId);
       rpcManager.cleanup();
     });
   }
 
   private broadcast(message: WebSocketMessage): void {
-    const serialized = serializeMessage(message);
+    // We serialize once here if we wanted optimization, but Transport interface doesn't support raw.
+    // So we iterate and send object.
     for (const client of this.clients.values()) {
-      if (client.connection.isOpen()) {
-        client.ws.send(serialized);
+      if (client.transport.isOpen()) {
+        client.transport.send(message);
       }
     }
   }
 
-  public get wss(): WebSocketServer {
-    return this.internalWss;
+  public get wss(): WebSocketServer | undefined {
+    if (this.transport instanceof WebSocketServerTransport) {
+      return this.transport.wssInstance;
+    }
+    return undefined;
   }
 
   public get state(): Readonly<KartonState<T>> {
@@ -210,13 +211,11 @@ class KartonServerImpl<T> implements KartonServer<T> {
   public async close(): Promise<void> {
     for (const client of this.clients.values()) {
       client.rpcManager.cleanup();
-      client.connection.close();
+      client.transport.close();
     }
     this.clients.clear();
 
-    return new Promise((resolve) => {
-      this.internalWss.close(() => resolve());
-    });
+    await this.transport.close();
   }
 
   public registerStateChangeCallback(
@@ -246,12 +245,15 @@ class KartonServerImpl<T> implements KartonServer<T> {
 export async function createKartonServer<T>(
   config: KartonServerConfig<T>,
 ): Promise<KartonServer<T>> {
-  // Create WebSocket server
-  const wss = new WebSocketServer({
-    noServer: true,
-  });
+  let transport: ServerTransport;
+
+  if (config.transport) {
+    transport = config.transport;
+  } else {
+    transport = new WebSocketServerTransport({ noServer: true });
+  }
 
   // Create and return the server implementation
-  const server = new KartonServerImpl(config, wss);
+  const server = new KartonServerImpl(config, transport);
   return server;
 }

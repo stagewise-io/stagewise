@@ -24,7 +24,7 @@ export const DialogContent = ({
       <BaseDialog.Popup
         {...props}
         className={cn(
-          '-translate-x-1/2 -translate-y-1/2 glass-body glass-body-motion fixed top-1/2 left-1/2 z-40 flex h-full w-full flex-col items-stretch gap-6 bg-background/80 p-5 text-foreground backdrop-blur-lg duration-150 ease-out data-[ending-style]:origin-top data-[starting-style]:origin-bottom data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm sm:h-fit sm:w-fit sm:min-w-lg sm:rounded-3xl',
+          'app-no-drag -translate-x-1/2 -translate-y-1/2 glass-body glass-body-motion fixed top-1/2 left-1/2 z-40 flex h-full w-full flex-col items-stretch gap-6 bg-background/80 p-5 text-foreground backdrop-blur-lg duration-150 ease-out data-[ending-style]:origin-top data-[starting-style]:origin-bottom data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm sm:h-fit sm:w-fit sm:min-w-lg sm:rounded-3xl',
           className,
         )}
       >

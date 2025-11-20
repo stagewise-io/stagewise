@@ -1,15 +1,16 @@
 import {
   createKartonServer,
   type KartonServer,
+  ElectronServerTransport,
 } from '@stagewise/karton/server';
 import { type KartonContract, defaultState } from '@stagewise/karton-contract';
 import type { Logger } from './logger';
+import { ipcMain } from 'electron';
 
 /**
  * The Karton service is responsible for managing the connection to the UI (web app).
  */
 export class KartonService {
-  // @ts-expect-error - We initialize the karton server in the initialize method.
   private kartonServer: KartonServer<KartonContract>;
   private logger: Logger;
 
@@ -18,10 +19,18 @@ export class KartonService {
   }
 
   private async initialize() {
+    const transport = new ElectronServerTransport({
+      ipcMain,
+      channel: 'karton',
+    });
+
     this.kartonServer = await createKartonServer<KartonContract>({
       initialState: defaultState,
+      transport,
     });
-    this.logger.debug('[KartonService] Karton server initialized');
+    this.logger.debug(
+      '[KartonService] Karton server initialized with Electron transport',
+    );
   }
 
   public static async create(logger: Logger): Promise<KartonService> {

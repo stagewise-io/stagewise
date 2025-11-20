@@ -4,10 +4,33 @@ import {
   createKartonReactClient,
   useComparingSelector,
 } from '@stagewise/karton/react/client';
+import { ElectronClientTransport } from '@stagewise/karton/client';
+
+// Declare window.electron type extension
+declare global {
+  interface Window {
+    electron: {
+      karton: {
+        send(channel: string, ...args: any[]): void;
+        on(
+          channel: string,
+          listener: (event: any, ...args: any[]) => void,
+        ): () => void;
+        removeListener(
+          channel: string,
+          listener: (...args: any[]) => void,
+        ): void;
+      };
+    };
+  }
+}
 
 const [KartonProvider, useKartonState, useKartonProcedure, useKartonConnected] =
   createKartonReactClient<KartonContract>({
-    webSocketPath: `http://localhost:3100/stagewise-toolbar-app/karton`,
+    transport: new ElectronClientTransport({
+      bridge: window.electron.karton,
+      channel: 'karton',
+    }),
     procedures: {
       devAppPreview: {
         getPreviewInfo: async () => {

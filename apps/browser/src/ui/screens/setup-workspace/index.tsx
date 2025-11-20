@@ -72,7 +72,7 @@ export const SetupWorkspaceScreen = ({ show }: { show: boolean }) => {
   return (
     <>
       <Dialog open={show && !hasChatMessage} dismissible={false}>
-        <DialogContent className="gap-3 delay-150 duration-300">
+        <DialogContent className="app-no-drag gap-3 delay-150 duration-300">
           <DialogHeader>
             <DialogTitle>
               {hasOtherWorkspacePaths

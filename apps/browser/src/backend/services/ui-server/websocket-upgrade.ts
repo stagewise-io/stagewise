@@ -8,7 +8,7 @@ import type { WebSocketServer } from 'ws';
 export const configureWebSocketUpgrade = (
   server: Server,
   proxyUpgradeHandler: ProxyWSUpgradeHandler,
-  kartonWebSocketServer: WebSocketServer,
+  kartonWebSocketServer: WebSocketServer | undefined,
   logger: Logger,
   workspaceManager: WorkspaceManagerService,
 ) => {
@@ -36,9 +36,16 @@ export const configureWebSocketUpgrade = (
       }
     } else if (pathname === stagewiseKartonPath) {
       // The only websocket that stagewise uses internally is the karton websocket, so if that fits, we simply forward to that
-      kartonWebSocketServer.handleUpgrade(request, socket, head, (ws) => {
-        kartonWebSocketServer.emit('connection', ws, request);
-      });
+      if (kartonWebSocketServer) {
+        kartonWebSocketServer.handleUpgrade(request, socket, head, (ws) => {
+          kartonWebSocketServer.emit('connection', ws, request);
+        });
+      } else {
+        logger.debug(
+          `[WebSocketUpgrade] Karton WebSocket path requested but WebSocket support is disabled: ${pathname}`,
+        );
+        socket.destroy();
+      }
     } else {
       logger.debug(`[WebSocketUpgrade] Unknown WebSocket path: ${pathname}`);
       socket.destroy();
