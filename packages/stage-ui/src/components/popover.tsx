@@ -121,10 +121,7 @@ export const PopoverClose = ({ className, ...props }: PopoverCloseProps) => {
           variant="ghost"
           size="icon-xs"
           {...props}
-          className={cn(
-            'absolute top-2.5 right-2.5 text-muted-foreground',
-            className,
-          )}
+          className={cn('absolute top-2.5 right-2.5', className)}
         >
           <XIcon className="size-4" />
         </Button>

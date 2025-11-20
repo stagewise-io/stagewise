@@ -61,7 +61,7 @@ export const TabsTrigger = ({
           {title && (
             <span
               className={cn(
-                'w-0 overflow-hidden whitespace-nowrap group-data-selected/tabstab:w-auto',
+                'hidden w-0 overflow-hidden whitespace-nowrap group-data-selected/tabstab:w-auto md:block',
               )}
             >
               {title}

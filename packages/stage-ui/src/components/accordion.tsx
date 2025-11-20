@@ -37,7 +37,7 @@ export function AccordionItem({
     <BaseAccordion.Item
       {...props}
       className={cn(
-        'border-zinc-500/10 border-b shadow-none hover:bg-zinc-500/5',
+        'border-foreground/15 border-b text-foreground shadow-none hover:bg-foreground/3',
         props.className,
       )}
     >
