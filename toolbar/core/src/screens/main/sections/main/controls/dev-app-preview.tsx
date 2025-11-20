@@ -267,12 +267,13 @@ export function UrlControl() {
   }, [getIFrame]);
 
   return (
-    <div className="glass-body flex h-10 w-full flex-1 flex-row items-center gap-2 rounded-full bg-background/80 p-1 backdrop-blur-lg">
+    <div className="glass-body @[175px]:flex hidden h-10 w-full flex-1 flex-row items-center gap-2 rounded-full bg-background/80 p-1 backdrop-blur-lg">
       <Button
         variant="ghost"
         size="icon-sm"
         onClick={navigateBack}
         disabled={!canNavigateBack}
+        className="@[320px]:flex hidden"
       >
         <ArrowLeftIcon className="size-4" />
       </Button>
@@ -326,6 +327,7 @@ export function UrlControl() {
           <Button
             variant="ghost"
             size="icon-sm"
+            className="@[320px]:flex hidden"
             onClick={() => (isLoading ? stopLoading() : reloadIFrame())}
           >
             {isLoading && (
@@ -405,7 +407,7 @@ export function ScreenSizeControl() {
               variant={screenSize ? 'primary' : 'secondary'}
               size="icon-md"
               className={cn(
-                'backdrop-blur-lg transition-all',
+                '@[320px]:flex hidden backdrop-blur-lg transition-all',
                 screenSize ? 'bg-primary' : 'bg-background/80',
               )}
             >
@@ -523,7 +525,7 @@ export function DevAppStateInfo() {
             <Button
               variant="secondary"
               size="icon-md"
-              className="bg-background/80 backdrop-blur-lg"
+              className="@[320px]:flex hidden bg-background/80 backdrop-blur-lg"
             >
               <PlayIcon className="size-4" />
               <div

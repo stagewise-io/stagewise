@@ -118,7 +118,7 @@ export const WorkspaceSettingsTabContent = () => {
       className="-mr-4 scrollbar-subtle h-fit w-full overflow-y-auto p-1 pr-3 pb-16"
     >
       <FormFieldset title="Agent configuration">
-        <FormField className="lg:flex-row">
+        <FormField className="@[700px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel htmlFor="workspace-path">
               Workspace Path
@@ -131,12 +131,12 @@ export const WorkspaceSettingsTabContent = () => {
             type="text"
             disabled
             id="workspace-path"
-            className="w-min min-w-80 lg:w-min"
+            className="@[700px]:w-min w-full @[700px]:min-w-80"
             value={workspacePath}
           />
         </FormField>
 
-        <FormField className="lg:flex-row">
+        <FormField className="@[700px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel htmlFor="workspace-agent-access-path">
               Agent access path
@@ -160,7 +160,7 @@ export const WorkspaceSettingsTabContent = () => {
                 </PopoverContent>
               </Popover>
               <br />
-              <span className="italic">
+              <span className="break-all italic">
                 Current access path: <strong>{agentAccessPath}</strong>
               </span>
             </FormFieldDescription>
@@ -168,7 +168,7 @@ export const WorkspaceSettingsTabContent = () => {
           <Input
             type="text"
             id="workspace-agent-access-path"
-            className="min-w-80 lg:w-min"
+            className="@[700px]:w-min w-full @[700px]:min-w-80"
             value={config.agentAccessPath}
             onValueChange={(value) => setConfig({ agentAccessPath: value })}
             debounce={200}
@@ -176,7 +176,7 @@ export const WorkspaceSettingsTabContent = () => {
         </FormField>
       </FormFieldset>
       <FormFieldset title="Dev Application setup">
-        <FormField className="lg:flex-row">
+        <FormField className="@[700px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel htmlFor="dev-application-port">Port</FormFieldLabel>
             <FormFieldDescription>
@@ -194,7 +194,7 @@ export const WorkspaceSettingsTabContent = () => {
             debounce={200}
           />
         </FormField>
-        <FormField className="lg:flex-row">
+        <FormField className="@[700px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel htmlFor="dev-application-use-auto-found-port">
               Use automatically found port
@@ -221,7 +221,7 @@ export const WorkspaceSettingsTabContent = () => {
             }
           />
         </FormField>
-        <FormField className="lg:flex-row">
+        <FormField className="@[700px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel htmlFor="dev-application-command">
               Start Command
@@ -242,7 +242,7 @@ export const WorkspaceSettingsTabContent = () => {
           <Input
             type="text"
             id="dev-application-command"
-            className="min-w-80 font-mono lg:w-min"
+            className="@[700px]:w-min w-full @[700px]:min-w-80 font-mono"
             value={config.appExecutionCommand ?? ''}
             onValueChange={(value) =>
               setConfig({
@@ -256,7 +256,7 @@ export const WorkspaceSettingsTabContent = () => {
         </FormField>
       </FormFieldset>
       <FormFieldset title="Other information">
-        <FormField className="lg:flex-row">
+        <FormField className="@[700px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel>Workspace data path</FormFieldLabel>
             <FormFieldDescription>
@@ -268,7 +268,7 @@ export const WorkspaceSettingsTabContent = () => {
           </p>
         </FormField>
 
-        <FormField className="lg:flex-row">
+        <FormField className="@[700px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel>Workspace cache path</FormFieldLabel>
             <FormFieldDescription>
@@ -280,7 +280,7 @@ export const WorkspaceSettingsTabContent = () => {
           </p>
         </FormField>
 
-        <FormField className="lg:flex-row">
+        <FormField className="@[700px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel>Workspace temp path</FormFieldLabel>
             <FormFieldDescription>
@@ -325,7 +325,7 @@ export const GlobalSettingsTabContent = () => {
       className="-mr-4 scrollbar-subtle h-fit w-full overflow-y-auto p-1 pr-3 pb-16"
     >
       <FormFieldset title="IDE Integrations">
-        <FormField className="lg:flex-row">
+        <FormField className="@[700px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel>Open files in IDE</FormFieldLabel>
             <FormFieldDescription>
@@ -393,7 +393,7 @@ export const GlobalSettingsTabContent = () => {
                 label: 'Other',
               },
             ]}
-            triggerClassName="min-w-48"
+            triggerClassName="w-fit @[450px]:min-w-48"
           />
         </FormField>
       </FormFieldset>
@@ -414,7 +414,7 @@ export const GlobalSettingsTabContent = () => {
             </FormFieldDescription>
           </div>
           <RadioGroup
-            className="grid grid-flow-row grid-cols-3 gap-3"
+            className="grid @[450px]:grid-cols-3 grid-cols-1 gap-3"
             onValueChange={(value) =>
               setConfig({
                 telemetryLevel: value as GlobalConfig['telemetryLevel'],
@@ -425,7 +425,7 @@ export const GlobalSettingsTabContent = () => {
             {isPaidUser && (
               <FormFieldLabel
                 htmlFor="telemetry-level-off"
-                className={`glass-body glass-body-motion glass-body-motion-interactive col-span-1 flex h-full flex-row items-center gap-3 rounded-xl p-3`}
+                className={`glass-body glass-body-motion glass-body-motion-interactive @[450px]:col-span-1 flex h-full flex-row items-center gap-3 rounded-xl p-3`}
               >
                 <div className="flex flex-1 flex-col items-start gap-2">
                   <FormFieldTitle>Off</FormFieldTitle>
@@ -494,7 +494,7 @@ export const GlobalSettingsTabContent = () => {
         </FormField>
       </FormFieldset>
       <FormFieldset title="Other">
-        <FormField className="md:flex-row">
+        <FormField className="@[450px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel>Follow us on social media</FormFieldLabel>
             <FormFieldDescription>

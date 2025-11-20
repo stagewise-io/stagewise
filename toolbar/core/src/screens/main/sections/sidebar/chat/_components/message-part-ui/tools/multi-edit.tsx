@@ -68,7 +68,7 @@ export const MultiEditToolPart = ({
       toolSubtitle={
         <div className="flex flex-row items-center justify-start gap-3">
           <span>{getTruncatedFileUrl(part.input?.relative_path ?? '')}</span>
-          <div className="flex shrink-0 flex-row items-center gap-2 font-medium text-xs">
+          <div className="@[320px]:flex hidden shrink-0 flex-row items-center gap-2 font-medium text-xs">
             {diff && (
               <>
                 <span className="shrink-0 text-success">+{newLineCount}</span>

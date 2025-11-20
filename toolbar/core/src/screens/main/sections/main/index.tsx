@@ -87,12 +87,12 @@ export function MainSection() {
       id="opened-content-panel"
       order={2}
       defaultSize={70}
-      className="flex h-full flex-1 flex-col items-stretch justify-between gap-4 p-3 pl-1"
+      className="@container flex h-full flex-1 flex-col items-stretch justify-between gap-4 p-3 pl-1"
     >
       {/* Tab navigation and controls area */}
       <div
         className={cn(
-          'flex flex-row items-center justify-between gap-20',
+          'flex flex-row items-center justify-between @[450px]:gap-20 gap-4',
           activeTab &&
             tabs[activeTab].hideTabBar &&
             !tabs[activeTab].controls &&
@@ -125,7 +125,7 @@ export function MainSection() {
                 <span
                   className={cn(
                     'whitespace-nowrap',
-                    activeTab !== tabId && 'w-0 overflow-hidden',
+                    activeTab !== tabId ? 'hidden' : '@[450px]:block hidden',
                   )}
                 >
                   {tab.title}
