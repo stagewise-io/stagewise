@@ -129,9 +129,7 @@ export function createOverwriteFileToolPart(
           before: beforeContent,
           after: content,
         },
-        undoExecute: async () => {
-          // Mock undo function
-        },
+        undoExecute: null,
       },
     },
   } as ToolPart;
@@ -234,9 +232,7 @@ export function createMultiEditToolPart(
           before: beforeContent,
           after: newContent,
         },
-        undoExecute: async () => {
-          // Mock undo function
-        },
+        undoExecute: null,
       },
     },
   } as ToolPart;
