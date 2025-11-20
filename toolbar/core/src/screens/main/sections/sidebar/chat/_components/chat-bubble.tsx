@@ -11,7 +11,6 @@ import type {
 import { AgentErrorType } from '@stagewise/karton-contract';
 import { RefreshCcwIcon, Undo2 } from 'lucide-react';
 import { useMemo, useCallback, useState, useEffect } from 'react';
-import TimeAgo from 'react-timeago';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { useChatState } from '@/hooks/use-chat-state';
 import {
@@ -198,25 +197,6 @@ export function ChatBubble({
                 : 'group/chat-bubble-assistant',
             )}
           >
-            <div
-              className={cn(
-                'group-hover/chat-bubble:-top-3 -top-2 absolute z-20 w-auto max-w-36 whitespace-nowrap rounded-full bg-white/90 px-1.5 py-0.5 text-xs text-zinc-950/80 opacity-0 shadow-sm ring-1 ring-zinc-500/10 ring-inset transition-all duration-150 ease-out group-hover/chat-bubble:opacity-100',
-                msg.role === 'assistant' ? 'left-1' : 'right-1',
-              )}
-            >
-              {(() => {
-                const createdAt = msg.metadata?.createdAt
-                  ? new Date(msg.metadata.createdAt)
-                  : new Date();
-                const now = new Date();
-                const diffMs = now.getTime() - createdAt.getTime();
-                const diffMins = diffMs / 60000;
-                if (diffMins >= 1) {
-                  return <TimeAgo date={createdAt} />;
-                }
-                return 'Just now';
-              })()}
-            </div>
             {(() => {
               const typeCounters: Record<string, number> = {};
               return msg.parts.map((part, index) => {
@@ -278,7 +258,7 @@ export function ChatBubble({
             })()}
             {(fileAttachments.length > 0 ||
               selectedPreviewElements.length > 0) && (
-              <div className="flex flex-row flex-wrap gap-2">
+              <div className="flex flex-row flex-wrap gap-2 pt-2">
                 <ContextElementsChipsFlexible
                   selectedElements={selectedPreviewElements.map(
                     (selectedPreviewElement) => ({
