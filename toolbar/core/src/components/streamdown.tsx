@@ -94,6 +94,12 @@ export const Streamdown = ({
         components={{
           code: MemoCode,
           a: MemoAnchor,
+          h1: MemoH1,
+          h2: MemoH2,
+          h3: MemoH3,
+          h4: MemoH4,
+          h5: MemoH5,
+          h6: MemoH6,
         }}
         rehypePlugins={[defaultRehypePlugins.raw!, defaultRehypePlugins.katex!]}
         urlTransform={(url) => {
@@ -290,6 +296,7 @@ const FileLink = ({
             'font-medium text-primary text-sm',
             'hover:opacity-80',
             'transition-opacity duration-200',
+            'break-all',
           )}
         >
           {filePath}
@@ -423,3 +430,160 @@ const MemoAnchor = memo<
     p.children === n.children,
 );
 MemoAnchor.displayName = 'MarkdownAnchor';
+
+// Custom heading components for compact chat rendering
+const H1Component = ({
+  className,
+  children,
+  ...props
+}: DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+  ExtraProps) => {
+  return (
+    <h1
+      className={cn('mt-6 mb-2 font-semibold text-lg', className)}
+      data-streamdown="heading-1"
+      {...props}
+    >
+      {children}
+    </h1>
+  );
+};
+
+const H2Component = ({
+  className,
+  children,
+  ...props
+}: DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+  ExtraProps) => {
+  return (
+    <h2
+      className={cn('mt-6 mb-2 font-semibold text-base', className)}
+      data-streamdown="heading-2"
+      {...props}
+    >
+      {children}
+    </h2>
+  );
+};
+
+const H3Component = ({
+  className,
+  children,
+  ...props
+}: DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+  ExtraProps) => {
+  return (
+    <h3
+      className={cn('mt-6 mb-2 font-semibold text-[15px]', className)}
+      data-streamdown="heading-3"
+      {...props}
+    >
+      {children}
+    </h3>
+  );
+};
+
+const H4Component = ({
+  className,
+  children,
+  ...props
+}: DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+  ExtraProps) => {
+  return (
+    <h4
+      className={cn('mt-6 mb-2 font-semibold text-sm', className)}
+      data-streamdown="heading-4"
+      {...props}
+    >
+      {children}
+    </h4>
+  );
+};
+
+const H5Component = ({
+  className,
+  children,
+  ...props
+}: DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+  ExtraProps) => {
+  return (
+    <h5
+      className={cn('mt-6 mb-2 font-semibold text-[13px]', className)}
+      data-streamdown="heading-5"
+      {...props}
+    >
+      {children}
+    </h5>
+  );
+};
+
+const H6Component = ({
+  className,
+  children,
+  ...props
+}: DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+  ExtraProps) => {
+  return (
+    <h6
+      className={cn('mt-6 mb-2 font-semibold text-xs', className)}
+      data-streamdown="heading-6"
+      {...props}
+    >
+      {children}
+    </h6>
+  );
+};
+
+const MemoH1 = memo<
+  DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+    ExtraProps
+>(
+  H1Component,
+  (p, n) => p.children === n.children && p.className === n.className,
+);
+MemoH1.displayName = 'MarkdownH1';
+
+const MemoH2 = memo<
+  DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+    ExtraProps
+>(
+  H2Component,
+  (p, n) => p.children === n.children && p.className === n.className,
+);
+MemoH2.displayName = 'MarkdownH2';
+
+const MemoH3 = memo<
+  DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+    ExtraProps
+>(
+  H3Component,
+  (p, n) => p.children === n.children && p.className === n.className,
+);
+MemoH3.displayName = 'MarkdownH3';
+
+const MemoH4 = memo<
+  DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+    ExtraProps
+>(
+  H4Component,
+  (p, n) => p.children === n.children && p.className === n.className,
+);
+MemoH4.displayName = 'MarkdownH4';
+
+const MemoH5 = memo<
+  DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+    ExtraProps
+>(
+  H5Component,
+  (p, n) => p.children === n.children && p.className === n.className,
+);
+MemoH5.displayName = 'MarkdownH5';
+
+const MemoH6 = memo<
+  DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement> &
+    ExtraProps
+>(
+  H6Component,
+  (p, n) => p.children === n.children && p.className === n.className,
+);
+MemoH6.displayName = 'MarkdownH6';
