@@ -1,7 +1,7 @@
 import type { Preview } from '@storybook/react-vite';
 import React from 'react';
 import { themes } from 'storybook/theming';
-import '../src/style.css';
+import '../src/app.css';
 import { DocsContainer } from '@storybook/addon-docs/blocks';
 import { useEffect, useState } from 'react';
 import { addons } from 'storybook/preview-api';

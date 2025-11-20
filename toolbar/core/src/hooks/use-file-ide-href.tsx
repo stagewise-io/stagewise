@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useKartonState } from './use-karton';
+import { useKartonState } from '@/hooks/use-karton';
 import { getIDEFileUrl } from '@/utils';
 
 export function useFileIDEHref() {
