@@ -39,3 +39,6 @@
   - Package name: `@stagewise/agent-interface`
   - Path: `packages/agent-interface`
   - Purpose: Definition and base functionality for the interface between Toolbar and Agents (like the stagewise agent client).
+
+# Documentation
+- IMPORTANT: Whenever you need to reference documentation about our dependencies (for example, to debug issues, understand API usage, or learn about configuration options, etc.), always use the context7 MCP to obtain the most current and accurate information.
