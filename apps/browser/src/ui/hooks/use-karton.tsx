@@ -7,7 +7,7 @@ import {
 
 const [KartonProvider, useKartonState, useKartonProcedure, useKartonConnected] =
   createKartonReactClient<KartonContract>({
-    webSocketPath: `${window.location.protocol}//${window.location.host}/stagewise-toolbar-app/karton`,
+    webSocketPath: `http://localhost:3100/stagewise-toolbar-app/karton`,
     procedures: {
       devAppPreview: {
         getPreviewInfo: async () => {

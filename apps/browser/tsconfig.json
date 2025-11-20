@@ -27,5 +27,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "references": [{ "path": "./tsconfig.ui.json" }]
+  "references": [
+    { "path": "./tsconfig.ui.json" },
+    { "path": "./tsconfig.backend.json" }
+  ]
 }

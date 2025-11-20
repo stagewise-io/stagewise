@@ -3,12 +3,11 @@
     "composite": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./src/ui/*"]
+      "@/*": ["./src/backend/*"]
     },
-    "types": ["vite/client"],
+    "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["src/ui", "forge.env.d.ts"]
+  "include": ["src/backend", "forge.env.d.ts"]
 }

@@ -21,7 +21,7 @@ export function ScreenRouter() {
           className={cn(
             '-z-10 pointer-events-none absolute inset-0 opacity-100 duration-1000 ease-out',
           )}
-          color={[0.9, 0.85, 1]}
+          color={[0.7, 0.9, 1]}
           speed={0.1}
         />
       )}

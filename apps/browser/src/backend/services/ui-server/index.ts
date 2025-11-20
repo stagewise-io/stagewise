@@ -2,7 +2,6 @@ import type { Logger } from '@/services/logger';
 import express from 'express';
 import type { WebSocketServer } from 'ws';
 import { findAvailablePort } from '@/utils/find-available-port';
-import { setupAppLoaderRoutes } from './app-loader-utils';
 import { getProxyMiddleware } from './dev-app-proxy-utils';
 import type { WorkspaceManagerService } from '../workspace-manager';
 import { createServer, type Server } from 'node:http';
@@ -23,7 +22,6 @@ export class UIServerService {
   private _authService: AuthService;
   private _app: express.Application;
 
-  // @ts-expect-error - We initialize the port in the server start function
   private _port: number;
   private _server: Server | null = null;
 
@@ -99,10 +97,10 @@ export class UIServerService {
     );
     setupComponentConvasRoutes(this.app, this._workspaceManager);
 
-    this._logger.debug(`[UIServerService] Setting up app loader routes...`);
+    //this._logger.debug(`[UIServerService] Setting up app loader routes...`);
 
     // This must happen last in setup because it includes a catch-all
-    setupAppLoaderRoutes(this.app, this._workspaceManager);
+    // setupAppLoaderRoutes(this.app, this._workspaceManager);
 
     this._logger.debug(`[UIServerService] Starting server...`);
 

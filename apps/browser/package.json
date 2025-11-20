@@ -1,25 +1,32 @@
 {
   "name": "@stagewise/browser",
-  "productName": "stagewise",
   "version": "1.0.0-alpha.1",
   "description": "The browser dev's always wished they had.",
-  "type": "module",
-  "main": ".vite/build/main.js",
-  "scripts": {
-    "start": "electron-forge start",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
-    "publish": "electron-forge publish",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
-  },
   "keywords": [],
+  "license": "AGPL-3.0-only",
   "author": {
     "name": "stagewise Inc.",
     "email": "support@stagewise.io"
   },
-  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": ".vite/build/main.js",
+  "scripts": {
+    "make": "dotenv -e ../../.env -- electron-forge make",
+    "package": "dotenv -e ../../.env -- electron-forge package",
+    "publish": "dotenv -e ../../.env -- electron-forge publish",
+    "start": "dotenv -e ../../.env -- electron-forge start",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-unhandled": "^5.0.0"
+  },
   "devDependencies": {
+    "@ai-sdk/anthropic": "2.0.9",
+    "@ai-sdk/google": "2.0.11",
+    "@ai-sdk/openai": "^2.0.23",
+    "@ai-sdk/provider": "^2.0.0",
     "@electron-forge/cli": "^7.10.2",
     "@electron-forge/maker-deb": "^7.10.2",
     "@electron-forge/maker-dmg": "^7.10.2",
@@ -30,7 +37,13 @@
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron-forge/plugin-vite": "^7.10.2",
     "@electron/fuses": "^1.8.0",
+    "@posthog/ai": "^6.4.3",
     "@react-three/fiber": "^9.3.0",
+    "@stagewise/agent-runtime-interface": "workspace:*",
+    "@stagewise/agent-runtime-node": "workspace:*",
+    "@stagewise/agent-tools": "workspace:*",
+    "@stagewise/agent-types": "workspace:*",
+    "@stagewise/api-client": "1.4.0",
     "@stagewise/flappy-game": "workspace:*",
     "@stagewise/karton": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
@@ -48,15 +61,21 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.2.0",
     "@types/three": "^0.180.0",
+    "@types/xml": "^1.0.11",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^4.6.0",
+    "ai": "5.0.9",
     "autoprefixer": "^10.4.21",
     "bowser": "^2.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "commander": "^14.0.0",
     "diff": "^8.0.2",
     "electron": "39.2.1",
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^3.0.5",
+    "ignore": "^6.0.2",
     "lucide-react": "^0.523.0",
     "mermaid": "^11.12.1",
     "ogl": "^1.0.11",
@@ -70,16 +89,18 @@
     "serialize-javascript": "^6.0.2",
     "shiki": "^3.14.0",
     "streamdown": "^1.4.0",
+    "superjson": "2.2.2",
     "tailwind-merge": "^3.2.0",
     "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4.1.5",
     "three": "^0.180.0",
     "typescript": "~4.5.5",
+    "utf-8-validate": "^6.0.5",
     "vite": "7.1.9",
-    "zod": "3.25.76"
+    "winston": "^3.17.0",
+    "ws": "^8.18.3",
+    "xml": "^1.0.1",
+    "zod": "4.1.12"
   },
-  "dependencies": {
-    "electron-squirrel-startup": "^1.0.1",
-    "electron-unhandled": "^5.0.0"
-  }
+  "productName": "stagewise"
 }
