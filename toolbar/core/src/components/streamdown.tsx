@@ -440,7 +440,7 @@ const H1Component = ({
   ExtraProps) => {
   return (
     <h1
-      className={cn('mt-6 mb-2 font-semibold text-lg', className)}
+      className={cn('mt-3 mb-2 font-semibold text-lg', className)}
       data-streamdown="heading-1"
       {...props}
     >
@@ -457,7 +457,7 @@ const H2Component = ({
   ExtraProps) => {
   return (
     <h2
-      className={cn('mt-6 mb-2 font-semibold text-base', className)}
+      className={cn('mt-3 mb-2 font-semibold text-base', className)}
       data-streamdown="heading-2"
       {...props}
     >
@@ -474,7 +474,7 @@ const H3Component = ({
   ExtraProps) => {
   return (
     <h3
-      className={cn('mt-6 mb-2 font-semibold text-[15px]', className)}
+      className={cn('mt-2 mb-1.5 font-semibold text-[15px]', className)}
       data-streamdown="heading-3"
       {...props}
     >
@@ -491,7 +491,7 @@ const H4Component = ({
   ExtraProps) => {
   return (
     <h4
-      className={cn('mt-6 mb-2 font-semibold text-sm', className)}
+      className={cn('mt-2 mb-1.5 font-semibold text-sm', className)}
       data-streamdown="heading-4"
       {...props}
     >
@@ -508,7 +508,7 @@ const H5Component = ({
   ExtraProps) => {
   return (
     <h5
-      className={cn('mt-6 mb-2 font-semibold text-[13px]', className)}
+      className={cn('mt-2 mb-1.5 font-semibold text-[13px]', className)}
       data-streamdown="heading-5"
       {...props}
     >
@@ -525,7 +525,7 @@ const H6Component = ({
   ExtraProps) => {
   return (
     <h6
-      className={cn('mt-6 mb-2 font-semibold text-xs', className)}
+      className={cn('mt-2 mb-1.5 font-semibold text-xs', className)}
       data-streamdown="heading-6"
       {...props}
     >

@@ -81,7 +81,7 @@ function ChatListEntry({
         </div>
         <div className="flex flex-row gap-1">
           <button
-            className="pointer-cursor flex size-8 items-center justify-center rounded-full text-muted-foreground transition-all duration-150 hover:bg-foreground/10 hover:text-rose-600"
+            className="pointer-cursor flex size-8 items-center justify-center rounded-full text-muted-foreground transition-all duration-150 hover:bg-foreground/10 hover:text-foreground"
             type="button"
             onClick={(ev) => {
               ev.stopPropagation();
