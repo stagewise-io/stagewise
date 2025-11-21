@@ -1,19 +1,40 @@
 import type { ToolPart } from '@stagewise/karton-contract';
-import { ToolPartUIBase } from './_shared';
-import { EyeIcon } from 'lucide-react';
+import { ToolPartUIReadOnly } from './_shared';
 import { getTruncatedFileUrl } from '@/utils';
 
 export const ReadFileToolPart = ({
   part,
+  shimmer = false,
 }: {
   part: Extract<ToolPart, { type: 'tool-readFileTool' }>;
+  shimmer?: boolean;
 }) => {
+  const streamingText = part.input?.relative_path
+    ? `Reading ${getTruncatedFileUrl(part.input?.relative_path ?? '')}...`
+    : 'Reading file...';
+
+  const finishedText =
+    part.state === 'output-available' ? (
+      <>
+        <span className="font-semibold">Read </span>
+        <span className="font-normal">
+          {getTruncatedFileUrl(part.input?.relative_path ?? '')}
+        </span>
+        {part.output?.result?.linesRead && (
+          <span className="font-normal">
+            {' '}
+            ({part.output?.result?.linesRead} lines)
+          </span>
+        )}
+      </>
+    ) : undefined;
+
   return (
-    <ToolPartUIBase
+    <ToolPartUIReadOnly
       part={part}
-      toolIcon={<EyeIcon className="size-3" />}
-      toolName={`Reading file...`}
-      toolSubtitle={getTruncatedFileUrl(part.input?.relative_path ?? '')}
+      shimmer={shimmer}
+      streamingText={streamingText}
+      finishedText={finishedText}
     />
   );
 };

@@ -28,6 +28,50 @@ import {
 } from '@/components/ui/code-block';
 import type { BundledLanguage } from 'shiki';
 
+export const ToolPartUIReadOnly = memo(
+  ({
+    streamingText,
+    finishedText,
+    part,
+    shimmer = true,
+  }: {
+    streamingText: string;
+    finishedText: string | React.ReactNode | undefined;
+    part: ToolUIPart;
+    shimmer?: boolean;
+  }) => {
+    // If we have finished text, show it
+    if (part.state === 'output-available') {
+      return (
+        <div className="shrink-0 text-muted-foreground text-xs">
+          {finishedText ?? `Finished reading`}
+        </div>
+      );
+    }
+
+    if (part.state === 'input-streaming' || part.state === 'input-available') {
+      return (
+        <div
+          className={cn(
+            'shrink-0 text-xs',
+            shimmer &&
+              'shimmer-text shimmer-duration-1500 shimmer-from-muted-foreground shimmer-to-zinc-50',
+          )}
+        >
+          {streamingText}
+        </div>
+      );
+    }
+
+    // Otherwise show streaming text with shimmer
+    if (part.state === 'output-error')
+      <div className="flex shrink-0 flex-row items-center gap-1 text-muted-foreground text-xs">
+        <XIcon className="size-3 shrink-0" />
+        {part.errorText ?? 'Error reading'}
+      </div>;
+  },
+);
+
 export const ToolPartUIBase = memo(
   ({
     toolIcon,

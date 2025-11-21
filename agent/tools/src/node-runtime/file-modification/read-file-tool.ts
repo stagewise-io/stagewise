@@ -103,6 +103,7 @@ export async function readFileToolExecute(
     const resultData = {
       content,
       totalLines,
+      linesRead,
     };
 
     // Apply output capping to prevent LLM context bloat

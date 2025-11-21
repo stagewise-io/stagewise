@@ -149,7 +149,7 @@ export const ThinkingPart = ({
         <CollapsibleContent className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%_-_8px),transparent)] scrollbar-hover-only block max-h-32 overflow-y-auto overscroll-y-none pt-1.5 pb-0.5 pl-2.5 text-[0.8rem]">
           <div
             ref={setContentWrapperRef}
-            className="pt-2 pb-1 opacity-60 group-data-[state=streaming]/thinking-part:opacity-90"
+            className="pb-1 opacity-60 group-data-[state=streaming]/thinking-part:opacity-90"
           >
             <Streamdown isAnimating={part.state === 'streaming'}>
               {displayedText}

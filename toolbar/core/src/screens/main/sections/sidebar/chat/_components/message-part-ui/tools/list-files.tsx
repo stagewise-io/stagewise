@@ -1,22 +1,40 @@
 import type { ToolPart } from '@stagewise/karton-contract';
-import { ToolPartUIBase } from './_shared';
-import { ListIcon } from 'lucide-react';
+import { ToolPartUIReadOnly } from './_shared';
 import { getTruncatedFileUrl } from '@/utils';
 
 export const ListFilesToolPart = ({
   part,
+  shimmer = false,
 }: {
   part: Extract<ToolPart, { type: 'tool-listFilesTool' }>;
+  shimmer?: boolean;
 }) => {
+  const streamingText = part.input?.includeDirectories
+    ? 'Listing directories...'
+    : 'Listing files...';
+  const finishedText =
+    part.state === 'output-available' ? (
+      <>
+        <span className="font-semibold">Listed </span>
+        <span className="font-normal">
+          {part.output?.result?.totalFiles}{' '}
+          {part.input?.includeDirectories ? 'directories' : 'files'}
+        </span>
+        {part.input?.relative_path && (
+          <span className="font-normal">
+            {' '}
+            in {getTruncatedFileUrl(part.input.relative_path)}
+          </span>
+        )}
+      </>
+    ) : undefined;
+
   return (
-    <ToolPartUIBase
+    <ToolPartUIReadOnly
       part={part}
-      toolIcon={<ListIcon className="size-3" />}
-      toolName={`Listing ${part.input ? (part.input.includeDirectories ? 'directories' : 'files') : ''}...`}
-      toolSubtitle={
-        part.input?.relative_path &&
-        `Looking in ${getTruncatedFileUrl(part.input.relative_path)}`
-      }
+      shimmer={shimmer}
+      streamingText={streamingText}
+      finishedText={finishedText}
     />
   );
 };

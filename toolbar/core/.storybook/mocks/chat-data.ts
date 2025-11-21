@@ -168,9 +168,78 @@ export function createReadFileToolPart(
       result: {
         content,
         totalLines: content.split('\n').length,
+        linesRead: content.split('\n').length,
         truncated: false,
         originalSize: content.length,
         cappedSize: content.length,
+      },
+    },
+  } as ToolPart;
+}
+
+// Helper to create list files tool part
+export function createListFilesToolPart(
+  relativePath: string,
+  files: Array<{
+    relativePath: string;
+    name: string;
+    type: 'file' | 'directory';
+    size?: number;
+    depth: number;
+  }>,
+  state: 'streaming' | 'complete' = 'complete',
+  options?: {
+    recursive?: boolean;
+    pattern?: string;
+    maxDepth?: number;
+    toolCallId?: string;
+  },
+): ToolPart {
+  const totalFiles = files.filter((f) => f.type === 'file').length;
+  const totalDirectories = files.filter((f) => f.type === 'directory').length;
+
+  if (state === 'streaming') {
+    return {
+      type: 'tool-listFilesTool',
+      toolCallId: options?.toolCallId || generateId(),
+      state: 'input-streaming',
+      input: {
+        relative_path: relativePath,
+        recursive: options?.recursive ?? false,
+        pattern: options?.pattern,
+        maxDepth: options?.maxDepth,
+      },
+    } as ToolPart;
+  }
+
+  // state === 'complete'
+  let message = `Successfully listed ${files.length} items in: ${relativePath}`;
+  if (options?.recursive) {
+    message += ` (recursive${options?.maxDepth !== undefined ? `, max depth ${options.maxDepth}` : ''})`;
+  }
+  if (options?.pattern) {
+    message += ` (filtered by pattern: ${options.pattern})`;
+  }
+  message += ` - ${totalFiles} files, ${totalDirectories} directories`;
+
+  return {
+    type: 'tool-listFilesTool',
+    toolCallId: options?.toolCallId || generateId(),
+    state: 'output-available',
+    input: {
+      relative_path: relativePath,
+      recursive: options?.recursive ?? false,
+      pattern: options?.pattern,
+      maxDepth: options?.maxDepth,
+    },
+    output: {
+      message,
+      result: {
+        files,
+        totalFiles,
+        totalDirectories,
+        truncated: false,
+        itemsRemoved: 0,
       },
     },
   } as ToolPart;
@@ -233,6 +302,120 @@ export function createMultiEditToolPart(
           after: newContent,
         },
         undoExecute: null,
+      },
+    },
+  } as ToolPart;
+}
+
+// Helper to create grep search tool part
+export function createGrepSearchToolPart(
+  query: string,
+  totalMatches: number,
+  state: 'streaming' | 'complete' | 'error' = 'complete',
+  options?: {
+    caseSensitive?: boolean;
+  },
+): ToolPart {
+  if (state === 'streaming') {
+    return {
+      type: 'tool-grepSearchTool',
+      toolCallId: generateId(),
+      state: 'input-streaming',
+      input: {
+        query,
+        max_matches: 100,
+        explanation: 'Searching for pattern',
+        case_sensitive: options?.caseSensitive ?? false,
+      },
+    } as ToolPart;
+  }
+
+  if (state === 'error') {
+    return {
+      type: 'tool-grepSearchTool',
+      toolCallId: generateId(),
+      state: 'output-error',
+      input: {
+        query,
+        max_matches: 100,
+        explanation: 'Searching for pattern',
+        case_sensitive: options?.caseSensitive ?? false,
+      },
+      errorText: 'Search failed: Invalid pattern',
+    } as ToolPart;
+  }
+
+  // state === 'complete'
+  return {
+    type: 'tool-grepSearchTool',
+    toolCallId: generateId(),
+    state: 'output-available',
+    input: {
+      query,
+      max_matches: 100,
+      explanation: 'Searching for pattern',
+      case_sensitive: options?.caseSensitive ?? false,
+    },
+    output: {
+      message: `Found ${totalMatches} matches for "${query}"`,
+      result: {
+        totalMatches,
+        matches: [],
+      },
+    },
+  } as ToolPart;
+}
+
+// Helper to create glob tool part
+export function createGlobToolPart(
+  pattern: string,
+  totalMatches: number,
+  state: 'streaming' | 'complete' | 'error' = 'complete',
+  options?: {
+    relativePath?: string;
+  },
+): ToolPart {
+  if (state === 'streaming') {
+    return {
+      type: 'tool-globTool',
+      toolCallId: generateId(),
+      state: 'input-streaming',
+      input: {
+        pattern,
+        relative_path: options?.relativePath,
+      },
+    } as ToolPart;
+  }
+
+  if (state === 'error') {
+    return {
+      type: 'tool-globTool',
+      toolCallId: generateId(),
+      state: 'output-error',
+      input: {
+        pattern,
+        relative_path: options?.relativePath,
+      },
+      errorText: 'Search failed: Invalid glob pattern',
+    } as ToolPart;
+  }
+
+  // state === 'complete'
+  return {
+    type: 'tool-globTool',
+    toolCallId: generateId(),
+    state: 'output-available',
+    input: {
+      pattern,
+      relative_path: options?.relativePath,
+    },
+    output: {
+      message: `Found ${totalMatches} files matching "${pattern}"`,
+      result: {
+        totalMatches,
+        relativePaths: [],
+        truncated: false,
+        itemsRemoved: 0,
       },
     },
   } as ToolPart;

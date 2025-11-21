@@ -39,6 +39,11 @@ import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
 import { OverwriteFileToolPart } from './message-part-ui/tools/overwrite-file';
 import { ReadFileToolPart } from './message-part-ui/tools/read-file';
 import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
+import {
+  ExploringToolParts,
+  isReadOnlyToolPart,
+  type ReadOnlyToolPart,
+} from './message-part-ui/tools/exploring';
 
 function isToolPart(part: UIMessagePart): part is ToolPart {
   return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
@@ -198,8 +203,39 @@ export function ChatBubble({
             )}
           >
             {(() => {
+              // Merge read-only tools into the previous tool part
+              const parts = msg.parts.reduce(
+                (acc, part) => {
+                  // Skip step-start parts, they don't contain information we need to render and break the ReadOnly-Part detection logic
+                  if (part.type === 'step-start') return acc;
+                  // Forward everything except read-only tools
+                  if (!isToolPart(part) || !isReadOnlyToolPart(part))
+                    acc.push(part);
+
+                  const previousPart = acc[acc.length - 1];
+                  // Merge read-only tools into the previous tool-part-array if one already exists
+                  if (
+                    isToolPart(part) &&
+                    isReadOnlyToolPart(part) &&
+                    Array.isArray(previousPart)
+                  ) {
+                    previousPart.push(part);
+                  }
+                  // Turn read-only tools into an array of parts if no previous tool-part-array exists
+                  else if (isToolPart(part) && isReadOnlyToolPart(part))
+                    acc.push([part]);
+
+                  return acc;
+                },
+                [] as (UIMessagePart | ReadOnlyToolPart[])[],
+              );
+
               const typeCounters: Record<string, number> = {};
-              return msg.parts.map((part, index) => {
+
+              return parts.map((part, index) => {
+                if (Array.isArray(part))
+                  return <ExploringToolParts parts={part} />;
+
                 const currentTypeIndex = typeCounters[part.type] ?? 0;
                 typeCounters[part.type] = currentTypeIndex + 1;
                 const stableKey = `${msg.id}:${part.type}:${currentTypeIndex}`;
@@ -228,7 +264,7 @@ export function ChatBubble({
                         key={stableKey}
                         thinkingDuration={msg.metadata?.thinkingDuration}
                         part={part as ReasoningUIPart}
-                        isLastPart={index === msg.parts.length - 1}
+                        isLastPart={index === parts.length - 1}
                       />
                     );
                   case 'file':
@@ -237,18 +273,19 @@ export function ChatBubble({
                     );
                   case 'tool-deleteFileTool':
                     return <DeleteFileToolPart key={stableKey} part={part} />;
-                  case 'tool-globTool':
-                    return <GlobToolPart key={stableKey} part={part} />;
-                  case 'tool-grepSearchTool':
-                    return <GrepSearchToolPart key={stableKey} part={part} />;
-                  case 'tool-listFilesTool':
-                    return <ListFilesToolPart key={stableKey} part={part} />;
                   case 'tool-multiEditTool':
                     return <MultiEditToolPart key={stableKey} part={part} />;
                   case 'tool-overwriteFileTool':
                     return (
                       <OverwriteFileToolPart key={stableKey} part={part} />
                     );
+                  // Read-only tools
+                  case 'tool-globTool':
+                    return <GlobToolPart key={stableKey} part={part} />;
+                  case 'tool-grepSearchTool':
+                    return <GrepSearchToolPart key={stableKey} part={part} />;
+                  case 'tool-listFilesTool':
+                    return <ListFilesToolPart key={stableKey} part={part} />;
                   case 'tool-readFileTool':
                     return <ReadFileToolPart key={stableKey} part={part} />;
                   default:
@@ -256,6 +293,7 @@ export function ChatBubble({
                 }
               });
             })()}
+
             {(fileAttachments.length > 0 ||
               selectedPreviewElements.length > 0) && (
               <div className="flex flex-row flex-wrap gap-2 pt-2">
