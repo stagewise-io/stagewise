@@ -36,7 +36,7 @@ describe('grep - Node.js Fallback', () => {
     it('should use Node.js fallback when ripgrep returns null', async () => {
       createFile(testDir, 'test.txt', 'Hello World\n');
 
-      const result = await fileSystem.grep('.', 'World');
+      const result = await fileSystem.grep('World');
 
       // Should succeed using fallback
       expectGrepSuccess(result);
@@ -46,7 +46,7 @@ describe('grep - Node.js Fallback', () => {
     it('should produce same output structure as ripgrep', async () => {
       createFile(testDir, 'test.txt', 'Line 1 MATCH\nLine 2\n');
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       expectGrepSuccess(result);
       expect(result).toHaveProperty('matches');
@@ -67,7 +67,7 @@ describe('grep - Node.js Fallback', () => {
     it('should handle case insensitive search by default', async () => {
       createFile(testDir, 'test.txt', 'Hello WORLD\nHello world\n');
 
-      const result = await fileSystem.grep('.', 'world');
+      const result = await fileSystem.grep('world');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 2);
@@ -76,7 +76,7 @@ describe('grep - Node.js Fallback', () => {
     it('should handle case sensitive search', async () => {
       createFile(testDir, 'test.txt', 'Hello WORLD\nHello world\n');
 
-      const result = await fileSystem.grep('.', 'world', {
+      const result = await fileSystem.grep('world', {
         caseSensitive: true,
       });
 
@@ -90,7 +90,7 @@ describe('grep - Node.js Fallback', () => {
       createFile(testDir, 'text.txt', 'This is text content');
       createBinaryFile(testDir, 'binary.bin', 1024);
 
-      const result = await fileSystem.grep('.', 'text', {
+      const result = await fileSystem.grep('text', {
         recursive: true,
       });
 
@@ -106,7 +106,7 @@ describe('grep - Node.js Fallback', () => {
       const content = '\x00binary content here';
       createFile(testDir, 'binary.dat', content);
 
-      const result = await fileSystem.grep('.', 'content');
+      const result = await fileSystem.grep('content');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 0); // Binary file skipped
@@ -115,7 +115,7 @@ describe('grep - Node.js Fallback', () => {
     it('should search binary files when explicitly requested', async () => {
       createBinaryFile(testDir, 'binary.bin', 1024);
 
-      const result = await fileSystem.grep('.', 'x', {});
+      const result = await fileSystem.grep('x', {});
 
       // Should attempt to search (may or may not find matches depending on binary content)
       expect(result.success).toBeDefined();
@@ -126,7 +126,7 @@ describe('grep - Node.js Fallback', () => {
       const content = 'x'.repeat(9000) + '\x00MATCH';
       createFile(testDir, 'file.txt', content);
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       // Should be treated as text since NUL is beyond 8KB window
       expectGrepSuccess(result);
@@ -144,7 +144,7 @@ describe('grep - Node.js Fallback', () => {
       }
       createFile(testDir, 'large.txt', lines.join('\n'));
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       expectGrepSuccess(result);
       // Should be truncated - not all 10000 matches returned
@@ -162,7 +162,7 @@ describe('grep - Node.js Fallback', () => {
         );
       }
 
-      const result = await fileSystem.grep('.', 'MATCH', {
+      const result = await fileSystem.grep('MATCH', {
         recursive: true,
       });
 
@@ -175,7 +175,7 @@ describe('grep - Node.js Fallback', () => {
     it('should respect maxMatches option', async () => {
       createFile(testDir, 'test.txt', 'MATCH\n'.repeat(100));
 
-      const result = await fileSystem.grep('.', 'MATCH', {
+      const result = await fileSystem.grep('MATCH', {
         maxMatches: 10,
       });
 
@@ -193,7 +193,7 @@ describe('grep - Node.js Fallback', () => {
       lines[9] = 'Line 10 MATCH'; // 10th line (index 9)
       createFile(testDir, 'test.txt', lines.join('\n'));
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       expectGrepSuccess(result);
       const match = result.matches?.[0];
@@ -217,7 +217,7 @@ describe('grep - Node.js Fallback', () => {
       ];
       createFile(testDir, 'test.txt', lines.join('\n'));
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       expectGrepSuccess(result);
       const match = result.matches?.[0];
@@ -240,7 +240,7 @@ describe('grep - Node.js Fallback', () => {
       ];
       createFile(testDir, 'test.txt', lines.join('\n'));
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       expectGrepSuccess(result);
       const match = result.matches?.[0];
@@ -256,7 +256,7 @@ describe('grep - Node.js Fallback', () => {
       const lines = ['Line 1', 'Line 2 MATCH', 'Line 3'];
       createFile(testDir, 'test.txt', lines.join('\n'));
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       expectGrepSuccess(result);
       const match = result.matches?.[0];
@@ -274,7 +274,7 @@ describe('grep - Node.js Fallback', () => {
     it('should find all matches in a line', async () => {
       createFile(testDir, 'test.txt', 'ERROR ERROR ERROR\n');
 
-      const result = await fileSystem.grep('.', 'ERROR');
+      const result = await fileSystem.grep('ERROR');
 
       expectGrepSuccess(result);
       expect(result.totalMatches).toBeGreaterThanOrEqual(3);
@@ -283,7 +283,7 @@ describe('grep - Node.js Fallback', () => {
     it('should report correct column for each match', async () => {
       createFile(testDir, 'test.txt', 'ab ERROR cd ERROR ef\n');
 
-      const result = await fileSystem.grep('.', 'ERROR');
+      const result = await fileSystem.grep('ERROR');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 2);
@@ -307,7 +307,7 @@ describe('grep - Node.js Fallback', () => {
     });
 
     it('should search recursively when enabled', async () => {
-      const result = await fileSystem.grep('.', 'MATCH', {
+      const result = await fileSystem.grep('MATCH', {
         recursive: true,
       });
 
@@ -316,7 +316,7 @@ describe('grep - Node.js Fallback', () => {
     });
 
     it('should respect maxDepth option', async () => {
-      const result = await fileSystem.grep('.', 'MATCH', {
+      const result = await fileSystem.grep('MATCH', {
         recursive: true,
         maxDepth: 1,
       });
@@ -328,7 +328,7 @@ describe('grep - Node.js Fallback', () => {
     });
 
     it('should filter by filePattern', async () => {
-      const result = await fileSystem.grep('.', 'MATCH', {
+      const result = await fileSystem.grep('MATCH', {
         recursive: true,
         filePattern: '*.ts',
       });
@@ -339,7 +339,7 @@ describe('grep - Node.js Fallback', () => {
     });
 
     it('should respect excludePatterns', async () => {
-      const result = await fileSystem.grep('.', 'MATCH', {
+      const result = await fileSystem.grep('MATCH', {
         recursive: true,
         excludePatterns: ['**/lib/**'],
       });
@@ -354,14 +354,16 @@ describe('grep - Node.js Fallback', () => {
     it('should handle invalid regex patterns', async () => {
       createFile(testDir, 'test.txt', 'test content');
 
-      const result = await fileSystem.grep('.', '(invalid');
+      const result = await fileSystem.grep('(invalid');
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
     });
 
     it('should handle non-existent directory gracefully', async () => {
-      const result = await fileSystem.grep('nonexistent', 'test');
+      const result = await fileSystem.grep('test', {
+        filePattern: 'nonexistent/**',
+      });
 
       // Should handle gracefully (either error or empty results)
       expect(result.success).toBeDefined();
@@ -372,7 +374,7 @@ describe('grep - Node.js Fallback', () => {
       // Just document the behavior
       createFile(testDir, 'readable.txt', 'MATCH');
 
-      const result = await fileSystem.grep('.', 'MATCH', {
+      const result = await fileSystem.grep('MATCH', {
         recursive: true,
       });
 
@@ -385,7 +387,7 @@ describe('grep - Node.js Fallback', () => {
     it('should handle empty files', async () => {
       createFile(testDir, 'empty.txt', '');
 
-      const result = await fileSystem.grep('.', 'test');
+      const result = await fileSystem.grep('test');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 0);
@@ -394,7 +396,7 @@ describe('grep - Node.js Fallback', () => {
     it('should handle files with only empty lines', async () => {
       createFile(testDir, 'empty-lines.txt', '\n\n\n\n');
 
-      const result = await fileSystem.grep('.', 'test');
+      const result = await fileSystem.grep('test');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 0);
@@ -404,7 +406,7 @@ describe('grep - Node.js Fallback', () => {
       const longLine = 'x'.repeat(50000) + 'MATCH' + 'y'.repeat(50000);
       createFile(testDir, 'long.txt', longLine);
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 1);
@@ -413,7 +415,7 @@ describe('grep - Node.js Fallback', () => {
     it('should handle files with unicode content', async () => {
       createFile(testDir, 'unicode.txt', 'Hello 世界 MATCH 🚀\n');
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 1);

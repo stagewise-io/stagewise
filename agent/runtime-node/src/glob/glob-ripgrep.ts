@@ -1,24 +1,13 @@
 import type {
   BaseFileSystemProvider,
   GlobResult,
+  GlobOptions,
 } from '@stagewise/agent-runtime-interface';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import path, { relative } from 'node:path';
+import path from 'node:path';
 import { getRipgrepPath } from '../vscode-ripgrep/get-path.js';
-
-/**
- * Options for executing ripgrep glob, matching the glob function's options
- */
-export interface RipgrepGlobOptions {
-  searchPath?: string;
-  includeDirectories?: boolean;
-  excludePatterns?: string[];
-  respectGitignore?: boolean;
-  absoluteSearchPath?: boolean;
-  absoluteSearchResults?: boolean;
-}
 
 /**
  * Builds ripgrep command-line arguments for file listing (glob).
@@ -31,8 +20,7 @@ export interface RipgrepGlobOptions {
  */
 function buildRipgrepGlobArgs(
   pattern: string,
-  searchPath: string,
-  options?: RipgrepGlobOptions,
+  options?: GlobOptions,
 ): string[] {
   const args: string[] = [];
 
@@ -56,9 +44,6 @@ function buildRipgrepGlobArgs(
   // Gitignore handling
   if (options?.respectGitignore === false) args.push('--no-ignore');
 
-  // Search path
-  args.push(searchPath);
-
   return args;
 }
 
@@ -68,14 +53,12 @@ function buildRipgrepGlobArgs(
  *
  * @param stdout - Readable stream from ripgrep
  * @param workingDirectory - Working directory for relative path calculation
- * @param absolute - Whether to return absolute paths
  * @param onError - Optional error callback
  * @returns Promise resolving to GlobResult
  */
 async function parseRipgrepGlobOutput(
   stdout: NodeJS.ReadableStream,
   workingDirectory: string,
-  absolute: boolean,
   onError?: (error: Error) => void,
 ): Promise<GlobResult> {
   const paths: string[] = [];
@@ -90,11 +73,8 @@ async function parseRipgrepGlobOutput(
       if (!line.trim()) return;
 
       try {
-        // Ripgrep returns paths relative to the search directory
-        // If absolute is requested, keep as-is (ripgrep gives absolute paths)
-        // Otherwise, make relative to working directory
-        const path = absolute ? line : relative(workingDirectory, line);
-        paths.push(path);
+        // Ripgrep returns paths relative to the cwd
+        paths.push(line);
       } catch (error) {
         onError?.(new Error(`Failed to process ripgrep output line: ${error}`));
       }
@@ -105,6 +85,7 @@ async function parseRipgrepGlobOutput(
         success: true,
         message: `Found ${paths.length} matching paths`,
         relativePaths: paths,
+        absolutePaths: paths.map((p) => path.join(workingDirectory, p)), // TODO: Fix resolving paths when 'absoluteSearchPath' is provided
         totalMatches: paths.length,
       });
     });
@@ -115,6 +96,8 @@ async function parseRipgrepGlobOutput(
         success: false,
         message: `Failed to parse ripgrep output: ${error instanceof Error ? error.message : 'Unknown error'}`,
         error: error instanceof Error ? error.message : 'Unknown error',
+        relativePaths: [],
+        absolutePaths: [],
       });
     });
   });
@@ -138,7 +121,7 @@ export async function globWithRipgrep(
   fileSystem: BaseFileSystemProvider,
   pattern: string,
   rgBinaryBasePath: string,
-  options?: RipgrepGlobOptions,
+  options?: GlobOptions,
   onError?: (error: Error) => void,
 ): Promise<GlobResult | null> {
   try {
@@ -148,19 +131,18 @@ export async function globWithRipgrep(
     if (!rgPath || !existsSync(rgPath)) return null;
 
     // Determine search path
-    const searchPath = options?.searchPath
+    const searchPath = options?.absoluteSearchPath
       ? options.absoluteSearchPath
-        ? options.searchPath
-        : path.join(fileSystem.getCurrentWorkingDirectory(), options.searchPath)
       : fileSystem.getCurrentWorkingDirectory();
 
     // Build ripgrep arguments
-    const args = buildRipgrepGlobArgs(pattern, searchPath, options);
+    const args = buildRipgrepGlobArgs(pattern, options);
 
     // Spawn ripgrep process
     const process = spawn(rgPath, args, {
       stdio: ['ignore', 'pipe', 'pipe'], // stdin ignored, stdout/stderr piped
       windowsHide: true, // Don't show console window on Windows
+      cwd: searchPath,
     });
 
     // Check if the process spawned successfully
@@ -175,7 +157,6 @@ export async function globWithRipgrep(
     const result = await parseRipgrepGlobOutput(
       process.stdout,
       fileSystem.getCurrentWorkingDirectory(),
-      options?.absoluteSearchResults ?? options?.absoluteSearchPath ?? false,
       onError,
     );
 

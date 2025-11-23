@@ -95,9 +95,7 @@ const getPackagesInPath = async (
   rootPath: string,
 ): Promise<Package[]> => {
   const allPackageJsons = await clientRuntime.fileSystem.glob('package.json', {
-    searchPath: rootPath,
-    absoluteSearchPath: true,
-    absoluteSearchResults: true,
+    absoluteSearchPath: rootPath,
     excludePatterns: [
       '**/test/',
       '**/tests/',
@@ -112,10 +110,10 @@ const getPackagesInPath = async (
   });
 
   const packages: Package[] = (
-    allPackageJsons.relativePaths
+    allPackageJsons.absolutePaths
       ? (
           await Promise.all(
-            allPackageJsons.relativePaths.map(async (path) => {
+            allPackageJsons.absolutePaths.map(async (path) => {
               try {
                 const packageJson = await readFile(path, 'utf-8');
                 const parsed = packageJsonSchema.parse(JSON.parse(packageJson));

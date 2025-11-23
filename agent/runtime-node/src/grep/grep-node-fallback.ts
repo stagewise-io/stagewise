@@ -3,28 +3,16 @@ import type {
   BaseFileSystemProvider,
   GrepMatch,
   GrepResult,
+  GrepOptions,
 } from '@stagewise/agent-runtime-interface';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import nodeProcess from 'node:process';
 import { minimatch } from 'minimatch';
 
 export async function grepNodeFallback(
   fileSystem: BaseFileSystemProvider,
-  searchPath: string,
   pattern: string,
-  options?: {
-    recursive?: boolean;
-    maxDepth?: number;
-    filePattern?: string;
-    caseSensitive?: boolean;
-    maxMatches?: number;
-    excludePatterns?: string[];
-    respectGitignore?: boolean;
-    searchBinaryFiles?: boolean;
-    absoluteSearchPath?: boolean;
-    absoluteSearchResults?: boolean;
-  },
+  options?: GrepOptions,
 ): Promise<GrepResult> {
   // Fallback to Node.js implementation if ripgrep is unavailable or failed
   try {
@@ -32,10 +20,10 @@ export async function grepNodeFallback(
     const matches: GrepMatch[] = [];
     let filesSearched = 0;
     let totalOutputSize = 0;
-    const basePath = options?.absoluteSearchPath
-      ? path.resolve(path.parse(nodeProcess.cwd()).root, searchPath)
-      : fileSystem.resolvePath(searchPath);
     const MAX_OUTPUT_SIZE = 1 * 1024 * 1024; // 1MB limit for total output
+    // Use absoluteSearchPath if provided, otherwise use current working directory
+    const basePath =
+      options?.absoluteSearchPath ?? fileSystem.getCurrentWorkingDirectory();
 
     const searchFile = async (filePath: string) => {
       if (options?.maxMatches && matches.length >= options.maxMatches) return;
@@ -45,24 +33,22 @@ export async function grepNodeFallback(
 
       try {
         // Check for binary files unless explicitly told to search them
-        if (!options?.searchBinaryFiles) {
-          // Read a small buffer to check for NUL bytes (following ripgrep's approach)
-          const stats = await fs.stat(filePath);
-          const bytesToRead = Math.min(
-            stats.size,
-            BINARY_DETECTION.CHECK_BUFFER_SIZE,
-          );
+        // Read a small buffer to check for NUL bytes (following ripgrep's approach)
+        const stats = await fs.stat(filePath);
+        const bytesToRead = Math.min(
+          stats.size,
+          BINARY_DETECTION.CHECK_BUFFER_SIZE,
+        );
 
-          if (bytesToRead > 0) {
-            const fileHandle = await fs.open(filePath, 'r');
-            try {
-              const buffer = Buffer.alloc(bytesToRead);
-              await fileHandle.read(buffer, 0, bytesToRead, 0);
-              // Check for NUL bytes (0x00) which indicate binary content
-              if (buffer.includes(0x00)) return;
-            } finally {
-              await fileHandle.close();
-            }
+        if (bytesToRead > 0) {
+          const fileHandle = await fs.open(filePath, 'r');
+          try {
+            const buffer = Buffer.alloc(bytesToRead);
+            await fileHandle.read(buffer, 0, bytesToRead, 0);
+            // Check for NUL bytes (0x00) which indicate binary content
+            if (buffer.includes(0x00)) return;
+          } finally {
+            await fileHandle.close();
           }
         }
 
@@ -94,13 +80,8 @@ export async function grepNodeFallback(
             // The total output size is still limited by MAX_OUTPUT_SIZE check below
 
             const matchEntry: GrepMatch = {
-              relativePath:
-                options?.absoluteSearchResults || options?.absoluteSearchPath
-                  ? filePath
-                  : path.relative(
-                      fileSystem.getCurrentWorkingDirectory(),
-                      filePath,
-                    ),
+              relativePath: path.relative(basePath, filePath),
+              absolutePath: filePath,
               line: i + 1,
               column: match.index + 1,
               match: match[0],
@@ -158,7 +139,7 @@ export async function grepNodeFallback(
       }
     };
 
-    if (await fileSystem.isDirectory(searchPath))
+    if (await fileSystem.isDirectory(basePath))
       await searchDirectory(basePath, 0);
     else await searchFile(basePath);
 

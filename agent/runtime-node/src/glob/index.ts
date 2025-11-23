@@ -1,6 +1,7 @@
 import type {
   BaseFileSystemProvider,
   GlobResult,
+  GlobOptions,
 } from '@stagewise/agent-runtime-interface';
 import { globWithRipgrep } from './glob-ripgrep.js';
 import { globNodeFallback } from './glob-node-fallback.js';
@@ -9,14 +10,7 @@ export async function glob(
   fileSystem: BaseFileSystemProvider,
   pattern: string,
   rgBinaryBasePath: string,
-  options?: {
-    searchPath?: string;
-    includeDirectories?: boolean;
-    excludePatterns?: string[];
-    respectGitignore?: boolean;
-    absoluteSearchPath?: boolean;
-    absoluteSearchResults?: boolean;
-  },
+  options?: GlobOptions,
 ): Promise<GlobResult> {
   const ripgrepResult = await globWithRipgrep(
     fileSystem,

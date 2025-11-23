@@ -54,7 +54,6 @@ describe('grep with ripgrep', () => {
 
     const result = await grepWithRipgrep(
       fileSystem,
-      '.',
       'MATCH',
       rgBinaryBasePath,
     );

@@ -367,11 +367,8 @@ const searchForChildWorkspacePaths = async (
   workspacePath: string,
 ): Promise<string[]> => {
   // Search for files called "stagewise.json" inside the cwd
-
   const result = await clientRuntime.fileSystem.glob('stagewise.json', {
-    searchPath: workspacePath,
-    absoluteSearchPath: true,
-    absoluteSearchResults: true,
+    absoluteSearchPath: workspacePath,
     respectGitignore: true,
     excludePatterns: [
       '**/node_modules/',
@@ -382,7 +379,7 @@ const searchForChildWorkspacePaths = async (
     ],
   });
 
-  const paths = result.relativePaths?.map((res) => path.dirname(res)) ?? [];
+  const paths = result.absolutePaths.map((res) => path.dirname(res)) ?? [];
 
   return paths;
 };

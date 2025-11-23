@@ -2,29 +2,20 @@ import { promises as fs, type Dirent } from 'node:fs';
 import path, { join } from 'node:path';
 import type {
   BaseFileSystemProvider,
+  GlobOptions,
   GlobResult,
 } from '@stagewise/agent-runtime-interface';
 import { makeRe as makeGlobRe, minimatch } from 'minimatch';
-import nodeProcess from 'node:process';
 
 export async function globNodeFallback(
   pattern: string,
   fileSystem: BaseFileSystemProvider,
-  options?: {
-    searchPath?: string;
-    includeDirectories?: boolean;
-    excludePatterns?: string[];
-    respectGitignore?: boolean;
-    absoluteSearchPath?: boolean;
-    absoluteSearchResults?: boolean;
-  },
+  options?: GlobOptions,
 ): Promise<GlobResult> {
   try {
     const paths: string[] = [];
-    const basePath = options?.searchPath
+    const basePath = options?.absoluteSearchPath
       ? options.absoluteSearchPath
-        ? path.resolve(path.parse(nodeProcess.cwd()).root, options.searchPath)
-        : path.join(fileSystem.getCurrentWorkingDirectory(), options.searchPath)
       : fileSystem.getCurrentWorkingDirectory();
 
     const excludeRes = (options?.excludePatterns ?? []).map((p) =>
@@ -65,16 +56,10 @@ export async function globNodeFallback(
           // Always match against relative path for pattern matching
           const matches = minimatch(rel, pattern);
 
-          if (
-            matches &&
-            (dirent.isFile() ||
-              (options?.includeDirectories && dirent.isDirectory()))
-          ) {
+          // Only return files, not directories (matching ripgrep's behavior)
+          if (matches && dirent.isFile()) {
             // Only convert to absolute path for the results if requested
-            const resultPath =
-              options?.absoluteSearchResults || options?.absoluteSearchPath
-                ? full
-                : rel;
+            const resultPath = options?.absoluteSearchPath ? full : rel;
             paths.push(resultPath);
           }
 
@@ -90,6 +75,7 @@ export async function globNodeFallback(
       success: true,
       message: `Found ${paths.length} matching paths`,
       relativePaths: paths,
+      absolutePaths: paths.map((p) => fileSystem.resolvePath(p)),
       totalMatches: paths.length,
     };
   } catch (error) {
@@ -97,6 +83,8 @@ export async function globNodeFallback(
       success: false,
       message: `Failed to glob: ${error instanceof Error ? error.message : 'Unknown error'}`,
       error: error instanceof Error ? error.message : 'Unknown error',
+      relativePaths: [],
+      absolutePaths: [],
     };
   }
 }

@@ -9,8 +9,10 @@ export {
   type DirectoryEntry,
   type DirectoryListResult,
   type GrepMatch,
+  type GrepOptions,
   type GrepResult,
   type GlobResult,
+  type GlobOptions,
   type SearchReplaceMatch,
   type SearchReplaceResult,
 } from './file-operations.js';

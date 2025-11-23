@@ -5,9 +5,10 @@ import type {
   GrepMatch,
   GrepResult,
   BaseFileSystemProvider,
+  GrepOptions,
 } from '@stagewise/agent-runtime-interface';
 import { createInterface } from 'node:readline';
-import { relative } from 'node:path';
+import path, { relative } from 'node:path';
 import { getRipgrepPath } from '../vscode-ripgrep/get-path.js';
 
 /**
@@ -17,12 +18,12 @@ export interface RipgrepGrepOptions {
   recursive?: boolean;
   maxDepth?: number;
   filePattern?: string;
+  absoluteSearchPath?: string;
   caseSensitive?: boolean;
   maxMatches?: number;
   excludePatterns?: string[];
   respectGitignore?: boolean;
   searchBinaryFiles?: boolean;
-  absoluteSearchPath?: boolean;
   absoluteSearchResults?: boolean;
 }
 
@@ -214,6 +215,7 @@ async function parseRipgrepGrepOutput(
           for (const submatch of matchData.submatches) {
             matches.push({
               relativePath: relative(workingDirectory, matchData.path.text),
+              absolutePath: path.join(workingDirectory, matchData.path.text),
               line: matchData.line_number,
               column: submatch.start + 1, // Convert 0-based to 1-based
               match: submatch.match.text,
@@ -271,21 +273,9 @@ async function parseRipgrepGrepOutput(
  */
 export async function grepWithRipgrep(
   fileSystem: BaseFileSystemProvider,
-  searchPath: string,
   pattern: string,
   rgBinaryBasePath: string,
-  options?: {
-    recursive?: boolean;
-    maxDepth?: number;
-    filePattern?: string;
-    caseSensitive?: boolean;
-    maxMatches?: number;
-    excludePatterns?: string[];
-    respectGitignore?: boolean;
-    searchBinaryFiles?: boolean;
-    absoluteSearchPath?: boolean;
-    absoluteSearchResults?: boolean;
-  },
+  options?: GrepOptions,
   onError?: (error: Error) => void,
 ): Promise<GrepResult | null> {
   try {
@@ -294,15 +284,18 @@ export async function grepWithRipgrep(
     // Check if ripgrep executable exists
     if (!rgPath || !existsSync(rgPath)) return null;
 
-    const resolvedSearchPath = fileSystem.resolvePath(searchPath);
+    // Use absoluteSearchPath if provided, otherwise use current working directory
+    const searchPath =
+      options?.absoluteSearchPath ?? fileSystem.getCurrentWorkingDirectory();
 
     // Build ripgrep arguments
-    const args = buildRipgrepGrepArgs(pattern, resolvedSearchPath, options);
+    const args = buildRipgrepGrepArgs(pattern, searchPath, options);
 
     // Spawn ripgrep process
     const process = spawn(rgPath, args, {
       stdio: ['ignore', 'pipe', 'pipe'], // stdin ignored, stdout/stderr piped
       windowsHide: true, // Don't show console window on Windows
+      cwd: fileSystem.getCurrentWorkingDirectory(), // Use current working directory for relative path calculation
     });
 
     // Check if the process spawned successfully
@@ -313,10 +306,10 @@ export async function grepWithRipgrep(
       onError?.(new Error(`Ripgrep process error: ${error}`));
     });
 
-    // Parse the output
+    // Parse the output (use searchPath for relative path calculation)
     const result = await parseRipgrepGrepOutput(
       process.stdout,
-      fileSystem.getCurrentWorkingDirectory(),
+      searchPath,
       onError,
     );
 

@@ -87,19 +87,15 @@ export async function grepSearchToolExecute(
       : undefined;
 
     // Perform the grep search with max matches limit
-    const grepResult = await clientRuntime.fileSystem.grep(
-      '.', // Search in the current working directory
-      query,
-      {
-        recursive: true, // Always search recursively
-        caseSensitive: case_sensitive,
-        filePattern: include_file_pattern,
-        excludePatterns: excludePatterns,
-        maxDepth: undefined, // No depth limit
-        respectGitignore: true, // Respect .gitignore by default
-        maxMatches: max_matches,
-      },
-    );
+    const grepResult = await clientRuntime.fileSystem.grep(query, {
+      recursive: true, // Always search recursively
+      caseSensitive: case_sensitive,
+      filePattern: include_file_pattern,
+      excludePatterns: excludePatterns,
+      maxDepth: undefined, // No depth limit
+      respectGitignore: true, // Respect .gitignore by default
+      maxMatches: max_matches,
+    });
 
     if (!grepResult.success)
       throw new Error(

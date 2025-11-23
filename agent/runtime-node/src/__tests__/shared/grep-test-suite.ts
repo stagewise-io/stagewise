@@ -30,7 +30,7 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'Hello World\nGoodbye World\n');
 
-      const result = await fileSystem.grep('.', 'World', {
+      const result = await fileSystem.grep('World', {
         recursive: false,
       });
 
@@ -44,12 +44,12 @@ export function runGrepTestSuite(
       createFile(testDir, 'test.txt', 'Hello WORLD\nHello world\n');
 
       // Case insensitive (default)
-      const resultInsensitive = await fileSystem.grep('.', 'world', {});
+      const resultInsensitive = await fileSystem.grep('world', {});
       expectGrepSuccess(resultInsensitive);
       expectGrepMatchCount(resultInsensitive, 2);
 
       // Case sensitive
-      const resultSensitive = await fileSystem.grep('.', 'world', {
+      const resultSensitive = await fileSystem.grep('world', {
         caseSensitive: true,
       });
       expectGrepSuccess(resultSensitive);
@@ -66,7 +66,7 @@ export function runGrepTestSuite(
       );
 
       // Match function declarations
-      const result = await fileSystem.grep('.', '^function\\s+\\w+');
+      const result = await fileSystem.grep('^function\\s+\\w+');
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 1);
       if (result.matches?.[0]) {
@@ -84,12 +84,12 @@ export function runGrepTestSuite(
       );
 
       // Start of line anchor
-      const startResult = await fileSystem.grep('.', '^start');
+      const startResult = await fileSystem.grep('^start');
       expectGrepSuccess(startResult);
       expectGrepMatchCount(startResult, 1);
 
       // End of line anchor
-      const endResult = await fileSystem.grep('.', 'end\\$');
+      const endResult = await fileSystem.grep('end\\$');
       expectGrepSuccess(endResult);
       expectGrepMatchCount(endResult, 1);
     });
@@ -100,7 +100,7 @@ export function runGrepTestSuite(
       createFile(testDir, 'test.txt', 'abc\ndef\nghi\n123\n');
 
       // Match lines with digits
-      const result = await fileSystem.grep('.', '\\d+');
+      const result = await fileSystem.grep('\\d+');
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 1);
     });
@@ -111,7 +111,7 @@ export function runGrepTestSuite(
       createFile(testDir, 'test.txt', 'a\naa\naaa\naaaa\n');
 
       // Match 2 or more a's
-      const result = await fileSystem.grep('.', 'a{2,}');
+      const result = await fileSystem.grep('a{2,}');
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 3);
     });
@@ -121,7 +121,7 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'Hello 世界\nこんにちは\n🚀 Rocket\n');
 
-      const result = await fileSystem.grep('.', '世界');
+      const result = await fileSystem.grep('世界');
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 1);
     });
@@ -132,7 +132,7 @@ export function runGrepTestSuite(
       createFile(testDir, 'test.txt', 'hello\nhello world\nothello\n');
 
       // Match "hello" as a whole word
-      const result = await fileSystem.grep('.', '\\bhello\\b');
+      const result = await fileSystem.grep('\\bhello\\b');
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 2);
     });
@@ -142,7 +142,7 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'test content');
 
-      const result = await fileSystem.grep('.', '');
+      const result = await fileSystem.grep('');
       // The behavior may vary - just check it doesn't crash
       expect(result.success).toBeDefined();
     });
@@ -153,7 +153,7 @@ export function runGrepTestSuite(
       createFile(testDir, 'test.txt', 'test content');
 
       // Invalid regex: unmatched parenthesis
-      const result = await fileSystem.grep('.', '(invalid');
+      const result = await fileSystem.grep('(invalid');
       // Ripgrep handles invalid regex differently than Node.js
       // It may return success with 0 matches instead of failing
       expect(result.success).toBeDefined();
@@ -181,7 +181,7 @@ export function runGrepTestSuite(
 
     it('should support recursive search', async () => {
       const fileSystem = getFileSystem();
-      const result = await fileSystem.grep('.', 'ERROR', {
+      const result = await fileSystem.grep('ERROR', {
         recursive: true,
       });
 
@@ -191,7 +191,7 @@ export function runGrepTestSuite(
 
     it('should support non-recursive search', async () => {
       const fileSystem = getFileSystem();
-      const result = await fileSystem.grep('.', 'ERROR', {
+      const result = await fileSystem.grep('ERROR', {
         recursive: false,
       });
 
@@ -207,7 +207,7 @@ export function runGrepTestSuite(
 
     it('should respect maxDepth', async () => {
       const fileSystem = getFileSystem();
-      const result = await fileSystem.grep('.', 'file', {
+      const result = await fileSystem.grep('file', {
         recursive: true,
         maxDepth: 1,
       });
@@ -219,7 +219,7 @@ export function runGrepTestSuite(
 
     it('should filter by filePattern', async () => {
       const fileSystem = getFileSystem();
-      const result = await fileSystem.grep('.', 'file', {
+      const result = await fileSystem.grep('file', {
         recursive: true,
         filePattern: '*.ts',
       });
@@ -231,7 +231,7 @@ export function runGrepTestSuite(
 
     it('should support multiple exclude patterns', async () => {
       const fileSystem = getFileSystem();
-      const result = await fileSystem.grep('.', 'file', {
+      const result = await fileSystem.grep('file', {
         recursive: true,
         excludePatterns: ['**/lib/**', '*.txt'],
       });
@@ -250,7 +250,7 @@ export function runGrepTestSuite(
         'error\nerror\nerror\nerror\nerror\nerror\nerror\nerror\nerror\nerror',
       );
 
-      const result = await fileSystem.grep('.', 'error', {
+      const result = await fileSystem.grep('error', {
         maxMatches: 3,
       });
 
@@ -267,7 +267,7 @@ export function runGrepTestSuite(
       createFile(testDir, 'text.txt', 'This is text');
       createBinaryFile(testDir, 'binary.bin', 1024);
 
-      const result = await fileSystem.grep('.', 'text', {
+      const result = await fileSystem.grep('text', {
         recursive: true,
       });
 
@@ -283,7 +283,7 @@ export function runGrepTestSuite(
 
       // This test documents the behavior - binary files with searchBinaryFiles: true
       // may not match text properly due to encoding issues
-      const result = await fileSystem.grep('.', 'test', {});
+      const result = await fileSystem.grep('test', {});
 
       expect(result.success).toBeDefined();
     });
@@ -312,7 +312,7 @@ export function runGrepTestSuite(
 
     it('should respect gitignore by default', async () => {
       const fileSystem = getFileSystem();
-      const result = await fileSystem.grep('.', 'ERROR', {
+      const result = await fileSystem.grep('ERROR', {
         recursive: true,
       });
 
@@ -331,7 +331,7 @@ export function runGrepTestSuite(
 
     it('should support disabling gitignore', async () => {
       const fileSystem = getFileSystem();
-      const result = await fileSystem.grep('.', 'ERROR', {
+      const result = await fileSystem.grep('ERROR', {
         recursive: true,
         respectGitignore: false,
       });
@@ -358,6 +358,7 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       // Initialize git repository so ripgrep respects .gitignore
       const { execSync } = require('node:child_process');
+      const path = require('node:path');
       execSync('git init', { cwd: testDir, stdio: 'ignore' });
 
       createFileTree(testDir, {
@@ -370,8 +371,9 @@ export function runGrepTestSuite(
         },
       });
 
-      const result = await fileSystem.grep('src', 'ERROR', {
+      const result = await fileSystem.grep('ERROR', {
         recursive: true,
+        absoluteSearchPath: path.join(testDir, 'src'),
       });
 
       expectGrepSuccess(result);
@@ -397,7 +399,7 @@ export function runGrepTestSuite(
         },
       });
 
-      const result = await fileSystem.grep('.', 'ERROR', {
+      const result = await fileSystem.grep('ERROR', {
         recursive: true,
       });
 
@@ -416,7 +418,7 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'line 1\nline 2 ERROR here\nline 3\n');
 
-      const result = await fileSystem.grep('.', 'ERROR');
+      const result = await fileSystem.grep('ERROR');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 1);
@@ -436,7 +438,7 @@ export function runGrepTestSuite(
       const lines = ['line 1', 'line 2', 'line 3 MATCH', 'line 4', 'line 5'];
       createFile(testDir, 'test.txt', lines.join('\n'));
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       expectGrepSuccess(result);
       const match = result.matches?.[0];
@@ -461,7 +463,7 @@ export function runGrepTestSuite(
         },
       });
 
-      const result = await fileSystem.grep('.', 'ERROR', {
+      const result = await fileSystem.grep('ERROR', {
         recursive: true,
       });
 
@@ -485,13 +487,44 @@ export function runGrepTestSuite(
         'file3.txt': 'no match',
       });
 
-      const result = await fileSystem.grep('.', 'ERROR', {
+      const result = await fileSystem.grep('ERROR', {
         recursive: true,
       });
 
       expectGrepSuccess(result);
       expect(result.totalMatches).toBe(3);
       expect(result.filesSearched).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should always provide both relativePath and absolutePath in matches', async () => {
+      const testDir = getTestDir();
+      const fileSystem = getFileSystem();
+      createFileTree(testDir, {
+        'test.txt': 'MATCH',
+        nested: {
+          'deep.txt': 'MATCH',
+        },
+      });
+
+      const result = await fileSystem.grep('MATCH', {
+        recursive: true,
+      });
+
+      expectGrepSuccess(result);
+      expect(result.matches).toBeDefined();
+      expect(result.matches!.length).toBeGreaterThan(0);
+
+      // Verify each match has both relativePath and absolutePath
+      for (const match of result.matches!) {
+        expect(match.relativePath).toBeDefined();
+        expect(match.absolutePath).toBeDefined();
+        expect(typeof match.relativePath).toBe('string');
+        expect(typeof match.absolutePath).toBe('string');
+        // absolutePath should contain the testDir
+        expect(match.absolutePath).toContain(testDir);
+        // absolutePath should end with relativePath (platform-independent check)
+        expect(match.absolutePath.endsWith(match.relativePath.replace(/\//g, require('node:path').sep))).toBe(true);
+      }
     });
   });
 
@@ -501,7 +534,7 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       createFile(testDir, 'empty.txt', '');
 
-      const result = await fileSystem.grep('.', 'test');
+      const result = await fileSystem.grep('test');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 0);
@@ -512,7 +545,7 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       createFile(testDir, 'no-newline.txt', 'line without newline');
 
-      const result = await fileSystem.grep('.', 'newline');
+      const result = await fileSystem.grep('newline');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 1);
@@ -524,7 +557,7 @@ export function runGrepTestSuite(
       const longLine = 'x'.repeat(20000) + 'MATCH' + 'y'.repeat(20000);
       createFile(testDir, 'long.txt', longLine);
 
-      const result = await fileSystem.grep('.', 'MATCH');
+      const result = await fileSystem.grep('MATCH');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 1);
@@ -535,7 +568,7 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       createLargeFile(testDir, 'large.txt', 10000, 'Line {line} with MATCH');
 
-      const result = await fileSystem.grep('.', 'MATCH', {
+      const result = await fileSystem.grep('MATCH', {
         maxMatches: 100,
       });
 
@@ -551,7 +584,7 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       createFile(testDir, 'test.txt', 'ERROR ERROR ERROR\n');
 
-      const result = await fileSystem.grep('.', 'ERROR');
+      const result = await fileSystem.grep('ERROR');
 
       expectGrepSuccess(result);
       expect(result.totalMatches).toBeGreaterThanOrEqual(3);
@@ -563,7 +596,7 @@ export function runGrepTestSuite(
       // File with CRLF and LF line endings
       createFile(testDir, 'mixed.txt', 'line1\r\nline2\nline3\r\n');
 
-      const result = await fileSystem.grep('.', 'line');
+      const result = await fileSystem.grep('line');
 
       expectGrepSuccess(result);
       expect(result.totalMatches).toBeGreaterThanOrEqual(3);
@@ -574,7 +607,7 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       createFile(testDir, 'file (with) [special] chars.txt', 'MATCH');
 
-      const result = await fileSystem.grep('.', 'MATCH', {
+      const result = await fileSystem.grep('MATCH', {
         recursive: true,
       });
 
@@ -587,7 +620,9 @@ export function runGrepTestSuite(
       const fileSystem = getFileSystem();
       createFile(testDir, 'single.txt', 'MATCH');
 
-      const result = await fileSystem.grep('single.txt', 'MATCH');
+      const result = await fileSystem.grep('MATCH', {
+        filePattern: 'single.txt',
+      });
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 1);
@@ -595,7 +630,9 @@ export function runGrepTestSuite(
 
     it('should handle non-existent path', async () => {
       const fileSystem = getFileSystem();
-      const result = await fileSystem.grep('nonexistent', 'test');
+      const result = await fileSystem.grep('test', {
+        filePattern: 'nonexistent/**',
+      });
 
       // Should either fail gracefully or return no matches
       expect(result.success).toBeDefined();
@@ -609,7 +646,7 @@ export function runGrepTestSuite(
         'file2.txt': 'nothing to find',
       });
 
-      const result = await fileSystem.grep('.', 'MISSING');
+      const result = await fileSystem.grep('MISSING');
 
       expectGrepSuccess(result);
       expectGrepMatchCount(result, 0);
@@ -626,7 +663,7 @@ export function runGrepTestSuite(
       }
 
       const startTime = Date.now();
-      const result = await fileSystem.grep('.', 'ERROR', {
+      const result = await fileSystem.grep('ERROR', {
         recursive: true,
       });
       const duration = Date.now() - startTime;
@@ -647,7 +684,6 @@ export function runGrepTestSuite(
 
       const startTime = Date.now();
       const result = await fileSystem.grep(
-        '.',
         'function\\s+\\w+\\s*\\([^)]*\\)\\s*\\{',
       );
       const duration = Date.now() - startTime;

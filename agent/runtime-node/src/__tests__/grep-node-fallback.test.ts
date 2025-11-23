@@ -32,7 +32,6 @@ describe('grep with Node.js fallback', () => {
 
     const result = await grepWithRipgrep(
       fileSystem,
-      '.',
       'MATCH',
       testDir, // Invalid path - ripgrep binary doesn't exist here
     );

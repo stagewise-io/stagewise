@@ -13,7 +13,6 @@ export const DESCRIPTION = `Search for files and directories matching a glob pat
 
 Parameters:
 - pattern (string, REQUIRED): Glob pattern supporting standard syntax (*, **, ?, [abc]). Examples: '**/*.test.ts' for test files, 'src/**/config.json' for configs.
-- relative_path (string, OPTIONAL): Relative directory path to search in. Defaults to current working directory if omitted.
 
 Behavior: Respects .gitignore by default. Returns relative file paths sorted by modification time. Output capped at 50 results and 40KB total.`;
 
@@ -22,12 +21,6 @@ export const globParamsSchema = z.object({
     .string()
     .describe(
       "Glob pattern supporting standard syntax (*, **, ?, [abc]). Examples: '**/*.test.ts' for test files, 'src/**/config.json' for configs.",
-    ),
-  relative_path: z
-    .string()
-    .optional()
-    .describe(
-      'Relative directory path to search in. Defaults to current working directory if omitted.',
     ),
 });
 
@@ -44,19 +37,12 @@ export async function globToolExecute(
   params: GlobParams,
   clientRuntime: ClientRuntime,
 ) {
-  const { pattern, relative_path } = params;
+  const { pattern } = params;
 
   try {
-    // Use the provided path as the search directory, or fall back to cwd
-    const searchPath = relative_path || undefined;
-
     // Perform the glob search
     const globResult = await clientRuntime.fileSystem.glob(pattern, {
-      searchPath,
-      includeDirectories: true, // Include both files and directories
       respectGitignore: true, // Respect .gitignore by default
-      absoluteSearchPath: false, // The agent is always relative to it's cwd
-      absoluteSearchResults: false,
     });
 
     if (!globResult.success)
@@ -84,9 +70,7 @@ export async function globToolExecute(
     };
 
     // Format the success message
-    const searchLocation = relative_path
-      ? ` in "${relative_path}"`
-      : ' in current directory';
+    const searchLocation = ` in "${clientRuntime.fileSystem.getCurrentWorkingDirectory()}"`;
     let message = `Found ${globResult.totalMatches || 0} matches for pattern "${pattern}"${searchLocation}`;
 
     // Add truncation message with helpful suggestions if results were capped
@@ -94,7 +78,6 @@ export async function globToolExecute(
       const originalCount = globResult.totalMatches || 0;
       const suggestions = [
         'Use a more specific glob pattern (e.g., "src/**/*.ts" instead of "**/*.ts")',
-        'Search in a subdirectory by specifying the path parameter',
         'Break down your search into multiple smaller queries',
       ];
 

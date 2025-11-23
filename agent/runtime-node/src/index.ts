@@ -13,6 +13,8 @@ import {
   type GlobResult,
   type SearchReplaceMatch,
   type SearchReplaceResult,
+  type GlobOptions,
+  type GrepOptions,
 } from '@stagewise/agent-runtime-interface';
 import { BINARY_DETECTION } from './shared.js';
 
@@ -259,48 +261,12 @@ export class NodeFileSystemProvider extends BaseFileSystemProvider {
     }
   }
 
-  async grep(
-    searchPath: string,
-    pattern: string,
-    options?: {
-      recursive?: boolean;
-      maxDepth?: number;
-      maxMatches?: number;
-      excludePatterns?: string[];
-      respectGitignore?: boolean;
-      caseSensitive?: boolean;
-      filePattern?: string;
-      absoluteSearchPath?: boolean;
-      absoluteSearchResults?: boolean;
-    },
-  ): Promise<GrepResult> {
-    return grep(
-      this,
-      searchPath,
-      pattern,
-      this.config.rgBinaryBasePath,
-      options,
-    );
+  async grep(pattern: string, options?: GrepOptions): Promise<GrepResult> {
+    return grep(this, pattern, this.config.rgBinaryBasePath, options);
   }
 
-  async glob(
-    pattern: string,
-    options?: {
-      searchPath?: string;
-      absolute?: boolean;
-      excludePatterns?: string[];
-      respectGitignore?: boolean;
-      absoluteSearchPath?: boolean;
-      absoluteSearchResults?: boolean;
-    },
-  ): Promise<GlobResult> {
-    // Map the "absolute" convenience option to "absoluteSearchResults"
-    const effectiveOptions = {
-      ...options,
-      absoluteSearchResults:
-        options?.absolute ?? options?.absoluteSearchResults,
-    };
-    return glob(this, pattern, this.config.rgBinaryBasePath, effectiveOptions);
+  async glob(pattern: string, options?: GlobOptions): Promise<GlobResult> {
+    return glob(this, pattern, this.config.rgBinaryBasePath, options);
   }
 
   async searchAndReplace(

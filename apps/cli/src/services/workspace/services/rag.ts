@@ -151,7 +151,6 @@ const getFilePathsForReactComponentInfo = async (
   const rgResults = await Promise.all(
     componentNames.map(async (componentName) => {
       return await clientRuntime.fileSystem.grep(
-        '.',
         `\\b(?:function\\s+${componentName}\\b|(?:const|let|var)\\s+${componentName}\\s*=\\s*(?:async\\s*)?\\(.*\\)\\s*=>|${componentName}\\s*:\\s*(?:async\\s*)?\\(.*\\)\\s*=>)`,
         {
           recursive: true,
