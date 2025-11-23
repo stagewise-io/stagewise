@@ -677,6 +677,17 @@ export class Agent {
     for await (const uiMessage of readUIMessageStream<ChatMessage>({
       stream: uiStream,
     })) {
+      // Skip assistant messages that only contain non-user-visible reasoning or step-start parts
+      if (
+        uiMessage.role === 'assistant' &&
+        uiMessage.parts?.length > 0 &&
+        uiMessage.parts.every(
+          (part) =>
+            part.type === 'reasoning' || part.type === 'step-start',
+        )
+      ) {
+        continue;
+      }
       const messageExists =
         this.karton?.state.activeChatId &&
         this.karton.state.chats[this.karton.state.activeChatId]?.messages.find(
