@@ -3,7 +3,6 @@
   "references": [
     { "path": "agent/knowledge" },
     { "path": "agent/runtime-interface" },
-    { "path": "agent/runtime-mock" },
     { "path": "agent/runtime-node" },
     { "path": "agent/tools" },
     { "path": "agent/types" },

@@ -101,28 +101,6 @@ importers:
         specifier: 4.0.17
         version: 4.0.17
 
-  agent/runtime-mock:
-    dependencies:
-      memfs:
-        specifier: ^4.17.2
-        version: 4.17.2
-    devDependencies:
-      '@stagewise/agent-runtime-interface':
-        specifier: workspace:*
-        version: link:../runtime-interface
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.9
-      esbuild:
-        specifier: 0.25.9
-        version: 0.25.9
-      rimraf:
-        specifier: ^5.0.0
-        version: 5.0.10
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.3
-
   agent/runtime-node:
     dependencies:
       chokidar:
