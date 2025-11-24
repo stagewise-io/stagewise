@@ -4,6 +4,7 @@ import type {
   TextUIPart,
   FileUIPart,
   ToolPart,
+  ReasoningUIPart,
 } from '@stagewise/karton-contract';
 
 export function generateId(): string {
@@ -15,6 +16,18 @@ export function createTextPart(text: string): TextUIPart {
   return {
     type: 'text',
     text,
+  };
+}
+
+// Helper to create reasoning/thinking parts
+export function createThinkingPart(
+  text: string,
+  state: 'streaming' | 'done' = 'done',
+): ReasoningUIPart {
+  return {
+    type: 'reasoning',
+    text,
+    state,
   };
 }
 
@@ -61,9 +74,15 @@ export function createAssistantMessage(
     id?: string;
     isStreaming?: boolean;
     toolParts?: ToolPart[];
+    thinkingPart?: ReasoningUIPart;
+    thinkingDuration?: number;
   },
 ): ChatMessage {
-  const parts: any[] = [...(options?.toolParts || []), createTextPart(text)];
+  const parts: any[] = [
+    ...(options?.thinkingPart ? [options.thinkingPart] : []),
+    ...(options?.toolParts || []),
+    createTextPart(text),
+  ];
 
   return {
     id: options?.id || generateId(),
@@ -71,6 +90,9 @@ export function createAssistantMessage(
     parts,
     metadata: {
       createdAt: new Date(),
+      ...(options?.thinkingDuration
+        ? { thinkingDuration: options.thinkingDuration }
+        : {}),
     },
   };
 }
@@ -416,6 +438,61 @@ export function createGlobToolPart(
         relativePaths: [],
         truncated: false,
         itemsRemoved: 0,
+      },
+    },
+  } as ToolPart;
+}
+
+// Helper to create delete file tool part
+export function createDeleteFileToolPart(
+  relativePath: string,
+  state: 'streaming' | 'complete' | 'error' = 'complete',
+  deletedContent?: string,
+): ToolPart {
+  if (state === 'streaming') {
+    return {
+      type: 'tool-deleteFileTool',
+      toolCallId: generateId(),
+      state: 'input-streaming',
+      input: {
+        relative_path: relativePath,
+      },
+    } as ToolPart;
+  }
+
+  if (state === 'error') {
+    return {
+      type: 'tool-deleteFileTool',
+      toolCallId: generateId(),
+      state: 'output-error',
+      input: {
+        relative_path: relativePath,
+      },
+      errorText: 'File not found or permission denied',
+    } as ToolPart;
+  }
+
+  // state === 'complete'
+  const fileContent =
+    deletedContent ??
+    `// Content of ${relativePath}\nexport const Component = () => null;`;
+
+  return {
+    type: 'tool-deleteFileTool',
+    toolCallId: generateId(),
+    state: 'output-available',
+    input: {
+      relative_path: relativePath,
+    },
+    output: {
+      message: 'File deleted successfully',
+      hiddenMetadata: {
+        undoExecute: null,
+        diff: {
+          path: relativePath,
+          before: fileContent,
+          after: '',
+        },
       },
     },
   } as ToolPart;
