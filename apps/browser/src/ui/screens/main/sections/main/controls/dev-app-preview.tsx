@@ -90,7 +90,7 @@ export function UrlControl() {
     // We check if the URL is valid. If it's not valid, check if there's a protocol prefix. If there is not protocol prefix, we add https: protocl by default. If the URL still isn't valid, we return a google search string with the input as the query.
     let checkedUrl = url.trim();
 
-    if (checkedUrl.includes(' ')) {
+    if (checkedUrl.includes(' ') || !checkedUrl.includes('.')) {
       checkedUrl = getSearchUrl(checkedUrl);
     }
 
@@ -98,7 +98,7 @@ export function UrlControl() {
       return checkedUrl;
     }
 
-    if (checkedUrl.split(':').length < 2) {
+    if (!checkedUrl.includes(':')) {
       checkedUrl = `https://${checkedUrl}`;
     }
 
