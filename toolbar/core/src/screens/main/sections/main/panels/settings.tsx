@@ -1,4 +1,3 @@
-import { IDE_LOGOS } from '@/assets/ide-logos';
 import {
   FormField,
   FormFieldDescription,
@@ -35,6 +34,7 @@ import {
   Tooltip,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
+import { IdeLogo } from '@/components/ide-logo';
 
 export const SettingsPanel = () => {
   const workspaceLoaded = useKartonState((s) => s.workspaceStatus === 'open');
@@ -343,50 +343,32 @@ export const GlobalSettingsTabContent = () => {
               {
                 value: 'cursor',
                 label: 'Cursor',
-                icon: (
-                  <img src={IDE_LOGOS.cursor} alt="Cursor" className="size-4" />
-                ),
+                icon: <IdeLogo ide="cursor" className="size-4" />,
               },
               {
                 value: 'vscode',
                 label: 'VS Code',
-                icon: (
-                  <img
-                    src={IDE_LOGOS.vscode}
-                    alt="VS Code"
-                    className="size-4"
-                  />
-                ),
+                icon: <IdeLogo ide="vscode" className="size-4" />,
               },
               {
                 value: 'zed',
                 label: 'Zed',
-                icon: <img src={IDE_LOGOS.zed} alt="Zed" className="size-4" />,
+                icon: <IdeLogo ide="zed" className="size-4" />,
               },
               {
                 value: 'kiro',
                 label: 'Kiro',
-                icon: (
-                  <img src={IDE_LOGOS.kiro} alt="Kiro" className="size-4" />
-                ),
+                icon: <IdeLogo ide="kiro" className="size-4" />,
               },
               {
                 value: 'windsurf',
                 label: 'Windsurf',
-                icon: (
-                  <img
-                    src={IDE_LOGOS.windsurf}
-                    alt="Windsurf"
-                    className="size-4"
-                  />
-                ),
+                icon: <IdeLogo ide="windsurf" className="size-4" />,
               },
               {
                 value: 'trae',
                 label: 'Trae',
-                icon: (
-                  <img src={IDE_LOGOS.trae} alt="Trae" className="size-4" />
-                ),
+                icon: <IdeLogo ide="trae" className="size-4" />,
               },
               {
                 value: 'other',

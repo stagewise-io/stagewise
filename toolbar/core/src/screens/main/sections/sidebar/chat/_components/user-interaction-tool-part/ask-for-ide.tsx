@@ -3,19 +3,43 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import type { OpenFilesInIde } from '@stagewise/karton-contract/shared-types';
 import type { PickToolPart } from './index.js';
 import { CheckIcon, XIcon, ChevronDownIcon } from 'lucide-react';
-import { IDE_LOGOS } from '@/assets/ide-logos';
+import { IdeLogo } from '@/components/ide-logo';
 
 const IDE_OPTIONS: Array<{
   value: OpenFilesInIde;
   label: string;
-  logo?: string;
+  logo?: React.ReactNode;
 }> = [
-  { value: 'cursor', label: 'Cursor', logo: IDE_LOGOS.cursor },
-  { value: 'vscode', label: 'VS Code', logo: IDE_LOGOS.vscode },
-  { value: 'zed', label: 'Zed', logo: IDE_LOGOS.zed },
-  { value: 'kiro', label: 'Kiro', logo: IDE_LOGOS.kiro },
-  { value: 'windsurf', label: 'Windsurf', logo: IDE_LOGOS.windsurf },
-  { value: 'trae', label: 'Trae', logo: IDE_LOGOS.trae },
+  {
+    value: 'cursor',
+    label: 'Cursor',
+    logo: <IdeLogo ide="cursor" className="size-4" />,
+  },
+  {
+    value: 'vscode',
+    label: 'VS Code',
+    logo: <IdeLogo ide="vscode" className="size-4" />,
+  },
+  {
+    value: 'zed',
+    label: 'Zed',
+    logo: <IdeLogo ide="zed" className="size-4" />,
+  },
+  {
+    value: 'kiro',
+    label: 'Kiro',
+    logo: <IdeLogo ide="kiro" className="size-4" />,
+  },
+  {
+    value: 'windsurf',
+    label: 'Windsurf',
+    logo: <IdeLogo ide="windsurf" className="size-4" />,
+  },
+  {
+    value: 'trae',
+    label: 'Trae',
+    logo: <IdeLogo ide="trae" className="size-4" />,
+  },
   { value: 'other', label: 'Other' },
 ];
 
@@ -26,7 +50,7 @@ const IdeOptionButton = memo(
     isDisabled,
     onSelect,
   }: {
-    option: { value: OpenFilesInIde; label: string; logo?: string };
+    option: { value: OpenFilesInIde; label: string; logo?: React.ReactNode };
     isSelected: boolean;
     isDisabled: boolean;
     onSelect: (ide: OpenFilesInIde) => void;
@@ -43,9 +67,7 @@ const IdeOptionButton = memo(
             : 'hover:border-primary/50'
         } ${isDisabled ? 'opacity-50' : 'glass-body-motion glass-body-motion-interactive cursor-pointer'}`}
       >
-        {option.logo && (
-          <img src={option.logo} alt={option.label} className="size-4" />
-        )}
+        {option.logo && option.logo}
         <span className="font-medium text-sm">{option.label}</span>
       </button>
     );

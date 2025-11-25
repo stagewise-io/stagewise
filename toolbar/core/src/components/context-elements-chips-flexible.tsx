@@ -5,7 +5,6 @@ import {
   SquareDashedMousePointer,
   AtomIcon,
   ChevronLeft,
-  FileIcon,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { useFileIDEHref } from '@/hooks/use-file-ide-href';
@@ -15,7 +14,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
-import { IDE_SELECTION_ITEMS } from '@/utils';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import type { SelectedElement } from '@stagewise/karton-contract';
 import {
@@ -25,7 +23,7 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { usePostHog } from 'posthog-js/react';
 import { useKartonState } from '@/hooks/use-karton';
-import { IDE_LOGOS } from '@/assets/ide-logos';
+import { IdeLogo } from './ide-logo';
 
 interface ContextElementsChipsProps {
   selectedElements: {
@@ -256,15 +254,10 @@ function ContextElementChip({
                             );
                           }}
                         >
-                          {openInIdeSelection !== 'other' ? (
-                            <img
-                              src={IDE_LOGOS[openInIdeSelection]}
-                              alt={IDE_SELECTION_ITEMS[openInIdeSelection]}
-                              className="size-3 shrink-0"
-                            />
-                          ) : (
-                            <FileIcon className="size-3 shrink-0" />
-                          )}
+                          <IdeLogo
+                            ide={openInIdeSelection}
+                            className="size-3 shrink-0"
+                          />
                           {getTruncatedFileUrl(metadata.relativePath)}
                         </a>
                       </TooltipTrigger>
