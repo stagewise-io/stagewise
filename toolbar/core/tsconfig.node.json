@@ -23,5 +23,6 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["build.vite.ts", "buildsteps/*.ts"]
+  "include": ["build.vite.ts", "buildsteps/*.ts"],
+  "exclude": ["node_modules", "dist", "coverage", "tmp", ".storybook", ".turbo"]
 }

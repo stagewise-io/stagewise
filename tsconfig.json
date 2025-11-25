@@ -12,7 +12,6 @@
     { "path": "packages/agent-interface-external" },
     { "path": "packages/karton-contract" },
     { "path": "packages/karton-contract-bridged" },
-    { "path": "packages/stage-ui" },
-    { "path": "toolbar/core" }
+    { "path": "packages/stage-ui" }
   ]
 }

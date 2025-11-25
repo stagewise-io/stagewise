@@ -6,8 +6,7 @@
     { "path": "../../agent/runtime-node" },
     { "path": "../../agent/tools" },
     { "path": "../../agent/types" },
-    { "path": "../../packages/karton-contract" },
-    { "path": "../../toolbar/core" }
+    { "path": "../../packages/karton-contract" }
   ],
   "compilerOptions": {
     // Environment setup & latest features

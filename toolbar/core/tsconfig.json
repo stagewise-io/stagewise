@@ -22,13 +22,19 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": false,
-    "emitDeclarationOnly": true,
-    "outDir": "./dist",
-    "composite": true,
+    "noEmit": true,
     "jsx": "react-jsx",
     "jsxImportSource": "react"
   },
   "basePath": ".",
-  "include": []
+  "include": [],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "tmp",
+    ".storybook",
+    "**/*.stories.tsx",
+    "**/*.stories.ts"
+  ]
 }

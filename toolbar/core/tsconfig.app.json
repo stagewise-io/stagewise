@@ -33,5 +33,14 @@
     "noPropertyAccessFromIndexSignature": false
   },
   "include": ["src"],
-  "exclude": ["src/**/*.stories.tsx", "src/**/*.stories.ts", ".storybook"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "tmp",
+    "src/**/*.stories.tsx",
+    "src/**/*.stories.ts",
+    ".storybook",
+    ".turbo"
+  ]
 }
