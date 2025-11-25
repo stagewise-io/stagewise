@@ -304,6 +304,8 @@ const FileLink = ({
             'transition-opacity duration-200',
             'break-all',
           )}
+          target="_blank"
+          rel="noopener noreferrer"
         >
           {filePath}
           {lineNumber && <span className="opacity-70">:{lineNumber}</span>}
@@ -408,6 +410,7 @@ const AnchorComponent = ({
         <a
           href={processedHref}
           target="_blank"
+          rel="noopener noreferrer"
           className={cn(
             'inline-flex items-baseline justify-start gap-0.5 break-all font-medium text-primary hover:opacity-80',
             className,

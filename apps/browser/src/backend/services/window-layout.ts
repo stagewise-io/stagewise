@@ -57,6 +57,10 @@ export class WindowLayoutService {
       },
     });
     this.uiContentView.setBackgroundColor('#00000000');
+    this.uiContentView.webContents.setWindowOpenHandler((details) => {
+      shell.openExternal(details.url);
+      return { action: 'deny' };
+    });
     this.baseWindow.contentView.addChildView(this.uiContentView);
 
     this.uiContentView.webContents.openDevTools();
@@ -238,6 +242,9 @@ export class WindowLayoutService {
       shell.openExternal(details.url);
       return { action: 'deny' };
     });
+    this.webContentsView.webContents.session.setUserAgent(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 stagewise/1.0.0-alpha',
+    );
 
     // Open home page on startup.
     this.handleWebContentGoto('https://google.com');
@@ -325,10 +332,10 @@ export class WindowLayoutService {
   private handleWebContentInteractivityChange(interactive: boolean) {
     // Depending on the interactivity, we either push the UI on top of the window or the web contents view container.
     if (interactive) {
-      //this.baseWindow.contentView.addChildView(this.webContentsViewContainer);
+      this.baseWindow.contentView.addChildView(this.webContentsViewContainer);
       //this.webContentsView.webContents.focus();
     } else {
-      //this.baseWindow.contentView.addChildView(this.uiContentView);
+      this.baseWindow.contentView.addChildView(this.uiContentView);
       //this.uiContentView.webContents.focus();
     }
   }
