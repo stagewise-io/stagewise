@@ -82,46 +82,94 @@
 }
 
 :root {
-  --glass-border-shadow: inset 2px 3px 1px -3px rgba(255, 255, 255, 0.8), inset 2px 3px 3px -2.5px rgba(255, 255, 255, 0.3), inset -2px -3px 1px -3px rgba(255, 255, 255, 0.8), inset -2px -3px 3px -2.5px rgba(255, 255, 255, 0.3), inset 0 0 1px 1px rgba(50,50,50,0.15);
-  --glass-body-shadow: inset 0 0 0 rgba(0,0,0,0), inset 0 4px 8px 4px rgba(255,255,255,0.1), inset 0 -16px 32px -24px rgba(0,0,0,0.1);
-  --glass-body-shadow-hover: inset 0 0 0 rgba(0,0,0,0), inset 0 4px 16px 4px rgba(255,255,255,0.15), inset 0 -16px 32px -24px rgba(0,0,0,0.1);
-  --glass-body-shadow-pressed: inset 0 0 0 rgba(0,0,0,0), inset 0 2px 4px 3px rgba(255,255,255,0.1), inset 0 -8px 16px -16px rgba(0,0,0,0.3);
+  --glass-border-shadow:
+    inset 2px 3px 1px -3px rgba(255, 255, 255, 0.8),
+    inset 2px 3px 3px -2.5px rgba(255, 255, 255, 0.3),
+    inset -2px -3px 1px -3px rgba(255, 255, 255, 0.8),
+    inset -2px -3px 3px -2.5px rgba(255, 255, 255, 0.3),
+    inset 0 0 1px 1px rgba(50, 50, 50, 0.15);
 
-  --glass-inset-border-shadow: inset 0 0 1px 0px rgba(0,0,0,0.2);
-  --glass-inset-shadow: inset 0 2px 3px 1px rgba(0,0,0,0.05), inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5), inset 0 4px 24px 12px rgba(0,0,0,0.05), 0.3px 0.7px 1px 0px rgba(255,255,255,0.2);
+  --glass-body-shadow:
+    inset 0 0 0 rgba(0, 0, 0, 0),
+    inset 0 4px 8px 4px rgba(255, 255, 255, 0.1),
+    inset 0 -16px 32px -24px rgba(0, 0, 0, 0.1);
+  --glass-body-shadow-hover:
+    inset 0 0 0 rgba(0, 0, 0, 0),
+    inset 0 4px 16px 4px rgba(255, 255, 255, 0.15),
+    inset 0 -16px 32px -24px rgba(0, 0, 0, 0.1);
+  --glass-body-shadow-pressed:
+    inset 0 0 0 rgba(0, 0, 0, 0),
+    inset 0 2px 4px 3px rgba(255, 255, 255, 0.1),
+    inset 0 -8px 16px -16px rgba(0, 0, 0, 0.3);
+
+  --glass-inset-border-shadow: inset 0 0 1px 0px rgba(0, 0, 0, 0.2);
+  --glass-inset-shadow:
+    inset 0 2px 3px 1px rgba(0, 0, 0, 0.05),
+    inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5),
+    inset 0 4px 24px 12px rgba(0, 0, 0, 0.05),
+    0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
   --glass-inset-background: transparent;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --glass-border-shadow: inset 2px 3px 1px -3px rgba(255, 255, 255, 0.6), inset 2px 3px 3px -2.5px rgba(255, 255, 255, 0.2), inset -2px -3px 1px -3px rgba(255, 255, 255, 0.6), inset -2px -3px 3px -2.5px rgba(255, 255, 255, 0.2), inset 0 0 1px 1px rgba(50,50,50,0.1);
-    --glass-body-shadow: inset 0 0 0 rgba(0,0,0,0), inset 0 4px 8px 4px rgba(255,255,255,0.05), inset 0 -16px 32px -24px rgba(0,0,0,0.05);
-    --glass-body-shadow-hover: inset 0 0 0 rgba(0,0,0,0), inset 0 4px 16px 4px rgba(255,255,255,0.1), inset 0 -16px 32px -24px rgba(0,0,0,0.05);
-    --glass-body-shadow-pressed: inset 0 0 0 rgba(0,0,0,0), inset 0 2px 4px 3px rgba(255,255,255,0.05), inset 0 -8px 16px -16px rgba(0,0,0,0.2);
-  
-    --glass-inset-border-shadow: inset 0 0 1px 0px rgba(0,0,0,0.2);
-    --glass-inset-shadow: inset 0 2px 3px 1px rgba(0,0,0,0.05), inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5), inset 0 4px 24px 12px rgba(0,0,0,0.05), 0.3px 0.7px 1px 0px rgba(255,255,255,0.2);
+    --glass-border-shadow:
+      inset 2px 3px 1px -3px rgba(255, 255, 255, 0.6),
+      inset 2px 3px 3px -2.5px rgba(255, 255, 255, 0.2),
+      inset -2px -3px 1px -3px rgba(255, 255, 255, 0.6),
+      inset -2px -3px 3px -2.5px rgba(255, 255, 255, 0.2),
+      inset 0 0 1px 1px rgba(50, 50, 50, 0.1);
+
+    --glass-body-shadow:
+      inset 0 0 0 rgba(0, 0, 0, 0),
+      inset 0 4px 8px 4px rgba(255, 255, 255, 0.05),
+      inset 0 -16px 32px -24px rgba(0, 0, 0, 0.05);
+    --glass-body-shadow-hover:
+      inset 0 0 0 rgba(0, 0, 0, 0),
+      inset 0 4px 16px 4px rgba(255, 255, 255, 0.1),
+      inset 0 -16px 32px -24px rgba(0, 0, 0, 0.05);
+    --glass-body-shadow-pressed:
+      inset 0 0 0 rgba(0, 0, 0, 0),
+      inset 0 2px 4px 3px rgba(255, 255, 255, 0.05),
+      inset 0 -8px 16px -16px rgba(0, 0, 0, 0.2);
+
+    --glass-inset-border-shadow: inset 0 0 1px 0px rgba(0, 0, 0, 0.2);
+    --glass-inset-shadow:
+      inset 0 2px 3px 1px rgba(0, 0, 0, 0.05),
+      inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5),
+      inset 0 4px 24px 12px rgba(0, 0, 0, 0.05),
+      0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
     /* Slightly lighter overlay similar to bg-muted-foreground/5 */
-    --glass-inset-background: rgba(148,163,184,0.05);
+    --glass-inset-background: rgba(148, 163, 184, 0.05);
   }
 }
 
 @utility glass-body {
-  @apply relative after:transition-all after:duration-150 after:pointer-events-none after:absolute after:inset-0 after:block after:size-full after:rounded-[inherit] after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow)];
+  @apply relative
+    after:pointer-events-none after:absolute after:inset-0 after:block after:size-full after:rounded-[inherit]
+    after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow)]
+    after:transition-all after:duration-150;
 }
 
 @utility glass-body-interactive {
-  @apply active:after:bg-black/2.5 enabled:hover:after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow-hover)] enabled:active:after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow-pressed)];
+  @apply active:after:bg-black/2.5
+    enabled:hover:after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow-hover)]
+    enabled:active:after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow-pressed)];
 }
 
 @utility glass-body-motion {
-  @apply transition-transform duration-300 ease-out shadow-black/5 shadow-lg;
+  @apply transition-transform duration-300 ease-out
+    shadow-lg shadow-black/5;
 }
 
 @utility glass-body-motion-interactive {
- @apply active:scale-[98%] hover:scale-[101%] hover:shadow-xl active:shadow-md;
+  @apply hover:scale-[101%] active:scale-[98%]
+    hover:shadow-xl active:shadow-md;
 }
 
 @utility glass-inset {
-  @apply relative before:pointer-events-none before:absolute before:inset-0 before:block before:size-full before:rounded-[inherit] before:bg-[var(--glass-inset-background)] before:shadow-[var(--glass-inset-border-shadow),var(--glass-inset-shadow)]; 
+  @apply relative
+    before:pointer-events-none before:absolute before:inset-0 before:block before:size-full before:rounded-[inherit]
+    before:bg-[var(--glass-inset-background)]
+    before:shadow-[var(--glass-inset-border-shadow),var(--glass-inset-shadow)];
 }
