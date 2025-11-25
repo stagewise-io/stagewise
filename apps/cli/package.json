@@ -66,13 +66,13 @@
     "zod": "4.0.17"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "2.0.9",
+    "@ai-sdk/anthropic": "2.0.45",
     "@ai-sdk/google": "2.0.11",
     "@ai-sdk/openai": "^2.0.23",
     "@ai-sdk/provider": "^2.0.0",
     "@posthog/ai": "^6.4.3",
     "@types/xml": "^1.0.11",
-    "ai": "5.0.9",
+    "ai": "5.0.101",
     "chokidar": "^4.0.3",
     "diff": "^8.0.2",
     "esbuild": "0.25.9",

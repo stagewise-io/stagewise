@@ -27,7 +27,7 @@
     "@stagewise/karton": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
     "@ai-sdk/provider": "^2.0.0",
-    "ai": "5.0.9",
+    "ai": "5.0.101",
     "zod": "4.0.17"
   },
   "devDependencies": {

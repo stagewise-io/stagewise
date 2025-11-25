@@ -29,10 +29,10 @@
     "test-lance": "tsx src/test-lance.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "2.0.9",
+    "@ai-sdk/anthropic": "2.0.45",
     "@ai-sdk/provider": "^2.0.0",
     "@stagewise/agent-tools": "workspace:*",
-    "ai": "5.0.9",
+    "ai": "5.0.101",
     "openai": "^5.20.2",
     "zod": "4.0.17"
   },

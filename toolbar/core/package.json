@@ -75,7 +75,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "diff": "^8.0.2",
-    "lucide-react": "^0.523.0",
+    "lucide-react": "0.554.0",
     "mermaid": "^11.12.1",
     "postcss": "^8.5.3",
     "postcss-prefix-selector": "^2.1.1",
@@ -104,6 +104,7 @@
   "dependencies": {
     "@react-three/fiber": "^9.3.0",
     "ogl": "^1.0.11",
+    "seti-icons": "^0.0.4",
     "three": "^0.180.0"
   }
 }

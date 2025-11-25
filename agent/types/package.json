@@ -28,6 +28,6 @@
     "@stagewise/api-client": "1.4.0"
   },
   "dependencies": {
-    "ai": "5.0.9"
+    "ai": "5.0.101"
   }
 }
