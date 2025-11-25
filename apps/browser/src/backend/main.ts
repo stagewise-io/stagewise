@@ -4,6 +4,7 @@
 
 import { AuthService } from './services/auth';
 import { UserExperienceService } from './services/experience';
+import { WindowLayoutService } from './services/window-layout';
 import { getEnvMode } from './utils/env';
 import { bootstrapGlobalServices } from './global-service-bootstrap';
 import { WorkspaceManagerService } from './services/workspace-manager';
@@ -11,9 +12,7 @@ import { UIServerService } from './services/ui-server';
 import { FilePickerService } from './services/file-picker';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { BrowserWindow } from 'electron';
-
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+import { AppMenuService } from './services/app-menu';
 
 export type MainParameters = {
   launchOptions: {
@@ -52,35 +51,6 @@ export async function main({
 
   logger.debug('[Main] Global services bootstrapped');
 
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    title: 'stagewise',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 16 },
-    vibrancy: 'popover',
-    backgroundMaterial: 'mica',
-    backgroundColor: '#fafafa00',
-    transparent: true,
-    roundedCorners: true,
-    closable: true,
-    frame: false,
-
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-    },
-  });
-
-  // and load the index.html of the app.
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-  } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
-  }
-
   // Start remaining services that are irrelevant to non-regular operation of the app.
   const filePickerService = await FilePickerService.create(
     logger,
@@ -93,6 +63,15 @@ export async function main({
     notificationService,
     logger,
   );
+
+  const _windowLayoutService = new WindowLayoutService(logger, kartonService);
+
+  const _appMenuService = new AppMenuService(
+    logger,
+    authService,
+    _windowLayoutService,
+  );
+
   const workspaceManagerService = await WorkspaceManagerService.create(
     logger,
     filePickerService,

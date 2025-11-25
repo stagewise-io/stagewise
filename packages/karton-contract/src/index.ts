@@ -250,6 +250,24 @@ export type AppState = {
       type: 'primary' | 'secondary' | 'destructive';
     }[]; // Allows up to three actions. Every action except for the first will be rendered as secondary. More than three actions will be ignored. Clicking on an action will also dismiss the notification.
   }[];
+
+  // Status of the web content view.
+  webContent: {
+    title: string; // The title of the web content view.
+    faviconUrls: string[]; // A list of URLs that represent the favicon of the webview.
+    url: string; // The current URL of the web content view.
+    devToolsOpen: boolean; // If true, the developer tools are open.
+    isLoading: boolean; // If true, the web content view is loading.
+    isResponsive: boolean; // If false, the web content view is not responsive and the user probably won't be able interact with it.
+    error: {
+      code: number;
+      message?: string;
+    } | null; // The error code of the web content view. If null, there is no error. Error should replace the currently displayed content with an error page.
+    navigationHistory: {
+      canGoBack: boolean;
+      canGoForward: boolean;
+    }; // The navigation history of the web content view.
+  } | null;
 };
 
 export type AuthStatus =
@@ -368,6 +386,29 @@ export type KartonContract = {
     config: {
       set: (config: GlobalConfig) => Promise<void>;
     };
+    webContent: {
+      layout: {
+        // This is called when the webcontents view is resized or moved or whatever. It's used to notify the main window about the new bounds that the webcontents view should have.
+        update: (
+          bounds: {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+          } | null,
+        ) => Promise<void>;
+        // When the webcontents view is hovered over, the UI will be called to notify so that the backend will manage the interactvity of UI and the web contents view accordingly.
+        changeInteractivity: (interactive: boolean) => Promise<void>;
+      };
+      stop: () => Promise<void>;
+      reload: () => Promise<void>;
+      goto: (url: string) => Promise<void>;
+      goBack: () => Promise<void>;
+      goForward: () => Promise<void>;
+      toggleDevTools: () => Promise<void>;
+      openDevTools: () => Promise<void>;
+      closeDevTools: () => Promise<void>;
+    };
   };
 };
 
@@ -402,4 +443,5 @@ export const defaultState: KartonContract['state'] = {
   },
   filePicker: null,
   notifications: [],
+  webContent: null,
 };

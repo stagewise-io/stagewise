@@ -13,6 +13,7 @@ if (started) {
 
 // Set the app name for macOS menu bar
 app.setName('stagewise');
+app.applicationMenu = null;
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -26,9 +27,6 @@ app.on('ready', () =>
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   // macOS apps typically keep the app running when all windows are closed but I (glenn) think that is bs so we'll quit the app when all windows are closed - no matter which platform.
-  if (process.platform === 'darwin') {
-    return;
-  }
   app.quit();
 });
 

@@ -1,5 +1,4 @@
-import { useCyclicUpdate } from '@/hooks/use-cyclic-update';
-import { cn, getIFrame } from '@/utils';
+import { cn } from '@/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Popover,
@@ -15,17 +14,17 @@ import {
 import { Input } from '@stagewise/stage-ui/components/input';
 import {
   PlayIcon,
-  Maximize2Icon,
   ProportionsIcon,
   CodeIcon,
-  Minimize2Icon,
   RefreshCwIcon,
   BookImageIcon,
   ArrowLeftIcon,
   SquareIcon,
   Loader2Icon,
+  ArrowRightIcon,
+  BugIcon,
 } from 'lucide-react';
-import { useCallback, useState, useMemo, useEffect } from 'react';
+import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { RadioGroup, Radio } from '@stagewise/stage-ui/components/radio';
 import {
   FormField,
@@ -35,6 +34,8 @@ import {
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { Layout, MainTab } from '@stagewise/karton-contract';
 import { usePostHog } from 'posthog-js/react';
+import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
+import { HotkeyActions } from '@/utils';
 
 export function DevAppPreviewControls() {
   const isFullScreen = useKartonState(
@@ -52,274 +53,107 @@ export function DevAppPreviewControls() {
     >
       <DevAppStateInfo />
       <ScreenSizeControl />
+      <DevToolsToggle />
       <UrlControl />
     </div>
   );
 }
 
 export function UrlControl() {
-  const [url, setUrl] = useState('');
-  const [isOverridingUrl, setIsOverridingUrl] = useState(false);
-  const [forceShowInput, setForceShowInput] = useState(false);
-  const [hasIFrame, setHasIFrame] = useState(true);
-  const [isNavigating, setIsNavigating] = useState(false);
+  const currentUrl = useKartonState((s) => s.webContent?.url);
 
-  const syncUrl = useCallback(() => {
-    if (isOverridingUrl || isNavigating) return;
-    try {
-      // Fetch everything in the url thats past the origin, unless the origin is different to the one of the main app.
-      const mainAppOrigin = window.location.origin;
-      const iframe = getIFrame();
-      if (!iframe) {
-        setUrl('');
-        return;
-      }
-      const iframeOrigin = iframe?.contentWindow?.location.origin;
-      if (!iframeOrigin) {
-        setUrl('');
-        return;
-      }
-      if (iframeOrigin !== mainAppOrigin) {
-        setUrl(iframe?.contentWindow?.location.href ?? '');
-      } else {
-        setUrl(
-          iframe?.contentWindow?.location.href?.split(mainAppOrigin)[1] ?? '',
-        );
-      }
-    } catch {
-      setUrl('');
+  const [urlModified, setUrlModified] = useState(false);
+  const [displayedUrl, setDisplayedUrl] = useState(currentUrl ?? '');
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  const syncUrlContent = useCallback(() => {
+    // We only set the current URL into the URL bar, if:
+    //  - The URL wasn't modified by the user.
+    //  - The URL input isn't focused/active.
+    if (!urlModified && document.activeElement !== urlInputRef.current) {
+      setDisplayedUrl(currentUrl);
+    } else {
+      console.log(
+        'Not syncing URL because it was modified by the user or the URL input is focused.',
+      );
     }
-  }, [getIFrame, url, isOverridingUrl, isNavigating]);
-
-  useCyclicUpdate(syncUrl, 10);
-
-  const navigateToUrl = useCallback(() => {
-    try {
-      try {
-        const activeEl = document.activeElement as HTMLElement | null;
-        activeEl?.blur?.();
-      } catch {
-        // ignore
-      }
-      setIsNavigating(true);
-      setIsLoading(true);
-      setIsOverridingUrl(true);
-      const iframe = getIFrame();
-      if (iframe) {
-        const fulfilledUrl = new URL(url, window.location.origin).toString();
-        iframe?.contentWindow?.location.replace(fulfilledUrl);
-      }
-    } catch {
-      // ignore
-    }
-  }, [getIFrame, url]);
-
-  const changeUrl = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setIsOverridingUrl(true);
-    // Set the url to the full url and fallback to the origin of the current window.
-
-    setUrl(e.target.value);
-  }, []);
-
-  const reloadIFrame = useCallback(() => {
-    try {
-      setIsNavigating(true);
-      setIsLoading(true);
-      setIsOverridingUrl(true);
-      const iframe = getIFrame();
-      if (iframe) {
-        iframe.contentWindow?.location.reload();
-      }
-    } catch {
-      // ignore
-    }
-  }, [getIFrame]);
-
-  const [canNavigateBack, setCanNavigateBack] = useState(false);
-  const checkCanNavigateBack = useCallback(() => {
-    try {
-      const iframe = getIFrame();
-      if (iframe) {
-        setCanNavigateBack((iframe.contentWindow?.history.length ?? 0) > 1);
-      } else {
-        setCanNavigateBack(false);
-      }
-    } catch {
-      setCanNavigateBack(false);
-    }
-  }, [getIFrame]);
-  useCyclicUpdate(checkCanNavigateBack, 10);
-
-  const navigateBack = useCallback(() => {
-    try {
-      setIsNavigating(true);
-      setIsLoading(true);
-      setIsOverridingUrl(true);
-      const iframe = getIFrame();
-      if (iframe) {
-        iframe.contentWindow?.history.back();
-      }
-    } catch {
-      // ignore
-    }
-  }, [getIFrame]);
-
-  const stopLoading = useCallback(() => {
-    try {
-      const iframe = getIFrame();
-      if (iframe) {
-        iframe.contentWindow?.stop();
-      }
-    } catch {
-      // ignore
-    } finally {
-      setIsNavigating(false);
-      setIsLoading(false);
-    }
-  }, [getIFrame]);
-
-  const [isLoading, setIsLoading] = useState(true);
-  const checkIsLoading = useCallback(() => {
-    try {
-      if (isNavigating) {
-        setIsLoading(true);
-        return;
-      }
-      const iframe = getIFrame();
-      const iframeDoc = iframe
-        ? iframe.contentDocument || iframe.contentWindow?.document
-        : null;
-      if (iframeDoc && iframeDoc.readyState === 'complete') {
-        setIsLoading(false);
-      } else {
-        setIsLoading(true);
-      }
-    } catch {
-      setIsLoading((prev) => prev || isNavigating);
-    }
-  }, [getIFrame, isNavigating]);
-  useCyclicUpdate(checkIsLoading, 10);
-
-  const checkHasIFrame = useCallback(() => {
-    try {
-      const iframe = getIFrame();
-      setHasIFrame(!!iframe);
-    } catch {
-      setHasIFrame(false);
-    }
-  }, [getIFrame]);
-  useCyclicUpdate(checkHasIFrame, 10);
-
-  // Listen to iframe load to finalize navigation states and allow syncing again
+  }, [currentUrl, urlModified]);
   useEffect(() => {
-    try {
-      const iframe = getIFrame();
-      if (!iframe) return;
-      const onBeforeUnload = () => {
-        try {
-          setIsNavigating(true);
-          setIsLoading(true);
-          setIsOverridingUrl(true);
-        } catch {
-          // ignore
-        }
-      };
-      const onLoad = () => {
-        setIsNavigating(false);
-        setIsOverridingUrl(false);
-        setIsLoading(false);
-        // Reattach beforeunload after each load to catch subsequent navigations (same-origin only)
-        try {
-          iframe.contentWindow?.addEventListener(
-            'beforeunload',
-            onBeforeUnload,
-          );
-        } catch {
-          // ignore
-        }
-      };
-      // Try to attach beforeunload immediately (same-origin only)
-      try {
-        iframe.contentWindow?.addEventListener('beforeunload', onBeforeUnload);
-        iframe.addEventListener('load', onLoad);
-      } catch {
-        // ignore
-      }
+    syncUrlContent();
+  }, [syncUrlContent]);
 
-      return () => {
-        try {
-          iframe.removeEventListener('load', onLoad);
-        } catch {
-          // ignore
-        }
-        try {
-          iframe.contentWindow?.removeEventListener(
-            'beforeunload',
-            onBeforeUnload,
-          );
-        } catch {
-          // ignore
-        }
-      };
-    } catch {
-      // ignore
+  // When the user presses Esc while the Url input is focused, we reset the URL modification state and trigger a URL sync.
+  const handleResetUrlModification = useCallback(() => {
+    if (document.activeElement !== urlInputRef.current) {
+      return false;
     }
-  }, [getIFrame]);
+    urlInputRef.current?.blur();
+    setUrlModified(false);
+    syncUrlContent();
+    return true;
+  }, [syncUrlContent]);
+  useHotKeyListener(handleResetUrlModification, HotkeyActions.ESC);
+
+  const isLoading = useKartonState((s) => s.webContent?.isLoading);
+  const _title = useKartonState((s) => s.webContent?.title);
+  const canGoBack = useKartonState(
+    (s) => s.webContent?.navigationHistory?.canGoBack,
+  );
+  const canGoForward = useKartonState(
+    (s) => s.webContent?.navigationHistory?.canGoForward,
+  );
+
+  const goBack = useKartonProcedure((p) => p.webContent.goBack);
+  const goForward = useKartonProcedure((p) => p.webContent.goForward);
+  const reload = useKartonProcedure((p) => p.webContent.reload);
+  const stop = useKartonProcedure((p) => p.webContent.stop);
+  const goto = useKartonProcedure((p) => p.webContent.goto);
 
   return (
     <div className="glass-body @[175px]:flex hidden h-10 w-full flex-1 flex-row items-center gap-2 rounded-full bg-background/80 p-1 backdrop-blur-lg">
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={navigateBack}
-        disabled={!canNavigateBack}
+        onClick={() => void goBack()}
+        disabled={!canGoBack}
         className="@[320px]:flex hidden"
       >
         <ArrowLeftIcon className="size-4" />
       </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => void goForward()}
+        disabled={!canGoForward}
+      >
+        <ArrowRightIcon className="size-4" />
+      </Button>
       <div className="relative flex-1">
-        <span className="-translate-y-1/2 absolute top-1/2 left-2 font-bold text-muted-foreground text-xs tracking-wide">
-          URL:
-        </span>
-        {hasIFrame || forceShowInput ? (
-          <Input
-            className="flex h-8 w-full max-w-none flex-1 flex-row items-center rounded-full pl-10"
-            inputClassName="pl-1.5 rounded-full outline-offset-0 h-6 mr-1"
-            type="text"
-            placeholder="URL"
-            onSubmit={navigateToUrl}
-            value={url.length > 0 ? url : '/'}
-            onChange={changeUrl}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                navigateToUrl();
-              }
-            }}
-          />
-        ) : (
-          <div
-            className="flex h-8 w-full max-w-none flex-1 cursor-pointer flex-row items-center rounded-full pl-10 text-yellow-600 dark:text-yellow-500"
-            onClick={() => {
-              setForceShowInput(true);
-              setUrl('/');
-              setIsOverridingUrl(true);
-            }}
-            role="button"
-            aria-label="Show URL input"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                setForceShowInput(true);
-                setUrl('/');
-                setIsOverridingUrl(true);
-              }
-            }}
-          >
-            <span className="truncate text-xs">
-              No access to iframe. Probably not same-origin.
-            </span>
-          </div>
-        )}
+        <Input
+          ref={urlInputRef}
+          className="flex h-8 w-full max-w-none flex-1 flex-row items-center rounded-full"
+          inputClassName="pl-1.5 rounded-full outline-offset-0 h-6 mr-1"
+          type="text"
+          placeholder="Enter a URL to navigate to..."
+          onSubmit={() => {
+            void goto(displayedUrl);
+            setUrlModified(false);
+            urlInputRef.current?.blur();
+          }}
+          value={displayedUrl}
+          onChange={(e) => {
+            if (document.activeElement === urlInputRef.current) {
+              setUrlModified(true);
+              setDisplayedUrl(e.target.value);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              void goto(displayedUrl);
+              setUrlModified(false);
+              urlInputRef.current?.blur();
+            }
+          }}
+        />
       </div>
 
       <Tooltip>
@@ -328,19 +162,21 @@ export function UrlControl() {
             variant="ghost"
             size="icon-sm"
             className="@[320px]:flex hidden"
-            onClick={() => (isLoading ? stopLoading() : reloadIFrame())}
+            onClick={() => (isLoading ? void stop() : void reload())}
           >
-            {isLoading && (
-              <Loader2Icon className="size-8 animate-spin text-primary" />
-            )}
-            {!isLoading ? (
-              <RefreshCwIcon className="size-4" />
+            {isLoading ? (
+              <>
+                <Loader2Icon className="size-8 animate-spin text-primary" />
+                <SquareIcon className="-translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 size-3 fill-current" />
+              </>
             ) : (
-              <SquareIcon className="-translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 size-3 fill-current" />
+              <RefreshCwIcon className="size-4" />
             )}
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Reload page</TooltipContent>
+        <TooltipContent>
+          {isLoading ? 'Stop loading' : 'Reload page'}
+        </TooltipContent>
       </Tooltip>
     </div>
   );
@@ -451,36 +287,24 @@ export function ScreenSizeControl() {
   );
 }
 
-export function FullScreenToggle() {
-  const isFullScreen = useKartonState(
-    (s) =>
-      s.userExperience.activeLayout === Layout.MAIN &&
-      s.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW &&
-      s.userExperience.devAppPreview.isFullScreen,
-  );
-  const toggleFullScreen = useKartonProcedure(
-    (p) =>
-      p.userExperience.mainLayout.mainLayout.devAppPreview.toggleFullScreen,
-  );
+function DevToolsToggle() {
+  const devToolsOpen = useKartonState((s) => s.webContent?.devToolsOpen);
+  const toggleDevTools = useKartonProcedure((p) => p.webContent.toggleDevTools);
 
   return (
     <Tooltip>
       <TooltipTrigger>
         <Button
-          variant="secondary"
+          variant={devToolsOpen ? 'primary' : 'secondary'}
           size="icon-md"
-          className="bg-background/80 backdrop-blur-lg"
-          onClick={() => toggleFullScreen()}
+          className={!devToolsOpen && 'bg-background/80 backdrop-blur-lg'}
+          onClick={() => toggleDevTools()}
         >
-          {isFullScreen ? (
-            <Minimize2Icon className="size-4" />
-          ) : (
-            <Maximize2Icon className="size-4" />
-          )}
+          <BugIcon className="size-4" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        {isFullScreen ? 'Exit full screen' : 'Full screen'}
+        {devToolsOpen ? 'Close dev tools' : 'Open dev tools'}
       </TooltipContent>
     </Tooltip>
   );

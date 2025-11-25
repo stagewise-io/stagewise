@@ -7,6 +7,7 @@ import { cn } from '@/utils';
 import { Layout } from '@stagewise/karton-contract';
 import { Logo } from '@/components/ui/logo';
 import { SetupWorkspaceScreen } from './setup-workspace';
+import { WebContentsBoundsSyncer } from '@/components/web-contents-bounds-syncer';
 
 export function ScreenRouter() {
   // We render different screens based on the app state.
@@ -48,6 +49,8 @@ export function ScreenRouter() {
       />
 
       <DefaultLayout show={connected && displayedLayout === Layout.MAIN} />
+
+      <WebContentsBoundsSyncer />
     </div>
   );
 }
