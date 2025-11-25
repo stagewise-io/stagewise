@@ -53,14 +53,17 @@ export function UrlControl() {
   const currentUrl = useKartonState((s) => s.webContent?.url);
 
   const [urlModified, setUrlModified] = useState(false);
-  const [displayedUrl, setDisplayedUrl] = useState(currentUrl ?? '');
   const urlInputRef = useRef<HTMLInputElement>(null);
   const syncUrlContent = useCallback(() => {
     // We only set the current URL into the URL bar, if:
     //  - The URL wasn't modified by the user.
     //  - The URL input isn't focused/active.
-    if (!urlModified && document.activeElement !== urlInputRef.current) {
-      setDisplayedUrl(currentUrl);
+    if (
+      !urlModified &&
+      document.activeElement !== urlInputRef.current &&
+      urlInputRef.current
+    ) {
+      urlInputRef.current.value = currentUrl;
     } else {
       console.log(
         'Not syncing URL because it was modified by the user or the URL input is focused.',
@@ -82,6 +85,29 @@ export function UrlControl() {
     return true;
   }, [syncUrlContent]);
   useHotKeyListener(handleResetUrlModification, HotkeyActions.ESC);
+
+  const buildFullUrl = useCallback((url: string) => {
+    // We check if the URL is valid. If it's not valid, check if there's a protocol prefix. If there is not protocol prefix, we add https: protocl by default. If the URL still isn't valid, we return a google search string with the input as the query.
+    let checkedUrl = url.trim();
+
+    if (checkedUrl.includes(' ')) {
+      checkedUrl = getSearchUrl(checkedUrl);
+    }
+
+    if (checkUrl(checkedUrl)) {
+      return checkedUrl;
+    }
+
+    if (checkedUrl.split(':').length < 2) {
+      checkedUrl = `https://${checkedUrl}`;
+    }
+
+    if (checkUrl(checkedUrl)) {
+      return checkedUrl;
+    }
+
+    return getSearchUrl(checkedUrl);
+  }, []);
 
   const isLoading = useKartonState((s) => s.webContent?.isLoading);
   const _title = useKartonState((s) => s.webContent?.title);
@@ -125,20 +151,18 @@ export function UrlControl() {
           type="text"
           placeholder="Enter a URL to navigate to..."
           onSubmit={() => {
-            void goto(displayedUrl);
+            void goto(buildFullUrl(urlInputRef.current?.value ?? ''));
             setUrlModified(false);
             urlInputRef.current?.blur();
           }}
-          value={displayedUrl}
-          onChange={(e) => {
+          onChange={() => {
             if (document.activeElement === urlInputRef.current) {
               setUrlModified(true);
-              setDisplayedUrl(e.target.value);
             }
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              void goto(displayedUrl);
+              void goto(buildFullUrl(urlInputRef.current?.value ?? ''));
               setUrlModified(false);
               urlInputRef.current?.blur();
             }
@@ -390,3 +414,16 @@ export function DevAppStateInfo() {
     </Popover>
   );
 }
+
+const checkUrl = (url: string) => {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const getSearchUrl = (query: string) => {
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+};
