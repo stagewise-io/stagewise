@@ -71,6 +71,9 @@ export class AppMenuService {
         ],
       },
       {
+        role: 'editMenu',
+      },
+      {
         label: 'User',
         id: 'user_menu',
         submenu: (() => {
