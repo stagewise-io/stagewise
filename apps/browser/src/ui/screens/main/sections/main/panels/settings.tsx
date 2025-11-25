@@ -40,7 +40,7 @@ export const SettingsPanel = () => {
   const workspaceLoaded = useKartonState((s) => s.workspaceStatus === 'open');
 
   return (
-    <div className="glass-body flex size-full flex-col items-stretch justify-start overflow-hidden rounded-xl bg-background/80 p-4">
+    <div className="glass-body flex size-full flex-col items-stretch justify-start overflow-hidden rounded-xl bg-background p-4">
       <Tabs defaultValue="workspace">
         <TabsList>
           {workspaceLoaded && (
@@ -263,7 +263,7 @@ export const WorkspaceSettingsTabContent = () => {
               This path is used to store persistent data for the workspace.
             </FormFieldDescription>
           </div>
-          <p className="max-w-1/2 break-all text-end font-medium font-mono text-muted-foreground text-sm">
+          <p className="max-w-1/2 select-text break-all text-end font-medium font-mono text-muted-foreground text-sm">
             {workspaceDataPath}
           </p>
         </FormField>
@@ -275,7 +275,7 @@ export const WorkspaceSettingsTabContent = () => {
               This path is used to store cached data for the workspace.
             </FormFieldDescription>
           </div>
-          <p className="max-w-1/2 break-all text-end font-medium font-mono text-muted-foreground text-sm">
+          <p className="max-w-1/2 select-text break-all text-end font-medium font-mono text-muted-foreground text-sm">
             {workspaceCachePath}
           </p>
         </FormField>
@@ -287,7 +287,7 @@ export const WorkspaceSettingsTabContent = () => {
               This path is used to store temporary data for the workspace.
             </FormFieldDescription>
           </div>
-          <p className="max-w-1/2 break-all text-end font-medium font-mono text-muted-foreground text-sm">
+          <p className="max-w-1/2 select-text break-all text-end font-medium font-mono text-muted-foreground text-sm">
             {workspaceTempPath}
           </p>
         </FormField>

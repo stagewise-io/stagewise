@@ -22,6 +22,7 @@ body {
   padding: 0;
   -webkit-app-region: no-drag;
   app-region: no-drag;
+  user-select: none;
 }
 
 @utility app-drag {
