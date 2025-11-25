@@ -26,7 +26,7 @@ export class WindowLayoutService {
       height: 600,
       title: 'stagewise',
       titleBarStyle: 'hiddenInset',
-      trafficLightPosition: { x: 16, y: 16 },
+      trafficLightPosition: { x: 14, y: 14 },
       vibrancy: 'popover',
       backgroundMaterial: 'mica',
       backgroundColor: '#fafafa00',

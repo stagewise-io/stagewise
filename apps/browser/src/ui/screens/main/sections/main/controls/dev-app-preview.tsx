@@ -14,8 +14,6 @@ import {
 import { Input } from '@stagewise/stage-ui/components/input';
 import {
   PlayIcon,
-  ProportionsIcon,
-  CodeIcon,
   RefreshCwIcon,
   BookImageIcon,
   ArrowLeftIcon,
@@ -25,15 +23,8 @@ import {
   BugIcon,
 } from 'lucide-react';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
-import { RadioGroup, Radio } from '@stagewise/stage-ui/components/radio';
-import {
-  FormField,
-  FormFieldLabel,
-  FormFieldTitle,
-} from '@stagewise/stage-ui/components/form';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { Layout, MainTab } from '@stagewise/karton-contract';
-import { usePostHog } from 'posthog-js/react';
 import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@/utils';
 
@@ -52,7 +43,6 @@ export function DevAppPreviewControls() {
       )}
     >
       <DevAppStateInfo />
-      <ScreenSizeControl />
       <DevToolsToggle />
       <UrlControl />
     </div>
@@ -199,7 +189,7 @@ export function SocialMediaPreviewsToggle() {
   );
 }
 
-const screenSizes: Record<
+const _screenSizes: Record<
   string,
   { width: number; height: number; presetName: string } | null
 > = {
@@ -213,79 +203,6 @@ const screenSizes: Record<
     presetName: 'Widescreen Desktop',
   },
 };
-
-export function ScreenSizeControl() {
-  const screenSize = useKartonState((s) =>
-    s.userExperience.activeLayout === Layout.MAIN &&
-    s.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
-      ? s.userExperience.devAppPreview.customScreenSize
-      : null,
-  );
-  const posthog = usePostHog();
-  const setScreenSize = useKartonProcedure(
-    (p) =>
-      p.userExperience.mainLayout.mainLayout.devAppPreview.changeScreenSize,
-  );
-
-  const onValueChange = useCallback(
-    (value: string | null) => {
-      setScreenSize(value ? screenSizes[value as string]! : null);
-    },
-    [setScreenSize],
-  );
-
-  return (
-    <Popover>
-      <Tooltip>
-        <TooltipTrigger>
-          <PopoverTrigger>
-            <Button
-              variant={screenSize ? 'primary' : 'secondary'}
-              size="icon-md"
-              className={cn(
-                '@[320px]:flex hidden backdrop-blur-lg transition-all',
-                screenSize ? 'bg-primary' : 'bg-background/80',
-              )}
-            >
-              <ProportionsIcon className="size-4" />
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Change screen size</TooltipContent>
-      </Tooltip>
-      <PopoverContent>
-        <PopoverTitle>Change screen size</PopoverTitle>
-        <RadioGroup
-          value={
-            Object.entries(screenSizes).find(
-              ([_, value]) => value?.presetName === screenSize?.presetName,
-            )?.[0] ?? 'full-screen'
-          }
-          onValueChange={(value) => {
-            onValueChange(value as string | null);
-            posthog.capture('dev_app_preview_screen_size_changed', {
-              screen_size: value,
-            });
-          }}
-        >
-          {Object.entries(screenSizes).map(([key, value]) => (
-            <FormField>
-              <FormFieldLabel
-                htmlFor={`screen-size-${key}`}
-                className="glass-body flex w-full flex-row items-center justify-between gap-4 rounded-xl py-1.5 pr-1.5 pl-3"
-              >
-                <FormFieldTitle>
-                  {value?.presetName ?? 'Default'}
-                </FormFieldTitle>
-                <Radio value={key} id={`screen-size-${key}`} />
-              </FormFieldLabel>
-            </FormField>
-          ))}
-        </RadioGroup>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 function DevToolsToggle() {
   const devToolsOpen = useKartonState((s) => s.webContent?.devToolsOpen);
@@ -473,30 +390,3 @@ export function DevAppStateInfo() {
     </Popover>
   );
 }
-
-const _CodeShowModeToggle = () => {
-  const [inCodeShowMode, setInCodeShowMode] = useState(false);
-
-  const toggleCodeShowMode = useCallback(() => {
-    setInCodeShowMode((prev) => !prev);
-  }, []);
-
-  return (
-    <Tooltip>
-      <TooltipTrigger>
-        <Button
-          variant={inCodeShowMode ? 'primary' : 'secondary'}
-          size="icon-md"
-          onClick={toggleCodeShowMode}
-          className={cn(
-            'backdrop-blur-lg transition-all',
-            inCodeShowMode ? 'bg-primary' : 'bg-background/80',
-          )}
-        >
-          <CodeIcon className="size-4" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Code show mode</TooltipContent>
-    </Tooltip>
-  );
-};

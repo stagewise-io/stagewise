@@ -87,12 +87,12 @@ export function MainSection() {
       id="opened-content-panel"
       order={2}
       defaultSize={70}
-      className="@container flex h-full flex-1 flex-col items-stretch justify-between gap-4 p-3 pl-1"
+      className="@container flex h-full flex-1 flex-col items-stretch justify-between gap-2 p-3 pt-0 pl-1"
     >
       {/* Tab navigation and controls area */}
       <div
         className={cn(
-          'flex flex-row items-center justify-between @[450px]:gap-20 gap-4',
+          'flex flex-row items-center justify-between gap-6',
           activeTab &&
             tabs[activeTab].hideTabBar &&
             !tabs[activeTab].controls &&
@@ -117,7 +117,7 @@ export function MainSection() {
                   'w-[calc-size(auto,size)] min-w-10 rounded-full transition-all duration-200 ease-out',
                 )}
                 variant={activeTab === tabId ? 'primary' : 'ghost'}
-                size={activeTab === tabId ? 'md' : 'icon-md'}
+                size={activeTab === tabId ? 'sm' : 'icon-sm'}
                 onClick={() => changeTab(tabId as MainTab)}
                 disabled={tab.disabled}
               >

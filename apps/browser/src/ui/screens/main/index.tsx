@@ -12,10 +12,11 @@ export function DefaultLayout({ show }: { show: boolean }) {
   return (
     <div
       className={cn(
-        'root fixed inset-0 flex size-full flex-row items-stretch justify-between transition-all delay-150 duration-300 ease-out',
+        'root fixed inset-0 flex size-full flex-row items-stretch justify-between pt-10 transition-all delay-150 duration-300 ease-out',
         !show && 'pointer-events-none translate-y-8 opacity-0 blur-lg',
       )}
     >
+      <div className="app-drag fixed top-0 right-0 left-0 h-8" />
       <ResizablePanelGroup
         direction="horizontal"
         autoSaveId="stagewise-center-panel-layout"

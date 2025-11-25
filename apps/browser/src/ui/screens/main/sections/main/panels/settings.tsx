@@ -40,7 +40,7 @@ export const SettingsPanel = () => {
   const workspaceLoaded = useKartonState((s) => s.workspaceStatus === 'open');
 
   return (
-    <div className="glass-body flex size-full flex-col items-stretch justify-start overflow-hidden rounded-xl p-4">
+    <div className="glass-body flex size-full flex-col items-stretch justify-start overflow-hidden rounded-xl bg-background/80 p-4">
       <Tabs defaultValue="workspace">
         <TabsList>
           {workspaceLoaded && (
