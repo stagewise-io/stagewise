@@ -341,6 +341,10 @@ export class WorkspaceService {
     return absolutePath;
   }
 
+  get id(): string {
+    return this.workspacePathsService!.workspaceId;
+  }
+
   get path(): string {
     return this.workspacePath;
   }

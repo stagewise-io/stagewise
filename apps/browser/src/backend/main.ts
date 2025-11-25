@@ -64,14 +64,6 @@ export async function main({
     logger,
   );
 
-  const _windowLayoutService = new WindowLayoutService(logger, kartonService);
-
-  const _appMenuService = new AppMenuService(
-    logger,
-    authService,
-    _windowLayoutService,
-  );
-
   const workspaceManagerService = await WorkspaceManagerService.create(
     logger,
     filePickerService,
@@ -82,6 +74,20 @@ export async function main({
     globalDataPathService,
     notificationService,
   );
+
+  const _windowLayoutService = new WindowLayoutService(
+    logger,
+    kartonService,
+    globalDataPathService,
+    workspaceManagerService,
+  );
+
+  const _appMenuService = new AppMenuService(
+    logger,
+    authService,
+    _windowLayoutService,
+  );
+
   const _userExperienceService = await UserExperienceService.create(
     logger,
     kartonService,

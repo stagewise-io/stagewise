@@ -115,4 +115,13 @@ export class WorkspacePathsService {
       this.workspaceFolderName,
     );
   }
+
+  /**
+   * Return the ID that's used as a base for the workspace data path.
+   *
+   * @warning This ID is not guaranteed to be unique and should not be used for any other purpose than identifying the workspace.
+   */
+  get workspaceId(): string {
+    return this.workspaceFolderName;
+  }
 }

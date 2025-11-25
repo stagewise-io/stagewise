@@ -4,8 +4,10 @@
 
 import express, { type Request, type Response } from 'express';
 import { stagewiseAppPrefix } from './shared';
-import { resolve } from 'node:path';
+import path, { resolve } from 'node:path';
 import type { WorkspaceManagerService } from '@/services/workspace-manager';
+
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 export async function setupComponentConvasRoutes(
   app: express.Application,

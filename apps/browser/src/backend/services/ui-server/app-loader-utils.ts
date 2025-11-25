@@ -4,10 +4,12 @@
 
 import express, { type Request, type Response } from 'express';
 import { stagewiseAppPrefix } from './shared';
-import { resolve } from 'node:path';
+import path, { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import type { WorkspaceManagerService } from '@/services/workspace-manager';
 import type { WorkspacePlugin } from '@/shared/plugins';
+
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 export async function setupAppLoaderRoutes(
   app: express.Application,

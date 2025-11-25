@@ -3,6 +3,8 @@ import path from 'node:path';
 import type { KartonService } from './karton';
 import type { Logger } from './logger';
 import contextMenu from 'electron-context-menu';
+import type { GlobalDataPathService } from './global-data-path';
+import type { WorkspaceManagerService } from './workspace-manager';
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
@@ -14,12 +16,38 @@ export class WindowLayoutService {
   private webContentsViewContainer: View;
   private webContentsView: WebContentsView;
   private uiContentView: WebContentsView;
+  private globalDataPathService: GlobalDataPathService;
+  private workspaceManagerService: WorkspaceManagerService;
 
-  constructor(logger: Logger, kartonService: KartonService) {
+  constructor(
+    logger: Logger,
+    kartonService: KartonService,
+    globalDataPathService: GlobalDataPathService,
+    workspaceManagerService: WorkspaceManagerService,
+  ) {
     this.logger = logger;
     this.kartonService = kartonService;
+    this.globalDataPathService = globalDataPathService;
+    this.workspaceManagerService = workspaceManagerService;
 
     this.logger.debug('[WindowLayoutService] Initializing service');
+
+    app.setPath(
+      'userData',
+      path.join(this.globalDataPathService.globalDataPath, 'userData'),
+    );
+    app.setPath(
+      'sessionData',
+      path.join(this.globalDataPathService.globalDataPath, 'sessionData'),
+    );
+    app.setPath(
+      'temp',
+      path.join(this.globalDataPathService.globalTempPath, 'temp'),
+    );
+    app.setPath(
+      'cache',
+      path.join(this.globalDataPathService.globalCachePath, 'cache'),
+    );
 
     this.baseWindow = new BaseWindow({
       width: 800,
@@ -40,7 +68,11 @@ export class WindowLayoutService {
     this.webContentsViewContainer.setBorderRadius(12);
     this.webContentsViewContainer.setBackgroundColor('#FFF');
 
-    this.webContentsView = new WebContentsView({});
+    this.webContentsView = new WebContentsView({
+      webPreferences: {
+        partition: 'persist:browser-content',
+      },
+    });
     this.webContentsView.setBorderRadius(12);
     contextMenu({
       showSaveImageAs: true,
@@ -54,6 +86,7 @@ export class WindowLayoutService {
     this.uiContentView = new WebContentsView({
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
+        partition: 'persist:stagewise-ui',
       },
     });
     this.uiContentView.setBackgroundColor('#00000000');
@@ -74,7 +107,9 @@ export class WindowLayoutService {
     });
     this.baseWindow.contentView.addChildView(this.uiContentView);
 
-    this.uiContentView.webContents.openDevTools();
+    if (process.env.NODE_ENV === 'development') {
+      this.uiContentView.webContents.openDevTools();
+    }
 
     // Sync sizes on startup and resize
     this.handleMainWindowResize();

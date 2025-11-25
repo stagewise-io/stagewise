@@ -25,6 +25,7 @@ export class WorkspaceManagerService {
   private authService: AuthService;
   private globalDataPathService: GlobalDataPathService;
   private notificationService: NotificationService;
+  private workspaceChangeListeners: (() => void)[] = [];
 
   private constructor(
     logger: Logger,
@@ -182,6 +183,8 @@ export class WorkspaceManagerService {
       draft.workspaceStatus = 'open';
     });
 
+    this.workspaceChangeListeners.forEach((listener) => listener());
+
     this.logger.debug('[WorkspaceManagerService] Loaded workspace');
   }
 
@@ -206,6 +209,8 @@ export class WorkspaceManagerService {
       draft.workspaceStatus = 'closed';
     });
 
+    this.workspaceChangeListeners.forEach((listener) => listener());
+
     this.logger.debug('[WorkspaceManagerService] Unloaded workspace');
   }
 
@@ -215,7 +220,19 @@ export class WorkspaceManagerService {
     if (this.currentWorkspace) {
       await this.unloadWorkspace();
     }
+    this.workspaceChangeListeners = [];
+
     this.logger.debug('[WorkspaceManagerService] Shutdown complete');
+  }
+
+  public registerWorkspaceChangeListener(listener: () => void) {
+    this.workspaceChangeListeners.push(listener);
+  }
+
+  public removeWorkspaceChangeListener(listener: () => void) {
+    this.workspaceChangeListeners = this.workspaceChangeListeners.filter(
+      (l) => l !== listener,
+    );
   }
 
   get workspace(): WorkspaceService | null {
