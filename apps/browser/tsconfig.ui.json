@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "composite": true,
-    "module": "ESNext",
+    "module": "es2022",
+    "lib": ["es2022"],
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "paths": {

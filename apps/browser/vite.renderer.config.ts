@@ -26,5 +26,6 @@ export default defineConfig({
     rollupOptions: {
       external: ['serialport', 'sqlite3'],
     },
+    target: 'es2022',
   },
 });
