@@ -81,6 +81,7 @@
 }
 
 :root {
+  /* Glass border shadows - light and dark edges with subtle border */
   --glass-border-shadow:
     inset 2px 3px 1px -3px rgba(255, 255, 255, 0.8),
     inset 2px 3px 3px -2.5px rgba(255, 255, 255, 0.3),
@@ -88,60 +89,75 @@
     inset -2px -3px 3px -2.5px rgba(255, 255, 255, 0.3),
     inset 0 0 1px 1px rgba(50, 50, 50, 0.15);
 
+  /* Glass body shadows - base state with top highlight and bottom shade */
   --glass-body-shadow:
     inset 0 0 0 rgba(0, 0, 0, 0), inset 0 4px 8px 4px rgba(255, 255, 255, 0.1),
     inset 0 -16px 32px -24px rgba(0, 0, 0, 0.1);
+
+  /* Glass body shadows - hover state with enhanced highlights */
   --glass-body-shadow-hover:
     inset 0 0 0 rgba(0, 0, 0, 0), inset 0 4px 16px 4px rgba(255, 255, 255, 0.15),
     inset 0 -16px 32px -24px rgba(0, 0, 0, 0.1);
+
+  /* Glass body shadows - pressed state with reduced highlights */
   --glass-body-shadow-pressed:
     inset 0 0 0 rgba(0, 0, 0, 0), inset 0 2px 4px 3px rgba(255, 255, 255, 0.1),
     inset 0 -8px 16px -16px rgba(0, 0, 0, 0.3);
 
+  /* Glass inset effects - border and depth shadows */
   --glass-inset-border-shadow: inset 0 0 1px 0px rgba(0, 0, 0, 0.2);
   --glass-inset-shadow:
-    inset 0 2px 3px 1px rgba(0, 0, 0, 0.05),
+    inset -1px 2px 1px -1px rgba(0, 0, 0, 0.05),
     inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5),
-    inset 0 4px 24px 12px rgba(0, 0, 0, 0.05),
+    /* inset 0 2px 6px 2px rgba(0,0,0,0.05), */
+    inset 0 2px 10px 6px rgba(0, 0, 0, 0.05),
     0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
   --glass-inset-background: transparent;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* Glass border shadows - reduced opacity for dark mode */
     --glass-border-shadow:
-      inset 2px 3px 1px -3px rgba(255, 255, 255, 0.6),
-      inset 2px 3px 3px -2.5px rgba(255, 255, 255, 0.2),
-      inset -2px -3px 1px -3px rgba(255, 255, 255, 0.6),
-      inset -2px -3px 3px -2.5px rgba(255, 255, 255, 0.2),
-      inset 0 0 1px 1px rgba(50, 50, 50, 0.1);
+      inset 2px 3px 1px -3px rgba(255, 255, 255, 0.3),
+      inset 2px 3px 2px -2.5px rgba(255, 255, 255, 0.05),
+      inset -2px -3px 1px -3px rgba(255, 255, 255, 0.3),
+      inset -2px -3px 2px -2.5px rgba(255, 255, 255, 0.05),
+      inset 0 0 1px 1px rgba(50, 50, 50, 0.05);
 
+    /* Glass body shadows - dark mode base state */
     --glass-body-shadow:
-      inset 0 0 0 rgba(0, 0, 0, 0), inset 0 4px 8px 4px
+      inset 0 0 0 rgba(0, 0, 0, 0), inset 0 2px 4px 2px
       rgba(255, 255, 255, 0.05), inset 0 -16px 32px -24px rgba(0, 0, 0, 0.05);
+
+    /* Glass body shadows - dark mode hover state */
     --glass-body-shadow-hover:
-      inset 0 0 0 rgba(0, 0, 0, 0), inset 0 4px 16px 4px
-      rgba(255, 255, 255, 0.1), inset 0 -16px 32px -24px rgba(0, 0, 0, 0.05);
+      inset 0 0 0 rgba(0, 0, 0, 0), inset 0 2px 16px 4px
+      rgba(255, 255, 255, 0.07), inset 0 -16px 32px -24px rgba(0, 0, 0, 0.05);
+
+    /* Glass body shadows - dark mode pressed state */
     --glass-body-shadow-pressed:
-      inset 0 0 0 rgba(0, 0, 0, 0), inset 0 2px 4px 3px
+      inset 0 0 0 rgba(0, 0, 0, 0), inset 0 2px 4px 2px
       rgba(255, 255, 255, 0.05), inset 0 -8px 16px -16px rgba(0, 0, 0, 0.2);
 
+    /* Glass inset effects - dark mode */
     --glass-inset-border-shadow: inset 0 0 1px 0px rgba(0, 0, 0, 0.2);
     --glass-inset-shadow:
       inset 0 2px 3px 1px rgba(0, 0, 0, 0.05),
-      inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5),
+      inset -3px -4px 2px -5px rgba(255, 255, 255, 0.5),
       inset 0 4px 24px 12px rgba(0, 0, 0, 0.05),
       0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
     /* Slightly lighter overlay similar to bg-muted-foreground/5 */
-    --glass-inset-background: rgba(148, 163, 184, 0.05);
+    --glass-inset-background: rgba(148, 163, 184, 0.15);
   }
 }
 
 @utility glass-body {
   @apply relative
-    after:pointer-events-none after:absolute after:inset-0 after:block after:size-full after:rounded-[inherit]
-    after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow)]
-    after:transition-all after:duration-150;
+    after:absolute after:inset-0 after:block after:size-full
+    after:pointer-events-none after:rounded-[inherit]
+    after:transition-all after:duration-150
+    after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow)];
 }
 
 @utility glass-body-interactive {
@@ -152,17 +168,18 @@
 
 @utility glass-body-motion {
   @apply transition-transform duration-300 ease-out
-    shadow-lg shadow-black/5;
+    shadow-black/5 shadow-lg;
 }
 
 @utility glass-body-motion-interactive {
-  @apply hover:scale-[101%] active:scale-[98%]
-    hover:shadow-xl active:shadow-md;
+  @apply hover:scale-[101%] hover:shadow-xl
+    active:scale-[98%] active:shadow-md;
 }
 
 @utility glass-inset {
   @apply relative
-    before:pointer-events-none before:absolute before:inset-0 before:block before:size-full before:rounded-[inherit]
+    before:absolute before:inset-0 before:block before:size-full
+    before:pointer-events-none before:rounded-[inherit]
     before:bg-[var(--glass-inset-background)]
     before:shadow-[var(--glass-inset-border-shadow),var(--glass-inset-shadow)];
 }
