@@ -61,6 +61,17 @@ export class WindowLayoutService {
       shell.openExternal(details.url);
       return { action: 'deny' };
     });
+    contextMenu({
+      showSaveImage: false,
+      showSaveImageAs: false,
+      showCopyLink: false,
+      showSearchWithGoogle: false,
+      showSelectAll: false,
+      showServices: false,
+      showLookUpSelection: false,
+      showInspectElement: false,
+      window: this.uiContentView.webContents,
+    });
     this.baseWindow.contentView.addChildView(this.uiContentView);
 
     this.uiContentView.webContents.openDevTools();
