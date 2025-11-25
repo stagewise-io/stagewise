@@ -7,7 +7,6 @@ import type { InternalToolbarConfig } from './config';
 import { ScreenRouter } from './screens';
 import { NotificationToaster } from './notification-toaster';
 import { AuthDialog } from './dialogs/auth';
-import { FilePickerDialog } from './dialogs/file-picker';
 import { TitleManager } from './components/title-manager';
 
 export const App: FunctionComponent<InternalToolbarConfig> = (config) => {
@@ -19,7 +18,6 @@ export const App: FunctionComponent<InternalToolbarConfig> = (config) => {
         <ScreenRouter />
 
         <AuthDialog />
-        <FilePickerDialog />
 
         <NotificationToaster />
       </ContextProviders>

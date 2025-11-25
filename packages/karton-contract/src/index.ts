@@ -229,15 +229,6 @@ export type AppState = {
             };
           }
       ));
-  filePicker: {
-    title: string;
-    description: string;
-    mode: 'file' | 'directory';
-    multiple: boolean;
-    currentPath: string; // The current path of the selector dialog.
-    parentSiblings: { path: string; type: 'directory' | 'file' }[][]; // Shows a list of sibling directories for each parent directory level.
-    children: { path: string; type: 'directory' | 'file' }[]; // Shows a list of child entities for the current path.
-  } | null;
   // State of the notification service.
   notifications: {
     id: string;
@@ -374,10 +365,6 @@ export type KartonContract = {
     };
     filePicker: {
       createRequest: (request: FilePickerRequest) => Promise<string[]>;
-      changeDirectory: (path: string) => Promise<void>;
-      dismiss: () => Promise<void>; // Closes the picker dialog.
-      createFolder: (path: string) => Promise<void>; // Creates a new folder in the specified path.
-      select: (path: string[]) => Promise<void>; // Notifies about final selection of the specified paths.
     };
     notifications: {
       triggerAction: (id: string, actionIndex: number) => Promise<void>;
@@ -441,7 +428,6 @@ export const defaultState: KartonContract['state'] = {
   userExperience: {
     activeLayout: Layout.SIGNIN,
   },
-  filePicker: null,
   notifications: [],
   webContent: null,
 };
