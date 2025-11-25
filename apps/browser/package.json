@@ -44,7 +44,6 @@
     "@stagewise/agent-tools": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
     "@stagewise/api-client": "1.4.0",
-    "@stagewise/flappy-game": "workspace:*",
     "@stagewise/karton": "workspace:*",
     "@stagewise/karton-contract": "workspace:*",
     "@stagewise/stage-ui": "workspace:*",
