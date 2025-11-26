@@ -1,22 +1,20 @@
 import { cn } from '@/utils';
 import type { ReasoningUIPart } from '@stagewise/karton-contract';
 import { useState, useEffect, useRef, useMemo } from 'react';
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from '@stagewise/stage-ui/components/collapsible';
-import { BrainIcon, ChevronDownIcon } from 'lucide-react';
+import { BrainIcon } from 'lucide-react';
 import { Streamdown } from '@/components/streamdown';
 import { useTypeWriterText } from '@/hooks/use-type-writer-text';
+import { ToolPartUI } from './tools/shared/tool-part-ui';
 
 export const ThinkingPart = ({
   part,
-  isLastPart,
+  isAutoExpanded,
+  isShimmering,
   thinkingDuration,
 }: {
   part: ReasoningUIPart;
-  isLastPart: boolean;
+  isAutoExpanded: boolean;
+  isShimmering: boolean;
   thinkingDuration?: number;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -30,8 +28,8 @@ export const ThinkingPart = ({
   }, [thinkingDuration]);
 
   useEffect(() => {
-    setIsExpanded(isLastPart);
-  }, [isLastPart]);
+    setIsExpanded(isAutoExpanded);
+  }, [isAutoExpanded]);
 
   // Find the scrollable container element (the CollapsibleContent with overflow-y-auto)
   const findScrollContainer = (
@@ -118,19 +116,28 @@ export const ThinkingPart = ({
     showAllOnFirstRender: true,
     animateOnIncreaseOnly: true,
   });
-
   return (
-    <div
-      data-state={part.state}
-      className="-mx-1 group/thinking-part block min-w-32 rounded-xl border-border/20 bg-muted-foreground/5"
-    >
-      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-        <CollapsibleTrigger
-          size="condensed"
-          className="h-6 cursor-pointer gap-1.5 rounded-full px-2.5 text-muted-foreground"
-        >
-          <BrainIcon className="size-3 group-data-[state=streaming]/thinking-part:animate-thinking-part-brain-pulse group-data-[state=streaming]/thinking-part:text-primary" />
-          <span className="group-data-[state=streaming]/thinking-part:shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 flex-1 truncate text-start text-xs">
+    <ToolPartUI
+      expanded={isExpanded}
+      setExpanded={setIsExpanded}
+      trigger={
+        <>
+          <BrainIcon
+            className={cn(
+              'size-3 text-muted-foreground',
+              isShimmering
+                ? 'animate-thinking-part-brain-pulse text-primary'
+                : '',
+            )}
+          />
+          <span
+            className={cn(
+              'flex-1 truncate text-start text-xs',
+              isShimmering
+                ? 'shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300'
+                : 'text-muted-foreground',
+            )}
+          >
             {part.state === 'streaming' && 'Thinking...'}
             {part.state === 'done' && formattedThinkingDuration && (
               <span>Thought for {formattedThinkingDuration}</span>
@@ -139,24 +146,18 @@ export const ThinkingPart = ({
               <span>Thought</span>
             )}
           </span>
-          <ChevronDownIcon
-            className={cn(
-              'size-3 transition-transform duration-150',
-              isExpanded && 'rotate-180',
-            )}
-          />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%_-_8px),transparent)] scrollbar-hover-only block max-h-32 overflow-y-auto overscroll-y-none pt-1.5 pb-0.5 pl-2.5 text-[0.8rem]">
-          <div
-            ref={setContentWrapperRef}
-            className="pb-1 opacity-60 group-data-[state=streaming]/thinking-part:opacity-90"
-          >
-            <Streamdown isAnimating={part.state === 'streaming'}>
-              {displayedText}
-            </Streamdown>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
+        </>
+      }
+      content={
+        <div
+          ref={setContentWrapperRef}
+          className="pb-1 opacity-60 group-data-[state=streaming]/thinking-part:opacity-90"
+        >
+          <Streamdown isAnimating={part.state === 'streaming'}>
+            {displayedText}
+          </Streamdown>
+        </div>
+      }
+    />
   );
 };

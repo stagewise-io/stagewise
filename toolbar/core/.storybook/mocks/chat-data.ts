@@ -102,12 +102,14 @@ export function createOverwriteFileToolPart(
   relativePath: string,
   content: string,
   state: 'streaming' | 'complete' | 'error' = 'complete',
-  oldContent?: string,
+  oldContent?: string | null,
 ): ToolPart {
   // Generate a simple "before" content if not provided
+  // If explicitly null, the file was created (didn't exist before)
   const beforeContent =
-    oldContent ??
-    `// Old content of ${relativePath}\nexport const OldComponent = () => null;`;
+    oldContent !== undefined
+      ? oldContent
+      : `// Old content of ${relativePath}\nexport const OldComponent = () => null;`;
 
   if (state === 'streaming') {
     return {
@@ -494,6 +496,114 @@ export function createDeleteFileToolPart(
           after: '',
         },
       },
+    },
+  } as ToolPart;
+}
+
+// Helper to create web search tool part
+export function createWebSearchToolPart(
+  query: string,
+  results: Array<{
+    url: string;
+    title: string;
+    pageAge?: string | null;
+  }>,
+  state: 'streaming' | 'complete' | 'error' = 'complete',
+): ToolPart {
+  if (state === 'streaming') {
+    return {
+      type: 'tool-web_search',
+      toolCallId: generateId(),
+      state: 'input-streaming',
+      input: {
+        query,
+      },
+    } as ToolPart;
+  }
+
+  if (state === 'error') {
+    return {
+      type: 'tool-web_search',
+      toolCallId: generateId(),
+      state: 'output-error',
+      input: {
+        query,
+      },
+      errorText: 'Search failed: Unable to connect to search service',
+    } as ToolPart;
+  }
+
+  // state === 'complete'
+  return {
+    type: 'tool-web_search',
+    toolCallId: generateId(),
+    state: 'output-available',
+    input: {
+      query,
+    },
+    output: results.map((r) => ({
+      type: 'web_search_result',
+      url: r.url,
+      title: r.title,
+      pageAge: r.pageAge ?? null,
+      encryptedContent: 'base64encodedcontent...', // Mock encrypted content
+    })),
+  } as ToolPart;
+}
+
+// Helper to create web fetch tool part
+export function createWebFetchToolPart(
+  url: string,
+  content: {
+    title: string;
+    text?: string;
+  },
+  state: 'streaming' | 'complete' | 'error' = 'complete',
+): ToolPart {
+  if (state === 'streaming') {
+    return {
+      type: 'tool-web_fetch',
+      toolCallId: generateId(),
+      state: 'input-streaming',
+      input: {
+        url,
+      },
+    } as ToolPart;
+  }
+
+  if (state === 'error') {
+    return {
+      type: 'tool-web_fetch',
+      toolCallId: generateId(),
+      state: 'output-error',
+      input: {
+        url,
+      },
+      errorText: `Failed to fetch "${url}": Connection timeout`,
+    } as ToolPart;
+  }
+
+  // state === 'complete'
+  return {
+    type: 'tool-web_fetch',
+    toolCallId: generateId(),
+    state: 'output-available',
+    input: {
+      url,
+    },
+    output: {
+      type: 'web_fetch_result',
+      url,
+      content: {
+        type: 'document',
+        title: content.title,
+        source: {
+          type: 'text',
+          mediaType: 'text/plain',
+          data: content.text ?? 'Mock fetched content from the web page...',
+        },
+      },
+      retrievedAt: new Date().toISOString(),
     },
   } as ToolPart;
 }

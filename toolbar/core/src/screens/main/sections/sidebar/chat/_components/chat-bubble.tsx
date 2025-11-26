@@ -7,6 +7,8 @@ import type {
   ReasoningUIPart,
   AgentError,
   UIMessagePart,
+  ToolUIPart,
+  DynamicToolUIPart,
 } from '@stagewise/karton-contract';
 import { AgentErrorType } from '@stagewise/karton-contract';
 import { RefreshCcwIcon, Undo2 } from 'lucide-react';
@@ -32,18 +34,15 @@ import { ThinkingPart } from './message-part-ui/thinking';
 import { FilePart } from './message-part-ui/file';
 import { TextPart } from './message-part-ui/text';
 import { DeleteFileToolPart } from './message-part-ui/tools/delete-file';
-import { GlobToolPart } from './message-part-ui/tools/glob';
-import { GrepSearchToolPart } from './message-part-ui/tools/grep-search';
-import { ListFilesToolPart } from './message-part-ui/tools/list-files';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
 import { OverwriteFileToolPart } from './message-part-ui/tools/overwrite-file';
-import { ReadFileToolPart } from './message-part-ui/tools/read-file';
 import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
 import {
   ExploringToolParts,
   isReadOnlyToolPart,
   type ReadOnlyToolPart,
 } from './message-part-ui/tools/exploring';
+import { UnknownToolPart } from './message-part-ui/tools/unknown';
 
 function isToolPart(part: UIMessagePart): part is ToolPart {
   return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
@@ -192,8 +191,8 @@ export function ChatBubble({
             className={cn(
               'glass-body group relative min-h-8 max-w-full animate-chat-bubble-appear space-y-3 break-words rounded-2xl px-3 py-2 font-normal text-sm last:mb-0.5',
               msg.role === 'assistant'
-                ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 pl-4 text-foreground dark:bg-[#1e283d]/60'
-                : 'origin-bottom-right rounded-br-xs bg-blue-600/90 pr-4 text-white',
+                ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-foreground dark:bg-[#1e283d]/60'
+                : 'origin-bottom-right rounded-br-xs bg-blue-600/90 text-white',
               msg.parts.length > 1 && 'w-full',
               msg.role === 'user' &&
                 '[--color-background:var(--color-blue-600)] [--color-busy:var(--color-blue-200)] [--color-error:var(--color-rose-200)] [--color-foreground:var(--color-white)] [--color-muted-background:var(--color-blue-500)] [--color-muted-foreground:var(--color-blue-200)] [--color-primary:var(--color-blue-200)] [--color-success:var(--color-green-200)]',
@@ -234,7 +233,16 @@ export function ChatBubble({
 
               return parts.map((part, index) => {
                 if (Array.isArray(part))
-                  return <ExploringToolParts parts={part} />;
+                  return (
+                    // Handles glob, grep, listFiles, readFile tools
+                    <ExploringToolParts
+                      parts={part}
+                      isAutoExpanded={index === parts.length - 1}
+                      isShimmering={
+                        isWorking && index === parts.length - 1 && isLastMessage
+                      }
+                    />
+                  );
 
                 const currentTypeIndex = typeCounters[part.type] ?? 0;
                 typeCounters[part.type] = currentTypeIndex + 1;
@@ -264,7 +272,13 @@ export function ChatBubble({
                         key={stableKey}
                         thinkingDuration={msg.metadata?.thinkingDuration}
                         part={part as ReasoningUIPart}
-                        isLastPart={index === parts.length - 1}
+                        isAutoExpanded={index === parts.length - 1}
+                        isShimmering={
+                          isWorking &&
+                          part.state === 'streaming' &&
+                          index === parts.length - 1 &&
+                          isLastMessage
+                        }
                       />
                     );
                   case 'file':
@@ -279,17 +293,18 @@ export function ChatBubble({
                     return (
                       <OverwriteFileToolPart key={stableKey} part={part} />
                     );
-                  // Read-only tools
-                  case 'tool-globTool':
-                    return <GlobToolPart key={stableKey} part={part} />;
-                  case 'tool-grepSearchTool':
-                    return <GrepSearchToolPart key={stableKey} part={part} />;
-                  case 'tool-listFilesTool':
-                    return <ListFilesToolPart key={stableKey} part={part} />;
-                  case 'tool-readFileTool':
-                    return <ReadFileToolPart key={stableKey} part={part} />;
                   default:
-                    return null;
+                    return (
+                      <UnknownToolPart
+                        shimmer={
+                          isWorking &&
+                          index === parts.length - 1 &&
+                          isLastMessage
+                        }
+                        key={stableKey}
+                        part={part as ToolUIPart | DynamicToolUIPart}
+                      />
+                    );
                 }
               });
             })()}

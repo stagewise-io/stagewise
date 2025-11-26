@@ -185,13 +185,19 @@ const CodeComponent = ({
           />
         </div>
       ) : (
-        <CodeBlock
-          code={code}
+        <div
+          data-code-block-container
           data-language={language}
-          data-streamdown="code-block"
-          language={language}
-          hideActionButtons={isStreaming}
-        />
+          className="scrollbar-hover-only w-full overflow-auto overscroll-contain rounded-lg border border-foreground/5 bg-background/10"
+        >
+          <CodeBlock
+            code={code}
+            data-language={language}
+            data-streamdown="code-block"
+            language={language}
+            hideActionButtons={isStreaming}
+          />
+        </div>
       )}
     </div>
   );

@@ -24,14 +24,13 @@ export const CollapsibleTrigger = ({
     <CollapsibleBase.Trigger
       {...props}
       className={cn(
-        'group flex w-full flex-row items-center justify-between font-medium text-sm transition-all duration-150 ease-out hover:bg-black/5 active:bg-black/10 dark:active:bg-white/10 dark:hover:bg-white/5',
+        'group flex w-full flex-row items-center justify-between font-medium text-sm transition-all duration-150 ease-out hover:bg-foreground/5 active:bg-foreground/10',
         paddingClass,
+        gapClass,
         props.className,
       )}
     >
-      <div className={cn('flex flex-1 flex-row items-center', gapClass)}>
-        {children}
-      </div>
+      {children}
     </CollapsibleBase.Trigger>
   );
 };
@@ -50,7 +49,7 @@ export const CollapsibleContent = ({
     <CollapsibleBase.Panel
       {...props}
       className={cn(
-        'flex h-[var(--collapsible-panel-height)] flex-col justify-end overflow-hidden p-2 text-foreground text-sm transition-all ease-out data-[ending-style]:h-0 data-[starting-style]:h-0',
+        'flex h-[var(--collapsible-panel-height)] flex-col justify-end overflow-hidden px-2 text-foreground text-sm transition-all ease-out data-[ending-style]:h-0 data-[starting-style]:h-0',
         props.className,
       )}
     >

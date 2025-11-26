@@ -205,11 +205,7 @@ export const CodeBlock = ({
   }, [code, language, preClassName, compactDiff]);
 
   return (
-    <div
-      data-code-block-container
-      data-language={language}
-      className="scrollbar-hover-only w-full overflow-auto overscroll-contain rounded-lg border border-foreground/5 bg-background/10"
-    >
+    <>
       <div
         className={cn('group/chat-bubble-user:hidden dark:hidden', className)}
         dangerouslySetInnerHTML={{ __html: html }}
@@ -227,7 +223,7 @@ export const CodeBlock = ({
         data-language={language}
         {...rest}
       />
-    </div>
+    </>
   );
 };
 

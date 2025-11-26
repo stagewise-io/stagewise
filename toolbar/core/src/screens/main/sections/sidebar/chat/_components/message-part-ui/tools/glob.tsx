@@ -1,38 +1,43 @@
 import type { ToolPart } from '@stagewise/karton-contract';
-import { ToolPartUIReadOnly } from './_shared';
+import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
+import { FileSearchIcon } from 'lucide-react';
 
 export const GlobToolPart = ({
   part,
-  shimmer = false,
+  disableShimmer = false,
+  minimal = false,
 }: {
   part: Extract<ToolPart, { type: 'tool-globTool' }>;
-  shimmer?: boolean;
+  disableShimmer?: boolean;
+  minimal?: boolean;
 }) => {
-  const streamingText = part.input?.pattern
-    ? `Searching for ${part.input?.pattern}...`
-    : `Searching files...`;
+  const streamingText = part.input?.pattern ? (
+    <span className="flex min-w-0 gap-1">
+      <span className="shrink-0">Searching for</span>
+      <span className="truncate">{part.input.pattern}...</span>
+    </span>
+  ) : (
+    'Searching files...'
+  );
 
   const finishedText =
     part.state === 'output-available' ? (
-      <>
-        <span className="font-semibold">Found </span>
-        <span className="font-normal">
+      <span className="flex min-w-0 gap-1">
+        <span className="shrink-0 truncate font-semibold">Found </span>
+        <span className="truncate font-normal">
           {part.output?.result?.totalMatches ?? 0} file
           {part.output?.result?.totalMatches !== 1 ? 's' : ''}
+          {part.input?.pattern && <> matching "{part.input.pattern}"</>}
         </span>
-        {part.input?.pattern && (
-          <>
-            {' '}
-            matching <span className="font-normal">"{part.input.pattern}"</span>
-          </>
-        )}
-      </>
+      </span>
     ) : undefined;
 
   return (
-    <ToolPartUIReadOnly
+    <ToolPartUINotCollapsible
+      icon={<FileSearchIcon className="size-3 shrink-0" />}
       part={part}
-      shimmer={shimmer}
+      minimal={minimal}
+      disableShimmer={disableShimmer}
       streamingText={streamingText}
       finishedText={finishedText}
     />
