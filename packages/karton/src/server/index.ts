@@ -3,6 +3,7 @@ export { WebSocketServerTransport } from '../transports/websocket-server.js';
 export {
   ElectronServerTransport,
   type ElectronServerTransportConfig,
+  type MessagePortMain,
 } from '../transports/electron-server.js';
 
 export type {

@@ -78,7 +78,6 @@ export async function main({
     logger,
     kartonService,
     globalDataPathService,
-    workspaceManagerService,
   );
 
   const _appMenuService = new AppMenuService(

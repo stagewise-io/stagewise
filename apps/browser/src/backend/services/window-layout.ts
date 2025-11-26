@@ -1,11 +1,19 @@
-import { BaseWindow, View, WebContentsView, app, shell } from 'electron';
+import {
+  BaseWindow,
+  View,
+  WebContentsView,
+  app,
+  shell,
+  MessageChannelMain,
+  ipcMain,
+} from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import type { KartonService } from './karton';
 import type { Logger } from './logger';
 import contextMenu from 'electron-context-menu';
 import type { GlobalDataPathService } from './global-data-path';
-import type { WorkspaceManagerService } from './workspace-manager';
+import type { MessagePortMain } from 'electron';
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
@@ -27,8 +35,9 @@ export class WindowLayoutService {
   private webContentsView: WebContentsView;
   private uiContentView: WebContentsView;
   private globalDataPathService: GlobalDataPathService;
-  private workspaceManagerService: WorkspaceManagerService;
   private saveStateTimeout: NodeJS.Timeout | null = null;
+  /** Port waiting to be delivered to the UI renderer (pre-created for immediate delivery) */
+  private pendingUIPort: MessagePortMain | null = null;
   private lastNonMaximizedBounds: {
     width: number;
     height: number;
@@ -40,12 +49,10 @@ export class WindowLayoutService {
     logger: Logger,
     kartonService: KartonService,
     globalDataPathService: GlobalDataPathService,
-    workspaceManagerService: WorkspaceManagerService,
   ) {
     this.logger = logger;
     this.kartonService = kartonService;
     this.globalDataPathService = globalDataPathService;
-    this.workspaceManagerService = workspaceManagerService;
 
     this.logger.debug('[WindowLayoutService] Initializing service');
 
@@ -134,6 +141,12 @@ export class WindowLayoutService {
       this.uiContentView.webContents.openDevTools();
     }
 
+    // Pre-create the karton MessagePort connection immediately.
+    // The port is registered with KartonService now, and delivered to the renderer when it requests it.
+    // This eliminates race conditions since the port exists before the renderer even loads.
+    this.setupUIKartonConnection();
+    this.setupKartonConnectionListener();
+
     // Sync sizes on startup and resize
     this.handleMainWindowResize();
     this.baseWindow.on('resize', () => {
@@ -181,43 +194,43 @@ export class WindowLayoutService {
     );
     this.kartonService.registerServerProcedureHandler(
       'webContent.layout.update',
-      this.handleWebContentBoundsChange.bind(this),
+      this.handleWebContentBoundsChange,
     );
     this.kartonService.registerServerProcedureHandler(
       'webContent.layout.changeInteractivity',
-      this.handleWebContentInteractivityChange.bind(this),
+      this.handleWebContentInteractivityChange,
     );
     this.kartonService.registerServerProcedureHandler(
       'webContent.stop',
-      this.handleWebContentStop.bind(this),
+      this.handleWebContentStop,
     );
     this.kartonService.registerServerProcedureHandler(
       'webContent.reload',
-      this.handleWebContentReload.bind(this),
+      this.handleWebContentReload,
     );
     this.kartonService.registerServerProcedureHandler(
       'webContent.goto',
-      this.handleWebContentGoto.bind(this),
+      this.handleWebContentGoto,
     );
     this.kartonService.registerServerProcedureHandler(
       'webContent.goBack',
-      this.handleWebContentGoBack.bind(this),
+      this.handleWebContentGoBack,
     );
     this.kartonService.registerServerProcedureHandler(
       'webContent.goForward',
-      this.handleWebContentGoForward.bind(this),
+      this.handleWebContentGoForward,
     );
     this.kartonService.registerServerProcedureHandler(
       'webContent.toggleDevTools',
-      this.handleWebContentToggleDevTools.bind(this),
+      this.handleWebContentToggleDevTools,
     );
     this.kartonService.registerServerProcedureHandler(
       'webContent.openDevTools',
-      this.handleWebContentOpenDevTools.bind(this),
+      this.handleWebContentOpenDevTools,
     );
     this.kartonService.registerServerProcedureHandler(
       'webContent.closeDevTools',
-      this.handleWebContentCloseDevTools.bind(this),
+      this.handleWebContentCloseDevTools,
     );
     this.logger.debug(
       '[WindowLayoutService] Karton event listeners registered',
@@ -356,44 +369,50 @@ export class WindowLayoutService {
     this.logger.debug('[WindowLayoutService] Teardown called');
     this.kartonService.removeServerProcedureHandler(
       'webContent.layout.update',
-      this.handleWebContentBoundsChange.bind(this),
+      this.handleWebContentBoundsChange,
     );
     this.kartonService.removeServerProcedureHandler(
       'webContent.layout.changeInteractivity',
-      this.handleWebContentInteractivityChange.bind(this),
+      this.handleWebContentInteractivityChange,
     );
     this.kartonService.removeServerProcedureHandler(
       'webContent.stop',
-      this.handleWebContentStop.bind(this),
+      this.handleWebContentStop,
     );
     this.kartonService.removeServerProcedureHandler(
       'webContent.reload',
-      this.handleWebContentReload.bind(this),
+      this.handleWebContentReload,
     );
     this.kartonService.removeServerProcedureHandler(
       'webContent.goto',
-      this.handleWebContentGoto.bind(this),
+      this.handleWebContentGoto,
     );
     this.kartonService.removeServerProcedureHandler(
       'webContent.goBack',
-      this.handleWebContentGoBack.bind(this),
+      this.handleWebContentGoBack,
     );
     this.kartonService.removeServerProcedureHandler(
       'webContent.goForward',
-      this.handleWebContentGoForward.bind(this),
+      this.handleWebContentGoForward,
     );
     this.kartonService.removeServerProcedureHandler(
       'webContent.toggleDevTools',
-      this.handleWebContentToggleDevTools.bind(this),
+      this.handleWebContentToggleDevTools,
     );
     this.kartonService.removeServerProcedureHandler(
       'webContent.openDevTools',
-      this.handleWebContentOpenDevTools.bind(this),
+      this.handleWebContentOpenDevTools,
     );
     this.kartonService.removeServerProcedureHandler(
       'webContent.closeDevTools',
-      this.handleWebContentCloseDevTools.bind(this),
+      this.handleWebContentCloseDevTools,
     );
+
+    // Clean up karton connection listener
+    if (this.kartonConnectListener) {
+      ipcMain.removeListener('karton-connect', this.kartonConnectListener);
+      this.kartonConnectListener = null;
+    }
 
     app.applicationMenu = null;
 
@@ -411,6 +430,90 @@ export class WindowLayoutService {
 
   public toggleUIDevTools() {
     this.uiContentView.webContents.toggleDevTools();
+  }
+
+  /** IPC listener for karton connection requests */
+  private kartonConnectListener:
+    | ((event: Electron.IpcMainEvent) => void)
+    | null = null;
+
+  /**
+   * Pre-create the karton MessagePort connection for the UI.
+   * The port is registered with KartonService immediately,
+   * and delivered to the renderer when it requests it.
+   * MessagePort queues messages until start() is called, so no messages are lost.
+   */
+  private setupUIKartonConnection(): void {
+    const connectionId = 'ui-main';
+    const { port1, port2 } = new MessageChannelMain();
+
+    // Register server-side immediately - messages will queue until renderer connects
+    this.kartonService.acceptPort(port1, connectionId);
+
+    // Store renderer port for delivery when requested
+    this.pendingUIPort = port2;
+
+    this.logger.debug(
+      `[WindowLayoutService] UI karton connection pre-created, connection ID: ${connectionId}`,
+    );
+  }
+
+  /**
+   * Setup the IPC listener to deliver the pre-created karton port to the renderer.
+   * When the renderer sends 'karton-connect', we immediately deliver the waiting port.
+   */
+  private setupKartonConnectionListener(): void {
+    // Remove any existing listener
+    if (this.kartonConnectListener) {
+      ipcMain.removeListener('karton-connect', this.kartonConnectListener);
+    }
+
+    this.kartonConnectListener = (event) => {
+      // Only handle requests from our UI webContents
+      if (event.sender.id !== this.uiContentView?.webContents?.id) {
+        this.logger.debug(
+          '[WindowLayoutService] Ignoring karton-connect from unknown sender',
+        );
+        return;
+      }
+
+      // Check if webContents is still valid
+      if (!this.uiContentView || this.uiContentView.webContents.isDestroyed()) {
+        this.logger.warn(
+          '[WindowLayoutService] UI webContents destroyed, cannot send port',
+        );
+        return;
+      }
+
+      if (this.pendingUIPort) {
+        // Deliver the pre-created port
+        this.uiContentView.webContents.postMessage('karton-port', null, [
+          this.pendingUIPort,
+        ]);
+        this.pendingUIPort = null;
+        this.logger.debug('[WindowLayoutService] UI karton port delivered');
+      } else {
+        // Reconnection case - create new port pair
+        this.logger.debug(
+          '[WindowLayoutService] UI requesting reconnection, creating new port',
+        );
+        this.setupUIKartonConnection();
+        if (this.pendingUIPort) {
+          this.uiContentView.webContents.postMessage('karton-port', null, [
+            this.pendingUIPort,
+          ]);
+          this.pendingUIPort = null;
+          this.logger.debug(
+            '[WindowLayoutService] UI karton port delivered (reconnection)',
+          );
+        }
+      }
+    };
+
+    ipcMain.on('karton-connect', this.kartonConnectListener);
+    this.logger.debug(
+      '[WindowLayoutService] Listening for karton connection requests',
+    );
   }
 
   private get windowStatePath(): string {
@@ -505,7 +608,7 @@ export class WindowLayoutService {
     });
   }
 
-  private handleWebContentInteractivityChange(interactive: boolean) {
+  private handleWebContentInteractivityChange = (interactive: boolean) => {
     // Depending on the interactivity, we either push the UI on top of the window or the web contents view container.
     if (interactive) {
       this.baseWindow.contentView.addChildView(this.webContentsViewContainer);
@@ -514,11 +617,11 @@ export class WindowLayoutService {
       this.baseWindow.contentView.addChildView(this.uiContentView);
       //this.uiContentView.webContents.focus();
     }
-  }
+  };
 
-  private handleWebContentBoundsChange(
+  private handleWebContentBoundsChange = (
     bounds: { x: number; y: number; width: number; height: number } | null,
-  ) {
+  ) => {
     // If bounds is null, the webcontents view container should disappear (don't close, but hide and suspend the view and all children, like an inactive tab)
     // If bounds is set, the wecontents view container should be resized and moved to follow the bounds that it's given.
     // As usual, every child of the webcontents view container should be resized to stay full-width of it's parent.
@@ -534,41 +637,41 @@ export class WindowLayoutService {
     } else {
       this.webContentsViewContainer.setVisible(false);
     }
-  }
+  };
 
-  private handleWebContentStop() {
+  private handleWebContentStop = () => {
     this.webContentsView.webContents.stop();
-  }
+  };
 
-  private handleWebContentReload() {
+  private handleWebContentReload = () => {
     this.webContentsView.webContents.reload();
-  }
+  };
 
-  private handleWebContentGoto(url: string) {
+  private handleWebContentGoto = (url: string) => {
     this.kartonService.setState((draft) => {
       // Optimistic update of the URL in the karton state.
       draft.webContent.url = url;
     });
     this.webContentsView.webContents.loadURL(url);
-  }
+  };
 
-  private handleWebContentGoBack() {
+  private handleWebContentGoBack = () => {
     this.webContentsView.webContents.navigationHistory.goBack();
-  }
+  };
 
-  private handleWebContentGoForward() {
+  private handleWebContentGoForward = () => {
     this.webContentsView.webContents.navigationHistory.goForward();
-  }
+  };
 
-  private handleWebContentOpenDevTools() {
+  private handleWebContentOpenDevTools = () => {
     this.webContentsView.webContents.openDevTools();
-  }
+  };
 
-  private handleWebContentCloseDevTools() {
+  private handleWebContentCloseDevTools = () => {
     this.webContentsView.webContents.closeDevTools();
-  }
+  };
 
-  private handleWebContentToggleDevTools() {
+  private handleWebContentToggleDevTools = () => {
     this.webContentsView.webContents.toggleDevTools();
-  }
+  };
 }

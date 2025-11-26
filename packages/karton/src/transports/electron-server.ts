@@ -8,62 +8,143 @@ import {
   deserializeMessage,
 } from '../shared/websocket-messages.js';
 
-interface IpcMain {
-  on(channel: string, listener: (event: any, ...args: any[]) => void): void;
-  removeListener(channel: string, listener: (...args: any[]) => void): void;
+/**
+ * Electron's MessagePortMain interface (main process side).
+ * This is a subset of the full MessagePortMain API that we need.
+ */
+export interface MessagePortMain {
+  postMessage(message: any): void;
+  start(): void;
+  close(): void;
+  on(event: 'message', listener: (messageEvent: { data: any }) => void): this;
+  on(event: 'close', listener: () => void): this;
+  off(event: 'message', listener: (messageEvent: { data: any }) => void): this;
+  off(event: 'close', listener: () => void): this;
+  once(event: 'message', listener: (messageEvent: { data: any }) => void): this;
+  once(event: 'close', listener: () => void): this;
 }
 
-export interface ElectronServerTransportConfig {
-  ipcMain: IpcMain;
-  channel?: string;
-}
+/**
+ * Configuration for ElectronServerTransport.
+ * This transport does not require any initial configuration as ports
+ * are accepted dynamically via the acceptPort method.
+ */
+export type ElectronServerTransportConfig = Record<string, never>;
 
+/**
+ * A single connection to a client via MessagePort.
+ * Created when a port is accepted by the server transport.
+ */
 class ElectronServerConnection implements Transport {
-  private sender: any;
-  private channel: string;
+  private port: MessagePortMain;
+  private connectionId: string;
   private messageHandler: ((message: KartonMessage) => void) | null = null;
   private closeHandler:
     | ((event?: { code: number; reason: string }) => void)
     | null = null;
+  private errorHandler: ((error: Error) => void) | null = null;
   private _isOpen = true;
+  private _messageListener: ((event: { data: any }) => void) | null = null;
+  private _closeListener: (() => void) | null = null;
 
-  constructor(sender: any, channel: string) {
-    this.sender = sender;
-    this.channel = channel;
+  constructor(port: MessagePortMain, connectionId: string) {
+    this.port = port;
+    this.connectionId = connectionId;
+
+    // Setup message listener
+    this._messageListener = (event: { data: any }) => {
+      this.handleData(event.data);
+    };
+    this.port.on('message', this._messageListener);
+
+    // Setup close listener
+    this._closeListener = () => {
+      this.triggerClose('Port closed by remote');
+    };
+    this.port.on('close', this._closeListener);
+
+    // Start the port to begin receiving messages
+    this.port.start();
   }
 
-  // Called by ServerTransport when data is received for this connection
-  public handleData(data: string) {
-    if (this.messageHandler) {
+  /**
+   * Get the connection ID for this connection.
+   */
+  public getConnectionId(): string {
+    return this.connectionId;
+  }
+
+  /**
+   * Handle incoming data from the port.
+   */
+  private handleData(data: unknown): void {
+    if (!this._isOpen) return;
+
+    if (typeof data === 'string') {
       try {
         const message = deserializeMessage(data);
-        this.messageHandler(message);
-      } catch (e) {
-        console.error(
-          'Failed to handle message in ElectronServerConnection',
-          e,
+        this.messageHandler?.(message);
+      } catch (err) {
+        this.errorHandler?.(
+          err instanceof Error
+            ? err
+            : new Error('Failed to deserialize message'),
         );
       }
     }
   }
 
-  // Called by ServerTransport when connection is replaced/closed
-  public triggerClose() {
+  /**
+   * Trigger connection close with a reason.
+   * @param reason - The reason for closing
+   * @param closePort - Whether to also close the underlying port (default: true)
+   */
+  public triggerClose(reason = 'Connection closed', closePort = true): void {
+    if (!this._isOpen) return;
+
     this._isOpen = false;
+
+    // Remove listeners
+    if (this._messageListener) {
+      this.port.off('message', this._messageListener);
+      this._messageListener = null;
+    }
+    if (this._closeListener) {
+      this.port.off('close', this._closeListener);
+      this._closeListener = null;
+    }
+
+    // Close the underlying port to free resources
+    if (closePort) {
+      try {
+        this.port.close();
+      } catch {
+        // Port may already be closed
+      }
+    }
+
+    // Notify close handler
     this.closeHandler?.({
       code: 1000,
-      reason: 'Connection replaced or closed',
+      reason,
     });
   }
 
+  /**
+   * Send a message through the port.
+   * Fails silently if the port is closed (for state sync).
+   */
   send(message: KartonMessage): void {
-    if (!this._isOpen) return;
+    if (!this._isOpen) {
+      return;
+    }
+
     try {
       const serialized = serializeMessage(message);
-      this.sender.send(this.channel, serialized);
-    } catch (_e) {
-      // Sender might be destroyed
-      this.triggerClose();
+      this.port.postMessage(serialized);
+    } catch {
+      // Port may have been closed unexpectedly
+      this.triggerClose('Send failed - port may be closed');
     }
   }
 
@@ -75,16 +156,21 @@ class ElectronServerConnection implements Transport {
   }
 
   close(): void {
-    this.triggerClose();
+    if (!this._isOpen) return;
+
+    // triggerClose will also close the port
+    this.triggerClose('Closed by server', true);
   }
 
   isOpen(): boolean {
-    return this._isOpen && !this.sender.isDestroyed?.();
+    return this._isOpen;
   }
 
   onOpen(handler: () => void): () => void {
-    // Always open when created
-    handler();
+    // Connection is already open when created
+    if (this._isOpen) {
+      handler();
+    }
     return () => {};
   }
 
@@ -97,65 +183,98 @@ class ElectronServerConnection implements Transport {
     };
   }
 
-  onError(_handler: (error: Error) => void): () => void {
-    // Not implemented for now
-    return () => {};
+  onError(handler: (error: Error) => void): () => void {
+    this.errorHandler = handler;
+    return () => {
+      this.errorHandler = null;
+    };
   }
 }
 
+/**
+ * Server-side transport for Electron using MessagePort.
+ *
+ * Unlike the IPC-based transport, this transport accepts ports dynamically
+ * via the acceptPort() method. Ports are created externally (typically by
+ * a PortBridgeService) and passed to this transport.
+ *
+ * This allows for:
+ * - Multiple isolated connections (UI, tabs, etc.)
+ * - Better differentiation between contract types
+ * - Graceful handling of connection failures
+ */
 export class ElectronServerTransport implements ServerTransport {
-  private ipcMain: IpcMain;
-  private channel: string;
-  private connections = new Map<number, ElectronServerConnection>();
+  private connections = new Map<string, ElectronServerConnection>();
   private connectionHandler: ((clientTransport: Transport) => void) | null =
     null;
-  private _listener: (event: any, arg: any) => void;
+  private connectionIdCounter = 0;
 
-  constructor(config: ElectronServerTransportConfig) {
-    this.ipcMain = config.ipcMain;
-    this.channel = config.channel || 'karton';
-    this._listener = (event, arg) => this.handleIpcMessage(event, arg);
-    this.ipcMain.on(this.channel, this._listener);
+  /**
+   * Accept a new MessagePort connection.
+   *
+   * @param port - The MessagePortMain from Electron's MessageChannelMain
+   * @param connectionId - Optional custom connection ID. If not provided, an auto-generated ID will be used.
+   * @returns The connection ID for this port
+   */
+  public acceptPort(port: MessagePortMain, connectionId?: string): string {
+    const id = connectionId ?? `conn-${++this.connectionIdCounter}`;
+
+    // Close existing connection with same ID if present
+    const existing = this.connections.get(id);
+    if (existing) {
+      existing.triggerClose('Connection replaced');
+      this.connections.delete(id);
+    }
+
+    // Create new connection
+    const connection = new ElectronServerConnection(port, id);
+    this.connections.set(id, connection);
+
+    // Setup cleanup on close
+    connection.onClose(() => {
+      if (this.connections.get(id) === connection) {
+        this.connections.delete(id);
+      }
+    });
+
+    // Notify connection handler
+    this.connectionHandler?.(connection);
+
+    return id;
   }
 
-  private handleIpcMessage(event: any, arg: any) {
-    const senderId = event.sender.id;
+  /**
+   * Get a connection by its ID.
+   */
+  public getConnection(connectionId: string): Transport | undefined {
+    return this.connections.get(connectionId);
+  }
 
-    if (arg === 'CONNECT') {
-      // Handle new connection
-      if (this.connections.has(senderId)) {
-        // Close existing
-        this.connections.get(senderId)?.triggerClose();
-        this.connections.delete(senderId);
-      }
+  /**
+   * Get all active connection IDs.
+   */
+  public getConnectionIds(): string[] {
+    return Array.from(this.connections.keys());
+  }
 
-      const connection = new ElectronServerConnection(
-        event.sender,
-        this.channel,
-      );
-      this.connections.set(senderId, connection);
+  /**
+   * Check if a connection exists.
+   */
+  public hasConnection(connectionId: string): boolean {
+    return this.connections.has(connectionId);
+  }
 
-      // Detect sender destruction to cleanup
-      if (event.sender.once) {
-        event.sender.once('destroyed', () => {
-          if (this.connections.get(senderId) === connection) {
-            connection.triggerClose();
-            this.connections.delete(senderId);
-          }
-        });
-      }
-
-      this.connectionHandler?.(connection);
-    } else {
-      // Handle data
-      const connection = this.connections.get(senderId);
-      if (connection) {
-        connection.handleData(arg);
-      } else {
-        // Message from unknown connection, maybe restart required?
-        // Ignore or send error back?
-      }
+  /**
+   * Close a specific connection by ID.
+   */
+  public closeConnection(connectionId: string): boolean {
+    const connection = this.connections.get(connectionId);
+    if (connection) {
+      connection.close();
+      this.connections.delete(connectionId);
+      return true;
     }
+    return false;
   }
 
   onConnection(handler: (clientTransport: Transport) => void): void {
@@ -163,10 +282,11 @@ export class ElectronServerTransport implements ServerTransport {
   }
 
   async close(): Promise<void> {
-    this.ipcMain.removeListener(this.channel, this._listener);
-    for (const conn of this.connections.values()) {
-      conn.triggerClose();
+    // Close all connections
+    for (const connection of this.connections.values()) {
+      connection.close();
     }
     this.connections.clear();
+    this.connectionHandler = null;
   }
 }
