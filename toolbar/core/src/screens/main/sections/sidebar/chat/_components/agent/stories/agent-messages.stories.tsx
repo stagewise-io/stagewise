@@ -14,8 +14,6 @@ import {
   createListFilesToolPart,
   createOverwriteFileToolPart,
   createMultiEditToolPart,
-  createWebSearchToolPart,
-  createWebFetchToolPart,
   createEmptyChat,
 } from '../../../../../../../../../.storybook/mocks/chat-data';
 
@@ -1647,101 +1645,6 @@ export const AssistantWebSearchError: Story = {
 };
 
 /**
- * Assistant WebFetch Complete
- *
- * Full conversation showing agent fetching a web page successfully.
- * Demonstrates: User ask → Agent think → Web fetch (output-available) → Agent summarize content
- */
-export const AssistantWebFetchComplete: Story = {
-  name: 'Assistant/Tool-WebFetch-Complete',
-  parameters: {
-    mockKartonState: {
-      ...baseState,
-      workspace: {
-        ...baseState.workspace,
-        agentChat: {
-          ...baseState.workspace?.agentChat,
-          chats: {
-            'chat-1': {
-              ...createEmptyChat(),
-              messages: [
-                createUserMessage(
-                  'Fetch the React documentation page about hooks',
-                ),
-                createAssistantMessage(
-                  'Let me fetch that documentation page for you.',
-                  {
-                    thinkingPart: createThinkingPart(
-                      'I will fetch the React hooks documentation...',
-                      'done',
-                    ),
-                    toolParts: [
-                      createWebFetchToolPart(
-                        'https://react.dev/reference/react/hooks',
-                        {
-                          title: 'Hooks – React',
-                          text: 'Hooks let you use different React features from your components. You can either use the built-in Hooks or combine them to build your own. This page lists all built-in Hooks in React...',
-                        },
-                        'complete',
-                      ),
-                    ],
-                  },
-                ),
-                createAssistantMessage(
-                  "I fetched the React Hooks documentation page. Here's a summary:\n\n**Overview:**\nHooks let you use different React features from your components without writing classes.\n\n**Built-in Hooks Include:**\n- State Hooks (useState, useReducer)\n- Effect Hooks (useEffect, useLayoutEffect)\n- Context Hooks (useContext)\n- Ref Hooks (useRef, useImperativeHandle)\n- Performance Hooks (useMemo, useCallback)\n\nWould you like me to explain any specific hook in detail?",
-                ),
-              ],
-            },
-          },
-        },
-      },
-    },
-  },
-};
-
-/**
- * Assistant WebFetch Streaming
- *
- * Shows agent fetching a web page in streaming state.
- * Demonstrates: User ask → Agent think → Web fetch (input-streaming)
- */
-export const AssistantWebFetchStreaming: Story = {
-  name: 'Assistant/Tool-WebFetch-Streaming',
-  parameters: {
-    mockKartonState: {
-      ...baseState,
-      workspace: {
-        ...baseState.workspace,
-        agentChat: {
-          ...baseState.workspace?.agentChat,
-          chats: {
-            'chat-1': {
-              ...createEmptyChat(),
-              messages: [
-                createUserMessage('Fetch https://nextjs.org/docs'),
-                createAssistantMessage('Fetching the page...', {
-                  thinkingPart: createThinkingPart(
-                    'I will fetch the Next.js documentation...',
-                    'done',
-                  ),
-                  toolParts: [
-                    createWebFetchToolPart(
-                      'https://nextjs.org/docs',
-                      { title: '' },
-                      'streaming',
-                    ),
-                  ],
-                }),
-              ],
-            },
-          },
-        },
-      },
-    },
-  },
-};
-
-/**
  * Assistant Markdown Output in TypeScript
  *
  * Shows agent outputting markdown-formatted code blocks in TypeScript.
@@ -1765,51 +1668,6 @@ export const AssistantMarkdownTypeScript: Story = {
                 ),
                 createAssistantMessage(
                   "Here's an example of a custom React hook in TypeScript:\n\n```tsx\nimport { useState, useEffect } from 'react';\n\ninterface UseDebounceOptions {\n  delay?: number;\n}\n\nexport function useDebounce<T>(value: T, options: UseDebounceOptions = {}): T {\n  const { delay = 500 } = options;\n  const [debouncedValue, setDebouncedValue] = useState<T>(value);\n\n  useEffect(() => {\n    const handler = setTimeout(() => {\n      setDebouncedValue(value);\n    }, delay);\n\n    return () => {\n      clearTimeout(handler);\n    };\n  }, [value, delay]);\n\n  return debouncedValue;\n}\n```\n\nThis hook delays updating a value, useful for search inputs or API calls.",
-                ),
-              ],
-            },
-          },
-        },
-      },
-    },
-  },
-};
-
-/**
- * Assistant WebFetch Error
- *
- * Shows error handling when web fetch fails.
- * Demonstrates: User ask → Agent attempt → Fetch fails (output-error) → Agent explain
- */
-export const AssistantWebFetchError: Story = {
-  name: 'Assistant/Tool-WebFetch-Error',
-  parameters: {
-    mockKartonState: {
-      ...baseState,
-      workspace: {
-        ...baseState.workspace,
-        agentChat: {
-          ...baseState.workspace?.agentChat,
-          chats: {
-            'chat-1': {
-              ...createEmptyChat(),
-              messages: [
-                createUserMessage('Fetch https://example-invalid-url.com/docs'),
-                createAssistantMessage('Let me fetch that page.', {
-                  thinkingPart: createThinkingPart(
-                    'I will fetch the requested page...',
-                    'done',
-                  ),
-                  toolParts: [
-                    createWebFetchToolPart(
-                      'https://example-invalid-url.com/docs',
-                      { title: '' },
-                      'error',
-                    ),
-                  ],
-                }),
-                createAssistantMessage(
-                  "I encountered an error while fetching the page. The URL may be invalid or the server is not responding.\n\nPossible reasons:\n1. The URL doesn't exist\n2. The server is temporarily unavailable\n3. There may be network connectivity issues\n\nPlease verify the URL and try again.",
                 ),
               ],
             },
