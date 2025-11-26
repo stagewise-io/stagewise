@@ -11,6 +11,25 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: './assets/icons/icon',
+    appCopyright: 'Copyright © 2025 stagewise GmbH',
+    win32metadata: {
+      CompanyName: 'stagewise GmbH',
+      ProductName: 'stagewise',
+      FileDescription: "The browser dev's always wished they had.",
+    },
+    name:
+      process.env.BUILD_MODE === 'production' ? 'stagewise' : 'stagewise-dev',
+    appBundleId:
+      process.env.BUILD_MODE === 'production'
+        ? 'io.stagewise.app'
+        : 'io.stagewise.dev',
+    appCategoryType: 'public.app-category.developer-tools',
+    protocols: [
+      {
+        name: 'stagewise',
+        schemes: ['stagewise'],
+      },
+    ],
   },
   rebuildConfig: {},
   makers: [

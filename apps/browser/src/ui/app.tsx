@@ -6,7 +6,6 @@ import { AppStateProvider } from './hooks/use-app-state';
 import type { InternalToolbarConfig } from './config';
 import { ScreenRouter } from './screens';
 import { NotificationToaster } from './notification-toaster';
-import { AuthDialog } from './dialogs/auth';
 import { TitleManager } from './components/title-manager';
 
 export const App: FunctionComponent<InternalToolbarConfig> = (config) => {
@@ -16,8 +15,6 @@ export const App: FunctionComponent<InternalToolbarConfig> = (config) => {
         <TitleManager />
 
         <ScreenRouter />
-
-        <AuthDialog />
 
         <NotificationToaster />
       </ContextProviders>

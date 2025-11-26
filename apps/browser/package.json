@@ -1,5 +1,5 @@
 {
-  "name": "@stagewise/browser",
+  "name": "stagewise",
   "version": "1.0.0-alpha.1",
   "description": "The browser dev's always wished they had.",
   "keywords": [],
@@ -11,10 +11,10 @@
   "type": "module",
   "main": ".vite/build/main.js",
   "scripts": {
-    "make": "dotenv -e ../../.env -- electron-forge make",
+    "make": "BUILD_MODE=production dotenv -e ../../.env -- electron-forge make",
     "package": "dotenv -e ../../.env -- electron-forge package",
     "publish": "dotenv -e ../../.env -- electron-forge publish",
-    "start": "dotenv -e ../../.env -- electron-forge start",
+    "start": "BUILD_MODE=development dotenv -e ../../.env -- electron-forge start",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

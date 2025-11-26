@@ -32,23 +32,6 @@ export class WindowLayoutService {
 
     this.logger.debug('[WindowLayoutService] Initializing service');
 
-    app.setPath(
-      'userData',
-      path.join(this.globalDataPathService.globalDataPath, 'userData'),
-    );
-    app.setPath(
-      'sessionData',
-      path.join(this.globalDataPathService.globalDataPath, 'sessionData'),
-    );
-    app.setPath(
-      'temp',
-      path.join(this.globalDataPathService.globalTempPath, 'temp'),
-    );
-    app.setPath(
-      'cache',
-      path.join(this.globalDataPathService.globalCachePath, 'cache'),
-    );
-
     this.baseWindow = new BaseWindow({
       width: 800,
       height: 600,
@@ -114,6 +97,13 @@ export class WindowLayoutService {
     // Sync sizes on startup and resize
     this.handleMainWindowResize();
     this.baseWindow.on('resize', this.handleMainWindowResize.bind(this));
+
+    app.on('second-instance', () => {
+      if (this.baseWindow) {
+        if (this.baseWindow.isMinimized()) this.baseWindow.restore();
+        this.baseWindow.focus();
+      }
+    });
 
     // and load the index.html of the app.
     if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {

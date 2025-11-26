@@ -4,9 +4,10 @@ import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import { AuthServerInterop, consoleUrl } from './server-interop';
 import { AuthTokenStore } from './token-store';
-import { stagewiseAppPrefix } from '../ui-server/shared';
 import type { NotificationService } from '../notification';
 import type { IdentifierService } from '../identifier';
+import type { URIHandlerService } from '../uri-handler';
+import { shell } from 'electron';
 
 export type AuthState = KartonContract['state']['userAccount'];
 
@@ -17,25 +18,30 @@ export class AuthService {
   private identifierService: IdentifierService;
   private kartonService: KartonService;
   private notificationService: NotificationService;
+  private uriHandlerService: URIHandlerService;
   private logger: Logger;
   private tokenStore!: AuthTokenStore;
   private serverInterop: AuthServerInterop;
   private _authStateCheckInterval: NodeJS.Timeout | null = null;
   private authChangeCallbacks: ((newAuthState: AuthState) => void)[] = [];
-  private authenticationConirmationCallback: (() => Promise<void>) | null =
+  private authenticationConfirmationCallback: (() => Promise<void>) | null =
     null;
+
+  private _uriHandlerId: string | null = null;
 
   private constructor(
     globalDataPathService: GlobalDataPathService,
     identifierService: IdentifierService,
     kartonService: KartonService,
     notificationService: NotificationService,
+    uriHandlerService: URIHandlerService,
     logger: Logger,
   ) {
     this.globalDataPathService = globalDataPathService;
     this.identifierService = identifierService;
     this.kartonService = kartonService;
     this.notificationService = notificationService;
+    this.uriHandlerService = uriHandlerService;
     this.logger = logger;
     this.serverInterop = new AuthServerInterop(logger);
   }
@@ -75,13 +81,6 @@ export class AuthService {
     );
 
     this.kartonService.registerServerProcedureHandler(
-      'userAccount.abortLogin',
-      async () => {
-        await this.abortLogin();
-      },
-    );
-
-    this.kartonService.registerServerProcedureHandler(
       'userAccount.refreshStatus',
       async () => {
         await this.checkAuthState();
@@ -102,6 +101,11 @@ export class AuthService {
       },
     );
 
+    this._uriHandlerId = this.uriHandlerService.registerHandler(
+      'auth',
+      this.handleAuthURI,
+    );
+
     // Check if we have any tokens stored in
     this.logger.debug('[AuthService] Initialized');
   }
@@ -111,6 +115,7 @@ export class AuthService {
     identifierService: IdentifierService,
     kartonService: KartonService,
     notificationService: NotificationService,
+    uriHandlerService: URIHandlerService,
     logger: Logger,
   ): Promise<AuthService> {
     const authService = new AuthService(
@@ -118,6 +123,7 @@ export class AuthService {
       identifierService,
       kartonService,
       notificationService,
+      uriHandlerService,
       logger,
     );
     await authService.initialize();
@@ -141,8 +147,24 @@ export class AuthService {
     );
     this.authChangeCallbacks = [];
 
+    if (this._uriHandlerId) {
+      this.uriHandlerService.unregisterHandler(this._uriHandlerId);
+    }
+
     this.logger.debug('[AuthService] Teared down auth service');
   }
+
+  private handleAuthURI: (uri: string) => Promise<void> = ((uri) => {
+    const path = uri.split('?')[0];
+    const searchParams = new URLSearchParams(uri.split('?')[1]);
+
+    if (path === 'auth/callback') {
+      const authCode = searchParams.get('authCode');
+      const error = searchParams.get('error');
+
+      void this.handleAuthCodeExchange(authCode, error);
+    }
+  }).bind(this);
 
   // Regularly callable function that checks, if auth if configured and valid.
   // Will be called every 10 minutes by default, but this function can also be call as soon as we think there may be some issue with auth.
@@ -311,22 +333,13 @@ export class AuthService {
       return;
     }
 
+    const authUrl = this.getAuthUrl();
+    shell.openExternal(authUrl);
+
     this.updateAuthState((draft) => {
       draft.userAccount = {
         ...draft.userAccount,
         machineId: this.identifierService.getMachineId(),
-        loginDialog: {
-          startUrl: this.getAuthUrl(),
-        },
-      };
-    });
-  }
-
-  public async abortLogin(): Promise<void> {
-    this.updateAuthState((draft) => {
-      draft.userAccount = {
-        ...draft.userAccount,
-        loginDialog: null,
       };
     });
   }
@@ -356,7 +369,7 @@ export class AuthService {
       };
     });
     // This function is executed if the user approves the sign in.
-    this.authenticationConirmationCallback = async () => {
+    this.authenticationConfirmationCallback = async () => {
       const tokenData = await this.serverInterop.exchangeToken(authCode);
       this.tokenStore.tokenData = {
         accessToken: tokenData.accessToken,
@@ -370,7 +383,7 @@ export class AuthService {
   private async confirmAuthenticationConfirmation(): Promise<void> {
     this.logger.debug('[AuthService] User confirmed authentication');
     try {
-      await this.authenticationConirmationCallback?.();
+      await this.authenticationConfirmationCallback?.();
       await this.checkAuthState();
     } catch (err) {
       this.logger.error(`[AuthService] Failed to exchange token: ${err}`);
@@ -382,13 +395,13 @@ export class AuthService {
           pendingAuthenticationConfirmation: false,
         };
       });
-      this.authenticationConirmationCallback = null;
+      this.authenticationConfirmationCallback = null;
     }
   }
 
   private async cancelAuthenticationConfirmation(): Promise<void> {
     this.logger.debug('[AuthService] User cancelled authentication');
-    this.authenticationConirmationCallback = null;
+    this.authenticationConfirmationCallback = null;
     this.updateAuthState((draft) => {
       draft.userAccount = {
         ...draft.userAccount,
@@ -412,8 +425,7 @@ export class AuthService {
   }
 
   private getAuthUrl(): string {
-    const runningPort = this.kartonService.state.appInfo.runningOnPort;
-    const callbackUrl = `http://localhost:${runningPort}${stagewiseAppPrefix}/auth/callback`;
+    const callbackUrl = `stagewise://auth/callback`;
 
     return `${consoleUrl}/authenticate-ide?ide=cli&redirect_uri=${encodeURIComponent(callbackUrl)}&no-cookie-banner=true`;
   }
