@@ -730,6 +730,7 @@ export const AssistantGrepSearchComplete: Story = {
 export const AssistantGrepSearchStreaming: Story = {
   name: 'Assistant/Tool-GrepSearch-Streaming',
   parameters: {
+    disableShimmer: false,
     mockKartonState: {
       ...baseState,
       workspace: {
@@ -1731,6 +1732,40 @@ export const AssistantWebFetchStreaming: Story = {
                     ),
                   ],
                 }),
+              ],
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+/**
+ * Assistant Markdown Output in TypeScript
+ *
+ * Shows agent outputting markdown-formatted code blocks in TypeScript.
+ * Demonstrates: User ask → Agent think → Generate TypeScript code → Agent present markdown
+ */
+export const AssistantMarkdownTypeScript: Story = {
+  name: 'Assistant/Response-Markdown-TypeScript',
+  parameters: {
+    mockKartonState: {
+      ...baseState,
+      workspace: {
+        ...baseState.workspace,
+        agentChat: {
+          ...baseState.workspace?.agentChat,
+          chats: {
+            'chat-1': {
+              ...createEmptyChat(),
+              messages: [
+                createUserMessage(
+                  'Show me an example of a custom React hook in TypeScript',
+                ),
+                createAssistantMessage(
+                  "Here's an example of a custom React hook in TypeScript:\n\n```tsx\nimport { useState, useEffect } from 'react';\n\ninterface UseDebounceOptions {\n  delay?: number;\n}\n\nexport function useDebounce<T>(value: T, options: UseDebounceOptions = {}): T {\n  const { delay = 500 } = options;\n  const [debouncedValue, setDebouncedValue] = useState<T>(value);\n\n  useEffect(() => {\n    const handler = setTimeout(() => {\n      setDebouncedValue(value);\n    }, delay);\n\n    return () => {\n      clearTimeout(handler);\n    };\n  }, [value, delay]);\n\n  return debouncedValue;\n}\n```\n\nThis hook delays updating a value, useful for search inputs or API calls.",
+                ),
               ],
             },
           },

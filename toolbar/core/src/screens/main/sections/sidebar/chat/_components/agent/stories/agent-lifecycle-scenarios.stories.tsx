@@ -219,6 +219,33 @@ export const ParallelExploration: Story = {
       userMessage: 'Find and fix inconsistent button styling across components',
       thinkingText:
         'Let me explore the component directory to find all button-related files...',
+      initialTool: {
+        type: 'grep',
+        query: 'className.*btn',
+        result: {
+          message: 'Found 3 matches for "className.*btn"',
+          result: {
+            totalMatches: 3,
+            matches: [
+              {
+                relativePath: 'src/components/Button.tsx',
+                line: 8,
+                preview: '  <button className="btn-primary">',
+              },
+              {
+                relativePath: 'src/components/IconButton.tsx',
+                line: 6,
+                preview: '  <button className="icon-btn-primary">',
+              },
+              {
+                relativePath: 'src/components/LinkButton.tsx',
+                line: 4,
+                preview: '  <button className="link-button">',
+              },
+            ],
+          },
+        },
+      },
       listFilesPath: 'src/components',
       listFilesResult: [
         {

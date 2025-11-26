@@ -13,6 +13,7 @@ import {
   createReadFileToolPart,
   createMultiEditToolPart,
   createOverwriteFileToolPart,
+  createGrepSearchToolPart,
   REALISTIC_TIMING,
   getRandomDuration,
 } from './shared-utilities';
@@ -25,6 +26,13 @@ export interface ExplorationScenarioConfig {
   userMessage: string;
   /** Agent's initial thinking text */
   thinkingText: string;
+  /** Initial solo tool call (optional) - runs before parallel operations */
+  initialTool?: {
+    type: 'grep' | 'list-files';
+    path?: string; // for list-files
+    query?: string; // for grep
+    result: any;
+  };
   /** List files configuration */
   listFilesPath: string;
   listFilesResult: Array<{
@@ -223,7 +231,70 @@ function buildExplorationTimeline(
 
   currentTime += thinkingDuration;
 
-  // 5. PHASE 1: List files + Glob in parallel
+  // 5. PHASE 0: Initial solo tool call (if configured)
+  if (config.initialTool) {
+    currentTime += 200;
+    const phase0StartTime = currentTime;
+    const initialToolId = 'initial-tool-1';
+    const initialToolPartIndex = partIndex++;
+
+    // Add initial tool in input-streaming
+    if (config.initialTool.type === 'grep') {
+      timeline.push({
+        type: 'update-message-part',
+        timestamp: phase0StartTime,
+        messageId: assistantMessageId,
+        partIndex: initialToolPartIndex,
+        updater: () =>
+          createGrepSearchToolPart(
+            config.initialTool!.query || 'Button',
+            0,
+            'input-streaming',
+            {
+              toolCallId: initialToolId,
+              explanation: 'Searching for button components',
+            },
+          ),
+      });
+    } else {
+      timeline.push({
+        type: 'update-message-part',
+        timestamp: phase0StartTime,
+        messageId: assistantMessageId,
+        partIndex: initialToolPartIndex,
+        updater: () =>
+          createListFilesToolPart(
+            config.initialTool!.path || 'src',
+            [],
+            'input-streaming',
+            { toolCallId: initialToolId },
+          ),
+      });
+    }
+
+    // Transition to input-available
+    currentTime = phase0StartTime + REALISTIC_TIMING.phaseTransition;
+    timeline.push({
+      type: 'update-tool-state',
+      timestamp: currentTime,
+      messageId: assistantMessageId,
+      toolCallId: initialToolId,
+      newState: 'input-available',
+    });
+
+    // Complete (output-available) after ~500ms
+    currentTime += 500;
+    timeline.push({
+      type: 'update-tool-state',
+      timestamp: currentTime,
+      messageId: assistantMessageId,
+      toolCallId: initialToolId,
+      newState: 'output-available',
+      output: config.initialTool.result,
+    });
+  }
+
+  // 6. PHASE 1: List files + Glob in parallel
   currentTime += 200;
   const phase1StartTime = currentTime;
   const listFilesToolId = 'list-files-tool-1';
@@ -315,7 +386,7 @@ function buildExplorationTimeline(
     },
   });
 
-  // 6. PHASE 2: Read 3 files in parallel
+  // 7. PHASE 2: Read 3 files in parallel
   currentTime += 500;
   const phase2StartTime = currentTime;
   const readToolIds: string[] = [];
@@ -379,7 +450,7 @@ function buildExplorationTimeline(
     });
   });
 
-  // 7. Intermediate text response
+  // 8. Intermediate text response
   currentTime += config.filesToRead.length * 250 + 300;
   const intermediateTextPartIndex = partIndex++;
   timeline.push({
@@ -406,7 +477,7 @@ function buildExplorationTimeline(
     duration: intermediateStreamDuration,
   });
 
-  // 8. PHASE 3: Edit files in parallel
+  // 9. PHASE 3: Edit files in parallel
   currentTime += intermediateStreamDuration + 400;
   const phase3StartTime = currentTime;
   const editToolIds: string[] = [];
@@ -515,7 +586,7 @@ function buildExplorationTimeline(
     });
   });
 
-  // 9. Final response (optional)
+  // 10. Final response (optional)
   if (config.finalResponse) {
     currentTime += config.edits.length * 300 + 300;
     const finalTextPartIndex = partIndex++;
@@ -546,7 +617,7 @@ function buildExplorationTimeline(
     currentTime += finalStreamDuration;
   }
 
-  // 10. Set isWorking to false
+  // 11. Set isWorking to false
   currentTime += 100;
   timeline.push({
     type: 'set-is-working',
