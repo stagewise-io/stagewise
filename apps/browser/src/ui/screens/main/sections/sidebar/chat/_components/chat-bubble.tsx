@@ -9,8 +9,8 @@ import type {
   UIMessagePart,
   ToolUIPart,
   DynamicToolUIPart,
-} from '@stagewise/karton-contract';
-import { AgentErrorType } from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
+import { AgentErrorType } from '@shared/karton-contracts/ui';
 import { RefreshCcwIcon, Undo2 } from 'lucide-react';
 import { useMemo, useCallback, useState, useEffect } from 'react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';

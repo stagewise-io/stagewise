@@ -1,4 +1,4 @@
-import type { BrowserData } from '@stagewise/karton-contract';
+import type { BrowserData } from '@shared/karton-contracts/ui';
 import xml from 'xml';
 import specialTokens from '../special-tokens.js';
 

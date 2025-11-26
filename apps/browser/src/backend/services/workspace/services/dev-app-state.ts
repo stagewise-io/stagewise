@@ -1,7 +1,7 @@
 import type { Logger } from '@/services/logger';
 import { type ChildProcess, spawn } from 'node:child_process';
 import type { WorkspaceConfigService } from './config';
-import type { WorkspaceConfig } from '@stagewise/karton-contract/shared-types';
+import type { WorkspaceConfig } from '@shared/karton-contracts/ui/shared-types';
 import type { KartonService } from '@/services/karton';
 import {
   checkPortHasContent,

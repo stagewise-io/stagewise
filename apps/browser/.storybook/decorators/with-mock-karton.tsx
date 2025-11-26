@@ -1,6 +1,6 @@
 import type { Decorator } from '@storybook/react';
 import { MockKartonProvider } from '../mocks/mock-hooks';
-import type { AppState } from '@stagewise/karton-contract';
+import type { AppState } from '@shared/karton-contracts/ui';
 
 /**
  * Storybook decorator that provides mock Karton state to components.

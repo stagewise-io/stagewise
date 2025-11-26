@@ -16,7 +16,7 @@
 
 import type { Logger } from './logger';
 import type { KartonService } from './karton';
-import type { FilePickerRequest } from '@stagewise/karton-contract/shared-types';
+import type { FilePickerRequest } from '@shared/karton-contracts/ui/shared-types';
 import { dialog } from 'electron';
 
 export class FilePickerService {

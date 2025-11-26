@@ -14,7 +14,7 @@ import {
   AgentErrorType,
   Layout,
   MainTab,
-} from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
 import {
   type AnthropicProviderOptions,
   createAnthropic,

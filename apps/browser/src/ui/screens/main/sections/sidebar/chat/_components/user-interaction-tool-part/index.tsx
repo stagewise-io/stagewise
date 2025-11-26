@@ -1,4 +1,4 @@
-import type { ToolPart } from '@stagewise/karton-contract';
+import type { ToolPart } from '@shared/karton-contracts/ui';
 import { AskForAppPathToolPartContent } from './app-path';
 import { AskForPortToolPartContent } from './ask-for-port';
 import { AskForAgentAccessPathToolPartContent } from './agent-access-path';

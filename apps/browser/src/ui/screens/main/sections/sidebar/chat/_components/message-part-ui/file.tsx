@@ -1,6 +1,6 @@
 import { FileIcon, ImageIcon, ExternalLinkIcon } from 'lucide-react';
 import { openFileUrl } from '@/utils';
-import type { FileUIPart } from '@stagewise/karton-contract';
+import type { FileUIPart } from '@shared/karton-contracts/ui';
 import { Button } from '@stagewise/stage-ui/components/button';
 
 export const FilePart = ({ part }: { part: FileUIPart }) => {

@@ -4,7 +4,7 @@ import { Loader2Icon, SparklesIcon } from 'lucide-react';
 import { useComparingSelector, useKartonState } from '@/hooks/use-karton';
 import { cn } from '@/utils';
 import { ChatErrorBubble } from './chat-error-bubble';
-import type { History } from '@stagewise/karton-contract';
+import type { History } from '@shared/karton-contracts/ui';
 
 export const ChatHistory = () => {
   const wasAtBottomRef = useRef(true);

@@ -91,6 +91,7 @@ export class WindowLayoutService {
 
     this.webContentsView = new WebContentsView({
       webPreferences: {
+        // preload: path.join(__dirname, 'web-content-preload/index.js'),
         partition: 'persist:browser-content',
       },
     });
@@ -100,13 +101,14 @@ export class WindowLayoutService {
       showServices: true,
       window: this.webContentsView.webContents,
     });
+    this.webContentsView.webContents.debugger.attach('1.3');
 
     this.webContentsViewContainer.addChildView(this.webContentsView);
     this.baseWindow.contentView.addChildView(this.webContentsViewContainer);
 
     this.uiContentView = new WebContentsView({
       webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
+        preload: path.join(__dirname, 'ui-preload/index.js'),
         partition: 'persist:stagewise-ui',
       },
     });

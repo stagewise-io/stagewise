@@ -14,7 +14,7 @@ import type {
   ChatMessage,
   FileUIPart,
   SelectedElement,
-} from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
 
 interface ContextSnippet {
   promptContextName: string;

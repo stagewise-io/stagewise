@@ -1,4 +1,4 @@
-import type { KartonContract } from '@stagewise/karton-contract';
+import type { KartonContract } from '@shared/karton-contracts/ui';
 import type { ToolCallProcessingResult } from './tool-call-utils.js';
 import type { ToolUIPart } from 'ai';
 import { randomUUID } from 'node:crypto';

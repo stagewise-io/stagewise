@@ -13,7 +13,7 @@ import { useCallback, useRef } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
-import { MainTab } from '@stagewise/karton-contract';
+import { MainTab } from '@shared/karton-contracts/ui';
 
 type Tab = {
   title: string;

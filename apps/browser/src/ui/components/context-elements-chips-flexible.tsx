@@ -15,7 +15,7 @@ import {
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import type { SelectedElement } from '@stagewise/karton-contract';
+import type { SelectedElement } from '@shared/karton-contracts/ui';
 import {
   Tooltip,
   TooltipTrigger,

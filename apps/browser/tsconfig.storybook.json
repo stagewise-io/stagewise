@@ -1,12 +1,11 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
-    "noEmit": true,
+    "composite": true,
     "paths": {
-      "@/*": ["../src/ui/*"],
-      "@shared/*": ["../src/shared/*"],
-      "@sb/*": ["./*"],
-      "tmp/*": ["../tmp/*"]
+      "@/*": ["./src/ui/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@sb/*": ["./.storybook/*"],
+      "tmp/*": ["./tmp/*"]
     },
     "types": ["node", "vite/client"],
     "target": "ES2020",
@@ -15,21 +14,20 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
     "jsxImportSource": "react"
   },
   "include": [
-    "../src/ui/**/*.stories.tsx",
-    "../src/ui/**/*.stories.ts",
-    "decorators/**/*.ts",
-    "decorators/**/*.tsx",
-    "mocks/**/*.ts",
-    "mocks/**/*.tsx",
-    "*.ts",
-    "*.tsx"
+    "src/ui/**/*.tsx",
+    "src/ui/**/*.ts",
+    ".storybook/decorators/**/*.ts",
+    ".storybook/decorators/**/*.tsx",
+    ".storybook/mocks/**/*.ts",
+    ".storybook/mocks/**/*.tsx",
+    ".storybook/*.ts",
+    ".storybook/*.tsx"
   ],
   "exclude": ["node_modules", "dist", "coverage", "tmp", ".turbo"]
 }

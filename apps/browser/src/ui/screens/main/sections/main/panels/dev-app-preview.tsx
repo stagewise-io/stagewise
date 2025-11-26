@@ -1,7 +1,7 @@
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { cn } from '@/utils';
-import { Layout, MainTab } from '@stagewise/karton-contract';
+import { Layout, MainTab } from '@shared/karton-contracts/ui';
 import { Loader2Icon } from 'lucide-react';
 import { useCallback, useRef } from 'react';
 

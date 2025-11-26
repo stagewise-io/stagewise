@@ -2,7 +2,7 @@
 // and then converts a set of UI messages to model messages that then can simply be used to trigger a LLM.
 
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
-import type { ChatMessage, KartonContract } from '@stagewise/karton-contract';
+import type { ChatMessage, KartonContract } from '@shared/karton-contracts/ui';
 import { convertToModelMessages, type ModelMessage } from 'ai';
 import { getSystemPrompt } from './templates/system-prompt';
 import { getUserMessage } from './templates/user';

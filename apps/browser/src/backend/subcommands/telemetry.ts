@@ -5,7 +5,7 @@
  */
 
 import { bootstrapGlobalServices } from '@/global-service-bootstrap';
-import type { GlobalConfig } from '@stagewise/karton-contract/shared-types';
+import type { GlobalConfig } from '@shared/karton-contracts/ui/shared-types';
 
 export async function getTelemetryLevelCmdHandler() {
   const globalServices = await bootstrapGlobalServices({});

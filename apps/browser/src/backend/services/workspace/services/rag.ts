@@ -5,7 +5,7 @@ import type { TelemetryService } from '../../telemetry';
 import type {
   ReactSelectedElementInfo,
   SelectedElement,
-} from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
 export class RagService {
   private logger: Logger;
   private kartonService: KartonService;

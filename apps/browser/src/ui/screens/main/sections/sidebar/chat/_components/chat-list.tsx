@@ -6,7 +6,7 @@ import {
   useKartonProcedure,
   useKartonState,
 } from '@/hooks/use-karton';
-import type { Chat } from '@stagewise/karton-contract';
+import type { Chat } from '@shared/karton-contracts/ui';
 import { cn } from '@/utils';
 
 export function ChatList({ onClose }: { onClose: () => void }) {

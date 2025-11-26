@@ -5,7 +5,7 @@ import type { PickToolPart } from './index.js';
 import { CheckIcon, XIcon } from 'lucide-react';
 import { useKartonProcedure } from '@/hooks/use-karton';
 import type { KartonServerProcedures } from '@stagewise/karton/react/client';
-import type { KartonContract } from '@stagewise/karton-contract';
+import type { KartonContract } from '@shared/karton-contracts/ui';
 import { Input } from '@stagewise/stage-ui/components/input';
 
 export const AskForAgentAccessPathToolPartContent = memo(

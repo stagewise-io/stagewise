@@ -1,6 +1,8 @@
-import { readFile } from 'node:fs/promises';
-import path, { resolve } from 'node:path';
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import path, { resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
@@ -10,24 +12,10 @@ const packageJson = JSON.parse(
 );
 const version = packageJson.version;
 
-// https://vitejs.dev/config
+// https://vite.dev/config/
 export default defineConfig({
-  build: {
-    target: 'esnext',
-    lib: {
-      formats: ['es'],
-      entry: 'src/backend/index.ts',
-      name: 'main',
-      fileName: 'main',
-    },
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src/backend'),
-    },
-    conditions: ['node'],
-    mainFields: ['module', 'main'],
-  },
+  base: './',
+  plugins: [react(), tailwindcss()],
   define: {
     'process.env': JSON.stringify({
       BUILD_MODE: process.env.BUILD_MODE ?? 'production',
@@ -40,5 +28,22 @@ export default defineConfig({
       LLM_PROXY_URL: process.env.LLM_PROXY_URL ?? 'https://llm.stagewise.io',
       CLI_VERSION: version,
     }),
+    'process.type': JSON.stringify('renderer'),
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src/ui'),
+      '@shared': path.resolve(__dirname, './src/shared'),
+    },
+    mainFields: ['module', 'main'],
+    extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
+    conditions: ['module', 'import', 'browser'],
+    preserveSymlinks: false,
+  },
+  build: {
+    rollupOptions: {
+      external: ['serialport', 'sqlite3'],
+    },
+    target: 'es2022',
   },
 });

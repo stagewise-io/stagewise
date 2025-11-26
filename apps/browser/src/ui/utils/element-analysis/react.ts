@@ -1,4 +1,4 @@
-import type { ReactSelectedElementInfo } from '@stagewise/karton-contract';
+import type { ReactSelectedElementInfo } from '@shared/karton-contracts/ui';
 
 export const getSelectedElementReactInfo = (
   element: HTMLElement,

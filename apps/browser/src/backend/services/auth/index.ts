@@ -1,4 +1,4 @@
-import type { KartonContract } from '@stagewise/karton-contract';
+import type { KartonContract } from '@shared/karton-contracts/ui';
 import type { GlobalDataPathService } from '../global-data-path';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';

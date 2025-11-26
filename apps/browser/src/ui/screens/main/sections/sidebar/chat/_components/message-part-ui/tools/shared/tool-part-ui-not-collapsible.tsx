@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
-import type { ToolUIPart } from '@stagewise/karton-contract';
-import type { DynamicToolUIPart } from '@stagewise/karton-contract';
+import type { ToolUIPart } from '@shared/karton-contracts/ui';
+import type { DynamicToolUIPart } from '@shared/karton-contracts/ui';
 import { cn } from '@/utils';
 import { XIcon } from 'lucide-react';
 import {

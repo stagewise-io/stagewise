@@ -6,7 +6,7 @@
  * @warning The state of worksapce-specific experiences is to be managed by the workspace manager etc.
  */
 
-import { Layout, MainTab } from '@stagewise/karton-contract';
+import { Layout, MainTab } from '@shared/karton-contracts/ui';
 import type { KartonService } from './karton';
 import type { Logger } from './logger';
 

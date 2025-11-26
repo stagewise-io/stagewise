@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
-import type { OpenFilesInIde } from '@stagewise/karton-contract/shared-types';
+import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import type { PickToolPart } from './index.js';
 import { CheckIcon, XIcon, ChevronDownIcon } from 'lucide-react';
 import { IdeLogo } from '@/components/ide-logo';

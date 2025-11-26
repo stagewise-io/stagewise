@@ -18,7 +18,7 @@ import { Input } from '@stagewise/stage-ui/components/input';
 import type {
   GlobalConfig,
   WorkspaceConfig,
-} from '@stagewise/karton-contract/shared-types';
+} from '@shared/karton-contracts/ui/shared-types';
 import { startTransition, useCallback, useOptimistic } from 'react';
 import {
   Popover,

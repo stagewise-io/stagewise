@@ -5,7 +5,7 @@ import type {
   AppState,
   ChatMessage,
   ToolPart,
-} from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
 
 export interface ToolStreamingPhase {
   /** Duration in milliseconds */

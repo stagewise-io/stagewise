@@ -1,4 +1,4 @@
-import type { AppState } from '@stagewise/karton-contract';
+import type { AppState } from '@shared/karton-contracts/ui';
 import { splitIntoChunks } from './shared-utilities';
 
 /**

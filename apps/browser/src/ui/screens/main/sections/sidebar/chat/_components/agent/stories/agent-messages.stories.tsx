@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ChatHistory } from '../../chat-history';
-import { withFileEditScenario } from '../../../../../../../../../.storybook/decorators/scenarios';
-import { withMockKarton } from '../../../../../../../../../.storybook/decorators/with-mock-karton';
-import { type AppState, Layout } from '@stagewise/karton-contract';
-import { MainTab } from '@stagewise/karton-contract';
+import { withFileEditScenario } from '@sb/decorators/scenarios';
+import { withMockKarton } from '@sb/decorators/with-mock-karton';
+import { type AppState, Layout } from '@shared/karton-contracts/ui';
+import { MainTab } from '@shared/karton-contracts/ui';
 import {
   createUserMessage,
   createAssistantMessage,
@@ -15,7 +15,7 @@ import {
   createOverwriteFileToolPart,
   createMultiEditToolPart,
   createEmptyChat,
-} from '../../../../../../../../../.storybook/mocks/chat-data';
+} from '@sb/mocks/chat-data';
 
 const meta: Meta<typeof ChatHistory> = {
   title: 'Agent/Messages',
@@ -36,7 +36,6 @@ const baseState: Partial<AppState> = {
     path: '/Users/user/projects/my-app',
     paths: {
       data: '/Users/user/projects/my-app/data',
-      cache: '/Users/user/projects/my-app/cache',
       temp: '/Users/user/projects/my-app/temp',
     },
     devAppStatus: null,

@@ -1,5 +1,5 @@
 import { getBrowserData } from '@/utils';
-import { type KartonContract, defaultState } from '@stagewise/karton-contract';
+import { type KartonContract, defaultState } from '@shared/karton-contracts/ui';
 import {
   createKartonReactClient,
   useComparingSelector,

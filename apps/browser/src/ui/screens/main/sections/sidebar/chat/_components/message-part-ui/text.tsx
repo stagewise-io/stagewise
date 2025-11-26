@@ -1,4 +1,4 @@
-import type { TextUIPart } from '@stagewise/karton-contract';
+import type { TextUIPart } from '@shared/karton-contracts/ui';
 import { memo } from 'react';
 import { Streamdown } from '@/components/streamdown';
 import { useTypeWriterText } from '@/hooks/use-type-writer-text';

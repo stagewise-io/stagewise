@@ -3,7 +3,7 @@ export interface UIHandle {
 }
 
 import type { ReactNode } from 'react';
-import type { ChatMessage } from '@stagewise/karton-contract';
+import type { ChatMessage } from '@shared/karton-contracts/ui';
 
 export type PluginChatMessage = Omit<ChatMessage, 'role' | 'metadata'> & {
   role: 'plugin';
@@ -37,7 +37,7 @@ export interface PromptContext {
   contextSnippets: ContextSnippet[];
 }
 
-export type { SelectedElement } from '@stagewise/karton-contract';
+export type { SelectedElement } from '@shared/karton-contracts/ui';
 
 /** Additional information that a plugin can provide when the user selects a context element */
 export interface ContextElementContext {

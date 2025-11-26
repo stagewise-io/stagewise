@@ -11,8 +11,8 @@
 
 import { useContext, useState, useCallback, useRef } from 'react';
 import { createContext, type ReactNode, useMemo } from 'react';
-import type { AppState, KartonContract } from '@stagewise/karton-contract';
-import { defaultState } from '@stagewise/karton-contract';
+import type { AppState, KartonContract } from '@shared/karton-contracts/ui';
+import { defaultState } from '@shared/karton-contracts/ui';
 
 // Create the mock Karton context
 interface MockKartonContextValue {

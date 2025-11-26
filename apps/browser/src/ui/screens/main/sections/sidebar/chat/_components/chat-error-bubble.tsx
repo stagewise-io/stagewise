@@ -1,5 +1,5 @@
 import { cn } from '@/utils';
-import { AgentErrorType, type AgentError } from '@stagewise/karton-contract';
+import { AgentErrorType, type AgentError } from '@shared/karton-contracts/ui';
 import { RefreshCcwIcon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import Markdown from 'react-markdown';

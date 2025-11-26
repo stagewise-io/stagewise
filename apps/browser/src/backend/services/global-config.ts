@@ -5,7 +5,7 @@ import type { KartonService } from './karton';
 import {
   type GlobalConfig,
   globalConfigSchema,
-} from '@stagewise/karton-contract/shared-types';
+} from '@shared/karton-contracts/ui/shared-types';
 
 /**
  * The global config service gives access to a global config objects that's stored

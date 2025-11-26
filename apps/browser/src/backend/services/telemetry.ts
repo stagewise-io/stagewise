@@ -6,7 +6,7 @@ import type { GlobalConfigService } from './global-config';
 import type {
   GlobalConfig,
   OpenFilesInIde,
-} from '@stagewise/karton-contract/shared-types';
+} from '@shared/karton-contracts/ui/shared-types';
 import type { Logger } from './logger';
 
 export interface EventProperties {

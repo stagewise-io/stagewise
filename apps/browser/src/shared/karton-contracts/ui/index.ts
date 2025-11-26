@@ -11,7 +11,7 @@ import type {
   SelectedElement,
   BrowserData,
   ReactSelectedElementInfo,
-} from './metadata.js';
+} from './metadata';
 import type {
   UIMessage,
   UIDataTypes,
@@ -23,7 +23,7 @@ import type {
   WorkspaceConfig,
   FilePickerRequest,
   GlobalConfig,
-} from './shared-types.js';
+} from './shared-types';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
 export type {

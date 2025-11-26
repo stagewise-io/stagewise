@@ -1,6 +1,6 @@
 import type { AllTools } from '@stagewise/agent-tools';
 import type { StaticToolCall, TypedToolCall } from 'ai';
-import type { History } from '@stagewise/karton-contract';
+import type { History } from '@shared/karton-contracts/ui';
 
 interface ToolCallContext<T extends StaticToolCall<AllTools>> {
   toolCall: T;

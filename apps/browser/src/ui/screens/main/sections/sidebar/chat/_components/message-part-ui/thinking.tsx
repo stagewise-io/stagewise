@@ -1,5 +1,5 @@
 import { cn } from '@/utils';
-import type { ReasoningUIPart } from '@stagewise/karton-contract';
+import type { ReasoningUIPart } from '@shared/karton-contracts/ui';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { BrainIcon } from 'lucide-react';
 import { Streamdown } from '@/components/streamdown';

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ChatHistory } from '../../chat-history';
-import { type AppState, Layout, MainTab } from '@stagewise/karton-contract';
+import { type AppState, Layout, MainTab } from '@shared/karton-contracts/ui';
 import {
   withSimpleResponseScenario,
   withFileReadingScenario,
@@ -10,8 +10,8 @@ import {
   withExplorationScenario,
   withErrorRecoveryScenario,
   withComplexRefactoringScenario,
-} from '../../../../../../../../../.storybook/decorators/scenarios';
-import { createEmptyChat } from '../../../../../../../../../.storybook/mocks/chat-data';
+} from '@sb/decorators/scenarios';
+import { createEmptyChat } from '@sb/mocks/chat-data';
 
 const meta: Meta<typeof ChatHistory> = {
   title: 'Chat/Agent/Scenarios/Agent Lifecycle',
@@ -28,7 +28,6 @@ const baseState: Partial<AppState> = {
     path: '/Users/user/projects/my-app',
     paths: {
       data: '/Users/user/projects/my-app/data',
-      cache: '/Users/user/projects/my-app/cache',
       temp: '/Users/user/projects/my-app/temp',
     },
     devAppStatus: null,

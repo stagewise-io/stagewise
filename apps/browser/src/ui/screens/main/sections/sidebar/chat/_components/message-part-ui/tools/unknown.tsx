@@ -1,4 +1,7 @@
-import type { DynamicToolUIPart, ToolUIPart } from '@stagewise/karton-contract';
+import type {
+  DynamicToolUIPart,
+  ToolUIPart,
+} from '@shared/karton-contracts/ui';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
 import { CircleQuestionMarkIcon } from 'lucide-react';
 

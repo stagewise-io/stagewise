@@ -3,7 +3,7 @@ import {
   type KartonServer,
   ElectronServerTransport,
 } from '@stagewise/karton/server';
-import { type KartonContract, defaultState } from '@stagewise/karton-contract';
+import { type KartonContract, defaultState } from '@shared/karton-contracts/ui';
 import type { Logger } from './logger';
 import { ipcMain } from 'electron';
 

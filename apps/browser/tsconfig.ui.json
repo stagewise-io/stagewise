@@ -6,10 +6,12 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./src/ui/*"]
+      "@/*": ["./src/ui/*"],
+      "@shared/*": ["./src/shared/*"]
     },
     "types": ["vite/client"],
     "skipLibCheck": true
   },
-  "include": ["src/ui", "forge.env.d.ts"]
+  "include": ["src/ui", "forge.env.d.ts", "src/shared", ".storybook/**/*"],
+  "exclude": ["**/*.stories.tsx", "**/*.stories.ts"]
 }

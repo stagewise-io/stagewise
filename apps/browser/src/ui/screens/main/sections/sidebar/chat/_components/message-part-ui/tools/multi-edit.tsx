@@ -1,4 +1,4 @@
-import type { ToolPart } from '@stagewise/karton-contract';
+import type { ToolPart } from '@shared/karton-contracts/ui';
 import { DiffPreview } from './shared/diff-preview';
 import { FileIcon } from './shared/file-icon';
 import { usePostHog } from 'posthog-js/react';

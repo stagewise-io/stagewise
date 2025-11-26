@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
-import { Layout, MainTab } from '@stagewise/karton-contract';
+import { Layout, MainTab } from '@shared/karton-contracts/ui';
 import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@/utils';
 

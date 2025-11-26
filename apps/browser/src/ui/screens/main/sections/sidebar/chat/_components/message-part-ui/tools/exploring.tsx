@@ -1,4 +1,4 @@
-import type { ToolPart } from '@stagewise/karton-contract';
+import type { ToolPart } from '@shared/karton-contracts/ui';
 import { useMemo, useState, useEffect } from 'react';
 import { GlobToolPart } from './glob';
 import { SearchIcon } from 'lucide-react';

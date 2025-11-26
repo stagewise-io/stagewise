@@ -1,6 +1,6 @@
 import { convertToModelMessages, generateText, type LanguageModel } from 'ai';
 import { z } from 'zod';
-import type { History } from '@stagewise/karton-contract';
+import type { History } from '@shared/karton-contracts/ui';
 
 export const generateChatTitleSystemPrompt = `
 <system_prompt>

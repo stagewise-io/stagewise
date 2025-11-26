@@ -12,7 +12,7 @@ import type { WorkspaceLoadingOverrides } from './loading-overrides';
 import {
   type WorkspaceConfig,
   workspaceConfigSchema,
-} from '@stagewise/karton-contract/shared-types';
+} from '@shared/karton-contracts/ui/shared-types';
 
 export class ConfigNotExistingException extends Error {
   constructor() {

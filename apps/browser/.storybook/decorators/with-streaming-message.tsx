@@ -5,7 +5,7 @@ import type {
   AppState,
   ChatMessage,
   TextUIPart,
-} from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
 import type { StreamingConfig } from '../mocks/streaming-configs';
 
 /**

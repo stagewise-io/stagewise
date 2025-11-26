@@ -2,7 +2,7 @@ import type {
   BrowserData,
   SelectedElement,
   UserMessageMetadata,
-} from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
 
 export const companionAnchorTagName = 'stagewise-companion-anchor';
 
@@ -210,7 +210,7 @@ export const hotkeyActionDefinitions: Record<
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';
 import { getSelectedElementReactInfo } from './utils/element-analysis/react';
-import type { OpenFilesInIde } from '@stagewise/karton-contract/shared-types';
+import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 
 const customTwMerge = extendTailwindMerge({
   extend: {

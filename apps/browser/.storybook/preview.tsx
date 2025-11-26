@@ -1,5 +1,4 @@
 import type { Preview } from '@storybook/react-vite';
-import React from 'react';
 import { themes } from 'storybook/theming';
 import '../src/ui/app.css';
 import { DocsContainer } from '@storybook/addon-docs/blocks';

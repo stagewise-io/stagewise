@@ -5,7 +5,7 @@ import type {
   FileUIPart,
   ToolPart,
   ReasoningUIPart,
-} from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
 
 export function generateId(): string {
   return Math.random().toString(36).substring(2, 15);

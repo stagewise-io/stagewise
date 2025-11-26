@@ -1,7 +1,7 @@
 import type { Decorator } from '@storybook/react';
 import { useState, useEffect } from 'react';
 import { MockKartonProvider } from '../../mocks/mock-hooks';
-import type { AppState } from '@stagewise/karton-contract';
+import type { AppState } from '@shared/karton-contracts/ui';
 import { TimelineExecutor, type TimelineEvent } from './timeline-engine';
 import {
   createUserMessage,

@@ -5,7 +5,7 @@ import type {
   ReasoningUIPart,
   ToolPart,
   FileUIPart,
-} from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
 
 /**
  * Generate a unique ID for messages and tool calls

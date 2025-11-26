@@ -25,7 +25,7 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { HotkeyComboText } from '@/components/hotkey-combo-text';
 import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
-import { Layout, MainTab } from '@stagewise/karton-contract';
+import { Layout, MainTab } from '@shared/karton-contracts/ui';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { usePostHog } from 'posthog-js/react';
 

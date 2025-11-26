@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@stagewise/karton-contract';
+import type { ChatMessage } from '@shared/karton-contracts/ui';
 import { convertToModelMessages, type UserModelMessage } from 'ai';
 import xml from 'xml';
 import specialTokens from '../utils/special-tokens';

@@ -3,7 +3,7 @@ import {
   MainTab,
   Layout,
   type KartonContract,
-} from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
 import xml from 'xml';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import specialTokens from '../utils/special-tokens.js';

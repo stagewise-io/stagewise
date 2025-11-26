@@ -1,4 +1,4 @@
-import type { ToolPart } from '@stagewise/karton-contract';
+import type { ToolPart } from '@shared/karton-contracts/ui';
 import { FileIcon } from './shared/file-icon';
 import {
   Tooltip,

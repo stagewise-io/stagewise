@@ -7,7 +7,7 @@
 import type { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
 import type { WorkspaceConfigService } from './config';
-import type { KartonContract } from '@stagewise/karton-contract';
+import type { KartonContract } from '@shared/karton-contracts/ui';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

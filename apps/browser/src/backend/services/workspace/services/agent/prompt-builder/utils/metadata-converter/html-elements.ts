@@ -1,7 +1,7 @@
 import type {
   ReactSelectedElementInfo,
   SelectedElement,
-} from '@stagewise/karton-contract';
+} from '@shared/karton-contracts/ui';
 import xml from 'xml';
 import specialTokens from '../special-tokens.js';
 

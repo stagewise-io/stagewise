@@ -4,10 +4,11 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
-      "@/*": ["./src/backend/*"]
+      "@/*": ["./src/backend/*"],
+      "@shared/*": ["./src/shared/*"]
     },
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["src/backend", "forge.env.d.ts"]
+  "include": ["src/backend", "forge.env.d.ts", "src/shared"]
 }

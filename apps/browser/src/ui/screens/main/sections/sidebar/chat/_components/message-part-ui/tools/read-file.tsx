@@ -1,4 +1,4 @@
-import type { ToolPart } from '@stagewise/karton-contract';
+import type { ToolPart } from '@shared/karton-contracts/ui';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
 import { EyeIcon } from 'lucide-react';
 
