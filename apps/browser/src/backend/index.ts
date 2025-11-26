@@ -18,11 +18,20 @@ if (!singleInstanceLock) {
 }
 
 // Set the app name for macOS menu bar
-app.setName('stagewise');
+app.setName(
+  process.env.BUILD_MODE === 'production' ? 'stagewise' : 'stagewise-dev',
+);
 app.applicationMenu = null;
 
 // Set the right path structure for the app
 // We keep userData where it is, but we will put session data into a sub-folder called "session"
+app.setPath(
+  'userData',
+  path.join(
+    app.getPath('appData'),
+    process.env.BUILD_MODE === 'production' ? 'stagewise' : 'stagewise-dev',
+  ),
+);
 app.setPath('sessionData', path.join(app.getPath('userData'), 'session'));
 
 // This method will be called when Electron has finished

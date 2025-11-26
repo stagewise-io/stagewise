@@ -27,15 +27,15 @@ export class URIHandlerService {
   }
 
   private async initialize(): Promise<void> {
+    app.setAsDefaultProtocolClient('stagewise');
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
         app.setAsDefaultProtocolClient('stagewise', process.execPath, [
           path.resolve(process.argv[1]),
         ]);
       }
-    } else {
-      app.setAsDefaultProtocolClient('stagewise');
     }
+
     this.logger.debug('[URIHandlerService] Set as default protocol client');
     this.logger.debug(
       `[URIHandlerService] Is default protocol client: ${app.isDefaultProtocolClient('stagewise') ? 'yes' : 'no'}`,

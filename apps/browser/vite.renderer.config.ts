@@ -18,7 +18,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   define: {
     'process.env': JSON.stringify({
-      NODE_ENV: process.env.NODE_ENV || 'production',
+      BUILD_MODE: process.env.BUILD_MODE ?? 'production',
+      NODE_ENV: process.env.NODE_ENV ?? 'production',
       POSTHOG_API_KEY: process.env.POSTHOG_API_KEY,
       POSTHOG_HOST: process.env.POSTHOG_HOST ?? 'https://eu.i.posthog.com',
       STAGEWISE_CONSOLE_URL:

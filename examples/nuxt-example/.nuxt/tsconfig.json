@@ -1,0 +1,172 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "nitropack/types": [
+        "../../../node_modules/nitropack/types"
+      ],
+      "nitropack/runtime": [
+        "../../../node_modules/nitropack/runtime"
+      ],
+      "nitropack": [
+        "../../../node_modules/nitropack"
+      ],
+      "defu": [
+        "../../../node_modules/defu"
+      ],
+      "h3": [
+        "../../../node_modules/h3"
+      ],
+      "consola": [
+        "../../../node_modules/consola"
+      ],
+      "ofetch": [
+        "../../../node_modules/ofetch"
+      ],
+      "@unhead/vue": [
+        "../../../node_modules/@unhead/vue"
+      ],
+      "@nuxt/devtools": [
+        "../../../node_modules/@nuxt/devtools"
+      ],
+      "@vue/runtime-core": [
+        "../../../node_modules/@vue/runtime-core"
+      ],
+      "@vue/compiler-sfc": [
+        "../../../node_modules/@vue/compiler-sfc"
+      ],
+      "unplugin-vue-router/client": [
+        "../../../node_modules/unplugin-vue-router/client"
+      ],
+      "@nuxt/schema": [
+        "../../../node_modules/@nuxt/schema"
+      ],
+      "nuxt": [
+        "../../../node_modules/nuxt"
+      ],
+      "vite/client": [
+        "../../../node_modules/vite/client"
+      ],
+      "~": [
+        ".."
+      ],
+      "~/*": [
+        "../*"
+      ],
+      "@": [
+        ".."
+      ],
+      "@/*": [
+        "../*"
+      ],
+      "~~": [
+        ".."
+      ],
+      "~~/*": [
+        "../*"
+      ],
+      "@@": [
+        ".."
+      ],
+      "@@/*": [
+        "../*"
+      ],
+      "#shared": [
+        "../shared"
+      ],
+      "assets": [
+        "../assets"
+      ],
+      "public": [
+        "../public"
+      ],
+      "public/*": [
+        "../public/*"
+      ],
+      "#app": [
+        "../../../node_modules/nuxt/dist/app"
+      ],
+      "#app/*": [
+        "../../../node_modules/nuxt/dist/app/*"
+      ],
+      "vue-demi": [
+        "../../../node_modules/nuxt/dist/app/compat/vue-demi"
+      ],
+      "#vue-router": [
+        "../../../node_modules/vue-router"
+      ],
+      "#unhead/composables": [
+        "../../../node_modules/nuxt/dist/head/runtime/composables/v3"
+      ],
+      "#imports": [
+        "./imports"
+      ],
+      "#app-manifest": [
+        "./manifest/meta/26d29671-bd22-4f25-b0fb-5573f04fffd6"
+      ],
+      "#components": [
+        "./components"
+      ],
+      "#build": [
+        "."
+      ],
+      "#build/*": [
+        "./*"
+      ]
+    },
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "ESNext",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitOverride": true,
+    "module": "preserve",
+    "noEmit": true,
+    "lib": [
+      "ESNext",
+      "dom",
+      "dom.iterable",
+      "webworker"
+    ],
+    "jsx": "preserve",
+    "jsxImportSource": "vue",
+    "types": [],
+    "moduleResolution": "Bundler",
+    "useDefineForClassFields": true,
+    "noImplicitThis": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": [
+    "../**/*",
+    "../.config/nuxt.*",
+    "./nuxt.d.ts",
+    "../../../node_modules/@nuxt/devtools/runtime",
+    "../../../node_modules/@nuxt/devtools/dist/runtime",
+    "../../../node_modules/@nuxt/telemetry/runtime",
+    "../../../node_modules/@nuxt/telemetry/dist/runtime",
+    "..",
+    "../../../node_modules/nuxt/dist/app",
+    "../../../node_modules/nuxt/dist/app/compat/vue-demi",
+    "../../../node_modules/vue-router/vue-router.node",
+    "../../../node_modules/nuxt/dist/head/runtime/composables/v3"
+  ],
+  "exclude": [
+    "../dist",
+    "../.data",
+    "../node_modules",
+    "../../../node_modules",
+    "../../../node_modules/nuxt/node_modules",
+    "../../../node_modules/@nuxt/devtools/node_modules",
+    "../../../node_modules/@nuxt/telemetry/node_modules",
+    "../../../node_modules/@nuxt/devtools/runtime/server",
+    "../../../node_modules/@nuxt/devtools/dist/runtime/server",
+    "../../../node_modules/@nuxt/telemetry/runtime/server",
+    "../../../node_modules/@nuxt/telemetry/dist/runtime/server",
+    "../.output"
+  ]
+}
