@@ -45,13 +45,13 @@ export function Input({
   return (
     <div
       className={cn(
-        'glass-inset w-full max-w-lg rounded-lg has-disabled:before:bg-transparent has-disabled:before:opacity-50',
+        'glass-inset w-full max-w-lg rounded-lg has-disabled:before:opacity-50',
         className,
       )}
     >
       <InputBase
         className={cn(
-          'focus:-outline-offset-1 h-8 w-full rounded-lg pr-1.5 pl-3 text-base text-foreground focus:outline focus:outline-2 focus:outline-blue-800 disabled:text-muted-foreground',
+          'focus:-outline-offset-1 h-8 w-full rounded-lg pr-1.5 pl-3 text-base text-foreground focus:outline focus:outline-1 focus:outline-muted-foreground/35 disabled:text-muted-foreground',
           inputClassName,
         )}
         onValueChange={onValueChange ? valueChangeCallback : undefined}

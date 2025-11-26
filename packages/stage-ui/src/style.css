@@ -2,7 +2,7 @@
 
 :root {
   --color-background: var(--color-white);
-  --color-foreground: var(--color-zinc-950);
+  --color-foreground: var(--color-zinc-750);
   --color-muted: var(--color-zinc-50);
   --color-muted-foreground: var(--color-zinc-500);
 
@@ -12,9 +12,9 @@
 
 .dark {
   --color-background: #151c2a;
-  --color-foreground: var(--color-slate-50);
+  --color-foreground: var(--color-slate-250);
   --color-muted: var(--color-slate-900);
-  --color-muted-foreground: var(--color-slate-400);
+  --color-muted-foreground: var(--color-slate-500);
 
   --color-primary: var(--color-blue-600);
   --color-primary-foreground: var(--color-blue-100);
@@ -109,10 +109,15 @@
   --glass-inset-shadow:
     inset -1px 2px 1px -1px rgba(0, 0, 0, 0.05),
     inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5),
-    /* inset 0 2px 6px 2px rgba(0,0,0,0.05), */
-    inset 0 2px 10px 6px rgba(0, 0, 0, 0.05),
+    /* inset 0 2px 6px 2px rgba(0, 0, 0, 0.05), */
+    /* inset 0 2px 10px 6px rgba(0, 0, 0, 0.05), */
     0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
-  --glass-inset-background: transparent;
+  --glass-inset-shadow-chat-bubble:
+    inset -1px 2px 1px -1px rgba(0, 0, 0, 0.05),
+    inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5),
+    0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
+  --glass-inset-background: rgba(148, 163, 184, 0.09);
+  --glass-inset-background-chat-bubble: rgba(255, 255, 255, 0.2);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -147,8 +152,14 @@
       inset -3px -4px 2px -5px rgba(255, 255, 255, 0.5),
       inset 0 4px 24px 12px rgba(0, 0, 0, 0.05),
       0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
+    --glass-inset-shadow-chat-bubble:
+      inset 0 2px 3px 1px rgba(0, 0, 0, 0.05),
+      inset -3px -4px 2px -5px rgba(255, 255, 255, 0.5),
+      inset 0 4px 24px 12px rgba(0, 0, 0, 0.05),
+      0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
     /* Slightly lighter overlay similar to bg-muted-foreground/5 */
     --glass-inset-background: rgba(148, 163, 184, 0.15);
+    --glass-inset-background-chat-bubble: rgba(148, 163, 184, 0.06);
   }
 }
 
@@ -182,4 +193,17 @@
     before:pointer-events-none before:rounded-[inherit]
     before:bg-[var(--glass-inset-background)]
     before:shadow-[var(--glass-inset-border-shadow),var(--glass-inset-shadow)];
+}
+
+@utility glass-inset-chat-bubble {
+  @apply relative
+    before:absolute before:inset-0 before:block before:size-full
+    before:pointer-events-none before:rounded-[inherit]
+    before:bg-[var(--glass-inset-background-chat-bubble)]
+    before:shadow-[var(--glass-inset-border-shadow),var(--glass-inset-shadow-chat-bubble)];
+}
+
+/* Make all shapes inside a .seti-icon SVG use the parent text color */
+.seti-icon svg * {
+  fill: currentColor;
 }
