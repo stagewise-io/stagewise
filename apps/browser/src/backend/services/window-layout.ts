@@ -1,5 +1,6 @@
 import { BaseWindow, View, WebContentsView, app, shell } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs';
 import type { KartonService } from './karton';
 import type { Logger } from './logger';
 import contextMenu from 'electron-context-menu';
@@ -7,6 +8,15 @@ import type { GlobalDataPathService } from './global-data-path';
 import type { WorkspaceManagerService } from './workspace-manager';
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
+interface WindowState {
+  width: number;
+  height: number;
+  x?: number;
+  y?: number;
+  isMaximized: boolean;
+  isFullScreen: boolean;
+}
 
 export class WindowLayoutService {
   private logger: Logger;
@@ -18,6 +28,13 @@ export class WindowLayoutService {
   private uiContentView: WebContentsView;
   private globalDataPathService: GlobalDataPathService;
   private workspaceManagerService: WorkspaceManagerService;
+  private saveStateTimeout: NodeJS.Timeout | null = null;
+  private lastNonMaximizedBounds: {
+    width: number;
+    height: number;
+    x?: number;
+    y?: number;
+  } | null = null;
 
   constructor(
     logger: Logger,
@@ -32,9 +49,22 @@ export class WindowLayoutService {
 
     this.logger.debug('[WindowLayoutService] Initializing service');
 
+    const savedState = this.loadWindowState();
+    const defaultWidth = 1200;
+    const defaultHeight = 800;
+
+    this.lastNonMaximizedBounds = {
+      width: savedState?.width || defaultWidth,
+      height: savedState?.height || defaultHeight,
+      x: savedState?.x,
+      y: savedState?.y,
+    };
+
     this.baseWindow = new BaseWindow({
-      width: 800,
-      height: 600,
+      width: this.lastNonMaximizedBounds.width,
+      height: this.lastNonMaximizedBounds.height,
+      x: this.lastNonMaximizedBounds.x,
+      y: this.lastNonMaximizedBounds.y,
       title: 'stagewise',
       titleBarStyle: 'hiddenInset',
       trafficLightPosition: { x: 14, y: 14 },
@@ -46,6 +76,14 @@ export class WindowLayoutService {
       closable: true,
       frame: false,
     });
+
+    if (savedState?.isMaximized) {
+      this.baseWindow.maximize();
+    }
+
+    if (savedState?.isFullScreen) {
+      this.baseWindow.setFullScreen(true);
+    }
 
     this.webContentsViewContainer = new View();
     this.webContentsViewContainer.setBorderRadius(12);
@@ -96,7 +134,27 @@ export class WindowLayoutService {
 
     // Sync sizes on startup and resize
     this.handleMainWindowResize();
-    this.baseWindow.on('resize', this.handleMainWindowResize.bind(this));
+    this.baseWindow.on('resize', () => {
+      this.handleMainWindowResize();
+      this.updateLastNonMaximizedBounds();
+      this.scheduleWindowStateSave();
+    });
+    this.baseWindow.on('move', () => {
+      this.updateLastNonMaximizedBounds();
+      this.scheduleWindowStateSave();
+    });
+    this.baseWindow.on('maximize', () => this.scheduleWindowStateSave());
+    this.baseWindow.on('unmaximize', () => this.scheduleWindowStateSave());
+    this.baseWindow.on('enter-full-screen', () =>
+      this.scheduleWindowStateSave(),
+    );
+    this.baseWindow.on('leave-full-screen', () =>
+      this.scheduleWindowStateSave(),
+    );
+    this.baseWindow.on('close', () => {
+      // Save immediately on close
+      this.saveWindowState();
+    });
 
     app.on('second-instance', () => {
       if (this.baseWindow) {
@@ -351,6 +409,86 @@ export class WindowLayoutService {
 
   public toggleUIDevTools() {
     this.uiContentView.webContents.toggleDevTools();
+  }
+
+  private get windowStatePath(): string {
+    return path.join(
+      this.globalDataPathService.globalDataPath,
+      'window-state.json',
+    );
+  }
+
+  private loadWindowState(): WindowState | null {
+    try {
+      const statePath = this.windowStatePath;
+      if (fs.existsSync(statePath)) {
+        const data = fs.readFileSync(statePath, 'utf-8');
+        return JSON.parse(data) as WindowState;
+      }
+    } catch (error) {
+      this.logger.error(
+        '[WindowLayoutService] Failed to load window state',
+        error,
+      );
+    }
+    return null;
+  }
+
+  private scheduleWindowStateSave() {
+    if (this.saveStateTimeout) {
+      // A save is already scheduled, so we just let it happen when it's due.
+      // This ensures we don't write more often than every 10 seconds.
+      return;
+    }
+
+    this.saveStateTimeout = setTimeout(() => {
+      this.saveWindowState();
+    }, 10000);
+  }
+
+  private saveWindowState() {
+    if (this.saveStateTimeout) {
+      clearTimeout(this.saveStateTimeout);
+      this.saveStateTimeout = null;
+    }
+
+    if (!this.baseWindow || this.baseWindow.isDestroyed()) return;
+
+    try {
+      const isMaximized = this.baseWindow.isMaximized();
+      const isFullScreen = this.baseWindow.isFullScreen();
+
+      // Use the last known non-maximized bounds for width/height/x/y
+      // Fallback to current bounds if tracking failed for some reason
+      const currentBounds = this.baseWindow.getBounds();
+      const savedBounds = this.lastNonMaximizedBounds || currentBounds;
+
+      const state: WindowState = {
+        width: savedBounds.width,
+        height: savedBounds.height,
+        x: savedBounds.x,
+        y: savedBounds.y,
+        isMaximized,
+        isFullScreen,
+      };
+
+      fs.writeFileSync(this.windowStatePath, JSON.stringify(state));
+    } catch (error) {
+      this.logger.error(
+        '[WindowLayoutService] Failed to save window state',
+        error,
+      );
+    }
+  }
+
+  private updateLastNonMaximizedBounds() {
+    if (
+      !this.baseWindow.isMaximized() &&
+      !this.baseWindow.isFullScreen() &&
+      !this.baseWindow.isDestroyed()
+    ) {
+      this.lastNonMaximizedBounds = this.baseWindow.getBounds();
+    }
   }
 
   private handleMainWindowResize() {
