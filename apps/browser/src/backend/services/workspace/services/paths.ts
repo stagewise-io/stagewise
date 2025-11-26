@@ -67,9 +67,6 @@ export class WorkspacePathsService {
       `[WorkspacePathsService] Workspace data path: "${this.workspaceDataPath}"`,
     );
     this.logger.debug(
-      `[WorkspacePathsService] Workspace cache path: "${this.workspaceCachePath}"`,
-    );
-    this.logger.debug(
       `[WorkspacePathsService] Workspace temp path: "${this.workspaceTempPath}"`,
     );
   }
@@ -84,20 +81,6 @@ export class WorkspacePathsService {
       this.globalDataPathService.globalDataPath,
       'workspaces',
       this.workspaceFolderName,
-    );
-  }
-
-  /**
-   * Returns the path to a cache folder.
-   *
-   * On every workspace load, a new cache folder will be created.
-   *
-   * It's recommended to use this folder for temporary files that are not needed after the CLI has finished running.
-   */
-  get workspaceCachePath(): string {
-    return path.join(
-      this.globalDataPathService.globalCachePath,
-      this.cacheFolderName,
     );
   }
 

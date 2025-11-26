@@ -109,7 +109,6 @@ export const WorkspaceSettingsTabContent = () => {
   );
 
   const workspaceDataPath = useKartonState((s) => s.workspace?.paths.data);
-  const workspaceCachePath = useKartonState((s) => s.workspace?.paths.cache);
   const workspaceTempPath = useKartonState((s) => s.workspace?.paths.temp);
 
   return (
@@ -265,18 +264,6 @@ export const WorkspaceSettingsTabContent = () => {
           </div>
           <p className="max-w-1/2 select-text break-all text-end font-medium font-mono text-muted-foreground text-sm">
             {workspaceDataPath}
-          </p>
-        </FormField>
-
-        <FormField className="@[700px]:flex-row">
-          <div className="flex flex-1 flex-col items-start gap-2">
-            <FormFieldLabel>Workspace cache path</FormFieldLabel>
-            <FormFieldDescription>
-              This path is used to store cached data for the workspace.
-            </FormFieldDescription>
-          </div>
-          <p className="max-w-1/2 select-text break-all text-end font-medium font-mono text-muted-foreground text-sm">
-            {workspaceCachePath}
           </p>
         </FormField>
 

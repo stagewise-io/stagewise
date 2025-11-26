@@ -3,6 +3,7 @@ import path from 'node:path';
 import { getEnvMode } from '@/utils/env';
 import fs from 'node:fs/promises';
 import type { Logger } from './logger';
+import { app } from 'electron';
 
 /**
  * This service provides the paths to a variety of global data directories that this app can use to store data and configurations etc.
@@ -36,11 +37,11 @@ export class GlobalDataPathService {
   }
 
   get configFilePath(): string {
-    return path.join(this.paths.config, 'config.json');
+    return path.join(app.getPath('userData'), 'config.json');
   }
 
   get identifierFilePath(): string {
-    return path.join(this.paths.data, 'identifier.json');
+    return path.join(app.getPath('userData'), 'identifier.json');
   }
 
   /**
@@ -53,16 +54,7 @@ export class GlobalDataPathService {
    * @warning If you store workspace related data, use the getWorkspaceDataPath method instead.
    */
   get globalDataPath(): string {
-    return this.paths.data;
-  }
-
-  /**
-   * Returns the path to a cache folder
-   *
-   * It's recommended to use this folder for temporary files that are not needed after the CLI has finished running.
-   */
-  get globalCachePath(): string {
-    return this.paths.cache;
+    return app.getPath('userData');
   }
 
   /**
@@ -71,6 +63,6 @@ export class GlobalDataPathService {
    * It's recommended to use this folder for temporary files that are expected to be deleted by the system.
    */
   get globalTempPath(): string {
-    return this.paths.temp;
+    return app.getPath('temp');
   }
 }

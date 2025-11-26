@@ -156,8 +156,6 @@ export class WorkspaceService {
           draft.workspace!.path = this.workspacePath;
           draft.workspace!.paths.data =
             this.workspacePathsService!.workspaceDataPath;
-          draft.workspace!.paths.cache =
-            this.workspacePathsService!.workspaceCachePath;
           draft.workspace!.paths.temp =
             this.workspacePathsService!.workspaceTempPath;
         });

@@ -3,7 +3,7 @@ unhandled();
 
 import { app } from 'electron';
 import started from 'electron-squirrel-startup';
-
+import path from 'node:path';
 import { main } from './main';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -11,16 +11,24 @@ if (started) {
   app.quit();
 }
 
+const singleInstanceLock = app.requestSingleInstanceLock();
+
+if (!singleInstanceLock) {
+  app.quit();
+}
+
 // Set the app name for macOS menu bar
 app.setName('stagewise');
 app.applicationMenu = null;
 
+// Set the right path structure for the app
+// We keep userData where it is, but we will put session data into a sub-folder called "session"
+app.setPath('sessionData', path.join(app.getPath('userData'), 'session'));
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', () =>
-  main({ launchOptions: { port: 3100, verbose: true, bridgeMode: true } }),
-);
+app.on('ready', () => main({ launchOptions: { verbose: true } }));
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -31,3 +39,11 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {});
+
+app.on('second-instance', (_ev, argv) => {
+  console.log('second-instance', argv);
+});
+
+app.on('open-url', (_ev, uri) => {
+  console.log('open-url', uri);
+});

@@ -124,7 +124,6 @@ export type AppState = {
     path: string;
     paths: {
       data: string;
-      cache: string;
       temp: string;
     };
     devAppStatus: {
@@ -187,17 +186,12 @@ export type AppState = {
     };
     tokenExpiresAt?: string;
     refreshTokenExpiresAt?: string;
-    loginDialog: {
-      startUrl: string;
-    } | null;
   };
   // Current stagewise app runtime information
   appInfo: {
-    bridgeMode: boolean; // Older deprecated flag
     envMode: 'development' | 'production'; // The mode in which the app is running.
     verbose: boolean; // Whether the app is running in verbose mode.
     version: string; // The version of the app.
-    runningOnPort: number; // The port on which the UI of the stagewise app is running.
     startedInPath: string; // Working directory in which the app was started.
   };
   // The global configuration of the CLI.
@@ -320,7 +314,6 @@ export type KartonContract = {
       refreshSubscription: () => Promise<void>;
       logout: () => Promise<void>;
       startLogin: () => Promise<void>;
-      abortLogin: () => Promise<void>;
       confirmAuthenticationConfirmation: () => Promise<void>;
       cancelAuthenticationConfirmation: () => Promise<void>;
     };
@@ -411,14 +404,11 @@ export const defaultState: KartonContract['state'] = {
   recentWorkspaces: [],
   userAccount: {
     status: 'unauthenticated',
-    loginDialog: null,
   },
   appInfo: {
-    bridgeMode: false,
     envMode: 'production',
     verbose: false,
     version: 'UNKNOWN',
-    runningOnPort: 0,
     startedInPath: '',
   },
   globalConfig: {

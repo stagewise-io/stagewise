@@ -8,19 +8,17 @@ import { WindowLayoutService } from './services/window-layout';
 import { getEnvMode } from './utils/env';
 import { bootstrapGlobalServices } from './global-service-bootstrap';
 import { WorkspaceManagerService } from './services/workspace-manager';
-import { UIServerService } from './services/ui-server';
 import { FilePickerService } from './services/file-picker';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { AppMenuService } from './services/app-menu';
+import { URIHandlerService } from './services/uri-handler';
 
 export type MainParameters = {
   launchOptions: {
-    port?: number;
     appPort?: number; // Will only be respected on the initially launched workspace.
     workspacePath?: string;
     verbose?: boolean;
-    bridgeMode?: boolean;
     workspaceOnStart?: boolean;
     wrappedCommand?: string;
   };
@@ -28,11 +26,9 @@ export type MainParameters = {
 
 export async function main({
   launchOptions: {
-    port,
     appPort,
     workspacePath,
     verbose,
-    bridgeMode,
     workspaceOnStart,
     wrappedCommand,
   },
@@ -56,11 +52,14 @@ export async function main({
     logger,
     kartonService,
   );
+  const uriHandlerService = await URIHandlerService.create(logger);
+
   const authService = await AuthService.create(
     globalDataPathService,
     identifierService,
     kartonService,
     notificationService,
+    uriHandlerService,
     logger,
   );
 
@@ -92,13 +91,6 @@ export async function main({
     logger,
     kartonService,
   );
-  const uiServerService = await UIServerService.create(
-    logger,
-    kartonService.webSocketServer,
-    workspaceManagerService,
-    authService,
-    port,
-  );
 
   // No need to unregister this callback, as it will be destroyed when the main app shuts down
   authService.registerAuthStateChangeCallback((newAuthState) => {
@@ -123,8 +115,6 @@ export async function main({
     draft.appInfo.envMode =
       getEnvMode() === 'dev' ? 'development' : 'production';
     draft.appInfo.verbose = verbose ?? false;
-    draft.appInfo.bridgeMode = bridgeMode ?? false;
-    draft.appInfo.runningOnPort = uiServerService.port;
     draft.appInfo.startedInPath = process.cwd();
   });
 
