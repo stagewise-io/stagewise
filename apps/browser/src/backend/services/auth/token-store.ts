@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import superjson from 'superjson';
+import { safeStorage } from 'electron';
 
 export const tokenDataSchema = z.looseObject({
   accessToken: z.string(),
@@ -62,9 +63,21 @@ export class AuthTokenStore {
 
   private async getStoredTokenData(): Promise<TokenData | null> {
     const tokenData = await fs
-      .readFile(this.getTokenDataPath(), 'utf-8')
-      .then((data) => {
-        const jsonData = superjson.parse(data);
+      .readFile(this.getTokenDataPath())
+      .then((buffer) => {
+        let dataStr: string;
+        try {
+          if (safeStorage.isEncryptionAvailable()) {
+            dataStr = safeStorage.decryptString(buffer);
+          } else {
+            throw new Error('Encryption not available');
+          }
+        } catch {
+          // If decryption fails, assume the file is unencrypted
+          dataStr = buffer.toString('utf-8');
+        }
+
+        const jsonData = superjson.parse(dataStr);
         const parsedTokenData = tokenDataSchema.safeParse(jsonData);
         if (!parsedTokenData.success) {
           this.logger.error(
@@ -103,16 +116,25 @@ export class AuthTokenStore {
           `[AuthTokenStore] Failed to remove token data file. Error: ${err}, File path: ${this.getTokenDataPath()}`,
         );
       });
-    } else {
+    } else if (this._tokenData !== null) {
+      const stringifiedData = superjson.stringify(this._tokenData);
+      let dataToWrite: Buffer | string = stringifiedData;
+
+      if (safeStorage.isEncryptionAvailable()) {
+        try {
+          dataToWrite = safeStorage.encryptString(stringifiedData);
+        } catch (error) {
+          this.logger.warn(
+            `[AuthTokenStore] Failed to encrypt token data, falling back to plaintext. Error: ${error}`,
+          );
+        }
+      }
+
       await fs
-        .writeFile(
-          this.getTokenDataPath(),
-          superjson.stringify(this._tokenData),
-          {
-            flush: true,
-            encoding: 'utf-8',
-          },
-        )
+        .writeFile(this.getTokenDataPath(), dataToWrite, {
+          flush: true,
+          encoding: Buffer.isBuffer(dataToWrite) ? undefined : 'utf-8',
+        })
         .catch((err) => {
           this.logger.error(
             `[AuthTokenStore] Failed to store token data. Error: ${err}, File path: ${this.getTokenDataPath()}`,
