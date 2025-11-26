@@ -6,7 +6,7 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import {
-  PencilIcon,
+  Loader2Icon,
   XIcon,
   ListChevronsDownUpIcon,
   ListChevronsUpDownIcon,
@@ -198,6 +198,7 @@ export const OverwriteFileToolPart = ({
       setExpanded={setExpanded}
       trigger={trigger}
       content={content}
+      contentClassName="max-h-56"
       contentFooter={contentFooter}
       contentFooterClassName="px-0"
     />
@@ -274,8 +275,7 @@ const SuccessHeader = ({
 const LoadingHeader = ({ relativePath }: { relativePath?: string }) => {
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <PencilIcon className="size-3 shrink-0 text-primary " />
-      {/* <Loader2Icon className="size-3 shrink-0 animate-spin text-primary " /> */}
+      <Loader2Icon className="size-3 shrink-0 animate-spin text-primary " />
       {relativePath !== null ? (
         <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">
           <span

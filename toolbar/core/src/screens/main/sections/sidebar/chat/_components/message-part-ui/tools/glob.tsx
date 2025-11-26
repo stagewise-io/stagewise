@@ -11,20 +11,15 @@ export const GlobToolPart = ({
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {
-  const streamingText = part.input?.pattern ? (
-    <span className="flex min-w-0 gap-1">
-      <span className="shrink-0">Searching for</span>
-      <span className="truncate">{part.input.pattern}...</span>
-    </span>
-  ) : (
-    'Searching files...'
-  );
+  const streamingText = part.input?.pattern
+    ? `Searching for ${part.input.pattern}...`
+    : 'Searching files...';
 
   const finishedText =
     part.state === 'output-available' ? (
       <span className="flex min-w-0 gap-1">
-        <span className="shrink-0 truncate font-semibold">Found </span>
-        <span className="truncate font-normal">
+        <span className="shrink-0 truncate font-medium">Found </span>
+        <span className="truncate font-normal text-muted-foreground/75">
           {part.output?.result?.totalMatches ?? 0} file
           {part.output?.result?.totalMatches !== 1 ? 's' : ''}
           {part.input?.pattern && <> matching "{part.input.pattern}"</>}

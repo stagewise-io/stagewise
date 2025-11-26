@@ -988,13 +988,11 @@ export class AgentService {
             return draft;
           });
 
-          if (
-            toolResults.length > 0 &&
-            !toolResults.some(
-              (r) =>
-                'userInteractionrequired' in r && r.userInteractionrequired,
-            )
-          ) {
+          const requiresUserInteraction = toolResults.some(
+            (r) => 'userInteractionrequired' in r && r.userInteractionrequired,
+          );
+
+          if (!requiresUserInteraction && toolResults.length > 0) {
             const updatedMessages =
               this.kartonService.state.workspace?.agentChat?.chats[chatId]
                 ?.messages;

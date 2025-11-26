@@ -120,6 +120,7 @@ export const ThinkingPart = ({
     <ToolPartUI
       expanded={isExpanded}
       setExpanded={setIsExpanded}
+      contentClassName="max-h-24"
       trigger={
         <>
           <BrainIcon

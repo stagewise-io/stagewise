@@ -81,6 +81,15 @@ export const MultiEditToolPart = ({
     }
   }, [state]);
 
+  const firstLineNumberEdited = useMemo(() => {
+    let startLine = 1;
+    for (const line of diff ?? []) {
+      if (line.added || line.removed) return startLine;
+      startLine += line.count;
+    }
+    return startLine;
+  }, [diff]);
+
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);
 
   const openInIdeSelection = useKartonState(
@@ -137,6 +146,7 @@ export const MultiEditToolPart = ({
           )}
         </>
       }
+      contentClassName="max-h-56"
       contentFooter={
         state === 'success' ? (
           <div className="flex w-full flex-row items-center justify-between">
@@ -172,7 +182,10 @@ export const MultiEditToolPart = ({
               </TooltipContent>
             </Tooltip>
             <a
-              href={getFileIDEHref(part.input?.relative_path ?? '')}
+              href={getFileIDEHref(
+                part.input?.relative_path ?? '',
+                firstLineNumberEdited,
+              )}
               onClick={() => {
                 posthog.capture(
                   'agent_file_opened_in_ide_via_multi_edit_tool',
@@ -189,13 +202,23 @@ export const MultiEditToolPart = ({
                 'shrink-0',
               )}
             >
-              <div className="flex flex-row items-center justify-center gap-1 text-muted-foreground">
-                <IdeLogo
-                  ide={openInIdeSelection}
-                  className="size-3 shrink-0 text-muted-foreground"
-                />
-                <span className="text-xs">Open file</span>
-              </div>
+              <Tooltip>
+                <TooltipTrigger>
+                  <div className="flex flex-row items-center justify-center gap-1 text-muted-foreground">
+                    <IdeLogo
+                      ide={openInIdeSelection}
+                      className="size-3 shrink-0 text-muted-foreground"
+                    />
+                    <span className="text-xs">Open file</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {getFileIDEHref(
+                    part.input?.relative_path ?? '',
+                    firstLineNumberEdited,
+                  )}
+                </TooltipContent>
+              </Tooltip>
             </a>
           </div>
         ) : undefined
@@ -268,7 +291,6 @@ const SuccessHeader = ({
 const LoadingHeader = ({ relativePath }: { relativePath?: string }) => {
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      {/* <PencilIcon className="size-3 shrink-0 text-primary " /> */}
       <Loader2Icon className="size-3 shrink-0 animate-spin text-primary" />
       {relativePath !== null ? (
         <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">

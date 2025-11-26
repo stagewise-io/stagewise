@@ -133,17 +133,20 @@ export const ExploringToolParts = ({
   }, [parts]);
 
   const explorationFinishedText = useMemo(() => {
-    if (explorationMetadata.filesFound + explorationMetadata.filesRead === 0)
+    const { filesFound, filesRead } = explorationMetadata;
+
+    if (filesFound === 0 && filesRead === 0) {
       return 'Explored directory';
-    const foundText =
-      explorationMetadata.filesFound > 0
-        ? `Found ${explorationMetadata.filesFound} file${explorationMetadata.filesFound !== 1 ? 's' : ''}`
-        : '';
-    const readText =
-      explorationMetadata.filesRead > 0
-        ? `Read ${explorationMetadata.filesRead} file${explorationMetadata.filesRead !== 1 ? 's' : ''}`
-        : '';
-    return `${foundText}${foundText && readText ? ',' : ''} ${readText}`;
+    }
+
+    const parts: string[] = [];
+    if (filesFound > 0) {
+      parts.push(`Found ${filesFound} file${filesFound !== 1 ? 's' : ''}`);
+    }
+    if (filesRead > 0) {
+      parts.push(`Read ${filesRead} file${filesRead !== 1 ? 's' : ''}`);
+    }
+    return parts.join(', ');
   }, [explorationMetadata]);
 
   // For single part, show it inline in the trigger without expand/collapse

@@ -11,19 +11,14 @@ export const GrepSearchToolPart = ({
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {
-  const streamingText = part.input?.query ? (
-    <span className="flex min-w-0 gap-1">
-      <span className="shrink-0">Searching for</span>
-      <span className="truncate">{part.input.query}...</span>
-    </span>
-  ) : (
-    'Searching with grep...'
-  );
+  const streamingText = part.input?.query
+    ? `Searching for ${part.input.query}...`
+    : 'Searching with grep...';
   const finishedText =
     part.state === 'output-available' ? (
       <span className="flex min-w-0 gap-1">
-        <span className="shrink-0 truncate font-semibold">Found </span>
-        <span className="truncate font-normal">
+        <span className="shrink-0 truncate font-medium">Found </span>
+        <span className="truncate font-normal text-muted-foreground/75">
           {part.output?.result?.totalMatches ?? 0} result
           {part.output?.result?.totalMatches !== 1 ? 's' : ''}
           {part.input?.query && <> for "{part.input.query}"</>}

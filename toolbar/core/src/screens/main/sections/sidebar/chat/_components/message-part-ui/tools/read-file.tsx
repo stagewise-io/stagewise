@@ -11,19 +11,15 @@ export const ReadFileToolPart = ({
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {
-  const streamingText = part.input?.relative_path ? (
-    <span className="flex min-w-0 gap-1">
-      <span className="truncate">Reading {part.input.relative_path}...</span>
-    </span>
-  ) : (
-    'Reading file...'
-  );
+  const streamingText = part.input?.relative_path
+    ? `Reading ${part.input.relative_path}...`
+    : 'Reading file...';
 
   const finishedText =
     part.state === 'output-available' ? (
       <span className="flex min-w-0 gap-1">
-        <span className="shrink-0 truncate font-semibold">Read </span>
-        <span className="truncate font-normal">
+        <span className="shrink-0 truncate font-medium">Read </span>
+        <span className="truncate font-normal text-muted-foreground/75">
           {part.input?.relative_path ?? ''}
           {part.output?.result?.linesRead && (
             <> ({part.output?.result?.linesRead} lines)</>
