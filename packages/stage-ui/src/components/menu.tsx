@@ -85,7 +85,7 @@ export const MenuSeparator = ({
     {...props}
     className={(state) =>
       cn(
-        'my-0.5 bg-zinc-500/10',
+        'my-0.5 bg-muted-foreground/10',
         className,
         state.orientation === 'horizontal' ? 'h-px w-full' : 'h-full w-px',
       )

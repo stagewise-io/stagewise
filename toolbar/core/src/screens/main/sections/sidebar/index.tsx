@@ -55,7 +55,7 @@ export function Sidebar() {
       className="@container group flex h-full flex-col items-stretch justify-between border-zinc-500/20 border-r bg-muted-foreground/5 data-[collapsed=true]:w-16 data-[collapsed=false]:min-w-64 data-[collapsed=true]:min-w-16 data-[collapsed=false]:max-w-2xl data-[collapsed=true]:max-w-16"
     >
       <SidebarTopSection isCollapsed={isCollapsed} />
-      <hr className="mx-4 h-px border-none bg-zinc-500/10" />
+      <hr className="mx-4 h-px border-none bg-muted-foreground/10" />
 
       {/* Chat area */}
       <SidebarChatSection openChatPanel={openChatPanel} />

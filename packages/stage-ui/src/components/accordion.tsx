@@ -42,7 +42,7 @@ export function AccordionItem({
       )}
     >
       <BaseAccordion.Header>
-        <BaseAccordion.Trigger className="group flex w-full flex-row items-center justify-between gap-4 bg-zinc-50/10 px-3 py-2 transition-colors duration-150 ease-out hover:bg-white/20">
+        <BaseAccordion.Trigger className="group flex w-full flex-row items-center justify-between gap-4 bg-background/10 px-3 py-2 transition-colors duration-150 ease-out hover:bg-background/20">
           {icon && <div className="size-5">{icon}</div>}
           <div className="block flex-1 text-start font-medium">{title}</div>
           <ChevronDownIcon className="size-4 origin-center rotate-0 opacity-40 transition-transform duration-150 ease-out group-hover:opacity-60 group-data-[panel-open]:rotate-180" />

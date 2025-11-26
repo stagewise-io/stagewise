@@ -127,7 +127,7 @@ const CodeComponent = ({
     return (
       <code
         className={cn(
-          'rounded bg-zinc-500/5 px-1.5 py-0.5 font-mono text-sm',
+          'rounded bg-muted-foreground/5 px-1.5 py-0.5 font-mono text-sm',
           className,
         )}
         data-streamdown="inline-code"
@@ -158,7 +158,7 @@ const CodeComponent = ({
   return (
     <div
       className={cn(
-        'group relative my-4 flex h-auto flex-col gap-1 rounded-2xl bg-zinc-500/5 p-2',
+        'group glass-inset-chat-bubble relative my-4 flex h-auto flex-col gap-1 rounded-2xl p-2',
         language === 'mermaid' ? 'max-h-96' : 'max-h-64',
         className,
       )}

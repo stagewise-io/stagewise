@@ -59,7 +59,7 @@ function ChatListEntry({
   return (
     <div className="py-0.5">
       <div
-        className="flex shrink-0 cursor-pointer flex-row items-center justify-between gap-4 rounded-lg px-2 py-2 transition-colors duration-150 hover:bg-zinc-500/5"
+        className="flex shrink-0 cursor-pointer flex-row items-center justify-between gap-4 rounded-lg px-2 py-2 transition-colors duration-150 hover:bg-muted-foreground/5"
         role="button"
         onClick={() => {
           switchChat(chatId);

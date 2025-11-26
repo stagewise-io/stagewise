@@ -15,7 +15,7 @@ export const buttonVariants = cva(
         warning:
           'glass-body snot-disabled:glass-body-interactive glass-body-motion not-disabled:glass-body-motion-interactive bg-yellow-200 font-normal text-yellow-900 dark:bg-yellow-800 dark:text-yellow-400',
         ghost:
-          'bg-transparent font-medium text-foreground not-disabled:hover:bg-zinc-500/5',
+          'bg-transparent font-medium text-foreground not-disabled:hover:bg-muted-foreground/5',
       },
       size: {
         xs: 'h-6 gap-1 rounded-xl px-2.5 py-1 text-xs',

@@ -31,7 +31,7 @@ export function UserStatusArea() {
         <Button
           size="icon-md"
           variant="secondary"
-          className="shrink-0 bg-zinc-500/20"
+          className="shrink-0 bg-muted-foreground/20"
         >
           {userAccount.user?.email.at(0)?.toUpperCase() ?? '?'}
           <div
