@@ -897,6 +897,9 @@ export class AgentService {
           } satisfies AnthropicProviderOptions,
           openai: {},
         },
+        headers: {
+          'anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
+        },
         messages: await this.promptBuilder.convertUIToModelMessages(
           history ?? [],
         ),
