@@ -269,21 +269,15 @@ body {
   -webkit-background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
-  animation: shimmer-move calc(var(--shimmer-duration) * 1ms) ease-in-out infinite;
+  animation: shimmer-move calc(var(--shimmer-duration) * 1ms) linear infinite;
 }
 
 @keyframes shimmer-move {
   0% {
     background-position: 140% 0%;
   }
-  10% {
-    background-position: 105% 0%;
-  }
-  90% {
-    background-position: 35% 0%;
-  }
   100% {
-    background-position: 0% 0%;
+    background-position: -40% 0%;
   }
 }
 
