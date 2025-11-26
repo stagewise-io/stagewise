@@ -164,10 +164,10 @@ body {
 
 @theme default {
   --color-background: var(--color-white);
-  --color-foreground: var(--color-zinc-950);
-  --color-muted: var(--color-zinc-100);
-  --color-muted-foreground: var(--color-zinc-700);
-  --color-border: var(--color-zinc-500);
+  --color-foreground: var(--color-zinc-800);
+  --color-muted: var(--color-zinc-50);
+  --color-muted-foreground: var(--color-zinc-500);
+  --color-border: var(--color-zinc-300);
   
 
   --color-success: var(--color-green-600);
@@ -238,7 +238,7 @@ body {
 }
 
 @utility line-numbers-container {
-  @apply bg-muted-foreground/5 pl-2 pr-1 flex flex-col items-end text-muted-foreground;
+  @apply bg-muted-foreground/5 pl-2 pr-1 flex flex-col items-end text-muted-foreground shrink-0;
 }
 
 @utility code-line-number-collapsed {

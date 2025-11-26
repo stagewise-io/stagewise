@@ -2,7 +2,7 @@
 
 :root {
   --color-background: var(--color-white);
-  --color-foreground: var(--color-zinc-750);
+  --color-foreground: var(--color-zinc-700);
   --color-muted: var(--color-zinc-50);
   --color-muted-foreground: var(--color-zinc-500);
 
@@ -12,7 +12,7 @@
 
 .dark {
   --color-background: #151c2a;
-  --color-foreground: var(--color-slate-250);
+  --color-foreground: var(--color-slate-200);
   --color-muted: var(--color-slate-900);
   --color-muted-foreground: var(--color-slate-500);
 
