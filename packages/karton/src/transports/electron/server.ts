@@ -61,6 +61,9 @@ class ElectronServerConnection implements Transport {
       this.triggerClose('Port closed by remote');
     };
     this.port.on('close', this._closeListener);
+
+    // Start the port to begin receiving messages
+    this.port.start();
   }
 
   /**

@@ -130,6 +130,9 @@ class KartonServerImpl<T> implements KartonServer<T> {
     const initialStateMessage = this.stateManager.getFullStateSyncMessage();
     transport.send(initialStateMessage);
 
+    // Start the transport to begin receiving messages
+    transport.startTransport();
+
     // Handle disconnect
     transport.onClose(() => {
       this.clients.delete(clientId);
