@@ -192,16 +192,18 @@ export function ChatPanel() {
   useEffect(() => {
     if (chatHistoryRef.current && footerRef.current) {
       const resizeObserver = new ResizeObserver(() => {
-        // calculate the height difference because we will need to apply that to the scroll position
-        const heightDifference =
-          Number.parseInt(
-            window
-              .getComputedStyle(footerRef.current)
-              .getPropertyValue('padding-bottom'),
-          ) - chatHistoryRef.current.clientHeight;
+        // Add a small padding (16px) instead of the full footer height
+        const desiredPadding = 16;
+        const currentPadding = Number.parseInt(
+          window
+            .getComputedStyle(chatHistoryRef.current)
+            .getPropertyValue('padding-bottom'),
+        ) || 0;
 
-        // scroll the chat history by the height difference after applying the updated padding
-        chatHistoryRef.current.style.paddingBottom = `${footerRef.current.clientHeight}px`;
+        // Calculate height difference for scroll adjustment
+        const heightDifference = desiredPadding - currentPadding;
+        // Apply minimal padding and adjust scroll position
+        chatHistoryRef.current.style.paddingBottom = `${desiredPadding}px`;
         chatHistoryRef.current.scrollTop -= heightDifference;
       });
       resizeObserver.observe(footerRef.current);

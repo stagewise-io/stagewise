@@ -45,7 +45,7 @@ export function ChatPanelHeader() {
         'pointer-events-none absolute top-px right-px left-px z-20 mb-0 origin-bottom px-3 py-3 pl-4.5 transition-all duration-300 ease-out *:pointer-events-auto',
         chatListOpen
           ? 'h-[calc(100%-2px)] rounded-[inherit] bg-white/60 backdrop-blur-lg'
-          : '!h-[calc-size(auto,size)] h-auto',
+          : 'h-auto',
       )}
       title={chatListOpen && <span className="mt-0.5">Chats</span>}
       clear
