@@ -131,7 +131,7 @@ export const MultiEditToolPart = ({
       content={
         <>
           {part.input?.edits && streaming && !diff && (
-            <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground text-xs">
+            <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground/75 text-xs">
               {part.input?.edits
                 ?.map((edit) => edit?.new_string ?? '')
                 .join('\n\n')}
@@ -146,7 +146,7 @@ export const MultiEditToolPart = ({
           )}
         </>
       }
-      contentClassName="max-h-56"
+      contentClassName={streaming ? 'max-h-24' : 'max-h-56'}
       contentFooter={
         state === 'success' ? (
           <div className="flex w-full flex-row items-center justify-between">
