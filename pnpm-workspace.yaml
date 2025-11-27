@@ -1,9 +1,4 @@
 packages:
 - apps/*
 - packages/*
-- playgrounds/*
-- examples/*
-- toolbar/*
-- plugins/*
 - agent/*
-- fun/*

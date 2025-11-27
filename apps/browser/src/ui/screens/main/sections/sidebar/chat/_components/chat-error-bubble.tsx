@@ -2,7 +2,7 @@ import { cn } from '@/utils';
 import { AgentErrorType, type AgentError } from '@shared/karton-contracts/ui';
 import { RefreshCcwIcon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
-import Markdown from 'react-markdown';
+import { Streamdown } from 'streamdown';
 import { useMemo } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 
@@ -100,7 +100,7 @@ export function ChatErrorBubble({ error }: { error: AgentError }) {
               : 'min-w-48 origin-bottom-left rounded-bl-xs bg-rose-600/90 text-white ring-rose-100/5',
           )}
         >
-          <Markdown>{errorMessage}</Markdown>
+          <Streamdown isAnimating={false}>{errorMessage}</Streamdown>
           {!isHandledError && (
             <span className="mt-2 block text-xs italic">
               {error.type}: {error.error.name}

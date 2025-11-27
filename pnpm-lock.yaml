@@ -458,9 +458,6 @@ importers:
       winston:
         specifier: ^3.17.0
         version: 3.18.3
-      ws:
-        specifier: ^8.18.3
-        version: 8.18.3(bufferutil@4.0.9)(utf-8-validate@6.0.5)
       xml:
         specifier: ^1.0.1
         version: 1.0.1
