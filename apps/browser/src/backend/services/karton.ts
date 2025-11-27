@@ -47,15 +47,12 @@ export class KartonService {
 
   /**
    * Accept a new MessagePort connection.
-   * This should be called by WindowLayoutService (or future TabManager)
-   * after creating a port pair and sending one to the renderer.
    *
    * @param port - The MessagePortMain from the main process side
-   * @param connectionId - Optional connection ID for tracking
    * @returns The connection ID assigned to this port
    */
-  public acceptPort(port: MessagePortMain, connectionId?: string): string {
-    const id = this.transport.acceptPort(port, connectionId);
+  public setTransportPort(port: MessagePortMain): string {
+    const id = this.transport.setPort(port, 'ui-main');
     this.logger.debug(`[KartonService] Accepted port connection: ${id}`);
     return id;
   }

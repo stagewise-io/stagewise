@@ -1,5 +1,5 @@
-import type { WebSocketMessage } from './types.js';
-import { serializeMessage, deserializeMessage } from './websocket-messages.js';
+import type { Message } from '../../shared/types.js';
+import superjson from 'superjson';
 
 export enum ConnectionState {
   CONNECTING = 'CONNECTING',
@@ -7,7 +7,7 @@ export enum ConnectionState {
   CLOSED = 'CLOSED',
 }
 
-export type MessageHandler = (message: WebSocketMessage) => void;
+export type MessageHandler = (message: Message) => void;
 export type EventHandler = () => void;
 export type CloseEventHandler = (event: {
   code: number;
@@ -19,7 +19,7 @@ export type RemoveListener = () => void;
 export class WebSocketConnection {
   private ws: WebSocket | any;
   private state: ConnectionState;
-  private messageQueue: WebSocketMessage[] = [];
+  private messageQueue: Message[] = [];
   private messageHandlers: Set<MessageHandler> = new Set();
   private openHandlers: Set<EventHandler> = new Set();
   private closeHandlers: Set<CloseEventHandler> = new Set();
@@ -28,7 +28,9 @@ export class WebSocketConnection {
   constructor(websocket: WebSocket | any) {
     this.ws = websocket;
     this.state = ConnectionState.CONNECTING;
+  }
 
+  public startTransport(): void {
     this.setupEventListeners();
 
     // Check initial state after setting up listeners
@@ -104,12 +106,12 @@ export class WebSocketConnection {
     }
   };
 
-  private sendImmediate(message: WebSocketMessage): void {
+  private sendImmediate(message: Message): void {
     const serialized = serializeMessage(message);
     this.ws.send(serialized);
   }
 
-  public send(message: WebSocketMessage): void {
+  public send(message: Message): void {
     if (this.state === ConnectionState.CLOSED) {
       throw new Error('Connection is closed');
     }
@@ -164,4 +166,22 @@ export class WebSocketConnection {
     this.messageQueue = [];
     this.cleanupEventListeners();
   }
+}
+
+export function serializeMessage(message: Message): string {
+  return superjson.stringify(message);
+}
+
+export function deserializeMessage(data: string): Message {
+  const parsed = superjson.parse(data) as Message;
+
+  if (!parsed.type) {
+    throw new Error('Invalid WebSocket message: missing type');
+  }
+
+  if (!parsed.data) {
+    throw new Error('Invalid WebSocket message: missing data');
+  }
+
+  return parsed;
 }

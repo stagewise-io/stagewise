@@ -1,10 +1,9 @@
 export { createKartonClient } from './karton-client.js';
-export { WebSocketTransport } from '../transports/websocket-client.js';
+export { WebSocketTransport } from '../transports/websocket/client.js';
 export {
   ElectronClientTransport,
-  type ElectronClientTransportConfig,
-  type ElectronBridge,
-} from '../transports/electron-client.js';
+  type MessagePortProxy,
+} from '../transports/electron/client.js';
 
 export type {
   KartonClient,

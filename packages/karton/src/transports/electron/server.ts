@@ -2,11 +2,7 @@ import type {
   Transport,
   ServerTransport,
   KartonMessage,
-} from '../shared/transport.js';
-import {
-  serializeMessage,
-  deserializeMessage,
-} from '../shared/websocket-messages.js';
+} from '../../shared/transport.js';
 
 /**
  * Electron's MessagePortMain interface (main process side).
@@ -44,15 +40,18 @@ class ElectronServerConnection implements Transport {
     | null = null;
   private errorHandler: ((error: Error) => void) | null = null;
   private _isOpen = true;
-  private _messageListener: ((event: { data: any }) => void) | null = null;
+  private _messageListener: ((event: { data: KartonMessage }) => void) | null =
+    null;
   private _closeListener: (() => void) | null = null;
 
   constructor(port: MessagePortMain, connectionId: string) {
     this.port = port;
     this.connectionId = connectionId;
+  }
 
+  public startTransport(): void {
     // Setup message listener
-    this._messageListener = (event: { data: any }) => {
+    this._messageListener = (event) => {
       this.handleData(event.data);
     };
     this.port.on('message', this._messageListener);
@@ -62,9 +61,6 @@ class ElectronServerConnection implements Transport {
       this.triggerClose('Port closed by remote');
     };
     this.port.on('close', this._closeListener);
-
-    // Start the port to begin receiving messages
-    this.port.start();
   }
 
   /**
@@ -77,20 +73,15 @@ class ElectronServerConnection implements Transport {
   /**
    * Handle incoming data from the port.
    */
-  private handleData(data: unknown): void {
+  private handleData(message: KartonMessage): void {
     if (!this._isOpen) return;
 
-    if (typeof data === 'string') {
-      try {
-        const message = deserializeMessage(data);
-        this.messageHandler?.(message);
-      } catch (err) {
-        this.errorHandler?.(
-          err instanceof Error
-            ? err
-            : new Error('Failed to deserialize message'),
-        );
-      }
+    try {
+      this.messageHandler?.(message);
+    } catch (err) {
+      this.errorHandler?.(
+        err instanceof Error ? err : new Error('Failed to deserialize message'),
+      );
     }
   }
 
@@ -140,8 +131,7 @@ class ElectronServerConnection implements Transport {
     }
 
     try {
-      const serialized = serializeMessage(message);
-      this.port.postMessage(serialized);
+      this.port.postMessage(message);
     } catch {
       // Port may have been closed unexpectedly
       this.triggerClose('Send failed - port may be closed');
@@ -205,19 +195,18 @@ class ElectronServerConnection implements Transport {
  */
 export class ElectronServerTransport implements ServerTransport {
   private connections = new Map<string, ElectronServerConnection>();
-  private connectionHandler: ((clientTransport: Transport) => void) | null =
+  private connectionHandler: ((serverTransport: Transport) => void) | null =
     null;
-  private connectionIdCounter = 0;
 
   /**
-   * Accept a new MessagePort connection.
+   * Set a new MessagePort as a transport port.
    *
    * @param port - The MessagePortMain from Electron's MessageChannelMain
    * @param connectionId - Optional custom connection ID. If not provided, an auto-generated ID will be used.
    * @returns The connection ID for this port
    */
-  public acceptPort(port: MessagePortMain, connectionId?: string): string {
-    const id = connectionId ?? `conn-${++this.connectionIdCounter}`;
+  public setPort(port: MessagePortMain, connectionId?: string): string {
+    const id = connectionId ?? crypto.randomUUID();
 
     // Close existing connection with same ID if present
     const existing = this.connections.get(id);

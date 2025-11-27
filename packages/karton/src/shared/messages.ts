@@ -1,37 +1,18 @@
-import superjson from 'superjson';
 import type { Patch } from 'immer';
 import type {
-  WebSocketMessage,
+  Message,
   RPCCallData,
   RPCReturnData,
   RPCExceptionData,
   StateSyncData,
   StatePatchData,
-} from './types.js';
-
-export function serializeMessage(message: WebSocketMessage): string {
-  return superjson.stringify(message);
-}
-
-export function deserializeMessage(data: string): WebSocketMessage {
-  const parsed = superjson.parse(data) as WebSocketMessage;
-
-  if (!parsed.type) {
-    throw new Error('Invalid WebSocket message: missing type');
-  }
-
-  if (!parsed.data) {
-    throw new Error('Invalid WebSocket message: missing data');
-  }
-
-  return parsed;
-}
+} from './types';
 
 export function createRPCCallMessage(
   rpcCallId: string,
   procedurePath: string,
   parameters: any[],
-): WebSocketMessage {
+): Message {
   return {
     type: 'rpc_call',
     data: {
@@ -45,7 +26,7 @@ export function createRPCCallMessage(
 export function createRPCReturnMessage(
   rpcCallId: string,
   value: unknown,
-): WebSocketMessage {
+): Message {
   return {
     type: 'rpc_return',
     data: {
@@ -58,7 +39,7 @@ export function createRPCReturnMessage(
 export function createRPCExceptionMessage(
   rpcCallId: string,
   error: Error,
-): WebSocketMessage {
+): Message {
   const serializedError = {
     ...error,
     name: error.name,
@@ -75,7 +56,7 @@ export function createRPCExceptionMessage(
   };
 }
 
-export function createStateSyncMessage(state: unknown): WebSocketMessage {
+export function createStateSyncMessage(state: unknown): Message {
   return {
     type: 'state_sync',
     data: {
@@ -84,7 +65,7 @@ export function createStateSyncMessage(state: unknown): WebSocketMessage {
   };
 }
 
-export function createStatePatchMessage(patch: Patch[]): WebSocketMessage {
+export function createStatePatchMessage(patch: Patch[]): Message {
   return {
     type: 'state_patch',
     data: {
@@ -94,31 +75,31 @@ export function createStatePatchMessage(patch: Patch[]): WebSocketMessage {
 }
 
 export function isRPCCallMessage(
-  message: WebSocketMessage,
-): message is WebSocketMessage & { data: RPCCallData } {
+  message: Message,
+): message is Message & { data: RPCCallData } {
   return message.type === 'rpc_call';
 }
 
 export function isRPCReturnMessage(
-  message: WebSocketMessage,
-): message is WebSocketMessage & { data: RPCReturnData } {
+  message: Message,
+): message is Message & { data: RPCReturnData } {
   return message.type === 'rpc_return';
 }
 
 export function isRPCExceptionMessage(
-  message: WebSocketMessage,
-): message is WebSocketMessage & { data: RPCExceptionData } {
+  message: Message,
+): message is Message & { data: RPCExceptionData } {
   return message.type === 'rpc_exception';
 }
 
 export function isStateSyncMessage(
-  message: WebSocketMessage,
-): message is WebSocketMessage & { data: StateSyncData } {
+  message: Message,
+): message is Message & { data: StateSyncData } {
   return message.type === 'state_sync';
 }
 
 export function isStatePatchMessage(
-  message: WebSocketMessage,
-): message is WebSocketMessage & { data: StatePatchData } {
+  message: Message,
+): message is Message & { data: StatePatchData } {
   return message.type === 'state_patch';
 }

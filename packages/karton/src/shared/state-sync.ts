@@ -6,22 +6,22 @@ import {
   type Patch,
 } from 'immer';
 import type { Draft } from 'immer';
-import type { WebSocketMessage } from './types.js';
+import type { Message } from './types.js';
 import {
   createStateSyncMessage,
   createStatePatchMessage,
   isStateSyncMessage,
   isStatePatchMessage,
-} from './websocket-messages.js';
+} from './messages.js';
 
 // Enable Immer patches globally
 enablePatches();
 
 export class StateManager<T> {
   private state: T;
-  private broadcast: (message: WebSocketMessage) => void;
+  private broadcast: (message: Message) => void;
 
-  constructor(initialState: T, broadcast: (message: WebSocketMessage) => void) {
+  constructor(initialState: T, broadcast: (message: Message) => void) {
     this.state = freeze(initialState as any, true) as T;
     this.broadcast = broadcast;
   }
@@ -49,7 +49,7 @@ export class StateManager<T> {
     return this.state;
   }
 
-  public getFullStateSyncMessage(): WebSocketMessage {
+  public getFullStateSyncMessage(): Message {
     return createStateSyncMessage(this.state);
   }
 }
@@ -63,10 +63,7 @@ export class ClientStateManager<T> {
     this.state = this.fallbackState;
   }
 
-  public handleMessage(
-    message: WebSocketMessage,
-    onStateChange?: () => void,
-  ): void {
+  public handleMessage(message: Message, onStateChange?: () => void): void {
     if (isStateSyncMessage(message)) {
       // Full state sync - replace entire state
       this.state = freeze((message.data as any).state as any, true) as T;

@@ -19,7 +19,6 @@ export const SignInScreen = ({ show }: { show: boolean }) => {
   const cancelAuthenticationConfirmation = useKartonProcedure(
     (p) => p.userAccount.cancelAuthenticationConfirmation,
   );
-  const authInProgress = useKartonState((s) => !!s.userAccount?.loginDialog);
   const pendingAuthenticationConfirmation = useKartonState(
     (s) => s.userAccount?.pendingAuthenticationConfirmation,
   );
@@ -110,11 +109,7 @@ export const SignInScreen = ({ show }: { show: boolean }) => {
               variant="primary"
               size="md"
               onClick={() => void startAuth()}
-              disabled={authInProgress}
             >
-              {authInProgress && (
-                <Loader2Icon className="size-5 animate-spin" />
-              )}
               Get started
               <ArrowRightIcon className="size-5" />
             </Button>

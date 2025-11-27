@@ -324,23 +324,23 @@ export interface StatePatchData {
   patch: Patch[];
 }
 
-export type WebSocketMessageType =
+export type MessageType =
   | 'rpc_call'
   | 'rpc_return'
   | 'rpc_exception'
   | 'state_sync'
   | 'state_patch';
 
-export type WebSocketMessageData =
+export type MessageData =
   | RPCCallData
   | RPCReturnData
   | RPCExceptionData
   | StateSyncData
   | StatePatchData;
 
-export interface WebSocketMessage {
-  type: WebSocketMessageType;
-  data: WebSocketMessageData;
+export interface Message {
+  type: MessageType;
+  data: MessageData;
 }
 
 export interface KartonServerConfig<T> {

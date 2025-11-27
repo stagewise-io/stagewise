@@ -1,6 +1,6 @@
 import { WebSocketServer, type WebSocket } from 'ws';
-import type { Transport, ServerTransport } from '../shared/transport.js';
-import { WebSocketTransport } from './websocket-client.js';
+import type { Transport, ServerTransport } from '../../shared/transport.js';
+import { WebSocketTransport } from './client.js';
 
 export class WebSocketServerTransport implements ServerTransport {
   private wss: WebSocketServer;

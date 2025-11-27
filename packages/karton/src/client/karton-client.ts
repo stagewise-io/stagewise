@@ -6,7 +6,7 @@ import type {
   KartonClientProcedureImplementations,
 } from '../shared/types.js';
 import type { Transport } from '../shared/transport.js';
-import { WebSocketTransport } from '../transports/websocket-client.js';
+import { WebSocketTransport } from '../transports/websocket/client.js';
 import { RPCManager } from '../shared/rpc.js';
 import { ClientStateManager } from '../shared/state-sync.js';
 import {
@@ -117,6 +117,8 @@ class KartonClientImpl<T> implements KartonClient<T> {
       this.transport.onError((error) => {
         console.error('Transport error:', error);
       });
+
+      this.transport.startTransport();
     } catch (error) {
       console.error('Failed to connect:', error);
       if (this.config.webSocketPath) {

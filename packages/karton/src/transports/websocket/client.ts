@@ -1,5 +1,5 @@
-import { WebSocketConnection } from '../shared/websocket-connection.js';
-import type { Transport, KartonMessage } from '../shared/transport.js';
+import { WebSocketConnection } from './utils.js';
+import type { Transport, KartonMessage } from '../../shared/transport.js';
 
 export class WebSocketTransport implements Transport {
   private connection: WebSocketConnection;
@@ -12,6 +12,10 @@ export class WebSocketTransport implements Transport {
       ws = urlOrWs;
     }
     this.connection = new WebSocketConnection(ws);
+  }
+
+  startTransport(): void {
+    this.connection.startTransport();
   }
 
   send(message: KartonMessage): void {

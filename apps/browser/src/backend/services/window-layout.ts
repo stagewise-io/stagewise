@@ -4,7 +4,6 @@ import {
   WebContentsView,
   app,
   shell,
-  MessageChannelMain,
   ipcMain,
 } from 'electron';
 import path from 'node:path';
@@ -37,7 +36,7 @@ export class WindowLayoutService {
   private globalDataPathService: GlobalDataPathService;
   private saveStateTimeout: NodeJS.Timeout | null = null;
   /** Port waiting to be delivered to the UI renderer (pre-created for immediate delivery) */
-  private pendingUIPort: MessagePortMain | null = null;
+  private uiSidePort: MessagePortMain | null = null;
   private lastNonMaximizedBounds: {
     width: number;
     height: number;
@@ -144,7 +143,6 @@ export class WindowLayoutService {
     // Pre-create the karton MessagePort connection immediately.
     // The port is registered with KartonService now, and delivered to the renderer when it requests it.
     // This eliminates race conditions since the port exists before the renderer even loads.
-    this.setupUIKartonConnection();
     this.setupKartonConnectionListener();
 
     // Sync sizes on startup and resize
@@ -438,79 +436,15 @@ export class WindowLayoutService {
     | null = null;
 
   /**
-   * Pre-create the karton MessagePort connection for the UI.
-   * The port is registered with KartonService immediately,
-   * and delivered to the renderer when it requests it.
-   * MessagePort queues messages until start() is called, so no messages are lost.
-   */
-  private setupUIKartonConnection(): void {
-    const connectionId = 'ui-main';
-    const { port1, port2 } = new MessageChannelMain();
-
-    // Register server-side immediately - messages will queue until renderer connects
-    this.kartonService.acceptPort(port1, connectionId);
-
-    // Store renderer port for delivery when requested
-    this.pendingUIPort = port2;
-
-    this.logger.debug(
-      `[WindowLayoutService] UI karton connection pre-created, connection ID: ${connectionId}`,
-    );
-  }
-
-  /**
    * Setup the IPC listener to deliver the pre-created karton port to the renderer.
    * When the renderer sends 'karton-connect', we immediately deliver the waiting port.
    */
-  private setupKartonConnectionListener(): void {
-    // Remove any existing listener
-    if (this.kartonConnectListener) {
-      ipcMain.removeListener('karton-connect', this.kartonConnectListener);
-    }
-
-    this.kartonConnectListener = (event) => {
-      // Only handle requests from our UI webContents
-      if (event.sender.id !== this.uiContentView?.webContents?.id) {
-        this.logger.debug(
-          '[WindowLayoutService] Ignoring karton-connect from unknown sender',
-        );
-        return;
+  private setupKartonConnectionListener() {
+    ipcMain.on('karton-connect', (event, connectionId) => {
+      if (connectionId === 'ui-main') {
+        this.kartonService.setTransportPort(event.ports[0]);
       }
-
-      // Check if webContents is still valid
-      if (!this.uiContentView || this.uiContentView.webContents.isDestroyed()) {
-        this.logger.warn(
-          '[WindowLayoutService] UI webContents destroyed, cannot send port',
-        );
-        return;
-      }
-
-      if (this.pendingUIPort) {
-        // Deliver the pre-created port
-        this.uiContentView.webContents.postMessage('karton-port', null, [
-          this.pendingUIPort,
-        ]);
-        this.pendingUIPort = null;
-        this.logger.debug('[WindowLayoutService] UI karton port delivered');
-      } else {
-        // Reconnection case - create new port pair
-        this.logger.debug(
-          '[WindowLayoutService] UI requesting reconnection, creating new port',
-        );
-        this.setupUIKartonConnection();
-        if (this.pendingUIPort) {
-          this.uiContentView.webContents.postMessage('karton-port', null, [
-            this.pendingUIPort,
-          ]);
-          this.pendingUIPort = null;
-          this.logger.debug(
-            '[WindowLayoutService] UI karton port delivered (reconnection)',
-          );
-        }
-      }
-    };
-
-    ipcMain.on('karton-connect', this.kartonConnectListener);
+    });
     this.logger.debug(
       '[WindowLayoutService] Listening for karton connection requests',
     );

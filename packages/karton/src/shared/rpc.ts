@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { WebSocketMessage } from './types.js';
+import type { Message } from './types.js';
 import {
   KartonRPCException,
   KartonRPCErrorReason,
@@ -12,7 +12,7 @@ import {
   isRPCCallMessage,
   isRPCReturnMessage,
   isRPCExceptionMessage,
-} from './websocket-messages.js';
+} from './messages.js';
 
 export interface RPCCallOptions {
   timeout?: number;
@@ -32,10 +32,10 @@ type ProcedureHandler = (...args: any[]) => Promise<any>;
 export class RPCManager {
   private pendingCalls: Map<string, PendingCall> = new Map();
   private procedures: Map<string, ProcedureHandler> = new Map();
-  private sendMessage: (message: WebSocketMessage) => void;
+  private sendMessage: (message: Message) => void;
   private defaultTimeout = 30000; // 30 seconds
 
-  constructor(sendMessage: (message: WebSocketMessage) => void) {
+  constructor(sendMessage: (message: Message) => void) {
     this.sendMessage = sendMessage;
   }
 
@@ -88,7 +88,7 @@ export class RPCManager {
     return this.procedures.has(path);
   }
 
-  public async handleMessage(message: WebSocketMessage): Promise<void> {
+  public async handleMessage(message: Message): Promise<void> {
     if (isRPCCallMessage(message)) {
       await this.handleRPCCall(message);
     } else if (isRPCReturnMessage(message)) {
@@ -98,9 +98,7 @@ export class RPCManager {
     }
   }
 
-  private async handleRPCCall(
-    message: WebSocketMessage & { data: any },
-  ): Promise<void> {
+  private async handleRPCCall(message: Message & { data: any }): Promise<void> {
     const { rpcCallId, procedurePath, parameters } = message.data;
     const handler = this.procedures.get(procedurePath);
 
@@ -124,7 +122,7 @@ export class RPCManager {
     }
   }
 
-  private handleRPCReturn(message: WebSocketMessage & { data: any }): void {
+  private handleRPCReturn(message: Message & { data: any }): void {
     const { rpcCallId, value } = message.data;
     const pendingCall = this.pendingCalls.get(rpcCallId);
 
@@ -135,7 +133,7 @@ export class RPCManager {
     }
   }
 
-  private handleRPCException(message: WebSocketMessage & { data: any }): void {
+  private handleRPCException(message: Message & { data: any }): void {
     const { rpcCallId, error } = message.data;
     const pendingCall = this.pendingCalls.get(rpcCallId);
 

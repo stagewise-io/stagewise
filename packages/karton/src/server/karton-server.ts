@@ -4,12 +4,12 @@ import type { WebSocketServer } from 'ws';
 import type {
   KartonServer,
   KartonServerConfig,
-  WebSocketMessage,
+  Message,
   KartonState,
   KartonClientProceduresWithClientId,
 } from '../shared/types.js';
 import type { Transport, ServerTransport } from '../shared/transport.js';
-import { WebSocketServerTransport } from '../transports/websocket-server.js';
+import { WebSocketServerTransport } from '../transports/websocket/server.js';
 import { RPCManager } from '../shared/rpc.js';
 import { StateManager } from '../shared/state-sync.js';
 import {
@@ -96,7 +96,7 @@ class KartonServerImpl<T> implements KartonServer<T> {
   }
 
   private handleNewConnection(transport: Transport): void {
-    const clientId = uuidv4();
+    const clientId = transport.getConnectionId?.() ?? uuidv4();
 
     // Create RPC manager for this client
     const rpcManager = new RPCManager((message) => {
@@ -137,7 +137,7 @@ class KartonServerImpl<T> implements KartonServer<T> {
     });
   }
 
-  private broadcast(message: WebSocketMessage): void {
+  private broadcast(message: Message): void {
     // We serialize once here if we wanted optimization, but Transport interface doesn't support raw.
     // So we iterate and send object.
     for (const client of this.clients.values()) {
