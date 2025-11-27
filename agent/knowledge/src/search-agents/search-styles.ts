@@ -1,5 +1,3 @@
-import { codingAgentTools } from '@stagewise/agent-tools';
-// import { getProjectInfo } from '@stagewise/agent-prompt-snippets';
 import { z } from 'zod';
 import { stepCountIs, tool } from 'ai';
 import { streamText, type ModelMessage } from 'ai';
@@ -120,17 +118,12 @@ export async function searchAndSaveStyleInformationFromProject(
       ],
     } satisfies ModelMessage;
 
-    const codingTools = codingAgentTools(clientRuntime);
-
     const stream = streamText({
       model,
       messages: [{ role: 'system', content: system }, prompt],
       tools: {
         saveStyleInformation: saveStyleInformationTool,
-        grepSearchTool: codingTools.grepSearchTool,
-        listFilesTool: codingTools.listFilesTool,
-        globTool: codingTools.globTool,
-        readFileTool: codingTools.readFileTool,
+        // coding tools, etc.
       },
       stopWhen: stepCountIs(100), // Increased to allow more thorough color extraction
       temperature: 0.15,

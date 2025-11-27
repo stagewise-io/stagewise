@@ -5,6 +5,8 @@ import { SearchIcon } from 'lucide-react';
 import { GrepSearchToolPart } from './grep-search';
 import { ListFilesToolPart } from './list-files';
 import { ReadFileToolPart } from './read-file';
+import { GetContext7LibraryDocsToolPart } from './get-context7-library-docs';
+import { ResolveContext7LibraryToolPart } from './resolve-context7-library';
 import { cn } from '@/utils';
 import { ToolPartUI } from './shared/tool-part-ui';
 
@@ -15,7 +17,9 @@ export type ReadOnlyToolPart = Extract<
       | 'tool-globTool'
       | 'tool-grepSearchTool'
       | 'tool-listFilesTool'
-      | 'tool-readFileTool';
+      | 'tool-readFileTool'
+      | 'tool-getContext7LibraryDocsTool'
+      | 'tool-resolveContext7LibraryTool';
   }
 >;
 
@@ -24,7 +28,9 @@ export function isReadOnlyToolPart(part: ToolPart): part is ReadOnlyToolPart {
     part.type === 'tool-globTool' ||
     part.type === 'tool-grepSearchTool' ||
     part.type === 'tool-listFilesTool' ||
-    part.type === 'tool-readFileTool'
+    part.type === 'tool-readFileTool' ||
+    part.type === 'tool-getContext7LibraryDocsTool' ||
+    part.type === 'tool-resolveContext7LibraryTool'
   );
 }
 
@@ -74,6 +80,24 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
+    case 'tool-getContext7LibraryDocsTool':
+      return (
+        <GetContext7LibraryDocsToolPart
+          key={part.toolCallId}
+          minimal={minimal}
+          part={part}
+          disableShimmer={disableShimmer}
+        />
+      );
+    case 'tool-resolveContext7LibraryTool':
+      return (
+        <ResolveContext7LibraryToolPart
+          key={part.toolCallId}
+          minimal={minimal}
+          part={part}
+          disableShimmer={disableShimmer}
+        />
+      );
     default:
       return null;
   }
@@ -110,6 +134,7 @@ export const ExploringToolParts = ({
     let filesRead = 0;
     let filesFound = 0;
     let linesRead = 0;
+    let docsRead = 0;
 
     const finishedParts = parts.filter(
       (part) => part.state === 'output-available',
@@ -127,25 +152,31 @@ export const ExploringToolParts = ({
         case 'tool-listFilesTool':
           filesFound += part.output?.result?.totalFiles ?? 0;
           break;
+        case 'tool-getContext7LibraryDocsTool':
+          docsRead += 1;
+          break;
       }
     });
-    return { filesRead, filesFound, linesRead };
+    return { filesRead, filesFound, linesRead, docsRead };
   }, [parts]);
 
   const explorationFinishedText = useMemo(() => {
-    const { filesFound, filesRead } = explorationMetadata;
+    const { filesFound, filesRead, docsRead } = explorationMetadata;
 
     if (filesFound === 0 && filesRead === 0) {
       return 'Explored directory';
     }
 
     const parts: string[] = [];
-    if (filesFound > 0) {
+    if (filesFound > 0)
       parts.push(`Found ${filesFound} file${filesFound !== 1 ? 's' : ''}`);
-    }
-    if (filesRead > 0) {
+
+    if (docsRead > 0)
+      parts.push(`Read ${docsRead} doc${docsRead !== 1 ? 's' : ''}`);
+
+    if (filesRead > 0)
       parts.push(`Read ${filesRead} file${filesRead !== 1 ? 's' : ''}`);
-    }
+
     return parts.join(', ');
   }, [explorationMetadata]);
 

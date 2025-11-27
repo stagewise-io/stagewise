@@ -164,6 +164,9 @@ importers:
       '@ai-sdk/provider':
         specifier: ^2.0.0
         version: 2.0.0
+      '@stagewise/api-client':
+        specifier: 2.0.1
+        version: 2.0.1(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5)
       ai:
         specifier: 5.0.101
         version: 5.0.101(zod@4.0.17)
@@ -200,8 +203,8 @@ importers:
         version: 5.0.101(zod@4.0.17)
     devDependencies:
       '@stagewise/api-client':
-        specifier: 2.0.0
-        version: 2.0.0(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5)
+        specifier: 2.0.1
+        version: 2.0.1(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5)
       rimraf:
         specifier: ^5.0.0
         version: 5.0.10
@@ -282,8 +285,8 @@ importers:
         specifier: workspace:*
         version: link:../../agent/types
       '@stagewise/api-client':
-        specifier: 2.0.0
-        version: 2.0.0(bufferutil@4.0.9)(typescript@4.5.5)(utf-8-validate@6.0.5)
+        specifier: 2.0.1
+        version: 2.0.1(bufferutil@4.0.9)(typescript@4.5.5)(utf-8-validate@6.0.5)
       '@stagewise/karton':
         specifier: workspace:*
         version: link:../../packages/karton
@@ -2857,8 +2860,8 @@ packages:
   '@so-ric/colorspace@1.1.6':
     resolution: {integrity: sha512-/KiKkpHNOBgkFJwu9sh48LkHSMYGyuTcSFK/qMBdnOAlrRJzRSXAOFB5qwzaVQuDl8wAvHVMkaASQDReTahxuw==}
 
-  '@stagewise/api-client@2.0.0':
-    resolution: {integrity: sha512-EsNnX9z4txbd+PXOlV8lPHzAcbAjuldv1i6+pD+CeQH4nwwzZHg5UuVO4MhGrmElRMpnDuAwYoh4m0Cl9AYd4A==}
+  '@stagewise/api-client@2.0.1':
+    resolution: {integrity: sha512-9t8exEjOlLXwOO3nZhnwcS6/rw2mc93vyTQtwX526NlC4GWD279Ut+WCJElUlXZYOHZChlILlxCyJvDMCVSkFQ==}
 
   '@standard-schema/spec@1.0.0':
     resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
@@ -11584,7 +11587,7 @@ snapshots:
       color: 5.0.3
       text-hex: 1.0.0
 
-  '@stagewise/api-client@2.0.0(bufferutil@4.0.9)(typescript@4.5.5)(utf-8-validate@6.0.5)':
+  '@stagewise/api-client@2.0.1(bufferutil@4.0.9)(typescript@4.5.5)(utf-8-validate@6.0.5)':
     dependencies:
       '@mendable/firecrawl-js': 4.7.0(bufferutil@4.0.9)(utf-8-validate@6.0.5)
       '@trpc/client': 11.4.4(@trpc/server@11.4.4(typescript@4.5.5))(typescript@4.5.5)
@@ -11598,7 +11601,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@stagewise/api-client@2.0.0(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5)':
+  '@stagewise/api-client@2.0.1(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5)':
     dependencies:
       '@mendable/firecrawl-js': 4.7.0(bufferutil@4.0.9)(utf-8-validate@6.0.5)
       '@trpc/client': 11.4.4(@trpc/server@11.4.4(typescript@5.9.3))(typescript@5.9.3)

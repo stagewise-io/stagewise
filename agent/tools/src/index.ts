@@ -9,6 +9,9 @@ import { grepSearchTool } from './node-runtime/file-modification/grep-search-too
 import { globTool } from './node-runtime/file-modification/glob-tool.js';
 import { multiEditTool } from './node-runtime/file-modification/multi-edit-tool.js';
 import { deleteFileTool } from './node-runtime/file-modification/delete-file-tool.js';
+import { getContext7LibraryDocsTool } from './node-runtime/research/get-context7-library-docs-tool.js';
+import { resolveContext7LibraryTool } from './node-runtime/research/resolve-context7-library-tool.js';
+
 import {
   askForDevScriptIntegrationTool,
   askForDevScriptIntegrationOutputSchema,
@@ -42,6 +45,7 @@ import {
   generateComponentTool,
   type InspirationComponent,
 } from './node-runtime/inspiration/generate-component-tool.js';
+import type { AppRouter, TRPCClient } from '@stagewise/api-client';
 
 export {
   askForAppPathTool,
@@ -173,7 +177,10 @@ export function setupAgentTools(
   };
 }
 
-export function codingAgentTools(clientRuntime: ClientRuntime) {
+export function codingAgentTools(
+  clientRuntime: ClientRuntime,
+  apiClient: TRPCClient<AppRouter>,
+) {
   return {
     overwriteFileTool: toolWithMetadata(overwriteFileTool(clientRuntime)),
     readFileTool: toolWithMetadata(readFileTool(clientRuntime)),
@@ -182,6 +189,12 @@ export function codingAgentTools(clientRuntime: ClientRuntime) {
     globTool: toolWithMetadata(globTool(clientRuntime)),
     multiEditTool: toolWithMetadata(multiEditTool(clientRuntime)),
     deleteFileTool: toolWithMetadata(deleteFileTool(clientRuntime)),
+    getContext7LibraryDocsTool: toolWithMetadata(
+      getContext7LibraryDocsTool(apiClient),
+    ),
+    resolveContext7LibraryTool: toolWithMetadata(
+      resolveContext7LibraryTool(apiClient),
+    ),
   };
 }
 

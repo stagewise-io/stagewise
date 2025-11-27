@@ -205,7 +205,7 @@ export class AgentService {
           },
         });
       case MainTab.DEV_APP_PREVIEW:
-        return codingAgentTools(this.clientRuntime);
+        return codingAgentTools(this.clientRuntime, this.client);
       case MainTab.IDEATION_CANVAS: {
         if (!this.apiKey) {
           this.logger.debug(
@@ -262,7 +262,7 @@ export class AgentService {
         );
       }
       default:
-        return codingAgentTools(this.clientRuntime);
+        return codingAgentTools(this.clientRuntime, this.client);
     }
   }
 

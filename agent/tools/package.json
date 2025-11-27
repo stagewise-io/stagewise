@@ -25,9 +25,10 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "ai": "5.0.101",
     "@ai-sdk/anthropic": "2.0.45",
-    "@ai-sdk/provider": "^2.0.0"
+    "@ai-sdk/provider": "^2.0.0",
+    "@stagewise/api-client": "2.0.1",
+    "ai": "5.0.101"
   },
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",
