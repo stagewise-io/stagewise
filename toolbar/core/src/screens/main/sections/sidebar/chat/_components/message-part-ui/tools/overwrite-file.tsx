@@ -119,7 +119,7 @@ export const OverwriteFileToolPart = ({
       );
     else if (streaming && part.input?.content && !diff)
       return (
-        <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground text-xs">
+        <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground/75 text-xs">
           {part.input?.content}
         </pre>
       );
@@ -198,7 +198,7 @@ export const OverwriteFileToolPart = ({
       setExpanded={setExpanded}
       trigger={trigger}
       content={content}
-      contentClassName="max-h-56"
+      contentClassName={streaming ? 'max-h-24' : 'max-h-56'}
       contentFooter={contentFooter}
       contentFooterClassName="px-0"
     />

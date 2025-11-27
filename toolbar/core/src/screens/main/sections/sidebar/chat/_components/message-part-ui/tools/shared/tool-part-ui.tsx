@@ -73,11 +73,12 @@ export const ToolPartUI = ({
     );
   };
 
-  // Track user scroll position and reset when expanded
+  // Track user scroll position and scroll to bottom on initial expansion
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || !expanded || !containerReady) return;
 
+    // Only scroll to bottom on initial expansion
     requestAnimationFrame(() => {
       if (container) {
         container.scrollTop = container.scrollHeight;
@@ -93,22 +94,45 @@ export const ToolPartUI = ({
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [expanded, containerReady, content]);
+  }, [expanded, containerReady]);
 
-  // Auto-scroll to bottom when parts change (if user hasn't scrolled away)
+  // Auto-scroll to bottom when content changes (if user hasn't scrolled away)
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || !expanded || !containerReady) return;
+    const contentWrapper = contentWrapperRef.current;
 
-    const shouldAutoScroll = !isUserScrolledRef.current;
+    if (!container || !contentWrapper || !expanded || !containerReady) return;
 
-    if (shouldAutoScroll) {
-      requestAnimationFrame(() => {
-        if (container) {
-          container.scrollTop = container.scrollHeight;
-        }
-      });
-    }
+    const shouldAutoScroll = () => !isUserScrolledRef.current;
+
+    const scrollToBottom = () => {
+      if (shouldAutoScroll()) {
+        requestAnimationFrame(() => {
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          }
+        });
+      }
+    };
+
+    // Initial scroll on expansion
+    scrollToBottom();
+
+    // Observe DOM mutations in the content area
+    const observer = new MutationObserver(() => {
+      scrollToBottom();
+    });
+
+    observer.observe(contentWrapper, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+    });
+
+    return () => {
+      observer.disconnect();
+    };
   }, [expanded, containerReady]);
 
   // Track scroll position of content to smoothly adjust fade effects
@@ -212,26 +236,26 @@ export const ToolPartUI = ({
             <div
               ref={contentScrollRef}
               className={cn(
-                'mask-alpha scrollbar-hover-only block max-h-32 overscroll-contain py-0.5',
+                'mask-alpha scrollbar-hover-only block max-h-32 overscroll-contain py-0.5 transition-[max-height] duration-300 ease-[var(--ease-spring-soft)]',
                 contentClassName,
               )}
-              style={{
-                ...getMaskStyle(),
-                overflowY: 'auto',
-                overflowX: 'auto',
-                maskImage: `
+              style={
+                {
+                  ...getMaskStyle(),
+                  overflowY: 'auto',
+                  overflowX: 'auto',
+                  maskImage: `
                   linear-gradient(to right, black calc(100% - ${hasVerticalScrollbar ? '10px' : '0px'}), transparent 100%),
                   linear-gradient(to bottom, transparent 0px, black var(--top-fade), black calc(100% - var(--bottom-fade) - ${hasHorizontalScrollbar ? '10px' : '0px'}), transparent 100%)
                 `,
-                WebkitMaskImage: `
+                  WebkitMaskImage: `
                   linear-gradient(to right, black calc(100% - ${hasVerticalScrollbar ? '10px' : '0px'}), transparent 100%),
                   linear-gradient(to bottom, transparent 0px, black var(--top-fade), black calc(100% - var(--bottom-fade) - ${hasHorizontalScrollbar ? '10px' : '0px'}), transparent 100%)
                 `,
-                maskComposite: 'intersect',
-                WebkitMaskComposite: 'source-in',
-                transition:
-                  '--top-fade 0.15s ease-out, --bottom-fade 0.15s ease-out',
-              }}
+                  maskComposite: 'intersect',
+                  WebkitMaskComposite: 'source-in',
+                } as React.CSSProperties
+              }
             >
               <div ref={setContentWrapperRef}>{content}</div>
             </div>

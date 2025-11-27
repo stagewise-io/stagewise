@@ -27,6 +27,14 @@ export const DeleteFileToolPart = ({
     [part.output?.hiddenMetadata],
   );
 
+  const deletedLineCount = useMemo(
+    () =>
+      diff
+        ?.filter((line) => line.removed)
+        .reduce((acc, line) => acc + (line.count ?? 0), 0) ?? 0,
+    [diff],
+  );
+
   const streaming = useMemo(() => {
     return part.state === 'input-streaming' || part.state === 'input-available';
   }, [part.state]);
@@ -52,8 +60,14 @@ export const DeleteFileToolPart = ({
       );
     else if (streaming)
       return <LoadingHeader relativePath={path ?? undefined} />;
-    else return <SuccessHeader relativePath={path ?? undefined} />;
-  }, [state, streaming, path, part.errorText]);
+    else
+      return (
+        <SuccessHeader
+          relativePath={path ?? undefined}
+          deletedLineCount={deletedLineCount}
+        />
+      );
+  }, [state, streaming, path, part.errorText, deletedLineCount]);
 
   const content = useMemo(() => {
     if (state === 'error') return undefined;
@@ -74,6 +88,7 @@ export const DeleteFileToolPart = ({
       setExpanded={setExpanded}
       trigger={trigger}
       content={content}
+      contentClassName="max-h-56"
     />
   );
 };
@@ -108,7 +123,13 @@ const ErrorHeader = ({
   );
 };
 
-const SuccessHeader = ({ relativePath }: { relativePath?: string }) => {
+const SuccessHeader = ({
+  relativePath,
+  deletedLineCount,
+}: {
+  relativePath?: string;
+  deletedLineCount?: number;
+}) => {
   return (
     <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
       <div className="pointer-events-auto flex flex-row items-center justify-start gap-1 text-muted-foreground">
@@ -130,6 +151,9 @@ const SuccessHeader = ({ relativePath }: { relativePath?: string }) => {
         </Tooltip>
       </div>
       <span className="shrink-0 text-error text-xs">(deleted)</span>
+      {(deletedLineCount ?? 0) > 0 && (
+        <span className="shrink-0 text-error text-xs">-{deletedLineCount}</span>
+      )}
     </div>
   );
 };

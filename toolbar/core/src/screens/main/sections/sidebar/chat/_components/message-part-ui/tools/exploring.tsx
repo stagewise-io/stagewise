@@ -189,7 +189,11 @@ export const ExploringToolParts = ({
           </div>
         </div>
       }
-      content={<div className="flex flex-col gap-1 pb-1">{partContents}</div>}
+      content={
+        <div className="flex flex-col gap-1 pb-1 opacity-75">
+          {partContents}
+        </div>
+      }
       contentClassName="max-h-24"
     />
   );
