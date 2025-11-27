@@ -73,6 +73,7 @@
     "clsx": "^2.1.1",
     "commander": "^14.0.0",
     "diff": "^8.0.2",
+    "dotenv-cli": "^11.0.0",
     "electron": "39.2.3",
     "electron-context-menu": "^4.1.1",
     "express": "^4.18.2",
