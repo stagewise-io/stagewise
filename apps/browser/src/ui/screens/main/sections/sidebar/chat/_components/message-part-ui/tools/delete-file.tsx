@@ -74,6 +74,7 @@ export const DeleteFileToolPart = ({
       setExpanded={setExpanded}
       trigger={trigger}
       content={content}
+      contentClassName="max-h-56"
     />
   );
 };

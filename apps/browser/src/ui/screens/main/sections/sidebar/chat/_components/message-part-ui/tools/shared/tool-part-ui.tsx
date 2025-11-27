@@ -236,7 +236,7 @@ export const ToolPartUI = ({
             <div
               ref={contentScrollRef}
               className={cn(
-                'mask-alpha scrollbar-hover-only block overscroll-contain py-0.5 transition-[max-height] duration-300 ease-[var(--ease-spring-soft)]',
+                'mask-alpha scrollbar-hover-only block max-h-32 overscroll-contain py-0.5 transition-[max-height] duration-300 ease-[var(--ease-spring-soft)]',
                 contentClassName,
               )}
               style={
