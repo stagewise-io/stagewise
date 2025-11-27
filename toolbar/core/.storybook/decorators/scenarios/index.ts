@@ -71,6 +71,9 @@ export type { FileReadingScenarioConfig } from './with-file-reading-scenario';
 export { withFileEditScenario } from './with-file-edit-scenario';
 export type { FileEditScenarioConfig } from './with-file-edit-scenario';
 
+export { withOverwriteFileScenario } from './with-overwrite-file-scenario';
+export type { OverwriteFileScenarioConfig } from './with-overwrite-file-scenario';
+
 export { withMultiFileEditScenario } from './with-multi-file-edit-scenario';
 export type { MultiFileEditScenarioConfig } from './with-multi-file-edit-scenario';
 

@@ -93,7 +93,7 @@ export const ToolPartUI = ({
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [expanded, containerReady]);
+  }, [expanded, containerReady, content]);
 
   // Auto-scroll to bottom when parts change (if user hasn't scrolled away)
   useEffect(() => {

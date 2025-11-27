@@ -5,6 +5,7 @@ import {
   withSimpleResponseScenario,
   withFileReadingScenario,
   withFileEditScenario,
+  withOverwriteFileScenario,
   withMultiFileEditScenario,
   withExplorationScenario,
   withErrorRecoveryScenario,
@@ -163,7 +164,94 @@ export const FileEdit: Story = {
 };
 
 /**
- * 4. Multi-File Edit Scenario
+ * 4. Create File Scenario (Overwrite File Tool)
+ *
+ * Agent creates a new file with streaming content.
+ * User asks → Agent thinks → Creates file with streamed content → Confirms
+ */
+export const CreateNewFile: Story = {
+  decorators: [withOverwriteFileScenario],
+  parameters: {
+    overwriteFileScenario: {
+      userMessage: 'Create a file called Haikus.md with 10 haikus about coding',
+      thinkingText:
+        'Let me compose some beautiful haikus about the art of programming and software development...',
+      targetFile: 'Haikus.md',
+      fileContent: `# Coding Haikus
+
+A collection of haikus about the art of programming.
+
+---
+
+## 1. The Bug Hunt
+
+Code runs perfectly
+Until production deploys—
+Then chaos ensues
+
+## 2. Stack Overflow
+
+Error message glows
+Stack Overflow saves the day
+Copy, paste, relief
+
+## 3. Coffee-Driven Development
+
+Morning coffee brews
+Keyboard clicks fill empty space
+Bugs become features
+
+## 4. The Merge Conflict
+
+Git merge goes sideways
+Conflicts bloom like spring flowers
+Resolve, commit, pray
+
+## 5. Late Night Coding
+
+Midnight code review
+Eyes blur, logic starts to fade
+Debug in the dawn
+
+## 6. The Refactor
+
+Old code, messy, crude
+Refactor brings clarity
+Tests still passing green
+
+## 7. Deployment Day
+
+Fingers hover, tense
+Deploy button mocks my fear
+Click—the world still spins
+
+## 8. Documentation
+
+Comments left behind
+Future self will thank me now
+Or curse my vague words
+
+## 9. The Breakthrough
+
+Stuck for hours, lost
+Then suddenly—clarity!
+Solution was simple
+
+## 10. Code Poetry
+
+Elegant design
+Functions flow like poetry
+Art meets engineering
+`,
+      responseText:
+        "I've created Haikus.md with 10 beautiful haikus about coding. Each one captures a different aspect of the programming experience!",
+    },
+    mockKartonState: baseState,
+  },
+};
+
+/**
+ * 5. Multi-File Edit Scenario
  *
  * Agent edits multiple files in parallel.
  * User asks → Agent thinks → Edits 3 files simultaneously → Confirms
@@ -203,7 +291,7 @@ export const MultiFileEdit: Story = {
 };
 
 /**
- * 5. Parallel Exploration Scenario (Most Complex)
+ * 6. Parallel Exploration Scenario (Most Complex)
  *
  * Multi-phase workflow with parallel operations.
  * User asks → Agent thinks →
@@ -317,7 +405,7 @@ export const ParallelExploration: Story = {
 };
 
 /**
- * 6. Error Recovery Scenario
+ * 7. Error Recovery Scenario
  *
  * Agent encounters and handles an error gracefully.
  * User asks → Agent thinks → Attempts operation → Fails → Explains error
@@ -340,7 +428,7 @@ export const ErrorRecovery: Story = {
 };
 
 /**
- * 7. Complex Refactoring Scenario
+ * 8. Complex Refactoring Scenario
  *
  * Multi-phase sequential refactoring.
  * User asks → Think → Read files → Explain → Initial edits → Explain next step → Final edit → Complete

@@ -117,7 +117,7 @@ export const OverwriteFileToolPart = ({
           collapsed={codeDiffCollapsed}
         />
       );
-    else if (state === 'success' && part.input?.content && streaming && !diff)
+    else if (streaming && part.input?.content && !diff)
       return (
         <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground text-xs">
           {part.input?.content}
