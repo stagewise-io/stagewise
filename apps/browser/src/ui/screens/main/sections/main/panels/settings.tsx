@@ -425,7 +425,7 @@ export const GlobalSettingsTabContent = () => {
                 <TooltipContent>
                   Only paid users can disable telemetry. Upgrade your plan{' '}
                   <a
-                    href={`${process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io'}/billing/checkout`}
+                    href={`${import.meta.env.VITE_STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io'}/billing/checkout`}
                     className="text-blue-600 underline hover:text-blue-700"
                     target="_blank"
                     rel="noopener noreferrer"

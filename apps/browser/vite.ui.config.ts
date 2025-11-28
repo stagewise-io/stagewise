@@ -1,23 +1,16 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import path, { resolve } from 'node:path';
-import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
-
-// Read package.json to get version
-const packageJson = JSON.parse(
-  await readFile(resolve(__dirname, 'package.json'), 'utf-8'),
-);
-const version = packageJson.version;
 
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss()],
   define: {
-    'process.env': JSON.stringify({
+    'process.env': 'import.meta.env' /*JSON.stringify({
       BUILD_MODE: process.env.BUILD_MODE ?? 'production',
       NODE_ENV: process.env.NODE_ENV ?? 'production',
       POSTHOG_API_KEY: process.env.POSTHOG_API_KEY,
@@ -27,8 +20,7 @@ export default defineConfig({
       API_URL: process.env.API_URL ?? 'https://v1.api.stagewise.io',
       LLM_PROXY_URL: process.env.LLM_PROXY_URL ?? 'https://llm.stagewise.io',
       CLI_VERSION: version,
-    }),
-    'process.type': JSON.stringify('renderer'),
+    }),*/,
   },
   resolve: {
     alias: {

@@ -51,7 +51,7 @@ export function LogoMenu() {
           </MenuItem>
         </a>
         <a
-          href={`${process.env.DISCORD_INVITE_LINK || 'https://discord.gg/gkdGsDYaKA'}`}
+          href={`${import.meta.env.VITE_DISCORD_INVITE_LINK || 'https://discord.gg/gkdGsDYaKA'}`}
           target="_blank"
         >
           <MenuItem>

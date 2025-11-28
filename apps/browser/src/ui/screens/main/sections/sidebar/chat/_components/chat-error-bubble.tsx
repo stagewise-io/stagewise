@@ -37,10 +37,10 @@ const formatDuration = (minutes: number): string => {
 };
 
 const consoleUrl =
-  process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
+  import.meta.env.VITE_STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
 
 const discordLink =
-  process.env.DISCORD_INVITE_LINK || 'https://discord.gg/gkdGsDYaKA';
+  import.meta.env.VITE_DISCORD_INVITE_LINK || 'https://discord.gg/gkdGsDYaKA';
 
 const needsExtraCreditsMessage = `Oh no, you ran out of credits!\n\nYou can [buy extra credits here](${consoleUrl}/billing/checkout-extra-credits) so we can continue working on your app 💪`;
 const needsSubscriptionMessage = `Wow, looks like you ran out of included credits in your trial!\n\nLet's [setup your subscription](${consoleUrl}/billing/checkout) so we can continue working on your app 💪`;

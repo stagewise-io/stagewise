@@ -62,7 +62,11 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
   useEffect(() => {
     if (!posthog) return;
     const telemetryLevel = globalConfig.telemetryLevel;
-    if (telemetryLevel === 'off') {
+    if (
+      telemetryLevel === 'off' ||
+      (import.meta.env.NODE_ENV === 'development' &&
+        import.meta.env.VITE_DISABLE_TELEMETRY === 'true')
+    ) {
       try {
         posthog.stopSessionRecording();
         posthog.consent.optInOut(false);
@@ -85,7 +89,7 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
         ui_host: 'https://eu.posthog.com',
         capture_pageview: false, // We capture pageviews manually
         capture_pageleave: true, // Enable pageleave capture
-        debug: process.env.NODE_ENV === 'development',
+        debug: import.meta.env.NODE_ENV === 'development',
         session_recording: {
           blockSelector: '#user-app-iframe',
           compress_events: true,

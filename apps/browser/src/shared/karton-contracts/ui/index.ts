@@ -395,8 +395,8 @@ export type KartonContract = {
 export const defaultState: KartonContract['state'] = {
   internalData: {
     posthog: {
-      apiKey: process.env.POSTHOG_API_KEY,
-      host: process.env.POSTHOG_HOST || 'https://eu.i.posthog.com',
+      apiKey: import.meta.env.VITE_POSTHOG_API_KEY,
+      host: import.meta.env.VITE_POSTHOG_HOST ?? 'https://eu.i.posthog.com',
     },
   },
   workspace: null,
