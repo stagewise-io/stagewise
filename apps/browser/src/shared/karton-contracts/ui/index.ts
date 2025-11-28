@@ -113,6 +113,31 @@ export type AgentError =
       error: { name: string; message: string };
     };
 
+export type TabState = {
+  id: string;
+  title: string;
+  url: string;
+  faviconUrls: string[];
+  isLoading: boolean;
+  isResponsive: boolean;
+  error: {
+    code: number;
+    message?: string;
+  } | null;
+  navigationHistory: {
+    canGoBack: boolean;
+    canGoForward: boolean;
+  };
+  devToolsOpen: boolean;
+};
+
+export type HistoryEntry = {
+  url: string;
+  title: string;
+  faviconUrls: string[];
+  lastVisitedAt: Date;
+};
+
 export type AppState = {
   internalData: {
     posthog?: {
@@ -236,23 +261,13 @@ export type AppState = {
     }[]; // Allows up to three actions. Every action except for the first will be rendered as secondary. More than three actions will be ignored. Clicking on an action will also dismiss the notification.
   }[];
 
-  // Status of the web content view.
-  webContent: {
-    title: string; // The title of the web content view.
-    faviconUrls: string[]; // A list of URLs that represent the favicon of the webview.
-    url: string; // The current URL of the web content view.
-    devToolsOpen: boolean; // If true, the developer tools are open.
-    isLoading: boolean; // If true, the web content view is loading.
-    isResponsive: boolean; // If false, the web content view is not responsive and the user probably won't be able interact with it.
-    error: {
-      code: number;
-      message?: string;
-    } | null; // The error code of the web content view. If null, there is no error. Error should replace the currently displayed content with an error page.
-    navigationHistory: {
-      canGoBack: boolean;
-      canGoForward: boolean;
-    }; // The navigation history of the web content view.
-  } | null;
+  // Browser state
+  browser: {
+    tabs: Record<string, TabState>;
+    activeTabId: string | null;
+    history: HistoryEntry[];
+    contextSelectionMode: boolean;
+  };
 };
 
 export type AuthStatus =
@@ -298,6 +313,7 @@ export type KartonContract = {
       undoToolCallsUntilUserMessage: (
         userMessageId: string,
         chatId: string,
+        shouldUndoUserMessage?: boolean,
       ) => Promise<void>;
       undoToolCallsUntilLatestUserMessage: (
         chatId: string,
@@ -366,7 +382,10 @@ export type KartonContract = {
     config: {
       set: (config: GlobalConfig) => Promise<void>;
     };
-    webContent: {
+    browser: {
+      createTab: (url?: string) => Promise<void>;
+      closeTab: (tabId: string) => Promise<void>;
+      switchTab: (tabId: string) => Promise<void>;
       layout: {
         // This is called when the webcontents view is resized or moved or whatever. It's used to notify the main window about the new bounds that the webcontents view should have.
         update: (
@@ -380,14 +399,15 @@ export type KartonContract = {
         // When the webcontents view is hovered over, the UI will be called to notify so that the backend will manage the interactvity of UI and the web contents view accordingly.
         changeInteractivity: (interactive: boolean) => Promise<void>;
       };
-      stop: () => Promise<void>;
-      reload: () => Promise<void>;
-      goto: (url: string) => Promise<void>;
-      goBack: () => Promise<void>;
-      goForward: () => Promise<void>;
-      toggleDevTools: () => Promise<void>;
-      openDevTools: () => Promise<void>;
-      closeDevTools: () => Promise<void>;
+      stop: (tabId?: string) => Promise<void>;
+      reload: (tabId?: string) => Promise<void>;
+      goto: (url: string, tabId?: string) => Promise<void>;
+      goBack: (tabId?: string) => Promise<void>;
+      goForward: (tabId?: string) => Promise<void>;
+      toggleDevTools: (tabId?: string) => Promise<void>;
+      openDevTools: (tabId?: string) => Promise<void>;
+      closeDevTools: (tabId?: string) => Promise<void>;
+      setContextSelectionMode: (active: boolean) => Promise<void>;
     };
   };
 };
@@ -419,5 +439,10 @@ export const defaultState: KartonContract['state'] = {
     activeLayout: Layout.SIGNIN,
   },
   notifications: [],
-  webContent: null,
+  browser: {
+    tabs: {},
+    activeTabId: null,
+    history: [],
+    contextSelectionMode: false,
+  },
 };

@@ -2,9 +2,9 @@ import { useKartonProcedure } from '@/hooks/use-karton';
 import { useCallback, useLayoutEffect, useRef } from 'react';
 
 export const WebContentsBoundsSyncer = () => {
-  const updateBounds = useKartonProcedure((p) => p.webContent.layout.update);
+  const updateBounds = useKartonProcedure((p) => p.browser.layout.update);
   const updateInteractivity = useKartonProcedure(
-    (p) => p.webContent.layout.changeInteractivity,
+    (p) => p.browser.layout.changeInteractivity,
   );
 
   // State refs

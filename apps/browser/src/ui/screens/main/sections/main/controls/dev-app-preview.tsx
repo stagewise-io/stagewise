@@ -50,7 +50,10 @@ export function DevAppPreviewControls() {
 }
 
 export function UrlControl() {
-  const currentUrl = useKartonState((s) => s.webContent?.url);
+  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const currentUrl = useKartonState((s) =>
+    activeTabId ? s.browser.tabs[activeTabId]?.url : '',
+  );
 
   const [urlModified, setUrlModified] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
@@ -109,27 +112,27 @@ export function UrlControl() {
     return getSearchUrl(checkedUrl);
   }, []);
 
-  const isLoading = useKartonState((s) => s.webContent?.isLoading);
-  const _title = useKartonState((s) => s.webContent?.title);
-  const canGoBack = useKartonState(
-    (s) => s.webContent?.navigationHistory?.canGoBack,
-  );
-  const canGoForward = useKartonState(
-    (s) => s.webContent?.navigationHistory?.canGoForward,
+  const activeTab = useKartonState((s) =>
+    activeTabId ? s.browser.tabs[activeTabId] : null,
   );
 
-  const goBack = useKartonProcedure((p) => p.webContent.goBack);
-  const goForward = useKartonProcedure((p) => p.webContent.goForward);
-  const reload = useKartonProcedure((p) => p.webContent.reload);
-  const stop = useKartonProcedure((p) => p.webContent.stop);
-  const goto = useKartonProcedure((p) => p.webContent.goto);
+  const isLoading = activeTab?.isLoading;
+  const _title = activeTab?.title;
+  const canGoBack = activeTab?.navigationHistory?.canGoBack;
+  const canGoForward = activeTab?.navigationHistory?.canGoForward;
+
+  const goBack = useKartonProcedure((p) => p.browser.goBack);
+  const goForward = useKartonProcedure((p) => p.browser.goForward);
+  const reload = useKartonProcedure((p) => p.browser.reload);
+  const stop = useKartonProcedure((p) => p.browser.stop);
+  const goto = useKartonProcedure((p) => p.browser.goto);
 
   return (
     <div className="glass-body @[175px]:flex hidden h-10 w-full flex-1 flex-row items-center gap-2 rounded-full bg-background/80 p-1 backdrop-blur-lg">
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => void goBack()}
+        onClick={() => void goBack(activeTabId ?? undefined)}
         disabled={!canGoBack}
         className="@[320px]:flex hidden"
       >
@@ -138,7 +141,7 @@ export function UrlControl() {
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => void goForward()}
+        onClick={() => void goForward(activeTabId ?? undefined)}
         disabled={!canGoForward}
       >
         <ArrowRightIcon className="size-4" />
@@ -151,7 +154,10 @@ export function UrlControl() {
           type="text"
           placeholder="Enter a URL to navigate to..."
           onSubmit={() => {
-            void goto(buildFullUrl(urlInputRef.current?.value ?? ''));
+            void goto(
+              buildFullUrl(urlInputRef.current?.value ?? ''),
+              activeTabId ?? undefined,
+            );
             setUrlModified(false);
             urlInputRef.current?.blur();
           }}
@@ -162,7 +168,10 @@ export function UrlControl() {
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              void goto(buildFullUrl(urlInputRef.current?.value ?? ''));
+              void goto(
+                buildFullUrl(urlInputRef.current?.value ?? ''),
+                activeTabId ?? undefined,
+              );
               setUrlModified(false);
               urlInputRef.current?.blur();
             }
@@ -176,7 +185,11 @@ export function UrlControl() {
             variant="ghost"
             size="icon-sm"
             className="@[320px]:flex hidden"
-            onClick={() => (isLoading ? void stop() : void reload())}
+            onClick={() =>
+              isLoading
+                ? void stop(activeTabId ?? undefined)
+                : void reload(activeTabId ?? undefined)
+            }
           >
             {isLoading ? (
               <>
@@ -229,8 +242,11 @@ const _screenSizes: Record<
 };
 
 function DevToolsToggle() {
-  const devToolsOpen = useKartonState((s) => s.webContent?.devToolsOpen);
-  const toggleDevTools = useKartonProcedure((p) => p.webContent.toggleDevTools);
+  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const devToolsOpen = useKartonState((s) =>
+    activeTabId ? s.browser.tabs[activeTabId]?.devToolsOpen : false,
+  );
+  const toggleDevTools = useKartonProcedure((p) => p.browser.toggleDevTools);
 
   return (
     <Tooltip>
@@ -239,7 +255,7 @@ function DevToolsToggle() {
           variant={devToolsOpen ? 'primary' : 'secondary'}
           size="icon-md"
           className={!devToolsOpen && 'bg-background/80 backdrop-blur-lg'}
-          onClick={() => toggleDevTools()}
+          onClick={() => toggleDevTools(activeTabId ?? undefined)}
         >
           <BugIcon className="size-4" />
         </Button>
