@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
  * @returns True if the extension is installed, false otherwise.
  */
 export function isCopilotChatInstalled(): boolean {
-  const extensionId = 'gitHub.copilot-chat';
+  const extensionId = 'github.copilot-chat';
   const extension = vscode.extensions.getExtension(extensionId);
   return !!extension;
 }
