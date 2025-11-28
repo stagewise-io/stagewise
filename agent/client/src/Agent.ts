@@ -674,20 +674,13 @@ export class Agent {
     uiStream: ReadableStream<InferUIMessageChunk<ChatMessage>>,
     onNewMessage?: (messageId: string) => void,
   ) {
+    let lastMessageId: string | null = null;
+
     for await (const uiMessage of readUIMessageStream<ChatMessage>({
       stream: uiStream,
     })) {
-      // Skip assistant messages that only contain non-user-visible reasoning or step-start parts
-      if (
-        uiMessage.role === 'assistant' &&
-        uiMessage.parts?.length > 0 &&
-        uiMessage.parts.every(
-          (part) =>
-            part.type === 'reasoning' || part.type === 'step-start',
-        )
-      ) {
-        continue;
-      }
+      lastMessageId = uiMessage.id;
+      
       const messageExists =
         this.karton?.state.activeChatId &&
         this.karton.state.chats[this.karton.state.activeChatId]?.messages.find(
@@ -716,6 +709,39 @@ export class Agent {
           );
         });
       }
+    }
+
+    // After streaming completes, remove the message if it has no actual content
+    // This prevents "Bad Request [ce]" errors when the message is sent back to the LLM
+    if (lastMessageId && this.karton?.state.activeChatId) {
+      this.karton.setState((draft) => {
+        const activeChatId = draft.activeChatId!;
+        const messages = draft.chats[activeChatId]!.messages;
+        const lastMessage = messages.find((m) => m.id === lastMessageId);
+
+        if (
+          lastMessage &&
+          lastMessage.role === 'assistant' &&
+          lastMessage.parts?.length > 0
+        ) {
+          // Check if message has any actual content (not just reasoning/step-start/empty text)
+          const hasActualContent = lastMessage.parts.some((part) => {
+            if (part.type === 'text') return part.text?.trim() !== '';
+            if (part.type === 'file') return true;
+            if (part.type === 'dynamic-tool' || part.type.startsWith('tool-'))
+              return true;
+            // reasoning and step-start don't count as actual content
+            return false;
+          });
+
+          if (!hasActualContent) {
+            // Remove the empty message to prevent "Bad Request [ce]" errors
+            draft.chats[activeChatId]!.messages = messages.filter(
+              (m) => m.id !== lastMessageId,
+            );
+          }
+        }
+      });
     }
   }
 
