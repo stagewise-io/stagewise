@@ -89,6 +89,14 @@ pnpm install
 pnpm dev  # runs the website and playgrounds
 ```
 
+To start the CLI:
+
+```bash
+pnpm build
+cd apps/cli
+pnpm dev -b
+```
+
 Useful commands:
 
 * `pnpm dev` — start all dev servers
