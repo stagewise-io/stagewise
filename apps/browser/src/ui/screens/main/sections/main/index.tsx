@@ -87,7 +87,7 @@ export function MainSection() {
       id="opened-content-panel"
       order={2}
       defaultSize={70}
-      className="@container flex h-full flex-1 flex-col items-stretch justify-between gap-2 p-3 pt-0 pl-1"
+      className="@container -ml-3 flex h-full flex-1 flex-col items-stretch justify-between gap-2 p-3 pt-0 pl-4"
     >
       {/* Tab navigation and controls area */}
       <div

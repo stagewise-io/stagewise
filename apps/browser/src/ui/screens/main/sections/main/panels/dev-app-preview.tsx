@@ -52,7 +52,7 @@ export const DevAppPreviewPanel = () => {
       ref={containerRef}
       id="dev-app-preview-container"
       className={cn(
-        'flex size-full select-none flex-col items-center justify-center overflow-hidden rounded-lg',
+        'flex size-full select-none flex-col items-center justify-center overflow-hidden rounded-lg shadow-[0_-2px_20px_0_rgba(0,0,0,0.10)]',
         isFullScreenMode &&
           'fixed inset-0 z-30 rounded-none bg-black/40 p-3 shadow-[0_0_16px_16px_rgba(0,0,0,0.2)] backdrop-blur-sm',
       )}
