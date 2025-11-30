@@ -159,7 +159,7 @@ export const WorkspaceSettingsTabContent = () => {
                 </PopoverContent>
               </Popover>
               <br />
-              <span className="break-all italic">
+              <span className="select-text break-all italic">
                 Current access path: <strong>{agentAccessPath}</strong>
               </span>
             </FormFieldDescription>

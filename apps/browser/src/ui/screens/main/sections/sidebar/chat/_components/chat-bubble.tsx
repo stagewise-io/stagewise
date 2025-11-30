@@ -189,7 +189,7 @@ export function ChatBubble({
         <div className="flex max-w-full flex-col items-start gap-2">
           <div
             className={cn(
-              'glass-body group relative min-h-8 max-w-full animate-chat-bubble-appear space-y-3 break-words rounded-2xl px-3 py-2 font-normal text-sm last:mb-0.5',
+              'glass-body group relative min-h-8 max-w-full animate-chat-bubble-appear select-text space-y-3 break-words rounded-2xl px-3 py-2 font-normal text-sm last:mb-0.5',
               msg.role === 'assistant'
                 ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-foreground dark:bg-[#1e283d]/60'
                 : 'origin-bottom-right rounded-br-xs bg-blue-600/90 text-white',
