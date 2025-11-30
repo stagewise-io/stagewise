@@ -22,7 +22,7 @@ export class WorkspaceManagerService {
   private logger: Logger;
   private filePickerService: FilePickerService;
   private telemetryService: TelemetryService;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
   private globalDataPathService: GlobalDataPathService;
   private notificationService: NotificationService;
   private workspaceChangeListeners: ((event: WorkspaceChangedEvent) => void)[] =
@@ -31,32 +31,32 @@ export class WorkspaceManagerService {
     logger: Logger,
     filePickerService: FilePickerService,
     telemetryService: TelemetryService,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
   ) {
     this.logger = logger;
     this.filePickerService = filePickerService;
     this.telemetryService = telemetryService;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
     this.globalDataPathService = globalDataPathService;
     this.notificationService = notificationService;
   }
 
   private async initialize() {
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.workspace = null;
       draft.workspaceStatus = 'closed';
     });
 
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'workspace.open',
       async (workspacePath) => {
         await this.loadWorkspace(workspacePath);
       },
     );
 
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'workspace.close',
       async () => {
         await this.unloadWorkspace();
@@ -68,7 +68,7 @@ export class WorkspaceManagerService {
     logger: Logger,
     filePickerService: FilePickerService,
     telemetryService: TelemetryService,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
   ) {
@@ -76,7 +76,7 @@ export class WorkspaceManagerService {
       logger,
       filePickerService,
       telemetryService,
-      kartonService,
+      uiKarton,
       globalDataPathService,
       notificationService,
     );
@@ -101,7 +101,7 @@ export class WorkspaceManagerService {
 
     this.logger.debug('[WorkspaceManagerService] Loading workspace...');
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.workspaceStatus = 'loading';
     });
 
@@ -122,7 +122,7 @@ export class WorkspaceManagerService {
       this.logger.debug(
         '[WorkspaceManagerService] No workspace path selected. Returning early.',
       );
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         draft.workspaceStatus = 'closed';
       });
       return;
@@ -132,7 +132,7 @@ export class WorkspaceManagerService {
       `[WorkspaceManagerService] Opening workspace at path: "${selectedPath}"`,
     );
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.workspaceStatus = 'setup';
     });
 
@@ -142,7 +142,7 @@ export class WorkspaceManagerService {
     this.currentWorkspace = await WorkspaceService.create(
       this.logger,
       this.telemetryService,
-      this.kartonService,
+      this.uiKarton,
       this.globalDataPathService,
       this.notificationService,
       selectedPath!,
@@ -157,7 +157,7 @@ export class WorkspaceManagerService {
             name,
           }),
         );
-        this.kartonService.setState((draft) => {
+        this.uiKarton.setState((draft) => {
           draft.workspaceStatus = 'open';
         });
       },
@@ -180,7 +180,7 @@ export class WorkspaceManagerService {
         '[WorkspaceManagerService] Failed to create workspace service. Abort loading workspace.',
       );
       // Make sure that the karton state for the workspace section is cleaned up
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         draft.workspaceStatus = 'closed';
         draft.workspace = null;
       });
@@ -207,14 +207,14 @@ export class WorkspaceManagerService {
     }
     this.logger.debug('[WorkspaceManagerService] Unloading workspace...');
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.workspaceStatus = 'closing';
     });
 
     await this.currentWorkspace.teardown();
     this.currentWorkspace = null;
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.workspaceStatus = 'closed';
     });
 

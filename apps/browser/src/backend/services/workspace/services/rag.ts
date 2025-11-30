@@ -8,19 +8,19 @@ import type {
 } from '@shared/karton-contracts/ui';
 export class RagService {
   private logger: Logger;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
   private clientRuntime: ClientRuntime;
   private telemetryService: TelemetryService;
 
   private constructor(
     logger: Logger,
     telemetryService: TelemetryService,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     clientRuntime: ClientRuntime,
   ) {
     this.logger = logger;
     this.telemetryService = telemetryService;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
     this.clientRuntime = clientRuntime;
   }
 
@@ -30,7 +30,7 @@ export class RagService {
   }
 
   private registerProcedureHandlers() {
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'agentChat.enrichSelectedElement',
       async (element) => {
         const codeMetadata =
@@ -42,7 +42,7 @@ export class RagService {
   }
 
   private removeServerProcedureHandlers() {
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler(
       'agentChat.enrichSelectedElement',
     );
   }
@@ -118,13 +118,13 @@ export class RagService {
   public static async create(
     logger: Logger,
     telemetryService: TelemetryService,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     clientRuntime: ClientRuntime,
   ) {
     const instance = new RagService(
       logger,
       telemetryService,
-      kartonService,
+      uiKarton,
       clientRuntime,
     );
     await instance.initialize();

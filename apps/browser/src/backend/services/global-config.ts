@@ -19,16 +19,16 @@ export class GlobalConfigService {
     oldConfig: GlobalConfig | null,
   ) => void)[] = [];
   private logger: Logger;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
 
   private constructor(
     globalDataPathService: GlobalDataPathService,
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
   ) {
     this.globalDataPathService = globalDataPathService;
     this.logger = logger;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
   }
 
   private async initialize(): Promise<void> {
@@ -54,10 +54,10 @@ export class GlobalConfigService {
     }
     this.config = parsedConfig.data;
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.globalConfig = parsedConfig.data;
     });
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'config.set',
       async (config: GlobalConfig) => this.set(config),
     );
@@ -73,12 +73,12 @@ export class GlobalConfigService {
   public static async create(
     globalDataPathService: GlobalDataPathService,
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
   ): Promise<GlobalConfigService> {
     const instance = new GlobalConfigService(
       globalDataPathService,
       logger,
-      kartonService,
+      uiKarton,
     );
     await instance.initialize();
     return instance;
@@ -104,7 +104,7 @@ export class GlobalConfigService {
     const parsedConfig = globalConfigSchema.parse(newConfig);
     this.config = parsedConfig;
     await this.saveConfigFile();
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.globalConfig = parsedConfig;
     });
     this.configUpdatedListeners.forEach((listener) =>

@@ -5,15 +5,21 @@
 import { AuthService } from './services/auth';
 import { AgentService } from './services/workspace/services/agent/agent';
 import { UserExperienceService } from './services/experience';
-import { WindowLayoutService } from './services/window-layout';
 import { getEnvMode } from './utils/env';
-import { bootstrapGlobalServices } from './global-service-bootstrap';
 import { WorkspaceManagerService } from './services/workspace-manager';
 import { FilePickerService } from './services/file-picker';
 import { existsSync } from 'node:fs';
 import path, { resolve } from 'node:path';
 import { AppMenuService } from './services/app-menu';
 import { URIHandlerService } from './services/uri-handler';
+import { IdentifierService } from './services/identifier';
+import { GlobalDataPathService } from './services/global-data-path';
+import { Logger } from './services/logger';
+import { TelemetryService } from './services/telemetry';
+import { GlobalConfigService } from './services/global-config';
+import { NotificationService } from './services/notification';
+import { WindowLayoutService } from './services/window-layout';
+import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
 import { getRepoRootForPath } from './utils/git-tools';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { generateId } from 'ai';
@@ -32,29 +38,73 @@ export async function main({
 }: MainParameters) {
   // In this file you can include the rest of your app's specific main process
   // code. You can also put them in separate files and import them here.
-  const {
+  const logger = new Logger(verbose ?? false);
+
+  const globalDataPathService = await GlobalDataPathService.create(logger);
+
+  const windowLayoutService = await WindowLayoutService.create(
     logger,
-    kartonService,
-    globalConfigService,
-    notificationService,
     globalDataPathService,
-    telemetryService,
+  );
+  const uiKarton = windowLayoutService.uiKarton;
+
+  const notificationService = await NotificationService.create(
+    logger,
+    uiKarton,
+  );
+
+  // Ensure ripgrep is installed for improved grep/glob performance
+  // If installation fails, the app will continue with Node.js fallback implementations
+  const identifierService = await IdentifierService.create(
+    globalDataPathService,
+    logger,
+  );
+  const globalConfigService = await GlobalConfigService.create(
+    globalDataPathService,
+    logger,
+    uiKarton,
+  );
+
+  const telemetryService = new TelemetryService(
     identifierService,
-  } = await bootstrapGlobalServices({ verbose: verbose });
+    globalConfigService,
+    logger,
+  );
+
+  ensureRipgrepInstalled({
+    rgBinaryBasePath: globalDataPathService.globalDataPath,
+    onLog: logger.debug,
+  })
+    .then((result) => {
+      if (!result.success) {
+        telemetryService.capture('cli-ripgrep-installation-failed', {
+          error: result.error ?? 'Unknown error',
+        });
+        logger.warn(
+          `Ripgrep installation failed: ${result.error}. Grep/glob operations will use slower Node.js implementations.`,
+        );
+      } else {
+        telemetryService.capture('cli-ripgrep-installation-succeeded');
+        if (verbose)
+          logger.debug('Ripgrep is available for grep/glob operations');
+      }
+    })
+    .catch((error) => {
+      logger.warn(
+        `Ripgrep installation failed: ${error}. Grep/glob operations will use slower Node.js implementations.`,
+      );
+    });
 
   logger.debug('[Main] Global services bootstrapped');
 
   // Start remaining services that are irrelevant to non-regular operation of the app.
-  const filePickerService = await FilePickerService.create(
-    logger,
-    kartonService,
-  );
+  const filePickerService = await FilePickerService.create(logger, uiKarton);
   const uriHandlerService = await URIHandlerService.create(logger);
 
   const authService = await AuthService.create(
     globalDataPathService,
     identifierService,
-    kartonService,
+    uiKarton,
     notificationService,
     uriHandlerService,
     logger,
@@ -64,7 +114,7 @@ export async function main({
     logger,
     filePickerService,
     telemetryService,
-    kartonService,
+    uiKarton,
     globalDataPathService,
     notificationService,
   );
@@ -78,7 +128,7 @@ export async function main({
             rgBinaryBasePath: globalDataPathService.globalDataPath,
           }),
         );
-        if (kartonService.state.workspaceStatus === 'setup')
+        if (uiKarton.state.workspaceStatus === 'setup')
           agentService.sendUserMessage({
             id: generateId(),
             role: 'user',
@@ -100,28 +150,22 @@ export async function main({
     }
   });
 
-  const _windowLayoutService = new WindowLayoutService(
-    logger,
-    kartonService,
-    globalDataPathService,
-  );
-
   const _appMenuService = new AppMenuService(
     logger,
     authService,
-    _windowLayoutService,
+    windowLayoutService,
   );
 
   const _userExperienceService = await UserExperienceService.create(
     logger,
-    kartonService,
+    uiKarton,
     globalDataPathService,
   );
 
   const agentService = await AgentService.create(
     logger,
     telemetryService,
-    kartonService,
+    uiKarton,
     globalConfigService,
     authService,
     async (params) => {
@@ -157,7 +201,7 @@ export async function main({
   logger.debug('[Main] Normal operation services bootstrapped');
 
   // Set initial app info into the karton service.
-  kartonService.setState((draft) => {
+  uiKarton.setState((draft) => {
     draft.appInfo.version = process.env.CLI_VERSION ?? '0.0.1';
     draft.appInfo.envMode =
       getEnvMode() === 'dev' ? 'development' : 'production';

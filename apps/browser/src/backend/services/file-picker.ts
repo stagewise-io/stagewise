@@ -21,15 +21,15 @@ import { dialog } from 'electron';
 
 export class FilePickerService {
   private logger: Logger;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
 
-  private constructor(logger: Logger, kartonService: KartonService) {
+  private constructor(logger: Logger, uiKarton: KartonService) {
     this.logger = logger;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
   }
 
   private async initialize() {
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'filePicker.createRequest',
       async (request: FilePickerRequest) => this.createRequest(request),
     );
@@ -37,9 +37,9 @@ export class FilePickerService {
 
   public static async create(
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
   ): Promise<FilePickerService> {
-    const instance = new FilePickerService(logger, kartonService);
+    const instance = new FilePickerService(logger, uiKarton);
     await instance.initialize();
     return instance;
   }

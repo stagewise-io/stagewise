@@ -24,22 +24,22 @@ export type NotificationId = string;
 
 export class NotificationService {
   logger: Logger;
-  kartonService: KartonService;
+  uiKarton: KartonService;
   storedNotifications: { [key: string]: Notification } = {};
 
-  private constructor(logger: Logger, kartonService: KartonService) {
+  private constructor(logger: Logger, uiKarton: KartonService) {
     this.logger = logger;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
   }
 
   private initialize() {
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'notifications.dismiss',
       async (id) => {
         this.dismissNotification(id);
       },
     );
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'notifications.triggerAction',
       async (id, actionIndex) => {
         this.handleActionTrigger(id, actionIndex);
@@ -47,8 +47,8 @@ export class NotificationService {
     );
   }
 
-  public static async create(logger: Logger, kartonService: KartonService) {
-    const instance = new NotificationService(logger, kartonService);
+  public static async create(logger: Logger, uiKarton: KartonService) {
+    const instance = new NotificationService(logger, uiKarton);
     instance.initialize();
     return instance;
   }
@@ -62,7 +62,7 @@ export class NotificationService {
 
     this.storedNotifications[id] = notification;
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.notifications.push({
         id,
         ...notification,
@@ -90,7 +90,7 @@ export class NotificationService {
       `NotificationService] Dismissing notification with title "${this.storedNotifications[id].title}"`,
     );
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       const index = draft.notifications.findIndex((n) => n.id === id);
       if (index !== -1) {
         draft.notifications.splice(index, 1);

@@ -75,7 +75,7 @@ const MAX_RECURSION_DEPTH = 50;
 export class AgentService {
   private logger: Logger;
   private telemetryService: TelemetryService;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
   private globalConfigService: GlobalConfigService;
   private authService: AuthService;
   private clientRuntime: ClientRuntime | null = null;
@@ -111,7 +111,7 @@ export class AgentService {
   private constructor(
     logger: Logger,
     telemetryService: TelemetryService,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     globalConfigService: GlobalConfigService,
     authService: AuthService,
     onSaveSetupInformation: (params: {
@@ -122,11 +122,11 @@ export class AgentService {
   ) {
     this.logger = logger;
     this.telemetryService = telemetryService;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
     this.globalConfigService = globalConfigService;
     this.authService = authService;
     this.onSaveSetupInformation = onSaveSetupInformation;
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       if (!draft.agentChat) {
         draft.agentChat = {
           chats: {},
@@ -140,7 +140,7 @@ export class AgentService {
     // Initialize prompt builder
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
-      this.kartonService.state,
+      this.uiKarton.state,
     );
 
     // Initialize timeout manager
@@ -151,7 +151,7 @@ export class AgentService {
     this.abortController.signal.addEventListener(
       'abort',
       () => {
-        const activeChatId = this.kartonService.state.agentChat?.activeChatId;
+        const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
         if (!activeChatId) return;
 
         this.cleanupPendingOperations(
@@ -177,7 +177,7 @@ export class AgentService {
       );
       return null;
     };
-    const workspaceStatus = this.kartonService.state.workspaceStatus;
+    const workspaceStatus = this.uiKarton.state.workspaceStatus;
     if (workspaceStatus === 'setup') {
       if (!this.clientRuntime)
         return captureToolsError('Setup agent tools - no client runtime');
@@ -221,7 +221,7 @@ export class AgentService {
             this.clientRuntime.fileSystem.setCurrentWorkingDirectory(
               absoluteAgentAccessPath,
             );
-            this.kartonService.setState((draft) => {
+            this.uiKarton.setState((draft) => {
               draft.workspace!.agent = {
                 accessPath: absoluteAgentAccessPath,
               };
@@ -281,7 +281,7 @@ export class AgentService {
                 };
               }
 
-              this.kartonService.setState((draft) => {
+              this.uiKarton.setState((draft) => {
                 if (draft.workspace?.inspirationComponents) {
                   draft.workspace.inspirationComponents.push(
                     componentWithCompiledCode,
@@ -350,37 +350,37 @@ export class AgentService {
     this.clientRuntime = clientRuntime;
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
-      this.kartonService.state,
+      this.uiKarton.state,
     );
   }
 
   public async sendUserMessage(message: ChatMessage): Promise<void> {
     this.logger.debug('[AgentService] Sending user message');
-    const activeChatId = this.kartonService.state.agentChat?.activeChatId;
+    const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
     if (!activeChatId) return;
     // Set thinking 'enabled' in main layout. IMPORTANT: Thinking mode must not be switched immediately after tool-responses!
-    const layout = this.kartonService.state.userExperience.activeLayout;
+    const layout = this.uiKarton.state.userExperience.activeLayout;
     if (
       layout === Layout.MAIN &&
-      this.kartonService.state.workspaceStatus === 'open' &&
+      this.uiKarton.state.workspaceStatus === 'open' &&
       this.thinkingEnabled === false
     )
       this.thinkingEnabled = true;
     else if (
       layout === Layout.MAIN &&
-      this.kartonService.state.workspaceStatus === 'setup'
+      this.uiKarton.state.workspaceStatus === 'setup'
     )
       this.thinkingEnabled = false;
 
     const pendingToolCalls = findPendingToolCalls(
-      this.kartonService as KartonStateProvider<KartonContract['state']>,
+      this.uiKarton as KartonStateProvider<KartonContract['state']>,
       activeChatId,
     );
     // User-Interaction tool calls could still have open inputs - cancel them
     if (pendingToolCalls.length > 0) {
       pendingToolCalls.forEach(({ toolCallId }) => {
         attachToolOutputToMessage(
-          this.kartonService as KartonStateProvider<KartonContract['state']>,
+          this.uiKarton as KartonStateProvider<KartonContract['state']>,
           [
             {
               toolCallId,
@@ -397,7 +397,7 @@ export class AgentService {
 
     this.setAgentWorking(true);
 
-    const newstate = this.kartonService.setState((draft) => {
+    const newstate = this.uiKarton.setState((draft) => {
       const chat = draft.agentChat?.chats[activeChatId];
       if (chat) {
         chat.messages.push({
@@ -429,7 +429,7 @@ export class AgentService {
     );
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
-      this.kartonService.state,
+      this.uiKarton.state,
     );
   }
 
@@ -448,7 +448,7 @@ export class AgentService {
       );
     }
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       if (draft.agentChat) {
         draft.agentChat.isWorking = isWorking;
       }
@@ -468,7 +468,7 @@ export class AgentService {
   ): void {
     if (chatId && this.lastMessageId) {
       const pendingToolCalls = findPendingToolCalls(
-        this.kartonService as KartonStateProvider<KartonContract['state']>,
+        this.uiKarton as KartonStateProvider<KartonContract['state']>,
         chatId,
       );
       if (pendingToolCalls.length > 0) {
@@ -483,7 +483,7 @@ export class AgentService {
         );
 
         attachToolOutputToMessage(
-          this.kartonService as KartonStateProvider<KartonContract['state']>,
+          this.uiKarton as KartonStateProvider<KartonContract['state']>,
           abortedResults,
           this.lastMessageId,
         );
@@ -529,7 +529,7 @@ export class AgentService {
     // Set initial state
     this.setAgentWorking(false);
     createAndActivateNewChat(
-      this.kartonService as KartonStateProvider<KartonContract['state']>,
+      this.uiKarton as KartonStateProvider<KartonContract['state']>,
     );
 
     this.logger.debug('[AgentService] Initialized');
@@ -538,28 +538,28 @@ export class AgentService {
   private registerProcedureHandlers() {
     // Agent Chat procedures
     try {
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.undoToolCallsUntilUserMessage',
         async (userMessageId: string, chatId: string) => {
           await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.undoToolCallsUntilLatestUserMessage',
         async (chatId: string): Promise<ChatMessage | null> => {
           return await this.undoToolCallsUntilLatestUserMessage(chatId);
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.retrySendingUserMessage',
         async () => {
           this.setAgentWorking(true);
-          const activeChatId = this.kartonService.state.agentChat?.activeChatId;
+          const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
           if (!activeChatId) return;
 
-          this.kartonService.setState((draft) => {
+          this.uiKarton.setState((draft) => {
             const chat = draft.agentChat?.chats[activeChatId];
             if (chat) {
               chat.error = undefined;
@@ -567,7 +567,7 @@ export class AgentService {
           });
 
           const messages =
-            this.kartonService.state.agentChat?.chats[activeChatId]?.messages;
+            this.uiKarton.state.agentChat?.chats[activeChatId]?.messages;
           await this.callAgent({
             chatId: activeChatId,
             history: messages,
@@ -577,10 +577,10 @@ export class AgentService {
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.abortAgentCall',
         async () => {
-          const activeChatId = this.kartonService.state.agentChat?.activeChatId;
+          const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
           if (!activeChatId) return;
 
           this.abortController.abort();
@@ -588,7 +588,7 @@ export class AgentService {
           this.abortController.signal.addEventListener(
             'abort',
             () => {
-              const chatId = this.kartonService.state.agentChat?.activeChatId;
+              const chatId = this.uiKarton.state.agentChat?.activeChatId;
               if (chatId) {
                 this.cleanupPendingOperations(
                   'Agent call aborted',
@@ -602,41 +602,41 @@ export class AgentService {
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.approveToolCall',
         async (_toolCallId: string, _callingClientId: string) => {
           // Implementation TBD
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.rejectToolCall',
         async (_toolCallId: string, _callingClientId: string) => {
           // Implementation TBD
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.create',
         async () => {
           return createAndActivateNewChat(
-            this.kartonService as KartonStateProvider<KartonContract['state']>,
+            this.uiKarton as KartonStateProvider<KartonContract['state']>,
           );
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.switch',
         async (chatId: string, _callingClientId: string) => {
-          this.kartonService.setState((draft) => {
+          this.uiKarton.setState((draft) => {
             if (draft.agentChat) draft.agentChat.activeChatId = chatId;
           });
 
-          const chats = this.kartonService.state.agentChat?.chats;
+          const chats = this.uiKarton.state.agentChat?.chats;
           if (chats) {
             Object.entries(chats).forEach(([id, chat]) => {
               if (chat.messages.length === 0 && id !== chatId) {
-                this.kartonService.setState((draft) => {
+                this.uiKarton.setState((draft) => {
                   if (draft.agentChat?.chats[id])
                     delete draft.agentChat?.chats[id];
                 });
@@ -646,52 +646,50 @@ export class AgentService {
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.delete',
         async (chatId: string, _callingClientId: string) => {
-          const activeChatId = this.kartonService.state.agentChat?.activeChatId;
+          const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
           if (!activeChatId) return;
 
           if (activeChatId === chatId) {
-            const chats = this.kartonService.state.agentChat?.chats;
+            const chats = this.uiKarton.state.agentChat?.chats;
             const nextChatId = Object.keys(chats || {}).find(
               (id) => id !== chatId,
             );
 
             if (!nextChatId) {
               createAndActivateNewChat(
-                this.kartonService as KartonStateProvider<
-                  KartonContract['state']
-                >,
+                this.uiKarton as KartonStateProvider<KartonContract['state']>,
               );
             } else {
-              this.kartonService.setState((draft) => {
+              this.uiKarton.setState((draft) => {
                 if (draft.agentChat) draft.agentChat.activeChatId = nextChatId;
               });
             }
           }
 
-          this.kartonService.setState((draft) => {
+          this.uiKarton.setState((draft) => {
             if (draft.agentChat?.chats[chatId])
               delete draft.agentChat?.chats[chatId];
           });
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.sendUserMessage',
         async (message: ChatMessage, _callingClientId: string) => {
           await this.sendUserMessage(message);
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.submitUserInteractionToolInput',
         async (toolCallId, input) => {
           const { type: _, ...cleanInput } = input;
           // Find tool call with state 'input-available' and the toolCallId and attach the output
           attachToolOutputToMessage(
-            this.kartonService as KartonStateProvider<KartonContract['state']>,
+            this.uiKarton as KartonStateProvider<KartonContract['state']>,
             [
               {
                 toolCallId,
@@ -702,27 +700,27 @@ export class AgentService {
             this.lastMessageId!,
           );
           const pendingToolCalls = findPendingToolCalls(
-            this.kartonService as KartonStateProvider<KartonContract['state']>,
-            this.kartonService.state.agentChat?.activeChatId!,
+            this.uiKarton as KartonStateProvider<KartonContract['state']>,
+            this.uiKarton.state.agentChat?.activeChatId!,
           );
           if (pendingToolCalls.length > 0) return { success: true }; // Other tool calls are still pending - only call agent on the last submission
           this.setAgentWorking(true);
           this.callAgent({
-            chatId: this.kartonService.state.agentChat?.activeChatId!,
+            chatId: this.uiKarton.state.agentChat?.activeChatId!,
             history:
-              this.kartonService.state.agentChat?.chats[
-                this.kartonService.state.agentChat?.activeChatId!
+              this.uiKarton.state.agentChat?.chats[
+                this.uiKarton.state.agentChat?.activeChatId!
               ]?.messages,
           });
           return { success: true };
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.cancelUserInteractionToolInput',
         async (toolCallId: string) => {
           attachToolOutputToMessage(
-            this.kartonService as KartonStateProvider<KartonContract['state']>,
+            this.uiKarton as KartonStateProvider<KartonContract['state']>,
             [
               {
                 toolCallId,
@@ -736,16 +734,16 @@ export class AgentService {
           );
           this.setAgentWorking(true);
           this.callAgent({
-            chatId: this.kartonService.state.agentChat?.activeChatId!,
+            chatId: this.uiKarton.state.agentChat?.activeChatId!,
             history:
-              this.kartonService.state.agentChat?.chats[
-                this.kartonService.state.agentChat?.activeChatId!
+              this.uiKarton.state.agentChat?.chats[
+                this.uiKarton.state.agentChat?.activeChatId!
               ]?.messages,
           });
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.assistantMadeCodeChangesUntilLatestUserMessage',
         async (chatId: string) => {
           return await this.assistantMadeCodeChangesUntilLatestUserMessage(
@@ -754,7 +752,7 @@ export class AgentService {
         },
       );
 
-      this.kartonService.registerServerProcedureHandler(
+      this.uiKarton.registerServerProcedureHandler(
         'userAccount.refreshSubscription',
         async () => {
           await this.fetchSubscription();
@@ -771,36 +769,32 @@ export class AgentService {
   }
 
   private removeServerProcedureHandlers() {
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler(
       'agentChat.undoToolCallsUntilUserMessage',
     );
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler(
       'agentChat.submitUserInteractionToolInput',
     );
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler(
       'agentChat.cancelUserInteractionToolInput',
     );
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler(
       'agentChat.undoToolCallsUntilLatestUserMessage',
     );
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler(
       'agentChat.retrySendingUserMessage',
     );
-    this.kartonService.removeServerProcedureHandler('agentChat.abortAgentCall');
-    this.kartonService.removeServerProcedureHandler(
-      'agentChat.approveToolCall',
-    );
-    this.kartonService.removeServerProcedureHandler('agentChat.rejectToolCall');
-    this.kartonService.removeServerProcedureHandler('agentChat.create');
-    this.kartonService.removeServerProcedureHandler('agentChat.switch');
-    this.kartonService.removeServerProcedureHandler('agentChat.delete');
-    this.kartonService.removeServerProcedureHandler(
-      'agentChat.sendUserMessage',
-    );
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler('agentChat.abortAgentCall');
+    this.uiKarton.removeServerProcedureHandler('agentChat.approveToolCall');
+    this.uiKarton.removeServerProcedureHandler('agentChat.rejectToolCall');
+    this.uiKarton.removeServerProcedureHandler('agentChat.create');
+    this.uiKarton.removeServerProcedureHandler('agentChat.switch');
+    this.uiKarton.removeServerProcedureHandler('agentChat.delete');
+    this.uiKarton.removeServerProcedureHandler('agentChat.sendUserMessage');
+    this.uiKarton.removeServerProcedureHandler(
       'agentChat.assistantMadeCodeChangesUntilLatestUserMessage',
     );
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler(
       'userAccount.refreshSubscription',
     );
   }
@@ -809,7 +803,7 @@ export class AgentService {
     try {
       const subscription =
         await this.client.subscription.getSubscription.query();
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         if (draft.userAccount) {
           draft.userAccount.subscription = {
             ...subscription,
@@ -823,12 +817,12 @@ export class AgentService {
   }
 
   private getCurrentTab(): MainTab | null {
-    if (this.kartonService.state.userExperience.activeLayout !== Layout.MAIN)
+    if (this.uiKarton.state.userExperience.activeLayout !== Layout.MAIN)
       return null;
 
-    if (!this.kartonService.state.userExperience.activeMainTab) return null;
+    if (!this.uiKarton.state.userExperience.activeMainTab) return null;
 
-    return this.kartonService.state.userExperience.activeMainTab;
+    return this.uiKarton.state.userExperience.activeMainTab;
   }
 
   private async callAgent({
@@ -873,7 +867,7 @@ export class AgentService {
         MAX_RECURSION_DEPTH,
       );
       this.setAgentWorking(false);
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
@@ -910,7 +904,7 @@ export class AgentService {
           ),
         );
 
-        this.kartonService.setState((draft) => {
+        this.uiKarton.setState((draft) => {
           const chat = draft.agentChat?.chats[chatId];
           if (chat) chat.title = title;
         });
@@ -920,7 +914,7 @@ export class AgentService {
         this.telemetryService.capture('agent-prompt-triggered');
       }
 
-      const isSetupMode = this.kartonService.state.workspaceStatus === 'setup';
+      const isSetupMode = this.uiKarton.state.workspaceStatus === 'setup';
 
       const model = this.telemetryService.withTracing(
         isSetupMode
@@ -996,7 +990,7 @@ export class AgentService {
         onFinish: async (r) => {
           this.authRetryCount = 0;
           const messages =
-            this.kartonService.state.agentChat?.chats[chatId]?.messages ?? [];
+            this.uiKarton.state.agentChat?.chats[chatId]?.messages ?? [];
 
           // Get current tools context for processing tool calls
           const currentToolsContext = this.getToolsContext();
@@ -1024,9 +1018,7 @@ export class AgentService {
                 });
               }
               attachToolOutputToMessage(
-                this.kartonService as KartonStateProvider<
-                  KartonContract['state']
-                >,
+                this.uiKarton as KartonStateProvider<KartonContract['state']>,
                 [result],
                 this.lastMessageId!,
               );
@@ -1050,7 +1042,7 @@ export class AgentService {
           );
 
           // Updating the used context window size of the chat.
-          this.kartonService.setState((draft) => {
+          this.uiKarton.setState((draft) => {
             const chat = draft.agentChat?.chats[chatId];
             if (chat && r.totalUsage.inputTokens)
               chat.usage.usedContextWindowSize = r.totalUsage.inputTokens;
@@ -1067,7 +1059,7 @@ export class AgentService {
             this.isWorking
           ) {
             const updatedMessages =
-              this.kartonService.state.agentChat?.chats[chatId]?.messages;
+              this.uiKarton.state.agentChat?.chats[chatId]?.messages;
 
             return this.callAgent({
               chatId,
@@ -1094,7 +1086,7 @@ export class AgentService {
       this.telemetryService.captureException(error as Error);
       const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
@@ -1113,7 +1105,7 @@ export class AgentService {
     uiStream: ReadableStream<InferUIMessageChunk<ChatMessage>>,
     onNewMessage?: (messageId: string) => void,
   ) {
-    const activeChatId = this.kartonService.state.agentChat?.activeChatId;
+    const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
     if (!activeChatId) return;
 
     let thinkingStartTime: number | null = null;
@@ -1139,7 +1131,7 @@ export class AgentService {
         thinkingDuration = Date.now() - thinkingStartTime;
         thinkingStartTime = null;
       }
-      const chat = this.kartonService.state.agentChat?.chats[activeChatId];
+      const chat = this.uiKarton.state.agentChat?.chats[activeChatId];
       const messageExists = chat?.messages.find((m) => m.id === uiMessage.id);
 
       const uiMessageWithMetadata: ChatMessage = {
@@ -1152,7 +1144,7 @@ export class AgentService {
       };
 
       if (messageExists) {
-        this.kartonService.setState((draft) => {
+        this.uiKarton.setState((draft) => {
           const chat = draft.agentChat?.chats[activeChatId];
           if (chat) {
             chat.messages = chat.messages.map((m) =>
@@ -1164,7 +1156,7 @@ export class AgentService {
         });
       } else {
         onNewMessage?.(uiMessage.id);
-        this.kartonService.setState((draft) => {
+        this.uiKarton.setState((draft) => {
           const chat = draft.agentChat?.chats[activeChatId];
           if (chat) {
             chat.messages.push(uiMessageWithMetadata as any);
@@ -1177,7 +1169,7 @@ export class AgentService {
   private async assistantMadeCodeChangesUntilLatestUserMessage(
     chatId: string,
   ): Promise<boolean> {
-    const chat = this.kartonService.state.agentChat?.chats[chatId];
+    const chat = this.uiKarton.state.agentChat?.chats[chatId];
     const history = chat?.messages ?? [];
     const reversedHistory = [...history].reverse();
     const userMessageIndex = reversedHistory.findIndex(
@@ -1205,7 +1197,7 @@ export class AgentService {
   ): Promise<ChatMessage | null> {
     if (!this.undoToolCallStack.has(chatId)) return null;
 
-    const chat = this.kartonService.state.agentChat?.chats[chatId];
+    const chat = this.uiKarton.state.agentChat?.chats[chatId];
     const history = chat?.messages ?? [];
     const reversedHistory = [...history].reverse();
     const userMessageIndex = reversedHistory.findIndex(
@@ -1230,7 +1222,7 @@ export class AgentService {
   ): Promise<void> {
     if (!this.undoToolCallStack.has(chatId)) return;
 
-    const chat = this.kartonService.state.agentChat?.chats[chatId];
+    const chat = this.uiKarton.state.agentChat?.chats[chatId];
     const history = chat?.messages ?? [];
     const userMessageIndex = history.findIndex(
       (m) => m.role === 'user' && 'id' in m && m.id === userMessageId,
@@ -1268,7 +1260,7 @@ export class AgentService {
       await undo.undoExecute?.();
     }
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       if (userMessageIndex !== -1) {
         const chat = draft.agentChat?.chats[chatId];
         if (chat) {
@@ -1299,7 +1291,7 @@ export class AgentService {
   public static async create(
     logger: Logger,
     telemetryService: TelemetryService,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     globalConfigService: GlobalConfigService,
     authService: AuthService,
     onSaveSetupInformation: (params: {
@@ -1311,7 +1303,7 @@ export class AgentService {
     const instance = new AgentService(
       logger,
       telemetryService,
-      kartonService,
+      uiKarton,
       globalConfigService,
       authService,
       onSaveSetupInformation,
@@ -1322,7 +1314,7 @@ export class AgentService {
   }
 
   public getInspirationComponents() {
-    return this.kartonService.state.workspace?.inspirationComponents ?? [];
+    return this.uiKarton.state.workspace?.inspirationComponents ?? [];
   }
 
   /**
@@ -1380,13 +1372,12 @@ export class AgentService {
       this.authRetryCount = 0;
 
       this.telemetryService.capture('agent-plan-limits-exceeded', {
-        hasSubscription:
-          this.kartonService.state.userAccount?.subscription?.active,
+        hasSubscription: this.uiKarton.state.userAccount?.subscription?.active,
         isPaidPlan: planLimitsExceededError.data.isPaidPlan || false,
         cooldownMinutes: planLimitsExceededError.data.cooldownMinutes,
       });
 
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
@@ -1415,8 +1406,7 @@ export class AgentService {
       await this.initializeClient();
       await this.initializeLitellm();
 
-      const messages =
-        this.kartonService.state.agentChat?.chats[chatId]?.messages;
+      const messages = this.uiKarton.state.agentChat?.chats[chatId]?.messages;
       await this.callAgent({
         chatId,
         history: messages,
@@ -1428,7 +1418,7 @@ export class AgentService {
     ) {
       this.authRetryCount = 0;
       this.setAgentWorking(false);
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
@@ -1439,7 +1429,7 @@ export class AgentService {
       });
       return;
     } else if (isContextLimitError(error.error)) {
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         const chat = draft.agentChat?.chats[chatId];
         if (chat)
           chat.error = {
@@ -1461,7 +1451,7 @@ export class AgentService {
       this.telemetryService.captureException(error.error as Error);
       const errorDesc = formatErrorDescription('Agent failed', errorDetails);
       this.setAgentWorking(false);
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {

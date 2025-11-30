@@ -19,7 +19,6 @@ interface WindowState {
 
 export class WindowLayoutService {
   private logger: Logger;
-  private kartonService: KartonService;
   private globalDataPathService: GlobalDataPathService;
 
   private baseWindow: BaseWindow | null = null;
@@ -42,16 +41,26 @@ export class WindowLayoutService {
     | ((event: Electron.IpcMainEvent, connectionId: string) => void)
     | null = null;
 
-  constructor(
+  private constructor(
     logger: Logger,
-    kartonService: KartonService,
     globalDataPathService: GlobalDataPathService,
   ) {
     this.logger = logger;
-    this.kartonService = kartonService;
     this.globalDataPathService = globalDataPathService;
+  }
 
+  public static async create(
+    logger: Logger,
+    globalDataPathService: GlobalDataPathService,
+  ): Promise<WindowLayoutService> {
+    const instance = new WindowLayoutService(logger, globalDataPathService);
+    await instance.initialize();
+    return instance;
+  }
+
+  private async initialize() {
     this.logger.debug('[WindowLayoutService] Initializing service');
+    this.uiController = await UIController.create(this.logger);
 
     const savedState = this.loadWindowState();
     const defaultWidth = 1200;
@@ -88,7 +97,6 @@ export class WindowLayoutService {
       this.baseWindow.setFullScreen(true);
     }
 
-    this.uiController = new UIController(this.logger, this.kartonService);
     this.baseWindow.contentView.addChildView(this.uiController.getView());
 
     this.setupKartonConnectionListener();
@@ -124,7 +132,7 @@ export class WindowLayoutService {
     });
 
     // Initialize browser state
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.browser = {
         tabs: {},
         activeTabId: null,
@@ -137,6 +145,13 @@ export class WindowLayoutService {
     this.createTab('https://google.com', true);
 
     this.logger.debug('[WindowLayoutService] Service initialized');
+  }
+
+  public get uiKarton(): KartonService {
+    if (!this.uiController) {
+      throw new Error('UIController is not initialized or has been torn down');
+    }
+    return this.uiController.uiKarton;
   }
 
   public teardown() {
@@ -176,7 +191,7 @@ export class WindowLayoutService {
   private setupKartonConnectionListener() {
     this.kartonConnectListener = (event, connectionId) => {
       if (connectionId === 'ui-main') {
-        this.kartonService.setTransportPort(event.ports[0]);
+        this.uiKarton.setTransportPort(event.ports[0]);
       }
     };
     ipcMain.on('karton-connect', this.kartonConnectListener);
@@ -225,7 +240,7 @@ export class WindowLayoutService {
 
     // Subscribe to state updates
     tab.on('state-updated', (updates: Partial<TabState>) => {
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         const tabState = draft.browser.tabs[id];
         if (tabState) {
           Object.assign(tabState, updates);
@@ -236,7 +251,7 @@ export class WindowLayoutService {
     this.tabs.set(id, tab);
 
     // Initialize state in Karton
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.browser.tabs[id] = {
         id,
         ...tab.getState(),
@@ -260,7 +275,7 @@ export class WindowLayoutService {
       this.tabs.delete(tabId);
 
       // Clean up Karton state
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         delete draft.browser.tabs[tabId];
       });
 
@@ -271,7 +286,7 @@ export class WindowLayoutService {
           await this.handleSwitchTab(firstTab);
         } else {
           this.activeTabId = null;
-          this.kartonService.setState((draft) => {
+          this.uiKarton.setState((draft) => {
             draft.browser.activeTabId = null;
           });
         }
@@ -300,7 +315,7 @@ export class WindowLayoutService {
 
     this.updateZOrder();
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.browser.activeTabId = tabId;
     });
   };
@@ -398,7 +413,7 @@ export class WindowLayoutService {
   };
 
   private handleSetContextSelectionMode = async (active: boolean) => {
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.browser.contextSelectionMode = active;
     });
     this.activeTab?.setContextSelectionMode(active);

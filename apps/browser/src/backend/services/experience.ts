@@ -17,28 +17,28 @@ import type { RecentlyOpenedWorkspace } from '@shared/karton-contracts/ui';
 
 export class UserExperienceService {
   private logger: Logger;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
   private globalDataPathService: GlobalDataPathService;
 
   private constructor(
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     globalDataPathService: GlobalDataPathService,
   ) {
     this.logger = logger;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
     this.globalDataPathService = globalDataPathService;
   }
 
   public static async create(
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     globalDataPathService: GlobalDataPathService,
   ) {
     logger.debug('[UserExperienceService] Creating service');
     const instance = new UserExperienceService(
       logger,
-      kartonService,
+      uiKarton,
       globalDataPathService,
     );
     await instance.initialize();
@@ -47,10 +47,10 @@ export class UserExperienceService {
   }
 
   private async initialize() {
-    this.kartonService.registerStateChangeCallback(
+    this.uiKarton.registerStateChangeCallback(
       this.handleServiceStateChange.bind(this),
     );
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'userExperience.mainLayout.changeTab',
       async (tab: MainTab) => {
         this.changeMainTab(tab);
@@ -62,7 +62,7 @@ export class UserExperienceService {
       hasBeenOpenedBeforeDate: Date.now() - 1000 * 60 * 60 * 24 * 30, // 30 days ago
     });
 
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'userExperience.mainLayout.mainLayout.devAppPreview.changeScreenSize',
       async (
         size: {
@@ -71,7 +71,7 @@ export class UserExperienceService {
           presetName: string;
         } | null,
       ) => {
-        this.kartonService.setState((draft) => {
+        this.uiKarton.setState((draft) => {
           if (
             draft.userExperience.activeLayout === Layout.MAIN &&
             draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
@@ -87,10 +87,10 @@ export class UserExperienceService {
         });
       },
     );
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'userExperience.mainLayout.mainLayout.devAppPreview.toggleShowCodeMode',
       async () => {
-        this.kartonService.setState((draft) => {
+        this.uiKarton.setState((draft) => {
           if (
             draft.userExperience.activeLayout === Layout.MAIN &&
             draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
@@ -101,10 +101,10 @@ export class UserExperienceService {
         });
       },
     );
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'userExperience.mainLayout.mainLayout.devAppPreview.toggleFullScreen',
       async () => {
-        this.kartonService.setState((draft) => {
+        this.uiKarton.setState((draft) => {
           if (
             draft.userExperience.activeLayout === Layout.MAIN &&
             draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
@@ -118,17 +118,17 @@ export class UserExperienceService {
   }
 
   public tearDown() {
-    this.kartonService.unregisterStateChangeCallback(
+    this.uiKarton.unregisterStateChangeCallback(
       this.handleServiceStateChange.bind(this),
     );
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler(
       'userExperience.mainLayout.changeTab',
     );
   }
 
   private handleServiceStateChange() {
     // Check if we need to load recently opened workspaces
-    const state = this.kartonService.state;
+    const state = this.uiKarton.state;
     const needsInitialization =
       this.activeScreen === Layout.MAIN &&
       !state.workspace?.setupActive &&
@@ -139,7 +139,7 @@ export class UserExperienceService {
       // Load data asynchronously first
       void this.getRecentlyOpenedWorkspaces().then(
         (recentlyOpenedWorkspaces) => {
-          this.kartonService.setState((draft) => {
+          this.uiKarton.setState((draft) => {
             draft.userExperience.activeLayout = this.activeScreen;
 
             if (draft.userExperience.activeLayout === Layout.MAIN) {
@@ -170,7 +170,7 @@ export class UserExperienceService {
       );
     } else {
       // No async data needed, update synchronously
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         draft.userExperience.activeLayout = this.activeScreen;
       });
     }
@@ -241,7 +241,7 @@ export class UserExperienceService {
 
     try {
       await this.writeRecentlyOpenedWorkspaces(recentlyOpenedWorkspaces);
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         draft.userExperience.recentlyOpenedWorkspaces =
           recentlyOpenedWorkspaces;
       });
@@ -299,7 +299,7 @@ export class UserExperienceService {
 
     try {
       await this.writeRecentlyOpenedWorkspaces(filteredWorkspaces);
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         draft.userExperience.recentlyOpenedWorkspaces = filteredWorkspaces;
       });
       this.logger.debug(
@@ -313,7 +313,7 @@ export class UserExperienceService {
   }
 
   public changeMainTab(tab: MainTab) {
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       if (
         tab ===
         (draft.userExperience as { activeMainTab: MainTab }).activeMainTab
@@ -339,7 +339,7 @@ export class UserExperienceService {
 
   public get activeScreen(): Layout {
     // Depending on the state of auth and workspace servcie, we render different screens.
-    if (this.kartonService.state.userAccount?.status === 'unauthenticated') {
+    if (this.uiKarton.state.userAccount?.status === 'unauthenticated') {
       return Layout.SIGNIN;
     }
 

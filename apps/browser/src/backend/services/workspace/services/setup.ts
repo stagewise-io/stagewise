@@ -25,7 +25,7 @@ export class ConfigNotExistingException extends Error {
 
 export class WorkspaceSetupService {
   private logger: Logger;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
   private workspacePath: string;
   private _setupCompleted = false;
   private onSetupCompleted?: (
@@ -35,7 +35,7 @@ export class WorkspaceSetupService {
 
   private constructor(
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     workspacePath: string,
     onSetupCompleted?: (
       config: WorkspaceConfig | null,
@@ -43,7 +43,7 @@ export class WorkspaceSetupService {
     ) => Promise<void>,
   ) {
     this.logger = logger;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
     this.workspacePath = workspacePath;
     this.onSetupCompleted = onSetupCompleted;
   }
@@ -72,15 +72,15 @@ export class WorkspaceSetupService {
     }
 
     // Register karton procedure handlers
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'workspace.setup.checkForActiveAppOnPort',
       this.handleCheckForActiveAppOnPort.bind(this),
     );
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'workspace.setup.submit',
       this.handleSetupSubmission.bind(this),
     );
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'workspace.setup.resolveRelativePathToAbsolutePath',
       async (relativePath: string, basePath?: string) => {
         return await this.handleResolveRelativePathToAbsolutePath(
@@ -91,7 +91,7 @@ export class WorkspaceSetupService {
     );
 
     // Update the karton state to reflect
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       if (draft.workspace) {
         draft.workspace.setupActive = true;
       }
@@ -105,7 +105,7 @@ export class WorkspaceSetupService {
 
   public static async create(
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     workspacePath: string,
     onSetupCompleted?: (
       config: WorkspaceConfig | null,
@@ -114,7 +114,7 @@ export class WorkspaceSetupService {
   ): Promise<WorkspaceSetupService> {
     const instance = new WorkspaceSetupService(
       logger,
-      kartonService,
+      uiKarton,
       workspacePath,
       onSetupCompleted,
     );
@@ -123,15 +123,15 @@ export class WorkspaceSetupService {
   }
 
   public async teardown(): Promise<void> {
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler(
       'workspace.setup.checkForActiveAppOnPort',
     );
-    this.kartonService.removeServerProcedureHandler('workspace.setup.submit');
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler('workspace.setup.submit');
+    this.uiKarton.removeServerProcedureHandler(
       'workspace.setup.resolveRelativePathToAbsolutePath',
     );
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       if (draft.workspace) {
         draft.workspace.setupActive = false;
       }
@@ -153,7 +153,7 @@ export class WorkspaceSetupService {
     }
 
     // Update the karton state to reflect the new config
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       if (draft.workspace) draft.workspace.setupActive = false;
     });
 

@@ -26,16 +26,16 @@ export class WorkspaceConfigService {
     oldConfig: WorkspaceConfig | null,
   ) => void)[] = [];
   private logger: Logger;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
   private workspacePath: string;
 
   private constructor(
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     workspacePath: string,
   ) {
     this.logger = logger;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
     this.workspacePath = workspacePath;
   }
 
@@ -58,7 +58,7 @@ export class WorkspaceConfigService {
       }
       this.config = newConfig;
       void this.saveConfigFile();
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         if (draft.workspace) {
           draft.workspace.config = parsedConfig.data;
         }
@@ -93,14 +93,14 @@ export class WorkspaceConfigService {
       );
       void this.saveConfigFile();
 
-      this.kartonService.setState((draft) => {
+      this.uiKarton.setState((draft) => {
         if (draft.workspace) {
           draft.workspace.config = this.config;
         }
       });
     }
 
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'workspace.config.set',
       async (config: WorkspaceConfig) => this.set(config),
     );
@@ -110,13 +110,13 @@ export class WorkspaceConfigService {
 
   public static async create(
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     workspacePath: string,
     initialConfig: WorkspaceConfig | null = null,
   ): Promise<WorkspaceConfigService> {
     const instance = new WorkspaceConfigService(
       logger,
-      kartonService,
+      uiKarton,
       workspacePath,
     );
     await instance.initialize(initialConfig);
@@ -127,7 +127,7 @@ export class WorkspaceConfigService {
     this.logger.debug('[WorkspaceConfigService] Teardown called');
     this.config = null;
     this.configUpdatedListeners = [];
-    this.kartonService.removeServerProcedureHandler('workspace.config.set');
+    this.uiKarton.removeServerProcedureHandler('workspace.config.set');
   }
 
   public get(): WorkspaceConfig {
@@ -153,7 +153,7 @@ export class WorkspaceConfigService {
     const parsedConfig = workspaceConfigSchema.parse(newConfig);
     this.config = parsedConfig;
     await this.saveConfigFile();
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       if (draft.workspace) {
         draft.workspace.config = this.config;
       }

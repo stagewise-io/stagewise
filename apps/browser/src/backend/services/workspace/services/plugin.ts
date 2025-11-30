@@ -79,7 +79,7 @@ const BuiltInPlugins: BuiltInPlugin[] = [
 
 export class WorkspacePluginService {
   private logger: Logger;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
   private workspaceConfigService: WorkspaceConfigService;
   private staticAnalysisService: StaticAnalysisService;
   private notificationService: NotificationService;
@@ -87,13 +87,13 @@ export class WorkspacePluginService {
 
   private constructor(
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     workspaceConfigService: WorkspaceConfigService,
     staticAnalysisService: StaticAnalysisService,
     notificationService: NotificationService,
   ) {
     this.logger = logger;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
     this.workspaceConfigService = workspaceConfigService;
     this.staticAnalysisService = staticAnalysisService;
     this.notificationService = notificationService;
@@ -110,14 +110,14 @@ export class WorkspacePluginService {
 
   public static async create(
     logger: Logger,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     workspaceConfigService: WorkspaceConfigService,
     staticAnalysisService: StaticAnalysisService,
     notificationService: NotificationService,
   ): Promise<WorkspacePluginService> {
     const instance = new WorkspacePluginService(
       logger,
-      kartonService,
+      uiKarton,
       workspaceConfigService,
       staticAnalysisService,
       notificationService,
@@ -220,7 +220,7 @@ export class WorkspacePluginService {
       `[WorkspacePluginService] Loaded plugins: ${JSON.stringify(this._configuredPlugins, null, 2)}`,
     );
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.workspace!.plugins = this._configuredPlugins.filter(
         (p) => p.available,
       );

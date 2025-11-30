@@ -21,7 +21,7 @@ import { getRepoRootForPath } from '@/utils/git-tools';
 export class WorkspaceService {
   private logger: Logger;
   private telemetryService: TelemetryService;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
   private globalDataPathService: GlobalDataPathService;
   private notificationService: NotificationService;
   private workspacePath: string;
@@ -43,7 +43,7 @@ export class WorkspaceService {
   private constructor(
     logger: Logger,
     telemetryService: TelemetryService,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
     workspacePath: string,
@@ -54,7 +54,7 @@ export class WorkspaceService {
   ) {
     this.logger = logger;
     this.telemetryService = telemetryService;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
     this.globalDataPathService = globalDataPathService;
     this.notificationService = notificationService;
     this.workspacePath = workspacePath;
@@ -73,7 +73,7 @@ export class WorkspaceService {
       this.workspacePath,
     );
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.workspace = {
         path: this.workspacePath,
         paths: {
@@ -95,7 +95,7 @@ export class WorkspaceService {
       };
     });
 
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'workspace.getGitRepoRoot',
       async () => {
         return getRepoRootForPath(this.workspacePath);
@@ -112,7 +112,7 @@ export class WorkspaceService {
       clientRuntime,
       this.workspacePath,
     );
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.workspace!.childWorkspacePaths = childWorkspacePaths;
     });
     const isOwnInChildWorkspaces = childWorkspacePaths.includes(
@@ -128,7 +128,7 @@ export class WorkspaceService {
     // Start all child services of the workspace. All regular services should only be started if the setup service is done.
     this.workspaceSetupService = await WorkspaceSetupService.create(
       this.logger,
-      this.kartonService,
+      this.uiKarton,
       this.workspacePath,
       async (setupConfig, newWorkspacePath) => {
         if (newWorkspacePath) this.workspacePath = newWorkspacePath;
@@ -138,7 +138,7 @@ export class WorkspaceService {
           this.globalDataPathService,
           this.workspacePath,
         );
-        this.kartonService.setState((draft) => {
+        this.uiKarton.setState((draft) => {
           draft.workspace!.path = this.workspacePath;
           draft.workspace!.paths.data =
             this.workspacePathsService!.workspaceDataPath;
@@ -148,7 +148,7 @@ export class WorkspaceService {
 
         this.workspaceConfigService = await WorkspaceConfigService.create(
           this.logger,
-          this.kartonService,
+          this.uiKarton,
           this.workspacePath,
           setupConfig,
         );
@@ -160,7 +160,7 @@ export class WorkspaceService {
 
         this.workspacePluginService = await WorkspacePluginService.create(
           this.logger,
-          this.kartonService,
+          this.uiKarton,
           this.workspaceConfigService,
           this.staticAnalysisService,
           this.notificationService,
@@ -170,7 +170,7 @@ export class WorkspaceService {
           clientRuntime.fileSystem.setCurrentWorkingDirectory(
             this.getAbsoluteAgentAccessPath(newConfig.agentAccessPath),
           );
-          this.kartonService.setState((draft) => {
+          this.uiKarton.setState((draft) => {
             draft.workspace!.agent = {
               accessPath: clientRuntime.fileSystem.getCurrentWorkingDirectory(),
             };
@@ -181,7 +181,7 @@ export class WorkspaceService {
           (await RagService.create(
             this.logger,
             this.telemetryService,
-            this.kartonService,
+            this.uiKarton,
             clientRuntime,
           ).catch((error) => {
             this.telemetryService.captureException(error as Error);
@@ -230,7 +230,7 @@ export class WorkspaceService {
   public static async create(
     logger: Logger,
     telemetryService: TelemetryService,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
     workspacePath: string,
@@ -242,7 +242,7 @@ export class WorkspaceService {
     const instance = new WorkspaceService(
       logger,
       telemetryService,
-      kartonService,
+      uiKarton,
       globalDataPathService,
       notificationService,
       workspacePath,
@@ -266,9 +266,9 @@ export class WorkspaceService {
     await this.staticAnalysisService?.teardown();
     await this.workspacePathsService?.teardown();
 
-    this.kartonService.removeServerProcedureHandler('workspace.getGitRepoRoot');
+    this.uiKarton.removeServerProcedureHandler('workspace.getGitRepoRoot');
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.workspace = null;
     });
   }

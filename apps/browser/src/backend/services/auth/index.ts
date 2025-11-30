@@ -16,7 +16,7 @@ const ACCESS_TOKEN_EXPIRATION_BUFFER_TIME = 10 * 60 * 1000; // We refresh the to
 export class AuthService {
   private globalDataPathService: GlobalDataPathService;
   private identifierService: IdentifierService;
-  private kartonService: KartonService;
+  private uiKarton: KartonService;
   private notificationService: NotificationService;
   private uriHandlerService: URIHandlerService;
   private logger: Logger;
@@ -32,14 +32,14 @@ export class AuthService {
   private constructor(
     globalDataPathService: GlobalDataPathService,
     identifierService: IdentifierService,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     notificationService: NotificationService,
     uriHandlerService: URIHandlerService,
     logger: Logger,
   ) {
     this.globalDataPathService = globalDataPathService;
     this.identifierService = identifierService;
-    this.kartonService = kartonService;
+    this.uiKarton = uiKarton;
     this.notificationService = notificationService;
     this.uriHandlerService = uriHandlerService;
     this.logger = logger;
@@ -52,7 +52,7 @@ export class AuthService {
       this.logger,
     );
 
-    this.kartonService.setState((draft) => {
+    this.uiKarton.setState((draft) => {
       draft.userAccount.status = 'server_unreachable';
     });
 
@@ -66,35 +66,35 @@ export class AuthService {
     ); // 10 minutes
 
     // Register all procedure handlers for the user account
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'userAccount.logout',
       async () => {
         await this.logout();
       },
     );
 
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'userAccount.startLogin',
       async () => {
         await this.startLogin();
       },
     );
 
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'userAccount.refreshStatus',
       async () => {
         await this.checkAuthState();
       },
     );
 
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'userAccount.confirmAuthenticationConfirmation',
       async () => {
         await this.confirmAuthenticationConfirmation();
       },
     );
 
-    this.kartonService.registerServerProcedureHandler(
+    this.uiKarton.registerServerProcedureHandler(
       'userAccount.cancelAuthenticationConfirmation',
       async () => {
         await this.cancelAuthenticationConfirmation();
@@ -113,7 +113,7 @@ export class AuthService {
   public static async create(
     globalDataPathService: GlobalDataPathService,
     identifierService: IdentifierService,
-    kartonService: KartonService,
+    uiKarton: KartonService,
     notificationService: NotificationService,
     uriHandlerService: URIHandlerService,
     logger: Logger,
@@ -121,7 +121,7 @@ export class AuthService {
     const authService = new AuthService(
       globalDataPathService,
       identifierService,
-      kartonService,
+      uiKarton,
       notificationService,
       uriHandlerService,
       logger,
@@ -133,16 +133,14 @@ export class AuthService {
   public tearDown(): void {
     clearInterval(this._authStateCheckInterval!);
 
-    this.kartonService.removeServerProcedureHandler('userAccount.logout');
-    this.kartonService.removeServerProcedureHandler('userAccount.startLogin');
-    this.kartonService.removeServerProcedureHandler('userAccount.abortLogin');
-    this.kartonService.removeServerProcedureHandler(
-      'userAccount.refreshStatus',
-    );
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler('userAccount.logout');
+    this.uiKarton.removeServerProcedureHandler('userAccount.startLogin');
+    this.uiKarton.removeServerProcedureHandler('userAccount.abortLogin');
+    this.uiKarton.removeServerProcedureHandler('userAccount.refreshStatus');
+    this.uiKarton.removeServerProcedureHandler(
       'userAccount.confirmAuthenticationConfirmation',
     );
-    this.kartonService.removeServerProcedureHandler(
+    this.uiKarton.removeServerProcedureHandler(
       'userAccount.cancelAuthenticationConfirmation',
     );
     this.authChangeCallbacks = [];
@@ -412,7 +410,7 @@ export class AuthService {
 
   public get authState(): AuthState {
     // We store everything in karton and just report it here. Makes it easier and reduces redundancy...
-    return this.kartonService.state.userAccount;
+    return this.uiKarton.state.userAccount;
   }
 
   public get accessToken(): string | undefined {
@@ -431,11 +429,11 @@ export class AuthService {
   }
 
   private updateAuthState(
-    draft: Parameters<typeof this.kartonService.setState>[0],
+    draft: Parameters<typeof this.uiKarton.setState>[0],
   ): void {
-    const oldState = structuredClone(this.kartonService.state.userAccount);
-    this.kartonService.setState(draft);
-    const newState = this.kartonService.state.userAccount;
+    const oldState = structuredClone(this.uiKarton.state.userAccount);
+    this.uiKarton.setState(draft);
+    const newState = this.uiKarton.state.userAccount;
     if (JSON.stringify(oldState) !== JSON.stringify(newState)) {
       this.authChangeCallbacks.forEach((callback) => {
         try {
