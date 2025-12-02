@@ -30,7 +30,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"],
+  "files": [],
   "references": [
     { "path": "./tsconfig.ui.json" },
     { "path": "./tsconfig.backend.json" },

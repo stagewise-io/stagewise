@@ -8,7 +8,10 @@
       "@shared/*": ["./src/shared/*"]
     },
     "types": ["node"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "target": "ES2022",
+    "strict": true
   },
-  "include": ["src/backend", "forge.env.d.ts", "src/shared"]
+  "include": ["src/backend", "forge.env.d.ts", "src/shared"],
+  "exclude": ["node_modules", "dist", "coverage", "tmp", ".turbo"]
 }
