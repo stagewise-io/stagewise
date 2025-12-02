@@ -78,7 +78,7 @@ export class AgentService {
   private globalConfigService: GlobalConfigService;
   private authService: AuthService;
   private workspaceSetupService: WorkspaceSetupService;
-  private clientRuntime: ClientRuntime;
+  private clientRuntime: ClientRuntime | null = null;
   private apiKey: string | null = null;
   private promptBuilder: PromptBuilder;
 
@@ -109,7 +109,6 @@ export class AgentService {
     kartonService: KartonService,
     globalConfigService: GlobalConfigService,
     authService: AuthService,
-    clientRuntime: ClientRuntime,
     workspaceSetupService: WorkspaceSetupService,
   ) {
     this.logger = logger;
@@ -117,7 +116,6 @@ export class AgentService {
     this.kartonService = kartonService;
     this.globalConfigService = globalConfigService;
     this.authService = authService;
-    this.clientRuntime = clientRuntime;
     this.workspaceSetupService = workspaceSetupService;
     this.kartonService.setState((draft) => {
       if (!draft.workspace?.agentChat) {
@@ -160,10 +158,30 @@ export class AgentService {
 
   private getTools(): AllTools | null {
     const currentTab = this.getCurrentTab();
+    const captureToolsError = (scope: string) => {
+      this.telemetryService.captureException(
+        new Error(
+          `Error getting tools. [${scope}] failed, please check if you are signed in and try again.`,
+        ),
+      );
+      this.logger.debug(
+        `[AgentService] Error getting tools. [${scope}] failed, please check if you are signed in and try again.`,
+      );
+      return null;
+    };
     switch (currentTab) {
       case Layout.SETUP_WORKSPACE:
+        if (!this.clientRuntime)
+          return captureToolsError('Setup agent tools - no client runtime');
         return setupAgentTools(this.clientRuntime, {
           onSaveInformation: async (params) => {
+            if (!this.clientRuntime) {
+              // This should never happen - agent can only be in setup-mode when a client runtime is available
+              captureToolsError(
+                'Saving information for workspace setup - no client runtime',
+              );
+              return;
+            }
             this.telemetryService.capture('workspace-setup-information-saved', {
               agent_access_path: params.agentAccessPath,
               ide: params.ide,
@@ -202,20 +220,24 @@ export class AgentService {
           },
         });
       case MainTab.DEV_APP_PREVIEW:
+        if (!this.clientRuntime)
+          return captureToolsError(
+            'Dev app preview agent tools - no client runtime',
+          );
+
         return codingAgentTools(this.clientRuntime, this.client);
       case MainTab.IDEATION_CANVAS: {
-        if (!this.apiKey) {
-          this.logger.debug(
-            '[AgentService] No API key available. Inspiration agent tools failed, please sign in before using the agent.',
+        if (!this.apiKey)
+          return captureToolsError('Inspiration agent tools - no API key');
+
+        if (!this.litellm)
+          return captureToolsError('Inspiration agent tools - no litellm');
+
+        if (!this.clientRuntime)
+          return captureToolsError(
+            'Inspiration agent tools - no client runtime',
           );
-          return null;
-        }
-        if (!this.litellm) {
-          this.logger.debug(
-            '[AgentService] No litellm available. Inspiration agent tools failed, please initialize litellm before using the agent.',
-          );
-          return null;
-        }
+
         return inspirationAgentTools(
           this.clientRuntime,
           this.telemetryService.withTracing(this.litellm('claude-haiku-4-5'), {
@@ -259,6 +281,8 @@ export class AgentService {
         );
       }
       default:
+        if (!this.clientRuntime)
+          return captureToolsError('Default agent tools - no client runtime');
         return codingAgentTools(this.clientRuntime, this.client);
     }
   }
@@ -294,6 +318,14 @@ export class AgentService {
     }
 
     this.client = createAuthenticatedClient(accessToken);
+  }
+
+  public setClientRuntime(clientRuntime: ClientRuntime | null): void {
+    this.clientRuntime = clientRuntime;
+    this.promptBuilder = new PromptBuilder(
+      this.clientRuntime,
+      this.kartonService.state,
+    );
   }
 
   private setAgentWorking(isWorking: boolean): void {
@@ -776,26 +808,27 @@ export class AgentService {
     chatId: string;
     history?: History;
   }): Promise<void> {
-    if (!this.apiKey) {
+    const captureAgentError = (scope: string) => {
+      this.telemetryService.captureException(
+        new Error(
+          `Agent call failed. [${scope}] failed, please check if you are signed in and try again.`,
+        ),
+      );
       this.logger.debug(
-        '[AgentService] No API key available. Agent call failed, please sign in before using the agent.',
+        `[AgentService] Agent call failed. [${scope}] failed, please check if you are signed in and try again.`,
       );
       return;
-    }
+    };
+    if (!this.apiKey) return captureAgentError('No API key available');
 
-    if (!this.litellm) {
-      this.logger.debug(
-        '[AgentService] No litellm available. Agent call failed, please initialize litellm before using the agent.',
-      );
-      return;
-    }
+    if (!this.litellm) return captureAgentError('No litellm available');
 
     const toolsWithExecute = this.getTools();
     if (!toolsWithExecute) {
+      // agent without workspace configured won't use any tools
       this.logger.debug(
-        '[AgentService] Error getting tools. Agent call failed, please check if you are signed in and try again.',
+        "[AgentService] Tools are null, agent without workspace configured won't use any tools",
       );
-      return;
     }
 
     if (!this.undoToolCallStack.has(chatId))
@@ -849,9 +882,7 @@ export class AgentService {
 
         this.kartonService.setState((draft) => {
           const chat = draft.workspace?.agentChat?.chats[chatId];
-          if (chat) {
-            chat.title = title;
-          }
+          if (chat) chat.title = title;
         });
       }
 
@@ -878,7 +909,9 @@ export class AgentService {
       );
 
       // Get the tools based on the agent mode
-      const tools = toolsWithoutExecute(toolsWithExecute);
+      const tools = toolsWithExecute
+        ? toolsWithoutExecute(toolsWithExecute)
+        : null;
 
       const stream = streamText({
         model,
@@ -903,7 +936,7 @@ export class AgentService {
         onError: async (error) => {
           await this.handleStreamingError(error, chatId);
         },
-        tools,
+        tools: tools ?? {},
         onAbort: () => {
           this.authRetryCount = 0;
           this.cleanupPendingOperations('Agent call aborted');
@@ -915,7 +948,9 @@ export class AgentService {
           this.telemetryService.captureException(r.error);
           if (NoSuchToolError.isInstance(r.error)) return null;
 
-          const tool = tools[r.toolCall.toolName as keyof AllTools];
+          const tool = toolsWithExecute
+            ? tools?.[r.toolCall.toolName as keyof AllTools]
+            : null;
           if (!tool) return null;
 
           try {
@@ -938,7 +973,7 @@ export class AgentService {
 
           const toolResults = await processToolCalls(
             r.toolCalls,
-            this.getTools()!,
+            this.getTools() as AllTools,
             messages,
             (result) => {
               if ('result' in result && hasUndoMetadata(result.result)) {
@@ -1229,7 +1264,6 @@ export class AgentService {
     kartonService: KartonService,
     globalConfigService: GlobalConfigService,
     authService: AuthService,
-    clientRuntime: ClientRuntime,
     workspaceSetupService: WorkspaceSetupService,
   ) {
     const instance = new AgentService(
@@ -1238,7 +1272,6 @@ export class AgentService {
       kartonService,
       globalConfigService,
       authService,
-      clientRuntime,
       workspaceSetupService,
     );
     await instance.initialize();

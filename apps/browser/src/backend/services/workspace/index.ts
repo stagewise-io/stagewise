@@ -82,7 +82,6 @@ export class WorkspaceService {
         path: this.workspacePath,
         paths: {
           data: '',
-          cache: '', // TODO: Find a way to initialize these -> Datapaths are only initialized after workspace setup.
           temp: '',
         },
         inspirationComponents: [],
@@ -240,7 +239,6 @@ export class WorkspaceService {
         this.kartonService,
         this.globalConfigService,
         this.authService,
-        clientRuntime,
         this.workspaceSetupService,
       ).catch((error) => {
         this.telemetryService.captureException(error as Error);
@@ -249,6 +247,8 @@ export class WorkspaceService {
         );
         return null;
       })) ?? null;
+
+    this._agentService?.setClientRuntime(clientRuntime);
   }
 
   public static async create(

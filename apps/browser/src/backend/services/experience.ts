@@ -107,7 +107,6 @@ export class UserExperienceService {
 
       if (draft.userExperience.activeLayout === Layout.MAIN) {
         if (
-          draft.workspaceStatus === 'open' &&
           !draft.workspace?.setupActive &&
           !draft.userExperience.activeMainTab
         ) {

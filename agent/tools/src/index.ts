@@ -212,7 +212,6 @@ export type AllTools =
 
 export type AllToolsUnion = ReturnType<typeof setupAgentTools> &
   ReturnType<typeof codingAgentTools> &
-  ReturnType<typeof codingAgentTools> &
   ReturnType<typeof inspirationAgentTools>;
 
 export type UITools = InferUITools<AllToolsUnion>;
