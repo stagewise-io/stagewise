@@ -9,7 +9,7 @@ import { getUserMessage } from './templates/user';
 
 export class PromptBuilder {
   constructor(
-    private readonly clientRuntime: ClientRuntime,
+    private readonly clientRuntime: ClientRuntime | null,
     private readonly kartonState: KartonContract['state'],
   ) {}
 
@@ -18,8 +18,8 @@ export class PromptBuilder {
   ): Promise<ModelMessage[]> {
     // Get the system prompt and put that on the start
     const systemPrompt = await getSystemPrompt(
-      this.clientRuntime,
       this.kartonState,
+      this.clientRuntime,
     );
     const modelMessages: ModelMessage[] = [systemPrompt];
 

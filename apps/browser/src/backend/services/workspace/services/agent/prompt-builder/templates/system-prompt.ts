@@ -21,8 +21,8 @@ import path from 'node:path';
  *   4. Workspace information -> Information about the currently opened workspace.
  */
 export async function getSystemPrompt(
-  clientRuntime: ClientRuntime,
   kartonState: KartonContract['state'],
+  clientRuntime: ClientRuntime | null = null,
 ): Promise<SystemModelMessage> {
   const newPrompt = `
   ${prefix}
@@ -35,8 +35,8 @@ export async function getSystemPrompt(
   ${toolCallGuidelines}
   ${codingGuidelines}
   ${dontDos}
-  ${await workspaceInformation(kartonState, clientRuntime)}
-  ${currentGoal(kartonState)}
+  ${clientRuntime ? await workspaceInformation(kartonState, clientRuntime) : ''}
+  ${currentGoal(kartonState, clientRuntime !== null)}
   `
     .trim()
     .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1'); // We remove all CDATA tags because they add unnecessary tokens and we can trust the system prompt content to not do bullshit.
@@ -561,11 +561,15 @@ const workspaceInformation = async (
   });
 };
 
-const currentGoal = (kartonState: KartonContract['state']) => {
+const currentGoal = (
+  kartonState: KartonContract['state'],
+  workspaceIsSetUp: boolean,
+) => {
   const goalContent = () => {
     if (kartonState.userExperience.activeLayout === Layout.MAIN) {
       if (
-        kartonState.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
+        kartonState.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW &&
+        workspaceIsSetUp
       ) {
         return `
 - Assist [USER] with frontend development tasks by implementing code changes as requested by [USER]
@@ -619,6 +623,14 @@ const currentGoal = (kartonState: KartonContract['state']) => {
 ## After changes
 - After making changes, ask USER if they are happy with changes.
 - Be proactive in proposing similar changes to other places of app that could benefit from same changes or that would fit to theme of change that USER triggered. Make sensible and atomic proposals that USER could simply approve. You should thus only make proposals that affect code you already saw.
+        `.trim();
+      } else if (
+        kartonState.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW &&
+        !workspaceIsSetUp
+      ) {
+        return `
+- [USER] has not opened or selected a [WORKSPACE] yet.
+- When asked to implement code changes, [STAGE] must tell [USER] that they need to open or select and configure a [WORKSPACE] first.
         `.trim();
       }
 
