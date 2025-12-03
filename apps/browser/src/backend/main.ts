@@ -70,23 +70,34 @@ export async function main({
   );
 
   workspaceManagerService.registerWorkspaceChangeListener((event) => {
-    if (event.type === 'loaded') {
-      agentService.setClientRuntime(
-        new ClientRuntimeNode({
-          workingDirectory: event.selectedPath,
-          rgBinaryBasePath: globalDataPathService.globalDataPath,
-        }),
-      );
-      if (kartonService.state.workspaceStatus === 'setup')
-        agentService.sendUserMessage({
-          id: generateId(),
-          role: 'user',
-          parts: [
-            { type: 'text', text: 'Help me set up the selected workspace!' },
-          ],
+    switch (event.type) {
+      case 'loaded':
+        agentService.setClientRuntime(
+          new ClientRuntimeNode({
+            workingDirectory: event.selectedPath,
+            rgBinaryBasePath: globalDataPathService.globalDataPath,
+          }),
+        );
+        if (kartonService.state.workspaceStatus === 'setup')
+          agentService.sendUserMessage({
+            id: generateId(),
+            role: 'user',
+            parts: [
+              { type: 'text', text: 'Help me set up the selected workspace!' },
+            ],
+          });
+        break;
+      case 'unloaded':
+        agentService.setClientRuntime(null);
+        break;
+      case 'setupCompleted':
+        void _userExperienceService.saveRecentlyOpenedWorkspace({
+          path: event.workspacePath,
+          name: event.name,
+          openedAt: Date.now(),
         });
+        break;
     }
-    if (event.type === 'unloaded') agentService.setClientRuntime(null);
   });
 
   const _windowLayoutService = new WindowLayoutService(
@@ -104,6 +115,7 @@ export async function main({
   const _userExperienceService = await UserExperienceService.create(
     logger,
     kartonService,
+    globalDataPathService,
   );
 
   const agentService = await AgentService.create(

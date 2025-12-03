@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type {
   AskForAppPathOutput,
   AskForAgentAccessPathOutput,
@@ -70,6 +71,20 @@ export type WorkspaceStatus =
   | 'loading'
   | 'closing'
   | 'setup';
+
+export const recentlyOpenedWorkspaceSchema = z.object({
+  path: z.string(),
+  name: z.string().optional(),
+  openedAt: z.number(),
+});
+
+export const recentlyOpenedWorkspacesArraySchema = z.array(
+  recentlyOpenedWorkspaceSchema,
+);
+
+export type RecentlyOpenedWorkspace = z.infer<
+  typeof recentlyOpenedWorkspaceSchema
+>;
 
 export enum Layout {
   SIGNIN = 'signin',
@@ -183,7 +198,6 @@ export type AppState = {
     childWorkspacePaths: string[]; // List of paths that are child paths of the currently opened workspace.
   } | null;
   workspaceStatus: WorkspaceStatus;
-  recentWorkspaces: string[]; // List of paths to recent workspaces.
   userAccount: {
     status: AuthStatus;
     machineId?: string;
@@ -210,7 +224,7 @@ export type AppState = {
   // The global configuration of the CLI.
   globalConfig: GlobalConfig;
   // State of the current user experience (getting started etc.)
-  userExperience:
+  userExperience: { recentlyOpenedWorkspaces: RecentlyOpenedWorkspace[] } & (
     | {
         activeLayout: Layout.SIGNIN;
       }
@@ -232,7 +246,8 @@ export type AppState = {
               } | null;
             };
           }
-      ));
+      ))
+  );
   // State of the notification service.
   notifications: {
     id: string;
@@ -403,7 +418,6 @@ export const defaultState: KartonContract['state'] = {
   agentChat: null,
   workspace: null,
   workspaceStatus: 'closed',
-  recentWorkspaces: [],
   userAccount: {
     status: 'unauthenticated',
   },
@@ -418,6 +432,7 @@ export const defaultState: KartonContract['state'] = {
     openFilesInIde: 'other',
   },
   userExperience: {
+    recentlyOpenedWorkspaces: [],
     activeLayout: Layout.SIGNIN,
   },
   notifications: [],

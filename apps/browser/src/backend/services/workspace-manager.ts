@@ -14,7 +14,8 @@ import type { NotificationService } from './notification';
 
 type WorkspaceChangedEvent =
   | { type: 'loaded'; selectedPath: string }
-  | { type: 'unloaded' };
+  | { type: 'unloaded' }
+  | { type: 'setupCompleted'; workspacePath: string; name?: string };
 
 export class WorkspaceManagerService {
   private currentWorkspace: WorkspaceService | null = null;
@@ -148,7 +149,14 @@ export class WorkspaceManagerService {
       loadedOnStart,
       pathGivenInStartingArg,
       wrappedCommand,
-      () => {
+      (workspacePath, name) => {
+        this.workspaceChangeListeners.forEach((listener) =>
+          listener({
+            type: 'setupCompleted',
+            workspacePath,
+            name,
+          }),
+        );
         this.kartonService.setState((draft) => {
           draft.workspaceStatus = 'open';
         });

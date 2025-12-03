@@ -35,7 +35,10 @@ export class WorkspaceService {
   private workspaceSetupService: WorkspaceSetupService | null = null;
   private ragService: RagService | null = null;
   private staticAnalysisService: StaticAnalysisService | null = null;
-  private onWorkspaceSetupCompleted?: () => void;
+  private onWorkspaceSetupCompleted?: (
+    workspacePath: string,
+    name?: string,
+  ) => void;
 
   private constructor(
     logger: Logger,
@@ -47,7 +50,7 @@ export class WorkspaceService {
     loadedOnStart: boolean,
     pathGivenInStartingArg: boolean,
     wrappedCommand?: string,
-    onWorkspaceSetupCompleted?: () => void,
+    onWorkspaceSetupCompleted?: (workspacePath: string, name?: string) => void,
   ) {
     this.logger = logger;
     this.telemetryService = telemetryService;
@@ -216,7 +219,10 @@ export class WorkspaceService {
           initial_setup: setupConfig !== null,
         });
 
-        this.onWorkspaceSetupCompleted?.();
+        this.onWorkspaceSetupCompleted?.(
+          this.workspacePath,
+          this.workspacePath.split(path.sep).pop() ?? undefined,
+        );
       },
     );
   }
@@ -231,7 +237,7 @@ export class WorkspaceService {
     loadedOnStart: boolean,
     pathGivenInStartingArg: boolean,
     wrappedCommand?: string,
-    onWorkspaceSetupCompleted?: () => void,
+    onWorkspaceSetupCompleted?: (workspacePath: string, name?: string) => void,
   ) {
     const instance = new WorkspaceService(
       logger,
