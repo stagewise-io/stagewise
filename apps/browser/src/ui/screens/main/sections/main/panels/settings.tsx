@@ -98,10 +98,6 @@ export const WorkspaceSettingsTabContent = () => {
     [config, setConfigOptimistic, _setWorkspaceConfig],
   );
 
-  const wrappedCommand = useKartonState(
-    (s) => s.workspace?.devAppStatus?.wrappedCommand,
-  );
-
   const workspaceDataPath = useKartonState((s) => s.workspace?.paths.data);
   const workspaceTempPath = useKartonState((s) => s.workspace?.paths.temp);
 
@@ -165,41 +161,6 @@ export const WorkspaceSettingsTabContent = () => {
             value={config.agentAccessPath}
             onValueChange={(value) => setConfig({ agentAccessPath: value })}
             debounce={200}
-          />
-        </FormField>
-      </FormFieldset>
-      <FormFieldset title="Dev Application setup">
-        <FormField className="@[700px]:flex-row">
-          <div className="flex flex-1 flex-col items-start gap-2">
-            <FormFieldLabel htmlFor="dev-application-command">
-              Start Command
-            </FormFieldLabel>
-            <FormFieldDescription>
-              The command that should be executed to start the dev application.
-              {wrappedCommand && (
-                <>
-                  <br />
-                  <span className="italic">
-                    Overriden by wrapped command:{' '}
-                    <strong className="font-mono">{wrappedCommand}</strong>
-                  </span>
-                </>
-              )}
-            </FormFieldDescription>
-          </div>
-          <Input
-            type="text"
-            id="dev-application-command"
-            className="@[700px]:w-min w-full @[700px]:min-w-80 font-mono"
-            value={config.appExecutionCommand ?? ''}
-            onValueChange={(value) =>
-              setConfig({
-                appExecutionCommand:
-                  value.length > 0 ? value.trim() : undefined,
-              })
-            }
-            debounce={200}
-            placeholder={'e.g. "dotenv . -- pnpm dev"'}
           />
         </FormField>
       </FormFieldset>

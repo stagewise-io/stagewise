@@ -1,12 +1,10 @@
 import { useKartonConnected, useKartonState } from '@/hooks/use-karton';
 import { SignInScreen } from './signin';
 import { DefaultLayout } from './main';
-import { OpenWorkspaceScreen } from './open-workspace';
 import Iridescence from '@/components/ui/iridescence';
 import { cn } from '@/utils';
 import { Layout } from '@shared/karton-contracts/ui';
 import { Logo } from '@/components/ui/logo';
-import { SetupWorkspaceScreen } from './setup-workspace';
 import { WebContentsBoundsSyncer } from '@/components/web-contents-bounds-syncer';
 
 export function ScreenRouter() {
@@ -39,14 +37,6 @@ export function ScreenRouter() {
       )}
 
       <SignInScreen show={connected && displayedLayout === Layout.SIGNIN} />
-
-      <OpenWorkspaceScreen
-        show={connected && displayedLayout === Layout.OPEN_WORKSPACE}
-      />
-
-      <SetupWorkspaceScreen
-        show={connected && displayedLayout === Layout.SETUP_WORKSPACE}
-      />
 
       <DefaultLayout show={connected && displayedLayout === Layout.MAIN} />
 

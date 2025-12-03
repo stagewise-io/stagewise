@@ -30,7 +30,6 @@ const baseState: Partial<AppState> = {
       data: '/Users/user/projects/my-app/data',
       temp: '/Users/user/projects/my-app/temp',
     },
-    devAppStatus: null,
     inspirationComponents: [],
     config: null,
     plugins: null,
@@ -45,14 +44,14 @@ const baseState: Partial<AppState> = {
     agent: {
       accessPath: '/Users/user/projects/my-app',
     },
-    agentChat: {
-      chats: {
-        'streaming-chat': createEmptyChat(),
-      },
-      activeChatId: 'streaming-chat',
-      toolCallApprovalRequests: [],
-      isWorking: false,
+  },
+  agentChat: {
+    chats: {
+      'streaming-chat': createEmptyChat(),
     },
+    activeChatId: 'streaming-chat',
+    toolCallApprovalRequests: [],
+    isWorking: false,
   },
   userExperience: {
     activeLayout: Layout.MAIN,

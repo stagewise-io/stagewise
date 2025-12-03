@@ -1,6 +1,6 @@
 import type { FileDiff, StagewiseToolMetadata } from '@stagewise/agent-types';
 import type { LanguageModelV2 } from '@ai-sdk/provider';
-import type { InferUITools, Tool, ToolUIPart } from 'ai';
+import type { InferUITools, Tool, ToolSet, ToolUIPart } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { overwriteFileTool } from './node-runtime/file-modification/overwrite-file-tool.js';
 import { readFileTool } from './node-runtime/file-modification/read-file-tool.js';
@@ -12,11 +12,6 @@ import { deleteFileTool } from './node-runtime/file-modification/delete-file-too
 import { getContext7LibraryDocsTool } from './node-runtime/research/get-context7-library-docs-tool.js';
 import { resolveContext7LibraryTool } from './node-runtime/research/resolve-context7-library-tool.js';
 
-import {
-  askForDevScriptIntegrationTool,
-  askForDevScriptIntegrationOutputSchema,
-  type AskForDevScriptIntegrationOutput,
-} from './node-runtime/project-setup/ask-for-dev-script-integration.js';
 import {
   type SaveRequiredInformationParams,
   saveRequiredInformationTool,
@@ -45,15 +40,12 @@ import type { AppRouter, TRPCClient } from '@stagewise/api-client';
 export {
   askForAppPathTool,
   askForAgentAccessPathTool,
-  askForDevScriptIntegrationTool,
-  askForDevScriptIntegrationOutputSchema,
   askForAppPathOutputSchema,
   askForAgentAccessPathOutputSchema,
   askForIdeTool,
   askForIdeOutputSchema,
   type AskForAppPathOutput,
   type AskForAgentAccessPathOutput,
-  type AskForDevScriptIntegrationOutput,
   type InspirationComponent,
   type AskForIdeOutput,
 };
@@ -152,9 +144,6 @@ export function setupAgentTools(
     ),
     askForAppPathTool: userInteractionTool(askForAppPathTool(clientRuntime)),
     askForIdeTool: userInteractionTool(askForIdeTool(clientRuntime)),
-    askForDevScriptIntegrationTool: userInteractionTool(
-      askForDevScriptIntegrationTool(clientRuntime),
-    ),
     saveRequiredInformationTool: toolWithMetadata(
       saveRequiredInformationTool(callbacks.onSaveInformation),
     ),
@@ -205,14 +194,65 @@ export function inspirationAgentTools(
   };
 }
 
-export type AllTools =
-  | ReturnType<typeof setupAgentTools>
-  | ReturnType<typeof codingAgentTools>
-  | ReturnType<typeof inspirationAgentTools>;
+export function noWorkspaceConfiguredAgentTools(
+  apiClient: TRPCClient<AppRouter>,
+) {
+  return {
+    getContext7LibraryDocsTool: toolWithMetadata(
+      getContext7LibraryDocsTool(apiClient),
+    ),
+    resolveContext7LibraryTool: toolWithMetadata(
+      resolveContext7LibraryTool(apiClient),
+    ),
+  } satisfies ToolSet;
+}
 
+// Define agent modes as a discriminated union type
+export type AgentMode = 'setup' | 'coding' | 'inspiration' | 'no-workspace';
+
+// Map each mode to its corresponding tool set
+export type AgentToolSet<M extends AgentMode> = M extends 'setup'
+  ? ReturnType<typeof setupAgentTools>
+  : M extends 'coding'
+    ? ReturnType<typeof codingAgentTools>
+    : M extends 'inspiration'
+      ? ReturnType<typeof inspirationAgentTools>
+      : M extends 'no-workspace'
+        ? ReturnType<typeof noWorkspaceConfiguredAgentTools>
+        : never;
+
+// Create a discriminated union for runtime use
+export type AgentToolsContext =
+  | { mode: 'setup'; tools: ReturnType<typeof setupAgentTools> }
+  | { mode: 'coding'; tools: ReturnType<typeof codingAgentTools> }
+  | {
+      mode: 'inspiration';
+      tools: ReturnType<typeof inspirationAgentTools>;
+    }
+  | {
+      mode: 'no-workspace';
+      tools: ReturnType<typeof noWorkspaceConfiguredAgentTools>;
+    };
+
+// Extract just the tools for union type (when needed for generic operations)
+export type AllTools = AgentToolsContext['tools'];
+
+// Define the base tool shape that all tools share (for common operations)
+export type BaseStagewiseTool = Tool<any, any> & {
+  stagewiseMetadata?: StagewiseToolMetadata & Record<string, any>;
+};
+
+// For union of all possible tool names across all modes
+export type AllToolNames = keyof AllTools;
+
+// Helper to extract tool names for a specific mode
+export type ToolNamesForMode<M extends AgentMode> = keyof AgentToolSet<M>;
+
+// Backwards compatibility: AllToolsUnion for intersection of all tool sets
 export type AllToolsUnion = ReturnType<typeof setupAgentTools> &
   ReturnType<typeof codingAgentTools> &
-  ReturnType<typeof inspirationAgentTools>;
+  ReturnType<typeof inspirationAgentTools> &
+  ReturnType<typeof noWorkspaceConfiguredAgentTools>;
 
 export type UITools = InferUITools<AllToolsUnion>;
 export type ToolPart = ToolUIPart<UITools>;

@@ -39,17 +39,17 @@ export const MyStory: Story = {
         agent: {
           accessPath: '/mock/workspace/path', // Required for file IDE links
         },
-        agentChat: {
-          activeChatId: 'chat-1',
-          chats: {
-            'chat-1': {
-              title: 'Test Chat',
-              messages: [...],
-              // ...
-            },
+      },
+      agentChat: {
+        activeChatId: 'chat-1',
+        chats: {
+          'chat-1': {
+            title: 'Test Chat',
+            messages: [...],
+            // ...
           },
-          isWorking: false,
         },
+        isWorking: false,
       },
     },
   },
@@ -138,18 +138,18 @@ export const StreamingExample: Story = {
     ),
     mockKartonState: {
       workspace: {
-        agentChat: {
-          activeChatId: 'test-chat',
-          chats: {
-            'test-chat': {
-              messages: [
-                createAssistantMessage('', { id: 'streaming-msg' }),
-              ],
-              // ...
-            },
+      },
+      agentChat: {
+        activeChatId: 'test-chat',
+        chats: {
+          'test-chat': {
+            messages: [
+              createAssistantMessage('', { id: 'streaming-msg' }),
+            ],
+            // ...
           },
-          isWorking: true,
         },
+        isWorking: true,
       },
     },
   },

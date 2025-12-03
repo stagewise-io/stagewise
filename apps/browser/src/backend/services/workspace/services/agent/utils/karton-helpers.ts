@@ -28,14 +28,14 @@ export function createAndActivateNewChat(
     hour12: true,
   })}`;
   karton.setState((draft) => {
-    if (!draft.workspace?.agentChat) return;
-    draft.workspace.agentChat.chats[chatId] = {
+    if (!draft.agentChat) return;
+    draft.agentChat.chats[chatId] = {
       title,
       createdAt: new Date(),
       messages: [],
       usage: { maxContextWindowSize: 200000, usedContextWindowSize: 0 },
     };
-    draft.workspace.agentChat.activeChatId = chatId;
+    draft.agentChat.activeChatId = chatId;
   });
   return chatId;
 }
@@ -49,16 +49,15 @@ export function createAndActivateNewChat(
  */
 export function attachToolOutputToMessage(
   karton: KartonStateProvider<KartonContract['state']>,
-  toolResults: ToolCallProcessingResult<any>[],
+  toolResults: ToolCallProcessingResult<any, any>[],
   messageId: string,
 ) {
   karton.setState((draft) => {
     const state = karton.state;
-    const activeChatId = state.workspace?.agentChat?.activeChatId;
-    if (!activeChatId || !draft.workspace?.agentChat?.chats[activeChatId])
-      return;
+    const activeChatId = state.agentChat?.activeChatId;
+    if (!activeChatId || !draft.agentChat?.chats[activeChatId]) return;
 
-    const message = draft.workspace.agentChat.chats[activeChatId].messages.find(
+    const message = draft.agentChat.chats[activeChatId].messages.find(
       (m) => m.id === messageId,
     );
     if (!message) return;
@@ -100,7 +99,7 @@ export function findPendingToolCalls(
   chatId: string,
 ): Array<{ toolCallId: string }> {
   const state = karton.state;
-  const chat = state.workspace?.agentChat?.chats[chatId];
+  const chat = state.agentChat?.chats[chatId];
   if (!chat) return [];
 
   const messages = chat.messages;

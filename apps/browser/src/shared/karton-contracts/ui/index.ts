@@ -1,6 +1,5 @@
 import type {
   AskForAppPathOutput,
-  AskForDevScriptIntegrationOutput,
   AskForAgentAccessPathOutput,
   InspirationComponent,
   AskForIdeOutput,
@@ -74,8 +73,6 @@ export type WorkspaceStatus =
 
 export enum Layout {
   SIGNIN = 'signin',
-  OPEN_WORKSPACE = 'open-workspace',
-  SETUP_WORKSPACE = 'setup-workspace',
   MAIN = 'main',
 }
 
@@ -144,28 +141,20 @@ export type AppState = {
       host?: string;
     };
   };
+  agentChat: {
+    activeChatId: ChatId | null;
+    chats: Record<ChatId, Chat>;
+    toolCallApprovalRequests: string[];
+    isWorking: boolean;
+  } | null;
   workspace: {
     path: string;
     paths: {
       data: string;
       temp: string;
     };
-    devAppStatus: {
-      contentAvailableOnPort: boolean; // Is true, if the CLI detected that there is content available on the configured dev app port.
-      childProcessRunning: boolean;
-      childProcessPid: number | null;
-      childProcessOwnedPorts: number[];
-      lastChildProcessError: { message: string; code: number } | null;
-      wrappedCommand: string | null; // Will only be true on the initially loaded workspace if stagewise directly wraps a command.
-    } | null;
     agent: {
       accessPath: string;
-    } | null;
-    agentChat: {
-      activeChatId: ChatId | null;
-      chats: Record<ChatId, Chat>;
-      toolCallApprovalRequests: string[];
-      isWorking: boolean;
     } | null;
     inspirationComponents: InspirationComponent[];
     config: WorkspaceConfig | null;
@@ -223,10 +212,7 @@ export type AppState = {
   // State of the current user experience (getting started etc.)
   userExperience:
     | {
-        activeLayout:
-          | Layout.SIGNIN
-          | Layout.OPEN_WORKSPACE
-          | Layout.SETUP_WORKSPACE;
+        activeLayout: Layout.SIGNIN;
       }
     | ({
         activeLayout: Layout.MAIN;
@@ -299,9 +285,6 @@ export type KartonContract = {
           | (AskForAgentAccessPathOutput & {
               type: 'askForAgentAccessPathTool';
             })
-          | (AskForDevScriptIntegrationOutput & {
-              type: 'askForDevScriptIntegrationTool';
-            })
           | (AskForIdeOutput & {
               type: 'askForIdeTool';
               ide: AskForIdeOutput['ide'];
@@ -332,7 +315,7 @@ export type KartonContract = {
       cancelAuthenticationConfirmation: () => Promise<void>;
     };
     workspace: {
-      open: (path: string) => Promise<void>;
+      open: (path?: string) => Promise<void>;
       close: () => Promise<void>;
       getGitRepoRoot: () => Promise<string>;
       setup: {
@@ -417,6 +400,7 @@ export const defaultState: KartonContract['state'] = {
       host: import.meta.env.VITE_POSTHOG_HOST ?? 'https://eu.i.posthog.com',
     },
   },
+  agentChat: null,
   workspace: null,
   workspaceStatus: 'closed',
   recentWorkspaces: [],

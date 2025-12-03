@@ -21,7 +21,7 @@ export function ChatPanel({
   const chatState = useChatState();
   const [isDragging, setIsDragging] = useState(false);
   const isWorking = useKartonState(
-    useComparingSelector((s) => s.workspace?.agentChat?.isWorking || false),
+    useComparingSelector((s) => s.agentChat?.isWorking || false),
   );
   const isConnected = useKartonConnected();
 

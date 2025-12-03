@@ -3,6 +3,7 @@
  */
 
 import { AuthService } from './services/auth';
+import { AgentService } from './services/workspace/services/agent/agent';
 import { UserExperienceService } from './services/experience';
 import { WindowLayoutService } from './services/window-layout';
 import { getEnvMode } from './utils/env';
@@ -10,9 +11,12 @@ import { bootstrapGlobalServices } from './global-service-bootstrap';
 import { WorkspaceManagerService } from './services/workspace-manager';
 import { FilePickerService } from './services/file-picker';
 import { existsSync } from 'node:fs';
-import path from 'node:path';
+import path, { resolve } from 'node:path';
 import { AppMenuService } from './services/app-menu';
 import { URIHandlerService } from './services/uri-handler';
+import { getRepoRootForPath } from './utils/git-tools';
+import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
+import { generateId } from 'ai';
 
 export type MainParameters = {
   launchOptions: {
@@ -61,11 +65,29 @@ export async function main({
     filePickerService,
     telemetryService,
     kartonService,
-    globalConfigService,
-    authService,
     globalDataPathService,
     notificationService,
   );
+
+  workspaceManagerService.registerWorkspaceChangeListener((event) => {
+    if (event.type === 'loaded') {
+      agentService.setClientRuntime(
+        new ClientRuntimeNode({
+          workingDirectory: event.selectedPath,
+          rgBinaryBasePath: globalDataPathService.globalDataPath,
+        }),
+      );
+      if (kartonService.state.workspaceStatus === 'setup')
+        agentService.sendUserMessage({
+          id: generateId(),
+          role: 'user',
+          parts: [
+            { type: 'text', text: 'Help me set up the selected workspace!' },
+          ],
+        });
+    }
+    if (event.type === 'unloaded') agentService.setClientRuntime(null);
+  });
 
   const _windowLayoutService = new WindowLayoutService(
     logger,
@@ -82,6 +104,27 @@ export async function main({
   const _userExperienceService = await UserExperienceService.create(
     logger,
     kartonService,
+  );
+
+  const agentService = await AgentService.create(
+    logger,
+    telemetryService,
+    kartonService,
+    globalConfigService,
+    authService,
+    async (params) => {
+      await workspaceManagerService.workspace?.setupService?.handleSetupSubmission(
+        {
+          agentAccessPath: params.agentAccessPath,
+        },
+        params.appPath,
+      );
+      agentService.setCurrentWorkingDirectory(
+        params.agentAccessPath === '{GIT_REPO_ROOT}'
+          ? getRepoRootForPath(params.appPath)
+          : resolve(params.appPath, params.agentAccessPath),
+      );
+    },
   );
 
   // No need to unregister this callback, as it will be destroyed when the main app shuts down

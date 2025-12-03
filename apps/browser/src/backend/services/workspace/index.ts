@@ -2,17 +2,14 @@
  * This file contains the workspace service class that is responsible for loading and unloading all the functionality surrounding a workspace.
  */
 
-import { AgentService } from '@/services/workspace/services/agent/agent';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
-import type { GlobalConfigService } from '../global-config';
 import { WorkspaceConfigService } from './services/config';
 import { WorkspacePluginService } from './services/plugin';
 import { WorkspaceSetupService } from './services/setup';
-import type { AuthService } from '../auth';
 import { RagService } from './services/rag';
 import { StaticAnalysisService } from './services/static-analysis';
 import { WorkspacePathsService } from './services/paths';
@@ -25,8 +22,6 @@ export class WorkspaceService {
   private logger: Logger;
   private telemetryService: TelemetryService;
   private kartonService: KartonService;
-  private globalConfigService: GlobalConfigService;
-  private authService: AuthService;
   private globalDataPathService: GlobalDataPathService;
   private notificationService: NotificationService;
   private workspacePath: string;
@@ -38,34 +33,32 @@ export class WorkspaceService {
   private workspaceConfigService: WorkspaceConfigService | null = null;
   private workspacePluginService: WorkspacePluginService | null = null;
   private workspaceSetupService: WorkspaceSetupService | null = null;
-  private _agentService: AgentService | null = null;
   private ragService: RagService | null = null;
   private staticAnalysisService: StaticAnalysisService | null = null;
+  private onWorkspaceSetupCompleted?: () => void;
 
   private constructor(
     logger: Logger,
     telemetryService: TelemetryService,
     kartonService: KartonService,
-    globalConfigService: GlobalConfigService,
-    authService: AuthService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
     workspacePath: string,
     loadedOnStart: boolean,
     pathGivenInStartingArg: boolean,
     wrappedCommand?: string,
+    onWorkspaceSetupCompleted?: () => void,
   ) {
     this.logger = logger;
     this.telemetryService = telemetryService;
     this.kartonService = kartonService;
-    this.globalConfigService = globalConfigService;
-    this.authService = authService;
     this.globalDataPathService = globalDataPathService;
     this.notificationService = notificationService;
     this.workspacePath = workspacePath;
     this.loadedOnStart = loadedOnStart;
     this.pathGivenInStartingArg = pathGivenInStartingArg;
     this.wrappedCommand = wrappedCommand;
+    this.onWorkspaceSetupCompleted = onWorkspaceSetupCompleted;
   }
 
   public async initialize() {
@@ -85,9 +78,7 @@ export class WorkspaceService {
           temp: '',
         },
         inspirationComponents: [],
-        agentChat: null,
         agent: null,
-        devAppStatus: null,
         config: null,
         plugins: null,
         setupActive: false,
@@ -172,11 +163,6 @@ export class WorkspaceService {
           this.notificationService,
         );
 
-        this.kartonService.setState((draft) => {
-          draft.workspace!.agent = {
-            accessPath: clientRuntime.fileSystem.getCurrentWorkingDirectory(),
-          };
-        });
         this.workspaceConfigService.addConfigUpdatedListener((newConfig) => {
           clientRuntime.fileSystem.setCurrentWorkingDirectory(
             this.getAbsoluteAgentAccessPath(newConfig.agentAccessPath),
@@ -229,53 +215,35 @@ export class WorkspaceService {
             : 'at_runtime_by_user_action',
           initial_setup: setupConfig !== null,
         });
+
+        this.onWorkspaceSetupCompleted?.();
       },
     );
-
-    this._agentService =
-      (await AgentService.create(
-        this.logger,
-        this.telemetryService,
-        this.kartonService,
-        this.globalConfigService,
-        this.authService,
-        this.workspaceSetupService,
-      ).catch((error) => {
-        this.telemetryService.captureException(error as Error);
-        this.logger.error(
-          `[WorkspaceService] Failed to create agent service. Error: ${error}`,
-        );
-        return null;
-      })) ?? null;
-
-    this._agentService?.setClientRuntime(clientRuntime);
   }
 
   public static async create(
     logger: Logger,
     telemetryService: TelemetryService,
     kartonService: KartonService,
-    globalConfigService: GlobalConfigService,
-    authService: AuthService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
     workspacePath: string,
     loadedOnStart: boolean,
     pathGivenInStartingArg: boolean,
     wrappedCommand?: string,
+    onWorkspaceSetupCompleted?: () => void,
   ) {
     const instance = new WorkspaceService(
       logger,
       telemetryService,
       kartonService,
-      globalConfigService,
-      authService,
       globalDataPathService,
       notificationService,
       workspacePath,
       loadedOnStart,
       pathGivenInStartingArg,
       wrappedCommand,
+      onWorkspaceSetupCompleted,
     );
     await instance.initialize();
     logger.debug('[WorkspaceService] Created service');
@@ -285,7 +253,6 @@ export class WorkspaceService {
   public async teardown() {
     this.logger.debug('[WorkspaceService] Teardown called');
 
-    this._agentService?.teardown();
     this.ragService?.teardown();
     await this.workspaceSetupService?.teardown();
     await this.workspacePluginService?.teardown();
@@ -335,8 +302,8 @@ export class WorkspaceService {
     return this.workspacePluginService!;
   }
 
-  get agentService(): AgentService | null {
-    return this._agentService!;
+  get setupService(): WorkspaceSetupService | null {
+    return this.workspaceSetupService!;
   }
 }
 

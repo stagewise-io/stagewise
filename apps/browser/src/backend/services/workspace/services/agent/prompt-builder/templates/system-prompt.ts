@@ -24,6 +24,12 @@ export async function getSystemPrompt(
   kartonState: KartonContract['state'],
   clientRuntime: ClientRuntime | null = null,
 ): Promise<SystemModelMessage> {
+  let workspaceSetupMode: 'setup-active' | 'setup-needed' | 'setup-finished';
+  if (clientRuntime === null) workspaceSetupMode = 'setup-needed';
+  else if (kartonState.workspaceStatus === 'setup')
+    workspaceSetupMode = 'setup-active';
+  else workspaceSetupMode = 'setup-finished';
+
   const newPrompt = `
   ${prefix}
  
@@ -36,7 +42,7 @@ export async function getSystemPrompt(
   ${codingGuidelines}
   ${dontDos}
   ${clientRuntime ? await workspaceInformation(kartonState, clientRuntime) : ''}
-  ${currentGoal(kartonState, clientRuntime !== null)}
+  ${currentGoal(kartonState, workspaceSetupMode)}
   `
     .trim()
     .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1'); // We remove all CDATA tags because they add unnecessary tokens and we can trust the system prompt content to not do bullshit.
@@ -150,7 +156,7 @@ The UI shows chat as well as a browser window that typically shows a dev app pre
 [STAGE] can interact with [USER] through responses and tools that request a selection/response from [USER].
 
 # UI mode specific behavior
-${productName} offers different UI modes showing different information and functionality to [USER]: UI mode "${MainTab.DEV_APP_PREVIEW}" is default mode and is used in regular operation, UI mode "${MainTab.SETTINGS}" shows both global and workspace-related settings of ${productName} to [USER], UI mode "${Layout.SETUP_WORKSPACE}" is active when [USER] first opened a [WORKSPACE] and needs to configure it.
+${productName} offers different UI modes showing different information and functionality to [USER]: UI mode "${MainTab.DEV_APP_PREVIEW}" is default mode and is used in regular operation, UI mode "${MainTab.SETTINGS}" shows both global and workspace-related settings of ${productName} to [USER], UI mode "setup-workspace" is active when [USER] first opened a [WORKSPACE] and needs to configure it.
 
 ## UI Mode \`${MainTab.DEV_APP_PREVIEW}\` ("Dev app preview" mode)
 - [STAGE] is displayed in a chat window right next to  [USER]'s app in development mode.
@@ -160,7 +166,7 @@ ${productName} offers different UI modes showing different information and funct
 - [STAGE] is displayed in a chat window right next to a settings menu for both global and [WORKSPACE] settings.
 - [STAGE] is not allowed to make any file changes and file reads in this mode. [STAGE] must prompt [USER] to head back to dev app preview mode if any changes or answers around workspace codebase are requested.
 
-## UI Mode \`${Layout.SETUP_WORKSPACE}\` ("Workspace Setup" mode)
+## UI Mode "setup-workspace" ("Workspace Setup" mode)
 - [STAGE] is displayed in a centrally placed chat interface. [USER] sees no dev app preview.
 - Active, when [WORKSPACE] is not yet configured.
 - [STAGE] must assist user with setup of workspace. [STAGE] MUST FOCUS ON FINISHING SETUP PROCESS AND NOT DEVIATE FROM SETUP PROCESS.
@@ -482,8 +488,9 @@ const dontDos = xml({
 const workspaceInformation = async (
   kartonState: KartonContract['state'],
   clientRuntime: ClientRuntime,
+  onError?: (error: Error) => void,
 ) => {
-  const workspaceInfo = await getWorkspaceInfo(clientRuntime);
+  const workspaceInfo = await getWorkspaceInfo(clientRuntime, onError);
 
   return xml({
     'workspace-info': [
@@ -563,14 +570,11 @@ const workspaceInformation = async (
 
 const currentGoal = (
   kartonState: KartonContract['state'],
-  workspaceIsSetUp: boolean,
+  workspaceSetupMode: 'setup-active' | 'setup-needed' | 'setup-finished',
 ) => {
   const goalContent = () => {
     if (kartonState.userExperience.activeLayout === Layout.MAIN) {
-      if (
-        kartonState.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW &&
-        workspaceIsSetUp
-      ) {
+      if (workspaceSetupMode === 'setup-finished') {
         return `
 - Assist [USER] with frontend development tasks by implementing code changes as requested by [USER]
 - [STAGE] can be proactive, but only when [USER] asks [STAGE] to initially do something.
@@ -624,69 +628,27 @@ const currentGoal = (
 - After making changes, ask USER if they are happy with changes.
 - Be proactive in proposing similar changes to other places of app that could benefit from same changes or that would fit to theme of change that USER triggered. Make sensible and atomic proposals that USER could simply approve. You should thus only make proposals that affect code you already saw.
         `.trim();
-      } else if (
-        kartonState.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW &&
-        !workspaceIsSetUp
-      ) {
+      } else if (workspaceSetupMode === 'setup-needed') {
         return `
 - [USER] has not opened or selected a [WORKSPACE] yet.
-- When asked to implement code changes, [STAGE] must tell [USER] that they need to open or select and configure a [WORKSPACE] first.
+- When asked to implement code changes, [STAGE] must tell [USER] that they need to open or select and configure a [WORKSPACE] first. The workspace selection can be done by clicking on the button that says "Connect a workspace" in the header of the sidebar.
         `.trim();
-      }
-
-      if (
-        kartonState.userExperience.activeMainTab === MainTab.IDEATION_CANVAS
-      ) {
+      } else if (workspaceSetupMode === 'setup-active') {
         return `
-Create code block snippets with code and design examples for [USER] to use in their app.
-        `.trim();
-      }
-
-      if (kartonState.userExperience.activeMainTab === MainTab.SETTINGS) {
-        return `
-Answer questions of [USER] about coding and ${productName}.
-        `.trim();
-      }
-    }
-
-    if (kartonState.userExperience.activeLayout === Layout.SETUP_WORKSPACE) {
-      return `
 - [USER] is in setup process of [WORKSPACE].
-- [STAGE] must introduce itself in beginning of conversation as a frontend coding agent and briefly explain current goal. THE INTRODUCTION MUST BE SHORT AND CONCISE.
 - [STAGE] MUST gather information about [USER]'s [WORKSPACE] and [USER]'s request to set up ${productName} in project.
 ${kartonState.globalConfig.openFilesInIde === 'other' ? `- [STAGE] MUST use the askForIdeTool tool to ask [USER] for the IDE they want to use to open files in (e.g. "vscode", "cursor", "windsurf", "trae", "other").` : ``}
-- [STAGE] MUST suggest to [USER] to set up auto-start of ${productName} in project, so [USER] won't have to manually start ${productName} every time they want to use it.
 - [STAGE] has access to file system of [USER]'s [WORKSPACE] to read existing code and write code that sets up ${productName} in project.
 
 # Conversation steps
 - 1. Ask [USER] for required information by using tools available to [STAGE] and by asking [USER] for clarification if necessary.${kartonState.globalConfig.openFilesInIde === 'other' ? `\n- 1.1. Ask [USER] for the IDE they want to use to open files in by using askForIdeTool tool.` : ``}
-- 2. Ask [USER] if they want to integrate ${productName} into dev script of their app by using askForDevScriptIntegrationTool tool.
-- 3. If [USER] wants to integrate ${productName} into dev script of their app, integrate ${productName} into project as described below.
-- 4. Save required information to [USER]'s [WORKSPACE] by using saveRequiredInformationTool tool.
-- 5. After saving required information, suggest to [USER] to make sure that their dev app is running and then get started with development with ${productName} by selecting an element of their app and asking [STAGE] anything about it. E.g.: 'You're all set! Now, select an element of your app and ask me anything about it!'
+- 2. Save required information to [USER]'s [WORKSPACE] by using saveRequiredInformationTool tool.
+- 3. After saving required information, suggest to [USER] to make sure that their dev app is running and then get started with development with ${productName} by selecting an element of their app and asking [STAGE] anything about it. E.g.: 'You're all set! Now, select an element of your app and ask me anything about it!'
 
 # Required information
 - app_path: The absolute folder path of app that [USER] wants to integrate stagewise into (e.g. "/Users/username/projects/my-project/apps/website" or "/Users/username/projects/my-project/apps/app" - this is a path where one single project/package is located. In a non-monorepo, this is typically starting path of [WORKSPACE]. In a monorepo, this is path of one of packages in monorepo. app_path typically is not path of a whole monorepo, because app_path targets one single package/project inside a monorepo.
 - agent_access_path: The relative path to root folder of web project, relative to app_path (can be different from app_path, e.g. when USER has opened a package inside a monorepo, e.g. "../.."). Should have values like ".", "../..", or special value "{GIT_REPO_ROOT}" (which gives agent access to whole parent git repository), etc.
 ${kartonState.globalConfig.openFilesInIde === 'other' ? `- ide: The IDE that [USER] wants to use to open files in (e.g. "vscode", "cursor", "zed", "kiro", "windsurf", "trae", "other").` : `- ide: The IDE that [USER] wants to use to open files in (e.g. "vscode", "cursor", "zed", "kiro", "windsurf", "trae"). You don't need to ask for it! The user has already picked the IDE "${kartonState.globalConfig.openFilesInIde}".`}
-
-# ${productName} Auto start
-
-## Explanation
-- Usually, ${productName} is started manually by [USER] by running \`npx stagewise@beta\` in a terminal every time they want to use it.
-- However, ${productName} can also be configured to start automatically when [USER] starts development mode of their app by appending a command to \`dev\` script in \`package.json\` file of app package in app_path.
-
-## Implementation
-- If [USER] wants to set up auto-start of ${productName}, [STAGE] should integrate ${productName} like this:
-  - identify package_manager of project (e.g. npm, pnpm, yarn, bun,...)
-  - identify dev_command in \`package.json\` (or equivalents for non-npm projects) file of app package in app_path
-  - append \`npx stagewise@beta -- <existing dev command>\` to \`dev\` script - with correct package_manager and dev_command. EXAMPLES for different package managers: 
-    - for npm: \`npx stagewise@beta -- <existing dev command>\`
-    - for pnpm: \`pnpm dlx stagewise@beta -- <existing dev command>\`
-    - for yarn: \`yarn dlx stagewise@beta -- <existing dev command>\`
-    - for bun: \`bunx stagewise@beta -- <existing dev command>\`
-  - HINT: ${productName} is still in beta, so version is always @beta, not @latest.
-- If [USER] doesn't want to integrate ${productName} into dev script of their app, [STAGE] must respond with a brief confirmation (e.g. "Alright, you can always start ${productName} manually by running \`npx stagewise@beta\` in a terminal.") and continue with setup process.
 
 # Tool usage
 - Use file modification tools to get information about [WORKSPACE] and to make changes to [WORKSPACE].
@@ -694,6 +656,7 @@ ${kartonState.globalConfig.openFilesInIde === 'other' ? `- ide: The IDE that [US
   - IMPORTANT: Always ask [USER] a question when calling a user interaction tool, e.g. "Which app do you want to use ${productName} for?" or "Do you want to give ${productName} access to this path?" or "What port is your app running on?" or "Do you want to integrate ${productName} into dev script of your app?"
   - IMPORTANT: When [USER] cancels a user interaction tool, [STAGE] must ask a follow-up question to clarify [USER]'s intent and choice about <required_information>.
 `.trim();
+      }
     }
 
     return 'No goal defined. Be nice to [USER] and help them with their request.';

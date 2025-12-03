@@ -1,21 +1,41 @@
-import type { AllTools } from '@stagewise/agent-tools';
-import type { StaticToolCall, TypedToolCall } from 'ai';
+import type { BaseStagewiseTool } from '@stagewise/agent-tools';
+import type { StaticToolCall, TypedToolCall, ToolSet } from 'ai';
 import type { History } from '@shared/karton-contracts/ui';
 
-interface ToolCallContext<T extends StaticToolCall<AllTools>> {
+interface ToolCallContext<
+  TTools extends ToolSet,
+  T extends StaticToolCall<TTools>,
+> {
   toolCall: T;
-  tool: AllTools[T['toolName']];
+  tool: TTools[T['toolName']];
   messages: History;
   onToolCallComplete?: (
-    result: ToolCallProcessingResult<T>,
+    result: ToolCallProcessingResult<TTools, T>,
   ) => void | Promise<void>;
 }
 
-export type ToolCallProcessingResult<T extends StaticToolCall<AllTools>> =
+export type ToolCallProcessingResult<
+  TTools extends ToolSet,
+  T extends StaticToolCall<TTools>,
+> =
   | {
       toolCallId: string;
       duration: number;
-      result: ReturnType<NonNullable<AllTools[T['toolName']]['execute']>>;
+      result: ReturnType<NonNullable<TTools[T['toolName']]['execute']>>;
+    }
+  | {
+      toolCallId: string;
+      duration: number;
+      error: { message: string };
+    }
+  | { toolCallId: string; duration: number; userInteractionrequired: true };
+
+// Generic result type that doesn't depend on specific tool call
+export type GenericToolCallResult =
+  | {
+      toolCallId: string;
+      duration: number;
+      result: any;
     }
   | {
       toolCallId: string;
@@ -28,16 +48,20 @@ export type ToolCallProcessingResult<T extends StaticToolCall<AllTools>> =
  * Processes a client-side tool call
  */
 export async function processClientSideToolCall<
-  T extends StaticToolCall<AllTools>,
+  TTools extends ToolSet,
+  T extends StaticToolCall<TTools>,
 >(
-  context: ToolCallContext<T>,
+  context: ToolCallContext<TTools, T>,
   onError?: (error: Error) => void,
-): Promise<ToolCallProcessingResult<T>> {
+): Promise<ToolCallProcessingResult<TTools, T>> {
   const { tool, toolCall, onToolCallComplete } = context;
 
   const startTime = Date.now();
 
-  if (tool.stagewiseMetadata?.requiresUserInteraction) {
+  // Type guard to check if tool has stagewise metadata
+  const stagewiseTool = tool as unknown as BaseStagewiseTool;
+
+  if (stagewiseTool.stagewiseMetadata?.requiresUserInteraction) {
     const result = {
       toolCallId: toolCall.toolCallId,
       duration: 0,
@@ -45,7 +69,8 @@ export async function processClientSideToolCall<
     } as const;
     await onToolCallComplete?.(result);
     return result;
-  } else if (!tool.execute) {
+  }
+  if (!tool.execute) {
     const result = {
       toolCallId: toolCall.toolCallId,
       duration: 0,
@@ -53,40 +78,39 @@ export async function processClientSideToolCall<
     };
     await onToolCallComplete?.(result);
     return result;
-  } else {
-    try {
-      // Execute the tool
-      // TypeScript can't narrow the generic constraint properly, but we know the types match
-      // because ToolCallContext ensures tool and toolCall are correctly paired
-      const executeResult = await tool.execute(toolCall.input as any, {
-        toolCallId: toolCall.toolCallId,
-        // messages: uiMessagesToModelMessages(context.messages),
-        messages: [], // TODO: Fix the AIConversion error (tool state input-available not supported)!
-      });
+  }
+  try {
+    // Execute the tool
+    // TypeScript can't narrow the generic constraint properly, but we know the types match
+    // because ToolCallContext ensures tool and toolCall are correctly paired
+    const executeResult = await tool.execute(toolCall.input as any, {
+      toolCallId: toolCall.toolCallId,
+      // messages: uiMessagesToModelMessages(context.messages),
+      messages: [], // TODO: Fix the AIConversion error (tool state input-available not supported)!
+    });
 
-      const result = {
-        toolCallId: toolCall.toolCallId,
-        duration: Date.now() - startTime,
-        result: executeResult as ReturnType<
-          NonNullable<AllTools[T['toolName']]['execute']>
-        >,
-      };
+    const result = {
+      toolCallId: toolCall.toolCallId,
+      duration: Date.now() - startTime,
+      result: executeResult as ReturnType<
+        NonNullable<TTools[T['toolName']]['execute']>
+      >,
+    };
 
-      await onToolCallComplete?.(result);
+    await onToolCallComplete?.(result);
 
-      return result;
-    } catch (error) {
-      onError?.(error as Error);
-      const result = {
-        toolCallId: toolCall.toolCallId,
-        duration: Date.now() - startTime,
-        error: {
-          message: error instanceof Error ? error.message : 'Unknown error',
-        },
-      };
-      await onToolCallComplete?.(result);
-      return result;
-    }
+    return result;
+  } catch (error) {
+    onError?.(error as Error);
+    const result = {
+      toolCallId: toolCall.toolCallId,
+      duration: Date.now() - startTime,
+      error: {
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+    };
+    await onToolCallComplete?.(result);
+    return result;
   }
 }
 
@@ -100,15 +124,13 @@ export async function processClientSideToolCall<
  * @param onToolCallComplete - The callback to call when a tool call is complete
  * @returns
  */
-export async function processToolCalls(
-  toolCalls: TypedToolCall<AllTools>[],
-  tools: AllTools,
+export async function processToolCalls<TTools extends ToolSet>(
+  toolCalls: TypedToolCall<TTools>[],
+  tools: TTools,
   messages: History,
-  onToolCallComplete?: (
-    result: ToolCallProcessingResult<StaticToolCall<AllTools>>,
-  ) => void | Promise<void>,
+  onToolCallComplete?: (result: GenericToolCallResult) => void | Promise<void>,
   onError?: (error: Error) => void,
-): Promise<ToolCallProcessingResult<StaticToolCall<AllTools>>[]> {
+): Promise<GenericToolCallResult[]> {
   // Process client-side tools in parallel
   const clientPromises = toolCalls.map(async (tc) => {
     if (tc.invalid) {
@@ -123,7 +145,7 @@ export async function processToolCalls(
           ? `${errorMessage.slice(0, 1000)}...`
           : errorMessage;
 
-      const result = {
+      const result: GenericToolCallResult = {
         toolCallId: tc.toolCallId,
         duration: 0,
         error: {
@@ -134,7 +156,7 @@ export async function processToolCalls(
       return result;
     }
     if (tc.dynamic) {
-      const result = {
+      const result: GenericToolCallResult = {
         toolCallId: tc.toolCallId,
         duration: 0,
         error: { message: 'Dynamic tool calls are not supported yet.' },
@@ -146,7 +168,7 @@ export async function processToolCalls(
     const tool = tools[tc.toolName];
 
     if (!tool) {
-      const result = {
+      const result: GenericToolCallResult = {
         toolCallId: tc.toolCallId,
         duration: 0,
         error: { message: `Tool ${tc.toolName} not found in provided tools.` },

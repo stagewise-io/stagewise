@@ -4,7 +4,6 @@ import { AskForAgentAccessPathToolPartContent } from './agent-access-path';
 import { memo } from 'react';
 import { useKartonProcedure } from '@/hooks/use-karton';
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
-import { AskForDevScriptIntegrationToolPartContent } from './dev-script-integration';
 import { AskForIdeToolPartContent } from './ask-for-ide';
 
 export type InteractionToolPart = Extract<
@@ -13,7 +12,6 @@ export type InteractionToolPart = Extract<
       type: 'tool-askForAppPathTool';
     }
   | { type: 'tool-askForAgentAccessPathTool' }
-  | { type: 'tool-askForDevScriptIntegrationTool' }
   | { type: 'tool-askForIdeTool' }
 >;
 
@@ -30,7 +28,6 @@ export function isInteractionToolPart(
   return (
     toolPart.type === 'tool-askForAppPathTool' ||
     toolPart.type === 'tool-askForAgentAccessPathTool' ||
-    toolPart.type === 'tool-askForDevScriptIntegrationTool' ||
     toolPart.type === 'tool-askForIdeTool'
   );
 }
@@ -82,20 +79,6 @@ export const InteractionToolPartItem = memo(
                     toolPart.toolCallId,
                     input,
                   )
-                }
-                onCancel={() =>
-                  void cancelUserInteractionToolInput(toolPart.toolCallId)
-                }
-              />
-            )}
-            {toolPart.type === 'tool-askForDevScriptIntegrationTool' && (
-              <AskForDevScriptIntegrationToolPartContent
-                toolPart={toolPart}
-                onSubmit={(input) =>
-                  void submitUserInteractionToolInput(toolPart.toolCallId, {
-                    shouldIntegrate: input.shouldIntegrate,
-                    type: 'askForDevScriptIntegrationTool',
-                  })
                 }
                 onCancel={() =>
                   void cancelUserInteractionToolInput(toolPart.toolCallId)

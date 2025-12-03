@@ -24,9 +24,11 @@ import {
   inspirationAgentTools,
   setupAgentTools,
   toolsWithoutExecute,
+  noWorkspaceConfiguredAgentTools,
   type UITools,
   type AllTools,
   type InspirationComponent,
+  type AgentToolsContext,
 } from '@stagewise/agent-tools';
 import {
   streamText,
@@ -37,7 +39,6 @@ import {
 } from 'ai';
 import type { AppRouter, TRPCClient } from '@stagewise/api-client';
 import type { AsyncIterableStream, InferUIMessageChunk, ToolUIPart } from 'ai';
-import type { WorkspaceSetupService } from '../setup';
 import { compileInspirationComponent } from './utils/compile-inspiration-component';
 import { getRepoRootForPath } from '@/utils/git-tools';
 import { PromptBuilder } from './prompt-builder';
@@ -48,7 +49,7 @@ import {
   type KartonStateProvider,
   attachToolOutputToMessage,
 } from './utils/karton-helpers';
-import type { ToolCallProcessingResult } from './utils/tool-call-utils';
+import type { GenericToolCallResult } from './utils/tool-call-utils';
 import { createAndActivateNewChat } from './utils/karton-helpers';
 import { ErrorDescriptions, formatErrorDescription } from './utils/error-utils';
 import { isAbortError } from './utils/is-abort-error';
@@ -77,7 +78,6 @@ export class AgentService {
   private kartonService: KartonService;
   private globalConfigService: GlobalConfigService;
   private authService: AuthService;
-  private workspaceSetupService: WorkspaceSetupService;
   private clientRuntime: ClientRuntime | null = null;
   private apiKey: string | null = null;
   private promptBuilder: PromptBuilder;
@@ -93,6 +93,11 @@ export class AgentService {
   private lastMessageId: string | null = null;
   private litellm: ReturnType<typeof createAnthropic> | null = null;
   private isWarmedUp = false;
+  private onSaveSetupInformation: (params: {
+    agentAccessPath: string;
+    ide: string | undefined;
+    appPath: string;
+  }) => Promise<void>;
   private undoToolCallStack: Map<
     ChatId,
     {
@@ -109,17 +114,21 @@ export class AgentService {
     kartonService: KartonService,
     globalConfigService: GlobalConfigService,
     authService: AuthService,
-    workspaceSetupService: WorkspaceSetupService,
+    onSaveSetupInformation: (params: {
+      agentAccessPath: string;
+      ide: string | undefined;
+      appPath: string;
+    }) => Promise<void>,
   ) {
     this.logger = logger;
     this.telemetryService = telemetryService;
     this.kartonService = kartonService;
     this.globalConfigService = globalConfigService;
     this.authService = authService;
-    this.workspaceSetupService = workspaceSetupService;
+    this.onSaveSetupInformation = onSaveSetupInformation;
     this.kartonService.setState((draft) => {
-      if (!draft.workspace?.agentChat) {
-        draft.workspace!.agentChat = {
+      if (!draft.agentChat) {
+        draft.agentChat = {
           chats: {},
           activeChatId: null,
           toolCallApprovalRequests: [],
@@ -142,8 +151,7 @@ export class AgentService {
     this.abortController.signal.addEventListener(
       'abort',
       () => {
-        const activeChatId =
-          this.kartonService.state.workspace?.agentChat?.activeChatId;
+        const activeChatId = this.kartonService.state.agentChat?.activeChatId;
         if (!activeChatId) return;
 
         this.cleanupPendingOperations(
@@ -156,7 +164,7 @@ export class AgentService {
     );
   }
 
-  private getTools(): AllTools | null {
+  private getToolsContext(): AgentToolsContext | null {
     const currentTab = this.getCurrentTab();
     const captureToolsError = (scope: string) => {
       this.telemetryService.captureException(
@@ -169,11 +177,13 @@ export class AgentService {
       );
       return null;
     };
-    switch (currentTab) {
-      case Layout.SETUP_WORKSPACE:
-        if (!this.clientRuntime)
-          return captureToolsError('Setup agent tools - no client runtime');
-        return setupAgentTools(this.clientRuntime, {
+    const workspaceStatus = this.kartonService.state.workspaceStatus;
+    if (workspaceStatus === 'setup') {
+      if (!this.clientRuntime)
+        return captureToolsError('Setup agent tools - no client runtime');
+      return {
+        mode: 'setup',
+        tools: setupAgentTools(this.clientRuntime, {
           onSaveInformation: async (params) => {
             if (!this.clientRuntime) {
               // This should never happen - agent can only be in setup-mode when a client runtime is available
@@ -197,12 +207,11 @@ export class AgentService {
               });
             }
 
-            await this.workspaceSetupService.handleSetupSubmission(
-              {
-                agentAccessPath: params.agentAccessPath,
-              },
-              params.appPath,
-            );
+            await this.onSaveSetupInformation({
+              agentAccessPath: params.agentAccessPath,
+              ide: params.ide,
+              appPath: params.appPath,
+            });
 
             const absoluteAgentAccessPath =
               params.agentAccessPath === '{GIT_REPO_ROOT}'
@@ -218,27 +227,33 @@ export class AgentService {
               };
             });
           },
-        });
-      case MainTab.DEV_APP_PREVIEW:
-        if (!this.clientRuntime)
-          return captureToolsError(
-            'Dev app preview agent tools - no client runtime',
-          );
+        }),
+      };
+    }
+    if (currentTab !== MainTab.IDEATION_CANVAS && workspaceStatus === 'open') {
+      if (!this.clientRuntime)
+        return captureToolsError(
+          'Dev app preview agent tools - no client runtime',
+        );
 
-        return codingAgentTools(this.clientRuntime, this.client);
-      case MainTab.IDEATION_CANVAS: {
-        if (!this.apiKey)
-          return captureToolsError('Inspiration agent tools - no API key');
+      return {
+        mode: 'coding',
+        tools: codingAgentTools(this.clientRuntime, this.client),
+      };
+    }
+    if (currentTab === MainTab.IDEATION_CANVAS && workspaceStatus === 'open') {
+      if (!this.apiKey)
+        return captureToolsError('Inspiration agent tools - no API key');
 
-        if (!this.litellm)
-          return captureToolsError('Inspiration agent tools - no litellm');
+      if (!this.litellm)
+        return captureToolsError('Inspiration agent tools - no litellm');
 
-        if (!this.clientRuntime)
-          return captureToolsError(
-            'Inspiration agent tools - no client runtime',
-          );
+      if (!this.clientRuntime)
+        return captureToolsError('Inspiration agent tools - no client runtime');
 
-        return inspirationAgentTools(
+      return {
+        mode: 'inspiration',
+        tools: inspirationAgentTools(
           this.clientRuntime,
           this.telemetryService.withTracing(this.litellm('claude-haiku-4-5'), {
             posthogProperties: {
@@ -278,13 +293,24 @@ export class AgentService {
               );
             },
           },
-        );
-      }
-      default:
-        if (!this.clientRuntime)
-          return captureToolsError('Default agent tools - no client runtime');
-        return codingAgentTools(this.clientRuntime, this.client);
+        ),
+      };
     }
+    if (!this.clientRuntime) {
+      return {
+        mode: 'no-workspace',
+        tools: noWorkspaceConfiguredAgentTools(this.client),
+      };
+    }
+
+    return {
+      mode: 'coding',
+      tools: codingAgentTools(this.clientRuntime, this.client),
+    };
+  }
+
+  private getTools(): AllTools | null {
+    return this.getToolsContext()?.tools ?? null;
   }
 
   private async initializeLitellm() {
@@ -328,6 +354,85 @@ export class AgentService {
     );
   }
 
+  public async sendUserMessage(message: ChatMessage): Promise<void> {
+    this.logger.debug('[AgentService] Sending user message');
+    const activeChatId = this.kartonService.state.agentChat?.activeChatId;
+    if (!activeChatId) return;
+    // Set thinking 'enabled' in main layout. IMPORTANT: Thinking mode must not be switched immediately after tool-responses!
+    const layout = this.kartonService.state.userExperience.activeLayout;
+    if (
+      layout === Layout.MAIN &&
+      this.kartonService.state.workspaceStatus === 'open' &&
+      this.thinkingEnabled === false
+    )
+      this.thinkingEnabled = true;
+    else if (
+      layout === Layout.MAIN &&
+      this.kartonService.state.workspaceStatus === 'setup'
+    )
+      this.thinkingEnabled = false;
+
+    const pendingToolCalls = findPendingToolCalls(
+      this.kartonService as KartonStateProvider<KartonContract['state']>,
+      activeChatId,
+    );
+    // User-Interaction tool calls could still have open inputs - cancel them
+    if (pendingToolCalls.length > 0) {
+      pendingToolCalls.forEach(({ toolCallId }) => {
+        attachToolOutputToMessage(
+          this.kartonService as KartonStateProvider<KartonContract['state']>,
+          [
+            {
+              toolCallId,
+              duration: 0,
+              error: {
+                message: 'Tool execution skipped by user',
+              },
+            },
+          ],
+          this.lastMessageId!,
+        );
+      });
+    }
+
+    this.setAgentWorking(true);
+
+    const newstate = this.kartonService.setState((draft) => {
+      const chat = draft.agentChat?.chats[activeChatId];
+      if (chat) {
+        chat.messages.push({
+          ...message,
+          metadata: {
+            ...message.metadata,
+            currentTab: this.getCurrentTab(),
+          },
+        } as any);
+        chat.error = undefined;
+      }
+    });
+
+    const messages = newstate?.agentChat?.chats[activeChatId]?.messages;
+
+    this.logger.debug('[AgentService] Calling agent');
+
+    await this.callAgent({
+      chatId: activeChatId,
+      history: messages,
+    });
+  }
+
+  public setCurrentWorkingDirectory(
+    absoluteCurrentWorkingDirectory: string,
+  ): void {
+    this.clientRuntime?.fileSystem.setCurrentWorkingDirectory(
+      absoluteCurrentWorkingDirectory,
+    );
+    this.promptBuilder = new PromptBuilder(
+      this.clientRuntime,
+      this.kartonService.state,
+    );
+  }
+
   private setAgentWorking(isWorking: boolean): void {
     this.timeoutManager.clear('is-working');
     const wasWorking = this.isWorking;
@@ -344,8 +449,8 @@ export class AgentService {
     }
 
     this.kartonService.setState((draft) => {
-      if (draft.workspace?.agentChat) {
-        draft.workspace.agentChat.isWorking = isWorking;
+      if (draft.agentChat) {
+        draft.agentChat.isWorking = isWorking;
       }
     });
 
@@ -367,16 +472,15 @@ export class AgentService {
         chatId,
       );
       if (pendingToolCalls.length > 0) {
-        const abortedResults: ToolCallProcessingResult<any>[] =
-          pendingToolCalls.map(({ toolCallId }) => ({
-            success: false,
+        const abortedResults: GenericToolCallResult[] = pendingToolCalls.map(
+          ({ toolCallId }) => ({
             toolCallId,
             duration: 0,
             error: {
-              type: 'error' as const,
               message: 'Tool execution aborted by user',
             },
-          }));
+          }),
+        );
 
         attachToolOutputToMessage(
           this.kartonService as KartonStateProvider<KartonContract['state']>,
@@ -452,20 +556,18 @@ export class AgentService {
         'agentChat.retrySendingUserMessage',
         async () => {
           this.setAgentWorking(true);
-          const activeChatId =
-            this.kartonService.state.workspace?.agentChat?.activeChatId;
+          const activeChatId = this.kartonService.state.agentChat?.activeChatId;
           if (!activeChatId) return;
 
           this.kartonService.setState((draft) => {
-            const chat = draft.workspace?.agentChat?.chats[activeChatId];
+            const chat = draft.agentChat?.chats[activeChatId];
             if (chat) {
               chat.error = undefined;
             }
           });
 
           const messages =
-            this.kartonService.state.workspace?.agentChat?.chats[activeChatId]
-              ?.messages;
+            this.kartonService.state.agentChat?.chats[activeChatId]?.messages;
           await this.callAgent({
             chatId: activeChatId,
             history: messages,
@@ -478,8 +580,7 @@ export class AgentService {
       this.kartonService.registerServerProcedureHandler(
         'agentChat.abortAgentCall',
         async () => {
-          const activeChatId =
-            this.kartonService.state.workspace?.agentChat?.activeChatId;
+          const activeChatId = this.kartonService.state.agentChat?.activeChatId;
           if (!activeChatId) return;
 
           this.abortController.abort();
@@ -487,8 +588,7 @@ export class AgentService {
           this.abortController.signal.addEventListener(
             'abort',
             () => {
-              const chatId =
-                this.kartonService.state.workspace?.agentChat?.activeChatId;
+              const chatId = this.kartonService.state.agentChat?.activeChatId;
               if (chatId) {
                 this.cleanupPendingOperations(
                   'Agent call aborted',
@@ -529,19 +629,16 @@ export class AgentService {
         'agentChat.switch',
         async (chatId: string, _callingClientId: string) => {
           this.kartonService.setState((draft) => {
-            if (draft.workspace?.agentChat) {
-              draft.workspace.agentChat.activeChatId = chatId;
-            }
+            if (draft.agentChat) draft.agentChat.activeChatId = chatId;
           });
 
-          const chats = this.kartonService.state.workspace?.agentChat?.chats;
+          const chats = this.kartonService.state.agentChat?.chats;
           if (chats) {
             Object.entries(chats).forEach(([id, chat]) => {
               if (chat.messages.length === 0 && id !== chatId) {
                 this.kartonService.setState((draft) => {
-                  if (draft.workspace?.agentChat?.chats[id]) {
-                    delete draft.workspace.agentChat?.chats[id];
-                  }
+                  if (draft.agentChat?.chats[id])
+                    delete draft.agentChat?.chats[id];
                 });
               }
             });
@@ -552,12 +649,11 @@ export class AgentService {
       this.kartonService.registerServerProcedureHandler(
         'agentChat.delete',
         async (chatId: string, _callingClientId: string) => {
-          const activeChatId =
-            this.kartonService.state.workspace?.agentChat?.activeChatId;
+          const activeChatId = this.kartonService.state.agentChat?.activeChatId;
           if (!activeChatId) return;
 
           if (activeChatId === chatId) {
-            const chats = this.kartonService.state.workspace?.agentChat?.chats;
+            const chats = this.kartonService.state.agentChat?.chats;
             const nextChatId = Object.keys(chats || {}).find(
               (id) => id !== chatId,
             );
@@ -570,17 +666,14 @@ export class AgentService {
               );
             } else {
               this.kartonService.setState((draft) => {
-                if (draft.workspace?.agentChat) {
-                  draft.workspace.agentChat.activeChatId = nextChatId;
-                }
+                if (draft.agentChat) draft.agentChat.activeChatId = nextChatId;
               });
             }
           }
 
           this.kartonService.setState((draft) => {
-            if (draft.workspace?.agentChat?.chats[chatId]) {
-              delete draft.workspace.agentChat?.chats[chatId];
-            }
+            if (draft.agentChat?.chats[chatId])
+              delete draft.agentChat?.chats[chatId];
           });
         },
       );
@@ -588,67 +681,7 @@ export class AgentService {
       this.kartonService.registerServerProcedureHandler(
         'agentChat.sendUserMessage',
         async (message: ChatMessage, _callingClientId: string) => {
-          this.logger.debug('[AgentService] Sending user message');
-          const activeChatId =
-            this.kartonService.state.workspace?.agentChat?.activeChatId;
-          if (!activeChatId) return;
-          // Set thinking 'enabled' in main layout. IMPORTANT: Thinking mode must not be switched immediately after tool-responses!
-          const layout = this.kartonService.state.userExperience.activeLayout;
-          if (layout === Layout.MAIN && this.thinkingEnabled === false)
-            this.thinkingEnabled = true;
-          else if (layout === Layout.SETUP_WORKSPACE)
-            this.thinkingEnabled = false;
-
-          const pendingToolCalls = findPendingToolCalls(
-            this.kartonService as KartonStateProvider<KartonContract['state']>,
-            activeChatId,
-          );
-          // User-Interaction tool calls could still have open inputs - cancel them
-          if (pendingToolCalls.length > 0) {
-            pendingToolCalls.forEach(({ toolCallId }) => {
-              attachToolOutputToMessage(
-                this.kartonService as KartonStateProvider<
-                  KartonContract['state']
-                >,
-                [
-                  {
-                    toolCallId,
-                    duration: 0,
-                    error: {
-                      message: 'Tool execution skipped by user',
-                    },
-                  },
-                ],
-                this.lastMessageId!,
-              );
-            });
-          }
-
-          this.setAgentWorking(true);
-
-          const newstate = this.kartonService.setState((draft) => {
-            const chat = draft.workspace?.agentChat?.chats[activeChatId];
-            if (chat) {
-              chat.messages.push({
-                ...message,
-                metadata: {
-                  ...message.metadata,
-                  currentTab: this.getCurrentTab(),
-                },
-              } as any);
-              chat.error = undefined;
-            }
-          });
-
-          const messages =
-            newstate?.workspace?.agentChat?.chats[activeChatId]?.messages;
-
-          this.logger.debug('[AgentService] Calling agent');
-
-          await this.callAgent({
-            chatId: activeChatId,
-            history: messages,
-          });
+          await this.sendUserMessage(message);
         },
       );
 
@@ -670,16 +703,15 @@ export class AgentService {
           );
           const pendingToolCalls = findPendingToolCalls(
             this.kartonService as KartonStateProvider<KartonContract['state']>,
-            this.kartonService.state.workspace?.agentChat?.activeChatId!,
+            this.kartonService.state.agentChat?.activeChatId!,
           );
           if (pendingToolCalls.length > 0) return { success: true }; // Other tool calls are still pending - only call agent on the last submission
           this.setAgentWorking(true);
           this.callAgent({
-            chatId:
-              this.kartonService.state.workspace?.agentChat?.activeChatId!,
+            chatId: this.kartonService.state.agentChat?.activeChatId!,
             history:
-              this.kartonService.state.workspace?.agentChat?.chats[
-                this.kartonService.state.workspace?.agentChat?.activeChatId!
+              this.kartonService.state.agentChat?.chats[
+                this.kartonService.state.agentChat?.activeChatId!
               ]?.messages,
           });
           return { success: true };
@@ -704,11 +736,10 @@ export class AgentService {
           );
           this.setAgentWorking(true);
           this.callAgent({
-            chatId:
-              this.kartonService.state.workspace?.agentChat?.activeChatId!,
+            chatId: this.kartonService.state.agentChat?.activeChatId!,
             history:
-              this.kartonService.state.workspace?.agentChat?.chats[
-                this.kartonService.state.workspace?.agentChat?.activeChatId!
+              this.kartonService.state.agentChat?.chats[
+                this.kartonService.state.agentChat?.activeChatId!
               ]?.messages,
           });
         },
@@ -791,12 +822,11 @@ export class AgentService {
     }
   }
 
-  private getCurrentTab(): MainTab | Layout.SETUP_WORKSPACE {
+  private getCurrentTab(): MainTab | null {
     if (this.kartonService.state.userExperience.activeLayout !== Layout.MAIN)
-      return Layout.SETUP_WORKSPACE;
+      return null;
 
-    if (!this.kartonService.state.userExperience.activeMainTab)
-      return Layout.SETUP_WORKSPACE;
+    if (!this.kartonService.state.userExperience.activeMainTab) return null;
 
     return this.kartonService.state.userExperience.activeMainTab;
   }
@@ -823,8 +853,8 @@ export class AgentService {
 
     if (!this.litellm) return captureAgentError('No litellm available');
 
-    const toolsWithExecute = this.getTools();
-    if (!toolsWithExecute) {
+    const toolsContext = this.getToolsContext();
+    if (!toolsContext) {
       // agent without workspace configured won't use any tools
       this.logger.debug(
         "[AgentService] Tools are null, agent without workspace configured won't use any tools",
@@ -844,7 +874,7 @@ export class AgentService {
       );
       this.setAgentWorking(false);
       this.kartonService.setState((draft) => {
-        const chat = draft.workspace?.agentChat?.chats[chatId];
+        const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
             type: AgentErrorType.AGENT_ERROR,
@@ -881,7 +911,7 @@ export class AgentService {
         );
 
         this.kartonService.setState((draft) => {
-          const chat = draft.workspace?.agentChat?.chats[chatId];
+          const chat = draft.agentChat?.chats[chatId];
           if (chat) chat.title = title;
         });
       }
@@ -890,9 +920,7 @@ export class AgentService {
         this.telemetryService.capture('agent-prompt-triggered');
       }
 
-      const isSetupMode =
-        this.kartonService.state.userExperience.activeLayout ===
-        Layout.SETUP_WORKSPACE;
+      const isSetupMode = this.kartonService.state.workspaceStatus === 'setup';
 
       const model = this.telemetryService.withTracing(
         isSetupMode
@@ -909,8 +937,8 @@ export class AgentService {
       );
 
       // Get the tools based on the agent mode
-      const tools = toolsWithExecute
-        ? toolsWithoutExecute(toolsWithExecute)
+      const tools = toolsContext
+        ? toolsWithoutExecute(toolsContext.tools)
         : null;
 
       const stream = streamText({
@@ -948,8 +976,8 @@ export class AgentService {
           this.telemetryService.captureException(r.error);
           if (NoSuchToolError.isInstance(r.error)) return null;
 
-          const tool = toolsWithExecute
-            ? tools?.[r.toolCall.toolName as keyof AllTools]
+          const tool = toolsContext
+            ? tools?.[r.toolCall.toolName as keyof typeof tools]
             : null;
           if (!tool) return null;
 
@@ -968,14 +996,23 @@ export class AgentService {
         onFinish: async (r) => {
           this.authRetryCount = 0;
           const messages =
-            this.kartonService.state.workspace?.agentChat?.chats[chatId]
-              ?.messages ?? [];
+            this.kartonService.state.agentChat?.chats[chatId]?.messages ?? [];
+
+          // Get current tools context for processing tool calls
+          const currentToolsContext = this.getToolsContext();
+          if (!currentToolsContext) {
+            this.logger.debug(
+              '[AgentService] No tools context available for processing tool calls',
+            );
+            return;
+          }
 
           const toolResults = await processToolCalls(
-            r.toolCalls,
-            this.getTools() as AllTools,
+            r.toolCalls as any,
+            currentToolsContext.tools as any,
             messages,
             (result) => {
+              if (!this.isWorking) return;
               if ('result' in result && hasUndoMetadata(result.result)) {
                 this.undoToolCallStack.get(chatId)?.push({
                   toolCallId: result.toolCallId,
@@ -1014,7 +1051,7 @@ export class AgentService {
 
           // Updating the used context window size of the chat.
           this.kartonService.setState((draft) => {
-            const chat = draft.workspace?.agentChat?.chats[chatId];
+            const chat = draft.agentChat?.chats[chatId];
             if (chat && r.totalUsage.inputTokens)
               chat.usage.usedContextWindowSize = r.totalUsage.inputTokens;
             return draft;
@@ -1024,10 +1061,13 @@ export class AgentService {
             (r) => 'userInteractionrequired' in r && r.userInteractionrequired,
           );
 
-          if (!requiresUserInteraction && toolResults.length > 0) {
+          if (
+            !requiresUserInteraction &&
+            toolResults.length > 0 &&
+            this.isWorking
+          ) {
             const updatedMessages =
-              this.kartonService.state.workspace?.agentChat?.chats[chatId]
-                ?.messages;
+              this.kartonService.state.agentChat?.chats[chatId]?.messages;
 
             return this.callAgent({
               chatId,
@@ -1055,7 +1095,7 @@ export class AgentService {
       const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
       this.kartonService.setState((draft) => {
-        const chat = draft.workspace?.agentChat?.chats[chatId];
+        const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
             type: AgentErrorType.AGENT_ERROR,
@@ -1073,8 +1113,7 @@ export class AgentService {
     uiStream: ReadableStream<InferUIMessageChunk<ChatMessage>>,
     onNewMessage?: (messageId: string) => void,
   ) {
-    const activeChatId =
-      this.kartonService.state.workspace?.agentChat?.activeChatId;
+    const activeChatId = this.kartonService.state.agentChat?.activeChatId;
     if (!activeChatId) return;
 
     let thinkingStartTime: number | null = null;
@@ -1100,8 +1139,7 @@ export class AgentService {
         thinkingDuration = Date.now() - thinkingStartTime;
         thinkingStartTime = null;
       }
-      const chat =
-        this.kartonService.state.workspace?.agentChat?.chats[activeChatId];
+      const chat = this.kartonService.state.agentChat?.chats[activeChatId];
       const messageExists = chat?.messages.find((m) => m.id === uiMessage.id);
 
       const uiMessageWithMetadata: ChatMessage = {
@@ -1115,7 +1153,7 @@ export class AgentService {
 
       if (messageExists) {
         this.kartonService.setState((draft) => {
-          const chat = draft.workspace?.agentChat?.chats[activeChatId];
+          const chat = draft.agentChat?.chats[activeChatId];
           if (chat) {
             chat.messages = chat.messages.map((m) =>
               m.id === uiMessage.id
@@ -1127,7 +1165,7 @@ export class AgentService {
       } else {
         onNewMessage?.(uiMessage.id);
         this.kartonService.setState((draft) => {
-          const chat = draft.workspace?.agentChat?.chats[activeChatId];
+          const chat = draft.agentChat?.chats[activeChatId];
           if (chat) {
             chat.messages.push(uiMessageWithMetadata as any);
           }
@@ -1139,7 +1177,7 @@ export class AgentService {
   private async assistantMadeCodeChangesUntilLatestUserMessage(
     chatId: string,
   ): Promise<boolean> {
-    const chat = this.kartonService.state.workspace?.agentChat?.chats[chatId];
+    const chat = this.kartonService.state.agentChat?.chats[chatId];
     const history = chat?.messages ?? [];
     const reversedHistory = [...history].reverse();
     const userMessageIndex = reversedHistory.findIndex(
@@ -1167,7 +1205,7 @@ export class AgentService {
   ): Promise<ChatMessage | null> {
     if (!this.undoToolCallStack.has(chatId)) return null;
 
-    const chat = this.kartonService.state.workspace?.agentChat?.chats[chatId];
+    const chat = this.kartonService.state.agentChat?.chats[chatId];
     const history = chat?.messages ?? [];
     const reversedHistory = [...history].reverse();
     const userMessageIndex = reversedHistory.findIndex(
@@ -1192,7 +1230,7 @@ export class AgentService {
   ): Promise<void> {
     if (!this.undoToolCallStack.has(chatId)) return;
 
-    const chat = this.kartonService.state.workspace?.agentChat?.chats[chatId];
+    const chat = this.kartonService.state.agentChat?.chats[chatId];
     const history = chat?.messages ?? [];
     const userMessageIndex = history.findIndex(
       (m) => m.role === 'user' && 'id' in m && m.id === userMessageId,
@@ -1232,7 +1270,7 @@ export class AgentService {
 
     this.kartonService.setState((draft) => {
       if (userMessageIndex !== -1) {
-        const chat = draft.workspace?.agentChat?.chats[chatId];
+        const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.messages = history.slice(0, userMessageIndex) as any;
         }
@@ -1264,7 +1302,11 @@ export class AgentService {
     kartonService: KartonService,
     globalConfigService: GlobalConfigService,
     authService: AuthService,
-    workspaceSetupService: WorkspaceSetupService,
+    onSaveSetupInformation: (params: {
+      agentAccessPath: string;
+      ide: string | undefined;
+      appPath: string;
+    }) => Promise<void>,
   ) {
     const instance = new AgentService(
       logger,
@@ -1272,7 +1314,7 @@ export class AgentService {
       kartonService,
       globalConfigService,
       authService,
-      workspaceSetupService,
+      onSaveSetupInformation,
     );
     await instance.initialize();
     logger.debug('[AgentService] Created service');
@@ -1345,7 +1387,7 @@ export class AgentService {
       });
 
       this.kartonService.setState((draft) => {
-        const chat = draft.workspace?.agentChat?.chats[chatId];
+        const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
             type: AgentErrorType.PLAN_LIMITS_EXCEEDED,
@@ -1374,7 +1416,7 @@ export class AgentService {
       await this.initializeLitellm();
 
       const messages =
-        this.kartonService.state.workspace?.agentChat?.chats[chatId]?.messages;
+        this.kartonService.state.agentChat?.chats[chatId]?.messages;
       await this.callAgent({
         chatId,
         history: messages,
@@ -1387,7 +1429,7 @@ export class AgentService {
       this.authRetryCount = 0;
       this.setAgentWorking(false);
       this.kartonService.setState((draft) => {
-        const chat = draft.workspace?.agentChat?.chats[chatId];
+        const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
             type: AgentErrorType.AGENT_ERROR,
@@ -1398,7 +1440,7 @@ export class AgentService {
       return;
     } else if (isContextLimitError(error.error)) {
       this.kartonService.setState((draft) => {
-        const chat = draft.workspace?.agentChat?.chats[chatId];
+        const chat = draft.agentChat?.chats[chatId];
         if (chat)
           chat.error = {
             type: AgentErrorType.CONTEXT_LIMIT_EXCEEDED,
@@ -1420,7 +1462,7 @@ export class AgentService {
       const errorDesc = formatErrorDescription('Agent failed', errorDetails);
       this.setAgentWorking(false);
       this.kartonService.setState((draft) => {
-        const chat = draft.workspace?.agentChat?.chats[chatId];
+        const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
             type: AgentErrorType.AGENT_ERROR,

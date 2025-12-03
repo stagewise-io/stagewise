@@ -345,7 +345,7 @@ const AnchorComponent = ({
   }, [href]);
 
   const conversationId = useKartonState(
-    (s) => s.workspace?.agentChat?.activeChatId ?? 'unknown',
+    (s) => s.agentChat?.activeChatId ?? 'unknown',
   );
 
   const openInIdeChoice = useKartonState((s) => s.globalConfig.openFilesInIde);

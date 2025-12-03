@@ -155,12 +155,6 @@ export class UserExperienceService {
     if (this.kartonService.state.userAccount?.status === 'unauthenticated') {
       return Layout.SIGNIN;
     }
-    if (this.kartonService.state.workspaceStatus === 'closed') {
-      return Layout.OPEN_WORKSPACE;
-    }
-    if (this.kartonService.state.workspace?.setupActive) {
-      return Layout.SETUP_WORKSPACE;
-    }
 
     return Layout.MAIN;
   }

@@ -363,12 +363,12 @@ All scenarios accept `mockKartonState` in parameters for initial state:
 const baseState: Partial<AppState> = {
   workspace: {
     agent: { accessPath: '/path/to/project' },
-    agentChat: {
-      chats: {},
-      activeChatId: 'streaming-chat',
-      toolCallApprovalRequests: [],
-      isWorking: false,
-    },
+  },
+  agentChat: {
+    chats: {},
+    activeChatId: 'streaming-chat',
+    toolCallApprovalRequests: [],
+    isWorking: false,
   },
 };
 
@@ -454,7 +454,7 @@ executor.start();
 ## Troubleshooting
 
 **Issue**: Timeline doesn't start
-- ✅ Ensure `mockKartonState` has `workspace.agentChat` structure
+- ✅ Ensure `mockKartonState` has `agentChat` structure
 - ✅ Check browser console for errors
 
 **Issue**: Timing feels wrong

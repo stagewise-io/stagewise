@@ -9,10 +9,12 @@ import type { Logger } from './logger';
 import type { FilePickerService } from './file-picker';
 import type { TelemetryService } from './telemetry';
 import type { KartonService } from './karton';
-import type { AuthService } from './auth';
 import type { GlobalDataPathService } from './global-data-path';
 import type { NotificationService } from './notification';
-import type { GlobalConfigService } from './global-config';
+
+type WorkspaceChangedEvent =
+  | { type: 'loaded'; selectedPath: string }
+  | { type: 'unloaded' };
 
 export class WorkspaceManagerService {
   private currentWorkspace: WorkspaceService | null = null;
@@ -20,19 +22,15 @@ export class WorkspaceManagerService {
   private filePickerService: FilePickerService;
   private telemetryService: TelemetryService;
   private kartonService: KartonService;
-  private globalConfigService: GlobalConfigService;
-  private authService: AuthService;
   private globalDataPathService: GlobalDataPathService;
   private notificationService: NotificationService;
-  private workspaceChangeListeners: (() => void)[] = [];
-
+  private workspaceChangeListeners: ((event: WorkspaceChangedEvent) => void)[] =
+    [];
   private constructor(
     logger: Logger,
     filePickerService: FilePickerService,
     telemetryService: TelemetryService,
     kartonService: KartonService,
-    globalConfigService: GlobalConfigService,
-    authService: AuthService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
   ) {
@@ -40,8 +38,6 @@ export class WorkspaceManagerService {
     this.filePickerService = filePickerService;
     this.telemetryService = telemetryService;
     this.kartonService = kartonService;
-    this.globalConfigService = globalConfigService;
-    this.authService = authService;
     this.globalDataPathService = globalDataPathService;
     this.notificationService = notificationService;
   }
@@ -72,8 +68,6 @@ export class WorkspaceManagerService {
     filePickerService: FilePickerService,
     telemetryService: TelemetryService,
     kartonService: KartonService,
-    globalConfigService: GlobalConfigService,
-    authService: AuthService,
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
   ) {
@@ -82,8 +76,6 @@ export class WorkspaceManagerService {
       filePickerService,
       telemetryService,
       kartonService,
-      globalConfigService,
-      authService,
       globalDataPathService,
       notificationService,
     );
@@ -114,26 +106,34 @@ export class WorkspaceManagerService {
 
     // If no workspace path is provided, we wait for a user selection through the file picker.
     const selectedPath =
-      workspacePath ??
-      (
-        await this.filePickerService.createRequest({
-          title: 'Select a workspace',
-          description: 'Select a workspace to load',
-          type: 'directory',
-          multiple: false,
-        })
-      )[0];
+      workspacePath !== undefined
+        ? workspacePath
+        : (
+            await this.filePickerService.createRequest({
+              title: 'Select a workspace',
+              description: 'Select a workspace to load',
+              type: 'directory',
+              multiple: false,
+            })
+          )?.[0];
 
     if (!selectedPath) {
       this.logger.debug(
         '[WorkspaceManagerService] No workspace path selected. Returning early.',
       );
+      this.kartonService.setState((draft) => {
+        draft.workspaceStatus = 'closed';
+      });
       return;
     }
 
     this.logger.debug(
       `[WorkspaceManagerService] Opening workspace at path: "${selectedPath}"`,
     );
+
+    this.kartonService.setState((draft) => {
+      draft.workspaceStatus = 'setup';
+    });
 
     // If a workspace path is provided, we use it.
     // Instantiate a new workspace service within the correct working directory etc.
@@ -142,14 +142,17 @@ export class WorkspaceManagerService {
       this.logger,
       this.telemetryService,
       this.kartonService,
-      this.globalConfigService,
-      this.authService,
       this.globalDataPathService,
       this.notificationService,
       selectedPath!,
       loadedOnStart,
       pathGivenInStartingArg,
       wrappedCommand,
+      () => {
+        this.kartonService.setState((draft) => {
+          draft.workspaceStatus = 'open';
+        });
+      },
     ).catch((error) => {
       this.logger.error(
         `[WorkspaceManagerService] Failed to create workspace service. Reason: ${error}`,
@@ -176,11 +179,12 @@ export class WorkspaceManagerService {
       return;
     }
 
-    this.kartonService.setState((draft) => {
-      draft.workspaceStatus = 'open';
-    });
-
-    this.workspaceChangeListeners.forEach((listener) => listener());
+    this.workspaceChangeListeners.forEach((listener) =>
+      listener({
+        type: 'loaded',
+        selectedPath,
+      }),
+    );
 
     this.logger.debug('[WorkspaceManagerService] Loaded workspace');
   }
@@ -206,8 +210,9 @@ export class WorkspaceManagerService {
       draft.workspaceStatus = 'closed';
     });
 
-    this.workspaceChangeListeners.forEach((listener) => listener());
-
+    this.workspaceChangeListeners.forEach((listener) =>
+      listener({ type: 'unloaded' }),
+    );
     this.logger.debug('[WorkspaceManagerService] Unloaded workspace');
   }
 
@@ -222,7 +227,9 @@ export class WorkspaceManagerService {
     this.logger.debug('[WorkspaceManagerService] Shutdown complete');
   }
 
-  public registerWorkspaceChangeListener(listener: () => void) {
+  public registerWorkspaceChangeListener(
+    listener: (event: WorkspaceChangedEvent) => void,
+  ) {
     this.workspaceChangeListeners.push(listener);
   }
 

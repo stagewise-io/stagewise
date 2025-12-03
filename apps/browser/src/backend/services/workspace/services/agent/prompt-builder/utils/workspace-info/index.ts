@@ -30,6 +30,7 @@ export type WorkspaceInfo = {
 
 export async function getWorkspaceInfo(
   clientRuntime: ClientRuntime,
+  onError?: (error: Error) => void,
 ): Promise<WorkspaceInfo> {
   // Gather all project information
   const gitRepoRoot = getRepoRootForPath(
@@ -41,7 +42,9 @@ export async function getWorkspaceInfo(
 
   const repoPackages: Package[] = filterPackagesWithoutRelevance(
     filterNonWhitelistedDependencies(
-      await getPackagesInPath(clientRuntime, gitRepoRoot),
+      await getPackagesInPath(clientRuntime, gitRepoRoot, (error) => {
+        onError?.(error);
+      }),
     ),
   ).slice(0, 20); // We only keep the top 20 packages with the most relevant dependencies. To prevent crazy pollution.
 
@@ -93,6 +96,7 @@ const packageJsonSchema = z.looseObject({
 const getPackagesInPath = async (
   clientRuntime: ClientRuntime,
   rootPath: string,
+  onError?: (error: Error) => void,
 ): Promise<Package[]> => {
   const allPackageJsons = await clientRuntime.fileSystem.glob('package.json', {
     absoluteSearchPath: rootPath,
@@ -137,7 +141,11 @@ const getPackagesInPath = async (
                   peerDependencies: peerDependencies,
                 };
               } catch (err) {
-                console.error('Error parsing package JSON: ', path, err);
+                onError?.(
+                  new Error(
+                    `Error parsing package JSON: ${path}, reason: ${err}`,
+                  ),
+                );
                 return null;
               }
             }),

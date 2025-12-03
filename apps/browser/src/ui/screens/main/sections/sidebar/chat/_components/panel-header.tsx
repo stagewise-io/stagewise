@@ -24,14 +24,10 @@ export function ChatPanelHeader({
 
   const createChatProcedure = useKartonProcedure((p) => p.agentChat.create);
   const chats = useKartonState(
-    useComparingSelector((s) => s.workspace?.agentChat?.chats || {}),
+    useComparingSelector((s) => s.agentChat?.chats || {}),
   );
-  const activeChatId = useKartonState(
-    (s) => s.workspace?.agentChat?.activeChatId || null,
-  );
-  const isWorking = useKartonState(
-    (s) => s.workspace?.agentChat?.isWorking || false,
-  );
+  const activeChatId = useKartonState((s) => s.agentChat?.activeChatId || null);
+  const isWorking = useKartonState((s) => s.agentChat?.isWorking || false);
 
   const createChat = useCallback(() => {
     createChatProcedure().then(() => {

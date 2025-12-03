@@ -120,9 +120,8 @@ function StreamingSimulator({
 
   // Build the streaming message state
   const streamingState = useMemo(() => {
-    const chatId =
-      baseMockState?.workspace?.agentChat?.activeChatId || 'streaming-chat';
-    const existingChat = baseMockState?.workspace?.agentChat?.chats?.[chatId];
+    const chatId = baseMockState?.agentChat?.activeChatId || 'streaming-chat';
+    const existingChat = baseMockState?.agentChat?.chats?.[chatId];
 
     // Find and update the target message
     const updatedMessages = (existingChat?.messages || []).map((msg) => {
@@ -150,17 +149,17 @@ function StreamingSimulator({
       ...baseMockState,
       workspace: {
         ...baseMockState?.workspace,
-        agentChat: {
-          ...baseMockState?.workspace?.agentChat,
-          chats: {
-            ...baseMockState?.workspace?.agentChat?.chats,
-            [chatId]: {
-              ...existingChat,
-              messages: updatedMessages,
-            },
+      },
+      agentChat: {
+        ...baseMockState?.agentChat,
+        chats: {
+          ...baseMockState?.agentChat?.chats,
+          [chatId]: {
+            ...existingChat,
+            messages: updatedMessages,
           },
-          isWorking,
         },
+        isWorking,
       },
     } as Partial<AppState>;
   }, [baseMockState, config.messageId, currentText, isComplete, isWorking]);

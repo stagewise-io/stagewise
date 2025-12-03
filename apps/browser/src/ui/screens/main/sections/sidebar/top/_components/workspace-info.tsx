@@ -1,4 +1,5 @@
 import { Button } from '@stagewise/stage-ui/components/button';
+
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import {
   Popover,
@@ -12,7 +13,12 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { useCallback, useMemo } from 'react';
-import { ChevronDownIcon, FolderIcon } from 'lucide-react';
+import {
+  ChevronDownIcon,
+  FolderIcon,
+  Loader2Icon,
+  PlusIcon,
+} from 'lucide-react';
 
 export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
   const workspace = useKartonState((s) => s.workspace);
@@ -30,26 +36,15 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
   const openWorkspace = useKartonProcedure((p) => p.workspace.open);
   const closeWorkspace = useKartonProcedure((p) => p.workspace.close);
 
+  const status = useKartonState((s) => s.workspaceStatus);
+
   const createFilePickerRequest = useKartonProcedure(
     (p) => p.filePicker.createRequest,
   );
 
-  const selectAndOpenWorkspace = useCallback(() => {
-    void createFilePickerRequest({
-      title: 'Select a workspace',
-      description: 'Select a workspace to load',
-      type: 'directory',
-      multiple: false,
-    })
-      .then(async (path) => {
-        if (workspace) {
-          await closeWorkspace();
-        }
-        await openWorkspace(path[0]!);
-      })
-      .catch((error) => {
-        console.error('Error selecting workspace:', error);
-      });
+  const selectAndOpenWorkspace = useCallback(async () => {
+    if (workspace) await closeWorkspace();
+    await openWorkspace(undefined);
   }, [createFilePickerRequest, openWorkspace, workspace, closeWorkspace]);
 
   const reloadWorkspace = useCallback(() => {
@@ -60,13 +55,52 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
   }, [closeWorkspace, openWorkspace, workspace]);
 
   if (!workspace) {
-    return null;
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="ml-4 text-foreground text-sm"
+        onClick={selectAndOpenWorkspace}
+      >
+        {status === 'loading' ? (
+          <Loader2Icon className="size-4 animate-spin" />
+        ) : (
+          <PlusIcon className="size-4" />
+        )}
+        {status === 'loading' ? 'Select a workspace...' : 'Connect a workspace'}{' '}
+        <br />
+      </Button>
+    );
+  }
+
+  if (status === 'setup') {
+    return (
+      <div className="flex flex-row items-center gap-2 px-4 text-sm">
+        <span className="shimmer-text shimmer-duration-2500 shimmer-from-muted-foreground shimmer-to-zinc-50">
+          Set up workspace in chat...
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-foreground/70 text-sm"
+          onClick={() => {
+            void closeWorkspace();
+          }}
+        >
+          Cancel
+        </Button>
+      </div>
+    );
   }
 
   return (
     <Popover>
       <PopoverTrigger>
-        <Button size={isCollapsed ? 'icon-md' : 'md'} variant="ghost">
+        <Button
+          className="ml-4"
+          size={isCollapsed ? 'icon-md' : 'md'}
+          variant="ghost"
+        >
           {isCollapsed ? (
             <FolderIcon className="size-5" />
           ) : (

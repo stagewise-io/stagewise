@@ -281,10 +281,8 @@ export class TimelineExecutor {
    */
   private handleAddMessage(event: AddMessageEvent): void {
     const chatId =
-      this.state.currentState.workspace?.agentChat?.activeChatId ||
-      'streaming-chat';
-    const existingChat =
-      this.state.currentState.workspace?.agentChat?.chats?.[chatId];
+      this.state.currentState.agentChat?.activeChatId || 'streaming-chat';
+    const existingChat = this.state.currentState.agentChat?.chats?.[chatId];
 
     const updatedMessages = [...(existingChat?.messages || []), event.message];
 
@@ -292,14 +290,14 @@ export class TimelineExecutor {
       ...this.state.currentState,
       workspace: {
         ...this.state.currentState.workspace,
-        agentChat: {
-          ...this.state.currentState.workspace?.agentChat,
-          chats: {
-            ...this.state.currentState.workspace?.agentChat?.chats,
-            [chatId]: {
-              ...existingChat,
-              messages: updatedMessages,
-            },
+      },
+      agentChat: {
+        ...this.state.currentState.agentChat,
+        chats: {
+          ...this.state.currentState.agentChat?.chats,
+          [chatId]: {
+            ...existingChat,
+            messages: updatedMessages,
           },
         },
       },
@@ -566,10 +564,10 @@ export class TimelineExecutor {
       ...this.state.currentState,
       workspace: {
         ...this.state.currentState.workspace,
-        agentChat: {
-          ...this.state.currentState.workspace?.agentChat,
-          isWorking: event.isWorking,
-        },
+      },
+      agentChat: {
+        ...this.state.currentState.agentChat,
+        isWorking: event.isWorking,
       },
     } as Partial<AppState>;
 
@@ -584,10 +582,8 @@ export class TimelineExecutor {
     updater: (message: any) => any,
   ): void {
     const chatId =
-      this.state.currentState.workspace?.agentChat?.activeChatId ||
-      'streaming-chat';
-    const existingChat =
-      this.state.currentState.workspace?.agentChat?.chats?.[chatId];
+      this.state.currentState.agentChat?.activeChatId || 'streaming-chat';
+    const existingChat = this.state.currentState.agentChat?.chats?.[chatId];
 
     const updatedMessages = (existingChat?.messages || []).map((msg: any) => {
       if (msg.id === messageId) {
@@ -600,14 +596,14 @@ export class TimelineExecutor {
       ...this.state.currentState,
       workspace: {
         ...this.state.currentState.workspace,
-        agentChat: {
-          ...this.state.currentState.workspace?.agentChat,
-          chats: {
-            ...this.state.currentState.workspace?.agentChat?.chats,
-            [chatId]: {
-              ...existingChat,
-              messages: updatedMessages,
-            },
+      },
+      agentChat: {
+        ...this.state.currentState.agentChat,
+        chats: {
+          ...this.state.currentState.agentChat?.chats,
+          [chatId]: {
+            ...existingChat,
+            messages: updatedMessages,
           },
         },
       },

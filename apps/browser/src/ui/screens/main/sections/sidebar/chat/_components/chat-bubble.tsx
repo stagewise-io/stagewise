@@ -69,12 +69,8 @@ export function ChatBubble({
   const assistantMadeCodeChangesUntilLatestUserMessage = useKartonProcedure(
     (p) => p.agentChat.assistantMadeCodeChangesUntilLatestUserMessage,
   );
-  const activeChatId = useKartonState(
-    (s) => s.workspace?.agentChat?.activeChatId || null,
-  );
-  const isWorking = useKartonState(
-    (s) => s.workspace?.agentChat?.isWorking || false,
-  );
+  const activeChatId = useKartonState((s) => s.agentChat?.activeChatId || null);
+  const isWorking = useKartonState((s) => s.agentChat?.isWorking || false);
   const { setChatInput } = useChatState();
   const [hasCodeChanges, setHasCodeChanges] = useState(false);
   const isEmptyMessage = useMemo(() => {
