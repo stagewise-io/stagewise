@@ -1,5 +1,3 @@
 {
-  "agentAccessPath": "{GIT_REPO_ROOT}",
-  "appPort": 5173,
-  "useAutoFoundAppPort": true
+  "agentAccessPath": "{GIT_REPO_ROOT}"
 }

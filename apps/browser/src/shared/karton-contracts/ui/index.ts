@@ -1,7 +1,6 @@
 import type {
   AskForAppPathOutput,
   AskForDevScriptIntegrationOutput,
-  AskForPortOutput,
   AskForAgentAccessPathOutput,
   InspirationComponent,
   AskForIdeOutput,
@@ -297,7 +296,6 @@ export type KartonContract = {
         toolCallId: string,
         input:
           | (AskForAppPathOutput & { type: 'askForAppPathTool' })
-          | (AskForPortOutput & { type: 'askForPortTool' })
           | (AskForAgentAccessPathOutput & {
               type: 'askForAgentAccessPathTool';
             })

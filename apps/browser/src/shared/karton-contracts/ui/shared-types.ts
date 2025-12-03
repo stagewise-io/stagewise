@@ -50,22 +50,6 @@ export const workspaceConfigSchema = z
         'Relative path to the active workspace path that defines to which paths the agent has access.',
       )
       .default('{GIT_REPO_ROOT}'),
-    appPort: z
-      .number()
-      .min(0)
-      .max(65536)
-      .describe('The port on which the app dev server serves the app preview')
-      .catch((val) => {
-        if (typeof val !== 'number') return 0;
-        return Math.max(0, Math.min(65536, val));
-      }),
-    useAutoFoundAppPort: z
-      .boolean()
-      .optional()
-      .describe(
-        'Whether to use the automatically found app port. If true, stagewise will try to find the app port automatically and use that instead of the configured value.',
-      )
-      .default(true),
     appExecutionCommand: z
       .string()
       .optional()

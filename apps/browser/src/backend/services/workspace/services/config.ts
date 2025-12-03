@@ -8,7 +8,6 @@ import type { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { WorkspaceLoadingOverrides } from './loading-overrides';
 import {
   type WorkspaceConfig,
   workspaceConfigSchema,
@@ -29,18 +28,15 @@ export class WorkspaceConfigService {
   private logger: Logger;
   private kartonService: KartonService;
   private workspacePath: string;
-  private workspaceLoadingOverrides: WorkspaceLoadingOverrides | null = null;
 
   private constructor(
     logger: Logger,
     kartonService: KartonService,
     workspacePath: string,
-    workspaceLoadingOverrides: WorkspaceLoadingOverrides | null = null,
   ) {
     this.logger = logger;
     this.kartonService = kartonService;
     this.workspacePath = workspacePath;
-    this.workspaceLoadingOverrides = workspaceLoadingOverrides;
   }
 
   private async initialize(
@@ -97,13 +93,6 @@ export class WorkspaceConfigService {
       );
       void this.saveConfigFile();
 
-      // If a workspace loading override was set, now is the time to override the parts of the config that were overridden.
-      // We only do this once on initialization.
-      if (this.workspaceLoadingOverrides) {
-        this.config.appPort =
-          this.workspaceLoadingOverrides.appPort ?? this.config.appPort;
-      }
-
       this.kartonService.setState((draft) => {
         if (draft.workspace) {
           draft.workspace.config = this.config;
@@ -123,14 +112,12 @@ export class WorkspaceConfigService {
     logger: Logger,
     kartonService: KartonService,
     workspacePath: string,
-    workspaceLoadingOverrides: WorkspaceLoadingOverrides | null = null,
     initialConfig: WorkspaceConfig | null = null,
   ): Promise<WorkspaceConfigService> {
     const instance = new WorkspaceConfigService(
       logger,
       kartonService,
       workspacePath,
-      workspaceLoadingOverrides,
     );
     await instance.initialize(initialConfig);
     return instance;

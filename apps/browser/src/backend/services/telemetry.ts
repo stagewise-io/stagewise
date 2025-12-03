@@ -39,7 +39,6 @@ export interface EventProperties {
   };
   'workspace-setup-information-saved': {
     agent_access_path: string;
-    app_port: number;
     ide?: OpenFilesInIde;
   };
   'cli-stored-config-json': undefined;

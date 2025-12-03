@@ -29,12 +29,6 @@ export const DevAppPreviewPanel = () => {
     void toggleFullScreen();
   }, [toggleFullScreen, isFullScreenMode]);
 
-  const appPort = useKartonState(
-    (s) => s.workspace?.devAppStatus?.childProcessOwnedPorts[0],
-  );
-
-  const configuredAppPort = useKartonState((s) => s.workspace?.config?.appPort);
-
   const workspaceFullyOpened = useKartonState(
     (s) => s.workspaceStatus === 'open',
   );
@@ -62,7 +56,7 @@ export const DevAppPreviewPanel = () => {
         id="dev-app-interactivity-area"
         className="non-interactive absolute inset-0 size-full"
       />
-      {workspaceFullyOpened && (appPort || configuredAppPort) ? (
+      {workspaceFullyOpened ? (
         <DOMContextSelector
           ref={selectorCanvasRef as React.RefObject<HTMLDivElement>}
         />

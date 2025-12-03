@@ -4,12 +4,6 @@ export interface InternalToolbarConfig {
   /** A list of plugins that the toolbar should use. */
   plugins: ToolbarPlugin[];
 
-  /** The port on which the dev app is running. */
-  devAppPort: number;
-
-  /** The port that should be displayed in the iframe's location API. */
-  appPort?: number;
-
   /** Configuration for URL synchronization behavior */
   urlSync?: {
     /** Enable or disable location monkey-patching */
@@ -40,7 +34,6 @@ export interface ToolbarPluginLoader {
   mainPlugin: string; // The main plugin code that will be loaded into the toolbar
 }
 
-export interface ToolbarConfig
-  extends Omit<InternalToolbarConfig, 'plugins' | 'devAppPort'> {
+export interface ToolbarConfig extends Omit<InternalToolbarConfig, 'plugins'> {
   plugins: ToolbarPluginLoader[];
 }

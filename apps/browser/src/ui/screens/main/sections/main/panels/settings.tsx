@@ -26,7 +26,6 @@ import {
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
-import { Switch } from '@stagewise/stage-ui/components/switch';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Select } from '@stagewise/stage-ui/components/select';
 import {
@@ -78,8 +77,6 @@ export const WorkspaceSettingsTabContent = () => {
   >(
     _workspaceConfig ?? {
       agentAccessPath: '',
-      appPort: 0,
-      useAutoFoundAppPort: true,
       eddyMode: undefined,
       autoPlugins: true,
       plugins: [],
@@ -101,9 +98,6 @@ export const WorkspaceSettingsTabContent = () => {
     [config, setConfigOptimistic, _setWorkspaceConfig],
   );
 
-  const autoFoundAppPort = useKartonState(
-    (s) => s.workspace?.devAppStatus?.childProcessOwnedPorts[0],
-  );
   const wrappedCommand = useKartonState(
     (s) => s.workspace?.devAppStatus?.wrappedCommand,
   );
@@ -175,51 +169,6 @@ export const WorkspaceSettingsTabContent = () => {
         </FormField>
       </FormFieldset>
       <FormFieldset title="Dev Application setup">
-        <FormField className="@[700px]:flex-row">
-          <div className="flex flex-1 flex-col items-start gap-2">
-            <FormFieldLabel htmlFor="dev-application-port">Port</FormFieldLabel>
-            <FormFieldDescription>
-              The port on which the dev application is running on your machine.
-            </FormFieldDescription>
-          </div>
-          <Input
-            type="number"
-            id="dev-application-port"
-            className="w-28"
-            value={config.appPort}
-            onValueChange={(value) =>
-              setConfig({ appPort: Number.parseInt(value) })
-            }
-            debounce={200}
-          />
-        </FormField>
-        <FormField className="@[700px]:flex-row">
-          <div className="flex flex-1 flex-col items-start gap-2">
-            <FormFieldLabel htmlFor="dev-application-use-auto-found-port">
-              Use automatically found port
-            </FormFieldLabel>
-            <FormFieldDescription>
-              If stagewise starts your app, it can try to determine the port
-              automatically and use that instead of the default configured port.
-              {autoFoundAppPort && (
-                <>
-                  <br />
-                  <span className="italic">
-                    Current automatically found port:{' '}
-                    <strong className="font-mono">{autoFoundAppPort}</strong>
-                  </span>
-                </>
-              )}
-            </FormFieldDescription>
-          </div>
-          <Switch
-            id="dev-application-use-auto-found-port"
-            defaultChecked={config.useAutoFoundAppPort}
-            onCheckedChange={(checked) =>
-              setConfig({ useAutoFoundAppPort: checked })
-            }
-          />
-        </FormField>
         <FormField className="@[700px]:flex-row">
           <div className="flex flex-1 flex-col items-start gap-2">
             <FormFieldLabel htmlFor="dev-application-command">

@@ -1,6 +1,5 @@
 import type { ToolPart } from '@shared/karton-contracts/ui';
 import { AskForAppPathToolPartContent } from './app-path';
-import { AskForPortToolPartContent } from './ask-for-port';
 import { AskForAgentAccessPathToolPartContent } from './agent-access-path';
 import { memo } from 'react';
 import { useKartonProcedure } from '@/hooks/use-karton';
@@ -10,7 +9,6 @@ import { AskForIdeToolPartContent } from './ask-for-ide';
 
 export type InteractionToolPart = Extract<
   ToolPart,
-  | { type: 'tool-askForPortTool' }
   | {
       type: 'tool-askForAppPathTool';
     }
@@ -30,7 +28,6 @@ export function isInteractionToolPart(
   toolPart: ToolPart,
 ): toolPart is InteractionToolPart {
   return (
-    toolPart.type === 'tool-askForPortTool' ||
     toolPart.type === 'tool-askForAppPathTool' ||
     toolPart.type === 'tool-askForAgentAccessPathTool' ||
     toolPart.type === 'tool-askForDevScriptIntegrationTool' ||
@@ -65,20 +62,6 @@ export const InteractionToolPartItem = memo(
           <>
             {toolPart.type === 'tool-askForAppPathTool' && (
               <AskForAppPathToolPartContent
-                toolPart={toolPart}
-                onSubmit={(input) =>
-                  void submitUserInteractionToolInput(
-                    toolPart.toolCallId,
-                    input,
-                  )
-                }
-                onCancel={() =>
-                  void cancelUserInteractionToolInput(toolPart.toolCallId)
-                }
-              />
-            )}
-            {toolPart.type === 'tool-askForPortTool' && (
-              <AskForPortToolPartContent
                 toolPart={toolPart}
                 onSubmit={(input) =>
                   void submitUserInteractionToolInput(

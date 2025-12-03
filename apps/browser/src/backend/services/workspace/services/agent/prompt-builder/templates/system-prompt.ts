@@ -656,7 +656,6 @@ ${kartonState.globalConfig.openFilesInIde === 'other' ? `- [STAGE] MUST use the 
 # Required information
 - app_path: The absolute folder path of app that [USER] wants to integrate stagewise into (e.g. "/Users/username/projects/my-project/apps/website" or "/Users/username/projects/my-project/apps/app" - this is a path where one single project/package is located. In a non-monorepo, this is typically starting path of [WORKSPACE]. In a monorepo, this is path of one of packages in monorepo. app_path typically is not path of a whole monorepo, because app_path targets one single package/project inside a monorepo.
 - agent_access_path: The relative path to root folder of web project, relative to app_path (can be different from app_path, e.g. when USER has opened a package inside a monorepo, e.g. "../.."). Should have values like ".", "../..", or special value "{GIT_REPO_ROOT}" (which gives agent access to whole parent git repository), etc.
-- app_port: The local port on which app is running in development mode (e.g. 3000 for Next.js running on http://localhost:3000).
 ${kartonState.globalConfig.openFilesInIde === 'other' ? `- ide: The IDE that [USER] wants to use to open files in (e.g. "vscode", "cursor", "zed", "kiro", "windsurf", "trae", "other").` : `- ide: The IDE that [USER] wants to use to open files in (e.g. "vscode", "cursor", "zed", "kiro", "windsurf", "trae"). You don't need to ask for it! The user has already picked the IDE "${kartonState.globalConfig.openFilesInIde}".`}
 
 # ${productName} Auto start

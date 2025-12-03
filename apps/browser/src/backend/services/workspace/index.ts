@@ -9,7 +9,6 @@ import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
 import type { GlobalConfigService } from '../global-config';
-import type { WorkspaceLoadingOverrides } from './services/loading-overrides';
 import { WorkspaceConfigService } from './services/config';
 import { WorkspacePluginService } from './services/plugin';
 import { WorkspaceSetupService } from './services/setup';
@@ -21,7 +20,6 @@ import type { GlobalDataPathService } from '@/services/global-data-path';
 import type { NotificationService } from '../notification';
 import path from 'node:path';
 import { getRepoRootForPath } from '@/utils/git-tools';
-import { WorkspaceDevAppStateService } from './services/dev-app-state';
 
 export class WorkspaceService {
   private logger: Logger;
@@ -32,7 +30,6 @@ export class WorkspaceService {
   private globalDataPathService: GlobalDataPathService;
   private notificationService: NotificationService;
   private workspacePath: string;
-  private workspaceLoadingOverrides: WorkspaceLoadingOverrides | null = null;
   private loadedOnStart = false;
   private pathGivenInStartingArg = false;
   private wrappedCommand?: string;
@@ -40,8 +37,6 @@ export class WorkspaceService {
   private workspacePathsService: WorkspacePathsService | null = null;
   private workspaceConfigService: WorkspaceConfigService | null = null;
   private workspacePluginService: WorkspacePluginService | null = null;
-  private workspaceDevAppStateService: WorkspaceDevAppStateService | null =
-    null;
   private workspaceSetupService: WorkspaceSetupService | null = null;
   private _agentService: AgentService | null = null;
   private ragService: RagService | null = null;
@@ -56,7 +51,6 @@ export class WorkspaceService {
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
     workspacePath: string,
-    workspaceLoadingOverrides: WorkspaceLoadingOverrides | null,
     loadedOnStart: boolean,
     pathGivenInStartingArg: boolean,
     wrappedCommand?: string,
@@ -69,7 +63,6 @@ export class WorkspaceService {
     this.globalDataPathService = globalDataPathService;
     this.notificationService = notificationService;
     this.workspacePath = workspacePath;
-    this.workspaceLoadingOverrides = workspaceLoadingOverrides;
     this.loadedOnStart = loadedOnStart;
     this.pathGivenInStartingArg = pathGivenInStartingArg;
     this.wrappedCommand = wrappedCommand;
@@ -164,7 +157,6 @@ export class WorkspaceService {
           this.logger,
           this.kartonService,
           this.workspacePath,
-          this.workspaceLoadingOverrides,
           setupConfig,
         );
 
@@ -197,16 +189,6 @@ export class WorkspaceService {
           });
         });
 
-        this.workspaceDevAppStateService =
-          await WorkspaceDevAppStateService.create(
-            this.logger,
-            this.telemetryService,
-            this.kartonService,
-            this.workspaceConfigService,
-            this.workspacePath,
-            this.wrappedCommand,
-          );
-
         this.ragService =
           (await RagService.create(
             this.logger,
@@ -221,6 +203,7 @@ export class WorkspaceService {
                 cause: error,
               },
             );
+            return null;
           })) ?? null;
 
         this.telemetryService.capture('workspace-opened', {
@@ -264,6 +247,7 @@ export class WorkspaceService {
         this.logger.error(
           `[WorkspaceService] Failed to create agent service. Error: ${error}`,
         );
+        return null;
       })) ?? null;
   }
 
@@ -276,7 +260,6 @@ export class WorkspaceService {
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
     workspacePath: string,
-    workspaceLoadingOverrides: WorkspaceLoadingOverrides | null,
     loadedOnStart: boolean,
     pathGivenInStartingArg: boolean,
     wrappedCommand?: string,
@@ -290,7 +273,6 @@ export class WorkspaceService {
       globalDataPathService,
       notificationService,
       workspacePath,
-      workspaceLoadingOverrides,
       loadedOnStart,
       pathGivenInStartingArg,
       wrappedCommand,
@@ -303,8 +285,6 @@ export class WorkspaceService {
   public async teardown() {
     this.logger.debug('[WorkspaceService] Teardown called');
 
-    // TODO: Teardown all the child services hosted within this workspace.
-    await this.workspaceDevAppStateService?.teardown();
     this._agentService?.teardown();
     this.ragService?.teardown();
     await this.workspaceSetupService?.teardown();
@@ -357,10 +337,6 @@ export class WorkspaceService {
 
   get agentService(): AgentService | null {
     return this._agentService!;
-  }
-
-  get devAppStateService(): WorkspaceDevAppStateService | null {
-    return this.workspaceDevAppStateService!;
   }
 }
 

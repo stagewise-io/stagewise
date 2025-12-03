@@ -18,11 +18,6 @@ import {
   type AskForDevScriptIntegrationOutput,
 } from './node-runtime/project-setup/ask-for-dev-script-integration.js';
 import {
-  askForPortTool,
-  askForPortOutputSchema,
-  type AskForPortOutput,
-} from './node-runtime/project-setup/ask-for-port-tool.js';
-import {
   type SaveRequiredInformationParams,
   saveRequiredInformationTool,
 } from './node-runtime/project-setup/save-required-information.js';
@@ -49,17 +44,14 @@ import type { AppRouter, TRPCClient } from '@stagewise/api-client';
 
 export {
   askForAppPathTool,
-  askForPortTool,
   askForAgentAccessPathTool,
   askForDevScriptIntegrationTool,
   askForDevScriptIntegrationOutputSchema,
   askForAppPathOutputSchema,
-  askForPortOutputSchema,
   askForAgentAccessPathOutputSchema,
   askForIdeTool,
   askForIdeOutputSchema,
   type AskForAppPathOutput,
-  type AskForPortOutput,
   type AskForAgentAccessPathOutput,
   type AskForDevScriptIntegrationOutput,
   type InspirationComponent,
@@ -155,7 +147,6 @@ export function setupAgentTools(
   callbacks: SetupAgentCallbacks,
 ) {
   return {
-    askForPortTool: userInteractionTool(askForPortTool(clientRuntime)),
     askForAgentAccessPathTool: userInteractionTool(
       askForAgentAccessPathTool(clientRuntime),
     ),

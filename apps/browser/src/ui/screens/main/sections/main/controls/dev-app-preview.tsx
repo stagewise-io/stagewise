@@ -1,19 +1,12 @@
 import { cn } from '@/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  PopoverTitle,
-} from '@stagewise/stage-ui/components/popover';
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { Input } from '@stagewise/stage-ui/components/input';
 import {
-  PlayIcon,
   RefreshCwIcon,
   BookImageIcon,
   ArrowLeftIcon,
@@ -22,7 +15,7 @@ import {
   ArrowRightIcon,
   BugIcon,
 } from 'lucide-react';
-import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { Layout, MainTab } from '@shared/karton-contracts/ui';
 import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
@@ -42,7 +35,6 @@ export function DevAppPreviewControls() {
         isFullScreen && 'pr-1',
       )}
     >
-      <DevAppStateInfo />
       <DevToolsToggle />
       <UrlControl />
     </div>
@@ -264,170 +256,6 @@ function DevToolsToggle() {
         {devToolsOpen ? 'Close dev tools' : 'Open dev tools'}
       </TooltipContent>
     </Tooltip>
-  );
-}
-
-export function DevAppStateInfo() {
-  const appState = useKartonState((s) => s.workspace?.devAppStatus);
-
-  const configuredAppCommand = useKartonState(
-    (s) => s.workspace?.config?.appExecutionCommand,
-  );
-
-  const startApp = useKartonProcedure((p) => p.workspace.devAppState.start);
-  const stopApp = useKartonProcedure((p) => p.workspace.devAppState.stop);
-  const restartApp = useKartonProcedure((p) => p.workspace.devAppState.restart);
-
-  const canControlApp = useMemo(() => {
-    return !!(appState?.wrappedCommand || configuredAppCommand);
-  }, [
-    appState?.wrappedCommand,
-    configuredAppCommand,
-    appState?.childProcessRunning,
-  ]);
-
-  const canStartApp = useMemo(() => {
-    return !appState?.childProcessRunning;
-  }, [appState]);
-
-  const canRestartApp = useMemo(() => {
-    return !!appState?.childProcessRunning;
-  }, [appState]);
-
-  const canStopApp = useMemo(() => {
-    return !!appState?.childProcessRunning;
-  }, [appState]);
-
-  return (
-    <Popover>
-      <Tooltip>
-        <TooltipTrigger>
-          <PopoverTrigger>
-            <Button
-              variant="secondary"
-              size="icon-md"
-              className="@[320px]:flex hidden bg-background/80 backdrop-blur-lg"
-            >
-              <PlayIcon className="size-4" />
-              <div
-                className={cn(
-                  'glass-body absolute right-px bottom-px z-10 size-3 rounded-full bg-green-600',
-                  appState?.childProcessRunning
-                    ? appState?.contentAvailableOnPort
-                      ? 'bg-green-600'
-                      : 'bg-yellow-600'
-                    : 'bg-gray-500',
-                )}
-              />
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Dev App Server Status</TooltipContent>
-      </Tooltip>
-      <PopoverContent>
-        <PopoverTitle>Dev App Server Status</PopoverTitle>
-        <div className="flex flex-col items-stretch gap-4">
-          <div className="flex flex-col items-stretch gap-2">
-            <div className="flex flex-row items-center justify-between gap-4">
-              <p className="text-muted-foreground text-sm">
-                Child process running
-              </p>
-              <p className="font-mono text-sm">
-                {appState?.childProcessRunning ? 'Yes' : 'No'}
-              </p>
-            </div>
-
-            <div className="flex flex-row items-center justify-between gap-4">
-              <p className="text-muted-foreground text-sm">Child process PID</p>
-              <p className="text-sm">{appState?.childProcessPid ?? '––'}</p>
-            </div>
-
-            <div className="flex flex-row items-center justify-between gap-4">
-              <p className="text-muted-foreground text-sm">
-                Child process port
-              </p>
-              <p className="font-mono text-sm">
-                {appState?.childProcessOwnedPorts.join(', ') ?? '––'}
-              </p>
-            </div>
-
-            <div className="flex flex-row items-center justify-between gap-4">
-              <p className="text-muted-foreground text-sm">
-                Content available on port
-              </p>
-              <p className="text-sm">
-                {appState?.contentAvailableOnPort ? 'Yes' : 'No'}
-              </p>
-            </div>
-
-            <div className="flex flex-row items-center justify-between gap-4">
-              <p className="text-muted-foreground text-sm">Last error</p>
-              <p className="text-sm">
-                {appState?.lastChildProcessError?.message ?? 'None'}
-              </p>
-            </div>
-            <div className="flex flex-row items-center justify-between gap-4">
-              <p className="text-muted-foreground text-sm">Last error code</p>
-              <p className="text-sm">
-                {appState?.lastChildProcessError?.code ?? 'None'}
-              </p>
-            </div>
-            <div className="flex flex-row items-center justify-between gap-4">
-              <p className="text-muted-foreground text-sm">Wrapped command</p>
-              <p className="font-mono text-sm">
-                {appState?.wrappedCommand ?? 'None'}
-              </p>
-            </div>
-          </div>
-        </div>
-        {canControlApp && (
-          <div className="flex flex-row-reverse items-center justify-start gap-2">
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="secondary"
-                  size="icon-sm"
-                  // className="bg-green-600/20 text-foreground dark:bg-green-700/20"
-                  onClick={() => startApp()}
-                  disabled={!canStartApp}
-                >
-                  <PlayIcon className="ml-px size-3.5 fill-current" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Start dev server</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="secondary"
-                  size="icon-sm"
-                  // className="bg-yellow-600/20 text-foreground dark:bg-yellow-700/20"
-                  onClick={() => restartApp()}
-                  disabled={!canRestartApp}
-                >
-                  <RefreshCwIcon className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Restart dev server</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="secondary"
-                  size="icon-sm"
-                  // className="bg-rose-600/20 text-rose-50 dark:bg-rose-700/20"
-                  onClick={() => stopApp()}
-                  disabled={!canStopApp}
-                >
-                  <SquareIcon className="size-3.5 fill-current" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Stop dev server</TooltipContent>
-            </Tooltip>
-          </div>
-        )}
-      </PopoverContent>
-    </Popover>
   );
 }
 

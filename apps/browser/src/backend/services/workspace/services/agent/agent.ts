@@ -166,7 +166,6 @@ export class AgentService {
           onSaveInformation: async (params) => {
             this.telemetryService.capture('workspace-setup-information-saved', {
               agent_access_path: params.agentAccessPath,
-              app_port: params.appPort,
               ide: params.ide,
             });
             this.logger.debug(
@@ -183,8 +182,6 @@ export class AgentService {
             await this.workspaceSetupService.handleSetupSubmission(
               {
                 agentAccessPath: params.agentAccessPath,
-                useAutoFoundAppPort: true,
-                appPort: params.appPort,
               },
               params.appPath,
             );

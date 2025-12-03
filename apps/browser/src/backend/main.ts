@@ -16,7 +16,6 @@ import { URIHandlerService } from './services/uri-handler';
 
 export type MainParameters = {
   launchOptions: {
-    appPort?: number; // Will only be respected on the initially launched workspace.
     workspacePath?: string;
     verbose?: boolean;
     workspaceOnStart?: boolean;
@@ -25,13 +24,7 @@ export type MainParameters = {
 };
 
 export async function main({
-  launchOptions: {
-    appPort,
-    workspacePath,
-    verbose,
-    workspaceOnStart,
-    wrappedCommand,
-  },
+  launchOptions: { workspacePath, verbose, workspaceOnStart, wrappedCommand },
 }: MainParameters) {
   // In this file you can include the rest of your app's specific main process
   // code. You can also put them in separate files and import them here.
@@ -131,9 +124,6 @@ export async function main({
     logger.debug('[Main] Loading initial workspace...');
     await workspaceManagerService.loadWorkspace(
       workspacePath ?? process.cwd(),
-      {
-        appPort: appPort ?? undefined,
-      },
       true,
       !!workspacePath,
       wrappedCommand,

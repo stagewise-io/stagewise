@@ -9,7 +9,6 @@ import type { Logger } from './logger';
 import type { FilePickerService } from './file-picker';
 import type { TelemetryService } from './telemetry';
 import type { KartonService } from './karton';
-import type { WorkspaceLoadingOverrides } from './workspace/services/loading-overrides';
 import type { AuthService } from './auth';
 import type { GlobalDataPathService } from './global-data-path';
 import type { NotificationService } from './notification';
@@ -95,7 +94,6 @@ export class WorkspaceManagerService {
 
   public async loadWorkspace(
     workspacePath?: string,
-    workspaceLoadingOverrides?: WorkspaceLoadingOverrides,
     loadedOnStart = false,
     pathGivenInStartingArg = false,
     wrappedCommand?: string,
@@ -149,7 +147,6 @@ export class WorkspaceManagerService {
       this.globalDataPathService,
       this.notificationService,
       selectedPath!,
-      workspaceLoadingOverrides ?? null,
       loadedOnStart,
       pathGivenInStartingArg,
       wrappedCommand,

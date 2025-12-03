@@ -89,26 +89,6 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
           </p>
         </div>
 
-        <div className="flex flex-col gap-0">
-          <h3 className="font-medium text-sm">Dev App Port</h3>
-          <p className="select-text font-mono text-foreground/70 text-sm">
-            {workspace?.config?.appPort ?? 'unknown'}
-          </p>
-        </div>
-        {/*
-        <div className="flex flex-col gap-0">
-          <h3 className="font-medium text-sm">
-            Loaded Plugins{' '}
-            <span className="inline-body glass-body rounded-full bg-black/60 px-1 py-px text-white text-xs">
-              {workspace?.plugins?.length ?? 0}
-            </span>
-          </h3>
-          <p className="text-foreground/70 text-sm">
-            {workspace?.plugins?.map((plugin) => plugin.name).join(', ')}
-            {workspace?.plugins?.length === 0 && 'No plugins loaded'}
-          </p>
-        </div>
-        */}
         <div className="grid grid-cols-2 gap-2">
           <Tooltip>
             <TooltipTrigger>
