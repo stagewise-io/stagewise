@@ -68,7 +68,7 @@
     "lucide-react": "^0.523.0",
     "postcss": "^8.5.3",
     "postcss-prefix-selector": "^2.1.1",
-    "react": "^19.1.0",
+    "react": "19.1.2",
     "react-dom": "^19.1.0",
     "rollup": "^4.44.2",
     "rollup-plugin-dts": "^6.2.1",
