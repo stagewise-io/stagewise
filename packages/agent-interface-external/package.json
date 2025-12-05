@@ -44,7 +44,7 @@
     "@types/node": "22.15.2",
     "@types/ws": "^8.18.1",
     "esbuild": "0.25.9",
-    "superjson": "2.2.2",
+    "superjson": "2.2.6",
     "tsup": "^8.4.0",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3",
