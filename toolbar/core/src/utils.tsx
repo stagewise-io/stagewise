@@ -36,6 +36,23 @@ export function getElementAtPoint(x: number, y: number) {
   return refElement;
 }
 
+export function getSurroundingElements(element: HTMLElement) {
+  const parents: HTMLElement[] = [];
+  const children: HTMLElement[] = [];
+  const parentElement = element.parentElement;
+  if (parentElement) {
+    parents.push(parentElement);
+  }
+  const firstChild = Array.from(element.children)?.[0] as HTMLElement | undefined;
+  if (firstChild) {
+    children.push(firstChild);
+  }
+  return {
+    parents,
+    children,
+  };
+}
+
 const isElementAtPoint = (
   element: HTMLElement,
   clientX: number,
@@ -173,6 +190,34 @@ export const hotkeyActionDefinitions: Record<
     keyComboMac: '⌘+⌥+.',
     isEventMatching: (ev) =>
       ev.code === 'Period' && (ev.ctrlKey || ev.metaKey) && ev.altKey,
+  },
+};
+
+// DOM Context Selector Hotkey Actions
+export enum DOMSelectorHotkeyActions {
+  NAVIGATE_TO_PARENT = 0,
+  NAVIGATE_TO_CHILD = 1,
+  SELECT_ELEMENT = 2,
+}
+
+export const domSelectorHotkeyDefinitions: Record<
+  DOMSelectorHotkeyActions,
+  HotkeyActionDefinition
+> = {
+  [DOMSelectorHotkeyActions.NAVIGATE_TO_PARENT]: {
+    keyComboDefault: 'Alt+↑',
+    keyComboMac: '⌥+↑',
+    isEventMatching: (ev) => ev.altKey && ev.key === 'ArrowUp',
+  },
+  [DOMSelectorHotkeyActions.NAVIGATE_TO_CHILD]: {
+    keyComboDefault: 'Alt+↓',
+    keyComboMac: '⌥+↓',
+    isEventMatching: (ev) => ev.altKey && ev.key === 'ArrowDown',
+  },
+  [DOMSelectorHotkeyActions.SELECT_ELEMENT]: {
+    keyComboDefault: 'Alt+Enter',
+    keyComboMac: '⌥+Enter',
+    isEventMatching: (ev) => ev.altKey && ev.key === 'Enter',
   },
 };
 

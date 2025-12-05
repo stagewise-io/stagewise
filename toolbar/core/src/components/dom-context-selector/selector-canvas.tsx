@@ -10,7 +10,9 @@ import { useChatState } from '@/hooks/use-chat-state';
 import { HoveredItem } from './hovered-item';
 import { useContextChipHover } from '@/hooks/use-context-chip-hover';
 import { SelectedItem } from './selected-item';
-import { cn, getElementAtPoint, getXPathForElement } from '@/utils';
+import { SurroundingElementsPanel } from './surrounding-elements-panel';
+import { cn, getElementAtPoint, getXPathForElement, getSurroundingElements } from '@/utils';
+import { useDOMSelectorKeyboard } from '@/hooks/use-dom-selector-keyboard';
 
 export function DOMContextSelector() {
   const {
@@ -67,6 +69,11 @@ export function DOMContextSelector() {
 
   const [hoversAddable, setHoversAddable] = useState(false);
 
+  const surroundingElements = useMemo(() => {
+    if (!hoveredElement) return { parents: [], children: [] };
+    return getSurroundingElements(hoveredElement);
+  }, [hoveredElement]);
+
   const updateHoveredElement = useCallback(() => {
     if (!mouseState.current) return;
     const refElement = getElementAtPoint(
@@ -85,6 +92,38 @@ export function DOMContextSelector() {
       setHoversAddable(true);
     }
   }, [selectedItems]);
+
+  // Navigate to parent element (Alt + Up)
+  const navigateToParent = useCallback(() => {
+    const parent = surroundingElements.parents[0];
+    if (parent && !selectedItems.includes(parent)) {
+      lastHoveredElement.current = parent;
+      setHoveredElement(parent);
+      setHoversAddable(true);
+    }
+  }, [surroundingElements, selectedItems]);
+
+  // Navigate to first child element (Alt + Down)
+  const navigateToChild = useCallback(() => {
+    const child = surroundingElements.children[0];
+    if (child && !selectedItems.includes(child)) {
+      lastHoveredElement.current = child;
+      setHoveredElement(child);
+      setHoversAddable(true);
+    }
+  }, [surroundingElements, selectedItems]);
+
+  // Select the currently hovered element (Alt + Enter)
+  const selectHoveredElement = useCallback(() => {
+    if (!hoveredElement || selectedItems.includes(hoveredElement)) return;
+    handleElementSelected(hoveredElement);
+  }, [hoveredElement, selectedItems, handleElementSelected]);
+
+  useDOMSelectorKeyboard(shouldShow, {
+    onNavigateToParent: navigateToParent,
+    onNavigateToChild: navigateToChild,
+    onSelectElement: selectHoveredElement,
+  });
 
   useEffect(() => {
     updateHoveredElement();
@@ -162,7 +201,14 @@ export function DOMContextSelector() {
     >
       {/* Show blue proposal overlay for new elements */}
       {hoveredElement && !hoveredSelectedElement && (
-        <HoveredItem refElement={hoveredElement} />
+        <>
+          <HoveredItem refElement={hoveredElement} />
+          <SurroundingElementsPanel
+            refElement={hoveredElement}
+            surroundingElements={surroundingElements}
+            onElementClick={handleElementSelected}
+          />
+        </>
       )}
 
       {domContextElements.map((el) => (
