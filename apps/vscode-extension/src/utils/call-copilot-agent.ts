@@ -6,7 +6,7 @@ export async function callCopilotAgent(request: {
   images: string[];
 }): Promise<void> {
   const prompt = `${request.prompt}`;
-  
+
   await vscode.commands.executeCommand('workbench.action.chat.openagent');
   await vscode.commands.executeCommand('workbench.action.chat.submit', {
     inputValue: prompt,
