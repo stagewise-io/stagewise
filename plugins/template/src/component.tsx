@@ -18,12 +18,13 @@ export const ExampleComponent = () => {
           onClick={() => {
             toolbar.sendPrompt({
               role: 'plugin',
-              content: [
+              parts: [
                 {
                   type: 'text',
                   text: "Hello Agent! This is just a test prompt. Could you please respond with 'Hello toolbar plugin!'",
                 },
               ],
+              id: '123',
             });
           }}
         >
