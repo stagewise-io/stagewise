@@ -39,7 +39,7 @@
     "dev": "node build.js"
   },
   "dependencies": {
-    "superjson": "^2.2.2",
+    "superjson": "^2.2.6",
     "uuid": "^11.0.4",
     "ws": "^8.18.0"
   },
