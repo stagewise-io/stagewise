@@ -1,5 +1,11 @@
 # stagewise-vscode-extension
 
+## 0.11.4
+
+### Patch Changes
+
+- b5a4004: Update command names for GitHub Copilot agent and chat extension
+
 ## 0.11.3
 
 ### Patch Changes
