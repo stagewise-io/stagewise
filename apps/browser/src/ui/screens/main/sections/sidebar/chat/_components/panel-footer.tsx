@@ -30,7 +30,7 @@ import { useEventListener } from '@/hooks/use-event-listener';
 import { usePostHog } from 'posthog-js/react';
 
 const GlassyTextInputClassNames =
-  'origin-center rounded-xl border border-black/10 ring-1 ring-white/20 transition-all duration-150 ease-out after:absolute after:inset-0 after:size-full after:content-normal after:rounded-[inherit] after:bg-gradient-to-b after:from-white/5 after:to-white/0 after:transition-colors after:duration-150 after:ease-out disabled:pointer-events-none disabled:bg-black/5 disabled:text-foreground/60 disabled:opacity-30';
+  'origin-center rounded-md border border-black/10 ring-1 ring-white/20 transition-all duration-150 ease-out after:absolute after:inset-0 after:size-full after:content-normal after:rounded-[inherit] after:bg-gradient-to-b after:from-white/5 after:to-white/0 after:transition-colors after:duration-150 after:ease-out disabled:pointer-events-none disabled:bg-black/5 disabled:text-foreground/60 disabled:opacity-30';
 
 const chatTextSlideshowTexts: Record<MainTab | 'fallback', string[]> = {
   [MainTab.DEV_APP_PREVIEW]: [
@@ -241,7 +241,7 @@ export function ChatPanelFooter() {
   return (
     <footer className="z-10 flex flex-col items-stretch gap-1 p-0">
       <div
-        className="glass-body glass-body-interactive flex flex-row items-stretch gap-1 rounded-xl rounded-t-lg bg-background/20 p-2 shadow shadow-black/5 before:absolute before:inset-0 before:rounded-xl data-[chat-active=true]:bg-primary/5 data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/10"
+        className="glass-body glass-body-interactive flex flex-row items-stretch gap-1 rounded-lg bg-background/20 p-2 shadow shadow-black/5 before:absolute before:inset-0 before:rounded-lg data-[chat-active=true]:bg-primary/5 data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/10"
         id="chat-input-container-box"
         data-chat-active={chatInputActive}
       >
@@ -322,7 +322,7 @@ export function ChatPanelFooter() {
                   onClick={abortAgent}
                   aria-label="Stop agent"
                   variant={'secondary'}
-                  className="!opacity-100 group z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg !disabled:*:opacity-10"
+                  className="group z-10 size-8 cursor-pointer rounded-full p-1 opacity-100! shadow-md backdrop-blur-lg !disabled:*:opacity-10"
                 >
                   <SquareIcon className="size-3.5 fill-current" />
                 </Button>

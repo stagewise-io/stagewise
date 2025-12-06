@@ -21,7 +21,7 @@ export const WebContentsBoundsSyncer = () => {
   useLayoutEffect(() => {
     const handleMouseEnter = (e: MouseEvent) => {
       if (e.target instanceof Element) {
-        if (e.target.id === 'dev-app-interactivity-area') {
+        if (e.target.id === 'dev-app-preview-container') {
           isHoveringRef.current = true;
         } else if (isHoveringRef.current) {
           isHoveringRef.current = false;
@@ -31,7 +31,7 @@ export const WebContentsBoundsSyncer = () => {
 
     const handleFocusChange = (e: FocusEvent) => {
       if (e.target instanceof Element) {
-        if (e.target.id === 'dev-app-interactivity-area') {
+        if (e.target.id === 'dev-app-preview-container') {
           isHoveringRef.current = true;
         } else if (isHoveringRef.current) {
           isHoveringRef.current = false;
@@ -63,9 +63,7 @@ export const WebContentsBoundsSyncer = () => {
     if (container) {
       const opacity = getEffectiveOpacity(container);
       // If opacity is below 0.5, treat as non-existing
-      if (opacity < 0.5) {
-        container = null;
-      }
+      if (opacity < 0.5) container = null;
     }
 
     if (!container) {

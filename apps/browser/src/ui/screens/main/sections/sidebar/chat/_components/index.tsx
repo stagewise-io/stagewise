@@ -4,7 +4,6 @@ import { cn } from '@/utils';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ChatHistory } from './chat-history';
 import { ChatPanelFooter } from './panel-footer';
-import { ChatPanelHeader } from './panel-header';
 import { usePostHog } from 'posthog-js/react';
 import {
   useComparingSelector,
@@ -71,7 +70,7 @@ export function ChatPanel({
       role="region"
       aria-label="Chat panel drop zone"
     >
-      <ChatPanelHeader multiChatControls={multiChatControls} />
+      {/* <ChatPanelHeader multiChatControls={multiChatControls} /> */}
       <PanelContent
         className={cn(
           '-mx-3.5 block px-0 py-0',

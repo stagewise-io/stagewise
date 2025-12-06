@@ -61,7 +61,7 @@ const IdeOptionButton = memo(
         type="button"
         onClick={() => onSelect(option.value)}
         disabled={isDisabled}
-        className={`glass-body flex shrink-0 flex-row items-center gap-3 rounded-xl p-2 transition-all ${
+        className={`glass-body flex shrink-0 flex-row items-center gap-3 rounded-md p-2 transition-all ${
           isSelected
             ? 'border-primary bg-primary/10'
             : 'hover:border-primary/50'

@@ -71,6 +71,8 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
     });
   }, [closeWorkspace, openWorkspace, workspace]);
 
+  if (isCollapsed) return null;
+
   if (!workspace && topRecentlyOpenedWorkspaces.length === 0) {
     return (
       <Button

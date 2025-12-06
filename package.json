@@ -51,7 +51,8 @@
       "keytar"
     ],
     "overrides": {
-      "stagewise": "link:apps/cli"
+      "stagewise": "link:apps/cli",
+      "lucide-react": "0.554.0"
     }
   },
   "dependencies": {

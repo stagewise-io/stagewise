@@ -39,7 +39,7 @@ export class TabController extends EventEmitter {
     this.logger = logger;
 
     this.viewContainer = new View();
-    this.viewContainer.setBorderRadius(12);
+    this.viewContainer.setBorderRadius(8);
     this.viewContainer.setBackgroundColor('#FFF');
 
     this.webContentsView = new WebContentsView({
@@ -48,7 +48,7 @@ export class TabController extends EventEmitter {
         partition: 'persist:browser-content',
       },
     });
-    this.webContentsView.setBorderRadius(12);
+    this.webContentsView.setBorderRadius(8);
 
     contextMenu({
       showSaveImageAs: true,
