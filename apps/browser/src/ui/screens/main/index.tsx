@@ -4,8 +4,8 @@ import {
   ResizablePanelGroup,
   ResizableHandle,
 } from '@stagewise/stage-ui/components/resizable';
-import { Sidebar } from './sections/sidebar';
-import { MainSection } from './sections/main';
+import { Sidebar } from './sidebar';
+import { MainSection } from './content';
 import { cn } from '@/utils';
 
 export function DefaultLayout({ show }: { show: boolean }) {
