@@ -2,17 +2,15 @@ import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
+import { TabsContainer } from './_components/tabs-container';
 import {
-  IconPlus,
   IconArrowLeft,
   IconArrowRight,
   IconArrowRotateAnticlockwise,
   IconCommand,
 } from 'nucleo-micro-bold';
-import { ActiveTab } from './_components/active-tab';
 import { Button } from '@stagewise/stage-ui/components/button';
 import type { TabState } from '@shared/karton-contracts/ui';
-import { InactiveTab } from './_components/inactive-tab';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { BackgroundWithCutout } from './_components/background-with-cutout';
 import { IconSquareCodeFill18 } from 'nucleo-ui-fill-18';
@@ -222,79 +220,5 @@ export function MainSection() {
         </div>
       </div>
     </ResizablePanel>
-  );
-}
-
-export function TabsContainer({
-  activeTabId,
-  tabs,
-  setActiveTabId,
-  onAddTab,
-  onCloseTab,
-}: {
-  activeTabId: string;
-  tabs: Record<string, TabState>;
-  setActiveTabId: (tabId: string) => void;
-  onAddTab: () => void;
-  onCloseTab: (tabId: string) => void;
-}) {
-  const getIsLeftNextToActiveTab = (tabId: string) => {
-    return (
-      Object.keys(tabs).findIndex((_id) => _id === tabId) ===
-      Object.keys(tabs).findIndex((tabId) => tabId === activeTabId) - 1
-    );
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 't') onAddTab();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  });
-
-  return (
-    <div className="flex shrink-0 flex-row items-start gap-0.75">
-      {Object.values(tabs).map((tab, index) => {
-        const isLeftNextToActiveTab = getIsLeftNextToActiveTab(tab.id);
-        if (tab.id === activeTabId)
-          return (
-            <ActiveTab
-              key={tab.id}
-              tabState={tab}
-              onClose={() => {
-                onCloseTab(tab.id);
-              }}
-              activateBottomLeftCornerRadius={index !== 0}
-            />
-          );
-        return (
-          <InactiveTab
-            key={tab.id}
-            {...tab}
-            onClick={() => {
-              setActiveTabId(tab.id);
-            }}
-            onClose={() => {
-              onCloseTab(tab.id);
-            }}
-            showRightSeparator={!isLeftNextToActiveTab}
-          />
-        );
-      })}
-      <Button
-        variant="ghost"
-        size="xs"
-        className="h-7 shrink-0 self-start rounded-[5px] hover:bg-zinc-50/70!"
-        onClick={onAddTab}
-      >
-        <IconPlus className="size-3 text-muted-foreground" />
-        <div className="pointer-events-none flex flex-row items-center gap-1 opacity-40">
-          <IconCommand className="size-3 text-muted-foreground" />
-          <span className="font-mono text-muted-foreground text-xs">T</span>
-        </div>
-      </Button>
-      <div className="app-drag h-full min-w-16! grow" />
-    </div>
   );
 }

@@ -2,43 +2,59 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { IconXmark } from 'nucleo-micro-bold';
 import type { TabState } from '@shared/karton-contracts/ui';
+import StagewiseLogo from '@/assets/stagewise/logo.png';
+import { WithTabTooltipPreview } from './with-tab-tooltip-preview';
 
 export function InactiveTab({
-  faviconUrls,
-  title,
+  tabState,
   onClick,
   onClose,
   showRightSeparator = true,
-}: TabState & {
+}: {
   onClick: () => void;
   onClose: () => void;
   showRightSeparator?: boolean;
+  tabState: TabState;
 }) {
   return (
-    <div
-      className={cn(
-        `flex w-40 items-center gap-2 self-start rounded-[5px] px-2 py-1 transition-colors hover:bg-zinc-50/70`,
-        showRightSeparator &&
-          'after:-right-[3px] after:absolute after:h-4 after:border-muted-foreground/20 after:border-r after:content-[""]',
-      )}
-      onClick={onClick}
-    >
-      {
-        <img
-          src={faviconUrls[0]}
-          alt={title}
-          className="ml-1 size-4 shrink-0"
-        />
-      }
-      <span className="truncate text-foreground text-sm">{title}</span>
-      <Button
-        variant="ghost"
-        size="icon-2xs"
-        className="ml-auto shrink-0"
-        onClick={onClose}
+    <WithTabTooltipPreview tabState={tabState}>
+      <div
+        className={cn(
+          `@container flex w-40 min-w-8 items-center gap-2 self-start rounded-[5px] px-2 py-1 transition-colors hover:bg-zinc-50/70`,
+          showRightSeparator &&
+            'after:-right-[2px] after:absolute after:h-4 after:border-muted-foreground/20 after:border-r after:content-[""]',
+        )}
+        onClick={onClick}
       >
-        <IconXmark className="size-3 text-muted-foreground" />
-      </Button>
-    </div>
+        {
+          <div className="@[40px]:ml-1 ml-0 flex h-5 shrink-0 items-center justify-center">
+            {tabState.faviconUrls.length > 0 ? (
+              <img
+                src={tabState.faviconUrls[0]}
+                alt={tabState.title}
+                className="size-4 shrink-0"
+              />
+            ) : (
+              <img
+                src={StagewiseLogo}
+                alt="Stagewise Logo"
+                className="size-4 grayscale"
+              />
+            )}
+          </div>
+        }
+        <span className="@[55px]:block hidden truncate text-foreground text-sm">
+          {tabState.title}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-2xs"
+          className="ml-auto @[40px]:flex hidden shrink-0"
+          onClick={onClose}
+        >
+          <IconXmark className="size-3 text-muted-foreground" />
+        </Button>
+      </div>
+    </WithTabTooltipPreview>
   );
 }
