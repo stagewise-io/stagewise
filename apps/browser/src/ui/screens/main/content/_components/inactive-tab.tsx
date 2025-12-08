@@ -2,7 +2,7 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { IconXmark } from 'nucleo-micro-bold';
 import type { TabState } from '@shared/karton-contracts/ui';
-import StagewiseLogo from '@/assets/stagewise/logo.png';
+import { TabFavicon } from './tab-favicon';
 import { WithTabTooltipPreview } from './with-tab-tooltip-preview';
 
 export function InactiveTab({
@@ -28,19 +28,7 @@ export function InactiveTab({
       >
         {
           <div className="@[40px]:ml-1 ml-0 flex h-5 shrink-0 items-center justify-center">
-            {tabState.faviconUrls.length > 0 ? (
-              <img
-                src={tabState.faviconUrls[0]}
-                alt={tabState.title}
-                className="size-4 shrink-0"
-              />
-            ) : (
-              <img
-                src={StagewiseLogo}
-                alt="Stagewise Logo"
-                className="size-4 grayscale"
-              />
-            )}
+            <TabFavicon tabState={tabState} />
           </div>
         }
         <span className="@[55px]:block hidden truncate text-foreground text-sm">

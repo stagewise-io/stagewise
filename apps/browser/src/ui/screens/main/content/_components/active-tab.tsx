@@ -1,10 +1,10 @@
 import { useLayoutEffect, useMemo, useRef, useState, useId } from 'react';
 import type { TabState } from '@shared/karton-contracts/ui';
-import StagewiseLogo from '@/assets/stagewise/logo.png';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { IconXmark } from 'nucleo-micro-bold';
 import { WithTabTooltipPreview } from './with-tab-tooltip-preview';
+import { TabFavicon } from './tab-favicon';
 
 const CUBIC_BEZIER_CONTROL_POINT_FACTOR = 0.5522847498;
 
@@ -76,19 +76,7 @@ export function ActiveTab({
           />
           <div className="flex items-center gap-2 py-1 pb-1.75 @[40px]:pl-1 pl-0">
             <div className="@[40px]:flex hidden shrink-0 items-center justify-center">
-              {tabState.faviconUrls.length > 0 ? (
-                <img
-                  src={tabState.faviconUrls[0]}
-                  alt={tabState.title}
-                  className="size-4"
-                />
-              ) : (
-                <img
-                  src={StagewiseLogo}
-                  alt="Stagewise Logo"
-                  className="size-4 grayscale"
-                />
-              )}
+              <TabFavicon tabState={tabState} />
             </div>
             <span className="@[55px]:block hidden truncate text-foreground text-sm">
               {tabState.title}

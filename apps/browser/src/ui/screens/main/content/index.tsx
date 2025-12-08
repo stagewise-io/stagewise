@@ -19,6 +19,7 @@ import {
   TooltipTrigger,
   Tooltip,
 } from '@stagewise/stage-ui/components/tooltip';
+import { StartPage } from './_components/start-page';
 
 export function MainSection() {
   const tabs = useKartonState((s) => s.browser.tabs);
@@ -174,6 +175,7 @@ export function MainSection() {
             <div className="relative flex flex-1 items-center rounded-full bg-zinc-500/5 pr-5 pl-3 focus-within:bg-zinc-500/10">
               <input
                 ref={urlInputRef}
+                placeholder="Search or type a URL"
                 type="text"
                 value={localUrl}
                 onChange={(e) => setLocalUrl(e.target.value)}
@@ -212,10 +214,19 @@ export function MainSection() {
           <div className="flex size-full flex-col gap-4 rounded-lg p-2">
             <div
               id="dev-app-preview-container"
-              className={cn(
-                'flex size-full flex-col items-center justify-center overflow-hidden rounded-lg shadow-[0_0_3px_rgba(0,0,0,0.1),0_-6px_48px_-24px_rgba(0,0,0,0.05)]',
+              className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg shadow-[0_0_3px_rgba(0,0,0,0.1),0_-6px_48px_-24px_rgba(0,0,0,0.05)]"
+            >
+              {activeTab?.url === 'ui-main' ? (
+                <StartPage />
+              ) : activeTab?.error ? (
+                <div>Error: {activeTab?.error?.message}</div>
+              ) : (
+                <div
+                  id="dev-app-preview-container"
+                  className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
+                />
               )}
-            />
+            </div>
           </div>
         </div>
       </div>
