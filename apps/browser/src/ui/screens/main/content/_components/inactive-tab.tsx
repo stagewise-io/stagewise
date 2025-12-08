@@ -29,10 +29,7 @@ export function InactiveTab({
         variant="ghost"
         size="icon-2xs"
         className="ml-auto shrink-0"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
+        onClick={onClose}
       >
         <IconXmark className="size-3 text-muted-foreground" />
       </Button>

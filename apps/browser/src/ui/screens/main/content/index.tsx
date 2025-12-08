@@ -297,6 +297,7 @@ export function TabsContainer({
           <span className="font-mono text-muted-foreground text-xs">T</span>
         </div>
       </Button>
+      <div className="app-drag h-full min-w-16! grow" />
     </div>
   );
 }
