@@ -133,11 +133,8 @@ export function MainSection() {
         {/* URL, Controls, etc. area */}
         <div
           className={cn(
-            `flex size-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg ${activeTabIndex !== 0 ? 'rounded-tl-lg' : ''} relative`,
+            `flex size-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg ${activeTabIndex !== 0 ? 'rounded-tl-lg' : ''} relative `,
           )}
-          style={{
-            marginLeft: activeTabIndex !== 0 ? '-1px' : '0',
-          }}
         >
           {/* Background with mask for the web-content */}
           <BackgroundWithCutout className={cn(`z-0`)} borderRadius={8} />
