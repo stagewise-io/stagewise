@@ -34,6 +34,7 @@
   "references": [
     { "path": "./tsconfig.ui.json" },
     { "path": "./tsconfig.backend.json" },
-    { "path": "./tsconfig.storybook.json" }
+    { "path": "./tsconfig.storybook.json" },
+    { "path": "./tsconfig.web-content-preload.json" }
   ]
 }

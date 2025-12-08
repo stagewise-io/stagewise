@@ -94,6 +94,11 @@ export class WebSocketConnection {
   private handleError = (error: Event | Error): void => {
     const err = error instanceof Error ? error : new Error('WebSocket error');
     this.errorHandlers.forEach((handler) => handler(err));
+
+    // Ensure we treat error as close if state is not closed
+    if (this.state !== ConnectionState.CLOSED) {
+      this.handleClose({ code: 1006, reason: err.message });
+    }
   };
 
   private handleMessage = (event: MessageEvent): void => {

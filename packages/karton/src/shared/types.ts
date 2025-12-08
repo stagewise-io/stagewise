@@ -374,6 +374,7 @@ export interface KartonServer<T> {
   unregisterStateChangeCallback: (
     callback: (state: Readonly<KartonState<T>>) => void,
   ) => void;
+  onClose: (handler: (connectionId: string) => void) => () => void;
 }
 
 export interface KartonClientConfig<T> {

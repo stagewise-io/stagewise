@@ -23,7 +23,7 @@ export class WindowLayoutService {
 
   private baseWindow: BaseWindow | null = null;
   private uiController: UIController | null = null;
-  private tabs: Map<string, TabController> = new Map();
+  private tabs: Record<string, TabController> = {};
   private activeTabId: string | null = null;
 
   private currentWebContentBounds: Electron.Rectangle | null = null;
@@ -60,7 +60,7 @@ export class WindowLayoutService {
 
   private async initialize() {
     this.logger.debug('[WindowLayoutService] Initializing service');
-    this.uiController = await UIController.create(this.logger);
+    this.uiController = new UIController(this.logger);
 
     const savedState = this.loadWindowState();
     const defaultWidth = 1200;
@@ -138,6 +138,8 @@ export class WindowLayoutService {
         activeTabId: null,
         history: [],
         contextSelectionMode: false,
+        selectedElements: [],
+        hoveredElement: null,
       };
     });
 
@@ -170,14 +172,14 @@ export class WindowLayoutService {
 
     if (this.baseWindow && !this.baseWindow.isDestroyed()) {
       this.baseWindow.contentView.removeChildView(this.uiController!.getView());
-      this.tabs.forEach((tab) => {
+      Object.values(this.tabs).forEach((tab) => {
         this.baseWindow!.contentView.removeChildView(tab.getViewContainer());
         tab.destroy();
       });
       this.baseWindow.destroy();
     }
 
-    this.tabs.clear();
+    this.tabs = {};
     this.uiController = null;
     this.baseWindow = null;
 
@@ -192,6 +194,20 @@ export class WindowLayoutService {
     this.kartonConnectListener = (event, connectionId) => {
       if (connectionId === 'ui-main') {
         this.uiKarton.setTransportPort(event.ports[0]);
+      } else if (connectionId === 'tab') {
+        this.logger.debug(
+          `[WindowLayoutService] Received karton connection request for tab connection...`,
+        );
+        // Trigger the right tab controller to store the connection in it's internal map.
+        const tab = Object.values(this.tabs).find(
+          (tab) => tab.webContentsId === event.sender.id,
+        );
+        if (tab) {
+          this.logger.debug(
+            `[WindowLayoutService] Adding karton connection to tab ${tab.id}...`,
+          );
+          tab.addKartonConnection(event.ports[0]);
+        }
       }
     };
     ipcMain.on('karton-connect', this.kartonConnectListener);
@@ -203,31 +219,32 @@ export class WindowLayoutService {
   private setupUIControllerListeners() {
     if (!this.uiController) return;
 
-    this.uiController.on('create-tab', this.handleCreateTab);
-    this.uiController.on('close-tab', this.handleCloseTab);
-    this.uiController.on('switch-tab', this.handleSwitchTab);
-    this.uiController.on('layout-update', this.handleLayoutUpdate);
-    this.uiController.on(
-      'interactivity-change',
-      this.handleInteractivityChange,
-    );
+    this.uiController.on('createTab', this.handleCreateTab);
+    this.uiController.on('closeTab', this.handleCloseTab);
+    this.uiController.on('switchTab', this.handleSwitchTab);
+    this.uiController.on('layoutUpdate', this.handleLayoutUpdate);
+    this.uiController.on('interactivityChange', this.handleInteractivityChange);
     this.uiController.on('stop', this.handleStop);
     this.uiController.on('reload', this.handleReload);
     this.uiController.on('goto', this.handleGoto);
-    this.uiController.on('go-back', this.handleGoBack);
-    this.uiController.on('go-forward', this.handleGoForward);
-    this.uiController.on('toggle-dev-tools', this.handleToggleDevTools);
-    this.uiController.on('open-dev-tools', this.handleOpenDevTools);
-    this.uiController.on('close-dev-tools', this.handleCloseDevTools);
+    this.uiController.on('goBack', this.handleGoBack);
+    this.uiController.on('goForward', this.handleGoForward);
+    this.uiController.on('toggleDevTools', this.handleToggleDevTools);
+    this.uiController.on('openDevTools', this.handleOpenDevTools);
+    this.uiController.on('closeDevTools', this.handleCloseDevTools);
     this.uiController.on(
-      'set-context-selection-mode',
+      'setContextSelectionMode',
       this.handleSetContextSelectionMode,
+    );
+    this.uiController.on(
+      'setContextSelectionMouseCoordinates',
+      this.handleSetContextSelectionMouseCoordinates,
     );
   }
 
   private get activeTab(): TabController | undefined {
     if (!this.activeTabId) return undefined;
-    return this.tabs.get(this.activeTabId);
+    return this.tabs[this.activeTabId];
   }
 
   private handleCreateTab = async (url?: string) => {
@@ -239,7 +256,7 @@ export class WindowLayoutService {
     const tab = new TabController(id, this.logger, url);
 
     // Subscribe to state updates
-    tab.on('state-updated', (updates: Partial<TabState>) => {
+    tab.on('stateUpdated', (updates: Partial<TabState>) => {
       this.uiKarton.setState((draft) => {
         const tabState = draft.browser.tabs[id];
         if (tabState) {
@@ -248,7 +265,11 @@ export class WindowLayoutService {
       });
     });
 
-    this.tabs.set(id, tab);
+    tab.on('putIntoBackground', () => {
+      this.handleInteractivityChange(false);
+    });
+
+    this.tabs[id] = tab;
 
     // Initialize state in Karton
     this.uiKarton.setState((draft) => {
@@ -268,11 +289,11 @@ export class WindowLayoutService {
   }
 
   private handleCloseTab = async (tabId: string) => {
-    const tab = this.tabs.get(tabId);
+    const tab = this.tabs[tabId];
     if (tab) {
       this.baseWindow!.contentView.removeChildView(tab.getViewContainer());
       tab.destroy();
-      this.tabs.delete(tabId);
+      delete this.tabs[tabId];
 
       // Clean up Karton state
       this.uiKarton.setState((draft) => {
@@ -281,7 +302,7 @@ export class WindowLayoutService {
 
       if (this.activeTabId === tabId) {
         // Switch to another tab if available
-        const firstTab = this.tabs.keys().next().value;
+        const firstTab = Object.keys(this.tabs)[0];
         if (firstTab) {
           await this.handleSwitchTab(firstTab);
         } else {
@@ -295,15 +316,15 @@ export class WindowLayoutService {
   };
 
   private handleSwitchTab = async (tabId: string) => {
-    if (!this.tabs.has(tabId)) return;
+    if (!this.tabs[tabId]) return;
 
     // Hide current
-    if (this.activeTabId && this.tabs.has(this.activeTabId)) {
-      this.tabs.get(this.activeTabId)!.setVisible(false);
+    if (this.activeTabId && this.tabs[this.activeTabId]) {
+      this.tabs[this.activeTabId]!.setVisible(false);
     }
 
     this.activeTabId = tabId;
-    const newTab = this.tabs.get(tabId)!;
+    const newTab = this.tabs[tabId]!;
 
     if (this.currentWebContentBounds) {
       newTab.setBounds(this.currentWebContentBounds);
@@ -355,12 +376,12 @@ export class WindowLayoutService {
   }
 
   private handleStop = async (tabId?: string) => {
-    const tab = tabId ? this.tabs.get(tabId) : this.activeTab;
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.stop();
   };
 
   private handleReload = async (tabId?: string) => {
-    const tab = tabId ? this.tabs.get(tabId) : this.activeTab;
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.reload();
   };
 
@@ -368,7 +389,7 @@ export class WindowLayoutService {
     this.logger.debug(
       `[WindowLayoutService] handleGoto called with url: ${url}, tabId: ${tabId}, activeTabId: ${this.activeTabId}`,
     );
-    const tab = tabId ? this.tabs.get(tabId) : this.activeTab;
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
     if (tab) {
       tab.loadURL(url);
     } else {
@@ -382,7 +403,7 @@ export class WindowLayoutService {
     this.logger.debug(
       `[WindowLayoutService] handleGoBack called with tabId: ${tabId}`,
     );
-    const tab = tabId ? this.tabs.get(tabId) : this.activeTab;
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.goBack();
   };
 
@@ -390,7 +411,7 @@ export class WindowLayoutService {
     this.logger.debug(
       `[WindowLayoutService] handleGoForward called with tabId: ${tabId}`,
     );
-    const tab = tabId ? this.tabs.get(tabId) : this.activeTab;
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.goForward();
   };
 
@@ -398,17 +419,17 @@ export class WindowLayoutService {
     this.logger.debug(
       `[WindowLayoutService] handleToggleDevTools called with tabId: ${tabId}`,
     );
-    const tab = tabId ? this.tabs.get(tabId) : this.activeTab;
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.toggleDevTools();
   };
 
   private handleOpenDevTools = async (tabId?: string) => {
-    const tab = tabId ? this.tabs.get(tabId) : this.activeTab;
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.openDevTools();
   };
 
   private handleCloseDevTools = async (tabId?: string) => {
-    const tab = tabId ? this.tabs.get(tabId) : this.activeTab;
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.closeDevTools();
   };
 
@@ -417,6 +438,13 @@ export class WindowLayoutService {
       draft.browser.contextSelectionMode = active;
     });
     this.activeTab?.setContextSelectionMode(active);
+  };
+
+  private handleSetContextSelectionMouseCoordinates = async (
+    x: number,
+    y: number,
+  ) => {
+    this.activeTab?.setContextSelectionMouseCoordinates(x, y);
   };
 
   // Window State Management (same as before)

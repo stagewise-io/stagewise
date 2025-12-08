@@ -20,6 +20,7 @@ import {
   Tooltip,
 } from '@stagewise/stage-ui/components/tooltip';
 import { StartPage } from './_components/start-page';
+import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
 
 export function MainSection() {
   const tabs = useKartonState((s) => s.browser.tabs);
@@ -221,7 +222,9 @@ export function MainSection() {
                 <div
                   id="dev-app-preview-container"
                   className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
-                />
+                >
+                  <DOMContextSelector />
+                </div>
               )}
             </div>
           </div>

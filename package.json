@@ -41,11 +41,16 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller",
       "esbuild",
       "fs-xattr",
       "macos-alias",
-      "electron",
-      "electron-winstaller"
+      "nucleo-micro-bold",
+      "nucleo-ui-fill-18",
+      "nucleo-ui-fill-duo-18",
+      "nucleo-ui-outline-18",
+      "nucleo-ui-outline-duo-18"
     ],
     "ignoredBuiltDependencies": [
       "keytar"

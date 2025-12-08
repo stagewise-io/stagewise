@@ -1,0 +1,44 @@
+:root {
+    font-family: 'Geist', sans-serif;
+    width: 100vw;
+    height: 100vh;
+    inset: 0px;
+    position: fixed;
+    pointer-events: none;
+    z-index: 2147483647;
+    overflow: hidden;
+}
+
+.hovered-element {
+    position: fixed;
+    background: oklch(54.6% 0.245 262.881 / 0.1);
+    border: solid 2px oklch(54.6% 0.245 262.881 / 0.8);
+    border-radius: 2px;
+}
+
+.selected-element {
+    position: fixed;
+    background: transparent;
+    border: dashed 2px oklch(14.1% 0.005 285.823 / 0.5);
+    border-radius: 2px;
+}
+
+.tag-name {
+    position: absolute;
+    top: -16px;
+    left: 0px;
+    width: fit-content;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 600;
+    text-align: center;
+    text-overflow: ellipsis;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 3px;
+    padding: 0px 4px;
+    box-shadow: 0 0 0 1px oklch(55.2% 0.016 285.938 / 0.3);
+}

@@ -35,6 +35,7 @@ class KartonServerImpl<T> implements KartonServer<T> {
   private serverProcedures: Map<string, any> = new Map();
   private _clientProcedures: KartonClientProceduresWithClientId<T>;
   private changeListeners: ((state: Readonly<KartonState<T>>) => void)[] = [];
+  private closeHandlers: ((connectionId: string) => void)[] = [];
 
   constructor(config: KartonServerConfig<T>, transport: ServerTransport) {
     this.transport = transport;
@@ -135,8 +136,11 @@ class KartonServerImpl<T> implements KartonServer<T> {
 
     // Handle disconnect
     transport.onClose(() => {
-      this.clients.delete(clientId);
-      rpcManager.cleanup();
+      if (this.clients.has(clientId)) {
+        this.clients.delete(clientId);
+        rpcManager.cleanup();
+        this.closeHandlers.forEach((handler) => handler(clientId));
+      }
     });
   }
 
@@ -235,6 +239,13 @@ class KartonServerImpl<T> implements KartonServer<T> {
     );
   }
 
+  public onClose(handler: (connectionId: string) => void): () => void {
+    this.closeHandlers.push(handler);
+    return () => {
+      this.closeHandlers = this.closeHandlers.filter((h) => h !== handler);
+    };
+  }
+
   private notifyStateChangeCallbacks(
     state: Readonly<KartonState<T>>,
     oldState: Readonly<KartonState<T>>,
@@ -245,9 +256,9 @@ class KartonServerImpl<T> implements KartonServer<T> {
   }
 }
 
-export async function createKartonServer<T>(
+export function createKartonServer<T>(
   config: KartonServerConfig<T>,
-): Promise<KartonServer<T>> {
+): KartonServer<T> {
   let transport: ServerTransport;
 
   if (config.transport) {

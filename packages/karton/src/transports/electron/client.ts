@@ -82,6 +82,9 @@ export class ElectronClientTransport implements Transport {
 
   startTransport(): void {
     this.portProxy.setOnMessage((message) => {
+      // Ignore empty messages
+      if (!message) return;
+
       try {
         this.messageHandler?.(message);
       } catch (err) {

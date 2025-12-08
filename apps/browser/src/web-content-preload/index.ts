@@ -1,17 +1,32 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { createElement, StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { App } from '@/app';
 
-contextBridge.exposeInMainWorld('electron', {
-  karton: {
-    send: (channel: string, ...args: any[]) =>
-      ipcRenderer.send(channel, ...args),
-    on: (channel: string, listener: (event: any, ...args: any[]) => void) => {
-      const subscription = (_event: any, ...args: any[]) =>
-        listener(_event, ...args);
-      ipcRenderer.on(channel, subscription);
-      return () => ipcRenderer.removeListener(channel, subscription);
-    },
-    removeListener: (channel: string, listener: (...args: any[]) => void) => {
-      ipcRenderer.removeListener(channel, listener as any);
-    },
+/**
+ * Setup section for the actual app that offers the context element selection UI
+ */
+window.addEventListener(
+  'DOMContentLoaded',
+  () => {
+    const container = document.createElement('stagewise-container');
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.width = '100vw';
+    container.style.height = '100vh';
+    container.style.zIndex = '2147483647';
+    container.style.pointerEvents = 'none';
+    document.body.appendChild(container);
+    const host = container.attachShadow({ mode: 'closed' });
+
+    // Initialize the app
+    try {
+      createRoot(host).render(
+        createElement(StrictMode, null, createElement(App)),
+      );
+    } catch (error) {
+      console.error(error);
+    }
   },
-});
+  { capture: true, once: true, passive: true },
+);

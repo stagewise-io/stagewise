@@ -1,20 +1,14 @@
 import { type ReactNode, createContext } from 'react';
-import { usePostHog } from 'posthog-js/react';
 import { useContext, useState, useCallback } from 'react';
 import { usePlugins } from './use-plugins';
 import {
   generateId,
-  getSelectedElementInfo,
   collectUserMessageMetadata,
   fileToDataUrl,
   isAnthropicSupportedFile,
 } from '@/utils';
-import { useKartonProcedure } from './use-karton';
-import type {
-  ChatMessage,
-  FileUIPart,
-  SelectedElement,
-} from '@shared/karton-contracts/ui';
+import { useKartonProcedure, useKartonState } from './use-karton';
+import type { ChatMessage, FileUIPart } from '@shared/karton-contracts/ui';
 
 interface ContextSnippet {
   promptContextName: string;
@@ -36,15 +30,6 @@ interface ChatContext {
   // Chat content operations
   chatInput: string;
   setChatInput: (value: string) => void;
-
-  // Selected elements operations (we should just transform this into custom data parts in a refactoring...)
-  selectedElements: {
-    selectedElement: SelectedElement;
-    domElement: HTMLElement;
-  }[];
-  addSelectedElement: (domElement: HTMLElement) => void;
-  removeSelectedElement: (domElement: HTMLElement) => void;
-  clearSelectedElements: () => void;
   sendMessage: () => void;
 
   // File attachments
@@ -54,27 +39,17 @@ interface ChatContext {
   clearFileAttachments: () => void;
 
   // UI state
-  isContextSelectorActive: boolean;
-  startContextSelector: () => void;
-  stopContextSelector: () => void;
   isSending: boolean;
 }
 
 const ChatHistoryContext = createContext<ChatContext>({
   chatInput: '',
   setChatInput: () => {},
-  selectedElements: [],
-  addSelectedElement: () => {},
-  removeSelectedElement: () => {},
-  clearSelectedElements: () => {},
   sendMessage: () => {},
   fileAttachments: [],
   addFileAttachment: () => {},
   removeFileAttachment: () => {},
   clearFileAttachments: () => {},
-  isContextSelectorActive: false,
-  startContextSelector: () => {},
-  stopContextSelector: () => {},
   isSending: false,
 });
 
@@ -83,17 +58,19 @@ interface ChatStateProviderProps {
 }
 
 export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
-  const posthog = usePostHog();
   const [chatInput, setChatInput] = useState<string>('');
-  const [isContextSelectorMode, setIsContextSelectorMode] =
-    useState<boolean>(false);
+
+  const _isContextSelectorMode = useKartonState(
+    (s) => s.browser.contextSelectionMode,
+  );
+  const clearContextElements = useKartonProcedure(
+    (p) => p.browser.contextSelection.clearElements,
+  );
+  const setContextSelectionActive = useKartonProcedure(
+    (p) => p.browser.contextSelection.setActive,
+  );
+
   const [isSending, setIsSending] = useState<boolean>(false);
-  const [selectedElements, setSelectedElements] = useState<
-    {
-      selectedElement: SelectedElement;
-      domElement: HTMLElement;
-    }[]
-  >([]);
 
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
 
@@ -101,10 +78,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
   const sendChatMessage = useKartonProcedure(
     (p) => p.agentChat.sendUserMessage,
-  );
-
-  const enrichSelectedElement = useKartonProcedure(
-    (p) => p.agentChat.enrichSelectedElement,
   );
 
   const addFileAttachment = useCallback((file: File) => {
@@ -132,59 +105,12 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     });
   }, []);
 
-  const startContextSelector = useCallback(() => {
-    setIsContextSelectorMode(true);
+  const _startContextSelector = useCallback(() => {
+    setContextSelectionActive(true);
   }, []);
 
-  const stopContextSelector = useCallback(() => {
-    setIsContextSelectorMode(false);
-  }, []);
-
-  const addSelectedElement = useCallback(
-    (element: HTMLElement) => {
-      const newSelectedElement = getSelectedElementInfo(generateId(), element);
-
-      setSelectedElements((prev) => {
-        const newContextElements = [
-          ...prev,
-          { selectedElement: newSelectedElement, domElement: element },
-        ];
-
-        return newContextElements;
-      });
-
-      // Now, we make a fetch to the CLI to let it enrich the selected Element with even more context information (related source files etc.).
-      enrichSelectedElement(newSelectedElement)
-        .then((enrichedSelectedElement) => {
-          setSelectedElements((prev) => {
-            const newContextElements = prev.map((item) => {
-              if (
-                item.selectedElement.stagewiseId ===
-                newSelectedElement.stagewiseId
-              ) {
-                return { ...item, selectedElement: enrichedSelectedElement };
-              }
-              return item;
-            });
-            return newContextElements;
-          });
-        })
-        .catch((error) => {
-          console.error(error);
-          posthog.captureException(error);
-        });
-    },
-    [enrichSelectedElement],
-  );
-
-  const removeSelectedElement = useCallback((element: HTMLElement) => {
-    setSelectedElements((prev) =>
-      prev.filter((item) => item.domElement !== element),
-    );
-  }, []);
-
-  const clearSelectedElements = useCallback(() => {
-    setSelectedElements([]);
+  const _stopContextSelector = useCallback(() => {
+    setContextSelectionActive(false);
   }, []);
 
   const sendMessage = useCallback(async () => {
@@ -210,8 +136,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       // Collect metadata for selected elements
       const metadata = collectUserMessageMetadata(
-        selectedElements.map((item) => item.selectedElement),
-        false,
+        // TODO: Add metadata back in here: selectedElements.map((item) => item.selectedElement),
+        [],
       );
 
       const message: ChatMessage = {
@@ -226,7 +152,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       // Reset state after sending
       setChatInput('');
-      clearSelectedElements();
+      clearContextElements();
       clearFileAttachments();
 
       // Send the message using the chat capability
@@ -236,29 +162,21 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     }
   }, [
     chatInput,
-    selectedElements,
     fileAttachments,
     plugins,
     sendChatMessage,
     clearFileAttachments,
-    clearSelectedElements,
+    clearContextElements,
   ]);
 
   const value: ChatContext = {
     chatInput,
     setChatInput,
-    selectedElements,
-    addSelectedElement,
-    removeSelectedElement,
-    clearSelectedElements,
     sendMessage,
     fileAttachments,
     addFileAttachment,
     removeFileAttachment,
     clearFileAttachments,
-    isContextSelectorActive: isContextSelectorMode,
-    startContextSelector,
-    stopContextSelector,
     isSending,
   };
 

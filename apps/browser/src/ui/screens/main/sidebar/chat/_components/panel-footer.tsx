@@ -1,4 +1,3 @@
-import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
 import { FileAttachmentChips } from '@/components/file-attachment-chips';
 import { TextSlideshow } from '@/components/ui/text-slideshow';
 import { ContextUsageRing } from './context-usage-ring';
@@ -61,6 +60,17 @@ export function ChatPanelFooter() {
       chats: s.agentChat?.chats,
     })),
   );
+
+  const contextSelectionActive = useKartonState(
+    (s) => s.browser.contextSelectionMode,
+  );
+  const setContextSelectionActive = useKartonProcedure(
+    (p) => p.browser.contextSelection.setActive,
+  );
+  const clearContextElements = useKartonProcedure(
+    (p) => p.browser.contextSelection.clearElements,
+  );
+
   const stopAgent = useKartonProcedure((p) => p.agentChat.abortAgentCall);
   const canStop = isWorking;
   const isConnected = useKartonConnected();
@@ -92,7 +102,7 @@ export function ChatPanelFooter() {
   const handleSubmit = useCallback(() => {
     if (canSendMessage) {
       chatState.sendMessage();
-      chatState.stopContextSelector();
+      setContextSelectionActive(false);
       setChatInputActive(false);
       // stopPromptCreation is already called in sendMessage
     }
@@ -171,9 +181,9 @@ export function ChatPanelFooter() {
   useEffect(() => {
     if (chatInputActive) {
       void inputRef.current?.focus();
-      chatState.startContextSelector();
+      setContextSelectionActive(true);
     } else {
-      chatState.stopContextSelector();
+      setContextSelectionActive(false);
       void inputRef.current?.blur();
     }
   }, [chatInputActive]);
@@ -207,15 +217,15 @@ export function ChatPanelFooter() {
   useHotKeyListener(
     useCallback(() => {
       setChatInputActive(true);
-      chatState.startContextSelector(); // We trigger this here again because the user might go into context selection mode after already having the input active
+      setContextSelectionActive(true); // We trigger this here again because the user might go into context selection mode after already having the input active
       return true;
     }, [chatState]),
     HotkeyActions.CTRL_ALT_PERIOD,
   );
   useHotKeyListener(
     useCallback(() => {
-      if (chatState.isContextSelectorActive) {
-        chatState.stopContextSelector();
+      if (contextSelectionActive) {
+        setContextSelectionActive(false);
       } else {
         setChatInputActive(false);
       }
@@ -292,20 +302,20 @@ export function ChatPanelFooter() {
               fileAttachments={chatState.fileAttachments}
               removeFileAttachment={chatState.removeFileAttachment}
             />
+            {/*
             <ContextElementsChipsFlexible
               selectedElements={chatState.selectedElements}
               removeSelectedElement={chatState.removeSelectedElement}
-            />
-            {chatState.fileAttachments.length +
-              chatState.selectedElements.length >
-              1 && (
+            /> */}
+            {chatState.fileAttachments
+              .length /*chatState.selectedElements.length*/ > 1 && (
               <Button
                 size="xs"
                 variant="ghost"
                 className="text-muted-foreground"
                 onClick={() => {
                   chatState.clearFileAttachments();
-                  chatState.clearSelectedElements();
+                  clearContextElements();
                 }}
               >
                 Clear all
@@ -339,17 +349,15 @@ export function ChatPanelFooter() {
                       size="icon-sm"
                       variant="ghost"
                       className="text-muted-foreground data-[context-selector-active=true]:bg-primary/5 data-[context-selector-active=true]:text-primary data-[context-selector-active=true]:hover:bg-primary/10"
-                      data-context-selector-active={
-                        chatState.isContextSelectorActive
-                      }
+                      data-context-selector-active={contextSelectionActive}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (chatState.isContextSelectorActive) {
-                          chatState.stopContextSelector();
+                        if (contextSelectionActive) {
+                          setContextSelectionActive(false);
                         } else {
                           setChatInputActive(true);
-                          chatState.startContextSelector();
+                          setContextSelectionActive(true);
                         }
                       }}
                       aria-label="Select context elements"
@@ -358,7 +366,7 @@ export function ChatPanelFooter() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {chatState.isContextSelectorActive ? (
+                    {contextSelectionActive ? (
                       <>
                         Stop selecting elements (
                         <HotkeyComboText action={HotkeyActions.ESC} />)

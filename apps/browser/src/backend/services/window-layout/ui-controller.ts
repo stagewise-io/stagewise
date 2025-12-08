@@ -9,39 +9,46 @@ import { KartonService } from '../karton';
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
-export interface UIControllerEvents {
-  'create-tab': (url?: string) => void;
-  'close-tab': (tabId: string) => void;
-  'switch-tab': (tabId: string) => void;
-  'layout-update': (
+export interface UIControllerEventMap {
+  createTab: [url?: string];
+  closeTab: [tabId: string];
+  switchTab: [tabId: string];
+  layoutUpdate: [
     bounds: { x: number; y: number; width: number; height: number } | null,
-  ) => void;
-  'interactivity-change': (interactive: boolean) => void;
-  stop: (tabId?: string) => void;
-  reload: (tabId?: string) => void;
-  goto: (url: string, tabId?: string) => void;
-  'go-back': (tabId?: string) => void;
-  'go-forward': (tabId?: string) => void;
-  'toggle-dev-tools': (tabId?: string) => void;
-  'open-dev-tools': (tabId?: string) => void;
-  'close-dev-tools': (tabId?: string) => void;
-  'set-context-selection-mode': (active: boolean) => void;
+  ];
+  interactivityChange: [interactive: boolean];
+  stop: [tabId?: string];
+  reload: [tabId?: string];
+  goto: [url: string, tabId?: string];
+  goBack: [tabId?: string];
+  goForward: [tabId?: string];
+  toggleDevTools: [tabId?: string];
+  openDevTools: [tabId?: string];
+  closeDevTools: [tabId?: string];
+  setContextSelectionMode: [active: boolean];
+  setContextSelectionMouseCoordinates: [x: number, y: number];
+  passthroughWheelEvent: [event: WheelEvent];
+  selectHoveredElement: [];
+  removeElement: [elementId: string];
+  clearElements: [];
 }
 
-export class UIController extends EventEmitter {
+export class UIController extends EventEmitter<UIControllerEventMap> {
   private view: WebContentsView;
   private logger: Logger;
   public readonly uiKarton: KartonService;
 
-  private constructor(logger: Logger, uiKarton: KartonService) {
+  constructor(logger: Logger) {
     super();
     this.logger = logger;
-    this.uiKarton = uiKarton;
-    const __dirname = path.dirname(new URL(import.meta.url).pathname);
+    this.uiKarton = new KartonService(logger);
 
     this.view = new WebContentsView({
       webPreferences: {
-        preload: path.join(__dirname, 'ui-preload/index.js'),
+        preload: path.join(
+          path.dirname(new URL(import.meta.url).pathname),
+          'ui-preload/index.js',
+        ),
         partition: 'persist:stagewise-ui',
       },
     });
@@ -72,11 +79,6 @@ export class UIController extends EventEmitter {
     this.registerKartonProcedures();
   }
 
-  public static async create(logger: Logger): Promise<UIController> {
-    const uiKarton = await KartonService.create(logger);
-    return new UIController(logger, uiKarton);
-  }
-
   private loadApp() {
     const __dirname = path.dirname(new URL(import.meta.url).pathname);
     // and load the index.html of the app.
@@ -94,19 +96,19 @@ export class UIController extends EventEmitter {
     this.uiKarton.registerServerProcedureHandler(
       'browser.createTab',
       async (url?: string) => {
-        this.emit('create-tab', url);
+        this.emit('createTab', url);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.closeTab',
       async (tabId: string) => {
-        this.emit('close-tab', tabId);
+        this.emit('closeTab', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.switchTab',
       async (tabId: string) => {
-        this.emit('switch-tab', tabId);
+        this.emit('switchTab', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -114,13 +116,13 @@ export class UIController extends EventEmitter {
       async (
         bounds: { x: number; y: number; width: number; height: number } | null,
       ) => {
-        this.emit('layout-update', bounds);
+        this.emit('layoutUpdate', bounds);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.layout.changeInteractivity',
       async (interactive: boolean) => {
-        this.emit('interactivity-change', interactive);
+        this.emit('interactivityChange', interactive);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -144,37 +146,70 @@ export class UIController extends EventEmitter {
     this.uiKarton.registerServerProcedureHandler(
       'browser.goBack',
       async (tabId?: string) => {
-        this.emit('go-back', tabId);
+        this.emit('goBack', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.goForward',
       async (tabId?: string) => {
-        this.emit('go-forward', tabId);
+        this.emit('goForward', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.toggleDevTools',
       async (tabId?: string) => {
-        this.emit('toggle-dev-tools', tabId);
+        this.emit('toggleDevTools', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.openDevTools',
       async (tabId?: string) => {
-        this.emit('open-dev-tools', tabId);
+        this.emit('openDevTools', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.closeDevTools',
       async (tabId?: string) => {
-        this.emit('close-dev-tools', tabId);
+        this.emit('closeDevTools', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
-      'browser.setContextSelectionMode',
+      'browser.contextSelection.setActive',
       async (active: boolean) => {
-        this.emit('set-context-selection-mode', active);
+        this.emit('setContextSelectionMode', active);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.contextSelection.setMouseCoordinates',
+      async (x: number, y: number) => {
+        this.emit('setContextSelectionMouseCoordinates', x, y);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.contextSelection.passthroughWheelEvent',
+      async (event: WheelEvent) => {
+        this.emit('passthroughWheelEvent', event);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.contextSelection.selectHoveredElement',
+      async () => {
+        // TODO: Implement by adding the element to the chat state controller.
+        this.emit('selectHoveredElement');
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.contextSelection.removeElement',
+      async (elementId: string) => {
+        // TODO: Implement by removing the element from the chat state controller.
+        this.emit('removeElement', elementId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.contextSelection.clearElements',
+      async () => {
+        // TODO: Implement by clearing all stored elements in the chat state controller.
+        this.emit('clearElements');
       },
     );
   }
@@ -190,6 +225,26 @@ export class UIController extends EventEmitter {
     this.uiKarton.removeServerProcedureHandler('browser.stop');
     this.uiKarton.removeServerProcedureHandler('browser.reload');
     this.uiKarton.removeServerProcedureHandler('browser.goto');
+    this.uiKarton.removeServerProcedureHandler('browser.goBack');
+    this.uiKarton.removeServerProcedureHandler('browser.goForward');
+    this.uiKarton.removeServerProcedureHandler('browser.toggleDevTools');
+    this.uiKarton.removeServerProcedureHandler('browser.openDevTools');
+    this.uiKarton.removeServerProcedureHandler('browser.closeDevTools');
+    this.uiKarton.removeServerProcedureHandler(
+      'browser.contextSelection.setActive',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'browser.contextSelection.setMouseCoordinates',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'browser.contextSelection.selectHoveredElement',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'browser.contextSelection.removeElement',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'browser.contextSelection.clearElements',
+    );
     // Note: Removing handlers by reference is tricky if we use arrow functions or inline handlers.
     // The karton service implementation likely matches by name or needs exact reference.
     // Assuming we might just need to unregister all or handle lifecycle properly.

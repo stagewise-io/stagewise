@@ -35,9 +35,9 @@ class ElectronServerConnection implements Transport {
   private port: MessagePortMain;
   private connectionId: string;
   private messageHandler: ((message: KartonMessage) => void) | null = null;
-  private closeHandler:
-    | ((event?: { code: number; reason: string }) => void)
-    | null = null;
+  private closeHandlers = new Set<
+    (event?: { code: number; reason: string }) => void
+  >();
   private errorHandler: ((error: Error) => void) | null = null;
   private _isOpen = true;
   private _messageListener: ((event: { data: KartonMessage }) => void) | null =
@@ -79,6 +79,9 @@ class ElectronServerConnection implements Transport {
   private handleData(message: KartonMessage): void {
     if (!this._isOpen) return;
 
+    // Ignore empty messages (e.g. from some Electron IPC behaviors)
+    if (!message) return;
+
     try {
       this.messageHandler?.(message);
     } catch (err) {
@@ -117,11 +120,21 @@ class ElectronServerConnection implements Transport {
       }
     }
 
-    // Notify close handler
-    this.closeHandler?.({
+    // Notify close handlers
+    const event = {
       code: 1000,
       reason,
-    });
+    };
+    for (const handler of this.closeHandlers) {
+      try {
+        handler(event);
+      } catch (error) {
+        console.error(
+          `Error in close handler for connection ${this.connectionId}:`,
+          error,
+        );
+      }
+    }
   }
 
   /**
@@ -170,9 +183,9 @@ class ElectronServerConnection implements Transport {
   onClose(
     handler: (event?: { code: number; reason: string }) => void,
   ): () => void {
-    this.closeHandler = handler;
+    this.closeHandlers.add(handler);
     return () => {
-      this.closeHandler = null;
+      this.closeHandlers.delete(handler);
     };
   }
 
@@ -200,6 +213,7 @@ export class ElectronServerTransport implements ServerTransport {
   private connections = new Map<string, ElectronServerConnection>();
   private connectionHandler: ((serverTransport: Transport) => void) | null =
     null;
+  private closeHandler: ((connectionId: string) => void) | null = null;
 
   /**
    * Set a new MessagePort as a transport port.
@@ -271,6 +285,10 @@ export class ElectronServerTransport implements ServerTransport {
 
   onConnection(handler: (clientTransport: Transport) => void): void {
     this.connectionHandler = handler;
+  }
+
+  onClose(handler: (connectionId: string) => void): void {
+    this.closeHandler = handler;
   }
 
   async close(): Promise<void> {

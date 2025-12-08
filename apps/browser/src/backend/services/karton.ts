@@ -20,16 +20,14 @@ export class KartonService {
   private transport: ElectronServerTransport;
   private logger: Logger;
 
-  private constructor(logger: Logger) {
+  constructor(logger: Logger) {
     this.logger = logger;
-  }
 
-  private async initialize() {
     // Create transport without any initial configuration
     // Ports will be accepted dynamically via acceptPort()
     this.transport = new ElectronServerTransport();
 
-    this.kartonServer = await createKartonServer<KartonContract>({
+    this.kartonServer = createKartonServer<KartonContract>({
       initialState: defaultState,
       transport: this.transport,
     });
@@ -37,12 +35,6 @@ export class KartonService {
     this.logger.debug(
       '[KartonService] Karton server initialized with MessagePort transport',
     );
-  }
-
-  public static async create(logger: Logger): Promise<KartonService> {
-    const instance = new KartonService(logger);
-    await instance.initialize();
-    return instance;
   }
 
   /**
@@ -94,7 +86,7 @@ export class KartonService {
     return this.kartonServer.setState.bind(this.kartonServer);
   }
 
-  get registerServerProcedureHandler() {
+  get registerServerProcedureHandler(): KartonServer<KartonContract>['registerServerProcedureHandler'] {
     return this.kartonServer.registerServerProcedureHandler.bind(
       this.kartonServer,
     );
