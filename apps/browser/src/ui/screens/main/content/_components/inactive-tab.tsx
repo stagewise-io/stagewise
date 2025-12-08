@@ -17,13 +17,19 @@ export function InactiveTab({
   return (
     <div
       className={cn(
-        `flex w-40 items-center gap-2 self-start rounded-[5px] px-2 py-1 pl-3 transition-colors hover:bg-zinc-50/70`,
+        `flex w-40 items-center gap-2 self-start rounded-[5px] px-2 py-1 transition-colors hover:bg-zinc-50/70`,
         showRightSeparator &&
           'after:-right-[3px] after:absolute after:h-4 after:border-muted-foreground/20 after:border-r after:content-[""]',
       )}
       onClick={onClick}
     >
-      {<img src={faviconUrls[0]} alt={title} className="size-4 shrink-0" />}
+      {
+        <img
+          src={faviconUrls[0]}
+          alt={title}
+          className="ml-1 size-4 shrink-0"
+        />
+      }
       <span className="truncate text-foreground text-sm">{title}</span>
       <Button
         variant="ghost"

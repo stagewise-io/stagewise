@@ -126,23 +126,24 @@ export function ActiveTab({
         </defs>
       </svg>
       {/* Active tab content */}
-      <div
-        ref={tabRef}
-        className={cn(
-          `block bg-background ${dimensions.width > 0 ? 'opacity-100' : 'opacity-0'}`,
-          className,
-        )}
-        style={{
-          clipPath: `url(#${clipPathId})`,
-          paddingLeft: activateBottomLeftCornerRadius ? borderRadius : 0,
-          marginLeft: activateBottomLeftCornerRadius ? -borderRadius : 0,
-          paddingRight: borderRadius,
-          marginRight: -borderRadius,
-          borderTopLeftRadius: borderRadius,
-          borderTopRightRadius: borderRadius,
-        }}
-      >
-        <div className="flex w-40 items-center gap-2 rounded-t-lg px-2 py-1 pb-1.75 pl-3">
+      <div className="relative w-40 px-2">
+        <div
+          ref={tabRef}
+          className={cn(
+            `absolute inset-0 block bg-background ${dimensions.width > 0 ? 'opacity-100' : 'opacity-0'}`,
+            className,
+          )}
+          style={{
+            clipPath: `url(#${clipPathId})`,
+            paddingLeft: activateBottomLeftCornerRadius ? borderRadius : 0,
+            marginLeft: activateBottomLeftCornerRadius ? -borderRadius : 0,
+            paddingRight: borderRadius,
+            marginRight: -borderRadius,
+            borderTopLeftRadius: borderRadius,
+            borderTopRightRadius: borderRadius,
+          }}
+        />
+        <div className="flex items-center gap-2 py-1 pb-1.75 pl-1">
           <img
             src={tabState.faviconUrls[0]}
             alt={tabState.title}
