@@ -22,17 +22,23 @@ export function BackgroundWithCutout({
   } | null>(null);
 
   useLayoutEffect(() => {
-    const targetElement = document.getElementById(targetElementId);
     const parentElement = parentRef.current;
+    if (!parentElement) return;
 
-    if (!targetElement || !parentElement) {
-      setBounds(null);
-      return;
-    }
+    let resizeObserver: ResizeObserver | null = null;
+    let targetElement: HTMLElement | null = null;
 
     const updateBounds = () => {
-      const targetRect = targetElement.getBoundingClientRect();
-      const parentRect = parentElement.getBoundingClientRect();
+      const target = document.getElementById(targetElementId);
+      const parent = parentRef.current;
+
+      if (!target || !parent) {
+        setBounds(null);
+        return;
+      }
+
+      const targetRect = target.getBoundingClientRect();
+      const parentRect = parent.getBoundingClientRect();
 
       setBounds({
         x: targetRect.x - parentRect.x,
@@ -44,16 +50,52 @@ export function BackgroundWithCutout({
       });
     };
 
-    updateBounds();
+    const setupObservers = () => {
+      targetElement = document.getElementById(targetElementId);
 
-    const observer = new ResizeObserver(updateBounds);
-    observer.observe(targetElement);
-    observer.observe(parentElement);
+      if (!targetElement) {
+        setBounds(null);
+        return;
+      }
+
+      updateBounds();
+
+      // Setup ResizeObserver for the target element
+      resizeObserver = new ResizeObserver(updateBounds);
+      resizeObserver.observe(targetElement);
+      resizeObserver.observe(parentElement);
+    };
+
+    // Initial setup
+    setupObservers();
+
+    // Watch for the target element being added/removed from the DOM
+    const mutationObserver = new MutationObserver(() => {
+      const currentTarget = document.getElementById(targetElementId);
+
+      // If element appeared and we don't have observers set up
+      if (currentTarget && !resizeObserver) setupObservers();
+      // If element disappeared and we have observers
+      else if (!currentTarget && resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+        targetElement = null;
+        setBounds(null);
+      }
+    });
+
+    // Observe the entire document body for changes
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
 
     window.addEventListener('resize', updateBounds);
 
     return () => {
-      observer.disconnect();
+      mutationObserver.disconnect();
+      if (resizeObserver) resizeObserver.disconnect();
+
       window.removeEventListener('resize', updateBounds);
     };
   }, [targetElementId]);
