@@ -35,7 +35,6 @@ export const ContextElementProvider = ({
       type: 'hover' | 'selected',
       active: boolean,
     ) => {
-      console.log('[Preload] Context Selection Update', type, active);
       if (type === 'hover') {
         setHighlightedElement(active ? element : null);
       } else if (type === 'selected') {
@@ -50,15 +49,8 @@ export const ContextElementProvider = ({
     };
 
     window.__CTX_EXTRACT_INFO__ = (element: Element, backendNodeId: number) => {
-      console.log(
-        '[Preload] Context Element Extracted',
-        element,
-        backendNodeId,
-      );
       return serializeElement(element, backendNodeId);
     };
-
-    console.log('[Preload] Context Selection Agent Ready');
 
     return () => {
       window.__CTX_SELECTION_UPDATE__ = undefined;

@@ -481,7 +481,6 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
   }
 
   public async updateMousePosition(x: number, y: number) {
-    console.log('updateMousePosition', x, y);
     if (!this.isSelectionActive) return;
     this.lastMousePos = { x, y };
     // We rely on the interval to process this
