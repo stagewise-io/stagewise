@@ -212,10 +212,7 @@ export function MainSection() {
             </Tooltip>
           </div>
           <div className="flex size-full flex-col gap-4 rounded-lg p-2">
-            <div
-              id="dev-app-preview-container"
-              className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg shadow-[0_0_3px_rgba(0,0,0,0.1),0_-6px_48px_-24px_rgba(0,0,0,0.05)]"
-            >
+            <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg shadow-[0_0_3px_rgba(0,0,0,0.1),0_-6px_48px_-24px_rgba(0,0,0,0.05)]">
               {activeTab?.url === 'ui-main' ? (
                 <StartPage />
               ) : activeTab?.error ? (
