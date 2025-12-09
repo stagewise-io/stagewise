@@ -37,6 +37,7 @@ export class WorkspaceService {
   private staticAnalysisService: StaticAnalysisService | null = null;
   private onWorkspaceSetupCompleted?: (
     workspacePath: string,
+    absoluteAgentAccessPath?: string,
     name?: string,
   ) => void;
 
@@ -50,7 +51,11 @@ export class WorkspaceService {
     loadedOnStart: boolean,
     pathGivenInStartingArg: boolean,
     wrappedCommand?: string,
-    onWorkspaceSetupCompleted?: (workspacePath: string, name?: string) => void,
+    onWorkspaceSetupCompleted?: (
+      workspacePath: string,
+      absoluteAgentAccessPath?: string,
+      name?: string,
+    ) => void,
   ) {
     this.logger = logger;
     this.telemetryService = telemetryService;
@@ -227,6 +232,7 @@ export class WorkspaceService {
 
         this.onWorkspaceSetupCompleted?.(
           this.workspacePath,
+          this.getAbsoluteAgentAccessPath(),
           this.workspacePath.split(path.sep).pop() ?? undefined,
         );
       },
@@ -243,7 +249,11 @@ export class WorkspaceService {
     loadedOnStart: boolean,
     pathGivenInStartingArg: boolean,
     wrappedCommand?: string,
-    onWorkspaceSetupCompleted?: (workspacePath: string, name?: string) => void,
+    onWorkspaceSetupCompleted?: (
+      workspacePath: string,
+      absoluteAgentAccessPath?: string,
+      name?: string,
+    ) => void,
   ) {
     const instance = new WorkspaceService(
       logger,

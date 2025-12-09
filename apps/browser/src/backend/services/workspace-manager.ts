@@ -15,7 +15,12 @@ import type { NotificationService } from './notification';
 type WorkspaceChangedEvent =
   | { type: 'loaded'; selectedPath: string; accessPath?: string }
   | { type: 'unloaded' }
-  | { type: 'setupCompleted'; workspacePath: string; name?: string };
+  | {
+      type: 'setupCompleted';
+      workspacePath: string;
+      absoluteAgentAccessPath?: string;
+      name?: string;
+    };
 
 export class WorkspaceManagerService {
   private currentWorkspace: WorkspaceService | null = null;
@@ -149,11 +154,12 @@ export class WorkspaceManagerService {
       loadedOnStart,
       pathGivenInStartingArg,
       wrappedCommand,
-      (workspacePath, name) => {
+      (workspacePath, absoluteAgentAccessPath, name) => {
         this.workspaceChangeListeners.forEach((listener) =>
           listener({
             type: 'setupCompleted',
             workspacePath,
+            absoluteAgentAccessPath,
             name,
           }),
         );
