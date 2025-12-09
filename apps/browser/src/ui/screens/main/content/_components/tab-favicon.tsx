@@ -2,6 +2,7 @@ import type { TabState } from '@shared/karton-contracts/ui';
 import { IconGlobe2Fill18 } from 'nucleo-ui-fill-18';
 import { Logo } from '@/components/ui/logo';
 import { useEffect, useMemo, useState } from 'react';
+import { Loader2Icon } from 'lucide-react';
 
 export function TabFavicon({ tabState }: { tabState: TabState }) {
   const isStartPage = useMemo(
@@ -34,6 +35,8 @@ export function TabFavicon({ tabState }: { tabState: TabState }) {
         <div className="flex size-4 items-center justify-center rounded-full bg-foreground">
           <Logo color="current" className="size-1/2 text-background" />
         </div>
+      ) : tabState?.isLoading ? (
+        <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" />
       ) : shouldShowFallback ? (
         <IconGlobe2Fill18 className="size-4 text-muted-foreground" />
       ) : (
