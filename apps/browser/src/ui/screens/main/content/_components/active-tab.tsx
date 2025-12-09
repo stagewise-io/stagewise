@@ -40,59 +40,59 @@ export function ActiveTab({
   }, [dimensions, borderRadius, activateBottomLeftCornerRadius]);
 
   return (
-    <>
-      {/* SVG definitions - hidden but accessible */}
-      <svg
-        width="0"
-        height="0"
-        className="absolute"
-        viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
-        preserveAspectRatio="none"
+    <WithTabTooltipPreview tabState={tabState}>
+      <div
+        data-state="active"
+        className="@container relative w-64 min-w-8 px-2"
       >
-        <defs>
-          <clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
-            <path d={svgPath} fill="white" />
-          </clipPath>
-        </defs>
-      </svg>
-      {/* Active tab content */}
-      <WithTabTooltipPreview tabState={tabState}>
-        <div className="@container relative w-64 min-w-8 px-2">
-          <div
-            ref={tabRef}
-            className={cn(
-              `absolute inset-0 block bg-background ${dimensions.width > 0 ? 'opacity-100' : 'opacity-0'}`,
-              className,
-            )}
-            style={{
-              clipPath: `url(#${clipPathId})`,
-              paddingLeft: activateBottomLeftCornerRadius ? borderRadius : 0,
-              marginLeft: activateBottomLeftCornerRadius ? -borderRadius : 0,
-              paddingRight: borderRadius,
-              marginRight: -borderRadius,
-              borderTopLeftRadius: borderRadius,
-              borderTopRightRadius: borderRadius,
-            }}
-          />
-          <div className="flex items-center gap-2 py-1 pb-1.75 @[40px]:pl-1 pl-0">
-            <div className="@[40px]:flex hidden shrink-0 items-center justify-center">
-              <TabFavicon tabState={tabState} />
-            </div>
-            <span className="@[55px]:block hidden truncate text-foreground text-xs">
-              {tabState.title}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-2xs"
-              className="ml-auto h-5 shrink-0"
-              onClick={onClose}
-            >
-              <IconXmark className="size-3 text-muted-foreground" />
-            </Button>
+        {/* SVG definitions - hidden but accessible */}
+        <svg
+          width="0"
+          height="0"
+          className="absolute"
+          viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
+              <path d={svgPath} fill="white" />
+            </clipPath>
+          </defs>
+        </svg>
+        <div
+          ref={tabRef}
+          className={cn(
+            `absolute inset-0 block bg-background ${dimensions.width > 0 ? 'opacity-100' : 'opacity-0'}`,
+            className,
+          )}
+          style={{
+            clipPath: `url(#${clipPathId})`,
+            paddingLeft: activateBottomLeftCornerRadius ? borderRadius : 0,
+            marginLeft: activateBottomLeftCornerRadius ? -borderRadius : 0,
+            paddingRight: borderRadius,
+            marginRight: -borderRadius,
+            borderTopLeftRadius: borderRadius,
+            borderTopRightRadius: borderRadius,
+          }}
+        />
+        <div className="flex items-center gap-2 py-1 pb-1.75 @[40px]:pl-1 pl-0">
+          <div className="@[40px]:flex hidden shrink-0 items-center justify-center">
+            <TabFavicon tabState={tabState} />
           </div>
+          <span className="@[55px]:block hidden truncate text-foreground text-xs">
+            {tabState.title}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-2xs"
+            className="ml-auto h-5 shrink-0"
+            onClick={onClose}
+          >
+            <IconXmark className="size-3 text-muted-foreground" />
+          </Button>
         </div>
-      </WithTabTooltipPreview>
-    </>
+      </div>
+    </WithTabTooltipPreview>
   );
 }
 
