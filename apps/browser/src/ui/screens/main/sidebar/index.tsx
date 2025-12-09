@@ -52,7 +52,7 @@ export function Sidebar() {
         posthog?.capture('sidebar_expanded');
       }}
       data-collapsed={isCollapsed}
-      className="@container group flex h-full flex-col items-stretch justify-between gap-3 data-[collapsed=true]:w-16 data-[collapsed=false]:min-w-64 data-[collapsed=true]:min-w-16 data-[collapsed=false]:max-w-2xl data-[collapsed=true]:max-w-16"
+      className="@container group overflow-visible! flex h-full flex-col items-stretch justify-between gap-3 data-[collapsed=true]:w-16 data-[collapsed=false]:min-w-64 data-[collapsed=true]:min-w-16 data-[collapsed=false]:max-w-2xl data-[collapsed=true]:max-w-16"
     >
       <SidebarTopSection isCollapsed={isCollapsed} />
       {/* Chat area */}

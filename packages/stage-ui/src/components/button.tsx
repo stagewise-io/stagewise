@@ -13,7 +13,7 @@ export const buttonVariants = cva(
         destructive:
           'glass-body not-disabled:glass-body-interactive glass-body-motion not-disabled:glass-body-motion-interactive bg-rose-600 font-normal text-rose-50 dark:bg-rose-800 dark:text-rose-400',
         warning:
-          'glass-body snot-disabled:glass-body-interactive glass-body-motion not-disabled:glass-body-motion-interactive bg-yellow-200 font-normal text-yellow-900 dark:bg-yellow-800 dark:text-yellow-400',
+          'glass-body not-disabled:glass-body-interactive glass-body-motion not-disabled:glass-body-motion-interactive bg-yellow-200 font-normal text-yellow-900 dark:bg-yellow-800 dark:text-yellow-400',
         ghost:
           'bg-transparent font-medium text-foreground not-disabled:hover:bg-muted-foreground/5',
       },

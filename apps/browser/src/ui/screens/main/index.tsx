@@ -24,7 +24,7 @@ export function DefaultLayout({ show }: { show: boolean }) {
       >
         <Sidebar />
 
-        <ResizableHandle className="w-0.5" />
+        <ResizableHandle className="w-1" />
 
         <MainSection />
       </ResizablePanelGroup>

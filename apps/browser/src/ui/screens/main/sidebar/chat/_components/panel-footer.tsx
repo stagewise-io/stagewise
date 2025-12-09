@@ -250,9 +250,9 @@ export function ChatPanelFooter() {
   });
 
   return (
-    <footer className="z-10 flex flex-col items-stretch gap-1 p-0">
+    <footer className="z-10 flex flex-col items-stretch gap-1 p-0 ">
       <div
-        className="glass-body glass-body-interactive flex flex-row items-stretch gap-1 rounded-lg bg-background/20 p-2 shadow shadow-black/5 before:absolute before:inset-0 before:rounded-lg data-[chat-active=true]:bg-primary/5 data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/10"
+        className="flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.04)] ring-1 ring-muted-foreground/15 before:absolute before:inset-0 before:rounded-lg data-[chat-active=true]:bg-primary/5 data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/10"
         id="chat-input-container-box"
         data-chat-active={chatInputActive}
       >

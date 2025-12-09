@@ -64,7 +64,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.logger = logger;
 
     this.viewContainer = new View();
-    this.viewContainer.setBorderRadius(8);
+    this.viewContainer.setBorderRadius(4);
     this.viewContainer.setBackgroundColor('#FFF');
     this.webContentsView = new WebContentsView({
       webPreferences: {
@@ -76,7 +76,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         partition: 'persist:browser-content',
       },
     });
-    this.webContentsView.setBorderRadius(8);
+    this.webContentsView.setBorderRadius(4);
     this.kartonTransport = new ElectronServerTransport();
 
     this.kartonServer = createKartonServer<TabKartonContract>({
