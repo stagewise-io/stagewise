@@ -79,7 +79,7 @@ export function ActiveTab({
           <div className="@[40px]:flex hidden shrink-0 items-center justify-center">
             <TabFavicon tabState={tabState} />
           </div>
-          <span className="@[55px]:block hidden truncate text-foreground text-xs">
+          <span className="mt-px @[55px]:block hidden truncate text-foreground text-xs">
             {tabState.title}
           </span>
           <Button
