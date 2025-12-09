@@ -86,7 +86,7 @@ export class WindowLayoutService {
       y: this.lastNonMaximizedBounds.y,
       title: 'stagewise',
       titleBarStyle: 'hiddenInset',
-      trafficLightPosition: { x: 14, y: 20 },
+      trafficLightPosition: { x: 14, y: 16 },
       backgroundMaterial: 'mica',
       backgroundColor: '#e4e4e4',
       transparent: true,
