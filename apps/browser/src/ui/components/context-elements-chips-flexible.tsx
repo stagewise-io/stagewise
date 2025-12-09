@@ -323,7 +323,7 @@ function ContextElementChip({
                     <p className="max-w-1/3 shrink-0 basis-1/3 break-all text-foreground text-sm">
                       {attribute}
                     </p>
-                    <p className="shrink basis-2/3 font-mono text-muted-foreground text-xs">
+                    <p className="mt-0.5 shrink basis-2/3 font-mono text-muted-foreground text-xs">
                       {selectedElement.attributes[attribute]}
                     </p>
                   </div>
