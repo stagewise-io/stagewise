@@ -20,7 +20,7 @@ export function InactiveTab({
     <WithTabTooltipPreview tabState={tabState}>
       <div
         className={cn(
-          `@container flex w-40 min-w-8 items-center gap-2 self-start rounded-[5px] px-2 py-1 transition-colors hover:bg-zinc-50/70`,
+          `@container flex w-64 min-w-8 items-center gap-2 self-start rounded-[5px] px-2 py-1 transition-colors hover:bg-zinc-50/70`,
           showRightSeparator &&
             'after:-right-[2px] after:absolute after:h-4 after:border-muted-foreground/20 after:border-r after:content-[""]',
         )}

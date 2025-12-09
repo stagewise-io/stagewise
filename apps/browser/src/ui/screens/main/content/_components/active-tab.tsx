@@ -57,7 +57,7 @@ export function ActiveTab({
       </svg>
       {/* Active tab content */}
       <WithTabTooltipPreview tabState={tabState}>
-        <div className="@container relative w-40 min-w-8 px-2">
+        <div className="@container relative w-64 min-w-8 px-2">
           <div
             ref={tabRef}
             className={cn(
