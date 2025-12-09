@@ -75,7 +75,6 @@ export function ChatPanel({
         className={cn(
           '-mx-3.5 block px-0 py-0',
           'h-full min-h-64',
-          'mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_48px,black)]',
           'overflow-hidden rounded-[inherit]',
         )}
       >
