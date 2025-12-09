@@ -1,6 +1,7 @@
 import { MessageCircleIcon } from 'lucide-react';
 import { ChatPanel } from './_components/index';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { cn } from '@/utils';
 
 export function SidebarChatSection({
   openChatPanel,
@@ -8,7 +9,11 @@ export function SidebarChatSection({
   openChatPanel: () => void;
 }) {
   return (
-    <div className="relative size-full rounded-lg bg-[#fcfcfc] p-2">
+    <div
+      className={cn(
+        'relative size-full rounded-lg bg-[#fcfcfc] p-2 group-data-[collapsed=true]:hidden',
+      )}
+    >
       <div className="size-full group-data-[collapsed=true]:hidden">
         <ChatPanel />
       </div>

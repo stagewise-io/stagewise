@@ -28,7 +28,9 @@ export function ActiveTab({
   const tabRef = useRef<HTMLDivElement>(null);
   const clipPathId = `tabClipPath-${useId()}`;
 
-  const dimensions = useElementDimensions(tabRef);
+  const dimensions = useElementDimensions(tabRef, [
+    activateBottomLeftCornerRadius,
+  ]);
 
   const svgPath = useMemo(() => {
     return getTabSvgPath({
@@ -96,7 +98,10 @@ export function ActiveTab({
   );
 }
 
-function useElementDimensions(elementRef: React.RefObject<HTMLElement>) {
+function useElementDimensions(
+  elementRef: React.RefObject<HTMLElement>,
+  dependencies: React.DependencyList = [],
+) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   useLayoutEffect(() => {
     const element = elementRef.current;
@@ -113,7 +118,8 @@ function useElementDimensions(elementRef: React.RefObject<HTMLElement>) {
     return () => {
       resizeObserver.disconnect();
     };
-  }, [elementRef]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elementRef, ...dependencies]);
   return dimensions;
 }
 

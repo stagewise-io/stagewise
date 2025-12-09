@@ -243,6 +243,7 @@ export function ChatPanelFooter() {
 
   useEventListener('sidebar-chat-panel-closed', () => {
     setChatInputActive(false);
+    setContextSelectionActive(false);
   });
 
   useEventListener('sidebar-chat-panel-opened', () => {

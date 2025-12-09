@@ -1,5 +1,5 @@
 import { Tooltip as BaseTooltip } from '@base-ui-components/react/tooltip';
-import type { ReactElement, ReactNode } from 'react';
+import type { ComponentProps, ReactElement, ReactNode } from 'react';
 
 export const TooltipProvider = BaseTooltip.Provider;
 
@@ -11,10 +11,18 @@ export const Tooltip = ({
   return <BaseTooltip.Root delay={200}>{children}</BaseTooltip.Root>;
 };
 
-export const TooltipTrigger = ({ children }: { children: ReactElement }) => {
+type TooltipTriggerProps = ComponentProps<typeof BaseTooltip.Trigger> & {
+  children?: ReactElement;
+};
+
+export const TooltipTrigger = ({ children, ...props }: TooltipTriggerProps) => {
   return (
     <BaseTooltip.Trigger
-      render={children as ReactElement<Record<string, unknown>, string>}
+      render={
+        props.render ||
+        (children as ReactElement<Record<string, unknown>, string>)
+      }
+      {...props}
     />
   );
 };

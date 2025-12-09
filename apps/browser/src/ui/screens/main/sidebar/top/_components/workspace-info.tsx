@@ -64,12 +64,9 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
     await openWorkspace(undefined);
   }, [createFilePickerRequest, openWorkspace, workspace, closeWorkspace]);
 
-  const reloadWorkspace = useCallback(() => {
-    const workspacePath = workspace!.path;
-    void closeWorkspace().then(() => {
-      void openWorkspace(workspacePath);
-    });
-  }, [closeWorkspace, openWorkspace, workspace]);
+  const disconnectWorkspace = useCallback(async () => {
+    void closeWorkspace();
+  }, [closeWorkspace]);
 
   if (isCollapsed) return null;
 
@@ -148,9 +145,9 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
 
   if (status === 'setup') {
     return (
-      <div className="flex flex-row items-center gap-2 px-4 text-sm">
-        <span className="shimmer-text shimmer-duration-2500 shimmer-from-muted-foreground shimmer-to-zinc-50">
-          Set up workspace in chat...
+      <div className="flex flex-row items-center gap-2 px-4 pl-8 text-xs">
+        <span className="shimmer-text shimmer-duration-2500 shimmer-from-muted-foreground shimmer-to-zinc-50 truncate">
+          Workspace setup...
         </span>
         <Button
           variant="ghost"
@@ -206,12 +203,12 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
                 variant="secondary"
                 size="sm"
                 className="w-full"
-                onClick={reloadWorkspace}
+                onClick={disconnectWorkspace}
               >
-                Reload
+                Disconnect
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Reload workspace</TooltipContent>
+            <TooltipContent>Disconnect workspace</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger>

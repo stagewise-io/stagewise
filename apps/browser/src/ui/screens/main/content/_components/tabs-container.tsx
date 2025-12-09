@@ -1,19 +1,25 @@
 import { Button } from '@stagewise/stage-ui/components/button';
+import { cn } from '@/utils';
 import { IconPlus } from 'nucleo-micro-bold';
 import { IconCommand } from 'nucleo-micro-bold';
 import { useIsContainerScrollable } from '@/hooks/use-is-container-scrollable';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TabState } from '@shared/karton-contracts/ui';
 import { ActiveTab } from './active-tab';
 import { InactiveTab } from './inactive-tab';
+import { AgentPreviewBadge } from './agent-preview-badge';
 
 export function TabsContainer({
+  openSidebarChatPanel,
+  isSidebarCollapsed,
   activeTabId,
   tabs,
   setActiveTabId,
   onAddTab,
   onCloseTab,
 }: {
+  openSidebarChatPanel: () => void;
+  isSidebarCollapsed: boolean;
   activeTabId: string;
   tabs: Record<string, TabState>;
   setActiveTabId: (tabId: string) => void;
@@ -25,6 +31,13 @@ export function TabsContainer({
     useIsContainerScrollable(scrollContainerRef);
   const [leftFadeDistance, setLeftFadeDistance] = useState(0);
   const [rightFadeDistance, setRightFadeDistance] = useState(0);
+
+  const activateBottomLeftCornerRadius = useMemo(() => {
+    return (
+      Object.keys(tabs).findIndex((_id) => _id === activeTabId) !== 0 ||
+      isSidebarCollapsed
+    );
+  }, [activeTabId, isSidebarCollapsed, tabs]);
 
   const getIsLeftNextToActiveTab = (tabId: string) => {
     return (
@@ -54,10 +67,23 @@ export function TabsContainer({
     }) as React.CSSProperties;
 
   return (
-    <div className="flex shrink-0 flex-row items-start">
+    <div
+      className={cn(
+        'flex shrink-0 flex-row items-start',
+        isSidebarCollapsed ? 'pl-18' : '',
+      )}
+    >
+      {isSidebarCollapsed && (
+        <div className="flex h-7 flex-row items-center gap-2 pr-2">
+          <AgentPreviewBadge onClick={openSidebarChatPanel} unreadCount={0} />
+        </div>
+      )}
       <div
         ref={scrollContainerRef}
-        className="mask-alpha scrollbar-none flex flex-row items-start gap-0.75 overflow-x-auto pr-2"
+        className={cn(
+          'mask-alpha scrollbar-none flex flex-row items-start gap-0.75 overflow-x-auto pr-2',
+          isSidebarCollapsed ? '-ml-2 pl-2' : '',
+        )}
         style={
           {
             ...getMaskStyle(),
@@ -66,7 +92,7 @@ export function TabsContainer({
           } as React.CSSProperties
         }
       >
-        {Object.values(tabs).map((tab, index) => {
+        {Object.values(tabs).map((tab) => {
           const isLeftNextToActiveTab = getIsLeftNextToActiveTab(tab.id);
           if (tab.id === activeTabId)
             return (
@@ -76,7 +102,7 @@ export function TabsContainer({
                 onClose={() => {
                   onCloseTab(tab.id);
                 }}
-                activateBottomLeftCornerRadius={index !== 0}
+                activateBottomLeftCornerRadius={activateBottomLeftCornerRadius}
               />
             );
           return (

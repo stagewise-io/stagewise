@@ -7,8 +7,22 @@ import {
 import { Sidebar } from './sidebar';
 import { MainSection } from './content';
 import { cn } from '@/utils';
+import { useCallback, useState } from 'react';
+import { useEventListener } from '@/hooks/use-event-listener';
 
 export function DefaultLayout({ show }: { show: boolean }) {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  useEventListener('sidebar-chat-panel-closed', () => {
+    setIsSidebarCollapsed(true);
+  });
+  useEventListener('sidebar-chat-panel-opened', () => {
+    setIsSidebarCollapsed(false);
+  });
+
+  const openSidebarChatPanel = useCallback(() => {
+    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+  }, []);
+
   return (
     <div
       className={cn(
@@ -24,9 +38,14 @@ export function DefaultLayout({ show }: { show: boolean }) {
       >
         <Sidebar />
 
-        <ResizableHandle className="w-1" />
+        <ResizableHandle
+          className={cn('w-1', isSidebarCollapsed ? 'hidden' : '')}
+        />
 
-        <MainSection />
+        <MainSection
+          isSidebarCollapsed={isSidebarCollapsed}
+          openSidebarChatPanel={openSidebarChatPanel}
+        />
       </ResizablePanelGroup>
     </div>
   );

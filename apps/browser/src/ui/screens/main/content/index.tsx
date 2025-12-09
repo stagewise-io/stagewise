@@ -22,7 +22,13 @@ import {
 import { StartPage } from './_components/start-page';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
 
-export function MainSection() {
+export function MainSection({
+  isSidebarCollapsed,
+  openSidebarChatPanel,
+}: {
+  isSidebarCollapsed: boolean;
+  openSidebarChatPanel: () => void;
+}) {
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
@@ -65,6 +71,10 @@ export function MainSection() {
   const activeTabIndex = useMemo(() => {
     return Object.keys(tabs).findIndex((_id) => _id === activeTabId) ?? 0;
   }, [activeTabId, tabs]);
+
+  const showTopLeftCornerRadius = useMemo(() => {
+    return activeTabIndex !== 0 || isSidebarCollapsed;
+  }, [activeTabIndex, isSidebarCollapsed]);
 
   useEffect(() => {
     if (activeTab?.url === 'ui-main') {
@@ -122,6 +132,8 @@ export function MainSection() {
     >
       <div className="flex h-full w-full flex-col">
         <TabsContainer
+          openSidebarChatPanel={openSidebarChatPanel}
+          isSidebarCollapsed={isSidebarCollapsed}
           activeTabId={activeTabId}
           tabs={tabs}
           setActiveTabId={switchTab}
@@ -138,7 +150,7 @@ export function MainSection() {
         {/* URL, Controls, etc. area */}
         <div
           className={cn(
-            `flex size-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg ${activeTabIndex !== 0 ? 'rounded-tl-lg' : ''} relative `,
+            `flex size-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg ${showTopLeftCornerRadius ? 'rounded-tl-lg' : ''} relative `,
           )}
         >
           {/* Background with mask for the web-content */}
