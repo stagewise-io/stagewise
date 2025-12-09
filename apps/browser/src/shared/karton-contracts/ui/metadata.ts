@@ -45,6 +45,20 @@ export const baseSelectedElementSchema = z.object({
     .describe(
       'A unique identifier for the element. This is used to track the element across different sessions.',
     ),
+  frameId: z
+    .string()
+    .min(1)
+    .max(128)
+    .describe('The frame ID where the element is located.'),
+  backendNodeId: z
+    .number()
+    .int()
+    .describe('The backend node ID of the element.'),
+  tabId: z
+    .string()
+    .min(1)
+    .max(128)
+    .describe('The tab ID where the element is located.'),
   nodeType: z.string().min(1).max(96).describe('The node type of the element.'),
   xpath: z.string().min(1).max(1024).describe('The XPath of the element.'),
   attributes: z

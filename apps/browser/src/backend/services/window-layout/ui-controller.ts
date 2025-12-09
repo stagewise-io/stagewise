@@ -27,7 +27,16 @@ export interface UIControllerEventMap {
   closeDevTools: [tabId?: string];
   setContextSelectionMode: [active: boolean];
   setContextSelectionMouseCoordinates: [x: number, y: number];
-  passthroughWheelEvent: [event: WheelEvent];
+  clearContextSelectionMouseCoordinates: [];
+  passthroughWheelEvent: [
+    event: {
+      type: 'wheel';
+      x: number;
+      y: number;
+      deltaX: number;
+      deltaY: number;
+    },
+  ];
   selectHoveredElement: [];
   removeElement: [elementId: string];
   clearElements: [];
@@ -186,8 +195,15 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'browser.contextSelection.clearMouseCoordinates',
+      async () => {
+        this.emit('clearContextSelectionMouseCoordinates');
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.passthroughWheelEvent',
-      async (event: WheelEvent) => {
+      async (event) => {
+        console.log('passthroughWheelEvent', event);
         this.emit('passthroughWheelEvent', event);
       },
     );

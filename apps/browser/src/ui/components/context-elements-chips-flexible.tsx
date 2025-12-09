@@ -31,11 +31,13 @@ interface ContextElementsChipsProps {
     selectedElement: SelectedElement;
   }[];
   removeSelectedElement?: (element: HTMLElement) => void;
+  removeSelectedElementById?: (id: string) => void;
 }
 
 export function ContextElementsChipsFlexible({
   selectedElements,
   removeSelectedElement,
+  removeSelectedElementById,
 }: ContextElementsChipsProps) {
   const { setHoveredElement } = useContextChipHover();
 
@@ -53,7 +55,12 @@ export function ContextElementsChipsFlexible({
           onDelete={
             removeSelectedElement && selectedElement.domElement
               ? () => removeSelectedElement?.(selectedElement.domElement!)
-              : undefined
+              : removeSelectedElementById
+                ? () =>
+                    removeSelectedElementById?.(
+                      selectedElement.selectedElement.stagewiseId,
+                    )
+                : undefined
           }
           onHover={setHoveredElement}
           onUnhover={() => setHoveredElement(null)}
@@ -121,13 +128,13 @@ function ContextElementChip({
   const flattenedReactComponentTree = useMemo(() => {
     // Return the flattened component tree as a list of components. Limit to first 3 components.
     const flattenedComponents = [];
-    let currentComponent = selectedElement.frameworkInfo.react;
+    let currentComponent = selectedElement.frameworkInfo?.react;
     while (currentComponent && flattenedComponents.length < 5) {
       flattenedComponents.push(currentComponent);
       currentComponent = currentComponent.parent;
     }
     return flattenedComponents;
-  }, [selectedElement.frameworkInfo.react]);
+  }, [selectedElement.frameworkInfo?.react]);
 
   return (
     <Popover>
@@ -192,7 +199,7 @@ function ContextElementChip({
             </div>
           </div>
 
-          {selectedElement.frameworkInfo.react &&
+          {selectedElement.frameworkInfo?.react &&
             flattenedReactComponentTree.length > 0 && (
               <div className="flex flex-col items-stretch justify-start gap-1.5">
                 <p className="font-medium text-foreground text-sm">
@@ -222,52 +229,53 @@ function ContextElementChip({
               </div>
             )}
 
-          {selectedElement.codeMetadata.length > 0 && (
-            <div className="flex flex-col items-stretch justify-start gap-1.5">
-              <p className="w-full font-medium text-foreground text-sm">
-                Related source files
-              </p>
-              <div className="flex w-full flex-col items-stretch gap-2">
-                {selectedElement.codeMetadata.slice(0, 10).map((metadata) => (
-                  <div
-                    key={`${metadata.relativePath}|${metadata.startLine}`}
-                    className="flex flex-col items-stretch"
-                  >
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <a
-                          href={getFileIDEHref(
-                            metadata.relativePath,
-                            metadata.startLine,
-                          )}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex shrink basis-4/5 gap-1 break-all text-foreground text-sm hover:text-primary"
-                          onClick={() => {
-                            posthog.capture(
-                              'agent_file_opened_in_ide_via_element_context',
-                              {
-                                file_path: metadata.relativePath,
-                                ide: openInIdeSelection,
-                                line_number: metadata.startLine,
-                              },
-                            );
-                          }}
-                        >
-                          <IdeLogo
-                            ide={openInIdeSelection}
-                            className="size-3 shrink-0"
-                          />
-                          {getTruncatedFileUrl(metadata.relativePath)}
-                        </a>
-                      </TooltipTrigger>
-                      <TooltipContent>{metadata.relation}</TooltipContent>
-                    </Tooltip>
-                  </div>
-                ))}
+          {selectedElement.codeMetadata &&
+            selectedElement.codeMetadata.length > 0 && (
+              <div className="flex flex-col items-stretch justify-start gap-1.5">
+                <p className="w-full font-medium text-foreground text-sm">
+                  Related source files
+                </p>
+                <div className="flex w-full flex-col items-stretch gap-2">
+                  {selectedElement.codeMetadata.slice(0, 10).map((metadata) => (
+                    <div
+                      key={`${metadata.relativePath}|${metadata.startLine}`}
+                      className="flex flex-col items-stretch"
+                    >
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <a
+                            href={getFileIDEHref(
+                              metadata.relativePath,
+                              metadata.startLine,
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex shrink basis-4/5 gap-1 break-all text-foreground text-sm hover:text-primary"
+                            onClick={() => {
+                              posthog.capture(
+                                'agent_file_opened_in_ide_via_element_context',
+                                {
+                                  file_path: metadata.relativePath,
+                                  ide: openInIdeSelection,
+                                  line_number: metadata.startLine,
+                                },
+                              );
+                            }}
+                          >
+                            <IdeLogo
+                              ide={openInIdeSelection}
+                              className="size-3 shrink-0"
+                            />
+                            {getTruncatedFileUrl(metadata.relativePath)}
+                          </a>
+                        </TooltipTrigger>
+                        <TooltipContent>{metadata.relation}</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </div>
       </PopoverContent>
     </Popover>

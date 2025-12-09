@@ -405,7 +405,14 @@ export type KartonContract = {
       contextSelection: {
         setActive: (active: boolean) => Promise<void>;
         setMouseCoordinates: (x: number, y: number) => Promise<void>; // Used by the client to communicate where the mouse is currently located. Will be forwarded to the tab to check which element is at that point.
-        passthroughWheelEvent: (event: WheelEvent) => Promise<void>; // Used by the client to pass through wheel events to the tab.
+        clearMouseCoordinates: () => Promise<void>; // Clears the mouse position to stop hit testing when mouse leaves the selector bounds
+        passthroughWheelEvent: (event: {
+          type: 'wheel';
+          x: number;
+          y: number;
+          deltaX: number;
+          deltaY: number;
+        }) => Promise<void>; // Used by the client to pass through wheel events to the tab.
         selectHoveredElement: () => Promise<void>; // If the user triggers the element to actually be selected as context, this will trigger a storage operation on the server side.
         removeElement: (elementId: string) => Promise<void>;
         clearElements: () => Promise<void>; // Removes all elements from selection

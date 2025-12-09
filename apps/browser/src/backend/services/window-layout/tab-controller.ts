@@ -9,6 +9,7 @@ import contextMenu from 'electron-context-menu';
 import type { Logger } from '../logger';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import {
   createKartonServer,
   ElectronServerTransport,
@@ -18,6 +19,7 @@ import {
   defaultState,
   type TabKartonContract,
 } from '@shared/karton-contracts/web-contents-preload';
+import type { SelectedElement } from '@shared/karton-contracts/ui/metadata';
 import type { ContextElement } from '@shared/context-elements';
 
 export interface TabState {
@@ -40,6 +42,8 @@ export interface TabState {
 export interface TabControllerEventMap {
   stateUpdated: [state: Partial<TabState>];
   putIntoBackground: [];
+  elementHovered: [element: SelectedElement | null];
+  elementSelected: [element: SelectedElement];
 }
 
 export class TabController extends EventEmitter<TabControllerEventMap> {
@@ -84,6 +88,19 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       this.webContentsView.webContents,
       this.logger,
     );
+
+    this.contextElementTracker.on('hoverChanged', async (elementId) => {
+      if (elementId) {
+        const info =
+          await this.contextElementTracker.collectHoveredElementInfo();
+        if (info) {
+          info.tabId = this.id;
+          this.emit('elementHovered', info);
+        }
+      } else {
+        this.emit('elementHovered', null);
+      }
+    });
 
     contextMenu({
       showSaveImageAs: true,
@@ -180,8 +197,49 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.contextElementTracker.setContextSelection(active);
   }
 
+  public async selectHoveredElement() {
+    const info = await this.contextElementTracker.collectHoveredElementInfo();
+    if (info) {
+      info.tabId = this.id;
+      this.emit('elementSelected', info);
+    }
+  }
+
+  public async updateContextSelection(selectedElements: SelectedElement[]) {
+    await this.contextElementTracker.updateHighlights(
+      selectedElements,
+      this.id,
+    );
+  }
+
   public setContextSelectionMouseCoordinates(x: number, y: number) {
+    this.webContentsView.webContents.sendInputEvent({
+      type: 'mouseMove',
+      x,
+      y,
+    });
     this.contextElementTracker.updateMousePosition(x, y);
+  }
+
+  public async clearContextSelectionMouseCoordinates() {
+    await this.contextElementTracker.clearMousePosition();
+  }
+
+  public passthroughWheelEvent(event: {
+    type: 'wheel';
+    x: number;
+    y: number;
+    deltaX: number;
+    deltaY: number;
+  }) {
+    const ev: Electron.MouseWheelInputEvent = {
+      type: 'mouseWheel',
+      x: event.x,
+      y: event.y,
+      deltaX: -event.deltaX,
+      deltaY: -event.deltaY,
+    };
+    this.webContentsView.webContents.sendInputEvent(ev);
   }
 
   public get webContentsId(): number {
@@ -336,7 +394,6 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
 
   // Data State
   private currentHover: HoverState | null = null;
-  private selectedElements: Map<string, HoverState> = new Map();
 
   // Cache for Isolated World IDs: Map<FrameId, ExecutionContextId>
   private contextCache: Map<string, number> = new Map();
@@ -402,8 +459,7 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
   private async checkDisconnect() {
     // We stay connected if:
     // 1. Context Selection (Hovering) is active
-    // 2. We have at least one selected element (highlighting requires updates)
-    const isNeeded = this.isSelectionActive || this.selectedElements.size > 0;
+    const isNeeded = this.isSelectionActive;
 
     if (!isNeeded && this.debugger.isAttached()) {
       try {
@@ -436,9 +492,6 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
    */
   private handleCdpMessage(method: string, params: any) {
     if (method === 'Runtime.executionContextCreated') {
-      this.logger.debug(
-        `[ContextElementTracker] Runtime.executionContextCreated: ${JSON.stringify(params)}`,
-      );
       const ctx = params.context;
 
       if (ctx.auxData?.frameId && ctx.name === 'Electron Isolated Context') {
@@ -486,59 +539,114 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     // We rely on the interval to process this
   }
 
-  public async selectElement(elementId: string) {
+  public async clearMousePosition() {
+    // Clear the hover highlight and stop hit testing
+    await this.clearHover();
+  }
+
+  public currentlyHoveredElementId(): string | null {
+    return this.currentHover?.id ?? null;
+  }
+
+  public async collectHoveredElementInfo(): Promise<SelectedElement | null> {
+    if (!this.currentHover) return null;
+    await this.ensureConnected();
+    const contextElement = await this.extractInfo(this.currentHover);
+
+    if (!contextElement) return null;
+
+    // Map ContextElement to SelectedElement
+    // Note: This mapping needs to align with SelectedElement schema.
+    // Assuming ContextElement has most fields, but we need to add frameId, backendNodeId, tabId.
+    // The caller (TabController) knows the tabId. We know frameId and backendNodeId here.
+
+    const selectedElement = {
+      ...contextElement,
+      frameId: this.currentHover.frameId,
+      backendNodeId: this.currentHover.backendId,
+      // tabId will be filled by TabController
+      stagewiseId: contextElement.id || randomUUID(), // fallback if id missing
+      nodeType: contextElement.tagName, // simplistic mapping, ContextElement uses tagName
+      // attributes, ownProperties, boundingClientRect match?
+      // Check ContextElement definition:
+      // attributes: Record<string, string> -> SelectedElement is slightly richer
+      // ownProperties: Record<string, unknown> -> OK
+      // boundingClientRect: { top, left, width, height } -> OK
+    } as unknown as SelectedElement;
+
+    // We need to return a structure that satisfies SelectedElement as much as possible,
+    // but strict type matching might require a converter function.
+    // For now we assume the shapes are compatible enough or we cast.
+    // Ideally we update extractInfo to return SelectedElement directly, but it relies on Preload script.
+
+    return selectedElement;
+  }
+
+  // Re-adding a tracker for *currently highlighted* items to enable diffing
+  private currentlyHighlighted: Set<string> = new Set();
+
+  public async updateHighlights(
+    elements: SelectedElement[],
+    currentTabId: string,
+  ) {
+    const hasItemsToHighlight = elements.some(
+      (el) => el.tabId === currentTabId,
+    );
+    const hasItemsToUnhighlight = this.currentlyHighlighted.size > 0;
+
+    if (!hasItemsToHighlight && !hasItemsToUnhighlight) return;
+
     await this.ensureConnected();
 
-    // Try to find the element in current hover
-    let target: HoverState | undefined;
-    if (this.currentHover?.id === elementId) {
-      target = this.currentHover;
-    } else {
-      // Warning: Selecting a non-hovered element by ID is hard via CDP
-      // unless we maintained a registry. Assuming flow is Hover->Select.
-      return;
-    }
+    const nextHighlighted = new Set<string>();
 
-    this.selectedElements.set(elementId, target);
-    await this.triggerPreloadHighlight(target, 'selected', true);
-  }
+    // Highlight new ones
+    for (const el of elements) {
+      if (el.tabId !== currentTabId) continue;
 
-  public async unselectElement(elementId: string) {
-    const target = this.selectedElements.get(elementId);
-    if (target) {
-      await this.triggerPreloadHighlight(target, 'selected', false);
-      this.selectedElements.delete(elementId);
-    }
-    this.checkDisconnect();
-  }
+      const key = `${el.frameId}:${el.backendNodeId}`;
+      nextHighlighted.add(key);
 
-  public async unselectAll() {
-    // We must be connected to send the "unhighlight" command
-    if (this.debugger.isAttached()) {
-      for (const target of this.selectedElements.values()) {
-        await this.triggerPreloadHighlight(target, 'selected', false);
+      if (!this.currentlyHighlighted.has(key)) {
+        const hoverState: HoverState = {
+          id: String(el.backendNodeId),
+          backendId: el.backendNodeId,
+          frameId: el.frameId,
+        };
+        await this.triggerPreloadHighlight(hoverState, 'selected', true);
       }
     }
-    this.selectedElements.clear();
+
+    // Unhighlight removed ones
+    // We need to store enough info to unhighlight (frameId, backendId).
+    // The key `${frameId}:${backendNodeId}` helps.
+    for (const key of this.currentlyHighlighted) {
+      if (!nextHighlighted.has(key)) {
+        const [frameId, backendIdStr] = key.split(':');
+        const backendId = Number.parseInt(backendIdStr, 10);
+        const hoverState: HoverState = {
+          id: backendIdStr,
+          backendId: backendId,
+          frameId: frameId,
+        };
+        await this.triggerPreloadHighlight(hoverState, 'selected', false);
+      }
+    }
+
+    this.currentlyHighlighted = nextHighlighted;
     this.checkDisconnect();
   }
 
-  public async getElementInformation(
-    elementId: string,
-  ): Promise<ContextElement | null> {
-    // Only works if we have state for it
-    let target = this.selectedElements.get(elementId);
-    if (!target && this.currentHover?.id === elementId)
-      target = this.currentHover;
-
-    if (!target) return null;
-
-    await this.ensureConnected();
-
-    const result = await this.extractInfo(target);
-
-    this.checkDisconnect(); // If we just wanted info and nothing is selected/hovered, detach.
-    return result;
+  public async getElementInformation(): Promise<ContextElement | null> {
+    // This method was used to get info for an ID.
+    // Now we expect info to be in the global store.
+    // But if we need to fetch it fresh:
+    // We need to know frameId and backendNodeId to resolve it.
+    // If we don't have it, we can't easily fetch it without searching.
+    // Assuming this method might be deprecated or we implement it if we have the info.
+    // The original implementation used `selectedElements` map to find the target.
+    // If we removed that map, we can't look it up unless we pass frameId/backendId.
+    return null;
   }
 
   // =========================================================================
@@ -556,11 +664,17 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     if (!this.lastMousePos || !this.isSelectionActive) return;
 
     try {
+      const { cssLayoutViewport } = await this.sendCommand(
+        'Page.getLayoutMetrics',
+      );
+      const scrollX = cssLayoutViewport.pageX;
+      const scrollY = cssLayoutViewport.pageY;
+
       const { backendNodeId, frameId } = await this.sendCommand(
         'DOM.getNodeForLocation',
         {
-          x: this.lastMousePos.x,
-          y: this.lastMousePos.y,
+          x: this.lastMousePos.x + scrollX,
+          y: this.lastMousePos.y + scrollY,
           ignorePointerEventsNone: false,
         },
       );
@@ -589,16 +703,29 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
       await this.triggerPreloadHighlight(this.currentHover, 'hover', true);
 
       this.emit('hoverChanged', elementId);
-    } catch {
-      /* ignore hit test errors */
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      // If no node found at location, clear hover and stop processing this position
+      // This is expected when the mouse is outside the web content bounds
+      if (errorMessage.includes('No node found')) {
+        if (this.currentHover) {
+          await this.clearHover();
+        } else {
+          this.lastMousePos = null; // Clear position to stop retrying
+        }
+        // Don't log this as an error - it's expected when mouse is outside bounds
+      } else {
+        this.logger.error(`[ContextElementTracker] processHitTest error: ${e}`);
+      }
     }
   }
 
-  private async clearHover() {
+  public async clearHover() {
     if (this.currentHover && this.debugger.isAttached()) {
       await this.triggerPreloadHighlight(this.currentHover, 'hover', false);
     }
     this.currentHover = null;
+    this.lastMousePos = null; // Clear mouse position to stop hit test attempts
     this.emit('hoverChanged', null);
   }
 

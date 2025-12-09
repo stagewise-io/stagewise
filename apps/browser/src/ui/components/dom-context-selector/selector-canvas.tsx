@@ -18,6 +18,9 @@ export function DOMContextSelector({
   const setMouseCoordinates = useKartonProcedure(
     (p) => p.browser.contextSelection.setMouseCoordinates,
   );
+  const clearMouseCoordinates = useKartonProcedure(
+    (p) => p.browser.contextSelection.clearMouseCoordinates,
+  );
   const passthroughWheelEvent = useKartonProcedure(
     (p) => p.browser.contextSelection.passthroughWheelEvent,
   );
@@ -40,7 +43,13 @@ export function DOMContextSelector({
   const handleSelectorMouseWheel = useCallback<
     WheelEventHandler<HTMLDivElement>
   >((event) => {
-    passthroughWheelEvent(event.nativeEvent);
+    passthroughWheelEvent({
+      type: 'wheel',
+      x: event.clientX,
+      y: event.clientY,
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+    });
   }, []);
 
   const handleSelectorMouseClick = useCallback<
@@ -58,10 +67,13 @@ export function DOMContextSelector({
     >
       {contextSelectionActive && (
         <div
+          id="context-selector-element-canvas"
           className="pointer-events-auto absolute inset-0 size-full cursor-copy"
           onMouseMove={handleSelectorMouseMove}
+          onMouseLeave={() => clearMouseCoordinates()}
           onWheel={handleSelectorMouseWheel}
           onClick={handleSelectorMouseClick}
+          onMouseDown={(e) => e.preventDefault()}
         />
       )}
     </div>

@@ -6,7 +6,7 @@ import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { GlobalDataPathService } from '../global-data-path';
 import { UIController } from './ui-controller';
-import { TabController, type TabState } from './tab-controller';
+import { TabController } from './tab-controller';
 
 interface WindowState {
   width: number;
@@ -237,8 +237,22 @@ export class WindowLayoutService {
       this.handleSetContextSelectionMode,
     );
     this.uiController.on(
+      'selectHoveredElement',
+      this.handleSelectHoveredElement,
+    );
+    this.uiController.on('removeElement', this.handleRemoveElement);
+    this.uiController.on('clearElements', this.handleClearElements);
+    this.uiController.on(
       'setContextSelectionMouseCoordinates',
       this.handleSetContextSelectionMouseCoordinates,
+    );
+    this.uiController.on(
+      'clearContextSelectionMouseCoordinates',
+      this.handleClearContextSelectionMouseCoordinates,
+    );
+    this.uiController.on(
+      'passthroughWheelEvent',
+      this.handlePassthroughWheelEvent,
     );
   }
 
@@ -256,7 +270,7 @@ export class WindowLayoutService {
     const tab = new TabController(id, this.logger, url);
 
     // Subscribe to state updates
-    tab.on('stateUpdated', (updates: Partial<TabState>) => {
+    tab.on('stateUpdated', (updates) => {
       this.uiKarton.setState((draft) => {
         const tabState = draft.browser.tabs[id];
         if (tabState) {
@@ -267,6 +281,29 @@ export class WindowLayoutService {
 
     tab.on('putIntoBackground', () => {
       this.handleInteractivityChange(false);
+    });
+
+    tab.on('elementHovered', (element) => {
+      // Only update if this is the active tab
+      if (this.activeTabId === id) {
+        this.uiKarton.setState((draft) => {
+          draft.browser.hoveredElement = element;
+        });
+      }
+    });
+
+    tab.on('elementSelected', (element) => {
+      this.uiKarton.setState((draft) => {
+        // Add if not exists
+        if (
+          !draft.browser.selectedElements.some(
+            (e) => e.stagewiseId === element.stagewiseId,
+          )
+        ) {
+          draft.browser.selectedElements.push(element);
+        }
+      });
+      this.broadcastSelectionUpdate();
     });
 
     this.tabs[id] = tab;
@@ -440,12 +477,54 @@ export class WindowLayoutService {
     this.activeTab?.setContextSelectionMode(active);
   };
 
+  private handleSelectHoveredElement = () => {
+    this.activeTab?.selectHoveredElement();
+  };
+
   private handleSetContextSelectionMouseCoordinates = async (
     x: number,
     y: number,
   ) => {
     this.activeTab?.setContextSelectionMouseCoordinates(x, y);
   };
+
+  private handleClearContextSelectionMouseCoordinates = async () => {
+    await this.activeTab?.clearContextSelectionMouseCoordinates();
+  };
+
+  private handlePassthroughWheelEvent = async (event: {
+    type: 'wheel';
+    x: number;
+    y: number;
+    deltaX: number;
+    deltaY: number;
+  }) => {
+    this.activeTab?.passthroughWheelEvent(event);
+  };
+
+  private handleRemoveElement = (elementId: string) => {
+    this.uiKarton.setState((draft) => {
+      draft.browser.selectedElements = draft.browser.selectedElements.filter(
+        (e) => e.stagewiseId !== elementId,
+      );
+    });
+    this.broadcastSelectionUpdate();
+  };
+
+  private handleClearElements = () => {
+    this.uiKarton.setState((draft) => {
+      draft.browser.selectedElements = [];
+    });
+    this.broadcastSelectionUpdate();
+  };
+
+  private broadcastSelectionUpdate() {
+    const state = this.uiKarton.state;
+    const selectedElements = state.browser.selectedElements;
+    Object.values(this.tabs).forEach((tab) => {
+      tab.updateContextSelection(selectedElements);
+    });
+  }
 
   // Window State Management (same as before)
   private get windowStatePath(): string {

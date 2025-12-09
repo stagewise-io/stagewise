@@ -1,6 +1,7 @@
 import { FileAttachmentChips } from '@/components/file-attachment-chips';
 import { TextSlideshow } from '@/components/ui/text-slideshow';
 import { ContextUsageRing } from './context-usage-ring';
+import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn, HotkeyActions } from '@/utils';
@@ -302,13 +303,15 @@ export function ChatPanelFooter() {
               fileAttachments={chatState.fileAttachments}
               removeFileAttachment={chatState.removeFileAttachment}
             />
-            {/*
             <ContextElementsChipsFlexible
-              selectedElements={chatState.selectedElements}
-              removeSelectedElement={chatState.removeSelectedElement}
-            /> */}
-            {chatState.fileAttachments
-              .length /*chatState.selectedElements.length*/ > 1 && (
+              selectedElements={chatState.selectedElements.map((e) => ({
+                selectedElement: e,
+              }))}
+              removeSelectedElementById={chatState.removeSelectedElement}
+            />
+            {chatState.fileAttachments.length +
+              chatState.selectedElements.length >
+              1 && (
               <Button
                 size="xs"
                 variant="ghost"

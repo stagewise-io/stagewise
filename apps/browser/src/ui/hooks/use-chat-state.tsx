@@ -8,7 +8,11 @@ import {
   isAnthropicSupportedFile,
 } from '@/utils';
 import { useKartonProcedure, useKartonState } from './use-karton';
-import type { ChatMessage, FileUIPart } from '@shared/karton-contracts/ui';
+import type {
+  ChatMessage,
+  FileUIPart,
+  SelectedElement,
+} from '@shared/karton-contracts/ui';
 
 interface ContextSnippet {
   promptContextName: string;
@@ -38,6 +42,10 @@ interface ChatContext {
   removeFileAttachment: (id: string) => void;
   clearFileAttachments: () => void;
 
+  // Context elements
+  selectedElements: SelectedElement[];
+  removeSelectedElement: (elementId: string) => void;
+
   // UI state
   isSending: boolean;
 }
@@ -50,6 +58,8 @@ const ChatHistoryContext = createContext<ChatContext>({
   addFileAttachment: () => {},
   removeFileAttachment: () => {},
   clearFileAttachments: () => {},
+  selectedElements: [],
+  removeSelectedElement: () => {},
   isSending: false,
 });
 
@@ -68,6 +78,11 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   );
   const setContextSelectionActive = useKartonProcedure(
     (p) => p.browser.contextSelection.setActive,
+  );
+
+  const selectedElements = useKartonState((s) => s.browser.selectedElements);
+  const removeSelectedElement = useKartonProcedure(
+    (p) => p.browser.contextSelection.removeElement,
   );
 
   const [isSending, setIsSending] = useState<boolean>(false);
@@ -135,10 +150,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       );
 
       // Collect metadata for selected elements
-      const metadata = collectUserMessageMetadata(
-        // TODO: Add metadata back in here: selectedElements.map((item) => item.selectedElement),
-        [],
-      );
+      const metadata = collectUserMessageMetadata(selectedElements);
 
       const message: ChatMessage = {
         id: generateId(),
@@ -167,6 +179,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     sendChatMessage,
     clearFileAttachments,
     clearContextElements,
+    selectedElements,
   ]);
 
   const value: ChatContext = {
@@ -177,6 +190,8 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     addFileAttachment,
     removeFileAttachment,
     clearFileAttachments,
+    selectedElements,
+    removeSelectedElement,
     isSending,
   };
 
