@@ -67,8 +67,13 @@ export function MainSection() {
   }, [activeTabId, tabs]);
 
   useEffect(() => {
-    setLocalUrl(activeTab?.url);
-    setUrlBeforeEdit(activeTab?.url ?? '');
+    if (activeTab?.url === 'ui-main') {
+      setLocalUrl('');
+      setUrlBeforeEdit('');
+    } else {
+      setLocalUrl(activeTab?.url);
+      setUrlBeforeEdit(activeTab?.url ?? '');
+    }
   }, [activeTab?.url]);
 
   // Command + L to focus URL bar

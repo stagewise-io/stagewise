@@ -1,6 +1,6 @@
-import StagewiseLogo from '@/assets/stagewise/logo.png';
 import type { TabState } from '@shared/karton-contracts/ui';
 import { IconGlobe2Fill18 } from 'nucleo-ui-fill-18';
+import { Logo } from '@/components/ui/logo';
 import { useEffect, useMemo, useState } from 'react';
 
 export function TabFavicon({ tabState }: { tabState: TabState }) {
@@ -31,11 +31,9 @@ export function TabFavicon({ tabState }: { tabState: TabState }) {
   return (
     <>
       {isStartPage ? (
-        <img
-          src={StagewiseLogo}
-          alt="stagewise Logo"
-          className="size-4 grayscale"
-        />
+        <div className="flex size-4 items-center justify-center rounded-full bg-foreground">
+          <Logo color="current" className="size-1/2 text-background" />
+        </div>
       ) : shouldShowFallback ? (
         <IconGlobe2Fill18 className="size-4 text-muted-foreground" />
       ) : (
