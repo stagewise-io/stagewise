@@ -31,7 +31,7 @@ export function InactiveTab({
             <TabFavicon tabState={tabState} />
           </div>
         }
-        <span className="@[55px]:block hidden truncate text-foreground text-sm">
+        <span className="@[55px]:block hidden truncate text-foreground text-xs">
           {tabState.title}
         </span>
         <Button
