@@ -212,6 +212,36 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     );
   }
 
+  public async scrollToElement(
+    backendNodeId: number,
+    frameId: string,
+  ): Promise<boolean> {
+    return await this.contextElementTracker.scrollToElement(
+      backendNodeId,
+      frameId,
+    );
+  }
+
+  public async checkFrameValidity(
+    frameId: string,
+    expectedFrameLocation: string,
+  ): Promise<boolean> {
+    return await this.contextElementTracker.checkFrameValidity(
+      frameId,
+      expectedFrameLocation,
+    );
+  }
+
+  public async checkElementExists(
+    backendNodeId: number,
+    frameId: string,
+  ): Promise<boolean> {
+    return await this.contextElementTracker.checkElementExists(
+      backendNodeId,
+      frameId,
+    );
+  }
+
   public setContextSelectionMouseCoordinates(x: number, y: number) {
     this.webContentsView.webContents.sendInputEvent({
       type: 'mouseMove',
@@ -398,6 +428,13 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
   // Cache for Isolated World IDs: Map<FrameId, ExecutionContextId>
   private contextCache: Map<string, number> = new Map();
 
+  // Cache for Frame Information: Map<FrameId, FrameInfo>
+  private frameCache: Map<
+    string,
+    { url: string; title: string | null; isMainFrame: boolean }
+  > = new Map();
+  private mainFrameId: string | null = null;
+
   // Initialization State
   private isInitialized = false;
 
@@ -445,6 +482,17 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
       await this.sendCommand('DOM.enable');
       await this.sendCommand('Page.enable');
       await this.sendCommand('Runtime.enable'); // Needed to find isolated worlds
+
+      // Initialize frame information by getting the frame tree
+      try {
+        const frameTree = await this.sendCommand('Page.getFrameTree');
+        this.initializeFrameTree(frameTree.frameTree);
+      } catch (err) {
+        this.logger.debug(
+          `[ContextElementTracker] Failed to get initial frame tree: ${err}`,
+        );
+      }
+
       this.isInitialized = true;
     } catch (err) {
       this.logger.error(
@@ -478,7 +526,124 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     this.isInitialized = false;
     this.isSelectionActive = false;
     this.contextCache.clear();
+    this.frameCache.clear();
+    this.mainFrameId = null;
     this.stopThrottle();
+  }
+
+  /**
+   * Recursively initialize frame tree information.
+   */
+  private initializeFrameTree(frameTree: {
+    frame: { id: string; url: string; name?: string; parentId?: string };
+    childFrames?: Array<{
+      frame: {
+        id: string;
+        url: string;
+        name?: string;
+        parentId?: string;
+      };
+      childFrames?: any[];
+    }>;
+  }) {
+    const frame = frameTree.frame;
+    const isMainFrame = frame.parentId === undefined;
+
+    if (isMainFrame) {
+      this.mainFrameId = frame.id;
+    }
+
+    // Note: frame.name is the frame's name attribute, not the document title
+    // The document title will come from Page.frameTitleUpdated events
+    // Preserve existing title if frame was already cached
+    const existing = this.frameCache.get(frame.id);
+    this.frameCache.set(frame.id, {
+      url: frame.url || '',
+      title: existing?.title || null,
+      isMainFrame,
+    });
+
+    // Recursively process child frames
+    if (frameTree.childFrames) {
+      for (const childFrame of frameTree.childFrames) {
+        this.initializeFrameTree(childFrame);
+      }
+    }
+  }
+
+  /**
+   * Get frame information for a given frameId.
+   * Optionally tries to fetch the title directly from the frame's document if not cached.
+   */
+  private async getFrameInfo(
+    frameId: string,
+    tryFetchTitle = false,
+  ): Promise<{
+    url: string;
+    title: string | null;
+    isMainFrame: boolean;
+  }> {
+    const cached = this.frameCache.get(frameId);
+    if (cached) {
+      // If we have a cached title, return it
+      if (cached.title) {
+        return cached;
+      }
+      // If title is missing and we should try to fetch it, attempt to get it from the document
+      if (tryFetchTitle) {
+        const title = await this.fetchFrameTitle(frameId);
+        if (title) {
+          // Update cache with the fetched title
+          this.frameCache.set(frameId, {
+            ...cached,
+            title,
+          });
+          return {
+            ...cached,
+            title,
+          };
+        }
+      }
+      return cached;
+    }
+
+    // Fallback: assume it's the main frame if we don't have info
+    const isMainFrame =
+      frameId === this.mainFrameId || this.mainFrameId === null;
+    return {
+      url: '',
+      title: null,
+      isMainFrame,
+    };
+  }
+
+  /**
+   * Try to fetch the frame's document title directly using CDP.
+   */
+  private async fetchFrameTitle(frameId: string): Promise<string | null> {
+    try {
+      const contextId = this.contextCache.get(frameId);
+      if (!contextId) {
+        return null;
+      }
+
+      // Evaluate document.title in the frame's context
+      const result = await this.sendCommand('Runtime.evaluate', {
+        expression: 'document.title',
+        contextId,
+        returnByValue: true,
+      });
+
+      if (result.result?.value && typeof result.result.value === 'string') {
+        return result.result.value || null;
+      }
+    } catch (error) {
+      // Silently fail - title might not be accessible (cross-origin, etc.)
+      this.logger.debug(
+        `[ContextElementTracker] Failed to fetch frame title for ${frameId}: ${error}`,
+      );
+    }
+    return null;
   }
 
   private sendCommand(method: string, params: any = {}): Promise<any> {
@@ -489,6 +654,7 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
 
   /**
    * Listens for execution context creation to map Frames to their Isolated Worlds.
+   * Also tracks frame information (URL, title, isMainFrame).
    */
   private handleCdpMessage(method: string, params: any) {
     if (method === 'Runtime.executionContextCreated') {
@@ -504,6 +670,66 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
         if (ctxId === params.executionContextId) {
           this.contextCache.delete(frameId);
           break;
+        }
+      }
+    } else if (method === 'Page.frameNavigated') {
+      // Track frame information when frames navigate
+      const frame = params.frame;
+      if (frame?.id) {
+        const isMainFrame = frame.parentId === undefined;
+        if (isMainFrame) {
+          this.mainFrameId = frame.id;
+        }
+        // Note: frame.name is the frame's name attribute, not the document title
+        // The document title comes from Page.frameTitleUpdated events
+        const existing = this.frameCache.get(frame.id);
+        this.frameCache.set(frame.id, {
+          url: frame.url || '',
+          title: existing?.title || null, // Preserve existing title if available
+          isMainFrame,
+        });
+      }
+    } else if (method === 'Page.frameAttached') {
+      // Track when frames are attached (for iframes)
+      const frameId = params.frameId;
+      const parentFrameId = params.parentFrameId;
+      if (frameId && parentFrameId !== undefined) {
+        // This is a subframe (iframe)
+        this.frameCache.set(frameId, {
+          url: '',
+          title: null,
+          isMainFrame: false,
+        });
+      }
+    } else if (method === 'Page.frameDetached') {
+      // Clean up frame information when frames are detached
+      const frameId = params.frameId;
+      if (frameId) {
+        this.frameCache.delete(frameId);
+        if (this.mainFrameId === frameId) {
+          this.mainFrameId = null;
+        }
+      }
+    } else if (method === 'Page.frameTitleUpdated') {
+      // Update frame title when it changes
+      const frameId = params.frameId;
+      const title = params.title || null;
+      if (frameId) {
+        const existing = this.frameCache.get(frameId);
+        if (existing) {
+          // Update existing frame entry
+          this.frameCache.set(frameId, {
+            ...existing,
+            title,
+          });
+        } else {
+          // Create frame entry if it doesn't exist yet (title update can come before frameNavigated)
+          const isMainFrame = frameId === this.mainFrameId;
+          this.frameCache.set(frameId, {
+            url: '',
+            title,
+            isMainFrame,
+          });
         }
       }
     }
@@ -555,6 +781,9 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
 
     if (!contextElement) return null;
 
+    // Get frame information, trying to fetch title if not cached
+    const frameInfo = await this.getFrameInfo(this.currentHover.frameId, true);
+
     // Map ContextElement to SelectedElement
     // Note: This mapping needs to align with SelectedElement schema.
     // Assuming ContextElement has most fields, but we need to add frameId, backendNodeId, tabId.
@@ -563,6 +792,9 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     const selectedElement = {
       ...contextElement,
       frameId: this.currentHover.frameId,
+      isMainFrame: frameInfo.isMainFrame,
+      frameLocation: frameInfo.url,
+      frameTitle: frameInfo.title,
       backendNodeId: this.currentHover.backendId,
       // tabId will be filled by TabController
       stagewiseId: contextElement.id || randomUUID(), // fallback if id missing
@@ -647,6 +879,108 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     // The original implementation used `selectedElements` map to find the target.
     // If we removed that map, we can't look it up unless we pass frameId/backendId.
     return null;
+  }
+
+  public async scrollToElement(
+    backendNodeId: number,
+    frameId: string,
+  ): Promise<boolean> {
+    await this.ensureConnected();
+    try {
+      const contextId = this.contextCache.get(frameId);
+      if (!contextId) {
+        this.logger.debug(
+          `[ContextElementTracker] No context found for frameId: ${frameId}`,
+        );
+        return false;
+      }
+
+      const { object } = await this.sendCommand('DOM.resolveNode', {
+        backendNodeId,
+        executionContextId: contextId,
+      });
+
+      // Call scrollIntoView on the element using Runtime.callFunctionOn
+      await this.sendCommand('Runtime.callFunctionOn', {
+        objectId: object.objectId,
+        functionDeclaration: `function() {
+          if (this.scrollIntoView) {
+            this.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+          }
+        }`,
+        returnByValue: false,
+      });
+
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `[ContextElementTracker] Failed to scroll to element: ${error}`,
+      );
+      return false;
+    }
+  }
+
+  public async checkFrameValidity(
+    frameId: string,
+    expectedFrameLocation: string,
+  ): Promise<boolean> {
+    await this.ensureConnected();
+    try {
+      // Refresh frame tree to get current frame information
+      const frameTree = await this.sendCommand('Page.getFrameTree');
+      this.initializeFrameTree(frameTree.frameTree);
+
+      const frameInfo = await this.getFrameInfo(frameId, false);
+      if (!frameInfo || !frameInfo.url) {
+        // Frame doesn't exist or has no URL
+        return false;
+      }
+
+      // Compare the frame's current URL with the expected location
+      // We compare origin and pathname, ignoring hash and search params
+      try {
+        const currentUrl = new URL(frameInfo.url);
+        const expectedUrl = new URL(expectedFrameLocation);
+        return (
+          currentUrl.origin === expectedUrl.origin &&
+          currentUrl.pathname === expectedUrl.pathname
+        );
+      } catch {
+        // If URL parsing fails, do a simple string comparison
+        return frameInfo.url === expectedFrameLocation;
+      }
+    } catch (error) {
+      this.logger.debug(
+        `[ContextElementTracker] Failed to check frame validity: ${error}`,
+      );
+      return false;
+    }
+  }
+
+  public async checkElementExists(
+    backendNodeId: number,
+    frameId: string,
+  ): Promise<boolean> {
+    await this.ensureConnected();
+    try {
+      const contextId = this.contextCache.get(frameId);
+      if (!contextId) {
+        // Frame context doesn't exist
+        return false;
+      }
+
+      // Try to resolve the node - if it succeeds, the element exists
+      await this.sendCommand('DOM.resolveNode', {
+        backendNodeId,
+        executionContextId: contextId,
+      });
+
+      // If we get here, the element exists
+      return true;
+    } catch {
+      // If resolving fails, the element doesn't exist
+      return false;
+    }
   }
 
   // =========================================================================

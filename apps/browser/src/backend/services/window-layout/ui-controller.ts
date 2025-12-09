@@ -40,12 +40,28 @@ export interface UIControllerEventMap {
   selectHoveredElement: [];
   removeElement: [elementId: string];
   clearElements: [];
+  scrollToElement: [tabId: string, backendNodeId: number, frameId: string];
+  checkFrameValidity: [
+    tabId: string,
+    frameId: string,
+    expectedFrameLocation: string,
+  ];
 }
 
 export class UIController extends EventEmitter<UIControllerEventMap> {
   private view: WebContentsView;
   private logger: Logger;
   public readonly uiKarton: KartonService;
+  private checkFrameValidityHandler?: (
+    tabId: string,
+    frameId: string,
+    expectedFrameLocation: string,
+  ) => Promise<boolean>;
+  private checkElementExistsHandler?: (
+    tabId: string,
+    backendNodeId: number,
+    frameId: string,
+  ) => Promise<boolean>;
 
   constructor(logger: Logger) {
     super();
@@ -228,6 +244,58 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
         this.emit('clearElements');
       },
     );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.scrollToElement',
+      async (tabId: string, backendNodeId: number, frameId: string) => {
+        this.emit('scrollToElement', tabId, backendNodeId, frameId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.checkFrameValidity',
+      async (tabId: string, frameId: string, expectedFrameLocation: string) => {
+        if (this.checkFrameValidityHandler) {
+          return await this.checkFrameValidityHandler(
+            tabId,
+            frameId,
+            expectedFrameLocation,
+          );
+        }
+        return false;
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.checkElementExists',
+      async (tabId: string, backendNodeId: number, frameId: string) => {
+        if (this.checkElementExistsHandler) {
+          return await this.checkElementExistsHandler(
+            tabId,
+            backendNodeId,
+            frameId,
+          );
+        }
+        return false;
+      },
+    );
+  }
+
+  public setCheckFrameValidityHandler(
+    handler: (
+      tabId: string,
+      frameId: string,
+      expectedFrameLocation: string,
+    ) => Promise<boolean>,
+  ) {
+    this.checkFrameValidityHandler = handler;
+  }
+
+  public setCheckElementExistsHandler(
+    handler: (
+      tabId: string,
+      backendNodeId: number,
+      frameId: string,
+    ) => Promise<boolean>,
+  ) {
+    this.checkElementExistsHandler = handler;
   }
 
   public unregisterKartonProcedures() {

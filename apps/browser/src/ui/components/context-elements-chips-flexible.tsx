@@ -6,7 +6,6 @@ import {
   AtomIcon,
   ChevronLeft,
 } from 'lucide-react';
-import { useMemo } from 'react';
 import { useFileIDEHref } from '@/hooks/use-file-ide-href';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import {
@@ -22,8 +21,10 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import { usePostHog } from 'posthog-js/react';
-import { useKartonState } from '@/hooks/use-karton';
+import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import { IdeLogo } from './ide-logo';
+import { IconOpenExternalOutline18 } from 'nucleo-ui-outline-18';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface ContextElementsChipsProps {
   selectedElements: {
@@ -108,7 +109,16 @@ function ContextElementChip({
   const openInIdeSelection = useKartonState(
     (s) => s.globalConfig.openFilesInIde,
   );
+  const tabs = useKartonState((s) => s.browser.tabs);
+  const switchTab = useKartonProcedure((p) => p.browser.switchTab);
+  const scrollToElement = useKartonProcedure((p) => p.browser.scrollToElement);
+  const checkElementExists = useKartonProcedure(
+    (p) => p.browser.checkElementExists,
+  );
   const { getFileIDEHref } = useFileIDEHref();
+  const [elementExistenceChecked, setElementExistenceChecked] = useState(false);
+  const [elementExists, setElementExists] = useState<boolean | null>(null);
+
   const chipLabel = useMemo(() => {
     // We first try to get the component name from the framework info and then fallback to the element tag name
     const reactComponentName =
@@ -135,6 +145,85 @@ function ContextElementChip({
     }
     return flattenedComponents;
   }, [selectedElement.frameworkInfo?.react]);
+
+  // Check if the element exists in the DOM
+  useEffect(() => {
+    if (!selectedElement.tabId) {
+      setElementExistenceChecked(true);
+      setElementExists(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const checkExistence = async () => {
+      try {
+        const exists = await checkElementExists(
+          selectedElement.tabId,
+          selectedElement.backendNodeId,
+          selectedElement.frameId,
+        );
+        if (!cancelled) {
+          setElementExists(exists);
+          setElementExistenceChecked(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setElementExists(false);
+          setElementExistenceChecked(true);
+        }
+      }
+    };
+
+    checkExistence();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedElement.tabId,
+    selectedElement.backendNodeId,
+    selectedElement.frameId,
+    checkElementExists,
+  ]);
+
+  // Check if the tab exists and if the element exists in the DOM
+  const isElementLocationValid = useMemo(() => {
+    if (!selectedElement.tabId) return false;
+    const tab = tabs[selectedElement.tabId];
+    if (!tab) return false;
+
+    // If we haven't checked yet, return false (button disabled until check completes)
+    if (!elementExistenceChecked) return false;
+    // Return the result of the element existence check
+    return elementExists === true;
+  }, [tabs, selectedElement.tabId, elementExistenceChecked, elementExists]);
+
+  const handleScrollToElement = useCallback(async () => {
+    if (!isElementLocationValid || !selectedElement.tabId) return;
+
+    try {
+      // Switch to the tab first
+      await switchTab(selectedElement.tabId);
+      // Wait a bit for the tab to be active, then scroll
+      setTimeout(async () => {
+        await scrollToElement(
+          selectedElement.tabId,
+          selectedElement.backendNodeId,
+          selectedElement.frameId,
+        );
+      }, 100);
+    } catch (error) {
+      console.error('Failed to scroll to element:', error);
+    }
+  }, [
+    isElementLocationValid,
+    selectedElement.tabId,
+    selectedElement.backendNodeId,
+    selectedElement.frameId,
+    switchTab,
+    scrollToElement,
+  ]);
 
   return (
     <Popover>
@@ -165,7 +254,27 @@ function ContextElementChip({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="pr-2">
+      <PopoverContent className="pt-6 pr-2">
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="absolute top-2 right-2 z-10"
+              onClick={handleScrollToElement}
+              disabled={!isElementLocationValid}
+            >
+              <IconOpenExternalOutline18 />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {isElementLocationValid
+              ? 'Scroll to element in tab'
+              : elementExistenceChecked
+                ? 'Element no longer exists in the DOM'
+                : 'Checking if element exists...'}
+          </TooltipContent>
+        </Tooltip>
         <div className="scrollbar-hover-only flex max-h-[35vh] max-w-72 flex-col gap-5 overflow-y-auto overflow-x-hidden pr-0.5 *:shrink-0">
           <div className="flex flex-col items-stretch justify-start gap-1.5">
             <p className="font-medium text-foreground text-sm">XPath</p>
@@ -173,6 +282,29 @@ function ContextElementChip({
               {selectedElement.xpath}
             </div>
           </div>
+          {selectedElement.frameLocation && (
+            <div className="flex flex-col items-stretch justify-start gap-1.5">
+              <p className="font-medium text-foreground text-sm">
+                Frame Location
+              </p>
+              <div className="w-full break-all font-mono text-muted-foreground text-xs">
+                {selectedElement.frameLocation}
+              </div>
+              {!selectedElement.isMainFrame && (
+                <p className="text-muted-foreground text-xs italic">
+                  Located within frame (iframe, etc.)
+                </p>
+              )}
+            </div>
+          )}
+          {selectedElement.frameTitle && (
+            <div className="flex flex-col items-stretch justify-start gap-1.5">
+              <p className="font-medium text-foreground text-sm">Frame Title</p>
+              <div className="w-full break-all text-muted-foreground text-xs">
+                {selectedElement.frameTitle}
+              </div>
+            </div>
+          )}
           <div className="flex flex-col items-stretch justify-start gap-1.5">
             <p className="font-medium text-foreground text-sm">Attributes</p>
             <div className="flex w-full flex-col items-stretch gap-0.5">
@@ -186,12 +318,12 @@ function ContextElementChip({
                 .map((attribute) => (
                   <div
                     key={attribute}
-                    className="flex flex-row items-start justify-start gap-1"
+                    className="flex flex-row items-start justify-start gap-3"
                   >
-                    <p className="max-w-1/3 shrink-0 basis-1/4 break-all text-foreground text-sm">
+                    <p className="max-w-1/3 shrink-0 basis-1/3 break-all text-foreground text-sm">
                       {attribute}
                     </p>
-                    <p className="shrink basis-3/4 font-mono text-muted-foreground text-xs">
+                    <p className="shrink basis-2/3 font-mono text-muted-foreground text-xs">
                       {selectedElement.attributes[attribute]}
                     </p>
                   </div>

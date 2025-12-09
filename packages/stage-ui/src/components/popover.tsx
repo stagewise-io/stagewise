@@ -51,6 +51,7 @@ export const PopoverContent = ({
 }: PopoverContentProps) => {
   return (
     <PopoverBase.Portal>
+      <PopoverBase.Backdrop className="fixed inset-0 z-40 h-screen w-screen" />
       <PopoverBase.Positioner
         sideOffset={sideOffset ?? 4}
         side={side}

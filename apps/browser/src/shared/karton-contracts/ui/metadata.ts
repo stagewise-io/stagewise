@@ -50,6 +50,20 @@ export const baseSelectedElementSchema = z.object({
     .min(1)
     .max(128)
     .describe('The frame ID where the element is located.'),
+  isMainFrame: z
+    .boolean()
+    .describe(
+      'True if the frame of the element is the top-most frame and not an iframe/etc.',
+    ),
+  frameLocation: z
+    .string()
+    .max(2048)
+    .describe('The URL of the frame that contains the element.'),
+  frameTitle: z
+    .string()
+    .max(512)
+    .nullable()
+    .describe('The title that the frame has set.'),
   backendNodeId: z
     .number()
     .int()

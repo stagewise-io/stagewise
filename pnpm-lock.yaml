@@ -394,8 +394,8 @@ importers:
         specifier: ^1.3.0
         version: 1.3.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       nucleo-ui-outline-18:
-        specifier: ^1.3.1
-        version: 1.3.1(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+        specifier: ^1.3.2
+        version: 1.3.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       nucleo-ui-outline-duo-18:
         specifier: ^1.3.0
         version: 1.3.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -7074,8 +7074,8 @@ packages:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
 
-  nucleo-ui-outline-18@1.3.1:
-    resolution: {integrity: sha512-bPL/ZODAt7VlWZoOwVLkN0RMpgKlsaRA4gmfR4CEUqgNYJjQaf/VVW3vcLBw8hqu/4hKuMVMTfrAnFF36gcTBw==}
+  nucleo-ui-outline-18@1.3.2:
+    resolution: {integrity: sha512-TRBEWSdD+vBJ1vvwo1b2AJJpTb3Owx4BliGpD+DZwxen6YnYqvkYmOb5eloyX5e7JCqe92LiEbFL7xTb1OUApQ==}
     peerDependencies:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
@@ -16736,7 +16736,7 @@ snapshots:
       react-dom: 19.2.0(react@19.2.0)
       tslib: 2.8.1
 
-  nucleo-ui-outline-18@1.3.1(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
+  nucleo-ui-outline-18@1.3.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
     dependencies:
       react: 19.2.0
       react-dom: 19.2.0(react@19.2.0)

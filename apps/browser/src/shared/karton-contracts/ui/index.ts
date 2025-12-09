@@ -417,6 +417,21 @@ export type KartonContract = {
         removeElement: (elementId: string) => Promise<void>;
         clearElements: () => Promise<void>; // Removes all elements from selection
       };
+      scrollToElement: (
+        tabId: string,
+        backendNodeId: number,
+        frameId: string,
+      ) => Promise<void>; // Scrolls to an element in the specified tab
+      checkFrameValidity: (
+        tabId: string,
+        frameId: string,
+        expectedFrameLocation: string,
+      ) => Promise<boolean>; // Checks if a frame exists and is at the expected location
+      checkElementExists: (
+        tabId: string,
+        backendNodeId: number,
+        frameId: string,
+      ) => Promise<boolean>; // Checks if an element exists in the DOM
     };
   };
 };

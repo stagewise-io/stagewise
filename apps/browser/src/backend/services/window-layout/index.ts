@@ -61,6 +61,12 @@ export class WindowLayoutService {
   private async initialize() {
     this.logger.debug('[WindowLayoutService] Initializing service');
     this.uiController = new UIController(this.logger);
+    this.uiController.setCheckFrameValidityHandler(
+      this.handleCheckFrameValidity.bind(this),
+    );
+    this.uiController.setCheckElementExistsHandler(
+      this.handleCheckElementExists.bind(this),
+    );
 
     const savedState = this.loadWindowState();
     const defaultWidth = 1200;
@@ -254,6 +260,7 @@ export class WindowLayoutService {
       'passthroughWheelEvent',
       this.handlePassthroughWheelEvent,
     );
+    this.uiController.on('scrollToElement', this.handleScrollToElement);
   }
 
   private get activeTab(): TabController | undefined {
@@ -500,6 +507,41 @@ export class WindowLayoutService {
     deltaY: number;
   }) => {
     this.activeTab?.passthroughWheelEvent(event);
+  };
+
+  private handleScrollToElement = async (
+    tabId: string,
+    backendNodeId: number,
+    frameId: string,
+  ) => {
+    const tab = this.tabs[tabId];
+    if (tab) {
+      await tab.scrollToElement(backendNodeId, frameId);
+    }
+  };
+
+  private handleCheckFrameValidity = async (
+    tabId: string,
+    frameId: string,
+    expectedFrameLocation: string,
+  ): Promise<boolean> => {
+    const tab = this.tabs[tabId];
+    if (tab) {
+      return await tab.checkFrameValidity(frameId, expectedFrameLocation);
+    }
+    return false;
+  };
+
+  private handleCheckElementExists = async (
+    tabId: string,
+    backendNodeId: number,
+    frameId: string,
+  ): Promise<boolean> => {
+    const tab = this.tabs[tabId];
+    if (tab) {
+      return await tab.checkElementExists(backendNodeId, frameId);
+    }
+    return false;
   };
 
   private handleRemoveElement = (elementId: string) => {

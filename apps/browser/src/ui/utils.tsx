@@ -471,8 +471,35 @@ export const getSelectedElementInfo = (
       {} as Record<string, unknown>,
     );
 
+  // Get frame information from the element's window
+  let frameLocation = '';
+  let frameTitle: string | null = null;
+  let isMainFrame = true;
+  let frameId = '';
+
+  try {
+    const elementWindow = element.ownerDocument?.defaultView || window;
+    frameLocation = elementWindow.location.href;
+    frameTitle = elementWindow.document.title || null;
+    // Check if this is the main frame (not an iframe)
+    isMainFrame = elementWindow === elementWindow.top;
+    // Generate a frame ID - in the UI context, we use a simple identifier
+    // The actual frameId from CDP will be set by the backend when elements are collected
+    frameId = isMainFrame ? 'main' : `frame-${frameLocation.slice(0, 50)}`;
+  } catch {
+    // If we can't access frame info (cross-origin), use defaults
+    frameLocation = '';
+    frameTitle = null;
+    isMainFrame = true;
+    frameId = 'main';
+  }
+
   return {
     stagewiseId,
+    frameId,
+    isMainFrame,
+    frameLocation: truncateString(frameLocation, 2048) ?? '',
+    frameTitle: frameTitle ? (truncateString(frameTitle, 512) ?? null) : null,
     nodeType: truncateString(element.nodeName, 96) ?? 'unknown',
     xpath:
       truncateString(getXPathForElement(element, false), 1024) ?? 'unknown',
@@ -519,6 +546,9 @@ export const getSelectedElementInfo = (
           : undefined,
     },
     codeMetadata: [],
+    // These fields are required but will be set by the backend when elements are collected via CDP
+    backendNodeId: 0,
+    tabId: '',
   };
 };
 
