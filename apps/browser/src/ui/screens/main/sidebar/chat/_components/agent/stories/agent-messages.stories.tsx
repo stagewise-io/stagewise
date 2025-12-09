@@ -364,8 +364,7 @@ export const AssistantDeleteFileComplete: Story = {
                       },
                       output: {
                         message: 'File deleted successfully',
-                        hiddenMetadata: {
-                          undoExecute: null as any,
+                        hiddenFromLLM: {
                           diff: {
                             path: 'src/components/Button.test.tsx',
                             before: `import { render, screen } from '@testing-library/react';
@@ -392,6 +391,9 @@ describe('Button', () => {
                             after: '',
                           },
                         },
+                      },
+                      nonSerializableMetadata: {
+                        undoExecute: null as any,
                       },
                     },
                   ],
@@ -445,8 +447,7 @@ export const AssistantDeleteFileStreaming: Story = {
                     },
                     output: {
                       message: 'File deleted successfully',
-                      hiddenMetadata: {
-                        undoExecute: null as any,
+                      hiddenFromLLM: {
                         diff: {
                           path: 'src/utils/utils.ts',
                           before: `/**
@@ -478,6 +479,9 @@ export function debounce<T extends (...args: any[]) => any>(
 }`,
                           after: '',
                         },
+                      },
+                      nonSerializableMetadata: {
+                        undoExecute: null as any,
                       },
                     },
                   },

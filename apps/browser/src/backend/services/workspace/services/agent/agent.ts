@@ -26,7 +26,6 @@ import {
   toolsWithoutExecute,
   noWorkspaceConfiguredAgentTools,
   type UITools,
-  type AllTools,
   type InspirationComponent,
   type AgentToolsContext,
 } from '@stagewise/agent-tools';
@@ -307,10 +306,6 @@ export class AgentService {
       mode: 'coding',
       tools: codingAgentTools(this.clientRuntime, this.client),
     };
-  }
-
-  private getTools(): AllTools | null {
-    return this.getToolsContext()?.tools ?? null;
   }
 
   private async initializeLitellm() {
@@ -1014,12 +1009,27 @@ export class AgentService {
                     r.toolCalls.find(
                       (tc) => tc.toolCallId === result.toolCallId,
                     )?.toolName ?? '',
-                  undoExecute: result.result.hiddenMetadata.undoExecute,
+                  undoExecute:
+                    result.result.nonSerializableMetadata?.undoExecute,
                 });
               }
+
+              // Strip 'nonSerializableMetadata' from result, attach the rest to the tool output
+              const cleanResult =
+                'result' in result
+                  ? (() => {
+                      const { nonSerializableMetadata: _, ...restResult } =
+                        result.result;
+                      return {
+                        ...result,
+                        result: restResult,
+                      };
+                    })()
+                  : result;
+
               attachToolOutputToMessage(
                 this.uiKarton as KartonStateProvider<KartonContract['state']>,
-                [result],
+                [cleanResult],
                 this.lastMessageId!,
               );
               this.telemetryService.capture('agent-tool-call-completed', {

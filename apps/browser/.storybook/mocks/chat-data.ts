@@ -147,12 +147,14 @@ export function createOverwriteFileToolPart(
     },
     output: {
       message: 'File updated successfully',
-      hiddenMetadata: {
+      hiddenFromLLM: {
         diff: {
           path: relativePath,
           before: beforeContent,
           after: content,
         },
+      },
+      nonSerializableMetadata: {
         undoExecute: null,
       },
     },
@@ -319,12 +321,14 @@ export function createMultiEditToolPart(
       result: {
         editsApplied: 1,
       },
-      hiddenMetadata: {
+      hiddenFromLLM: {
         diff: {
           path: relativePath,
           before: beforeContent,
           after: newContent,
         },
+      },
+      nonSerializableMetadata: {
         undoExecute: null,
       },
     },
@@ -488,13 +492,15 @@ export function createDeleteFileToolPart(
     },
     output: {
       message: 'File deleted successfully',
-      hiddenMetadata: {
-        undoExecute: null,
+      hiddenFromLLM: {
         diff: {
           path: relativePath,
           before: fileContent,
           after: '',
         },
+      },
+      nonSerializableMetadata: {
+        undoExecute: null,
       },
     },
   } as ToolPart;

@@ -574,12 +574,14 @@ function buildExplorationTimeline(
             editsApplied: 1,
           },
         }),
-        hiddenMetadata: {
+        hiddenFromLLM: {
           diff: {
             path: edit.path,
             before: edit.beforeContent,
             after: edit.afterContent,
           },
+        },
+        nonSerializableMetadata: {
           undoExecute: null,
         },
       },

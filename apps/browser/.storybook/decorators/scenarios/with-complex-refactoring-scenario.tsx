@@ -400,13 +400,12 @@ function buildComplexRefactoringTimeline(
         result: {
           editsApplied: 1,
         },
-        hiddenMetadata: {
+        hiddenFromLLM: {
           diff: {
             path: edit.path,
             before: edit.beforeContent,
             after: edit.afterContent,
           },
-          undoExecute: null,
         },
       },
     });
@@ -509,12 +508,14 @@ function buildComplexRefactoringTimeline(
       result: {
         editsApplied: 1,
       },
-      hiddenMetadata: {
+      hiddenFromLLM: {
         diff: {
           path: finalEdit.path,
           before: finalEdit.beforeContent,
           after: finalEdit.afterContent,
         },
+      },
+      nonSerializableMetadata: {
         undoExecute: null,
       },
     },

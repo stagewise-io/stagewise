@@ -259,12 +259,14 @@ function buildDeleteFileTimeline(
     newState: 'output-available',
     output: {
       message: 'File deleted successfully',
-      hiddenMetadata: {
+      hiddenFromLLM: {
         diff: {
           path: config.targetFile,
           before: config.deletedContent,
           after: '',
         },
+      },
+      nonSerializableMetadata: {
         undoExecute: null,
       },
     },

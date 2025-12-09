@@ -69,7 +69,8 @@ export function validateToolOutput<
   TOutput extends {
     message: string;
     result?: any;
-    hiddenMetadata?: { diff?: FileDiff; undoExecute?: () => Promise<void> };
+    hiddenFromLLM?: { diff?: FileDiff };
+    nonSerializableMetadata?: { undoExecute?: () => Promise<void> };
   },
 >(output: TOutput): TOutput {
   return output;

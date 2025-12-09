@@ -16,36 +16,36 @@ export type FileDiff = {
 };
 
 /**
- * Type guard to check if a SharedToolOutput has undoExecute in hiddenMetadata
+ * Type guard to check if a SharedToolOutput has undoExecute in nonSerializableMetadata
  */
 export function hasUndoMetadata(output: any): output is {
-  hiddenMetadata: { undoExecute: () => Promise<void> };
+  nonSerializableMetadata: { undoExecute: () => Promise<void> };
 } {
   return (
     output &&
     typeof output === 'object' &&
-    'hiddenMetadata' in output &&
-    output.hiddenMetadata &&
-    typeof output.hiddenMetadata === 'object' &&
-    'undoExecute' in output.hiddenMetadata &&
-    typeof output.hiddenMetadata.undoExecute === 'function'
+    'nonSerializableMetadata' in output &&
+    output.nonSerializableMetadata &&
+    typeof output.nonSerializableMetadata === 'object' &&
+    'undoExecute' in output.nonSerializableMetadata &&
+    typeof output.nonSerializableMetadata.undoExecute === 'function'
   );
 }
 
 /**
- * Type guard to check if a SharedToolOutput has diff in hiddenMetadata
+ * Type guard to check if a SharedToolOutput has diff in hiddenFromLLM
  */
 export function hasDiffMetadata(
   output: any,
-): output is { hiddenMetadata: { diff: FileDiff } } {
+): output is { hiddenFromLLM: { diff: FileDiff } } {
   return (
     output &&
     typeof output === 'object' &&
-    'hiddenMetadata' in output &&
-    output.hiddenMetadata &&
-    typeof output.hiddenMetadata === 'object' &&
-    'diff' in output.hiddenMetadata &&
-    output.hiddenMetadata.diff !== null &&
-    output.hiddenMetadata.diff !== undefined
+    'hiddenFromLLM' in output &&
+    output.hiddenFromLLM &&
+    typeof output.hiddenFromLLM === 'object' &&
+    'diff' in output.hiddenFromLLM &&
+    output.hiddenFromLLM.diff !== null &&
+    output.hiddenFromLLM.diff !== undefined
   );
 }

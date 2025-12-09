@@ -47,9 +47,9 @@ export class PromptBuilder {
               ) {
                 // Create a new part without diff and undoExecute
                 if (part.output) {
-                  // Extract part.output.hiddenMetadata
-                  if ('hiddenMetadata' in part.output) {
-                    const { hiddenMetadata: _hiddenMetadata, ...cleanOutput } =
+                  // Extract part.output.hiddenFromLLM
+                  if ('hiddenFromLLM' in part.output) {
+                    const { hiddenFromLLM: _hiddenFromLLM, ...cleanOutput } =
                       part.output;
                     return {
                       ...part,

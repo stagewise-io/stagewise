@@ -301,12 +301,14 @@ function buildMultiFileEditTimeline(
         result: {
           editsApplied: 1,
         },
-        hiddenMetadata: {
+        hiddenFromLLM: {
           diff: {
             path: file.path,
             before: file.beforeContent,
             after: file.afterContent,
           },
+        },
+        nonSerializableMetadata: {
           undoExecute: null,
         },
       },

@@ -270,12 +270,14 @@ function buildFileEditTimeline(
     newState: 'output-available',
     output: {
       message: 'File updated successfully',
-      hiddenMetadata: {
+      hiddenFromLLM: {
         diff: {
           path: config.targetFile,
           before: config.beforeContent,
           after: config.afterContent,
         },
+      },
+      nonSerializableMetadata: {
         undoExecute: null,
       },
     },

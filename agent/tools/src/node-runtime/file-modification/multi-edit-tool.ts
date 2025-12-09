@@ -115,9 +115,11 @@ export async function multiEditToolExecute(
         result: {
           editsApplied: totalEditsApplied,
         },
-        hiddenMetadata: {
-          undoExecute: async () => {},
+        hiddenFromLLM: {
           diff: undefined,
+        },
+        nonSerializableMetadata: {
+          undoExecute: async () => {},
         },
       };
 
@@ -186,9 +188,11 @@ export async function multiEditToolExecute(
     return {
       message: `Successfully applied ${totalEditsApplied} edits to ${relative_path}`,
       result: { editsApplied: totalEditsApplied },
-      hiddenMetadata: {
-        undoExecute,
+      hiddenFromLLM: {
         diff,
+      },
+      nonSerializableMetadata: {
+        undoExecute,
       },
     };
   } catch (error) {

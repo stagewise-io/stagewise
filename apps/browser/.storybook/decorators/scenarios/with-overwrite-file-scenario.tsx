@@ -264,12 +264,14 @@ function buildOverwriteFileTimeline(
     newState: 'output-available',
     output: {
       message: 'File created successfully',
-      hiddenMetadata: {
+      hiddenFromLLM: {
         diff: {
           path: config.targetFile,
           before: '',
           after: config.fileContent,
         },
+      },
+      nonSerializableMetadata: {
         undoExecute: null,
       },
     },

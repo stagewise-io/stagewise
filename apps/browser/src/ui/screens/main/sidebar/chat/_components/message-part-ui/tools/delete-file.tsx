@@ -21,10 +21,10 @@ export const DeleteFileToolPart = ({
 
   const diff = useMemo(
     () =>
-      part.output?.hiddenMetadata?.diff
-        ? diffLines(part.output.hiddenMetadata.diff.before ?? '', '')
+      part.output?.hiddenFromLLM?.diff
+        ? diffLines(part.output.hiddenFromLLM.diff.before ?? '', '')
         : null,
-    [part.output?.hiddenMetadata],
+    [part.output?.hiddenFromLLM],
   );
 
   const deletedLineCount = useMemo(

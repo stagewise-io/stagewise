@@ -98,9 +98,11 @@ export async function deleteFileToolExecute(
 
     return {
       message: `Successfully deleted file: ${relative_path}`,
-      hiddenMetadata: {
-        undoExecute,
+      hiddenFromLLM: {
         diff,
+      },
+      nonSerializableMetadata: {
+        undoExecute,
       },
     };
   } catch (e) {

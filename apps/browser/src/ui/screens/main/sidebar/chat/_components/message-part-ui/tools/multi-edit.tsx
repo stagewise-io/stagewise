@@ -33,13 +33,13 @@ export const MultiEditToolPart = ({
   const { getFileIDEHref } = useFileIDEHref();
   const diff = useMemo(
     () =>
-      part.output?.hiddenMetadata?.diff
+      part.output?.hiddenFromLLM?.diff
         ? diffLines(
-            part.output?.hiddenMetadata?.diff.before ?? '',
-            part.output?.hiddenMetadata?.diff.after ?? '',
+            part.output?.hiddenFromLLM?.diff.before ?? '',
+            part.output?.hiddenFromLLM?.diff.after ?? '',
           )
         : null,
-    [part.output?.hiddenMetadata],
+    [part.output?.hiddenFromLLM],
   );
 
   const posthog = usePostHog();

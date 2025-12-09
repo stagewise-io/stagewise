@@ -183,9 +183,11 @@ export async function overwriteFileToolExecute(
 
     return {
       message,
-      hiddenMetadata: {
-        undoExecute,
+      hiddenFromLLM: {
         diff,
+      },
+      nonSerializableMetadata: {
+        undoExecute,
       },
     };
   } catch (error) {
