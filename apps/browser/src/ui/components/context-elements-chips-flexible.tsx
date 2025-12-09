@@ -323,9 +323,21 @@ function ContextElementChip({
                     <p className="max-w-1/3 shrink-0 basis-1/3 break-all text-foreground text-sm">
                       {attribute}
                     </p>
-                    <p className="mt-0.5 shrink basis-2/3 font-mono text-muted-foreground text-xs">
-                      {selectedElement.attributes[attribute]}
-                    </p>
+                    {isUrl(selectedElement.attributes[attribute]) ? (
+                      <a
+                        href={selectedElement.attributes[attribute]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary text-xs hover:text-primary"
+                      >
+                        {selectedElement.attributes[attribute]}{' '}
+                        <IconOpenExternalOutline18 className="mb-0.5 ml-0.5 inline size-3.5" />
+                      </a>
+                    ) : (
+                      <p className="mt-0.5 shrink basis-2/3 select-text font-mono text-muted-foreground text-xs">
+                        {selectedElement.attributes[attribute]}
+                      </p>
+                    )}
                   </div>
                 ))}
             </div>
@@ -412,4 +424,13 @@ function ContextElementChip({
       </PopoverContent>
     </Popover>
   );
+}
+
+function isUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
