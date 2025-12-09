@@ -138,13 +138,6 @@ export class WorkspaceService {
           this.globalDataPathService,
           this.workspacePath,
         );
-        this.uiKarton.setState((draft) => {
-          draft.workspace!.path = this.workspacePath;
-          draft.workspace!.paths.data =
-            this.workspacePathsService!.workspaceDataPath;
-          draft.workspace!.paths.temp =
-            this.workspacePathsService!.workspaceTempPath;
-        });
 
         this.workspaceConfigService = await WorkspaceConfigService.create(
           this.logger,
@@ -165,6 +158,19 @@ export class WorkspaceService {
           this.staticAnalysisService,
           this.notificationService,
         );
+
+        this.uiKarton.setState((draft) => {
+          draft.workspace!.path = this.workspacePath;
+          draft.workspace!.paths.data =
+            this.workspacePathsService!.workspaceDataPath;
+          draft.workspace!.paths.temp =
+            this.workspacePathsService!.workspaceTempPath;
+          draft.workspace!.agent = {
+            accessPath: this.getAbsoluteAgentAccessPath(
+              setupConfig?.agentAccessPath,
+            ),
+          };
+        });
 
         this.workspaceConfigService.addConfigUpdatedListener((newConfig) => {
           clientRuntime.fileSystem.setCurrentWorkingDirectory(
@@ -284,7 +290,6 @@ export class WorkspaceService {
     const accessPath =
       agentAccessPath ?? this.workspaceConfigService?.get().agentAccessPath;
     if (!accessPath) return getRepoRootForPath(this.workspacePath);
-
     const isGitRepoRoot = accessPath.trim() === '{GIT_REPO_ROOT}';
     if (isGitRepoRoot) return getRepoRootForPath(this.workspacePath);
 

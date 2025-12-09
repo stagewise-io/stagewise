@@ -125,16 +125,6 @@ export class AgentService {
     this.globalConfigService = globalConfigService;
     this.authService = authService;
     this.onSaveSetupInformation = onSaveSetupInformation;
-    this.uiKarton.setState((draft) => {
-      if (!draft.agentChat) {
-        draft.agentChat = {
-          chats: {},
-          activeChatId: null,
-          toolCallApprovalRequests: [],
-          isWorking: false,
-        };
-      }
-    });
 
     // Initialize prompt builder
     this.promptBuilder = new PromptBuilder(
@@ -220,11 +210,6 @@ export class AgentService {
             this.clientRuntime.fileSystem.setCurrentWorkingDirectory(
               absoluteAgentAccessPath,
             );
-            this.uiKarton.setState((draft) => {
-              draft.workspace!.agent = {
-                accessPath: absoluteAgentAccessPath,
-              };
-            });
           },
         }),
       };
@@ -508,6 +493,17 @@ export class AgentService {
 
   public async initialize() {
     this.logger.debug('[AgentService] Initializing...');
+
+    this.uiKarton.setState((draft) => {
+      if (!draft.agentChat) {
+        draft.agentChat = {
+          chats: {},
+          activeChatId: null,
+          toolCallApprovalRequests: [],
+          isWorking: false,
+        };
+      }
+    });
 
     // Initialize client and litellm
     await this.initializeClient();

@@ -13,7 +13,7 @@ import type { GlobalDataPathService } from './global-data-path';
 import type { NotificationService } from './notification';
 
 type WorkspaceChangedEvent =
-  | { type: 'loaded'; selectedPath: string }
+  | { type: 'loaded'; selectedPath: string; accessPath?: string }
   | { type: 'unloaded' }
   | { type: 'setupCompleted'; workspacePath: string; name?: string };
 
@@ -187,12 +187,13 @@ export class WorkspaceManagerService {
       return;
     }
 
-    this.workspaceChangeListeners.forEach((listener) =>
+    this.workspaceChangeListeners.forEach(async (listener) => {
       listener({
         type: 'loaded',
         selectedPath,
-      }),
-    );
+        accessPath: this.currentWorkspace?.configService?.get().agentAccessPath,
+      });
+    });
 
     this.logger.debug('[WorkspaceManagerService] Loaded workspace');
   }

@@ -121,10 +121,15 @@ export async function main({
 
   workspaceManagerService.registerWorkspaceChangeListener((event) => {
     switch (event.type) {
-      case 'loaded':
+      case 'loaded': {
+        const accessPath = event.accessPath ?? event.selectedPath;
+        const absoluteAccessPath =
+          accessPath === '{GIT_REPO_ROOT}'
+            ? getRepoRootForPath(event.selectedPath)
+            : resolve(event.selectedPath, accessPath);
         agentService.setClientRuntime(
           new ClientRuntimeNode({
-            workingDirectory: event.selectedPath,
+            workingDirectory: absoluteAccessPath,
             rgBinaryBasePath: globalDataPathService.globalDataPath,
           }),
         );
@@ -137,6 +142,7 @@ export async function main({
             ],
           });
         break;
+      }
       case 'unloaded':
         agentService.setClientRuntime(null);
         break;
