@@ -8,6 +8,7 @@ import type { Logger } from '../logger';
 import type { GlobalDataPathService } from '../global-data-path';
 import { UIController } from './ui-controller';
 import { TabController } from './tab-controller';
+import { ChatStateController } from './chat-state-controller';
 
 interface WindowState {
   width: number;
@@ -26,6 +27,7 @@ export class WindowLayoutService {
   private uiController: UIController | null = null;
   private tabs: Record<string, TabController> = {};
   private activeTabId: string | null = null;
+  private chatStateController: ChatStateController | null = null;
 
   private currentWebContentBounds: Electron.Rectangle | null = null;
   private isWebContentInteractive = true;
@@ -160,6 +162,12 @@ export class WindowLayoutService {
         hoveredElement: null,
       };
     });
+
+    // Initialize ChatStateController
+    this.chatStateController = new ChatStateController(
+      this.uiKarton,
+      this.tabs,
+    );
 
     // Create initial tab
     this.createTab('https://google.com', true);
@@ -328,20 +336,13 @@ export class WindowLayoutService {
     });
 
     tab.on('elementSelected', (element) => {
-      this.uiKarton.setState((draft) => {
-        // Add if not exists
-        if (
-          !draft.browser.selectedElements.some(
-            (e) => e.stagewiseId === element.stagewiseId,
-          )
-        ) {
-          draft.browser.selectedElements.push(element);
-        }
-      });
-      this.broadcastSelectionUpdate();
+      this.chatStateController?.addElement(element);
     });
 
     this.tabs[id] = tab;
+
+    // Update ChatStateController tabs reference
+    this.chatStateController?.updateTabsReference(this.tabs);
 
     // Initialize state in Karton
     this.uiKarton.setState((draft) => {
@@ -369,6 +370,9 @@ export class WindowLayoutService {
       this.baseWindow!.contentView.removeChildView(tab.getViewContainer());
       tab.destroy();
       delete this.tabs[tabId];
+
+      // Update ChatStateController tabs reference
+      this.chatStateController?.updateTabsReference(this.tabs);
 
       // Clean up Karton state
       this.uiKarton.setState((draft) => {
@@ -593,28 +597,12 @@ export class WindowLayoutService {
   };
 
   private handleRemoveElement = (elementId: string) => {
-    this.uiKarton.setState((draft) => {
-      draft.browser.selectedElements = draft.browser.selectedElements.filter(
-        (e) => e.stagewiseId !== elementId,
-      );
-    });
-    this.broadcastSelectionUpdate();
+    this.chatStateController?.removeElement(elementId);
   };
 
   private handleClearElements = () => {
-    this.uiKarton.setState((draft) => {
-      draft.browser.selectedElements = [];
-    });
-    this.broadcastSelectionUpdate();
+    this.chatStateController?.clearElements();
   };
-
-  private broadcastSelectionUpdate() {
-    const state = this.uiKarton.state;
-    const selectedElements = state.browser.selectedElements;
-    Object.values(this.tabs).forEach((tab) => {
-      tab.updateContextSelection(selectedElements);
-    });
-  }
 
   // Window State Management (same as before)
   private get windowStatePath(): string {
