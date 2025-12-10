@@ -1,5 +1,6 @@
 import { BaseWindow, app, ipcMain } from 'electron';
 import path from 'node:path';
+import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { KartonService } from '../karton';
@@ -299,6 +300,14 @@ export class WindowLayoutService {
 
     tab.on('putIntoBackground', () => {
       this.handleInteractivityChange(false);
+    });
+
+    tab.on('handleKeyDown', (keyDownEvent) => {
+      if (getHotkeyDefinitionForEvent(keyDownEvent as KeyboardEvent)) {
+        this.handleInteractivityChange(false);
+        this.uiController?.focus();
+        this.uiController?.forwardKeyDownEvent(keyDownEvent);
+      }
     });
 
     tab.on('elementHovered', (element) => {

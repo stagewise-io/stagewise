@@ -4,7 +4,8 @@ import { ContextUsageRing } from './context-usage-ring';
 import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useChatState } from '@/hooks/use-chat-state';
-import { cn, HotkeyActions } from '@/utils';
+import { cn } from '@/utils';
+import { HotkeyActions } from '@shared/hotkeys';
 import {
   ArrowUpIcon,
   SquareIcon,

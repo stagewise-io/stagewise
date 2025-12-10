@@ -1,6 +1,34 @@
 import { createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '@/app';
+import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
+
+declare global {
+  interface Window {
+    tunnelKeyDown: (keyDownEvent: KeyboardEvent) => void;
+  }
+}
+
+// Dominant captures in capture phase
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (getHotkeyDefinitionForEvent(e)?.captureDominantly) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+    }
+    window.tunnelKeyDown(e);
+  },
+  { capture: true },
+);
+
+// Non-dominant captures in bubble phase
+window.addEventListener('keydown', (e) => {
+  // Only tunnel up if event was not captured by a dominant listener in the capture phase
+  if (e.defaultPrevented) return;
+  window.tunnelKeyDown(e);
+});
 
 /**
  * Setup section for the actual app that offers the context element selection UI

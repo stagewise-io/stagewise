@@ -1,5 +1,6 @@
 import { Providers } from './providers';
 import { HoveredElementTracker } from './components/hovered-element-tracker';
+import { KeydownTunnel } from './hooks/keydown-tunnel';
 
 export const App = () => {
   return (
@@ -18,6 +19,7 @@ export const App = () => {
         }}
       >
         <HoveredElementTracker />
+        <KeydownTunnel />
       </div>
     </Providers>
   );

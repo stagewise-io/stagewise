@@ -1,9 +1,11 @@
 import { WebContentsView, shell } from 'electron';
+import { domCodeToElectronKeyCode } from '../../utils/dom-code-to-electron-key-code';
 import path from 'node:path';
 import contextMenu from 'electron-context-menu';
 import type { Logger } from '../logger';
 import { EventEmitter } from 'node:events';
 import { KartonService } from '../karton';
+import type { SerializableKeyboardEvent } from '@shared/karton-contracts/web-contents-preload';
 
 // These are injected by the build system
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -276,6 +278,22 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
         return false;
       },
     );
+  }
+
+  public forwardKeyDownEvent(key: SerializableKeyboardEvent) {
+    const electronKeyCode = domCodeToElectronKeyCode(key.code, key.key);
+    const modifiers = [
+      key.ctrlKey ? ('control' as const) : undefined,
+      key.altKey ? ('alt' as const) : undefined,
+      key.shiftKey ? ('shift' as const) : undefined,
+      key.metaKey ? ('meta' as const) : undefined,
+    ].filter(Boolean) as ('control' | 'alt' | 'shift' | 'meta')[];
+
+    this.view.webContents.sendInputEvent({
+      type: 'keyDown',
+      keyCode: electronKeyCode,
+      modifiers,
+    });
   }
 
   public setCheckFrameValidityHandler(

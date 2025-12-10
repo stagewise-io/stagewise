@@ -1,4 +1,4 @@
-import { hotkeyActionDefinitions, type HotkeyActions } from '../utils';
+import { hotkeyActionDefinitions, type HotkeyActions } from '@shared/hotkeys';
 import useBrowserInfo from '../hooks/use-user-agent';
 
 export function HotkeyComboText({ action }: { action: HotkeyActions }) {

@@ -1,7 +1,6 @@
-import type { HotkeyActions } from '@/utils';
 import { useCallback } from 'react';
 import { useEventListener } from './use-event-listener';
-import { getIFrameWindow, hotkeyActionDefinitions } from '@/utils';
+import { hotkeyActionDefinitions, type HotkeyActions } from '@shared/hotkeys';
 import { usePostHog } from 'posthog-js/react';
 
 export function useHotKeyListener(
@@ -26,20 +25,5 @@ export function useHotKeyListener(
     [action],
   );
 
-  useEventListener('keydown', hotKeyListener, {
-    capture: true,
-  });
-
-  // Also listen to iframe events to capture hotkeys when iframe has focus
-  const iframeWindow = getIFrameWindow();
-
-  useEventListener(
-    'keydown',
-    hotKeyListener,
-    {
-      capture: true,
-    },
-    iframeWindow ?? undefined,
-    !!iframeWindow,
-  );
+  useEventListener('keydown', hotKeyListener);
 }

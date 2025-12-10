@@ -6,9 +6,8 @@ const elementIds = new WeakMap<Element, string>();
 let idCounter = 0;
 
 function getUniqueId(element: Element): string {
-  if (!elementIds.has(element)) {
-    elementIds.set(element, `el-${++idCounter}`);
-  }
+  if (!elementIds.has(element)) elementIds.set(element, `el-${++idCounter}`);
+
   return elementIds.get(element)!;
 }
 

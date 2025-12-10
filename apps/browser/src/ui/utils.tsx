@@ -178,35 +178,6 @@ export function formatToSizeFormat(sizeInBytes: number) {
 
   return `${n.toFixed(n < 10 && l > 0 ? 1 : 0)} ${units[l]}`;
 }
-
-export interface HotkeyActionDefinition {
-  keyComboDefault: string;
-  keyComboMac: string;
-  isEventMatching: (ev: KeyboardEvent) => boolean;
-}
-
-export enum HotkeyActions {
-  ESC = 0,
-  CTRL_ALT_PERIOD = 1,
-}
-
-export const hotkeyActionDefinitions: Record<
-  HotkeyActions,
-  HotkeyActionDefinition
-> = {
-  [HotkeyActions.ESC]: {
-    keyComboDefault: 'Esc',
-    keyComboMac: 'esc',
-    isEventMatching: (ev) => ev.code === 'Escape',
-  },
-  [HotkeyActions.CTRL_ALT_PERIOD]: {
-    keyComboDefault: 'Ctrl+Alt+.',
-    keyComboMac: '⌘+⌥+.',
-    isEventMatching: (ev) =>
-      ev.code === 'Period' && (ev.ctrlKey || ev.metaKey) && ev.altKey,
-  },
-};
-
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';
 import { getSelectedElementReactInfo } from './utils/element-analysis/react';

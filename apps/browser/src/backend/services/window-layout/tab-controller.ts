@@ -11,6 +11,7 @@ import {
 import {
   defaultState,
   type TabKartonContract,
+  type SerializableKeyboardEvent,
 } from '@shared/karton-contracts/web-contents-preload';
 import type { ContextElement } from '@shared/context-elements';
 import { ContextElementTracker } from './context-element-tracker';
@@ -35,6 +36,7 @@ export interface TabState {
 export interface TabControllerEventMap {
   stateUpdated: [state: Partial<TabState>];
   putIntoBackground: [];
+  handleKeyDown: [keyDownEvent: SerializableKeyboardEvent];
   elementHovered: [element: ContextElement | null];
   elementSelected: [element: ContextElement];
 }
@@ -282,6 +284,13 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       async () => {
         // TODO: Switch the focus to the UI. This means: Move the UI in front of the tab again.
         this.emit('putIntoBackground');
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'handleKeyDown',
+      async (key) => {
+        this.emit('handleKeyDown', key);
       },
     );
   }
