@@ -1,20 +1,18 @@
-import type {
-  ReactSelectedElementInfo,
-  SelectedElement,
-} from '@shared/karton-contracts/ui';
+import type { ReactSelectedElementInfo } from '@shared/context-elements/react';
+import type { ContextElement } from '@shared/context-elements';
 import xml from 'xml';
 import specialTokens from '../special-tokens.js';
 
 /**
  * Gets siblings of the selected element from its parent
  */
-function getSiblings(element: SelectedElement): SelectedElement[] {
+function getSiblings(element: ContextElement): ContextElement[] {
   if (!element.parent?.children) {
     return [];
   }
 
   return element.parent.children.filter(
-    (child) => child.stagewiseId !== element.stagewiseId,
+    (child: ContextElement) => child.stagewiseId !== element.stagewiseId,
   );
 }
 
@@ -36,16 +34,17 @@ const serializeReactComponentTree = (
 };
 
 export function relevantCodebaseFilesToContextSnippet(
-  selectedElements: SelectedElement[],
+  selectedElements: ContextElement[],
   maxFileCount = 20,
   maxFilesPerSelectedElement = 2,
 ): string {
   // We don't simply flatten the code metadata for every element because that would overly focus the files of the first selected elements.
   // Instead, we interleave and then deduplicate to can as many relevant files as possible.
-  const interleavedCodeMetadata: SelectedElement['codeMetadata'] = [];
+  const interleavedCodeMetadata: NonNullable<ContextElement['codeMetadata']> =
+    [];
   for (let index = 0; index < maxFilesPerSelectedElement; index++) {
     for (const element of selectedElements) {
-      const metadata = element.codeMetadata[index];
+      const metadata = element.codeMetadata?.[index];
       if (metadata) {
         interleavedCodeMetadata.push(metadata);
       }
@@ -53,13 +52,12 @@ export function relevantCodebaseFilesToContextSnippet(
   }
 
   const combinedDedupedCodeMetadata = interleavedCodeMetadata
-    .reduce<SelectedElement['codeMetadata']>(
-      (acc, curr) =>
-        acc.find((m) => m.relativePath === curr.relativePath)
-          ? acc
-          : acc.concat(curr),
-      [],
-    )
+    .reduce<NonNullable<ContextElement['codeMetadata']>>((acc, curr) => {
+      if (!acc) return [curr];
+      return acc.find((m) => m.relativePath === curr.relativePath)
+        ? acc
+        : acc.concat(curr);
+    }, [])
     .slice(0, maxFileCount);
 
   if (combinedDedupedCodeMetadata.length === 0) {
@@ -88,7 +86,7 @@ export function relevantCodebaseFilesToContextSnippet(
  * @returns Formatted XML-style string that the LLM can parse
  */
 export function selectedElementToContextSnippet(
-  element: SelectedElement,
+  element: ContextElement,
 ): string {
   if (!element) {
     throw new Error('Element cannot be null or undefined');
@@ -124,7 +122,7 @@ const importantAttributes: Set<string> = new Set([
 ]);
 
 function serializeSelectedElementPart(
-  element: SelectedElement,
+  element: ContextElement,
   depth = 0,
 ): xml.XmlObject {
   const truncateParent = depth < minSerializationDepth;
@@ -164,6 +162,18 @@ function serializeSelectedElementPart(
         ),
       },
     }));
+
+  const computedStylesChildNode: xml.XmlObject =
+    !minimizeContent && element.computedStyles
+      ? {
+          computedStyles: {
+            _cdata: truncateTextContent(
+              JSON.stringify(element.computedStyles ?? {}),
+              200,
+            ),
+          },
+        }
+      : {};
 
   const ownPropertiesChildNodes: xml.XmlObject[] = !minimizeContent
     ? Object.entries(element.ownProperties)
@@ -214,7 +224,7 @@ function serializeSelectedElementPart(
       : [];
 
   const relatedFileChildNodes: xml.XmlObject[] = !minimizeContent
-    ? element.codeMetadata.map((file) => ({
+    ? (element.codeMetadata || []).map((file) => ({
         'file-ref': {
           _attr: {
             path: file.relativePath,
@@ -234,13 +244,12 @@ function serializeSelectedElementPart(
         }
       : {};
 
-  console.log(element);
-
   return {
-    [element.nodeType.toLowerCase()]: [
+    [(element.nodeType || element.tagName).toLowerCase()]: [
       attributeChildNode,
       xpathChildNode,
       positionChildNode,
+      computedStylesChildNode,
       ...ownPropertiesChildNodes,
       ...attributesChildNodes,
       textContentChildNode,
@@ -255,6 +264,6 @@ function serializeSelectedElementPart(
 
 function truncateTextContent(textContent: string, maxLength: number): string {
   return textContent.length > maxLength
-    ? `${textContent.slice(0, maxLength)}...${specialTokens.truncated}`
+    ? `${textContent.slice(0, maxLength)}...${specialTokens.truncated(textContent.length - maxLength, 'char')}`
     : textContent;
 }

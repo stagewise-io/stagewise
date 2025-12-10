@@ -8,11 +8,8 @@ import {
   isAnthropicSupportedFile,
 } from '@/utils';
 import { useKartonProcedure, useKartonState } from './use-karton';
-import type {
-  ChatMessage,
-  FileUIPart,
-  SelectedElement,
-} from '@shared/karton-contracts/ui';
+import type { ChatMessage, FileUIPart } from '@shared/karton-contracts/ui';
+import type { ContextElement } from '@shared/context-elements';
 
 interface ContextSnippet {
   promptContextName: string;
@@ -43,7 +40,7 @@ interface ChatContext {
   clearFileAttachments: () => void;
 
   // Context elements
-  selectedElements: SelectedElement[];
+  selectedElements: ContextElement[];
   removeSelectedElement: (elementId: string) => void;
 
   // UI state

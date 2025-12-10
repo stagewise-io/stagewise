@@ -73,7 +73,7 @@ export function ChatPanel({
       {/* <ChatPanelHeader multiChatControls={multiChatControls} /> */}
       <PanelContent
         className={cn(
-          '-mx-3.5 block px-0 py-0',
+          '-mx-2 block px-0 py-0',
           'h-full min-h-64',
           'overflow-hidden rounded-[inherit]',
         )}

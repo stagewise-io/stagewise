@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MainTab } from './index';
+import { contextElementSchema } from '../../context-elements';
 import { reactSelectedElementInfoSchema } from '../../context-elements/react';
 
 /** Information about a selected element */
@@ -187,7 +188,7 @@ export type BrowserData = z.infer<typeof browserDataSchema>;
 
 const metadataSchema = z.object({
   createdAt: z.date(),
-  selectedPreviewElements: z.array(selectedElementSchema).optional(),
+  selectedPreviewElements: z.array(contextElementSchema).optional(),
   currentTab: z.enum(MainTab).optional(), // optional because it is set by the agent -> TODO: find a type-safe way
   browserData: browserDataSchema.optional(),
   thinkingDuration: z.number().optional(),

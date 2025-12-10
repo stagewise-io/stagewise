@@ -14,7 +14,7 @@ import {
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import type { SelectedElement } from '@shared/karton-contracts/ui';
+import type { ContextElement } from '@shared/context-elements';
 import {
   Tooltip,
   TooltipTrigger,
@@ -29,7 +29,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 interface ContextElementsChipsProps {
   selectedElements: {
     domElement?: HTMLElement;
-    selectedElement: SelectedElement;
+    selectedElement: ContextElement;
   }[];
   removeSelectedElement?: (element: HTMLElement) => void;
   removeSelectedElementById?: (id: string) => void;
@@ -73,7 +73,7 @@ export function ContextElementsChipsFlexible({
 
 interface ContextElementChipProps {
   element?: HTMLElement;
-  selectedElement: SelectedElement;
+  selectedElement: ContextElement;
   onDelete?: () => void;
   onHover: (element: HTMLElement) => void;
   onUnhover: () => void;
@@ -128,7 +128,9 @@ function ContextElementChip({
       return reactComponentName;
     }
 
-    const tagName = selectedElement.nodeType.toLowerCase();
+    const tagName = (
+      selectedElement.nodeType || selectedElement.tagName
+    ).toLowerCase();
     const id = selectedElement.attributes.id
       ? `#${selectedElement.attributes.id}`
       : '';

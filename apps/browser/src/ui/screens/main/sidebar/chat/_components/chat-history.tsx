@@ -5,7 +5,6 @@ import { useComparingSelector, useKartonState } from '@/hooks/use-karton';
 import { cn } from '@/utils';
 import { ChatErrorBubble } from './chat-error-bubble';
 import type { History } from '@shared/karton-contracts/ui';
-import { useIsContainerScrollable } from '@/hooks/use-is-container-scrollable';
 
 export const ChatHistory = () => {
   const wasAtBottomRef = useRef(true);
@@ -17,8 +16,6 @@ export const ChatHistory = () => {
       chats: s.agentChat?.chats,
     })),
   );
-
-  const { canScrollDown, canScrollUp } = useIsContainerScrollable(ref);
 
   const activeChat = useMemo(() => {
     return activeChatId ? chats?.[activeChatId] : null;
@@ -115,16 +112,7 @@ export const ChatHistory = () => {
       aria-label="Agent message display"
       // className="scrollbar-subtle pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-2 py-4 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none"
       className={cn(
-        'scrollbar-subtle pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-2 py-4 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none',
-        canScrollUp &&
-          canScrollDown &&
-          'mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black_calc(100%-16px),transparent_100%)]',
-        canScrollUp &&
-          !canScrollDown &&
-          'mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_16px,black)]',
-        !canScrollUp &&
-          canScrollDown &&
-          'mask-alpha mask-[linear-gradient(to_top,transparent_0px,black_16px,black)]',
+        'scrollbar-subtle mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_4px,black_100%)] pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-4 py-4 pr-1 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none',
       )}
       onScroll={handleScroll}
     >

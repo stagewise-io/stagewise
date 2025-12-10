@@ -2,10 +2,8 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { KartonService } from '../../karton';
 import type { Logger } from '../../logger';
 import type { TelemetryService } from '../../telemetry';
-import type {
-  ReactSelectedElementInfo,
-  SelectedElement,
-} from '@shared/karton-contracts/ui';
+import type { ReactSelectedElementInfo } from '@shared/context-elements/react';
+import type { ContextElement } from '@shared/context-elements';
 export class RagService {
   private logger: Logger;
   private uiKarton: KartonService;
@@ -48,9 +46,9 @@ export class RagService {
   }
 
   private async getRelatedContextFilesForSelectedElement(
-    element: SelectedElement,
-  ): Promise<SelectedElement['codeMetadata']> {
-    let codeMetadata: SelectedElement['codeMetadata'] = [];
+    element: ContextElement,
+  ): Promise<ContextElement['codeMetadata']> {
+    let codeMetadata: ContextElement['codeMetadata'] = [];
 
     // We check if framework-specific info exists that may help us. If yes, we can statically infer fitting files and line numbers.
     if (element.frameworkInfo?.react) {
@@ -137,7 +135,7 @@ const getFilePathsForReactComponentInfo = async (
   componentInfo: ReactSelectedElementInfo,
   clientRuntime: ClientRuntime,
 ): Promise<{
-  codeMetadata: SelectedElement['codeMetadata'];
+  codeMetadata: ContextElement['codeMetadata'];
   coveredLevels: number;
 }> => {
   const componentNames: string[] = [];
@@ -191,7 +189,7 @@ const getFilePathsForReactComponentInfo = async (
       [],
     );
 
-  const results: SelectedElement['codeMetadata'] = foundFiles.map((file) => {
+  const results: ContextElement['codeMetadata'] = foundFiles.map((file) => {
     const relationTextParts = file.relationGrades.map((grade, index) => {
       return `${coveredLevels[grade]! > 1 && grade === 0 ? 'potentially ' : ''}${index === 0 ? 'contains' : ''} ${grade === 0 ? 'implementation' : `${grade}${grade === 1 ? 'st' : grade === 2 ? 'nd' : grade === 3 ? 'rd' : 'th'} grade${index === (file.relationGrades.length - 1) ? ' parent' : ''}`}`;
     });

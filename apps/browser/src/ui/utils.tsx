@@ -1,8 +1,8 @@
 import type {
   BrowserData,
-  SelectedElement,
   UserMessageMetadata,
 } from '@shared/karton-contracts/ui';
+import type { ContextElement } from '@shared/context-elements';
 
 export const companionAnchorTagName = 'stagewise-companion-anchor';
 
@@ -437,7 +437,7 @@ export const getSelectedElementInfo = (
   mode: 'originalElement' | 'children' | 'parents' = 'originalElement',
   callDepth?: number,
   childrenCount?: number,
-): SelectedElement => {
+): ContextElement => {
   const boundingRect = element.getBoundingClientRect();
 
   // Collect raw attributes
@@ -495,11 +495,9 @@ export const getSelectedElementInfo = (
   }
 
   return {
+    id: stagewiseId,
     stagewiseId,
-    frameId,
-    isMainFrame,
-    frameLocation: truncateString(frameLocation, 2048) ?? '',
-    frameTitle: frameTitle ? (truncateString(frameTitle, 512) ?? null) : null,
+    tagName: truncateString(element.nodeName, 96) ?? 'unknown',
     nodeType: truncateString(element.nodeName, 96) ?? 'unknown',
     xpath:
       truncateString(getXPathForElement(element, false), 1024) ?? 'unknown',
@@ -526,7 +524,7 @@ export const getSelectedElementInfo = (
                 (childrenCount ?? 0) + 1,
               );
             })
-        : undefined,
+        : [],
     parent:
       (mode === 'parents' || mode === 'originalElement') &&
       element.parentElement &&
@@ -538,15 +536,20 @@ export const getSelectedElementInfo = (
             (callDepth ?? 0) + 1,
             undefined,
           )
+        : null,
+    siblings: [],
+    frameworkInfo:
+      mode === 'originalElement'
+        ? {
+            react: getSelectedElementReactInfo(element),
+          }
         : undefined,
-    frameworkInfo: {
-      react:
-        mode === 'originalElement'
-          ? getSelectedElementReactInfo(element)
-          : undefined,
-    },
     codeMetadata: [],
     // These fields are required but will be set by the backend when elements are collected via CDP
+    frameId,
+    isMainFrame,
+    frameLocation: truncateString(frameLocation, 2048) ?? '',
+    frameTitle: frameTitle ? (truncateString(frameTitle, 512) ?? null) : null,
     backendNodeId: 0,
     tabId: '',
   };
@@ -586,7 +589,7 @@ export const getBrowserData = (): BrowserData | null => {
 };
 
 export const collectUserMessageMetadata = (
-  selectedElements: SelectedElement[],
+  selectedElements: ContextElement[],
   _sentByPlugin?: boolean,
 ): UserMessageMetadata => {
   const browserData = getBrowserData();

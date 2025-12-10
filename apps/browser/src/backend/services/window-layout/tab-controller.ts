@@ -19,7 +19,6 @@ import {
   defaultState,
   type TabKartonContract,
 } from '@shared/karton-contracts/web-contents-preload';
-import type { SelectedElement } from '@shared/karton-contracts/ui/metadata';
 import type { ContextElement } from '@shared/context-elements';
 import { ReactComponentTracker } from './react-component-tracker';
 
@@ -43,8 +42,8 @@ export interface TabState {
 export interface TabControllerEventMap {
   stateUpdated: [state: Partial<TabState>];
   putIntoBackground: [];
-  elementHovered: [element: SelectedElement | null];
-  elementSelected: [element: SelectedElement];
+  elementHovered: [element: ContextElement | null];
+  elementSelected: [element: ContextElement];
 }
 
 export class TabController extends EventEmitter<TabControllerEventMap> {
@@ -206,7 +205,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     }
   }
 
-  public async updateContextSelection(selectedElements: SelectedElement[]) {
+  public async updateContextSelection(selectedElements: ContextElement[]) {
     await this.contextElementTracker.updateHighlights(
       selectedElements,
       this.id,
@@ -926,7 +925,7 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     return this.currentHover?.id ?? null;
   }
 
-  public async collectHoveredElementInfo(): Promise<SelectedElement | null> {
+  public async collectHoveredElementInfo(): Promise<ContextElement | null> {
     if (!this.currentHover) return null;
     await this.ensureConnected();
 
@@ -944,12 +943,8 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     // Get frame information, trying to fetch title if not cached
     const frameInfo = await this.getFrameInfo(this.currentHover.frameId, true);
 
-    // Map ContextElement to SelectedElement
-    // Note: This mapping needs to align with SelectedElement schema.
-    // Assuming ContextElement has most fields, but we need to add frameId, backendNodeId, tabId.
-    // The caller (TabController) knows the tabId. We know frameId and backendNodeId here.
-
-    const selectedElement = {
+    // Add frame and tab information to the ContextElement
+    const enrichedElement: ContextElement = {
       ...contextElement,
       frameId: this.currentHover.frameId,
       isMainFrame: frameInfo.isMainFrame,
@@ -958,30 +953,18 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
       backendNodeId: this.currentHover.backendId,
       // tabId will be filled by TabController
       stagewiseId: contextElement.id || randomUUID(), // fallback if id missing
-      nodeType: contextElement.tagName,
-      // attributes, ownProperties, boundingClientRect match?
-      // Check ContextElement definition:
-      // attributes: Record<string, string> -> SelectedElement is slightly richer
-      // ownProperties: Record<string, unknown> -> OK
-      // boundingClientRect: { top, left, width, height } -> OK
-      // frameworkInfo is now included from ContextElement
-      frameworkInfo: contextElement.frameworkInfo,
-      codeMetadata: [], // Initialize empty code metadata
-    } as unknown as SelectedElement;
+      nodeType: contextElement.tagName, // Ensure nodeType is set for compatibility
+      codeMetadata: contextElement.codeMetadata || [], // Initialize empty code metadata if not present
+    };
 
-    // We need to return a structure that satisfies SelectedElement as much as possible,
-    // but strict type matching might require a converter function.
-    // For now we assume the shapes are compatible enough or we cast.
-    // Ideally we update extractInfo to return SelectedElement directly, but it relies on Preload script.
-
-    return selectedElement;
+    return enrichedElement;
   }
 
   // Re-adding a tracker for *currently highlighted* items to enable diffing
   private currentlyHighlighted: Set<string> = new Set();
 
   public async updateHighlights(
-    elements: SelectedElement[],
+    elements: ContextElement[],
     currentTabId: string,
   ) {
     const hasItemsToHighlight = elements.some(

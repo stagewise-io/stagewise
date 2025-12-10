@@ -188,6 +188,85 @@ const truncateValue = (
   return value;
 };
 
+/**
+ * Extract computed styles from an element.
+ * Only extracts styles for the original element (not for children/parents/siblings).
+ */
+const getComputedStyles = (
+  element: Element,
+  mode: 'originalElement' | 'children' | 'parents' | 'siblings',
+): ContextElement['computedStyles'] | undefined => {
+  // Only extract computed styles for the original element
+  if (mode !== 'originalElement') {
+    return undefined;
+  }
+
+  try {
+    const computed = window.getComputedStyle(element);
+    const styles: ContextElement['computedStyles'] = {};
+
+    // Font-family
+    const fontFamily = computed.fontFamily;
+    if (fontFamily && fontFamily !== 'initial' && fontFamily !== 'inherit') {
+      styles.fontFamily = truncateString(fontFamily, 256) ?? undefined;
+    }
+
+    // Background-color
+    const backgroundColor = computed.backgroundColor;
+    styles.backgroundColor = backgroundColor;
+
+    // Background-image (truncated to 500 characters)
+    const backgroundImage = computed.backgroundImage;
+    if (
+      backgroundImage &&
+      backgroundImage !== 'initial' &&
+      backgroundImage !== 'inherit' &&
+      backgroundImage !== 'none'
+    ) {
+      styles.backgroundImage =
+        truncateString(backgroundImage, 500) ?? undefined;
+    }
+
+    // Border style (use shorthand to get all border properties)
+    const border = computed.border;
+    styles.border = border ? truncateString(border, 256) : undefined;
+
+    // Box-shadow
+    const boxShadow = computed.boxShadow;
+    styles.boxShadow = boxShadow ? truncateString(boxShadow, 256) : undefined;
+
+    // Filter
+    const filter = computed.filter;
+    styles.filter = filter ? truncateString(filter, 256) : undefined;
+
+    // Transform
+    const transform = computed.transform;
+    styles.transform = transform ? truncateString(transform, 256) : undefined;
+
+    // Only return if we have at least one style
+    return Object.keys(styles).length > 0 ? styles : undefined;
+  } catch {
+    // Silently fail if computed styles can't be accessed
+    return undefined;
+  }
+};
+
+/**
+ * Get text content of an element, excluding content from <style> and <script> tags.
+ * This prevents CSS and JavaScript code from appearing in textContent.
+ */
+const getCleanTextContent = (element: Element): string => {
+  // Clone the element to avoid modifying the original
+  const clone = element.cloneNode(true) as Element;
+
+  // Remove all <style> and <script> elements from the clone
+  const styleAndScriptElements = clone.querySelectorAll('style, script');
+  styleAndScriptElements.forEach((el) => el.remove());
+
+  // Get textContent from the cleaned clone
+  return clone.textContent || '';
+};
+
 const getXPathForElement = (element: Element, useId: boolean) => {
   if (element.id && useId) {
     return `/*[@id="${element.id}"]`;
@@ -484,6 +563,9 @@ const serializeElementRecursive = (
   const reactInfo =
     mode === 'originalElement' ? getReactInfo(element) : undefined;
 
+  // Extract computed styles only for the original element
+  const computedStyles = getComputedStyles(element, mode);
+
   return {
     id: backendNodeId ? backendNodeId.toString() : undefined,
     tagName: truncateString(element.nodeName, 96) ?? 'unknown',
@@ -497,7 +579,7 @@ const serializeElementRecursive = (
       width: boundingRect.width,
       height: boundingRect.height,
     },
-    textContent: truncateString(element.textContent || '', 512) ?? 'unknown',
+    textContent: truncateString(getCleanTextContent(element), 512) ?? 'unknown',
     parent,
     siblings,
     children,
@@ -505,6 +587,7 @@ const serializeElementRecursive = (
       reactInfo !== null && reactInfo !== undefined
         ? { react: reactInfo }
         : undefined,
+    computedStyles,
   };
 };
 

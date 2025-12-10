@@ -37,7 +37,7 @@ export interface PromptContext {
   contextSnippets: ContextSnippet[];
 }
 
-export type { SelectedElement } from '@shared/karton-contracts/ui';
+export type { ContextElement } from '@shared/context-elements';
 
 /** Additional information that a plugin can provide when the user selects a context element */
 export interface ContextElementContext {

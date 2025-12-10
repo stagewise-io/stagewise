@@ -5,12 +5,9 @@ import type {
   InspirationComponent,
   AskForIdeOutput,
 } from '@stagewise/agent-tools';
-import type {
-  UserMessageMetadata,
-  SelectedElement,
-  BrowserData,
-} from './metadata';
+import type { UserMessageMetadata, BrowserData } from './metadata';
 import type { ReactSelectedElementInfo } from '../../context-elements/react';
+import type { ContextElement } from '../../context-elements';
 import type {
   UIMessage,
   UIDataTypes,
@@ -25,12 +22,8 @@ import type {
 } from './shared-types';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
-export type {
-  UserMessageMetadata,
-  SelectedElement,
-  BrowserData,
-  ReactSelectedElementInfo,
-};
+export type { UserMessageMetadata, BrowserData, ReactSelectedElementInfo };
+export type { ContextElement } from '../../context-elements';
 export type UIMessagePart = AIMessagePart<UIDataTypes, UITools>;
 
 export type { FileDiff };
@@ -267,8 +260,8 @@ export type AppState = {
     activeTabId: string | null;
     history: HistoryEntry[];
     contextSelectionMode: boolean;
-    selectedElements: SelectedElement[];
-    hoveredElement: SelectedElement | null;
+    selectedElements: ContextElement[];
+    hoveredElement: ContextElement | null;
   };
 };
 
