@@ -74,7 +74,7 @@ export class UserExperienceService {
         this.uiKarton.setState((draft) => {
           if (
             draft.userExperience.activeLayout === Layout.MAIN &&
-            draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
+            draft.userExperience.activeMainTab === MainTab.BROWSING
           ) {
             draft.userExperience.devAppPreview.customScreenSize = size
               ? {
@@ -93,7 +93,7 @@ export class UserExperienceService {
         this.uiKarton.setState((draft) => {
           if (
             draft.userExperience.activeLayout === Layout.MAIN &&
-            draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
+            draft.userExperience.activeMainTab === MainTab.BROWSING
           ) {
             draft.userExperience.devAppPreview.inShowCodeMode =
               !draft.userExperience.devAppPreview.inShowCodeMode;
@@ -107,7 +107,7 @@ export class UserExperienceService {
         this.uiKarton.setState((draft) => {
           if (
             draft.userExperience.activeLayout === Layout.MAIN &&
-            draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW
+            draft.userExperience.activeMainTab === MainTab.BROWSING
           ) {
             draft.userExperience.devAppPreview.isFullScreen =
               !draft.userExperience.devAppPreview.isFullScreen;
@@ -156,7 +156,7 @@ export class UserExperienceService {
                 draft.userExperience = {
                   recentlyOpenedWorkspaces,
                   activeLayout: Layout.MAIN,
-                  activeMainTab: MainTab.DEV_APP_PREVIEW,
+                  activeMainTab: MainTab.BROWSING,
                   devAppPreview: {
                     isFullScreen: false,
                     inShowCodeMode: false,
@@ -323,7 +323,7 @@ export class UserExperienceService {
 
       if (draft.userExperience.activeLayout === Layout.MAIN) {
         draft.userExperience.activeMainTab = tab;
-        if (draft.userExperience.activeMainTab === MainTab.DEV_APP_PREVIEW) {
+        if (draft.userExperience.activeMainTab === MainTab.BROWSING) {
           // TODO We can make this nicer by persisting the config in between sessions.
           draft.userExperience.devAppPreview = {
             isFullScreen: false,

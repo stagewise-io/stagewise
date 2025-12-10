@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@shared/karton-contracts/ui';
+import type { ChatMessage, ContextElement } from '@shared/karton-contracts/ui';
 import { convertToModelMessages, type UserModelMessage } from 'ai';
 import xml from 'xml';
 import specialTokens from '../utils/special-tokens';
@@ -54,14 +54,17 @@ export function getUserMessage(userMessage: ChatMessage): UserModelMessage {
     userMessage.metadata.selectedPreviewElements
       .slice(0, 5)
       .forEach((element) => {
-        systemAttachmentTextPart.push(selectedElementToContextSnippet(element));
+        systemAttachmentTextPart.push(
+          selectedElementToContextSnippet(element as ContextElement),
+        );
       });
 
     // We add the relevant codebase files to the system attachment to provide the LLM with the codebase context.
     // We limit this to max 3 files to avoid overwhelming the model with too much information.
     systemAttachmentTextPart.push(
       relevantCodebaseFilesToContextSnippet(
-        userMessage.metadata?.selectedPreviewElements ?? [],
+        (userMessage.metadata?.selectedPreviewElements ??
+          []) as ContextElement[],
         3,
       ),
     );

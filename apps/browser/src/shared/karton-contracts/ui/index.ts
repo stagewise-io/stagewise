@@ -85,9 +85,7 @@ export enum Layout {
 }
 
 export enum MainTab {
-  DEV_APP_PREVIEW = 'dev-app-preview',
-  IDEATION_CANVAS = 'ideation-canvas',
-  SETTINGS = 'settings',
+  BROWSING = 'browsing',
 }
 
 export type AgentError =
@@ -221,25 +219,19 @@ export type AppState = {
     | {
         activeLayout: Layout.SIGNIN;
       }
-    | ({
+    | {
         activeLayout: Layout.MAIN;
-      } & (
-        | {
-            activeMainTab: MainTab.IDEATION_CANVAS | MainTab.SETTINGS | null;
-          }
-        | {
-            activeMainTab: MainTab.DEV_APP_PREVIEW;
-            devAppPreview: {
-              isFullScreen: boolean;
-              inShowCodeMode: boolean;
-              customScreenSize: {
-                width: number;
-                height: number;
-                presetName: string; // Preset can be a name like "mobile" or "iPhone 13" or whatever
-              } | null;
-            };
-          }
-      ))
+        activeMainTab: MainTab.BROWSING;
+        devAppPreview: {
+          isFullScreen: boolean;
+          inShowCodeMode: boolean;
+          customScreenSize: {
+            width: number;
+            height: number;
+            presetName: string; // Preset can be a name like "mobile" or "iPhone 13" or whatever
+          } | null;
+        };
+      }
   );
   // State of the notification service.
   notifications: {

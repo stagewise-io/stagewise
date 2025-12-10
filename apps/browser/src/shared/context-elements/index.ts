@@ -59,10 +59,14 @@ const baseContextElementSchema = z.object({
 
 // Extend the base schema with recursive fields using z.lazy
 export const contextElementSchema = baseContextElementSchema.extend({
-  parent: z.lazy(() => contextElementSchema).nullable(),
-  siblings: z.array(z.lazy(() => contextElementSchema)),
-  children: z.array(z.lazy(() => contextElementSchema)),
+  parent: baseContextElementSchema.optional(),
+  siblings: z.array(baseContextElementSchema),
+  children: z.array(baseContextElementSchema),
 });
 
 // Derive the TypeScript type from the schema
-export type ContextElement = z.infer<typeof contextElementSchema>;
+export type ContextElement = z.infer<typeof contextElementSchema> & {
+  parent?: ContextElement;
+  siblings: ContextElement[];
+  children: ContextElement[];
+};

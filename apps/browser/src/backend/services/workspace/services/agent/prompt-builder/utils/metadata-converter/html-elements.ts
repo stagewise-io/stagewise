@@ -202,6 +202,17 @@ function serializeSelectedElementPart(
         }
       : {};
 
+  const frameChildNode: xml.XmlObject = {
+    frame: {
+      _attr: {
+        tabId: element.tabId ?? 'unknown',
+        isMainFrame: element.isMainFrame ?? 'unknown',
+        frameLocation: element.frameLocation ?? 'unknown',
+        frameTitle: element.frameTitle ?? 'unknown',
+      },
+    },
+  };
+
   const parentChildNode: xml.XmlObject =
     !truncateParent && depth <= 0 && element.parent
       ? {
@@ -219,7 +230,9 @@ function serializeSelectedElementPart(
   const childrenChildNodes: xml.XmlObject[] =
     !truncateChildren && depth >= 0 && element.children
       ? element.children.slice(0, 3).map((child) => ({
-          child: [serializeSelectedElementPart(child, depth + 1)],
+          child: [
+            serializeSelectedElementPart(child as ContextElement, depth + 1),
+          ],
         }))
       : [];
 
@@ -253,6 +266,7 @@ function serializeSelectedElementPart(
       ...ownPropertiesChildNodes,
       ...attributesChildNodes,
       textContentChildNode,
+      frameChildNode,
       parentChildNode,
       ...siblingChildNodes,
       ...childrenChildNodes,
