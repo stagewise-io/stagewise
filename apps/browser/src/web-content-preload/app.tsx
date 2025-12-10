@@ -1,14 +1,24 @@
 import { Providers } from './providers';
-import modernNormalizeCss from './modern-normalize.css?inline';
-import cssContent from './app.css?inline';
 import { HoveredElementTracker } from './components/hovered-element-tracker';
 
 export const App = () => {
   return (
     <Providers>
-      <style>{modernNormalizeCss}</style>
-      <style>{cssContent}</style>
-      <HoveredElementTracker />
+      <div
+        style={{
+          fontFamily: "'Geist', sans-serif",
+          width: '100vw',
+          height: '100vh',
+          inset: '0px',
+          position: 'fixed',
+          pointerEvents: 'none',
+          zIndex: '2147483647',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <HoveredElementTracker />
+      </div>
     </Providers>
   );
 };

@@ -234,6 +234,8 @@ function serializeSelectedElementPart(
         }
       : {};
 
+  console.log(element);
+
   return {
     [element.nodeType.toLowerCase()]: [
       attributeChildNode,

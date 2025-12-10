@@ -22,6 +22,7 @@ function getElementAttributes(element: HTMLElement): { [key: string]: string } {
 
   for (let i = 0; i < element.attributes.length; i++) {
     const attr = element.attributes[i];
+    console.log('attr', attr);
     if (!attr) continue;
     // Store data-* attributes separately for emphasis
     if (attr.name.startsWith('data-')) {
@@ -61,6 +62,7 @@ function generateElementContext(element: HTMLElement, index: number): string {
   }
 
   const attributes = getElementAttributes(element);
+  console.log('attributes', attributes);
   if (Object.keys(attributes).length > 0) {
     context += `  <attributes>\n`;
     for (const [key, value] of Object.entries(attributes)) {
@@ -76,6 +78,8 @@ function generateElementContext(element: HTMLElement, index: number): string {
     const maxLength = 100;
     context += `  <text>${text.length > maxLength ? `${text.substring(0, maxLength)}...` : text}</text>\n`;
   }
+
+  console.log('parent tagName', element.parentElement?.tagName);
 
   context += `  <structural_context>\n`;
   if (element.parentElement) {

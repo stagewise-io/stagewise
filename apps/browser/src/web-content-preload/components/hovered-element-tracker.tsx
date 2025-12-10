@@ -80,13 +80,46 @@ function ElementOverlay({
     };
   }, [element]);
 
+  const overlayStyles =
+    style === 'hovered'
+      ? {
+          position: 'fixed' as const,
+          background: 'oklch(54.6% 0.245 262.881 / 0.1)',
+          border: 'solid 2px oklch(54.6% 0.245 262.881 / 0.8)',
+          borderRadius: '2px',
+        }
+      : {
+          position: 'fixed' as const,
+          background: 'transparent',
+          border: 'dashed 2px oklch(14.1% 0.005 285.823 / 0.5)',
+          borderRadius: '2px',
+        };
+
   return (
-    <div
-      ref={divRef}
-      onMouseEnter={onHover}
-      className={style === 'hovered' ? 'hovered-element' : 'selected-element'}
-    >
-      <div className="tag-name">{element.tagName.toLowerCase()}</div>
+    <div ref={divRef} onMouseEnter={onHover} style={overlayStyles}>
+      <div
+        style={{
+          position: 'absolute',
+          top: '-16px',
+          left: '0px',
+          width: 'fit-content',
+          height: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '9px',
+          fontWeight: 600,
+          textAlign: 'center',
+          textOverflow: 'ellipsis',
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          color: 'white',
+          borderRadius: '3px',
+          padding: '0px 4px',
+          boxShadow: '0 0 0 1px oklch(55.2% 0.016 285.938 / 0.3)',
+        }}
+      >
+        {element.tagName.toLowerCase()}
+      </div>
     </div>
   );
 }

@@ -1042,7 +1042,9 @@ export class AgentService {
               });
             },
             (error) => {
-              this.logger.debug('[AgentService] Agent failed', error);
+              this.logger.debug(
+                `[AgentService] Agent failed:  ${error.message} ${error.stack}`,
+              );
               this.telemetryService.captureException(error as Error);
             },
           );
@@ -1088,7 +1090,9 @@ export class AgentService {
         this.lastMessageId = messageId;
       });
     } catch (error) {
-      this.logger.debug('[AgentService] Agent failed', error);
+      this.logger.debug(
+        `[AgentService] Agent failed: ${error instanceof Error ? error.message : JSON.stringify(error)} ${error instanceof Error ? error.stack : ''}`,
+      );
       this.telemetryService.captureException(error as Error);
       const errorDesc = formatErrorDescription('Agent failed', error);
       this.setAgentWorking(false);
@@ -1451,9 +1455,7 @@ export class AgentService {
       return;
     } else {
       const errorDetails = extractDetailsFromError(error.error);
-      this.logger.debug(
-        `[Agent Service] Agent failed with error ${JSON.stringify(error)}`,
-      );
+      this.logger.debug(`[Agent Service] Agent failed: ${error.error}`);
       this.telemetryService.captureException(error.error as Error);
       const errorDesc = formatErrorDescription('Agent failed', errorDetails);
       this.setAgentWorking(false);

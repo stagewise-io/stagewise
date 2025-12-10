@@ -142,7 +142,7 @@ export function MainSection() {
           )}
         >
           {/* Background with mask for the web-content */}
-          <BackgroundWithCutout className={cn(`z-0`)} borderRadius={8} />
+          <BackgroundWithCutout className={cn(`z-0`)} borderRadius={4} />
           <div className="flex w-full items-center gap-2 p-2 pb-0">
             <Button
               variant="ghost"
@@ -218,7 +218,7 @@ export function MainSection() {
             </Tooltip>
           </div>
           <div className="flex size-full flex-col gap-4 rounded-lg p-2">
-            <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg shadow-[0_0_3px_rgba(0,0,0,0.1),0_-6px_48px_-24px_rgba(0,0,0,0.05)]">
+            <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-sm shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] ring-1 ring-foreground/10">
               {activeTab?.url === 'ui-main' ? (
                 <StartPage />
               ) : activeTab?.error ? (

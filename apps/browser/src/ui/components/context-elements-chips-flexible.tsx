@@ -24,7 +24,7 @@ import { usePostHog } from 'posthog-js/react';
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import { IdeLogo } from './ide-logo';
 import { IconOpenExternalOutline18 } from 'nucleo-ui-outline-18';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
 interface ContextElementsChipsProps {
   selectedElements: {
@@ -347,13 +347,13 @@ function ContextElementChip({
             flattenedReactComponentTree.length > 0 && (
               <div className="flex flex-col items-stretch justify-start gap-1.5">
                 <p className="font-medium text-foreground text-sm">
-                  <AtomIcon className="mb-px inline size-4" /> React Component
-                  Tree
+                  <AtomIcon className="-my-px inline-block size-3 self-end align-baseline" />{' '}
+                  React Component Tree
                 </p>
                 <div>
                   {flattenedReactComponentTree.map((component, index) => {
                     return (
-                      <>
+                      <Fragment key={`${component.componentName}-${index}`}>
                         <span
                           className={cn(
                             'font-mono text-foreground text-xs',
@@ -362,11 +362,12 @@ function ContextElementChip({
                           )}
                         >
                           {component.componentName}
+                          {component.isRSC ? '(RSC)' : ''}
                         </span>
                         {index < flattenedReactComponentTree.length - 1 && (
                           <ChevronLeft className="inline-block size-3.5 text-muted-foreground" />
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </div>

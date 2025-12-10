@@ -9,8 +9,8 @@ import type {
   UserMessageMetadata,
   SelectedElement,
   BrowserData,
-  ReactSelectedElementInfo,
 } from './metadata';
+import type { ReactSelectedElementInfo } from '../../context-elements/react';
 import type {
   UIMessage,
   UIDataTypes,

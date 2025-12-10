@@ -86,6 +86,16 @@ export class WindowLayoutService {
       y: this.lastNonMaximizedBounds.y,
       title: 'stagewise',
       titleBarStyle: 'hiddenInset',
+      // fullscreenable: false,
+      ...(process.platform !== 'darwin'
+        ? {
+            titleBarOverlay: {
+              color: '#e4e4e4',
+              symbolColor: '#3f3f46',
+              height: 64,
+            },
+          }
+        : {}),
       trafficLightPosition: { x: 14, y: 16 },
       backgroundMaterial: 'mica',
       backgroundColor: '#e4e4e4',
@@ -94,6 +104,7 @@ export class WindowLayoutService {
       closable: true,
       frame: false,
     });
+    this.baseWindow.setWindowButtonVisibility(true);
 
     if (savedState?.isMaximized) {
       this.baseWindow.maximize();
@@ -120,9 +131,9 @@ export class WindowLayoutService {
     });
     this.baseWindow.on('maximize', () => this.scheduleWindowStateSave());
     this.baseWindow.on('unmaximize', () => this.scheduleWindowStateSave());
-    this.baseWindow.on('enter-full-screen', () =>
-      this.scheduleWindowStateSave(),
-    );
+    this.baseWindow.on('enter-full-screen', () => {
+      this.scheduleWindowStateSave();
+    });
     this.baseWindow.on('leave-full-screen', () =>
       this.scheduleWindowStateSave(),
     );
