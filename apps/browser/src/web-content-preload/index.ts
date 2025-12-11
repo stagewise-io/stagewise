@@ -13,12 +13,13 @@ declare global {
 window.addEventListener(
   'keydown',
   (e) => {
-    if (getHotkeyDefinitionForEvent(e)?.captureDominantly) {
+    const hotkeyDef = getHotkeyDefinitionForEvent(e);
+    if (hotkeyDef?.captureDominantly) {
       e.preventDefault();
       e.stopImmediatePropagation();
       e.stopPropagation();
+      window.tunnelKeyDown(e);
     }
-    window.tunnelKeyDown(e);
   },
   { capture: true },
 );
