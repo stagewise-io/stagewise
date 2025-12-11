@@ -12,12 +12,14 @@ interface TextSlideshowProps
     VariantProps<typeof textSlideshowVariants> {
   texts: string[];
   changeEveryMs?: number;
+  appendix?: string | React.ReactNode;
 }
 
 function TextSlideshow({
   className,
   texts,
   changeEveryMs = 3000,
+  appendix,
   ...props
 }: TextSlideshowProps) {
   const [currentIndex, setCurrentIndex] = React.useState(0);
@@ -58,6 +60,7 @@ function TextSlideshow({
         key={`current-${currentIndex}`}
       >
         {texts[currentIndex]}
+        {appendix}
       </span>
       <span
         className={cn(
@@ -69,6 +72,7 @@ function TextSlideshow({
         key={`next-${(currentIndex + 1) % texts.length}`}
       >
         {texts[(currentIndex + 1) % texts.length]}
+        {appendix}
       </span>
     </span>
   );
