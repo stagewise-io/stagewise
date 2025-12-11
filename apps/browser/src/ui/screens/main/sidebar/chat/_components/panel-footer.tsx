@@ -43,8 +43,6 @@ const chatTextSlideshowTexts: Record<MainTab | 'fallback', string[]> = {
     "Try: Let's try a different icon for this button",
     'Try: Make the press animation of the component more subtle',
   ],
-  [MainTab.IDEATION_CANVAS]: ['Try: Build a form field with my design system'],
-  [MainTab.SETTINGS]: ['Ask stage any question...'],
   fallback: ['Ask stage any question...'],
 };
 export function ChatPanelFooter() {
