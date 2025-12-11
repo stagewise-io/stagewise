@@ -43,6 +43,15 @@ export interface TabControllerEventMap {
   elementHovered: [element: ContextElement | null];
   elementSelected: [element: ContextElement];
   tabFocused: [tabId: string];
+  viewportSizeChanged: [
+    size: {
+      width: number;
+      height: number;
+      scale: number;
+      top: number;
+      left: number;
+    },
+  ];
 }
 
 export class TabController extends EventEmitter<TabControllerEventMap> {
@@ -56,6 +65,34 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   // Current state cache
   private currentState: TabState;
+
+  // Viewport size cache
+  private currentViewportSize: {
+    width: number;
+    height: number;
+    top: number;
+    left: number;
+    scale: number;
+    fitScale: number;
+    appliedDeviceScaleFactor: number;
+  } | null = null;
+
+  // Viewport layout cache (scroll position, scale, zoom)
+  private currentViewportLayout: {
+    top: number;
+    left: number;
+    scale: number;
+    zoom: number;
+  } | null = null;
+
+  // Viewport tracking
+  private viewportTrackingInterval: NodeJS.Timeout | null = null;
+  private readonly VIEWPORT_TRACKING_INTERVAL_MS = 200;
+
+  // DevTools debugger tracking
+  private devToolsDebugger: Electron.Debugger | null = null;
+  private devToolsPlaceholderObjectId: string | null = null;
+  private devToolsDeviceModeWrapperObjectId: string | null = null;
 
   constructor(id: string, logger: Logger, initialUrl?: string) {
     super();
@@ -149,6 +186,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     };
 
     this.setupEventListeners();
+    this.startViewportTracking();
 
     if (initialUrl) {
       this.loadURL(initialUrl);
@@ -267,12 +305,21 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   }
 
   public setContextSelectionMouseCoordinates(x: number, y: number) {
+    // Compensate for scroll position when emitting input events
+    // The coordinates are relative to the viewport, but we need to account for scroll
+
+    const scale = this.currentViewportSize?.scale || 1;
+    const adjustedX = Math.floor(x / scale);
+    const adjustedY = Math.floor(y / scale);
+
+    // TODO: In some cases the coords are not right when changing to a small device in emulation and not reloading the page. I don't know why (glenn) but we should fix this sometime. For now this takes too much time.
+
     this.webContentsView.webContents.sendInputEvent({
       type: 'mouseMove',
-      x,
-      y,
+      x: adjustedX,
+      y: adjustedY,
     });
-    this.contextElementTracker.updateMousePosition(x, y);
+    this.contextElementTracker.updateMousePosition(adjustedX, adjustedY);
   }
 
   public async clearContextSelectionMouseCoordinates() {
@@ -286,10 +333,14 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     deltaX: number;
     deltaY: number;
   }) {
+    const scale = this.currentViewportSize?.scale || 1;
+    const adjustedX = Math.floor(event.x / scale);
+    const adjustedY = Math.floor(event.y / scale);
+
     const ev: Electron.MouseWheelInputEvent = {
       type: 'mouseWheel',
-      x: event.x,
-      y: event.y,
+      x: adjustedX,
+      y: adjustedY,
       deltaX: -event.deltaX,
       deltaY: -event.deltaY,
     };
@@ -338,11 +389,36 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   public destroy() {
     // View destruction is handled by removing from parent, but we can explicitly help if needed
     // The webcontents will be destroyed when the view is destroyed
+    this.stopViewportTracking();
+    this.detachDevToolsDebugger();
     this.removeAllListeners();
   }
 
   public getState(): TabState {
     return { ...this.currentState };
+  }
+
+  public getViewportSize(): {
+    width: number;
+    height: number;
+    scale: number;
+    fitScale: number;
+    appliedDeviceScaleFactor: number;
+    top: number;
+    left: number;
+  } | null {
+    return this.currentViewportSize ? { ...this.currentViewportSize } : null;
+  }
+
+  public getViewportLayout(): {
+    top: number;
+    left: number;
+    scale: number;
+    zoom: number;
+  } | null {
+    return this.currentViewportLayout
+      ? { ...this.currentViewportLayout }
+      : null;
   }
 
   private updateState(updates: Partial<TabState>) {
@@ -409,12 +485,26 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       this.updateState({ title });
     });
 
-    wc.on('devtools-closed', () => {
+    wc.on('devtools-closed', async () => {
       this.updateState({ devToolsOpen: false });
+      this.detachDevToolsDebugger();
+      // Immediately update viewport size when DevTools close
+      // to transition back to regular viewport tracking (full size)
+      try {
+        await this.updateViewportInfo();
+      } catch (err) {
+        this.logger.debug(
+          `[TabController] Failed to update viewport size after DevTools close: ${err}`,
+        );
+      }
     });
 
     wc.on('devtools-opened', () => {
       this.updateState({ devToolsOpen: true });
+      // Attach debugger after a short delay to ensure devToolsWebContents is ready
+      setTimeout(() => {
+        this.attachDevToolsDebugger();
+      }, 100);
     });
 
     wc.on('responsive', () => {
@@ -433,5 +523,406 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       shell.openExternal(details.url);
       return { action: 'deny' };
     });
+  }
+
+  private startViewportTracking() {
+    if (this.viewportTrackingInterval) {
+      return;
+    }
+
+    this.viewportTrackingInterval = setInterval(() => {
+      this.updateViewportInfo().catch((err) => {
+        this.logger.debug(
+          `[TabController] Failed to update viewport info: ${err}`,
+        );
+      });
+    }, this.VIEWPORT_TRACKING_INTERVAL_MS);
+
+    // Initial update
+    this.updateViewportInfo().catch((err) => {
+      this.logger.debug(
+        `[TabController] Failed to update viewport info: ${err}`,
+      );
+    });
+  }
+
+  private stopViewportTracking() {
+    if (this.viewportTrackingInterval) {
+      clearInterval(this.viewportTrackingInterval);
+      this.viewportTrackingInterval = null;
+    }
+  }
+
+  private async updateViewportInfo() {
+    const wc = this.webContentsView.webContents;
+
+    if (wc.isDestroyed() || wc.isLoading()) {
+      return;
+    }
+
+    const isDevToolsOpen = this.currentState.devToolsOpen;
+
+    // Get visualViewport info from main page (needed for scale and layout in all cases)
+    let visualViewport: {
+      scale: number;
+      zoom: number;
+      pageX: number;
+      pageY: number;
+      clientWidth: number;
+      clientHeight: number;
+    } | null = null;
+
+    // Only attach if not already attached (context element tracker might have it)
+    let shouldDetach = false;
+    if (!wc.debugger.isAttached()) {
+      try {
+        wc.debugger.attach('1.3');
+        shouldDetach = true;
+      } catch {
+        // Debugger might already be attached or failed to attach
+        // This is fine, we'll try again next interval
+        return;
+      }
+    }
+
+    try {
+      const layoutMetrics = await wc.debugger.sendCommand(
+        'Page.getLayoutMetrics',
+      );
+      visualViewport = layoutMetrics.cssVisualViewport;
+
+      if (!visualViewport) {
+        // If visual viewport is not available, we can't get accurate scale
+        // This should be rare, but we'll skip emitting in this case
+        return;
+      }
+
+      // Store viewport layout (scroll position, scale, zoom) for input event compensation
+      this.currentViewportLayout = {
+        top: visualViewport.pageY || 0,
+        left: visualViewport.pageX || 0,
+        scale: visualViewport.scale,
+        zoom: visualViewport.zoom || 1,
+      };
+    } catch (err) {
+      // Ignore errors - might happen if page is not ready
+      this.logger.debug(`[TabController] Error getting visualViewport: ${err}`);
+      return;
+    } finally {
+      // Only detach if we attached it ourselves
+      if (shouldDetach && wc.debugger.isAttached()) {
+        try {
+          wc.debugger.detach();
+        } catch {
+          // Ignore detach errors
+        }
+      }
+    }
+
+    // Get size information - either from DevTools bounds or visualViewport
+    if (isDevToolsOpen) {
+      // When DevTools are open, get bounds from DevTools placeholder element
+      // Scale will be retrieved from DevTools device mode model
+      await this.updateViewportSizeFromDevTools();
+    } else {
+      // When DevTools are closed, use full visualViewport dimensions
+      // Scale is always 1 in non-devtools mode
+      const viewportSize = {
+        width: visualViewport.clientWidth,
+        height: visualViewport.clientHeight,
+        top: 0,
+        left: 0,
+        scale: 1,
+        fitScale: 1,
+        appliedDeviceScaleFactor: 1,
+      };
+      this.currentViewportSize = viewportSize;
+      this.emit('viewportSizeChanged', viewportSize);
+    }
+  }
+
+  /**
+   * Get viewport size from DevTools placeholder element bounds
+   * and get scale from DevTools device mode model
+   */
+  private async updateViewportSizeFromDevTools() {
+    if (
+      !this.devToolsDebugger ||
+      !this.devToolsDebugger.isAttached() ||
+      !this.devToolsPlaceholderObjectId
+    ) {
+      // DevTools debugger not ready yet, skip this update
+      return;
+    }
+
+    try {
+      // Get the box model which contains position and size information
+      const boxModel = await this.devToolsDebugger.sendCommand(
+        'DOM.getBoxModel',
+        {
+          objectId: this.devToolsPlaceholderObjectId,
+        },
+      );
+
+      if (boxModel.model?.content) {
+        // content array format: [x1, y1, x2, y2, x3, y3, x4, y4]
+        // This represents the four corners of the content box
+        const content = boxModel.model.content;
+        if (content.length >= 8) {
+          // Calculate bounds from content box corners
+          const x = Math.min(content[0], content[2], content[4], content[6]);
+          const y = Math.min(content[1], content[3], content[5], content[7]);
+          const right = Math.max(
+            content[0],
+            content[2],
+            content[4],
+            content[6],
+          );
+          const bottom = Math.max(
+            content[1],
+            content[3],
+            content[5],
+            content[7],
+          );
+          const width = right - x;
+          const height = bottom - y;
+
+          // Get scale from DevTools device mode model
+          // deviceModeWrapper.deviceModeView.model.scale()
+          let scale = 1;
+          let appliedDeviceScaleFactor = 1;
+          let fitScale = 1;
+          if (this.devToolsDeviceModeWrapperObjectId) {
+            try {
+              const scaleResult = await this.devToolsDebugger.sendCommand(
+                'Runtime.callFunctionOn',
+                {
+                  objectId: this.devToolsDeviceModeWrapperObjectId,
+                  functionDeclaration: `
+                    function() {
+                      try {
+                        // this is DeviceModeWrapper, access deviceModeView property
+                        if (this.deviceModeView && this.deviceModeView.model) {
+                          return { scale: this.deviceModeView.model.scale(), fitScale: this.deviceModeView.model.fitScale(), appliedDeviceScaleFactor: this.deviceModeView.model.appliedDeviceScaleFactor()};
+                        }
+                        return { scale: 1, fitScale: 1, appliedDeviceScaleFactor: 1 };
+                      } catch (e) {
+                        return { scale: 1, fitScale: 1, appliedDeviceScaleFactor: 1 };
+                      }
+                    }
+                  `,
+                  returnByValue: true,
+                },
+              );
+              if (
+                scaleResult.result?.value !== undefined &&
+                typeof scaleResult.result.value.scale === 'number' &&
+                typeof scaleResult.result.value.appliedDeviceScaleFactor ===
+                  'number' &&
+                typeof scaleResult.result.value.fitScale === 'number'
+              ) {
+                scale = scaleResult.result.value.scale;
+                appliedDeviceScaleFactor =
+                  scaleResult.result.value.appliedDeviceScaleFactor;
+                fitScale = scaleResult.result.value.fitScale;
+              }
+            } catch (err) {
+              // If we can't get the scale, fall back to 1
+              this.logger.debug(
+                `[TabController] Failed to get scale from device mode: ${err}`,
+              );
+            }
+          }
+
+          // Emit viewportSizeChanged with DevTools bounds and scale from device mode
+          const viewportSize = {
+            width,
+            height,
+            top: y,
+            left: x,
+            scale,
+            fitScale,
+            appliedDeviceScaleFactor,
+          };
+          this.currentViewportSize = viewportSize;
+          this.emit('viewportSizeChanged', viewportSize);
+        }
+      }
+    } catch (err) {
+      // Element might not be available yet, or nodeId might be invalid
+      // Try to re-acquire the element reference
+      if (
+        err instanceof Error &&
+        (err.message.includes('No node') ||
+          err.message.includes('not found') ||
+          err.message.includes('invalid'))
+      ) {
+        // Try to get the element again
+        await this.getDevToolsPlaceholderElement();
+      }
+    }
+  }
+
+  /**
+   * Attach debugger to DevTools WebContents to intercept setInspectedPageBounds calls
+   */
+  private async attachDevToolsDebugger() {
+    const wc = this.webContentsView.webContents;
+    const devToolsWebContents = wc.devToolsWebContents;
+
+    if (!devToolsWebContents || devToolsWebContents.isDestroyed()) {
+      this.logger.debug(
+        '[TabController] DevTools WebContents not available for debugger attachment',
+      );
+      return;
+    }
+
+    if (this.devToolsDebugger) {
+      // Already attached
+      return;
+    }
+
+    try {
+      const dtDebugger = devToolsWebContents.debugger;
+      if (dtDebugger.isAttached()) {
+        this.logger.debug('[TabController] DevTools debugger already attached');
+        return;
+      }
+
+      dtDebugger.attach('1.3');
+      this.devToolsDebugger = dtDebugger;
+      this.logger.debug('[TabController] DevTools debugger attached');
+
+      // Enable Runtime and DOM domains to access the placeholder element
+      await dtDebugger.sendCommand('Runtime.enable');
+      await dtDebugger.sendCommand('DOM.enable');
+
+      // Get reference to the inspected page placeholder element and device mode wrapper
+      // Retry a few times since it might not be available immediately
+      let attempts = 0;
+      const maxAttempts = 10;
+      while (
+        attempts < maxAttempts &&
+        (!this.devToolsPlaceholderObjectId ||
+          !this.devToolsDeviceModeWrapperObjectId)
+      ) {
+        await this.getDevToolsPlaceholderElement();
+        if (
+          (!this.devToolsPlaceholderObjectId ||
+            !this.devToolsDeviceModeWrapperObjectId) &&
+          attempts < maxAttempts - 1
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        attempts++;
+      }
+
+      // DevTools bounds will be polled as part of the unified viewport tracking
+    } catch (err) {
+      this.logger.error(
+        `[TabController] Failed to attach DevTools debugger: ${err}`,
+      );
+      this.devToolsDebugger = null;
+    }
+  }
+
+  /**
+   * Detach debugger from DevTools WebContents
+   */
+  private detachDevToolsDebugger() {
+    if (!this.devToolsDebugger) {
+      return;
+    }
+
+    try {
+      if (this.devToolsDebugger.isAttached()) {
+        this.devToolsDebugger.detach();
+      }
+      this.logger.debug('[TabController] DevTools debugger detached');
+    } catch (err) {
+      this.logger.error(
+        `[TabController] Error detaching DevTools debugger: ${err}`,
+      );
+    } finally {
+      this.devToolsDebugger = null;
+      this.devToolsPlaceholderObjectId = null;
+      this.devToolsDeviceModeWrapperObjectId = null;
+    }
+  }
+
+  /**
+   * Get reference to the inspected page placeholder element and device mode wrapper from DevTools
+   */
+  private async getDevToolsPlaceholderElement() {
+    if (!this.devToolsDebugger || !this.devToolsDebugger.isAttached()) {
+      return;
+    }
+
+    try {
+      // Get the AdvancedApp instance and access both the placeholder element and device mode wrapper
+      const result = await this.devToolsDebugger.sendCommand(
+        'Runtime.evaluate',
+        {
+          expression: `
+            (function() {
+              try {
+                const app = globalThis.Emulation?.AdvancedApp?.instance();
+                if (app) {
+                  const placeholder = app.inspectedPagePlaceholder?.element || null;
+                  const deviceModeWrapper = app.deviceModeView || null;
+                  return { placeholder, deviceModeWrapper };
+                }
+                return { placeholder: null, deviceModeWrapper: null };
+              } catch (e) {
+                return { placeholder: null, deviceModeWrapper: null };
+              }
+            })();
+          `,
+          returnByValue: false,
+        },
+      );
+
+      if (result.result?.objectId) {
+        // Get the properties from the returned object
+        const properties = await this.devToolsDebugger.sendCommand(
+          'Runtime.getProperties',
+          {
+            objectId: result.result.objectId,
+            ownProperties: true,
+          },
+        );
+
+        // Find placeholder and deviceModeWrapper properties
+        for (const prop of properties.result || []) {
+          if (prop.name === 'placeholder' && prop.value?.objectId) {
+            this.devToolsPlaceholderObjectId = prop.value.objectId;
+            this.logger.debug(
+              `[TabController] DevTools placeholder element found with objectId: ${this.devToolsPlaceholderObjectId}`,
+            );
+          } else if (
+            prop.name === 'deviceModeWrapper' &&
+            prop.value?.objectId
+          ) {
+            this.devToolsDeviceModeWrapperObjectId = prop.value.objectId;
+            this.logger.debug(
+              `[TabController] DevTools device mode wrapper found with objectId: ${this.devToolsDeviceModeWrapperObjectId}`,
+            );
+          }
+        }
+
+        // Release the temporary result object
+        await this.devToolsDebugger.sendCommand('Runtime.releaseObject', {
+          objectId: result.result.objectId,
+        });
+      } else {
+        this.logger.debug(
+          '[TabController] Failed to get objectId for DevTools elements',
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `[TabController] Failed to get DevTools placeholder element: ${err}`,
+      );
+    }
   }
 }

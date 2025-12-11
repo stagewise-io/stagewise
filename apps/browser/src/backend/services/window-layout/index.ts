@@ -160,6 +160,7 @@ export class WindowLayoutService {
         contextSelectionMode: false,
         selectedElements: [],
         hoveredElement: null,
+        viewportSize: null,
       };
     });
 
@@ -339,6 +340,15 @@ export class WindowLayoutService {
       this.chatStateController?.addElement(element);
     });
 
+    tab.on('viewportSizeChanged', (size) => {
+      // Only update if this is the active tab
+      if (this.activeTabId === id) {
+        this.uiKarton.setState((draft) => {
+          draft.browser.viewportSize = size;
+        });
+      }
+    });
+
     this.tabs[id] = tab;
 
     // Update ChatStateController tabs reference
@@ -423,8 +433,10 @@ export class WindowLayoutService {
       newTab.setVisible(false);
     }
 
+    // Clear viewport size - it will be updated by the new tab's tracking
     this.uiKarton.setState((draft) => {
       draft.browser.activeTabId = tabId;
+      draft.browser.viewportSize = null;
     });
   };
 

@@ -228,7 +228,6 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.passthroughWheelEvent',
       async (event) => {
-        console.log('passthroughWheelEvent', event);
         this.emit('passthroughWheelEvent', event);
       },
     );

@@ -591,8 +591,8 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
       if (!this.currentlyHighlighted.has(key)) {
         const hoverState: HoverState = {
           id: String(el.backendNodeId),
-          backendId: el.backendNodeId,
-          frameId: el.frameId,
+          backendId: el.backendNodeId!,
+          frameId: el.frameId!,
         };
         await this.triggerPreloadHighlight(hoverState, 'selected', true);
       }

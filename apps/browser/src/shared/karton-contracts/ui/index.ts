@@ -254,6 +254,13 @@ export type AppState = {
     contextSelectionMode: boolean;
     selectedElements: ContextElement[];
     hoveredElement: ContextElement | null;
+    viewportSize: {
+      top: number;
+      left: number;
+      width: number;
+      height: number;
+      scale: number;
+    } | null;
   };
 };
 
@@ -460,5 +467,7 @@ export const defaultState: KartonContract['state'] = {
     contextSelectionMode: false,
     selectedElements: [],
     hoveredElement: null,
+    viewportSize: null,
+    viewportLayout: null,
   },
 };
