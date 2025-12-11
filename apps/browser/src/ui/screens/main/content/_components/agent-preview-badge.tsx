@@ -17,7 +17,7 @@ export function AgentPreviewBadge({
   unreadCount,
 }: AgentPreviewBadgeProps) {
   return (
-    <div className="flex h-full flex-row items-center rounded-lg rounded-br-[6px] p-1 pr-2">
+    <div className="flex h-full shrink-0 flex-row items-center rounded-lg rounded-br-[6px] p-1 pr-2">
       <Tooltip>
         <TooltipTrigger>
           <Button

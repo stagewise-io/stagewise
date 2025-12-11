@@ -5,6 +5,6 @@ export function HotkeyComboText({ action }: { action: HotkeyActions }) {
   const userAgent = useBrowserInfo();
 
   return userAgent.os.name?.toLowerCase().includes('mac')
-    ? hotkeyActionDefinitions[action].keyComboMac
-    : hotkeyActionDefinitions[action].keyComboDefault;
+    ? hotkeyActionDefinitions[action].keyComboMac.replace('+', '')
+    : hotkeyActionDefinitions[action].keyComboDefault.replace('+', '');
 }
