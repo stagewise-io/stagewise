@@ -1,4 +1,6 @@
 import { type MessagePortMain, View, WebContentsView, shell } from 'electron';
+import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
+import type { Input } from 'electron';
 import contextMenu from 'electron-context-menu';
 import type { Logger } from '../logger';
 import { EventEmitter } from 'node:events';
@@ -15,6 +17,7 @@ import {
 } from '@shared/karton-contracts/web-contents-preload';
 import type { ContextElement } from '@shared/context-elements';
 import { ContextElementTracker } from './context-element-tracker';
+import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
 
 export interface TabState {
   title: string;
@@ -73,6 +76,21 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     });
     this.webContentsView.setBorderRadius(4);
     this.kartonTransport = new ElectronServerTransport();
+
+    // Forward keydown events when dev tools are opened
+    this.webContentsView.webContents.addListener('devtools-opened', () => {
+      this.webContentsView.webContents.devToolsWebContents?.addListener(
+        'input-event',
+        (_e, input) => {
+          const domEvent = electronInputToDomKeyboardEvent(input as Input);
+          if (input.type === 'keyDown' || input.type === 'rawKeyDown') {
+            const hotkeyDef = getHotkeyDefinitionForEvent(domEvent);
+            if (hotkeyDef?.captureDominantly)
+              this.emit('handleKeyDown', domEvent);
+          }
+        },
+      );
+    });
 
     this.kartonServer = createKartonServer<TabKartonContract>({
       initialState: defaultState,
