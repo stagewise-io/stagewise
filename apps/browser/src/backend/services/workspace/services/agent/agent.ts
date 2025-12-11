@@ -13,7 +13,7 @@ import {
   type ChatMessage,
   AgentErrorType,
   Layout,
-  MainTab,
+  type MainTab,
 } from '@shared/karton-contracts/ui';
 import {
   type AnthropicProviderOptions,
@@ -21,12 +21,10 @@ import {
 } from '@ai-sdk/anthropic';
 import {
   codingAgentTools,
-  inspirationAgentTools,
   setupAgentTools,
   toolsWithoutExecute,
   noWorkspaceConfiguredAgentTools,
   type UITools,
-  type InspirationComponent,
   type AgentToolsContext,
 } from '@stagewise/agent-tools';
 import {
@@ -38,7 +36,6 @@ import {
 } from 'ai';
 import type { AppRouter, TRPCClient } from '@stagewise/api-client';
 import type { AsyncIterableStream, InferUIMessageChunk, ToolUIPart } from 'ai';
-import { compileInspirationComponent } from './utils/compile-inspiration-component';
 import { getRepoRootForPath } from '@/utils/git-tools';
 import { PromptBuilder } from './prompt-builder';
 import { TimeoutManager } from './utils/time-out-manager';
@@ -154,7 +151,6 @@ export class AgentService {
   }
 
   private getToolsContext(): AgentToolsContext | null {
-    const currentTab = this.getCurrentTab();
     const captureToolsError = (scope: string) => {
       this.telemetryService.captureException(
         new Error(
@@ -212,72 +208,6 @@ export class AgentService {
             );
           },
         }),
-      };
-    }
-    if (currentTab !== MainTab.IDEATION_CANVAS && workspaceStatus === 'open') {
-      if (!this.clientRuntime)
-        return captureToolsError(
-          'Dev app preview agent tools - no client runtime',
-        );
-
-      return {
-        mode: 'coding',
-        tools: codingAgentTools(this.clientRuntime, this.client),
-      };
-    }
-    if (currentTab === MainTab.IDEATION_CANVAS && workspaceStatus === 'open') {
-      if (!this.apiKey)
-        return captureToolsError('Inspiration agent tools - no API key');
-
-      if (!this.litellm)
-        return captureToolsError('Inspiration agent tools - no litellm');
-
-      if (!this.clientRuntime)
-        return captureToolsError('Inspiration agent tools - no client runtime');
-
-      return {
-        mode: 'inspiration',
-        tools: inspirationAgentTools(
-          this.clientRuntime,
-          this.telemetryService.withTracing(this.litellm('claude-haiku-4-5'), {
-            posthogProperties: {
-              $ai_span_name: 'inspiration-agent',
-              developerTag: process.env.DEVELOPER_TAG || undefined,
-            },
-          }),
-          {
-            onGenerated: async (component) => {
-              let componentWithCompiledCode: InspirationComponent;
-              try {
-                componentWithCompiledCode = await compileInspirationComponent(
-                  component,
-                  this.logger,
-                );
-              } catch (error) {
-                componentWithCompiledCode = {
-                  ...component,
-                  compiledCode: `export default function ErrorComponent() {
-                    return <div>
-                      Error compiling component.
-                      ${error instanceof Error ? error.message : 'Unknown error'}
-                    </div>
-                  }`,
-                };
-              }
-
-              this.uiKarton.setState((draft) => {
-                if (draft.workspace?.inspirationComponents) {
-                  draft.workspace.inspirationComponents.push(
-                    componentWithCompiledCode,
-                  );
-                }
-              });
-              this.logger.debug(
-                '[AgentService] Inspiration component generated',
-              );
-            },
-          },
-        ),
       };
     }
     if (!this.clientRuntime) {
