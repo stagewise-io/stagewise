@@ -219,6 +219,7 @@ export function ChatPanelFooter() {
         await togglePanelKeyboardFocus('stagewise-ui');
       } else {
         window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
+        await togglePanelKeyboardFocus('tab-content');
       }
     }, [chatInputActive, contextSelectionActive, isWorking]),
     HotkeyActions.CTRL_I,
