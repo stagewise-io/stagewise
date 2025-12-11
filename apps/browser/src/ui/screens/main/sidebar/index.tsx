@@ -33,7 +33,7 @@ export function Sidebar() {
     }
   }, []);
 
-  useEventListener('sidebar-chat-panel-focussed', () => {
+  useEventListener('sidebar-chat-panel-focused', () => {
     if (panelRef.current) {
       panelRef.current.expand();
       // Restore previous size if available, otherwise use defaultSize
@@ -50,6 +50,11 @@ export function Sidebar() {
       if (previousSizeRef.current !== null)
         panelRef.current.resize(previousSizeRef.current);
     }
+  });
+
+  useEventListener('sidebar-chat-panel-closed', () => {
+    setIsCollapsed(true);
+    posthog?.capture('sidebar_collapsed');
   });
 
   return (

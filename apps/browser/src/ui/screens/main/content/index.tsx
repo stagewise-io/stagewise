@@ -21,6 +21,7 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { StartPage } from './_components/start-page';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
+import { CoreHotkeyBindings } from './_components/core-hotkey-bindings';
 
 export function MainSection({
   isSidebarCollapsed,
@@ -38,6 +39,12 @@ export function MainSection({
   const goForward = useKartonProcedure((p) => p.browser.goForward);
   const reload = useKartonProcedure((p) => p.browser.reload);
   const goto = useKartonProcedure((p) => p.browser.goto);
+  const createNewTab = useCallback(() => {
+    createTab();
+    // Focus URL bar
+    setLocalUrl('');
+    urlInputRef.current?.focus();
+  }, [createTab]);
   const gotoUrl = useCallback(
     (url: string, tabId?: string) => {
       const trimmed = url.trim();
@@ -81,47 +88,22 @@ export function MainSection({
       setLocalUrl('');
       setUrlBeforeEdit('');
     } else {
-      setLocalUrl(activeTab?.url);
+      setLocalUrl(activeTab?.url ?? '');
       setUrlBeforeEdit(activeTab?.url ?? '');
     }
   }, [activeTab?.url]);
 
-  // Command + L to focus URL bar
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'l') {
-        e.preventDefault();
-        urlInputRef.current?.focus();
-        urlInputRef.current?.select();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // TODO: Add global key handlers management
-  // Escape key handler for URL input - intercepts in capture phase before global handlers
-  const handleEscapeKey = useCallback(
+  useEventListener(
+    'keydown',
     (e: KeyboardEvent) => {
-      // Check if URL input is focused and it's an Escape key
-      if (
-        document.activeElement === urlInputRef.current &&
-        e.code === 'Escape'
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
+      if (e.code === 'Escape') {
         setLocalUrl(urlBeforeEdit);
         urlInputRef.current?.blur();
       }
     },
-    [urlBeforeEdit],
+    { capture: true },
+    urlInputRef.current,
   );
-
-  useEventListener('keydown', handleEscapeKey, { capture: true });
-
-  // Get position of dev-app-preview-container
 
   return (
     <ResizablePanel
@@ -130,6 +112,13 @@ export function MainSection({
       defaultSize={70}
       className="@container overflow-visible! flex h-full flex-1 flex-col items-start justify-between"
     >
+      <CoreHotkeyBindings
+        onCreateTab={createNewTab}
+        onFocusUrlBar={() => {
+          urlInputRef.current?.focus();
+          urlInputRef.current?.select();
+        }}
+      />
       <div className="flex h-full w-full flex-col">
         <TabsContainer
           openSidebarChatPanel={openSidebarChatPanel}
@@ -137,12 +126,7 @@ export function MainSection({
           activeTabId={activeTabId}
           tabs={tabs}
           setActiveTabId={switchTab}
-          onAddTab={async () => {
-            await createTab();
-            // Focus URL bar
-            setLocalUrl('');
-            urlInputRef.current?.focus();
-          }}
+          onAddTab={createNewTab}
           onCloseTab={(tabId) => {
             closeTab(tabId);
           }}

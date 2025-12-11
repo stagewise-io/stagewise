@@ -47,14 +47,6 @@ export function TabsContainer({
   };
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 't') onAddTab();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  });
-
-  useEffect(() => {
     setLeftFadeDistance(canScrollLeft ? 16 : 0);
     setRightFadeDistance(canScrollRight ? 16 : 0);
   }, [canScrollLeft, canScrollRight]);

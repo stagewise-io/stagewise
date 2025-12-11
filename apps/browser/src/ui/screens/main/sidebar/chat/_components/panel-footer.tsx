@@ -61,6 +61,8 @@ export function ChatPanelFooter() {
     })),
   );
 
+  const focusChatHotkeyText = HotkeyComboText({ action: HotkeyActions.CTRL_I });
+
   const contextSelectionActive = useKartonState(
     (s) => s.browser.contextSelectionMode,
   );
@@ -104,7 +106,6 @@ export function ChatPanelFooter() {
       chatState.sendMessage();
       setContextSelectionActive(false);
       setChatInputActive(false);
-      // stopPromptCreation is already called in sendMessage
     }
   }, [chatState, canSendMessage]);
 
@@ -170,18 +171,12 @@ export function ChatPanelFooter() {
 
   const [chatInputActive, setChatInputActive] = useState<boolean>(false);
 
-  const showTextSlideshow = useMemo(() => {
-    return (
-      (activeChat?.messages.length ?? 0) === 0 &&
-      chatState.chatInput.length === 0 &&
-      !chatInputActive
-    );
-  }, [activeChat?.messages.length, chatState.chatInput, chatInputActive]);
-
   useEffect(() => {
     if (chatInputActive) {
-      void inputRef.current?.focus();
-      setContextSelectionActive(true);
+      // Wait for the next tick to ensure the input is mounted
+      setTimeout(() => {
+        void inputRef.current?.focus();
+      }, 0);
     } else {
       setContextSelectionActive(false);
       void inputRef.current?.blur();
@@ -189,9 +184,7 @@ export function ChatPanelFooter() {
   }, [chatInputActive]);
 
   const onInputFocus = useCallback(() => {
-    if (!chatInputActive) {
-      setChatInputActive(true);
-    }
+    if (!chatInputActive) setChatInputActive(true);
   }, [chatInputActive]);
 
   const onInputBlur = useCallback(
@@ -216,28 +209,31 @@ export function ChatPanelFooter() {
 
   useHotKeyListener(
     useCallback(() => {
-      setChatInputActive(true);
-      setContextSelectionActive(true); // We trigger this here again because the user might go into context selection mode after already having the input active
-      return true;
-    }, [chatState]),
-    HotkeyActions.CTRL_ALT_PERIOD,
-  );
-  useHotKeyListener(
-    useCallback(() => {
-      if (contextSelectionActive) {
-        setContextSelectionActive(false);
+      if (!chatInputActive) {
+        window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+        setContextSelectionActive(true); // We trigger this here again because the user might go into context selection mode after already having the input active
       } else {
-        setChatInputActive(false);
+        window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
       }
-      return true;
-    }, [chatState]),
-    HotkeyActions.ESC,
+    }, [chatInputActive, contextSelectionActive, isWorking]),
+    HotkeyActions.CTRL_I,
+  );
+
+  useEventListener(
+    'keydown',
+    (e: KeyboardEvent) => {
+      if (e.code === 'Escape') {
+        if (contextSelectionActive) setContextSelectionActive(false);
+        else setChatInputActive(false);
+      }
+    },
+    {},
+    inputRef.current,
   );
 
   useEffect(() => {
-    if (chatInputActive) {
-      window.dispatchEvent(new Event('sidebar-chat-panel-focussed'));
-    }
+    if (chatInputActive)
+      window.dispatchEvent(new Event('sidebar-chat-panel-focused'));
   }, [chatInputActive]);
 
   useEventListener('sidebar-chat-panel-closed', () => {
@@ -246,7 +242,10 @@ export function ChatPanelFooter() {
   });
 
   useEventListener('sidebar-chat-panel-opened', () => {
-    setChatInputActive(true);
+    if (!isWorking) {
+      setChatInputActive(true);
+      setContextSelectionActive(true);
+    }
   });
 
   return (
@@ -274,19 +273,30 @@ export function ChatPanelFooter() {
               disabled={!enableInputField}
               className={cn(
                 GlassyTextInputClassNames,
-                'scrollbar-subtle z-10 h-28 w-full resize-none border-none bg-transparent px-2 py-1 text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out placeholder:text-muted-foreground focus:outline-none disabled:bg-transparent',
+                'scrollbar-subtle z-10 h-28 w-full resize-none border-none bg-transparent px-2 py-1 text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out focus:outline-none disabled:bg-transparent',
               )}
-              placeholder={!showTextSlideshow ? 'Type a message...' : undefined}
             />
             <div className="pointer-events-none absolute inset-0 z-20 size-full px-[9px] py-[5px]">
-              {/* TODO: Only render this if there is no chat history yet. */}
-              <TextSlideshow
-                className={cn(
-                  'text-muted-foreground text-sm',
-                  !showTextSlideshow && 'opacity-0',
-                )}
-                texts={chatTextSlideshowTexts[openTab ?? 'fallback']}
-              />
+              {chatState.chatInput.length > 0 ? null : activeChat?.messages
+                  .length === 0 ? (
+                <TextSlideshow
+                  appendix={
+                    <span className="text-muted-foreground/60 text-sm">
+                      {' '}
+                      {focusChatHotkeyText}
+                    </span>
+                  }
+                  className={cn('text-muted-foreground text-sm')}
+                  texts={chatTextSlideshowTexts[openTab ?? 'fallback']}
+                />
+              ) : (
+                <span className="text-muted-foreground text-sm">
+                  Type a message...{' '}
+                  <span className="text-muted-foreground/60 text-sm">
+                    {focusChatHotkeyText}
+                  </span>
+                </span>
+              )}
             </div>
           </div>
 
@@ -370,17 +380,11 @@ export function ChatPanelFooter() {
                   </TooltipTrigger>
                   <TooltipContent>
                     {contextSelectionActive ? (
-                      <>
-                        Stop selecting elements (
-                        <HotkeyComboText action={HotkeyActions.ESC} />)
-                      </>
+                      'Stop selecting elements (Esc)'
                     ) : (
                       <>
                         Add reference elements (
-                        <HotkeyComboText
-                          action={HotkeyActions.CTRL_ALT_PERIOD}
-                        />
-                        )
+                        <HotkeyComboText action={HotkeyActions.CTRL_I} />)
                       </>
                     )}
                   </TooltipContent>
