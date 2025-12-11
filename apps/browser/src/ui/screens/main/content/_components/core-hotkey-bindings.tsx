@@ -12,7 +12,9 @@ export function CoreHotkeyBindings({
 }) {
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const tabs = useKartonState((s) => s.browser.tabs);
-
+  const togglePanelKeyboardFocus = useKartonProcedure(
+    (p) => p.browser.layout.togglePanelKeyboardFocus,
+  );
   const tabIds = useMemo(() => Object.keys(tabs), [tabs]);
   const tabCount = useMemo(() => tabIds.length, [tabIds]);
 
@@ -37,6 +39,7 @@ export function CoreHotkeyBindings({
 
   // New tab
   useHotKeyListener(() => {
+    togglePanelKeyboardFocus('stagewise-ui');
     onCreateTab();
   }, HotkeyActions.CTRL_T);
 
@@ -139,14 +142,17 @@ export function CoreHotkeyBindings({
 
   // Focus URL bar
   useHotKeyListener(() => {
+    togglePanelKeyboardFocus('stagewise-ui');
     onFocusUrlBar();
   }, HotkeyActions.CTRL_L);
 
   useHotKeyListener(() => {
+    togglePanelKeyboardFocus('stagewise-ui');
     onFocusUrlBar();
   }, HotkeyActions.ALT_D);
 
   useHotKeyListener(() => {
+    togglePanelKeyboardFocus('stagewise-ui');
     onFocusUrlBar();
   }, HotkeyActions.F6);
 

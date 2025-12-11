@@ -39,31 +39,12 @@ export function MainSection({
   const goForward = useKartonProcedure((p) => p.browser.goForward);
   const reload = useKartonProcedure((p) => p.browser.reload);
   const goto = useKartonProcedure((p) => p.browser.goto);
-  const createNewTab = useCallback(() => {
+  const handleCreateTab = useCallback(() => {
     createTab();
     // Focus URL bar
     setLocalUrl('');
     urlInputRef.current?.focus();
   }, [createTab]);
-  const gotoUrl = useCallback(
-    (url: string, tabId?: string) => {
-      const trimmed = url.trim();
-      // Check if it's already a valid URL with protocol
-      try {
-        new URL(trimmed);
-        return goto(trimmed, tabId);
-      } catch {}
-      // Check if it looks like a domain (no spaces, has a dot)
-      if (!trimmed.includes(' ') && trimmed.includes('.'))
-        return goto(`https://${trimmed}`, tabId);
-      // Treat as search query
-      goto(
-        `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`,
-        tabId,
-      );
-    },
-    [goto],
-  );
   const toggleDevTools = useKartonProcedure((p) => p.browser.toggleDevTools);
   const [localUrl, setLocalUrl] = useState(tabs[activeTabId]?.url ?? '');
   const [urlBeforeEdit, setUrlBeforeEdit] = useState(
@@ -113,7 +94,7 @@ export function MainSection({
       className="@container overflow-visible! flex h-full flex-1 flex-col items-start justify-between"
     >
       <CoreHotkeyBindings
-        onCreateTab={createNewTab}
+        onCreateTab={handleCreateTab}
         onFocusUrlBar={() => {
           urlInputRef.current?.focus();
           urlInputRef.current?.select();
@@ -126,7 +107,7 @@ export function MainSection({
           activeTabId={activeTabId}
           tabs={tabs}
           setActiveTabId={switchTab}
-          onAddTab={createNewTab}
+          onAddTab={handleCreateTab}
           onCloseTab={(tabId) => {
             closeTab(tabId);
           }}
@@ -185,7 +166,7 @@ export function MainSection({
                 className="h-[30px] w-full truncate rounded-full px-2 text-foreground text-sm outline-none"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    gotoUrl(localUrl, activeTabId);
+                    goToUrl(goto, localUrl, activeTabId);
                     setUrlBeforeEdit(localUrl);
                     urlInputRef.current?.blur();
                   }
@@ -233,4 +214,22 @@ export function MainSection({
       </div>
     </ResizablePanel>
   );
+}
+
+function goToUrl(
+  goto: (url: string, tabId?: string) => void,
+  url: string,
+  tabId?: string,
+) {
+  const trimmed = url.trim();
+  // Check if it's already a valid URL with protocol
+  try {
+    new URL(trimmed);
+    return goto(trimmed, tabId);
+  } catch {}
+  // Check if it looks like a domain (no spaces, has a dot)
+  if (!trimmed.includes(' ') && trimmed.includes('.'))
+    return goto(`https://${trimmed}`, tabId);
+  // Treat as search query
+  goto(`https://www.google.com/search?q=${encodeURIComponent(trimmed)}`, tabId);
 }

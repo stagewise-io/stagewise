@@ -351,14 +351,17 @@ export class WindowLayoutService {
     tab.setVisible(false);
     this.baseWindow!.contentView.addChildView(tab.getViewContainer());
 
-    if (setActive) {
-      await this.handleSwitchTab(id);
-    }
+    if (setActive) await this.handleSwitchTab(id);
   }
 
   private handleCloseTab = async (tabId: string) => {
     const tab = this.tabs[tabId];
     if (tab) {
+      // Get tab order before deletion to determine next/previous tab
+      const tabIdsBeforeDeletion = Object.keys(this.tabs);
+      const currentIndex = tabIdsBeforeDeletion.indexOf(tabId);
+      const isActiveTab = this.activeTabId === tabId;
+
       this.baseWindow!.contentView.removeChildView(tab.getViewContainer());
       tab.destroy();
       delete this.tabs[tabId];
@@ -368,16 +371,25 @@ export class WindowLayoutService {
         delete draft.browser.tabs[tabId];
       });
 
-      if (this.activeTabId === tabId) {
-        // Switch to another tab if available
-        const firstTab = Object.keys(this.tabs)[0];
-        if (firstTab) {
-          await this.handleSwitchTab(firstTab);
+      if (isActiveTab) {
+        // Get remaining tabs after deletion
+        const remainingTabIds = Object.keys(this.tabs);
+
+        // Try next tab first
+        let nextTabId: string | undefined;
+        if (currentIndex < remainingTabIds.length) {
+          // Next tab is at the same index (since we removed current)
+          nextTabId = remainingTabIds[currentIndex];
+        } else if (currentIndex > 0) {
+          // If no next tab, try previous tab
+          nextTabId = remainingTabIds[currentIndex - 1];
+        }
+
+        if (nextTabId) {
+          await this.handleSwitchTab(nextTabId);
         } else {
-          this.activeTabId = null;
-          this.uiKarton.setState((draft) => {
-            draft.browser.activeTabId = null;
-          });
+          // If no other tabs exist, create a new one
+          await this.createTab('ui-main', true);
         }
       }
     }
@@ -397,6 +409,7 @@ export class WindowLayoutService {
     if (this.currentWebContentBounds) {
       newTab.setBounds(this.currentWebContentBounds);
       newTab.setVisible(true);
+      this.updateZOrder();
     } else {
       // If no bounds set yet, keep invisible until layout update
       newTab.setVisible(false);

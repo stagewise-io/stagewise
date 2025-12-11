@@ -73,6 +73,10 @@ export function ChatPanelFooter() {
     (p) => p.browser.contextSelection.clearElements,
   );
 
+  const togglePanelKeyboardFocus = useKartonProcedure(
+    (p) => p.browser.layout.togglePanelKeyboardFocus,
+  );
+
   const stopAgent = useKartonProcedure((p) => p.agentChat.abortAgentCall);
   const canStop = isWorking;
   const isConnected = useKartonConnected();
@@ -188,7 +192,7 @@ export function ChatPanelFooter() {
   }, [chatInputActive]);
 
   const onInputBlur = useCallback(
-    (ev: React.FocusEvent<HTMLTextAreaElement, Element>) => {
+    async (ev: React.FocusEvent<HTMLTextAreaElement, Element>) => {
       // We should only allow chat blur if the user clicked outside the chat box or the context selector element tree. Otherwise, we should keep the input active by refocusing it.
       const target = ev.relatedTarget as HTMLElement;
       if (target?.closest('#chat-file-attachment-menu-content')) {
@@ -208,10 +212,11 @@ export function ChatPanelFooter() {
   );
 
   useHotKeyListener(
-    useCallback(() => {
+    useCallback(async () => {
       if (!chatInputActive) {
         window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
         setContextSelectionActive(true); // We trigger this here again because the user might go into context selection mode after already having the input active
+        await togglePanelKeyboardFocus('stagewise-ui');
       } else {
         window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
       }
