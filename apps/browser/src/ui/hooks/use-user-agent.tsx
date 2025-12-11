@@ -3,13 +3,10 @@
 
 import { useMemo } from 'react';
 import bowser from 'bowser';
-import { getIFrameWindow } from '@/utils';
 
 const useBrowserInfo = () => {
   const browserInfo = useMemo(() => {
-    const iframeWindow = getIFrameWindow();
-    const userAgent =
-      iframeWindow?.navigator.userAgent || window.navigator.userAgent;
+    const userAgent = window.navigator.userAgent;
 
     const result = bowser.parse(userAgent);
     return {
