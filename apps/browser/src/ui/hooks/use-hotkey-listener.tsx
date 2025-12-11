@@ -4,7 +4,7 @@ import { hotkeyActionDefinitions, type HotkeyActions } from '@shared/hotkeys';
 import { usePostHog } from 'posthog-js/react';
 
 export function useHotKeyListener(
-  action: () => boolean | undefined,
+  action: () => void,
   hotKeyAction: HotkeyActions,
 ) {
   const posthog = usePostHog();
@@ -15,11 +15,9 @@ export function useHotKeyListener(
         posthog.capture('agent_select_elements_hotkey_pressed', {
           hotkey_action: hotKeyAction,
         });
-        const matched = action();
-        if (typeof matched !== 'boolean' || matched) {
-          ev.preventDefault();
-          ev.stopPropagation();
-        }
+
+        action();
+        ev.stopPropagation();
       }
     },
     [action],
