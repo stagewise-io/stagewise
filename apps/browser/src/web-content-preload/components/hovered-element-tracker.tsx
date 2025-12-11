@@ -13,7 +13,9 @@ function getUniqueId(element: Element): string {
 
 export function HoveredElementTracker() {
   const { highlightedElement, selectedElements } = useContextElements();
-  const putIntoBackground = useKartonProcedure((s) => s.putIntoBackground);
+  const movePanelToForeground = useKartonProcedure(
+    (s) => s.movePanelToForeground,
+  );
 
   return (
     <>
@@ -21,7 +23,7 @@ export function HoveredElementTracker() {
         <ElementOverlay
           key={getUniqueId(element)}
           element={element}
-          onHover={putIntoBackground}
+          onHover={() => movePanelToForeground('tab-content')}
           style="selected"
         />
       ))}
@@ -29,7 +31,7 @@ export function HoveredElementTracker() {
       {highlightedElement && (
         <ElementOverlay
           element={highlightedElement}
-          onHover={putIntoBackground}
+          onHover={() => movePanelToForeground('tab-content')}
           style="hovered"
         />
       )}

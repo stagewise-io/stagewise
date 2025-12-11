@@ -241,7 +241,14 @@ export class WindowLayoutService {
     this.uiController.on('closeTab', this.handleCloseTab);
     this.uiController.on('switchTab', this.handleSwitchTab);
     this.uiController.on('layoutUpdate', this.handleLayoutUpdate);
-    this.uiController.on('interactivityChange', this.handleInteractivityChange);
+    this.uiController.on(
+      'movePanelToForeground',
+      this.handleMovePanelToForeground,
+    );
+    this.uiController.on(
+      'togglePanelKeyboardFocus',
+      this.handleTogglePanelKeyboardFocus,
+    );
     this.uiController.on('stop', this.handleStop);
     this.uiController.on('reload', this.handleReload);
     this.uiController.on('goto', this.handleGoto);
@@ -298,16 +305,13 @@ export class WindowLayoutService {
       });
     });
 
-    tab.on('putIntoBackground', () => {
-      this.handleInteractivityChange(false);
+    tab.on('movePanelToForeground', (panel) => {
+      this.handleMovePanelToForeground(panel);
     });
 
     tab.on('handleKeyDown', (keyDownEvent) => {
-      if (getHotkeyDefinitionForEvent(keyDownEvent as KeyboardEvent)) {
-        this.handleInteractivityChange(false);
-        this.uiController?.focus();
-        this.uiController?.forwardKeyDownEvent(keyDownEvent);
-      }
+      const def = getHotkeyDefinitionForEvent(keyDownEvent as KeyboardEvent);
+      if (def) this.uiController?.forwardKeyDownEvent(keyDownEvent);
     });
 
     tab.on('elementHovered', (element) => {
@@ -398,8 +402,6 @@ export class WindowLayoutService {
       newTab.setVisible(false);
     }
 
-    this.updateZOrder();
-
     this.uiKarton.setState((draft) => {
       draft.browser.activeTabId = tabId;
     });
@@ -418,9 +420,18 @@ export class WindowLayoutService {
     }
   };
 
-  private handleInteractivityChange = async (interactive: boolean) => {
-    this.isWebContentInteractive = interactive;
+  private handleMovePanelToForeground = async (
+    panel: 'stagewise-ui' | 'tab-content',
+  ) => {
+    this.isWebContentInteractive = panel === 'tab-content';
     this.updateZOrder();
+  };
+
+  private handleTogglePanelKeyboardFocus = async (
+    panel: 'stagewise-ui' | 'tab-content',
+  ) => {
+    if (panel === 'stagewise-ui') this.uiController?.focus();
+    else this.activeTab?.focus();
   };
 
   private updateZOrder() {

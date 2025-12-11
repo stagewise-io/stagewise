@@ -376,8 +376,12 @@ export type KartonContract = {
             height: number;
           } | null,
         ) => Promise<void>;
-        // When the webcontents view is hovered over, the UI will be called to notify so that the backend will manage the interactvity of UI and the web contents view accordingly.
-        changeInteractivity: (interactive: boolean) => Promise<void>;
+        togglePanelKeyboardFocus: (
+          panel: 'stagewise-ui' | 'tab-content',
+        ) => Promise<void>;
+        movePanelToForeground: (
+          panel: 'stagewise-ui' | 'tab-content',
+        ) => Promise<void>;
       };
       stop: (tabId?: string) => Promise<void>;
       reload: (tabId?: string) => Promise<void>;

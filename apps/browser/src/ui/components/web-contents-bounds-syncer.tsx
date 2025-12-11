@@ -3,8 +3,8 @@ import { useCallback, useLayoutEffect, useRef } from 'react';
 
 export const WebContentsBoundsSyncer = () => {
   const updateBounds = useKartonProcedure((p) => p.browser.layout.update);
-  const updateInteractivity = useKartonProcedure(
-    (p) => p.browser.layout.changeInteractivity,
+  const movePanelToForeground = useKartonProcedure(
+    (p) => p.browser.layout.movePanelToForeground,
   );
 
   // State refs
@@ -70,7 +70,7 @@ export const WebContentsBoundsSyncer = () => {
       // If container is gone but we previously had bounds, clear them
       if (lastBoundsRef.current !== null) {
         void updateBounds(null);
-        void updateInteractivity(false);
+        void movePanelToForeground('stagewise-ui');
         lastBoundsRef.current = null;
       }
     } else {
@@ -99,7 +99,7 @@ export const WebContentsBoundsSyncer = () => {
       // Check interactivity
       const isHovering = isHoveringRef.current;
       if (lastInteractiveRef.current !== isHovering) {
-        void updateInteractivity(isHovering);
+        void movePanelToForeground(isHovering ? 'tab-content' : 'stagewise-ui');
         lastInteractiveRef.current = isHovering;
       }
     }

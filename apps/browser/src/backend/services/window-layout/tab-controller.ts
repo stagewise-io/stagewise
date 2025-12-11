@@ -35,7 +35,7 @@ export interface TabState {
 
 export interface TabControllerEventMap {
   stateUpdated: [state: Partial<TabState>];
-  putIntoBackground: [];
+  movePanelToForeground: [panel: 'stagewise-ui' | 'tab-content'];
   handleKeyDown: [keyDownEvent: SerializableKeyboardEvent];
   elementHovered: [element: ContextElement | null];
   elementSelected: [element: ContextElement];
@@ -186,6 +186,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.webContentsView.webContents.toggleDevTools();
   }
 
+  public focus() {
+    this.webContentsView.webContents.focus();
+  }
+
   public setContextSelectionMode(active: boolean) {
     // TODO: Implement context selection mode logic
     // This will likely involve sending a message to the preload script
@@ -280,10 +284,9 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   private registerKartonProcedureHandlers() {
     this.kartonServer.registerServerProcedureHandler(
-      'putIntoBackground',
-      async () => {
-        // TODO: Switch the focus to the UI. This means: Move the UI in front of the tab again.
-        this.emit('putIntoBackground');
+      'movePanelToForeground',
+      async (panel: 'stagewise-ui' | 'tab-content') => {
+        this.emit('movePanelToForeground', panel);
       },
     );
 

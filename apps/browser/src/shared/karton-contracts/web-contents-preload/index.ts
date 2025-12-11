@@ -23,7 +23,9 @@ export type SerializableKeyboardEvent = {
 export type TabKartonContract = {
   state: TabState;
   serverProcedures: {
-    putIntoBackground: () => Promise<void>; // Puts the tab into background (behind UI) and is triggered if some placeholder in the tab overlay is interacted with.
+    movePanelToForeground: (
+      panel: 'stagewise-ui' | 'tab-content',
+    ) => Promise<void>; // Moves the panel to foreground (in front of UI) and is triggered if some placeholder in the tab overlay is interacted with.
     handleKeyDown: (keyDownEvent: SerializableKeyboardEvent) => Promise<void>; // Handles a key down event.
   };
 };

@@ -18,7 +18,8 @@ export interface UIControllerEventMap {
   layoutUpdate: [
     bounds: { x: number; y: number; width: number; height: number } | null,
   ];
-  interactivityChange: [interactive: boolean];
+  movePanelToForeground: [panel: 'stagewise-ui' | 'tab-content'];
+  togglePanelKeyboardFocus: [panel: 'stagewise-ui' | 'tab-content'];
   stop: [tabId?: string];
   reload: [tabId?: string];
   goto: [url: string, tabId?: string];
@@ -147,9 +148,15 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
-      'browser.layout.changeInteractivity',
-      async (interactive: boolean) => {
-        this.emit('interactivityChange', interactive);
+      'browser.layout.movePanelToForeground',
+      async (panel: 'stagewise-ui' | 'tab-content') => {
+        this.emit('movePanelToForeground', panel);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.layout.togglePanelKeyboardFocus',
+      async (panel: 'stagewise-ui' | 'tab-content') => {
+        this.emit('togglePanelKeyboardFocus', panel);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -322,7 +329,10 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.uiKarton.removeServerProcedureHandler('browser.switchTab');
     this.uiKarton.removeServerProcedureHandler('browser.layout.update');
     this.uiKarton.removeServerProcedureHandler(
-      'browser.layout.changeInteractivity',
+      'browser.layout.movePanelToForeground',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'browser.layout.togglePanelKeyboardFocus',
     );
     this.uiKarton.removeServerProcedureHandler('browser.stop');
     this.uiKarton.removeServerProcedureHandler('browser.reload');
