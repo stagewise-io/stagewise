@@ -1,4 +1,5 @@
 import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
+import { useTabUIState } from '@/hooks/use-tab-ui-state';
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
@@ -39,18 +40,33 @@ export function MainSection({
   const goForward = useKartonProcedure((p) => p.browser.goForward);
   const reload = useKartonProcedure((p) => p.browser.reload);
   const goto = useKartonProcedure((p) => p.browser.goto);
-  const handleCreateTab = useCallback(() => {
-    createTab();
-    // Focus URL bar
-    setLocalUrl('');
-    urlInputRef.current?.focus();
-  }, [createTab]);
+  const togglePanelKeyboardFocus = useKartonProcedure(
+    (p) => p.browser.layout.togglePanelKeyboardFocus,
+  );
   const toggleDevTools = useKartonProcedure((p) => p.browser.toggleDevTools);
   const [localUrl, setLocalUrl] = useState(tabs[activeTabId]?.url ?? '');
   const [urlBeforeEdit, setUrlBeforeEdit] = useState(
     tabs[activeTabId]?.url ?? '',
   );
   const urlInputRef = useRef<HTMLInputElement>(null);
+
+  const { tabUiState, setTabUiState, removeTabUiState } = useTabUIState();
+
+  const handleCreateTab = useCallback(() => {
+    createTab();
+    // Focus URL bar
+    setLocalUrl('');
+    urlInputRef.current?.focus();
+  }, [createTab]);
+
+  const handleSwitchTab = useCallback(
+    async (tabId: string) => {
+      const focus = tabUiState[tabId]?.focusedPanel ?? 'stagewise-ui';
+      await switchTab(tabId);
+      void togglePanelKeyboardFocus(focus);
+    },
+    [switchTab, tabUiState],
+  );
 
   const activeTab = useMemo(() => {
     return tabs[activeTabId] as TabState | undefined;
@@ -59,6 +75,33 @@ export function MainSection({
   const activeTabIndex = useMemo(() => {
     return Object.keys(tabs).findIndex((_id) => _id === activeTabId) ?? 0;
   }, [activeTabId, tabs]);
+
+  const handleTabFocused = useCallback(
+    (event: CustomEvent<string>) => {
+      setTabUiState(event.detail, {
+        focusedPanel: 'tab-content',
+      });
+    },
+    [setTabUiState],
+  );
+
+  const handleUIFocused = useCallback(
+    (_e: FocusEvent) => {
+      setTabUiState(activeTabId, {
+        focusedPanel: 'stagewise-ui',
+      });
+    },
+    [activeTabId, setTabUiState],
+  );
+
+  useEventListener('focus', handleUIFocused, undefined, window);
+
+  useEventListener(
+    'stagewise-tab-focused',
+    handleTabFocused,
+    undefined,
+    window,
+  );
 
   const showTopLeftCornerRadius = useMemo(() => {
     return activeTabIndex !== 0 || isSidebarCollapsed;
@@ -106,10 +149,11 @@ export function MainSection({
           isSidebarCollapsed={isSidebarCollapsed}
           activeTabId={activeTabId}
           tabs={tabs}
-          setActiveTabId={switchTab}
+          setActiveTabId={handleSwitchTab}
           onAddTab={handleCreateTab}
           onCloseTab={(tabId) => {
             closeTab(tabId);
+            removeTabUiState(tabId);
           }}
         />
         {/* URL, Controls, etc. area */}

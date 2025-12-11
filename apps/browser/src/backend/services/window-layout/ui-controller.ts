@@ -287,6 +287,10 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
   }
 
+  public forwardFocusEvent(tabId: string) {
+    this.view.webContents.send('stagewise-tab-focused', tabId);
+  }
+
   public forwardKeyDownEvent(key: SerializableKeyboardEvent) {
     const electronKeyCode = domCodeToElectronKeyCode(key.code, key.key);
     const modifiers = [

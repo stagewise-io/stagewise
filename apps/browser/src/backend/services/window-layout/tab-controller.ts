@@ -42,6 +42,7 @@ export interface TabControllerEventMap {
   handleKeyDown: [keyDownEvent: SerializableKeyboardEvent];
   elementHovered: [element: ContextElement | null];
   elementSelected: [element: ContextElement];
+  tabFocused: [tabId: string];
 }
 
 export class TabController extends EventEmitter<TabControllerEventMap> {
@@ -88,6 +89,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
             if (hotkeyDef?.captureDominantly)
               this.emit('handleKeyDown', domEvent);
           }
+        },
+      );
+      this.webContentsView.webContents.devToolsWebContents?.addListener(
+        'focus',
+        () => {
+          this.emit('tabFocused', this.id);
         },
       );
     });
@@ -392,6 +399,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
           },
         });
       }
+    });
+
+    wc.on('focus', () => {
+      this.emit('tabFocused', this.id);
     });
 
     wc.on('page-title-updated', (_event, title) => {

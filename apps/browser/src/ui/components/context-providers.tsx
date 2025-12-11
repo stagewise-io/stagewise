@@ -7,6 +7,7 @@ import { KartonProvider } from '@/hooks/use-karton';
 import { TooltipProvider } from '@stagewise/stage-ui/components/tooltip';
 import { ContextChipHoverProvider } from '@/hooks/use-context-chip-hover';
 import { PostHogProvider } from '@/hooks/use-posthog';
+import { TabStateUIProvider } from '../hooks/use-tab-ui-state';
 
 export function ContextProviders({
   children,
@@ -22,7 +23,9 @@ export function ContextProviders({
           <PostHogProvider>
             <PluginProvider>
               <ContextChipHoverProvider>
-                <ChatStateProvider>{children}</ChatStateProvider>
+                <ChatStateProvider>
+                  <TabStateUIProvider>{children}</TabStateUIProvider>
+                </ChatStateProvider>
               </ContextChipHoverProvider>
             </PluginProvider>
           </PostHogProvider>

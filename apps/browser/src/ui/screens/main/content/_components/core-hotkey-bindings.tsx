@@ -2,6 +2,7 @@ import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import { useCallback, useMemo } from 'react';
+import { useTabUIState } from '@/hooks/use-tab-ui-state';
 
 export function CoreHotkeyBindings({
   onCreateTab,
@@ -12,6 +13,7 @@ export function CoreHotkeyBindings({
 }) {
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const tabs = useKartonState((s) => s.browser.tabs);
+  const { removeTabUiState } = useTabUIState();
   const togglePanelKeyboardFocus = useKartonProcedure(
     (p) => p.browser.layout.togglePanelKeyboardFocus,
   );
@@ -34,6 +36,16 @@ export function CoreHotkeyBindings({
   const reload = useKartonProcedure((p) => p.browser.reload);
   const goto = useKartonProcedure((p) => p.browser.goto);
   const toggleDevTools = useKartonProcedure((p) => p.browser.toggleDevTools);
+  const { tabUiState } = useTabUIState();
+
+  const handleSwitchTab = useCallback(
+    async (tabId: string) => {
+      const focus = tabUiState[tabId]?.focusedPanel ?? 'stagewise-ui';
+      await switchTab(tabId);
+      void togglePanelKeyboardFocus(focus);
+    },
+    [togglePanelKeyboardFocus, switchTab],
+  );
 
   // TAB NAVIGATION
 
@@ -47,13 +59,14 @@ export function CoreHotkeyBindings({
   useHotKeyListener(() => {
     if (!activeTabId) return;
     closeTab(activeTabId);
+    removeTabUiState(activeTabId);
   }, HotkeyActions.CTRL_W);
 
   // Switch to next tab
   const handleNextTab = useCallback(async () => {
     if (!tabNeighborsToActiveTab) return;
-    await switchTab(tabNeighborsToActiveTab.next);
-  }, [tabNeighborsToActiveTab, switchTab]);
+    await handleSwitchTab(tabNeighborsToActiveTab.next);
+  }, [tabNeighborsToActiveTab, handleSwitchTab]);
 
   useHotKeyListener(handleNextTab, HotkeyActions.CTRL_TAB);
   useHotKeyListener(handleNextTab, HotkeyActions.CMD_OPTION_ARROW_RIGHT);
@@ -62,8 +75,8 @@ export function CoreHotkeyBindings({
   // Switch to previous tab
   const handlePreviousTab = useCallback(() => {
     if (!tabNeighborsToActiveTab) return;
-    switchTab(tabNeighborsToActiveTab.previous);
-  }, [tabNeighborsToActiveTab, switchTab]);
+    handleSwitchTab(tabNeighborsToActiveTab.previous);
+  }, [tabNeighborsToActiveTab, handleSwitchTab]);
 
   useHotKeyListener(handlePreviousTab, HotkeyActions.CTRL_SHIFT_TAB);
   useHotKeyListener(handlePreviousTab, HotkeyActions.CMD_OPTION_ARROW_LEFT);
@@ -77,15 +90,15 @@ export function CoreHotkeyBindings({
           // CTRL_9 focuses last tab
           if (tabCount === 0) return;
           const lastTabId = tabIds[tabCount - 1];
-          switchTab(lastTabId);
+          handleSwitchTab(lastTabId);
         } else {
           // CTRL_1-8 focus tabs by index (0-based)
           if (index >= tabCount) return;
-          switchTab(tabIds[index]);
+          handleSwitchTab(tabIds[index]);
         }
       };
     },
-    [tabIds, tabCount, switchTab],
+    [tabIds, tabCount, handleSwitchTab],
   );
 
   useHotKeyListener(createTabIndexHandler(0), HotkeyActions.CTRL_1);

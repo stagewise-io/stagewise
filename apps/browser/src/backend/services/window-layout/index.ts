@@ -314,6 +314,10 @@ export class WindowLayoutService {
       if (def) this.uiController?.forwardKeyDownEvent(keyDownEvent);
     });
 
+    tab.on('tabFocused', (id) => {
+      this.uiController?.forwardFocusEvent(id);
+    });
+
     tab.on('elementHovered', (element) => {
       // Only update if this is the active tab
       if (this.activeTabId === id) {
