@@ -122,6 +122,8 @@ export type TabState = {
   faviconUrls: string[];
   isLoading: boolean;
   isResponsive: boolean;
+  isPlayingAudio: boolean;
+  isMuted: boolean;
   error: {
     code: number;
     message?: string;
@@ -398,6 +400,8 @@ export type KartonContract = {
       toggleDevTools: (tabId?: string) => Promise<void>;
       openDevTools: (tabId?: string) => Promise<void>;
       closeDevTools: (tabId?: string) => Promise<void>;
+      setAudioMuted: (muted: boolean, tabId?: string) => Promise<void>;
+      toggleAudioMuted: (tabId?: string) => Promise<void>;
       contextSelection: {
         setActive: (active: boolean) => Promise<void>;
         setMouseCoordinates: (x: number, y: number) => Promise<void>; // Used by the client to communicate where the mouse is currently located. Will be forwarded to the tab to check which element is at that point.

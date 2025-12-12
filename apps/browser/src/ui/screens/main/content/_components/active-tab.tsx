@@ -2,9 +2,11 @@ import { useLayoutEffect, useMemo, useRef, useState, useId } from 'react';
 import type { TabState } from '@shared/karton-contracts/ui';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconXmark } from 'nucleo-micro-bold';
+
 import { WithTabTooltipPreview } from './with-tab-tooltip-preview';
 import { TabFavicon } from './tab-favicon';
+import { IconVolumeUpFill18, IconVolumeXmarkFill18 } from 'nucleo-ui-fill-18';
+import { IconXmark } from 'nucleo-micro-bold';
 
 const CUBIC_BEZIER_CONTROL_POINT_FACTOR = 0.5522847498;
 
@@ -18,12 +20,14 @@ export function ActiveTab({
   activateBottomLeftCornerRadius = true,
   tabState,
   onClose,
+  onToggleAudioMuted,
 }: {
   borderRadius?: number;
   className?: string;
   activateBottomLeftCornerRadius?: boolean;
   tabState: TabState;
   onClose: () => void;
+  onToggleAudioMuted: () => void;
 }) {
   const tabRef = useRef<HTMLDivElement>(null);
   const clipPathId = `tabClipPath-${useId()}`;
@@ -77,20 +81,39 @@ export function ActiveTab({
             borderTopRightRadius: borderRadius,
           }}
         />
-        <div className="flex items-center gap-2 py-1 pb-1.75 @[40px]:pl-1 pl-0">
+        <div className="flex h-8 items-center gap-2 py-1 pb-1.75 @[40px]:pl-1 pl-0">
           <div className="@[40px]:flex hidden shrink-0 items-center justify-center">
             <TabFavicon tabState={tabState} />
           </div>
-          <span className="mt-px @[55px]:block hidden truncate text-foreground text-xs">
+          <span className="mt-px @[55px]:block hidden flex-1 truncate text-foreground text-xs">
             {tabState.title}
           </span>
+          {(tabState.isPlayingAudio || tabState.isMuted) && (
+            <Button
+              variant="ghost"
+              size="icon-2xs"
+              onClick={onToggleAudioMuted}
+              className={cn(
+                'shrink-0',
+                tabState.isMuted
+                  ? 'text-rose-500 hover:text-rose-800'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {!tabState.isMuted ? (
+                <IconVolumeUpFill18 className="size-3" />
+              ) : (
+                <IconVolumeXmarkFill18 className="size-3" />
+              )}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon-2xs"
-            className="ml-auto h-5 shrink-0"
+            className="ml-auto shrink-0 text-muted-foreground hover:text-foreground"
             onClick={onClose}
           >
-            <IconXmark className="size-3 text-muted-foreground" />
+            <IconXmark className="size-3" />
           </Button>
         </div>
       </div>

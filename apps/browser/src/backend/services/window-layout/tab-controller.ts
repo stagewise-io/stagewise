@@ -25,6 +25,8 @@ export interface TabState {
   faviconUrls: string[];
   isLoading: boolean;
   isResponsive: boolean;
+  isPlayingAudio: boolean;
+  isMuted: boolean;
   error: {
     code: number;
     message?: string;
@@ -210,6 +212,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       url: initialUrl || '',
       isLoading: false,
       isResponsive: true,
+      isPlayingAudio: this.webContentsView.webContents.isCurrentlyAudible(),
+      isMuted: this.webContentsView.webContents.audioMuted,
       error: null,
       navigationHistory: {
         canGoBack: false,
@@ -244,6 +248,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   public setVisible(visible: boolean) {
     this.viewContainer.setVisible(visible);
+    // Update audio state when tab becomes visible to ensure it's current
+    if (visible) {
+      this.updateAudioState();
+    }
   }
 
   public loadURL(url: string) {
@@ -281,6 +289,19 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   public toggleDevTools() {
     this.webContentsView.webContents.toggleDevTools();
+  }
+
+  public setAudioMuted(muted: boolean) {
+    this.webContentsView.webContents.setAudioMuted(muted);
+    // Update state immediately to keep it in sync
+    this.updateAudioState();
+  }
+
+  public toggleAudioMuted() {
+    const currentMuted = this.webContentsView.webContents.audioMuted;
+    this.webContentsView.webContents.setAudioMuted(!currentMuted);
+    // Update state immediately to keep it in sync
+    this.updateAudioState();
   }
 
   public focus() {
@@ -497,6 +518,14 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.emit('stateUpdated', updates);
   }
 
+  private updateAudioState() {
+    const wc = this.webContentsView.webContents;
+    this.updateState({
+      isPlayingAudio: wc.isCurrentlyAudible(),
+      isMuted: wc.audioMuted,
+    });
+  }
+
   private setupEventListeners() {
     const wc = this.webContentsView.webContents;
 
@@ -532,6 +561,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         isLoading: false,
         error: null,
       });
+      // Update audio state when page finishes loading
+      this.updateAudioState();
     });
 
     wc.on('did-fail-load', (_event, errorCode, errorDescription) => {
@@ -588,6 +619,11 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
     wc.on('page-favicon-updated', (_event, faviconUrls) => {
       this.updateState({ faviconUrls });
+    });
+
+    wc.on('audio-state-changed', () => {
+      // Use isCurrentlyAudible() for reliable state checking
+      this.updateAudioState();
     });
 
     wc.setWindowOpenHandler((details) => {

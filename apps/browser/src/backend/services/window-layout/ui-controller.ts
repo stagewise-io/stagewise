@@ -28,6 +28,8 @@ export interface UIControllerEventMap {
   toggleDevTools: [tabId?: string];
   openDevTools: [tabId?: string];
   closeDevTools: [tabId?: string];
+  setAudioMuted: [muted: boolean, tabId?: string];
+  toggleAudioMuted: [tabId?: string];
   setContextSelectionMode: [active: boolean];
   setContextSelectionMouseCoordinates: [x: number, y: number];
   clearContextSelectionMouseCoordinates: [];
@@ -208,6 +210,18 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'browser.setAudioMuted',
+      async (muted: boolean, tabId?: string) => {
+        this.emit('setAudioMuted', muted, tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.toggleAudioMuted',
+      async (tabId?: string) => {
+        this.emit('toggleAudioMuted', tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.setActive',
       async (active: boolean) => {
         this.emit('setContextSelectionMode', active);
@@ -345,6 +359,8 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.uiKarton.removeServerProcedureHandler('browser.toggleDevTools');
     this.uiKarton.removeServerProcedureHandler('browser.openDevTools');
     this.uiKarton.removeServerProcedureHandler('browser.closeDevTools');
+    this.uiKarton.removeServerProcedureHandler('browser.setAudioMuted');
+    this.uiKarton.removeServerProcedureHandler('browser.toggleAudioMuted');
     this.uiKarton.removeServerProcedureHandler(
       'browser.contextSelection.setActive',
     );

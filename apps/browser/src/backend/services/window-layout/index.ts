@@ -294,6 +294,8 @@ export class WindowLayoutService {
     this.uiController.on('toggleDevTools', this.handleToggleDevTools);
     this.uiController.on('openDevTools', this.handleOpenDevTools);
     this.uiController.on('closeDevTools', this.handleCloseDevTools);
+    this.uiController.on('setAudioMuted', this.handleSetAudioMuted);
+    this.uiController.on('toggleAudioMuted', this.handleToggleAudioMuted);
     this.uiController.on(
       'setContextSelectionMode',
       this.handleSetContextSelectionMode,
@@ -569,6 +571,16 @@ export class WindowLayoutService {
   private handleCloseDevTools = async (tabId?: string) => {
     const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.closeDevTools();
+  };
+
+  private handleSetAudioMuted = async (muted: boolean, tabId?: string) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    tab?.setAudioMuted(muted);
+  };
+
+  private handleToggleAudioMuted = async (tabId?: string) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    tab?.toggleAudioMuted();
   };
 
   private handleSetContextSelectionMode = async (active: boolean) => {

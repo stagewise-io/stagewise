@@ -17,6 +17,7 @@ export function TabsContainer({
   setActiveTabId,
   onAddTab,
   onCloseTab,
+  onToggleAudioMuted,
 }: {
   openSidebarChatPanel: () => void;
   isSidebarCollapsed: boolean;
@@ -25,6 +26,7 @@ export function TabsContainer({
   setActiveTabId: (tabId: string) => void;
   onAddTab: () => void;
   onCloseTab: (tabId: string) => void;
+  onToggleAudioMuted: (tabId: string) => void;
 }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { canScrollLeft, canScrollRight } =
@@ -94,6 +96,9 @@ export function TabsContainer({
                 onClose={() => {
                   onCloseTab(tab.id);
                 }}
+                onToggleAudioMuted={() => {
+                  onToggleAudioMuted(tab.id);
+                }}
                 activateBottomLeftCornerRadius={activateBottomLeftCornerRadius}
               />
             );
@@ -107,6 +112,9 @@ export function TabsContainer({
               onClose={() => {
                 onCloseTab(tab.id);
               }}
+              onToggleAudioMuted={() => {
+                onToggleAudioMuted(tab.id);
+              }}
               showRightSeparator={!isLeftNextToActiveTab}
             />
           );
@@ -115,7 +123,7 @@ export function TabsContainer({
       <Button
         variant="ghost"
         size="xs"
-        className="-ml-1.25 h-7 shrink-0 self-start rounded-[5px] hover:bg-zinc-50/70!"
+        className="-ml-1.25 h-7.25 shrink-0 self-start rounded-[8.5px] rounded-bl-md hover:bg-zinc-50/70!"
         onClick={onAddTab}
       >
         <IconPlus className="size-3 text-muted-foreground" />

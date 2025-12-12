@@ -44,6 +44,9 @@ export function MainSection({
     (p) => p.browser.layout.togglePanelKeyboardFocus,
   );
   const toggleDevTools = useKartonProcedure((p) => p.browser.toggleDevTools);
+  const toggleAudioMuted = useKartonProcedure(
+    (p) => p.browser.toggleAudioMuted,
+  );
   const [localUrl, setLocalUrl] = useState(tabs[activeTabId]?.url ?? '');
   const [urlBeforeEdit, setUrlBeforeEdit] = useState(
     tabs[activeTabId]?.url ?? '',
@@ -155,16 +158,19 @@ export function MainSection({
             closeTab(tabId);
             removeTabUiState(tabId);
           }}
+          onToggleAudioMuted={(tabId) => {
+            toggleAudioMuted(tabId);
+          }}
         />
         {/* URL, Controls, etc. area */}
         <div
           className={cn(
-            `flex size-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg ${showTopLeftCornerRadius ? 'rounded-tl-lg' : ''} relative `,
+            `flex size-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg ${showTopLeftCornerRadius ? 'rounded-tl-lg' : ''} relative`,
           )}
         >
           {/* Background with mask for the web-content */}
           <BackgroundWithCutout className={cn(`z-0`)} borderRadius={4} />
-          <div className="flex w-full items-center gap-2 p-2 pb-0">
+          <div className="flex w-full shrink-0 items-center gap-2 p-2 pb-0">
             <Button
               variant="ghost"
               size="icon-sm"
