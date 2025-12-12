@@ -545,7 +545,11 @@ export class WindowLayoutService {
     this.uiKarton.setState((draft) => {
       draft.browser.contextSelectionMode = active;
     });
-    this.activeTab?.setContextSelectionMode(active);
+    this.activeTab?.setContextSelectionMode(active).catch((err) => {
+      this.logger.error(
+        `[WindowLayoutService] Failed to set context selection mode: ${err}`,
+      );
+    });
   };
 
   private handleSelectHoveredElement = () => {

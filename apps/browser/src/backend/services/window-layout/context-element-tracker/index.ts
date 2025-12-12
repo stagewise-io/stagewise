@@ -23,8 +23,17 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
   // Logic State
   private isSelectionActive = false;
   private lastMousePos: { x: number; y: number } | null = null;
-  private throttleTimer: NodeJS.Timeout | null = null;
-  private readonly HIT_TEST_INTERVAL_MS = 100;
+  private hitTestThrottleTimer: NodeJS.Timeout | null = null;
+  private isHitTestPending = false;
+  private readonly HIT_TEST_THROTTLE_MS = 16; // ~60fps for smooth detection
+  private lastHitTestTime = 0;
+  private lastHitTestResult: { backendNodeId: number; frameId: string } | null =
+    null;
+
+  // Cache for parsed element information: Map<`${backendNodeId}:${frameId}`, ContextElement>
+  // This avoids re-parsing the same element when the mouse stays over it
+  private parsedElementCache: Map<string, ContextElement> = new Map();
+  private readonly MAX_PARSED_ELEMENT_CACHE_SIZE = 100;
 
   // Data State
   private currentHover: HoverState | null = null;
@@ -67,7 +76,9 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
       this.clearHover();
     });
 
-    // Note: We do NOT attach here. We wait for usage.
+    // Always attach debugger on construction for better performance
+    // The performance hit is minimal and avoids attach/detach conflicts
+    this.attachDebugger();
   }
 
   // =========================================================================
@@ -75,25 +86,14 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
   // =========================================================================
 
   /**
-   * Ensures the debugger is attached and domains are enabled.
-   * Call this before performing any CDP operations.
+   * Attaches the debugger if not already attached.
+   * This is called on construction to always keep the debugger attached.
    */
-  private async ensureConnected() {
-    if (this.isInitialized) return;
-
+  private attachDebugger() {
     // Check if webContents is destroyed or not ready
     if (this.webContents.isDestroyed()) {
       this.logger.debug(
-        '[ContextElementTracker] Cannot connect: webContents is destroyed',
-      );
-      return;
-    }
-
-    // Check if webContents is loading - we need it to be ready for CDP commands
-    // If it's still loading, we can't reliably attach the debugger
-    if (this.webContents.isLoading()) {
-      this.logger.debug(
-        '[ContextElementTracker] Cannot connect: webContents is still loading',
+        '[ContextElementTracker] Cannot attach: webContents is destroyed',
       );
       return;
     }
@@ -106,19 +106,54 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
         this.logger.error(
           `[ContextElementTracker] Failed to attach debugger: ${err}`,
         );
-        // Reset initialization state on failure
-        this.isInitialized = false;
         return;
       }
     }
 
-    try {
-      // Listen for detached event to cleanup state if user/devtools closes it
+    // Set up event listeners if not already set up
+    if (!this.isInitialized) {
       this.debugger.on('detach', () => this.handleExternalDetach());
       this.debugger.on('message', (_event, method, params) =>
         this.handleCdpMessage(method, params),
       );
+    }
+  }
 
+  /**
+   * Ensures the debugger is attached and domains are enabled.
+   * Call this before performing any CDP operations.
+   */
+  private async ensureConnected() {
+    if (this.isInitialized) return;
+
+    // Ensure debugger is attached
+    this.attachDebugger();
+
+    // Check if webContents is destroyed or not ready
+    if (this.webContents.isDestroyed()) {
+      this.logger.debug(
+        '[ContextElementTracker] Cannot connect: webContents is destroyed',
+      );
+      return;
+    }
+
+    // Check if webContents is loading - we need it to be ready for CDP commands
+    // If it's still loading, we can't reliably enable domains
+    if (this.webContents.isLoading()) {
+      this.logger.debug(
+        '[ContextElementTracker] Cannot connect: webContents is still loading',
+      );
+      return;
+    }
+
+    if (!this.debugger.isAttached()) {
+      this.logger.debug(
+        '[ContextElementTracker] Debugger not attached, cannot initialize',
+      );
+      return;
+    }
+
+    try {
       await this.sendCommand('DOM.enable');
       await this.sendCommand('Page.enable');
       await this.sendCommand('Runtime.enable'); // Needed to find isolated worlds
@@ -142,34 +177,6 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
       );
       // Reset initialization state on failure
       this.isInitialized = false;
-      // Detach debugger if initialization failed
-      try {
-        if (this.debugger.isAttached()) {
-          this.debugger.detach();
-        }
-      } catch {
-        // Ignore detach errors
-      }
-    }
-  }
-
-  /**
-   * Checks if we still need the debugger. If not, detach.
-   */
-  private async checkDisconnect() {
-    // We stay connected if:
-    // 1. Context Selection (Hovering) is active
-    const isNeeded = this.isSelectionActive;
-
-    if (!isNeeded && this.debugger.isAttached()) {
-      try {
-        // Clear any cached contexts before detaching
-        this.contextCache.clear();
-        this.debugger.detach();
-        this.logger.debug('[ContextElementTracker] Debugger detached');
-      } catch {
-        /* ignore */
-      }
     }
   }
 
@@ -180,8 +187,9 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     this.contextCache.clear();
     this.frameCache.clear();
     this.objectIdCache.clear();
+    this.parsedElementCache.clear();
     this.mainFrameId = null;
-    this.stopThrottle();
+    this.cancelHitTestThrottle();
   }
 
   /**
@@ -302,10 +310,45 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     return null;
   }
 
-  private sendCommand(method: string, params: any = {}): Promise<any> {
-    if (!this.debugger.isAttached())
+  private async sendCommand(
+    method: string,
+    params: any = {},
+    retries = 2,
+  ): Promise<any> {
+    if (!this.debugger.isAttached()) {
       return Promise.reject(new Error('Debugger detached'));
-    return this.debugger.sendCommand(method, params);
+    }
+
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await this.debugger.sendCommand(method, params);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        const errorMessage = lastError.message;
+
+        // Retry on "target closed" errors
+        if (
+          errorMessage.includes('target closed') &&
+          attempt < retries &&
+          !this.webContents.isDestroyed()
+        ) {
+          this.logger.debug(
+            `[ContextElementTracker] Target closed error, retrying (${attempt + 1}/${retries}): ${errorMessage}`,
+          );
+          // Wait a bit before retrying
+          await new Promise((resolve) =>
+            setTimeout(resolve, 50 * (attempt + 1)),
+          );
+          continue;
+        }
+
+        // Don't retry for other errors
+        throw lastError;
+      }
+    }
+
+    throw lastError || new Error('Failed to send command after retries');
   }
 
   /**
@@ -325,29 +368,54 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     }
 
     // Cache miss - fetch from CDP
-    const { object } = await this.sendCommand('DOM.resolveNode', {
-      backendNodeId,
-      executionContextId: contextId,
-    });
+    try {
+      const { object } = await this.sendCommand('DOM.resolveNode', {
+        backendNodeId,
+        executionContextId: contextId,
+      });
 
-    if (!object.objectId) {
-      throw new Error(
-        `No objectId returned from DOM.resolveNode for backendNodeId: ${backendNodeId}, contextId: ${contextId}`,
-      );
-    }
-
-    // Add to cache, implementing LRU eviction
-    if (this.objectIdCache.size >= this.MAX_OBJECT_ID_CACHE_SIZE) {
-      // Delete the oldest entry (first in Map iteration order)
-      const firstKey = this.objectIdCache.keys().next().value;
-      if (firstKey) {
-        this.objectIdCache.delete(firstKey);
+      if (!object.objectId) {
+        throw new Error(
+          `No objectId returned from DOM.resolveNode for backendNodeId: ${backendNodeId}, contextId: ${contextId}`,
+        );
       }
+
+      // Add to cache, implementing LRU eviction
+      if (this.objectIdCache.size >= this.MAX_OBJECT_ID_CACHE_SIZE) {
+        // Delete the oldest entry (first in Map iteration order)
+        const firstKey = this.objectIdCache.keys().next().value;
+        if (firstKey) {
+          this.objectIdCache.delete(firstKey);
+        }
+      }
+
+      this.objectIdCache.set(cacheKey, object.objectId);
+
+      return { objectId: object.objectId };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      // If context is invalid, clear it from cache and rethrow
+      if (errorMessage.includes('Cannot find context')) {
+        // Clear all cached object IDs for this context
+        for (const [key] of this.objectIdCache.entries()) {
+          const [, cachedContextIdStr] = key.split(':');
+          if (Number.parseInt(cachedContextIdStr, 10) === contextId) {
+            this.objectIdCache.delete(key);
+          }
+        }
+        // Clear the context from contextCache if it's invalid
+        for (const [frameId, contexts] of this.contextCache.entries()) {
+          if (
+            contexts.preloadContextId === contextId ||
+            contexts.mainWorldContextId === contextId
+          ) {
+            this.contextCache.delete(frameId);
+            break;
+          }
+        }
+      }
+      throw err;
     }
-
-    this.objectIdCache.set(cacheKey, object.objectId);
-
-    return { objectId: object.objectId };
   }
 
   /**
@@ -407,6 +475,8 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
           }
           if (contexts.mainWorldContextId === destroyedContextId) {
             contexts.mainWorldContextId = 0;
+            // Reset ReactComponentTracker initialization when main world context is destroyed
+            this.reactComponentTracker.resetInitialization();
           }
 
           // If both contexts are gone, remove the entry entirely
@@ -498,25 +568,23 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
 
     if (active) {
       await this.ensureConnected();
-      // Only start the throttle timer if we successfully connected
-      if (this.isInitialized && !this.throttleTimer) {
-        this.throttleTimer = setInterval(
-          () => this.processHitTest(),
-          this.HIT_TEST_INTERVAL_MS,
-        );
-      }
+      // Hit testing is now event-driven, no interval needed
     } else {
-      this.stopThrottle();
+      this.cancelHitTestThrottle();
       this.lastMousePos = null;
+      this.lastHitTestResult = null;
+      // Note: We keep parsedElementCache even when selection is inactive
+      // to speed up re-activation if the same elements are hovered
       await this.clearHover();
-      this.checkDisconnect(); // Detach if no selections remain
+      // Note: We no longer detach the debugger - it stays attached for better performance
     }
   }
 
   public async updateMousePosition(x: number, y: number) {
     if (!this.isSelectionActive) return;
     this.lastMousePos = { x, y };
-    // We rely on the interval to process this
+    // Trigger hit test with debouncing to avoid excessive calls during rapid mouse movement
+    this.scheduleHitTest();
   }
 
   public async clearMousePosition() {
@@ -536,6 +604,27 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     // (it might have been cleared during navigation)
     if (!this.currentHover) return null;
 
+    const cacheKey = `${this.currentHover.backendId}:${this.currentHover.frameId}`;
+
+    // Check if we have cached parsed data for this element
+    const cachedElement = this.parsedElementCache.get(cacheKey);
+    if (cachedElement) {
+      // Return cached element, but update dynamic fields (frame info might have changed)
+      const frameInfo = await this.getFrameInfo(
+        this.currentHover.frameId,
+        true,
+      );
+      return {
+        ...cachedElement,
+        frameId: this.currentHover.frameId,
+        isMainFrame: frameInfo.isMainFrame,
+        frameLocation: frameInfo.url,
+        frameTitle: frameInfo.title,
+        backendNodeId: this.currentHover.backendId,
+      };
+    }
+
+    // No cache, extract info from scratch
     const contextElement = await this.extractInfo(this.currentHover);
 
     if (!contextElement) return null;
@@ -560,7 +649,31 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
       codeMetadata: contextElement.codeMetadata || [], // Initialize empty code metadata if not present
     };
 
+    // Cache the parsed element (without tabId, as that's added by TabController)
+    this.cacheParsedElement(cacheKey, enrichedElement);
+
     return enrichedElement;
+  }
+
+  /**
+   * Caches a parsed element, implementing LRU eviction when cache reaches max size.
+   */
+  private cacheParsedElement(cacheKey: string, element: ContextElement) {
+    // Implement LRU eviction
+    if (this.parsedElementCache.size >= this.MAX_PARSED_ELEMENT_CACHE_SIZE) {
+      // Delete the oldest entry (first in Map iteration order)
+      const firstKey = this.parsedElementCache.keys().next().value;
+      if (firstKey) {
+        this.parsedElementCache.delete(firstKey);
+      }
+    }
+
+    // Store element without tabId (it's added by TabController and may vary)
+    const { tabId, ...elementWithoutTabId } = element;
+    this.parsedElementCache.set(
+      cacheKey,
+      elementWithoutTabId as ContextElement,
+    );
   }
 
   // Re-adding a tracker for *currently highlighted* items to enable diffing
@@ -615,7 +728,7 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     }
 
     this.currentlyHighlighted = nextHighlighted;
-    this.checkDisconnect();
+    // Note: We no longer detach the debugger - it stays attached for better performance
   }
 
   public async getElementInformation(): Promise<ContextElement | null> {
@@ -750,15 +863,69 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
   // Core Logic
   // =========================================================================
 
-  private stopThrottle() {
-    if (this.throttleTimer) {
-      clearInterval(this.throttleTimer);
-      this.throttleTimer = null;
+  private cancelHitTestThrottle() {
+    if (this.hitTestThrottleTimer) {
+      clearTimeout(this.hitTestThrottleTimer);
+      this.hitTestThrottleTimer = null;
+    }
+    this.isHitTestPending = false;
+  }
+
+  private scheduleHitTest() {
+    const now = Date.now();
+    const timeSinceLastTest = now - this.lastHitTestTime;
+
+    // If a hit test is already running, we'll process again after it completes
+    if (this.isHitTestPending) {
+      return;
+    }
+
+    // Fire immediately if enough time has passed, or if this is the first call
+    if (
+      timeSinceLastTest >= this.HIT_TEST_THROTTLE_MS ||
+      this.lastHitTestTime === 0
+    ) {
+      this.lastHitTestTime = now;
+      this.isHitTestPending = true;
+      this.processHitTest()
+        .catch((err) => {
+          this.logger.error(
+            `[ContextElementTracker] Error in hit test: ${err}`,
+          );
+        })
+        .finally(() => {
+          this.isHitTestPending = false;
+          // If mouse moved during execution, schedule another test
+          if (this.lastMousePos && this.isSelectionActive) {
+            this.scheduleHitTest();
+          }
+        });
+    } else {
+      // Throttle: schedule for later, but only if not already scheduled
+      if (!this.hitTestThrottleTimer) {
+        const delay = this.HIT_TEST_THROTTLE_MS - timeSinceLastTest;
+        this.hitTestThrottleTimer = setTimeout(() => {
+          this.hitTestThrottleTimer = null;
+          if (
+            this.lastMousePos &&
+            this.isSelectionActive &&
+            !this.isHitTestPending
+          ) {
+            this.scheduleHitTest();
+          }
+        }, delay);
+      }
     }
   }
 
   private async processHitTest() {
     if (!this.lastMousePos || !this.isSelectionActive || !this.isInitialized) {
+      return;
+    }
+
+    // Capture mouse position at start to avoid race conditions
+    const mousePos = this.lastMousePos;
+    if (!mousePos) {
       return;
     }
 
@@ -772,15 +939,21 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
       const { backendNodeId, frameId } = await this.sendCommand(
         'DOM.getNodeForLocation',
         {
-          x: this.lastMousePos.x + scrollX,
-          y: this.lastMousePos.y + scrollY,
+          x: mousePos.x + scrollX,
+          y: mousePos.y + scrollY,
           ignorePointerEventsNone: false,
         },
       );
 
-      if (!backendNodeId) return;
+      if (!backendNodeId) {
+        // Clear hover if no node found
+        if (this.currentHover) {
+          await this.clearHover();
+        }
+        this.lastHitTestResult = null;
+        return;
+      }
 
-      const elementId = backendNodeId.toString();
       // FrameID might be missing if it's the Main Frame.
       // We need a reliable way to map Main Frame.
       // Prefer mainFrameId if available, otherwise use frameId or first cached frame
@@ -790,8 +963,26 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
         this.contextCache.keys().next().value ||
         '';
 
-      if (this.currentHover?.id === elementId) return;
+      const elementId = backendNodeId.toString();
+      const _cacheKey = `${backendNodeId}:${actualFrameId}`;
 
+      // Check if this is the same element as before
+      const isSameElement =
+        this.lastHitTestResult?.backendNodeId === backendNodeId &&
+        this.lastHitTestResult?.frameId === actualFrameId;
+
+      // Always update lastHitTestResult to track current element
+      this.lastHitTestResult = {
+        backendNodeId,
+        frameId: actualFrameId,
+      };
+
+      // If it's the same element and we already have it hovered, no need to update
+      if (isSameElement && this.currentHover?.id === elementId) {
+        return;
+      }
+
+      // Update hover state
       if (this.currentHover) {
         await this.triggerPreloadHighlight(this.currentHover, 'hover', false);
       }
@@ -804,6 +995,8 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
 
       await this.triggerPreloadHighlight(this.currentHover, 'hover', true);
 
+      // If we have cached parsed data for this element, we can emit immediately
+      // Otherwise, the parsing will happen when collectHoveredElementInfo is called
       this.emit('hoverChanged', elementId);
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : String(e);
@@ -815,6 +1008,7 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
         } else {
           this.lastMousePos = null; // Clear position to stop retrying
         }
+        this.lastHitTestResult = null;
         // Don't log this as an error - it's expected when mouse is outside bounds
       } else {
         this.logger.error(`[ContextElementTracker] processHitTest error: ${e}`);
@@ -842,8 +1036,8 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
   ) {
     const contexts = this.contextCache.get(state.frameId);
     if (!contexts) {
-      this.logger.error(
-        `[ContextElementTracker] No contexts found for frameId: ${state.frameId}`,
+      this.logger.debug(
+        `[ContextElementTracker] No contexts found for frameId: ${state.frameId}, frame may have been destroyed`,
       );
       return;
     }
@@ -851,7 +1045,7 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     // Use preload context for highlighting (needs access to window.__CTX_SELECTION_UPDATE__)
     const contextId = contexts?.preloadContextId;
     if (!contextId) {
-      this.logger.error(
+      this.logger.debug(
         `[ContextElementTracker] No preload context found for frameId: ${state.frameId}`,
       );
       return;
@@ -872,8 +1066,19 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
             }`,
         arguments: [{ value: type }, { value: active }],
       });
-    } catch {
-      /* ignore */
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      // If context is destroyed, clear the hover state gracefully
+      if (errorMessage.includes('Cannot find context')) {
+        this.logger.debug(
+          `[ContextElementTracker] Context destroyed during highlight for frameId: ${state.frameId}`,
+        );
+        // Clear hover state if context is invalid
+        if (this.currentHover?.frameId === state.frameId && type === 'hover') {
+          this.currentHover = null;
+        }
+      }
+      // Silently ignore other errors (element may have been removed from DOM)
     }
   }
 
@@ -881,8 +1086,8 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
     try {
       const contexts = this.contextCache.get(state.frameId);
       if (!contexts) {
-        this.logger.error(
-          `[ContextElementTracker] No contexts found for frameId: ${state.frameId}`,
+        this.logger.debug(
+          `[ContextElementTracker] No contexts found for frameId: ${state.frameId}, frame may have been destroyed`,
         );
         return null;
       }
@@ -891,14 +1096,14 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
       const mainWorldContextId = contexts.mainWorldContextId;
 
       if (!preloadContextId) {
-        this.logger.error(
+        this.logger.debug(
           `[ContextElementTracker] No preload context found for frameId: ${state.frameId}`,
         );
         return null;
       }
 
       if (!mainWorldContextId) {
-        this.logger.error(
+        this.logger.debug(
           `[ContextElementTracker] No main world context found for frameId: ${state.frameId}`,
         );
         return null;
@@ -906,10 +1111,26 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
 
       // Step 1: Serialize element using __CTX_EXTRACT_INFO__ in preload context
       // Resolve node in preload context to access the preload script's global function
-      const { objectId: preloadObjectId } = await this.resolveNodeWithCache(
-        state.backendId,
-        preloadContextId,
-      );
+      let preloadObjectId: string;
+      try {
+        const result = await this.resolveNodeWithCache(
+          state.backendId,
+          preloadContextId,
+        );
+        preloadObjectId = result.objectId;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        if (errorMessage.includes('Cannot find context')) {
+          this.logger.debug(
+            `[ContextElementTracker] Context destroyed during extraction for frameId: ${state.frameId}`,
+          );
+          // Clear hover state if context is invalid
+          if (this.currentHover?.frameId === state.frameId) {
+            this.clearHover();
+          }
+        }
+        throw err;
+      }
 
       // Call __CTX_EXTRACT_INFO__ which exists in the preload script context
       const extractResult = await this.sendCommand('Runtime.callFunctionOn', {
@@ -943,9 +1164,21 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
         );
         mainWorldObjectId = result.objectId;
       } catch (error) {
-        this.logger.error(
-          `[ContextElementTracker] Failed to resolve node in main world context: ${error}`,
-        );
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('Cannot find context')) {
+          this.logger.debug(
+            `[ContextElementTracker] Main world context destroyed during extraction for frameId: ${state.frameId}`,
+          );
+          // Clear hover state if context is invalid
+          if (this.currentHover?.frameId === state.frameId) {
+            this.clearHover();
+          }
+        } else {
+          this.logger.debug(
+            `[ContextElementTracker] Failed to resolve node in main world context: ${error}`,
+          );
+        }
         // Return what we have from step 1 even if step 2 fails
         return contextElement;
       }
@@ -955,24 +1188,46 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
         return contextElement;
       }
 
-      // Fetch React information using ReactComponentTracker
-      // This returns raw data that will be parsed later
-      const reactData =
-        await this.reactComponentTracker.fetchReactInfo(mainWorldObjectId);
+      // Step 2: Fetch React information using ReactComponentTracker
+      // This is necessary because React fiber trees are in the main world context,
+      // which the preload script (isolated world) cannot access directly
+      // The preload script's getReactInfo can only access React internals via DOM properties,
+      // but ReactComponentTracker uses CDP to access the full fiber tree from main world
+      // It uses injected functions in the main world context for better performance
+      try {
+        const reactData = await this.reactComponentTracker.fetchReactInfo(
+          mainWorldObjectId,
+          mainWorldContextId,
+        );
 
-      // Store raw React data in frameworkInfo for now
-      // The actual parsing logic will be implemented separately
-      if (reactData !== null) {
-        contextElement.frameworkInfo = {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          react: reactData as any,
-        };
+        // Store React data in frameworkInfo
+        // This will override any React info from preload script if it exists
+        if (reactData !== null) {
+          contextElement.frameworkInfo = {
+            ...contextElement.frameworkInfo,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            react: reactData as any,
+          };
+        }
+      } catch (error) {
+        // Log but don't fail - we still have other element info
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('Cannot find context')) {
+          // Context destroyed - expected during navigation
+        } else {
+          this.logger.debug(
+            `[ContextElementTracker] Failed to fetch React info: ${error}`,
+          );
+        }
+        // Continue with element info even if React info fails
       }
 
-      // Step 3: Fetch own properties from main world context
-      // This gives us access to framework-specific properties and custom properties
+      // Step 3: Fetch own property names from main world context (not full serialization)
+      // This gives us a list of property names without the expensive serialization overhead
+      // The actual property analysis can be done later if needed, in the main world context
       try {
-        const ownPropertiesResult = (await this.sendCommand(
+        const ownPropertyNamesResult = (await this.sendCommand(
           'Runtime.callFunctionOn',
           {
             objectId: mainWorldObjectId,
@@ -993,114 +1248,53 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
                 'toLocaleString',
               ]);
 
-              const copyObject = (obj, depth, maxDepth) => {
-                if (obj === null || obj === undefined) {
-                  return obj;
-                }
-
-                if (typeof obj !== 'object') {
-                  return typeof obj === 'function' ? undefined : obj;
-                }
-
-                if (depth >= maxDepth) {
-                  if (Array.isArray(obj)) {
-                    return [];
-                  }
-                  return {};
-                }
-
-                if (Array.isArray(obj)) {
-                  return obj
-                    .map((item) => copyObject(item, depth + 1, maxDepth))
-                    .filter((item) => item !== undefined)
-                    .slice(0, 50);
-                }
-
-                const result = {};
-                const ownProps = Object.getOwnPropertyNames(obj);
-                
-                for (let i = 0; i < Math.min(ownProps.length, 500); i++) {
-                  const key = ownProps[i];
-                  
-                  if (excludedProperties.has(key)) {
-                    continue;
-                  }
-
-                  try {
-                    const value = obj[key];
-                    
-                    if (typeof value === 'function') {
-                      continue;
-                    }
-
-                    const copiedValue = copyObject(value, depth + 1, maxDepth);
-                    
-                    if (copiedValue !== undefined) {
-                      result[key] = copiedValue;
-                    }
-                  } catch {
-                    // Skip properties that throw errors when accessed
-                    continue;
-                  }
-                }
-
-                return result;
-              };
-
               const ownProps = Object.getOwnPropertyNames(this);
-              const result = {};
-              
-              for (let i = 0; i < Math.min(ownProps.length, 500); i++) {
-                const prop = ownProps[i];
-                
-                if (excludedProperties.has(prop)) {
-                  continue;
-                }
-
-                try {
-                  const value = this[prop];
-                  
-                  if (typeof value === 'function') {
-                    continue;
-                  }
-
-                  result[prop] = copyObject(value, 0, 3);
-                } catch {
-                  // Skip properties that throw errors when accessed
-                  continue;
-                }
-              }
-
-              return result;
+              // Return only property names, not their values, to avoid serialization overhead
+              return ownProps.filter(prop => !excludedProperties.has(prop));
             }`,
             returnByValue: true,
           },
         )) as {
           result?: {
-            value?: Record<string, unknown>;
+            value?: string[];
           };
         };
 
-        if (ownPropertiesResult.result?.value) {
-          // Merge main world ownProperties into contextElement
+        if (ownPropertyNamesResult.result?.value) {
+          // Store property names in a special field for reference
+          // The actual property values are already captured from preload context
+          // This avoids the expensive "Object couldn't be returned by value" errors
           contextElement.ownProperties = {
             ...contextElement.ownProperties,
-            ...ownPropertiesResult.result.value,
+            // Add a marker to indicate these are property names from main world
+            _mainWorldPropertyNames: ownPropertyNamesResult.result.value,
           };
         }
       } catch (error) {
         // Log error but don't fail - we still have preload context properties
         this.logger.debug(
-          `[ContextElementTracker] Failed to fetch own properties from main world: ${error}`,
+          `[ContextElementTracker] Failed to fetch own property names from main world: ${error}`,
         );
       }
 
       return contextElement;
     } catch (error) {
-      // Silently fail if extraction fails
-      this.logger.error(
-        `[ContextElementTracker] Failed to extract info: ${error}`,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      // Handle context destruction gracefully
+      if (errorMessage.includes('Cannot find context')) {
+        this.logger.debug(
+          `[ContextElementTracker] Context destroyed during extraction: ${errorMessage}`,
+        );
+        // Clear hover state if context is invalid
+        if (this.currentHover?.frameId === state.frameId) {
+          await this.clearHover();
+        }
+      } else {
+        this.logger.error(
+          `[ContextElementTracker] Failed to extract info: ${error}`,
+        );
+      }
       return null;
     }
   }

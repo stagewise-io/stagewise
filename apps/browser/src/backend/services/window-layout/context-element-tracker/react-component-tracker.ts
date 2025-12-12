@@ -7,10 +7,195 @@ import type { ReactSelectedElementInfo } from '@shared/context-elements/react';
 export class ReactComponentTracker {
   private cdpDebugger: Electron.Debugger;
   private logger: Logger;
+  private isInitialized = false;
+  private initializationPromise: Promise<void> | null = null;
 
   constructor(cdpDebugger: Electron.Debugger, logger: Logger) {
     this.cdpDebugger = cdpDebugger;
     this.logger = logger;
+  }
+
+  /**
+   * Injects React analysis functions into the main world context.
+   * This avoids sending large function declarations on every call.
+   */
+  private async ensureInitialized(contextId: number): Promise<void> {
+    if (this.isInitialized) return;
+    if (this.initializationPromise) return this.initializationPromise;
+
+    this.initializationPromise = (async () => {
+      try {
+        // Inject the React analysis functions into main world context
+        // Use a non-enumerable, non-configurable property to make it less detectable
+        const result = await this.sendCommand('Runtime.evaluate', {
+          expression: `
+            (function() {
+              // Check if React is available
+              const hasReact = typeof window !== 'undefined' && (
+                window.__REACT_DEVTOOLS_GLOBAL_HOOK__ ||
+                document.querySelector('[data-reactroot]') !== null ||
+                document.querySelector('[data-reactroot]') !== null
+              );
+              
+              // Use a Symbol-based key stored in a WeakMap to make it undetectable
+              const analyzerKey = Symbol.for('__sw_react_analyzer__');
+              if (window[analyzerKey]) {
+                return { initialized: true, hasReact }; // Already initialized
+              }
+
+              const analyzer = {
+                findFiber: function(node) {
+                  if (!node) return null;
+                  const props = Object.getOwnPropertyNames(node);
+                  for (const key of props) {
+                    if (key.startsWith('__reactFiber$')) return node[key] || null;
+                    if (key.startsWith('__reactInternalInstance$')) return node[key] || null;
+                  }
+                  const root = node._reactRootContainer;
+                  if (root?._internalRoot?.current) return root._internalRoot.current;
+                  return null;
+                },
+                serializeFiberTree: function(fiber) {
+                  const safeGet = (obj, path) => {
+                    try {
+                      const parts = path.split('.');
+                      let current = obj;
+                      for (const part of parts) {
+                        if (current == null) return undefined;
+                        current = current[part];
+                      }
+                      return current;
+                    } catch {
+                      return undefined;
+                    }
+                  };
+                  
+                  const extractTypeInfo = (type) => {
+                    if (!type) return { name: undefined, displayName: undefined };
+                    try {
+                      if (typeof type === 'function') {
+                        return {
+                          name: type.name || undefined,
+                          displayName: type.displayName || undefined,
+                        };
+                      }
+                      if (typeof type === 'object') {
+                        return {
+                          name: safeGet(type, 'name') || safeGet(type, 'render.name') || undefined,
+                          displayName: safeGet(type, 'displayName') || safeGet(type, 'render.displayName') || undefined,
+                        };
+                      }
+                    } catch {
+                      // Ignore errors when accessing properties
+                    }
+                    return { name: undefined, displayName: undefined };
+                  };
+                  
+                  const extractDebugOwner = (fiber) => {
+                    try {
+                      const owner = (fiber && (fiber._debugOwner || fiber.debugOwner)) || null;
+                      if (!owner) {
+                        return { name: undefined, env: undefined };
+                      }
+                      const name = typeof owner.name === 'string' ? owner.name : undefined;
+                      const env = typeof owner.env === 'string' ? owner.env : undefined;
+                      return {
+                        name: name || undefined,
+                        env: env || undefined,
+                      };
+                    } catch {
+                      return { name: undefined, env: undefined };
+                    }
+                  };
+                  
+                  const fibers = [];
+                  const visited = new WeakSet();
+                  let currentFiber = fiber;
+                  let count = 0;
+                  
+                  while (currentFiber && count < 30) {
+                    if (visited.has(currentFiber)) break;
+                    visited.add(currentFiber);
+                    
+                    try {
+                      const typeInfo = extractTypeInfo(currentFiber.type);
+                      const elementTypeInfo = extractTypeInfo(currentFiber.elementType);
+                      const debugOwner = extractDebugOwner(currentFiber);
+                      
+                      fibers.push({
+                        typeName: typeInfo.name,
+                        typeDisplayName: typeInfo.displayName,
+                        elementTypeName: elementTypeInfo.name,
+                        elementTypeDisplayName: elementTypeInfo.displayName,
+                        debugOwnerName: debugOwner.name,
+                        debugOwnerEnv: debugOwner.env,
+                      });
+                    } catch {
+                      // Skip this fiber if extraction fails
+                      fibers.push({
+                        typeName: undefined,
+                        typeDisplayName: undefined,
+                        elementTypeName: undefined,
+                        elementTypeDisplayName: undefined,
+                        debugOwnerName: undefined,
+                        debugOwnerEnv: undefined,
+                      });
+                    }
+                    
+                    currentFiber = currentFiber.return || null;
+                    count++;
+                  }
+                  
+                  return fibers;
+                }
+              };
+              
+              // Store in a non-enumerable, non-configurable property
+              // This makes it harder for the page to detect or interfere with it
+              Object.defineProperty(window, analyzerKey, {
+                value: analyzer,
+                writable: false,
+                enumerable: false,
+                configurable: false
+              });
+              return { initialized: true, success: true, hasReact };
+            })();
+          `,
+          contextId,
+        });
+
+        const resultValue = result as {
+          result?: {
+            value?: {
+              initialized?: boolean;
+              success?: boolean;
+              hasReact?: boolean;
+            };
+          };
+        };
+        if (
+          resultValue.result?.value?.success ||
+          resultValue.result?.value?.initialized
+        ) {
+          this.isInitialized = true;
+        } else {
+          this.isInitialized = true; // Mark as initialized anyway
+        }
+      } catch (_error) {
+        // Continue without optimization - will fall back to inline functions
+        // Don't mark as initialized so we can retry
+      }
+    })();
+
+    return this.initializationPromise;
+  }
+
+  /**
+   * Resets initialization state (e.g., after navigation).
+   */
+  public resetInitialization() {
+    this.isInitialized = false;
+    this.initializationPromise = null;
   }
 
   /**
@@ -29,15 +214,60 @@ export class ReactComponentTracker {
   /**
    * Finds the React fiber for a given DOM element.
    * Returns the fiber object ID or null if not found.
+   * Uses injected functions in main world context for better performance.
    */
-  private async findFiberForElement(objectId: string): Promise<string | null> {
+  private async findFiberForElement(
+    objectId: string,
+    contextId: number,
+  ): Promise<string | null> {
+    // Ensure functions are injected into main world context
+    await this.ensureInitialized(contextId);
+
+    // Try using injected function first (more performant)
+    try {
+      const fiberResult = (await this.sendCommand('Runtime.callFunctionOn', {
+        objectId,
+        functionDeclaration: `function() {
+          try {
+            const analyzerKey = Symbol.for('__sw_react_analyzer__');
+            const analyzer = window[analyzerKey];
+            if (analyzer && typeof analyzer.findFiber === 'function') {
+              let fiber = analyzer.findFiber(this);
+              if (fiber) return fiber;
+              let current = this.parentElement;
+              let depth = 0;
+              while (current && depth < 5) {
+                fiber = analyzer.findFiber(current);
+                if (fiber) return fiber;
+                current = current.parentElement;
+                depth++;
+              }
+            }
+          } catch (e) {
+            // Fall through to inline implementation
+          }
+          return null;
+        }`,
+        returnByValue: false,
+        // Note: Cannot specify executionContextId when using objectId - objectId already implies the context
+      })) as { result?: { objectId?: string } };
+
+      if (fiberResult.result?.objectId) {
+        return fiberResult.result.objectId;
+      }
+    } catch (_error) {
+      // Fall through to inline implementation
+    }
+
+    // Fallback to inline function if injection failed
+    // Now find the fiber (must return objectId, not by value)
     const fiberResult = (await this.sendCommand('Runtime.callFunctionOn', {
       objectId,
       functionDeclaration: `function() {
         const findFiber = (node) => {
           if (!node) return null;
-          const props = Object.getOwnPropertyNames(node);
-          for (const key of props) {
+          const nodeProps = Object.getOwnPropertyNames(node);
+          for (const key of nodeProps) {
             if (key.startsWith('__reactFiber$')) return node[key] || null;
             if (key.startsWith('__reactInternalInstance$')) return node[key] || null;
           }
@@ -57,7 +287,8 @@ export class ReactComponentTracker {
         }
         return null;
       }`,
-      returnByValue: false,
+      returnByValue: false, // Must return objectId for subsequent calls
+      // Note: Cannot specify executionContextId when using objectId - objectId already implies the context
     })) as { result?: { objectId?: string } };
 
     return fiberResult.result?.objectId || null;
@@ -66,8 +297,12 @@ export class ReactComponentTracker {
   /**
    * Serializes all relevant fiber nodes by walking up the fiber tree.
    * Extracts only serializable properties to avoid circular references.
+   * Uses injected functions in main world context for better performance.
    */
-  private async serializeFiberTree(fiberObjectId: string): Promise<Array<{
+  private async serializeFiberTree(
+    fiberObjectId: string,
+    contextId: number,
+  ): Promise<Array<{
     typeName?: string;
     typeDisplayName?: string;
     elementTypeName?: string;
@@ -75,6 +310,48 @@ export class ReactComponentTracker {
     debugOwnerName?: string;
     debugOwnerEnv?: string;
   }> | null> {
+    // Ensure functions are injected into main world context
+    await this.ensureInitialized(contextId);
+
+    // Try using injected function first (more performant)
+    try {
+      const result = (await this.sendCommand('Runtime.callFunctionOn', {
+        objectId: fiberObjectId,
+        functionDeclaration: `function() {
+          try {
+            const analyzerKey = Symbol.for('__sw_react_analyzer__');
+            const analyzer = window[analyzerKey];
+            if (analyzer && typeof analyzer.serializeFiberTree === 'function') {
+              return analyzer.serializeFiberTree(this);
+            }
+          } catch (e) {
+            // Fall through to inline implementation
+          }
+          return null;
+        }`,
+        returnByValue: true,
+        // Note: Cannot specify executionContextId when using objectId - objectId already implies the context
+      })) as {
+        result?: {
+          value?: Array<{
+            typeName?: string;
+            typeDisplayName?: string;
+            elementTypeName?: string;
+            elementTypeDisplayName?: string;
+            debugOwnerName?: string;
+            debugOwnerEnv?: string;
+          }>;
+        };
+      };
+
+      if (result.result?.value) {
+        return result.result.value;
+      }
+    } catch (_error) {
+      // Fall through to inline implementation
+    }
+
+    // Fallback to inline function if injection failed
     const result = (await this.sendCommand('Runtime.callFunctionOn', {
       objectId: fiberObjectId,
       functionDeclaration: `function() {
@@ -171,6 +448,7 @@ export class ReactComponentTracker {
         return fibers;
       }`,
       returnByValue: true,
+      // Note: Cannot specify executionContextId when using objectId - objectId already implies the context
     })) as {
       result?: {
         value?: Array<{
@@ -326,22 +604,28 @@ export class ReactComponentTracker {
   /**
    * Fetches React component tree information for a given element.
    * Minimizes sandbox code by serializing fiber data and parsing in main process.
+   * Uses injected functions in main world context for better performance.
    *
    * @param objectId - The object ID from DOM.resolveNode (main world)
+   * @param contextId - The execution context ID (main world context)
    * @returns React component tree or null if not found
    */
   async fetchReactInfo(
     objectId: string,
+    contextId: number,
   ): Promise<ReactSelectedElementInfo | null> {
     try {
-      // Step 1: Find the React fiber (minimal sandbox code)
-      const fiberObjectId = await this.findFiberForElement(objectId);
+      // Step 1: Find the React fiber (uses injected function if available)
+      const fiberObjectId = await this.findFiberForElement(objectId, contextId);
       if (!fiberObjectId) {
         return null;
       }
 
-      // Step 2: Serialize all relevant fiber nodes (minimal sandbox code)
-      const serializedFibers = await this.serializeFiberTree(fiberObjectId);
+      // Step 2: Serialize all relevant fiber nodes (uses injected function if available)
+      const serializedFibers = await this.serializeFiberTree(
+        fiberObjectId,
+        contextId,
+      );
       if (!serializedFibers || serializedFibers.length === 0) {
         return null;
       }

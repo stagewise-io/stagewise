@@ -370,8 +370,8 @@ importers:
         specifier: ^11.0.0
         version: 11.0.0
       electron:
-        specifier: 39.2.4
-        version: 39.2.4
+        specifier: 39.2.6
+        version: 39.2.6
       electron-context-menu:
         specifier: ^4.1.1
         version: 4.1.1
@@ -4847,8 +4847,8 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@39.2.4:
-    resolution: {integrity: sha512-KxPtwpFceQKSxRtUY39piHLYhJMMyHfOhc70e6zRnKGrbRdK6hzEqssth8IGjlKOdkeT4KCvIEngnNraYk39+g==}
+  electron@39.2.6:
+    resolution: {integrity: sha512-dHBgTodWBZd+tL1Dt0PSh/CFLHeDkFCTKCTXu1dgPhlE9Z3k2zzlBQ9B2oW55CFsKanBDHiUomHJNw0XaSdQpA==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
 
@@ -13957,7 +13957,7 @@ snapshots:
       - supports-color
     optional: true
 
-  electron@39.2.4:
+  electron@39.2.6:
     dependencies:
       '@electron/get': 2.0.3
       '@types/node': 22.15.2

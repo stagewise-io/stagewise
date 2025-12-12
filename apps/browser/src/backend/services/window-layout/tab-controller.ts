@@ -87,7 +87,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   // Viewport tracking
   private viewportTrackingInterval: NodeJS.Timeout | null = null;
-  private readonly VIEWPORT_TRACKING_INTERVAL_MS = 200;
+  private readonly VIEWPORT_TRACKING_INTERVAL_MS = 1000; // Reduced from 200ms to 1s
+  private isContextSelectionActive = false;
 
   // DevTools debugger tracking
   private devToolsDebugger: Electron.Debugger | null = null;
@@ -146,15 +147,39 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       this.logger,
     );
 
-    this.contextElementTracker.on('hoverChanged', async (elementId) => {
+    // Track pending info collection to avoid duplicate work
+    let pendingInfoCollection: NodeJS.Timeout | null = null;
+    let lastHoveredElementId: string | null = null;
+
+    this.contextElementTracker.on('hoverChanged', (elementId) => {
+      // Clear any pending info collection
+      if (pendingInfoCollection) {
+        clearTimeout(pendingInfoCollection);
+        pendingInfoCollection = null;
+      }
+
       if (elementId) {
-        const info =
-          await this.contextElementTracker.collectHoveredElementInfo();
-        if (info) {
-          info.tabId = this.id;
-          this.emit('elementHovered', info);
+        // If it's the same element, don't re-collect info
+        if (lastHoveredElementId === elementId) {
+          return;
         }
+
+        lastHoveredElementId = elementId;
+
+        // Defer expensive info collection until mouse has settled
+        // This keeps mouse movement responsive while still collecting full info
+        pendingInfoCollection = setTimeout(async () => {
+          pendingInfoCollection = null;
+          const info =
+            await this.contextElementTracker.collectHoveredElementInfo();
+          if (info && lastHoveredElementId === elementId) {
+            // Double-check elementId hasn't changed during async operation
+            info.tabId = this.id;
+            this.emit('elementHovered', info);
+          }
+        }, 200); // Wait 200ms after mouse stops moving
       } else {
+        lastHoveredElementId = null;
         this.emit('elementHovered', null);
       }
     });
@@ -253,9 +278,36 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.webContentsView.webContents.focus();
   }
 
-  public setContextSelectionMode(active: boolean) {
+  public async setContextSelectionMode(active: boolean) {
     // TODO: Implement context selection mode logic
     // This will likely involve sending a message to the preload script
+    this.isContextSelectionActive = active;
+
+    // Ensure viewport size is fetched before enabling context selection
+    if (active) {
+      // Retry viewport update with exponential backoff
+      let retries = 3;
+      let delay = 100;
+      while (retries > 0) {
+        try {
+          await this.updateViewportInfo();
+          // Validate that we have a valid viewport size
+          if (this.currentViewportSize) {
+            break; // Success, exit retry loop
+          }
+        } catch (err) {
+          this.logger.debug(
+            `[TabController] Failed to update viewport info on context selection activation (${retries} retries left): ${err}`,
+          );
+        }
+        retries--;
+        if (retries > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          delay *= 2; // Exponential backoff
+        }
+      }
+    }
+
     this.contextElementTracker.setContextSelection(active);
   }
 
@@ -320,6 +372,16 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       y: adjustedY,
     });
     this.contextElementTracker.updateMousePosition(adjustedX, adjustedY);
+
+    // Trigger immediate viewport update on mouse move when context selection is active
+    // This ensures viewport size is up-to-date for accurate coordinate calculations
+    if (this.isContextSelectionActive) {
+      this.updateViewportInfo().catch((err) => {
+        this.logger.debug(
+          `[TabController] Failed to update viewport info on mouse move: ${err}`,
+        );
+      });
+    }
   }
 
   public async clearContextSelectionMouseCoordinates() {
@@ -530,12 +592,16 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       return;
     }
 
+    // Only poll viewport when context selection is active OR DevTools are open
     this.viewportTrackingInterval = setInterval(() => {
-      this.updateViewportInfo().catch((err) => {
-        this.logger.debug(
-          `[TabController] Failed to update viewport info: ${err}`,
-        );
-      });
+      // Only poll if context selection is active or DevTools are open
+      if (this.isContextSelectionActive || this.currentState.devToolsOpen) {
+        this.updateViewportInfo().catch((err) => {
+          this.logger.debug(
+            `[TabController] Failed to update viewport info: ${err}`,
+          );
+        });
+      }
     }, this.VIEWPORT_TRACKING_INTERVAL_MS);
 
     // Initial update
@@ -572,17 +638,13 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       clientHeight: number;
     } | null = null;
 
-    // Only attach if not already attached (context element tracker might have it)
-    let shouldDetach = false;
+    // Check if debugger is already attached (ContextElementTracker keeps it attached)
+    // If not attached, we can't proceed - ContextElementTracker should have attached it
     if (!wc.debugger.isAttached()) {
-      try {
-        wc.debugger.attach('1.3');
-        shouldDetach = true;
-      } catch {
-        // Debugger might already be attached or failed to attach
-        // This is fine, we'll try again next interval
-        return;
-      }
+      this.logger.debug(
+        '[TabController] Debugger not attached, cannot get viewport info',
+      );
+      return;
     }
 
     try {
@@ -597,6 +659,14 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         return;
       }
 
+      // Validate viewport dimensions are reasonable
+      if (visualViewport.clientWidth <= 0 || visualViewport.clientHeight <= 0) {
+        this.logger.debug(
+          `[TabController] Invalid viewport dimensions: ${visualViewport.clientWidth}x${visualViewport.clientHeight}`,
+        );
+        return;
+      }
+
       // Store viewport layout (scroll position, scale, zoom) for input event compensation
       this.currentViewportLayout = {
         top: visualViewport.pageY || 0,
@@ -605,18 +675,18 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         zoom: visualViewport.zoom || 1,
       };
     } catch (err) {
-      // Ignore errors - might happen if page is not ready
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      // Handle "target closed" errors with retry logic
+      if (errorMessage.includes('target closed')) {
+        this.logger.debug(
+          `[TabController] Target closed while getting visualViewport, will retry: ${err}`,
+        );
+        // Don't return immediately - let the retry mechanism handle it
+        throw err;
+      }
+      // Ignore other errors - might happen if page is not ready
       this.logger.debug(`[TabController] Error getting visualViewport: ${err}`);
       return;
-    } finally {
-      // Only detach if we attached it ourselves
-      if (shouldDetach && wc.debugger.isAttached()) {
-        try {
-          wc.debugger.detach();
-        } catch {
-          // Ignore detach errors
-        }
-      }
     }
 
     // Get size information - either from DevTools bounds or visualViewport
@@ -636,8 +706,21 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         fitScale: 1,
         appliedDeviceScaleFactor: 1,
       };
-      this.currentViewportSize = viewportSize;
-      this.emit('viewportSizeChanged', viewportSize);
+      // Only emit if values actually changed
+      if (
+        !this.currentViewportSize ||
+        this.currentViewportSize.width !== viewportSize.width ||
+        this.currentViewportSize.height !== viewportSize.height ||
+        this.currentViewportSize.top !== viewportSize.top ||
+        this.currentViewportSize.left !== viewportSize.left ||
+        this.currentViewportSize.scale !== viewportSize.scale ||
+        this.currentViewportSize.fitScale !== viewportSize.fitScale ||
+        this.currentViewportSize.appliedDeviceScaleFactor !==
+          viewportSize.appliedDeviceScaleFactor
+      ) {
+        this.currentViewportSize = viewportSize;
+        this.emit('viewportSizeChanged', viewportSize);
+      }
     }
   }
 
@@ -744,8 +827,21 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
             fitScale,
             appliedDeviceScaleFactor,
           };
-          this.currentViewportSize = viewportSize;
-          this.emit('viewportSizeChanged', viewportSize);
+          // Only emit if values actually changed
+          if (
+            !this.currentViewportSize ||
+            this.currentViewportSize.width !== viewportSize.width ||
+            this.currentViewportSize.height !== viewportSize.height ||
+            this.currentViewportSize.top !== viewportSize.top ||
+            this.currentViewportSize.left !== viewportSize.left ||
+            this.currentViewportSize.scale !== viewportSize.scale ||
+            this.currentViewportSize.fitScale !== viewportSize.fitScale ||
+            this.currentViewportSize.appliedDeviceScaleFactor !==
+              viewportSize.appliedDeviceScaleFactor
+          ) {
+            this.currentViewportSize = viewportSize;
+            this.emit('viewportSizeChanged', viewportSize);
+          }
         }
       }
     } catch (err) {
