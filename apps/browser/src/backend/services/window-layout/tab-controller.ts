@@ -95,10 +95,19 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private devToolsPlaceholderObjectId: string | null = null;
   private devToolsDeviceModeWrapperObjectId: string | null = null;
 
-  constructor(id: string, logger: Logger, initialUrl?: string) {
+  // Callback to create new tabs
+  private onCreateTab?: (url: string) => void;
+
+  constructor(
+    id: string,
+    logger: Logger,
+    initialUrl?: string,
+    onCreateTab?: (url: string) => void,
+  ) {
     super();
     this.id = id;
     this.logger = logger;
+    this.onCreateTab = onCreateTab;
 
     this.viewContainer = new View();
     this.viewContainer.setBorderRadius(4);
@@ -582,7 +591,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     });
 
     wc.setWindowOpenHandler((details) => {
-      shell.openExternal(details.url);
+      if (this.onCreateTab) {
+        this.onCreateTab(details.url);
+      } else {
+        // Fallback to external browser if no callback is provided
+        shell.openExternal(details.url);
+      }
       return { action: 'deny' };
     });
   }

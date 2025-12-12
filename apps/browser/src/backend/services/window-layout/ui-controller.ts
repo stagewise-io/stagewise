@@ -1,4 +1,4 @@
-import { WebContentsView, shell } from 'electron';
+import { WebContentsView } from 'electron';
 import { domCodeToElectronKeyCode } from '../../utils/dom-code-to-electron-key-code';
 import path from 'node:path';
 import contextMenu from 'electron-context-menu';
@@ -83,7 +83,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
 
     this.view.setBackgroundColor('#00000000');
     this.view.webContents.setWindowOpenHandler((details) => {
-      shell.openExternal(details.url);
+      this.emit('createTab', details.url);
       return { action: 'deny' };
     });
 

@@ -149,6 +149,7 @@ export class WindowLayoutService {
         if (this.baseWindow.isMinimized()) this.baseWindow.restore();
         this.baseWindow.focus();
       }
+      // URL handling is done in main.ts
     });
 
     // Initialize browser state
@@ -215,6 +216,33 @@ export class WindowLayoutService {
 
   public toggleUIDevTools() {
     this.uiController?.toggleDevTools();
+  }
+
+  /**
+   * Opens a URL in a new tab, or navigates the active tab if it's a new/default tab.
+   * A tab is considered "new" if it's the only tab and is on the default URL (google.com).
+   */
+  public async openUrl(url: string): Promise<void> {
+    this.logger.debug(`[WindowLayoutService] openUrl called with url: ${url}`);
+
+    // Check if we should reuse the active tab (if it's new/default)
+    const shouldReuseActiveTab =
+      this.activeTab &&
+      Object.keys(this.tabs).length === 1 &&
+      this.activeTab.getState().url === 'https://google.com' &&
+      !this.activeTab.getState().navigationHistory.canGoBack;
+
+    if (shouldReuseActiveTab) {
+      this.logger.debug(
+        `[WindowLayoutService] Reusing active tab for url: ${url}`,
+      );
+      await this.handleGoto(url);
+    } else {
+      this.logger.debug(
+        `[WindowLayoutService] Creating new tab for url: ${url}`,
+      );
+      await this.handleCreateTab(url);
+    }
   }
 
   private setupKartonConnectionListener() {
@@ -302,7 +330,9 @@ export class WindowLayoutService {
 
   private async createTab(url: string | undefined, setActive: boolean) {
     const id = randomUUID();
-    const tab = new TabController(id, this.logger, url);
+    const tab = new TabController(id, this.logger, url, (newUrl: string) => {
+      void this.handleCreateTab(newUrl);
+    });
 
     // Subscribe to state updates
     tab.on('stateUpdated', (updates) => {

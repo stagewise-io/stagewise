@@ -48,11 +48,3 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {});
-
-app.on('second-instance', (_ev, argv) => {
-  console.log('second-instance', argv);
-});
-
-app.on('open-url', (_ev, uri) => {
-  console.log('open-url', uri);
-});
