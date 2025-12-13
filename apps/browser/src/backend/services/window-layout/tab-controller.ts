@@ -479,10 +479,20 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   // }
 
   public destroy() {
-    // View destruction is handled by removing from parent, but we can explicitly help if needed
-    // The webcontents will be destroyed when the view is destroyed
     this.stopViewportTracking();
     this.detachDevToolsDebugger();
+
+    // Close karton server and transport
+    this.kartonServer.close().catch((err) => {
+      this.logger.debug(`[TabController] Error closing karton server: ${err}`);
+    });
+
+    // Explicitly destroy the webContents to stop all processes
+    // In Electron, WebContents must be explicitly destroyed
+    if (!this.webContentsView.webContents.isDestroyed()) {
+      this.webContentsView.webContents.destroy();
+    }
+
     this.removeAllListeners();
   }
 
