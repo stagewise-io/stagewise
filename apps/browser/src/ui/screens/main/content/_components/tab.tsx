@@ -14,18 +14,24 @@ function s(...path: string[]) {
   return path.join(' ');
 }
 
-export function ActiveTab({
+export function Tab({
+  isActive,
   borderRadius = 8,
   className = '',
   activateBottomLeftCornerRadius = true,
+  showRightSeparator = true,
   tabState,
+  onClick,
   onClose,
   onToggleAudioMuted,
 }: {
+  isActive: boolean;
   borderRadius?: number;
   className?: string;
   activateBottomLeftCornerRadius?: boolean;
+  showRightSeparator?: boolean;
   tabState: TabState;
+  onClick?: () => void;
   onClose: () => void;
   onToggleAudioMuted: () => void;
 }) {
@@ -34,91 +40,151 @@ export function ActiveTab({
 
   const dimensions = useElementDimensions(tabRef, [
     activateBottomLeftCornerRadius,
+    isActive,
   ]);
 
   const svgPath = useMemo(() => {
+    if (!isActive) return '';
     return getTabSvgPath({
       height: dimensions.height,
       width: dimensions.width,
       borderRadius,
       activateBottomLeftCornerRadius,
     });
-  }, [dimensions, borderRadius, activateBottomLeftCornerRadius]);
+  }, [dimensions, borderRadius, activateBottomLeftCornerRadius, isActive]);
 
   return (
     <WithTabTooltipPreview tabState={tabState}>
       <div
-        data-state="active"
-        className="@container relative w-64 min-w-8 px-2"
+        data-state={isActive ? 'active' : 'inactive'}
+        className={cn(
+          '@container w-64 min-w-8',
+          isActive
+            ? 'relative px-2'
+            : cn(
+                'flex h-7.25 items-center gap-2 self-start rounded-[8.5px] px-2 py-1 transition-colors hover:bg-zinc-50/70 has-[+[data-state="active"]]:rounded-br-md [[data-state="active"]+&]:rounded-bl-md',
+                showRightSeparator &&
+                  'after:-right-[2px] after:absolute after:h-4 after:border-muted-foreground/20 after:border-r after:content-[""]',
+              ),
+        )}
+        onClick={isActive ? undefined : onClick}
       >
-        {/* SVG definitions - hidden but accessible */}
-        <svg
-          width="0"
-          height="0"
-          className="absolute"
-          viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
-              <path d={svgPath} fill="white" />
-            </clipPath>
-          </defs>
-        </svg>
-        <div
-          ref={tabRef}
-          className={cn(
-            `absolute inset-0 block bg-background ${dimensions.width > 0 ? 'opacity-100' : 'opacity-0'}`,
-            className,
-          )}
-          style={{
-            clipPath: `url(#${clipPathId})`,
-            paddingLeft: activateBottomLeftCornerRadius ? borderRadius : 0,
-            marginLeft: activateBottomLeftCornerRadius ? -borderRadius : 0,
-            paddingRight: borderRadius,
-            marginRight: -borderRadius,
-            borderTopLeftRadius: borderRadius,
-            borderTopRightRadius: borderRadius,
-          }}
-        />
-        <div className="flex h-8 items-center gap-2 py-1 pb-1.75 @[40px]:pl-1 pl-0">
-          <div className="@[40px]:flex hidden shrink-0 items-center justify-center">
-            <TabFavicon tabState={tabState} />
-          </div>
-          <span className="mt-px @[55px]:block hidden flex-1 truncate text-foreground text-xs">
-            {tabState.title}
-          </span>
-          {(tabState.isPlayingAudio || tabState.isMuted) && (
-            <Button
-              variant="ghost"
-              size="icon-2xs"
-              onClick={onToggleAudioMuted}
-              className={cn(
-                'shrink-0',
-                tabState.isMuted
-                  ? 'text-rose-500 hover:text-rose-800'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
+        {/* SVG definitions and background mask for active tab */}
+        {isActive && (
+          <>
+            <svg
+              width="0"
+              height="0"
+              className="absolute"
+              viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
+              preserveAspectRatio="none"
             >
-              {!tabState.isMuted ? (
-                <IconVolumeUpFill18 className="size-3" />
-              ) : (
-                <IconVolumeXmarkFill18 className="size-3" />
+              <defs>
+                <clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
+                  <path d={svgPath} fill="white" />
+                </clipPath>
+              </defs>
+            </svg>
+            <div
+              ref={tabRef}
+              className={cn(
+                `absolute inset-0 block bg-background ${dimensions.width > 0 ? 'opacity-100' : 'opacity-0'}`,
+                className,
               )}
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon-2xs"
-            className="ml-auto shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={onClose}
-          >
-            <IconXmark className="size-3" />
-          </Button>
-        </div>
+              style={{
+                clipPath: `url(#${clipPathId})`,
+                paddingLeft: activateBottomLeftCornerRadius ? borderRadius : 0,
+                marginLeft: activateBottomLeftCornerRadius ? -borderRadius : 0,
+                paddingRight: borderRadius,
+                marginRight: -borderRadius,
+                borderTopLeftRadius: borderRadius,
+                borderTopRightRadius: borderRadius,
+              }}
+            />
+          </>
+        )}
+        {/* Shared tab content */}
+        <TabContent
+          isActive={isActive}
+          tabState={tabState}
+          onClose={onClose}
+          onToggleAudioMuted={onToggleAudioMuted}
+        />
       </div>
     </WithTabTooltipPreview>
   );
+}
+
+function TabContent({
+  isActive,
+  tabState,
+  onClose,
+  onToggleAudioMuted,
+}: {
+  isActive: boolean;
+  tabState: TabState;
+  onClose: () => void;
+  onToggleAudioMuted: () => void;
+}) {
+  const content = (
+    <>
+      <div
+        className={cn(
+          'shrink-0 items-center justify-center',
+          isActive ? '@[40px]:flex hidden' : '@[40px]:ml-1 ml-0 flex h-5',
+        )}
+      >
+        <TabFavicon tabState={tabState} />
+      </div>
+      <span className="mt-px @[55px]:block hidden flex-1 truncate text-foreground text-xs">
+        {tabState.title}
+      </span>
+      {(tabState.isPlayingAudio || tabState.isMuted) && (
+        <Button
+          variant="ghost"
+          size="icon-2xs"
+          onClick={onToggleAudioMuted}
+          className={cn(
+            'shrink-0',
+            tabState.isMuted
+              ? 'text-rose-500 hover:text-rose-800'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {!tabState.isMuted ? (
+            <IconVolumeUpFill18
+              className={cn('size-3', !isActive && 'text-muted-foreground')}
+            />
+          ) : (
+            <IconVolumeXmarkFill18
+              className={cn('size-3', !isActive && 'text-rose-600')}
+            />
+          )}
+        </Button>
+      )}
+      <Button
+        variant="ghost"
+        size="icon-2xs"
+        className={cn(
+          'ml-auto shrink-0 text-muted-foreground hover:text-foreground',
+          !isActive && '@[40px]:flex hidden',
+        )}
+        onClick={onClose}
+      >
+        <IconXmark className="size-3" />
+      </Button>
+    </>
+  );
+
+  if (isActive) {
+    return (
+      <div className="flex h-8 items-center gap-2 py-1 pb-1.75 @[40px]:pl-1 pl-0">
+        {content}
+      </div>
+    );
+  }
+
+  return content;
 }
 
 function useElementDimensions(

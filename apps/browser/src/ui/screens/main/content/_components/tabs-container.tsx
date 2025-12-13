@@ -5,8 +5,7 @@ import { IconCommand } from 'nucleo-micro-bold';
 import { useIsContainerScrollable } from '@/hooks/use-is-container-scrollable';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TabState } from '@shared/karton-contracts/ui';
-import { ActiveTab } from './active-tab';
-import { InactiveTab } from './inactive-tab';
+import { Tab } from './tab';
 import { AgentPreviewBadge } from './agent-preview-badge';
 
 export function TabsContainer({
@@ -88,34 +87,21 @@ export function TabsContainer({
       >
         {Object.values(tabs).map((tab) => {
           const isLeftNextToActiveTab = getIsLeftNextToActiveTab(tab.id);
-          if (tab.id === activeTabId)
-            return (
-              <ActiveTab
-                key={tab.id}
-                tabState={tab}
-                onClose={() => {
-                  onCloseTab(tab.id);
-                }}
-                onToggleAudioMuted={() => {
-                  onToggleAudioMuted(tab.id);
-                }}
-                activateBottomLeftCornerRadius={activateBottomLeftCornerRadius}
-              />
-            );
+          const isActive = tab.id === activeTabId;
           return (
-            <InactiveTab
+            <Tab
               key={tab.id}
+              isActive={isActive}
               tabState={tab}
-              onClick={() => {
-                setActiveTabId(tab.id);
-              }}
+              onClick={isActive ? undefined : () => setActiveTabId(tab.id)}
               onClose={() => {
                 onCloseTab(tab.id);
               }}
               onToggleAudioMuted={() => {
                 onToggleAudioMuted(tab.id);
               }}
-              showRightSeparator={!isLeftNextToActiveTab}
+              activateBottomLeftCornerRadius={activateBottomLeftCornerRadius}
+              showRightSeparator={!isActive && !isLeftNextToActiveTab}
             />
           );
         })}
