@@ -14,7 +14,6 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import type { TabState } from '@shared/karton-contracts/ui';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { BackgroundWithCutout } from './_components/background-with-cutout';
-import { IconSquareCodeFill18 } from 'nucleo-ui-fill-18';
 import {
   TooltipContent,
   TooltipTrigger,
@@ -23,6 +22,7 @@ import {
 import { StartPage } from './_components/start-page';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
 import { CoreHotkeyBindings } from './_components/core-hotkey-bindings';
+import { IconSquareCodeFillDuo18 } from 'nucleo-ui-fill-duo-18';
 
 export function MainSection({
   isSidebarCollapsed,
@@ -34,6 +34,7 @@ export function MainSection({
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const goBack = useKartonProcedure((p) => p.browser.goBack);
   const goForward = useKartonProcedure((p) => p.browser.goForward);
   const reload = useKartonProcedure((p) => p.browser.reload);
@@ -53,6 +54,14 @@ export function MainSection({
     setLocalUrl('');
     urlInputRef.current?.focus();
   }, [createTab]);
+
+  const handleCleanAllTabs = useCallback(() => {
+    Object.values(tabs).forEach((tab) => {
+      if (tab.id !== activeTabId) {
+        closeTab(tab.id);
+      }
+    });
+  }, [tabs, activeTabId]);
 
   const activeTab = useMemo(() => {
     return tabs[activeTabId] as TabState | undefined;
@@ -134,6 +143,7 @@ export function MainSection({
           openSidebarChatPanel={openSidebarChatPanel}
           isSidebarCollapsed={isSidebarCollapsed}
           onAddTab={handleCreateTab}
+          onCleanAllTabs={handleCleanAllTabs}
         />
         {/* URL, Controls, etc. area */}
         <div
@@ -211,7 +221,14 @@ export function MainSection({
                     toggleDevTools(activeTabId);
                   }}
                 >
-                  <IconSquareCodeFill18 className="size-5 text-muted-foreground" />
+                  <IconSquareCodeFillDuo18
+                    className={cn(
+                      'size-5',
+                      activeTab?.devToolsOpen
+                        ? 'text-primary'
+                        : 'text-muted-foreground',
+                    )}
+                  />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Open developer tools</TooltipContent>

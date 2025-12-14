@@ -76,7 +76,7 @@ export function Tab({
       <div
         data-state={isActive ? 'active' : 'inactive'}
         className={cn(
-          '@container w-64 min-w-8',
+          '@container w-52 min-w-24',
           isActive
             ? 'relative px-2'
             : cn(
@@ -135,6 +135,7 @@ function TabContent({
   isActive: boolean;
   tabState: TabState;
 }) {
+  const tabs = useKartonState((s) => s.browser.tabs);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const toggleAudioMuted = useKartonProcedure(
     (p) => p.browser.toggleAudioMuted,
@@ -149,6 +150,12 @@ function TabContent({
   const handleToggleAudioMuted = () => {
     toggleAudioMuted(tabState.id);
   };
+
+  const shouldHideCloseButton = useMemo(() => {
+    const isOnlyTab = Object.keys(tabs).length === 1;
+    const isNewTabPage = tabState.url === 'ui-main';
+    return isOnlyTab && isNewTabPage;
+  }, [tabs, tabState.url]);
   const content = (
     <>
       <div
@@ -185,17 +192,19 @@ function TabContent({
           )}
         </Button>
       )}
-      <Button
-        variant="ghost"
-        size="icon-2xs"
-        className={cn(
-          'ml-auto shrink-0 text-muted-foreground hover:text-foreground',
-          !isActive && '@[40px]:flex hidden',
-        )}
-        onClick={handleClose}
-      >
-        <IconXmark className="size-3" />
-      </Button>
+      {!shouldHideCloseButton && (
+        <Button
+          variant="ghost"
+          size="icon-2xs"
+          className={cn(
+            'ml-auto shrink-0 text-muted-foreground hover:text-foreground',
+            !isActive && '@[40px]:flex hidden',
+          )}
+          onClick={handleClose}
+        >
+          <IconXmark className="size-3" />
+        </Button>
+      )}
     </>
   );
 

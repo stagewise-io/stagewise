@@ -7,15 +7,23 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Tab } from './tab';
 import { AgentPreviewBadge } from './agent-preview-badge';
 import { useKartonState } from '@/hooks/use-karton';
+import { IconBrush2Fill18 } from 'nucleo-ui-fill-18';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 
 export function TabsContainer({
   openSidebarChatPanel,
   isSidebarCollapsed,
   onAddTab,
+  onCleanAllTabs,
 }: {
   openSidebarChatPanel: () => void;
   isSidebarCollapsed: boolean;
   onAddTab: () => void;
+  onCleanAllTabs: () => void;
 }) {
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
@@ -93,6 +101,23 @@ export function TabsContainer({
         </div>
       </Button>
       <div className="app-drag h-full min-w-16! grow" />
+      {Object.values(tabs).length > 1 && (
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="mt-0.75 mr-0.75 shrink-0 self-start rounded-[8.5px] hover:bg-zinc-50/70!"
+              onClick={onCleanAllTabs}
+            >
+              <IconBrush2Fill18 className="size-3.5 text-muted-foreground" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <span>Close all other tabs</span>
+          </TooltipContent>
+        </Tooltip>
+      )}
     </div>
   );
 }
