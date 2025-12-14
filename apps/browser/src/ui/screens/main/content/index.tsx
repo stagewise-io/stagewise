@@ -34,26 +34,18 @@ export function MainSection({
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
-  const closeTab = useKartonProcedure((p) => p.browser.closeTab);
-  const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const goBack = useKartonProcedure((p) => p.browser.goBack);
   const goForward = useKartonProcedure((p) => p.browser.goForward);
   const reload = useKartonProcedure((p) => p.browser.reload);
   const goto = useKartonProcedure((p) => p.browser.goto);
-  const togglePanelKeyboardFocus = useKartonProcedure(
-    (p) => p.browser.layout.togglePanelKeyboardFocus,
-  );
   const toggleDevTools = useKartonProcedure((p) => p.browser.toggleDevTools);
-  const toggleAudioMuted = useKartonProcedure(
-    (p) => p.browser.toggleAudioMuted,
-  );
   const [localUrl, setLocalUrl] = useState(tabs[activeTabId]?.url ?? '');
   const [urlBeforeEdit, setUrlBeforeEdit] = useState(
     tabs[activeTabId]?.url ?? '',
   );
   const urlInputRef = useRef<HTMLInputElement>(null);
 
-  const { tabUiState, setTabUiState, removeTabUiState } = useTabUIState();
+  const { setTabUiState } = useTabUIState();
 
   const handleCreateTab = useCallback(() => {
     createTab();
@@ -61,15 +53,6 @@ export function MainSection({
     setLocalUrl('');
     urlInputRef.current?.focus();
   }, [createTab]);
-
-  const handleSwitchTab = useCallback(
-    async (tabId: string) => {
-      const focus = tabUiState[tabId]?.focusedPanel ?? 'stagewise-ui';
-      await switchTab(tabId);
-      void togglePanelKeyboardFocus(focus);
-    },
-    [switchTab, tabUiState],
-  );
 
   const activeTab = useMemo(() => {
     return tabs[activeTabId] as TabState | undefined;
@@ -150,17 +133,7 @@ export function MainSection({
         <TabsContainer
           openSidebarChatPanel={openSidebarChatPanel}
           isSidebarCollapsed={isSidebarCollapsed}
-          activeTabId={activeTabId}
-          tabs={tabs}
-          setActiveTabId={handleSwitchTab}
           onAddTab={handleCreateTab}
-          onCloseTab={(tabId) => {
-            closeTab(tabId);
-            removeTabUiState(tabId);
-          }}
-          onToggleAudioMuted={(tabId) => {
-            toggleAudioMuted(tabId);
-          }}
         />
         {/* URL, Controls, etc. area */}
         <div

@@ -7,6 +7,8 @@ import { WithTabTooltipPreview } from './with-tab-tooltip-preview';
 import { TabFavicon } from './tab-favicon';
 import { IconVolumeUpFill18, IconVolumeXmarkFill18 } from 'nucleo-ui-fill-18';
 import { IconXmark } from 'nucleo-micro-bold';
+import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
+import { useTabUIState } from '@/hooks/use-tab-ui-state';
 
 const CUBIC_BEZIER_CONTROL_POINT_FACTOR = 0.5522847498;
 
@@ -15,26 +17,42 @@ function s(...path: string[]) {
 }
 
 export function Tab({
-  isActive,
   borderRadius = 8,
   className = '',
   activateBottomLeftCornerRadius = true,
-  showRightSeparator = true,
   tabState,
-  onClick,
-  onClose,
-  onToggleAudioMuted,
 }: {
-  isActive: boolean;
   borderRadius?: number;
   className?: string;
   activateBottomLeftCornerRadius?: boolean;
-  showRightSeparator?: boolean;
   tabState: TabState;
-  onClick?: () => void;
-  onClose: () => void;
-  onToggleAudioMuted: () => void;
 }) {
+  const tabs = useKartonState((s) => s.browser.tabs);
+  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const isActive = tabState.id === activeTabId;
+  const switchTab = useKartonProcedure((p) => p.browser.switchTab);
+  const togglePanelKeyboardFocus = useKartonProcedure(
+    (p) => p.browser.layout.togglePanelKeyboardFocus,
+  );
+  const { tabUiState } = useTabUIState();
+
+  const handleClick = async () => {
+    if (isActive) return;
+    const focus = tabUiState[tabState.id]?.focusedPanel ?? 'stagewise-ui';
+    await switchTab(tabState.id);
+    void togglePanelKeyboardFocus(focus);
+  };
+
+  // Calculate if this tab should show right separator
+  // (show if not active and not left of active tab)
+  const shouldShowRightSeparator = useMemo(() => {
+    if (isActive) return false;
+    const tabIds = Object.keys(tabs);
+    const currentIndex = tabIds.findIndex((id) => id === tabState.id);
+    const activeIndex = tabIds.findIndex((id) => id === activeTabId);
+    return currentIndex !== activeIndex - 1;
+  }, [isActive, tabs, tabState.id, activeTabId]);
+
   const tabRef = useRef<HTMLDivElement>(null);
   const clipPathId = `tabClipPath-${useId()}`;
 
@@ -63,11 +81,11 @@ export function Tab({
             ? 'relative px-2'
             : cn(
                 'flex h-7.25 items-center gap-2 self-start rounded-[8.5px] px-2 py-1 transition-colors hover:bg-zinc-50/70 has-[+[data-state="active"]]:rounded-br-md [[data-state="active"]+&]:rounded-bl-md',
-                showRightSeparator &&
+                shouldShowRightSeparator &&
                   'after:-right-[2px] after:absolute after:h-4 after:border-muted-foreground/20 after:border-r after:content-[""]',
               ),
         )}
-        onClick={isActive ? undefined : onClick}
+        onClick={isActive ? undefined : handleClick}
       >
         {/* SVG definitions and background mask for active tab */}
         {isActive && (
@@ -104,12 +122,7 @@ export function Tab({
           </>
         )}
         {/* Shared tab content */}
-        <TabContent
-          isActive={isActive}
-          tabState={tabState}
-          onClose={onClose}
-          onToggleAudioMuted={onToggleAudioMuted}
-        />
+        <TabContent isActive={isActive} tabState={tabState} />
       </div>
     </WithTabTooltipPreview>
   );
@@ -118,14 +131,24 @@ export function Tab({
 function TabContent({
   isActive,
   tabState,
-  onClose,
-  onToggleAudioMuted,
 }: {
   isActive: boolean;
   tabState: TabState;
-  onClose: () => void;
-  onToggleAudioMuted: () => void;
 }) {
+  const closeTab = useKartonProcedure((p) => p.browser.closeTab);
+  const toggleAudioMuted = useKartonProcedure(
+    (p) => p.browser.toggleAudioMuted,
+  );
+  const { removeTabUiState } = useTabUIState();
+
+  const handleClose = () => {
+    closeTab(tabState.id);
+    removeTabUiState(tabState.id);
+  };
+
+  const handleToggleAudioMuted = () => {
+    toggleAudioMuted(tabState.id);
+  };
   const content = (
     <>
       <div
@@ -143,7 +166,7 @@ function TabContent({
         <Button
           variant="ghost"
           size="icon-2xs"
-          onClick={onToggleAudioMuted}
+          onClick={handleToggleAudioMuted}
           className={cn(
             'shrink-0',
             tabState.isMuted
@@ -169,7 +192,7 @@ function TabContent({
           'ml-auto shrink-0 text-muted-foreground hover:text-foreground',
           !isActive && '@[40px]:flex hidden',
         )}
-        onClick={onClose}
+        onClick={handleClose}
       >
         <IconXmark className="size-3" />
       </Button>

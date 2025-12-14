@@ -4,29 +4,21 @@ import { IconPlus } from 'nucleo-micro-bold';
 import { IconCommand } from 'nucleo-micro-bold';
 import { useIsContainerScrollable } from '@/hooks/use-is-container-scrollable';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { TabState } from '@shared/karton-contracts/ui';
 import { Tab } from './tab';
 import { AgentPreviewBadge } from './agent-preview-badge';
+import { useKartonState } from '@/hooks/use-karton';
 
 export function TabsContainer({
   openSidebarChatPanel,
   isSidebarCollapsed,
-  activeTabId,
-  tabs,
-  setActiveTabId,
   onAddTab,
-  onCloseTab,
-  onToggleAudioMuted,
 }: {
   openSidebarChatPanel: () => void;
   isSidebarCollapsed: boolean;
-  activeTabId: string;
-  tabs: Record<string, TabState>;
-  setActiveTabId: (tabId: string) => void;
   onAddTab: () => void;
-  onCloseTab: (tabId: string) => void;
-  onToggleAudioMuted: (tabId: string) => void;
 }) {
+  const tabs = useKartonState((s) => s.browser.tabs);
+  const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { canScrollLeft, canScrollRight } =
     useIsContainerScrollable(scrollContainerRef);
@@ -39,13 +31,6 @@ export function TabsContainer({
       isSidebarCollapsed
     );
   }, [activeTabId, isSidebarCollapsed, tabs]);
-
-  const getIsLeftNextToActiveTab = (tabId: string) => {
-    return (
-      Object.keys(tabs).findIndex((_id) => _id === tabId) ===
-      Object.keys(tabs).findIndex((tabId) => tabId === activeTabId) - 1
-    );
-  };
 
   useEffect(() => {
     setLeftFadeDistance(canScrollLeft ? 16 : 0);
@@ -86,22 +71,11 @@ export function TabsContainer({
         }
       >
         {Object.values(tabs).map((tab) => {
-          const isLeftNextToActiveTab = getIsLeftNextToActiveTab(tab.id);
-          const isActive = tab.id === activeTabId;
           return (
             <Tab
               key={tab.id}
-              isActive={isActive}
               tabState={tab}
-              onClick={isActive ? undefined : () => setActiveTabId(tab.id)}
-              onClose={() => {
-                onCloseTab(tab.id);
-              }}
-              onToggleAudioMuted={() => {
-                onToggleAudioMuted(tab.id);
-              }}
               activateBottomLeftCornerRadius={activateBottomLeftCornerRadius}
-              showRightSeparator={!isActive && !isLeftNextToActiveTab}
             />
           );
         })}
