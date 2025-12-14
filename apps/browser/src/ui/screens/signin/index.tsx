@@ -43,7 +43,7 @@ export const SignInScreen = ({ show }: { show: boolean }) => {
 
   return (
     <Dialog open={show} dismissible={false}>
-      <DialogContent className="app-no-drag gap-3 delay-150 duration-300 md:p-10">
+      <DialogContent className="gap-3 delay-150 duration-300 md:p-10">
         <div className="glass-body -ml-0.5 flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full">
           <AnimatedGradientBackground className="absolute inset-0 z-0 size-full" />
           <Logo

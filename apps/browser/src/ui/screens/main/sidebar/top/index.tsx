@@ -26,6 +26,8 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   const switchChat = useKartonProcedure((p) => p.agentChat.switch);
   const deleteChat = useKartonProcedure((p) => p.agentChat.delete);
   const chats = useKartonState((s) => s.agentChat?.chats) || {};
+  const platform = useKartonState((s) => s.appInfo.platform);
+  const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
 
   const groupedChats = useMemo(() => groupChatsByTime(chats), [chats]);
 
@@ -55,11 +57,12 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   return (
     <div
       className={cn(
-        'ml-12 flex h-8 max-h-8 min-h-8 flex-row items-center justify-start gap-2 pr-2 group-data-[collapsed=true]:hidden',
+        'app-drag flex h-8 max-h-8 min-h-8 flex-row items-center justify-start gap-2 pr-2 group-data-[collapsed=true]:hidden',
+        platform === 'darwin' && !isFullScreen ? 'ml-12' : 'ml-0',
       )}
     >
       <WorkspaceInfoBadge isCollapsed={isCollapsed} />
-      <div className="glass-body ml-1 @[350px]:inline-flex hidden shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
+      <div className="app-no-drag glass-body ml-1 @[350px]:inline-flex hidden shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
         Alpha
       </div>
       <div className="flex-1 group-data-[collapsed=true]:hidden" />
@@ -85,7 +88,11 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
               <TooltipTrigger
                 render={
                   <MenuTrigger>
-                    <Button variant="ghost" size="icon-sm" className="shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="app-no-drag shrink-0"
+                    >
                       <IconHistoryFill18 className="size-4 text-foreground" />
                     </Button>
                   </MenuTrigger>

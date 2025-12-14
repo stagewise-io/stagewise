@@ -214,6 +214,8 @@ export type AppState = {
     verbose: boolean; // Whether the app is running in verbose mode.
     version: string; // The version of the app.
     startedInPath: string; // Working directory in which the app was started.
+    platform: 'darwin' | 'linux' | 'win32'; // The platform on which the app is running.
+    isFullScreen: boolean; // Whether the app window is in fullscreen mode.
   };
   // The global configuration of the CLI.
   globalConfig: GlobalConfig;
@@ -455,6 +457,8 @@ export const defaultState: KartonContract['state'] = {
     verbose: false,
     version: 'UNKNOWN',
     startedInPath: '',
+    platform: 'darwin',
+    isFullScreen: false,
   },
   globalConfig: {
     telemetryLevel: 'full',

@@ -21,6 +21,8 @@ export function TabsContainer({
 }) {
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const platform = useKartonState((s) => s.appInfo.platform);
+  const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { canScrollLeft, canScrollRight } =
     useIsContainerScrollable(scrollContainerRef);
@@ -50,7 +52,9 @@ export function TabsContainer({
     <div
       className={cn(
         'flex shrink-0 flex-row items-start',
-        isSidebarCollapsed ? 'pl-18' : '',
+        isSidebarCollapsed && platform === 'darwin' && !isFullScreen
+          ? 'pl-18'
+          : '',
       )}
     >
       {isSidebarCollapsed && (
@@ -98,7 +102,10 @@ export function TabsContainer({
         <Button
           variant="ghost"
           size="xs"
-          className="mr-0.75 h-7.25 shrink-0 self-start rounded-[8.5px] text-zinc-200 hover:bg-zinc-50/70! hover:text-muted-foreground"
+          className={cn(
+            'h-7.25 shrink-0 self-start rounded-[8.5px] text-zinc-200 hover:bg-zinc-50/70! hover:text-muted-foreground',
+            platform !== 'darwin' ? 'mr-16' : 'mr-0.75',
+          )}
           onClick={onCleanAllTabs}
         >
           <span className="mr-1 text-xs">⌘ ↑ W</span>

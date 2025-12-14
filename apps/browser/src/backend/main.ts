@@ -217,6 +217,7 @@ export async function main({
       getEnvMode() === 'dev' ? 'development' : 'production';
     draft.appInfo.verbose = verbose ?? false;
     draft.appInfo.startedInPath = process.cwd();
+    draft.appInfo.platform = process.platform as 'darwin' | 'linux' | 'win32';
   });
 
   logger.debug('[Main] App info set into karton service');

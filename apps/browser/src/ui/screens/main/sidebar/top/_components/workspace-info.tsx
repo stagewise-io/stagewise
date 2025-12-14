@@ -9,6 +9,7 @@ import {
 } from '@stagewise/stage-ui/components/menu';
 
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
+import { cn } from '@/utils';
 import {
   Popover,
   PopoverTrigger,
@@ -30,6 +31,8 @@ import {
 
 export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
   const workspace = useKartonState((s) => s.workspace);
+  const platform = useKartonState((s) => s.appInfo.platform);
+  const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
 
   const workspaceDir = useMemo(() => {
     return workspace
@@ -75,7 +78,12 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
       <Button
         variant="ghost"
         size="sm"
-        className="ml-4 text-foreground text-sm"
+        className={cn(
+          'text-foreground text-sm',
+          !isCollapsed && platform === 'darwin' && !isFullScreen
+            ? 'ml-4'
+            : 'ml-0',
+        )}
         onClick={selectAndOpenWorkspace}
       >
         {status === 'loading' ? (
@@ -96,7 +104,12 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
           <Button
             variant="ghost"
             size="sm"
-            className="ml-4 truncate text-foreground text-sm"
+            className={cn(
+              'truncate text-foreground text-sm',
+              !isCollapsed && platform === 'darwin' && !isFullScreen
+                ? 'ml-4'
+                : 'ml-0',
+            )}
           >
             {status === 'loading' ? (
               <Loader2Icon className="size-4 shrink-0 animate-spin" />
@@ -167,7 +180,11 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
     <Popover>
       <PopoverTrigger>
         <Button
-          className="ml-4"
+          className={cn(
+            !isCollapsed && platform === 'darwin' && !isFullScreen
+              ? 'ml-4'
+              : 'ml-0',
+          )}
           size={isCollapsed ? 'icon-md' : 'md'}
           variant="ghost"
         >

@@ -136,10 +136,16 @@ export class WindowLayoutService {
     this.baseWindow.on('unmaximize', () => this.scheduleWindowStateSave());
     this.baseWindow.on('enter-full-screen', () => {
       this.scheduleWindowStateSave();
+      this.uiKarton.setState((draft) => {
+        draft.appInfo.isFullScreen = true;
+      });
     });
-    this.baseWindow.on('leave-full-screen', () =>
-      this.scheduleWindowStateSave(),
-    );
+    this.baseWindow.on('leave-full-screen', () => {
+      this.scheduleWindowStateSave();
+      this.uiKarton.setState((draft) => {
+        draft.appInfo.isFullScreen = false;
+      });
+    });
     this.baseWindow.on('close', () => {
       this.saveWindowState();
     });
@@ -163,6 +169,7 @@ export class WindowLayoutService {
         hoveredElement: null,
         viewportSize: null,
       };
+      draft.appInfo.isFullScreen = this.baseWindow.isFullScreen();
     });
 
     // Initialize ChatStateController
