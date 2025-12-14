@@ -137,6 +137,7 @@ export function MainSection({
           urlInputRef.current?.focus();
           urlInputRef.current?.select();
         }}
+        onCleanAllTabs={handleCleanAllTabs}
       />
       <div className="flex h-full w-full flex-col">
         <TabsContainer

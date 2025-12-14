@@ -7,9 +7,11 @@ import { useTabUIState } from '@/hooks/use-tab-ui-state';
 export function CoreHotkeyBindings({
   onCreateTab,
   onFocusUrlBar,
+  onCleanAllTabs,
 }: {
   onCreateTab: () => void;
   onFocusUrlBar: () => void;
+  onCleanAllTabs: () => void;
 }) {
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const tabs = useKartonState((s) => s.browser.tabs);
@@ -61,6 +63,11 @@ export function CoreHotkeyBindings({
     closeTab(activeTabId);
     removeTabUiState(activeTabId);
   }, HotkeyActions.CTRL_W);
+
+  // Close all tabs except active
+  useHotKeyListener(() => {
+    onCleanAllTabs();
+  }, HotkeyActions.CTRL_SHIFT_W);
 
   // Switch to next tab
   const handleNextTab = useCallback(async () => {

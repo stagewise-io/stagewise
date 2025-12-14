@@ -1,18 +1,12 @@
 import { Button } from '@stagewise/stage-ui/components/button';
 import { cn } from '@/utils';
 import { IconPlus } from 'nucleo-micro-bold';
-import { IconCommand } from 'nucleo-micro-bold';
 import { useIsContainerScrollable } from '@/hooks/use-is-container-scrollable';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Tab } from './tab';
 import { AgentPreviewBadge } from './agent-preview-badge';
 import { useKartonState } from '@/hooks/use-karton';
 import { IconBrush2Fill18 } from 'nucleo-ui-fill-18';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@stagewise/stage-ui/components/tooltip';
 
 export function TabsContainer({
   openSidebarChatPanel,
@@ -91,32 +85,25 @@ export function TabsContainer({
       <Button
         variant="ghost"
         size="xs"
-        className="-ml-1.25 h-7.25 shrink-0 self-start rounded-[8.5px] rounded-bl-md hover:bg-zinc-50/70!"
+        className="-ml-1.25 h-7.25 shrink-0 self-start rounded-[8.5px] rounded-bl-md text-zinc-200 hover:bg-zinc-50/70! hover:text-muted-foreground"
         onClick={onAddTab}
       >
         <IconPlus className="size-3 text-muted-foreground" />
-        <div className="pointer-events-none flex flex-row items-center gap-1 opacity-40">
-          <IconCommand className="size-3 text-muted-foreground" />
-          <span className="font-mono text-muted-foreground text-xs">T</span>
+        <div className="pointer-events-none flex flex-row items-center gap-1">
+          <span className="ml-1 text-xs">⌘ T</span>
         </div>
       </Button>
       <div className="app-drag h-full min-w-16! grow" />
       {Object.values(tabs).length > 1 && (
-        <Tooltip>
-          <TooltipTrigger>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="mt-0.75 mr-0.75 shrink-0 self-start rounded-[8.5px] hover:bg-zinc-50/70!"
-              onClick={onCleanAllTabs}
-            >
-              <IconBrush2Fill18 className="size-3.5 text-muted-foreground" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <span>Close all other tabs</span>
-          </TooltipContent>
-        </Tooltip>
+        <Button
+          variant="ghost"
+          size="xs"
+          className="mr-0.75 h-7.25 shrink-0 self-start rounded-[8.5px] text-zinc-200 hover:bg-zinc-50/70! hover:text-muted-foreground"
+          onClick={onCleanAllTabs}
+        >
+          <span className="mr-1 text-xs">⌘ ↑ W</span>
+          <IconBrush2Fill18 className="size-3.5 text-muted-foreground" />
+        </Button>
       )}
     </div>
   );
