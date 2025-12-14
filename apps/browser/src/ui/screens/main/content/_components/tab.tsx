@@ -3,7 +3,7 @@ import type { TabState } from '@shared/karton-contracts/ui';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 
-import { WithTabTooltipPreview } from './with-tab-tooltip-preview';
+import { WithTabPreviewCard } from './with-tab-preview-card';
 import { TabFavicon } from './tab-favicon';
 import { IconVolumeUpFill18, IconVolumeXmarkFill18 } from 'nucleo-ui-fill-18';
 import { IconXmark } from 'nucleo-micro-bold';
@@ -72,7 +72,7 @@ export function Tab({
   }, [dimensions, borderRadius, activateBottomLeftCornerRadius, isActive]);
 
   return (
-    <WithTabTooltipPreview tabState={tabState}>
+    <WithTabPreviewCard tabState={tabState} activeTabId={activeTabId}>
       <div
         data-state={isActive ? 'active' : 'inactive'}
         className={cn(
@@ -124,7 +124,7 @@ export function Tab({
         {/* Shared tab content */}
         <TabContent isActive={isActive} tabState={tabState} />
       </div>
-    </WithTabTooltipPreview>
+    </WithTabPreviewCard>
   );
 }
 
@@ -166,7 +166,7 @@ function TabContent({
       >
         <TabFavicon tabState={tabState} />
       </div>
-      <span className="mt-px @[55px]:block hidden flex-1 truncate text-foreground text-xs">
+      <span className="mt-px @[55px]:block hidden flex-1 truncate font-medium text-foreground text-xs">
         {tabState.title}
       </span>
       {(tabState.isPlayingAudio || tabState.isMuted) && (

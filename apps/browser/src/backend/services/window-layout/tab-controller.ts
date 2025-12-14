@@ -36,6 +36,7 @@ export interface TabState {
     canGoForward: boolean;
   };
   devToolsOpen: boolean;
+  screenshot: string | null; // Data URL of the tab screenshot
 }
 
 export interface TabControllerEventMap {
@@ -91,6 +92,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private viewportTrackingInterval: NodeJS.Timeout | null = null;
   private readonly VIEWPORT_TRACKING_INTERVAL_MS = 1000; // Reduced from 200ms to 1s
   private isContextSelectionActive = false;
+
+  // Screenshot tracking
+  private screenshotInterval: NodeJS.Timeout | null = null;
+  private readonly SCREENSHOT_INTERVAL_MS = 15000; // 15 seconds
 
   // DevTools debugger tracking
   private devToolsDebugger: Electron.Debugger | null = null;
@@ -221,10 +226,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       },
       devToolsOpen: false,
       faviconUrls: [],
+      screenshot: null,
     };
 
     this.setupEventListeners();
     this.startViewportTracking();
+    this.startScreenshotTracking();
 
     if (initialUrl) {
       this.loadURL(initialUrl);
@@ -480,6 +487,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   public destroy() {
     this.stopViewportTracking();
+    this.stopScreenshotTracking();
     this.detachDevToolsDebugger();
 
     // Close karton server and transport
@@ -573,6 +581,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       });
       // Update audio state when page finishes loading
       this.updateAudioState();
+      // Capture screenshot when page finishes loading
+      this.captureScreenshot().catch((err) => {
+        this.logger.debug(
+          `[TabController] Failed to capture screenshot on page load: ${err}`,
+        );
+      });
     });
 
     wc.on('did-fail-load', (_event, errorCode, errorDescription) => {
@@ -676,6 +690,61 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     if (this.viewportTrackingInterval) {
       clearInterval(this.viewportTrackingInterval);
       this.viewportTrackingInterval = null;
+    }
+  }
+
+  private startScreenshotTracking() {
+    if (this.screenshotInterval) {
+      return;
+    }
+
+    // Capture screenshot every 15 seconds
+    this.screenshotInterval = setInterval(() => {
+      this.captureScreenshot().catch((err) => {
+        this.logger.debug(
+          `[TabController] Failed to capture screenshot: ${err}`,
+        );
+      });
+    }, this.SCREENSHOT_INTERVAL_MS);
+
+    // Initial capture
+    this.captureScreenshot().catch((err) => {
+      this.logger.debug(
+        `[TabController] Failed to capture initial screenshot: ${err}`,
+      );
+    });
+  }
+
+  private stopScreenshotTracking() {
+    if (this.screenshotInterval) {
+      clearInterval(this.screenshotInterval);
+      this.screenshotInterval = null;
+    }
+  }
+
+  private async captureScreenshot(): Promise<void> {
+    const wc = this.webContentsView.webContents;
+
+    // Don't capture if webContents is destroyed, loading, or showing an error
+    if (
+      wc.isDestroyed() ||
+      wc.isLoading() ||
+      this.currentState.error !== null ||
+      this.currentState.url === 'ui-main'
+    ) {
+      return;
+    }
+
+    try {
+      // Capture the page as a NativeImage
+      const image = await wc.capturePage();
+      // Convert to data URL (PNG format)
+      const dataUrl = image.toDataURL();
+      // Update state with screenshot
+      this.updateState({ screenshot: dataUrl });
+    } catch (err) {
+      // Log error but don't throw - screenshot capture failures shouldn't break the tab
+      this.logger.debug(`[TabController] Error capturing screenshot: ${err}`);
     }
   }
 

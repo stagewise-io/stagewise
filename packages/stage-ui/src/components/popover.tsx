@@ -4,21 +4,6 @@ import { Button } from './button';
 import { XIcon } from 'lucide-react';
 import type { ComponentProps, ReactElement } from 'react';
 
-<PopoverBase.Root>
-  <PopoverBase.Trigger />
-  <PopoverBase.Portal>
-    <PopoverBase.Backdrop />
-    <PopoverBase.Positioner>
-      <PopoverBase.Popup>
-        <PopoverBase.Arrow />
-        <PopoverBase.Title />
-        <PopoverBase.Description />
-        <PopoverBase.Close />
-      </PopoverBase.Popup>
-    </PopoverBase.Positioner>
-  </PopoverBase.Portal>
-</PopoverBase.Root>;
-
 export const Popover = PopoverBase.Root;
 
 export type PopoverTriggerProps = Omit<

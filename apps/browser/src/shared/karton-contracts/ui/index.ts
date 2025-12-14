@@ -133,6 +133,7 @@ export type TabState = {
     canGoForward: boolean;
   };
   devToolsOpen: boolean;
+  screenshot: string | null; // Data URL of the tab screenshot
 };
 
 export type HistoryEntry = {
