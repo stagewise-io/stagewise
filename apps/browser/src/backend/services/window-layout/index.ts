@@ -40,6 +40,11 @@ export class WindowLayoutService {
     y?: number;
   } | null = null;
 
+  private initialWindowState: {
+    isMaximized: boolean;
+    isFullScreen: boolean;
+  } = { isMaximized: false, isFullScreen: false };
+
   private kartonConnectListener:
     | ((event: Electron.IpcMainEvent, connectionId: string) => void)
     | null = null;
@@ -89,6 +94,7 @@ export class WindowLayoutService {
       y: this.lastNonMaximizedBounds.y,
       title: 'stagewise',
       titleBarStyle: 'hiddenInset',
+      show: false, // Don't show until UI is ready to prevent visual glitches
       // fullscreenable: false,
       ...(process.platform !== 'darwin'
         ? {
@@ -109,13 +115,11 @@ export class WindowLayoutService {
     });
     this.baseWindow.setWindowButtonVisibility(true);
 
-    if (savedState?.isMaximized) {
-      this.baseWindow.maximize();
-    }
-
-    if (savedState?.isFullScreen) {
-      this.baseWindow.setFullScreen(true);
-    }
+    // Store initial state to apply after window is shown
+    this.initialWindowState = {
+      isMaximized: savedState?.isMaximized ?? false,
+      isFullScreen: savedState?.isFullScreen ?? false,
+    };
 
     this.baseWindow.contentView.addChildView(this.uiController.getView());
 
@@ -170,7 +174,7 @@ export class WindowLayoutService {
         viewportSize: null,
         isSearchBarActive: false,
       };
-      draft.appInfo.isFullScreen = this.baseWindow.isFullScreen();
+      draft.appInfo.isFullScreen = this.baseWindow?.isFullScreen() ?? false;
     });
 
     // Initialize ChatStateController
@@ -282,6 +286,7 @@ export class WindowLayoutService {
   private setupUIControllerListeners() {
     if (!this.uiController) return;
 
+    this.uiController.on('uiReady', this.handleUIReady);
     this.uiController.on('createTab', this.handleCreateTab);
     this.uiController.on('closeTab', this.handleCloseTab);
     this.uiController.on('switchTab', this.handleSwitchTab);
@@ -491,6 +496,32 @@ export class WindowLayoutService {
       draft.browser.activeTabId = tabId;
       draft.browser.viewportSize = null;
     });
+  };
+
+  private handleUIReady = async () => {
+    this.logger.debug('[WindowLayoutService] UI is ready, showing window');
+
+    // Force a bounds update to ensure any tabs waiting for bounds get shown
+    // This handles the race condition where tabs are created before UI is ready
+    if (this.currentWebContentBounds && this.activeTab) {
+      this.activeTab.setVisible(true);
+      this.activeTab.setBounds(this.currentWebContentBounds);
+    }
+
+    // Now that everything is ready, show the window
+    if (this.baseWindow && !this.baseWindow.isDestroyed()) {
+      this.baseWindow.show();
+
+      // Apply initial window state after showing
+      if (this.initialWindowState.isMaximized) {
+        this.baseWindow.maximize();
+      }
+      if (this.initialWindowState.isFullScreen) {
+        this.baseWindow.setFullScreen(true);
+      }
+
+      this.logger.debug('[WindowLayoutService] Window shown');
+    }
   };
 
   private handleLayoutUpdate = async (

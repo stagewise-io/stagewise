@@ -12,6 +12,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 export interface UIControllerEventMap {
+  uiReady: [];
   createTab: [url?: string];
   closeTab: [tabId: string];
   switchTab: [tabId: string];
@@ -111,6 +112,18 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     if (process.env.NODE_ENV === 'development') {
       this.view.webContents.openDevTools();
     }
+
+    // Listen for the UI finishing load to ensure proper rendering
+    this.view.webContents.once('did-finish-load', () => {
+      this.logger.debug(
+        '[UIController] UI finished loading, invalidating view',
+      );
+      // Force a repaint after UI loads to prevent invisible UI bug
+      const bounds = this.view.getBounds();
+      this.view.setBounds({ ...bounds });
+      // Emit event so WindowLayoutService can trigger initial layout check
+      this.emit('uiReady');
+    });
 
     this.loadApp();
     this.registerKartonProcedures();

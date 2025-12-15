@@ -75,33 +75,41 @@ export const WebContentsBoundsSyncer = () => {
       }
     } else {
       const rect = container.getBoundingClientRect();
-      const newBounds = {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-      };
 
-      // Deep compare bounds
-      const lastBounds = lastBoundsRef.current;
-      const boundsChanged =
-        !lastBounds ||
-        lastBounds.x !== newBounds.x ||
-        lastBounds.y !== newBounds.y ||
-        lastBounds.width !== newBounds.width ||
-        lastBounds.height !== newBounds.height;
+      // Only process bounds if container has valid dimensions (properly laid out)
+      // This prevents sending zero-size bounds before layout completes
+      if (rect.width > 0 && rect.height > 0) {
+        const newBounds = {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+        };
 
-      if (boundsChanged) {
-        void updateBounds(newBounds);
-        lastBoundsRef.current = newBounds;
+        // Deep compare bounds
+        const lastBounds = lastBoundsRef.current;
+        const boundsChanged =
+          !lastBounds ||
+          lastBounds.x !== newBounds.x ||
+          lastBounds.y !== newBounds.y ||
+          lastBounds.width !== newBounds.width ||
+          lastBounds.height !== newBounds.height;
+
+        if (boundsChanged) {
+          void updateBounds(newBounds);
+          lastBoundsRef.current = newBounds;
+        }
+
+        // Check interactivity
+        const isHovering = isHoveringRef.current;
+        if (lastInteractiveRef.current !== isHovering) {
+          void movePanelToForeground(
+            isHovering ? 'tab-content' : 'stagewise-ui',
+          );
+          lastInteractiveRef.current = isHovering;
+        }
       }
-
-      // Check interactivity
-      const isHovering = isHoveringRef.current;
-      if (lastInteractiveRef.current !== isHovering) {
-        void movePanelToForeground(isHovering ? 'tab-content' : 'stagewise-ui');
-        lastInteractiveRef.current = isHovering;
-      }
+      // If dimensions are 0, we wait for the next frame check when layout is complete
     }
 
     requestRef.current = requestAnimationFrame(check);
