@@ -101,6 +101,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   // Screenshot tracking
   private screenshotInterval: NodeJS.Timeout | null = null;
   private readonly SCREENSHOT_INTERVAL_MS = 15000; // 15 seconds
+  private screenshotOnResizeTimeout: NodeJS.Timeout | null = null;
+  private readonly SCREENSHOT_RESIZE_DEBOUNCE_MS = 200; // 200ms debounce
 
   // DevTools debugger tracking
   private devToolsDebugger: Electron.Debugger | null = null;
@@ -242,6 +244,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.setupEventListeners();
     this.startViewportTracking();
     this.startScreenshotTracking();
+    this.setupScreenshotOnResize();
 
     if (initialUrl) {
       this.loadURL(initialUrl);
@@ -261,6 +264,9 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       width: bounds.width,
       height: bounds.height,
     });
+
+    // Trigger debounced screenshot capture on bounds change
+    this.debouncedScreenshotCapture();
   }
 
   public setVisible(visible: boolean) {
@@ -498,6 +504,13 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   public destroy() {
     this.stopViewportTracking();
     this.stopScreenshotTracking();
+
+    // Clear any pending screenshot on resize
+    if (this.screenshotOnResizeTimeout) {
+      clearTimeout(this.screenshotOnResizeTimeout);
+      this.screenshotOnResizeTimeout = null;
+    }
+
     this.detachDevToolsDebugger();
 
     // Close karton server and transport
@@ -736,6 +749,30 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       clearInterval(this.screenshotInterval);
       this.screenshotInterval = null;
     }
+  }
+
+  private setupScreenshotOnResize() {
+    // Listen to viewport size changes and capture screenshot with debounce
+    this.on('viewportSizeChanged', () => {
+      this.debouncedScreenshotCapture();
+    });
+  }
+
+  private debouncedScreenshotCapture() {
+    // Clear any pending screenshot capture
+    if (this.screenshotOnResizeTimeout) {
+      clearTimeout(this.screenshotOnResizeTimeout);
+    }
+
+    // Schedule screenshot capture after debounce period
+    this.screenshotOnResizeTimeout = setTimeout(() => {
+      this.screenshotOnResizeTimeout = null;
+      this.captureScreenshot().catch((err) => {
+        this.logger.debug(
+          `[TabController] Failed to capture screenshot on resize: ${err}`,
+        );
+      });
+    }, this.SCREENSHOT_RESIZE_DEBOUNCE_MS);
   }
 
   private async captureScreenshot(): Promise<void> {
