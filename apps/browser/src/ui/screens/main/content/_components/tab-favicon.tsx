@@ -32,7 +32,7 @@ export function TabFavicon({ tabState }: { tabState: TabState }) {
   return (
     <>
       {isStartPage ? (
-        <div className="flex size-4 items-center justify-center rounded-full bg-gradient-to-br from-blue-700 to-violet-700">
+        <div className="flex size-4 items-center justify-center rounded-full bg-linear-to-br from-blue-700 to-violet-700">
           <Logo color="current" className="size-1/2 text-background" />
         </div>
       ) : tabState?.isLoading ? (
