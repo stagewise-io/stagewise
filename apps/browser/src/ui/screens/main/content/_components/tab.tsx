@@ -166,7 +166,7 @@ function TabContent({
       >
         <TabFavicon tabState={tabState} />
       </div>
-      <span className="mt-px @[55px]:block hidden flex-1 truncate font-medium text-foreground text-xs">
+      <span className="mt-px @[55px]:block hidden flex-1 truncate font-regular text-foreground text-xs">
         {tabState.title}
       </span>
       {(tabState.isPlayingAudio || tabState.isMuted) && (
