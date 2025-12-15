@@ -7,6 +7,11 @@ import { Tab } from './tab';
 import { AgentPreviewBadge } from './agent-preview-badge';
 import { useKartonState } from '@/hooks/use-karton';
 import { IconBrush2Fill18 } from 'nucleo-ui-fill-18';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 
 export function TabsContainer({
   openSidebarChatPanel,
@@ -99,18 +104,25 @@ export function TabsContainer({
       </Button>
       <div className="app-drag h-full min-w-2! grow" />
       {Object.values(tabs).length > 1 && (
-        <Button
-          variant="ghost"
-          size="xs"
-          className={cn(
-            'h-7.25 shrink-0 self-start rounded-[8.5px] text-zinc-200 opacity-80 transition-all duration-150 ease-out hover:bg-zinc-50/70! hover:text-muted-foreground hover:opacity-100',
-            platform !== 'darwin' ? 'mr-16' : 'mr-0',
-          )}
-          onClick={onCleanAllTabs}
-        >
-          <span className="mr-1 text-xs">⌘ ↑ W</span>
-          <IconBrush2Fill18 className="size-3.5 text-muted-foreground" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              variant="ghost"
+              size="xs"
+              className={cn(
+                'h-7.25 shrink-0 self-start rounded-[8.5px] text-zinc-200 opacity-80 transition-all duration-150 ease-out hover:bg-zinc-50/70! hover:text-muted-foreground hover:opacity-100',
+                platform !== 'darwin' ? 'mr-16' : 'mr-0',
+              )}
+              onClick={onCleanAllTabs}
+            >
+              <span className="mr-1 text-xs">⌘ ↑ W</span>
+              <IconBrush2Fill18 className="size-3.5 text-muted-foreground" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <span>Close all other tabs</span>
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );
