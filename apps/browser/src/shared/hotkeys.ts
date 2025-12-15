@@ -431,7 +431,7 @@ export const hotkeyActionDefinitions: Record<
       (ev.ctrlKey || ev.metaKey) &&
       !ev.shiftKey &&
       !ev.altKey,
-    captureDominantly: false,
+    captureDominantly: true,
   },
   [HotkeyActions.F3]: {
     keyComboDefault: 'F3',

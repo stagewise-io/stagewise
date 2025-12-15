@@ -134,6 +134,11 @@ export type TabState = {
   };
   devToolsOpen: boolean;
   screenshot: string | null; // Data URL of the tab screenshot
+  search: {
+    text: string;
+    resultsCount: number;
+    activeMatchIndex: number; // 1-indexed position of current match
+  } | null;
 };
 
 export type HistoryEntry = {
@@ -266,6 +271,7 @@ export type AppState = {
       height: number;
       scale: number;
     } | null;
+    isSearchBarActive: boolean;
   };
 };
 
@@ -435,6 +441,17 @@ export type KartonContract = {
         backendNodeId: number,
         frameId: string,
       ) => Promise<boolean>; // Checks if an element exists in the DOM
+      searchInPage: {
+        start: (searchText: string, tabId?: string) => Promise<void>;
+        updateText: (searchText: string, tabId?: string) => Promise<void>;
+        next: (tabId?: string) => Promise<void>;
+        previous: (tabId?: string) => Promise<void>;
+        stop: (tabId?: string) => Promise<void>;
+      };
+      searchBar: {
+        activate: () => Promise<void>;
+        deactivate: () => Promise<void>;
+      };
     };
   };
 };
@@ -478,5 +495,6 @@ export const defaultState: KartonContract['state'] = {
     hoveredElement: null,
     viewportSize: null,
     viewportLayout: null,
+    isSearchBarActive: false,
   },
 };

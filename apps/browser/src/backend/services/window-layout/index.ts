@@ -168,6 +168,7 @@ export class WindowLayoutService {
         selectedElements: [],
         hoveredElement: null,
         viewportSize: null,
+        isSearchBarActive: false,
       };
       draft.appInfo.isFullScreen = this.baseWindow.isFullScreen();
     });
@@ -326,6 +327,19 @@ export class WindowLayoutService {
       this.handlePassthroughWheelEvent,
     );
     this.uiController.on('scrollToElement', this.handleScrollToElement);
+    this.uiController.on('startSearchInPage', this.handleStartSearchInPage);
+    this.uiController.on(
+      'updateSearchInPageText',
+      this.handleUpdateSearchInPageText,
+    );
+    this.uiController.on('nextSearchResult', this.handleNextSearchResult);
+    this.uiController.on(
+      'previousSearchResult',
+      this.handlePreviousSearchResult,
+    );
+    this.uiController.on('stopSearchInPage', this.handleStopSearchInPage);
+    this.uiController.on('activateSearchBar', this.handleActivateSearchBar);
+    this.uiController.on('deactivateSearchBar', this.handleDeactivateSearchBar);
   }
 
   private get activeTab(): TabController | undefined {
@@ -667,6 +681,48 @@ export class WindowLayoutService {
 
   private handleClearElements = () => {
     this.chatStateController?.clearElements();
+  };
+
+  private handleStartSearchInPage = (searchText: string, tabId?: string) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    tab?.startSearch(searchText);
+  };
+
+  private handleUpdateSearchInPageText = (
+    searchText: string,
+    tabId?: string,
+  ) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    tab?.updateSearchText(searchText);
+  };
+
+  private handleNextSearchResult = (tabId?: string) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    tab?.nextResult();
+  };
+
+  private handlePreviousSearchResult = (tabId?: string) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    tab?.previousResult();
+  };
+
+  private handleStopSearchInPage = (tabId?: string) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    tab?.stopSearch();
+  };
+
+  private handleActivateSearchBar = () => {
+    this.uiKarton.setState((draft) => {
+      draft.browser.isSearchBarActive = true;
+    });
+  };
+
+  private handleDeactivateSearchBar = () => {
+    this.uiKarton.setState((draft) => {
+      draft.browser.isSearchBarActive = false;
+    });
+    // Also stop any active search
+    this.activeTab?.stopSearch();
   };
 
   // Window State Management (same as before)

@@ -7,10 +7,12 @@ import { useTabUIState } from '@/hooks/use-tab-ui-state';
 export function CoreHotkeyBindings({
   onCreateTab,
   onFocusUrlBar,
+  onFocusSearchBar,
   onCleanAllTabs,
 }: {
   onCreateTab: () => void;
   onFocusUrlBar: () => void;
+  onFocusSearchBar: () => void;
   onCleanAllTabs: () => void;
 }) {
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
@@ -175,6 +177,14 @@ export function CoreHotkeyBindings({
     togglePanelKeyboardFocus('stagewise-ui');
     onFocusUrlBar();
   }, HotkeyActions.F6);
+
+  // SEARCH BAR
+
+  // Focus search bar
+  useHotKeyListener(() => {
+    togglePanelKeyboardFocus('stagewise-ui');
+    onFocusSearchBar();
+  }, HotkeyActions.CTRL_F);
 
   // DEV TOOLS
 

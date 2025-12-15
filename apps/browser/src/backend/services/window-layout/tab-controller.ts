@@ -37,6 +37,11 @@ export interface TabState {
   };
   devToolsOpen: boolean;
   screenshot: string | null; // Data URL of the tab screenshot
+  search: {
+    text: string;
+    resultsCount: number;
+    activeMatchIndex: number;
+  } | null;
 }
 
 export interface TabControllerEventMap {
@@ -104,6 +109,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   // Callback to create new tabs
   private onCreateTab?: (url: string) => void;
+
+  // Search state tracking
+  private currentSearchRequestId: number | null = null;
+  private currentSearchText: string | null = null;
 
   constructor(
     id: string,
@@ -227,6 +236,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       devToolsOpen: false,
       faviconUrls: [],
       screenshot: null,
+      search: null,
     };
 
     this.setupEventListeners();
@@ -498,7 +508,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     // Explicitly destroy the webContents to stop all processes
     // In Electron, WebContents must be explicitly destroyed
     if (!this.webContentsView.webContents.isDestroyed()) {
-      this.webContentsView.webContents.destroy();
+      this.webContentsView.webContents.close({ waitForBeforeUnload: false });
     }
 
     this.removeAllListeners();
@@ -548,6 +558,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     const wc = this.webContentsView.webContents;
 
     wc.on('did-navigate', (_event, url) => {
+      this.stopSearch(); // Clear search on navigation
       this.updateState({
         url,
         navigationHistory: {
@@ -558,6 +569,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     });
 
     wc.on('did-navigate-in-page', (_event, url) => {
+      this.stopSearch(); // Clear search on in-page navigation
       this.updateState({
         url,
         navigationHistory: {
@@ -648,6 +660,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     wc.on('audio-state-changed', () => {
       // Use isCurrentlyAudible() for reliable state checking
       this.updateAudioState();
+    });
+
+    wc.on('found-in-page', (_event, result) => {
+      this.handleFoundInPage(result);
     });
 
     wc.setWindowOpenHandler((details) => {
@@ -1149,5 +1165,111 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         `[TabController] Failed to get DevTools placeholder element: ${err}`,
       );
     }
+  }
+
+  // Search in page methods
+  public startSearch(searchText: string) {
+    const wc = this.webContentsView.webContents;
+    if (wc.isDestroyed()) return;
+
+    // Stop any existing search first
+    if (this.currentSearchText !== null) {
+      this.stopSearch();
+    }
+
+    // Start new search and immediately navigate to first result
+    // We use findNext: true with forward: true to both start the search AND highlight the first match
+    const requestId = wc.findInPage(searchText, {
+      findNext: true,
+      forward: true,
+    });
+    this.currentSearchRequestId = requestId;
+    this.currentSearchText = searchText;
+
+    // Update state immediately to show search is active
+    this.updateState({
+      search: {
+        text: searchText,
+        resultsCount: 0,
+        activeMatchIndex: 0,
+      },
+    });
+  }
+
+  public updateSearchText(searchText: string) {
+    const wc = this.webContentsView.webContents;
+    if (wc.isDestroyed()) return;
+
+    // Stop current search
+    if (this.currentSearchText !== null) {
+      wc.stopFindInPage('clearSelection');
+    }
+
+    // Start search with new text and navigate to first match
+    const requestId = wc.findInPage(searchText, {
+      findNext: true,
+      forward: true,
+    });
+    this.currentSearchRequestId = requestId;
+    this.currentSearchText = searchText;
+
+    this.updateState({
+      search: {
+        text: searchText,
+        resultsCount: 0,
+        activeMatchIndex: 0,
+      },
+    });
+  }
+
+  public nextResult() {
+    const wc = this.webContentsView.webContents;
+    if (wc.isDestroyed() || this.currentSearchText === null) return;
+
+    // Navigate to next match
+    const requestId = wc.findInPage(this.currentSearchText, {
+      findNext: true,
+      forward: true,
+    });
+    this.currentSearchRequestId = requestId;
+  }
+
+  public previousResult() {
+    const wc = this.webContentsView.webContents;
+    if (wc.isDestroyed() || this.currentSearchText === null) return;
+
+    // Navigate to previous match
+    const requestId = wc.findInPage(this.currentSearchText, {
+      findNext: true,
+      forward: false,
+    });
+    this.currentSearchRequestId = requestId;
+  }
+
+  public stopSearch() {
+    const wc = this.webContentsView.webContents;
+    if (wc.isDestroyed()) return;
+
+    wc.stopFindInPage('clearSelection');
+    this.currentSearchRequestId = null;
+    this.currentSearchText = null;
+
+    this.updateState({ search: null });
+  }
+
+  private handleFoundInPage(result: Electron.Result) {
+    // Ignore stale results from previous searches
+    if (result.requestId !== this.currentSearchRequestId) {
+      return;
+    }
+
+    // Update state with new results
+    this.updateState({
+      search: {
+        text: this.currentSearchText!,
+        resultsCount: result.matches,
+        activeMatchIndex: result.activeMatchOrdinal,
+      },
+    });
   }
 }

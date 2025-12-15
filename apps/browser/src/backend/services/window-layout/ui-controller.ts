@@ -51,6 +51,13 @@ export interface UIControllerEventMap {
     frameId: string,
     expectedFrameLocation: string,
   ];
+  startSearchInPage: [searchText: string, tabId?: string];
+  updateSearchInPageText: [searchText: string, tabId?: string];
+  nextSearchResult: [tabId?: string];
+  previousSearchResult: [tabId?: string];
+  stopSearchInPage: [tabId?: string];
+  activateSearchBar: [];
+  deactivateSearchBar: [];
 }
 
 export class UIController extends EventEmitter<UIControllerEventMap> {
@@ -296,6 +303,48 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
           );
         }
         return false;
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.searchInPage.start',
+      async (searchText: string, tabId?: string) => {
+        this.emit('startSearchInPage', searchText, tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.searchInPage.updateText',
+      async (searchText: string, tabId?: string) => {
+        this.emit('updateSearchInPageText', searchText, tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.searchInPage.next',
+      async (tabId?: string) => {
+        this.emit('nextSearchResult', tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.searchInPage.previous',
+      async (tabId?: string) => {
+        this.emit('previousSearchResult', tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.searchInPage.stop',
+      async (tabId?: string) => {
+        this.emit('stopSearchInPage', tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.searchBar.activate',
+      async () => {
+        this.emit('activateSearchBar');
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.searchBar.deactivate',
+      async () => {
+        this.emit('deactivateSearchBar');
       },
     );
   }

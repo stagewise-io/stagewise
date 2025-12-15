@@ -23,6 +23,7 @@ import { StartPage } from './_components/start-page';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
 import { CoreHotkeyBindings } from './_components/core-hotkey-bindings';
 import { IconSquareCodeFillDuo18 } from 'nucleo-ui-fill-duo-18';
+import { SearchBar } from './_components/search-bar';
 
 export function MainSection({
   isSidebarCollapsed,
@@ -45,6 +46,10 @@ export function MainSection({
     tabs[activeTabId]?.url ?? '',
   );
   const urlInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const activateSearchBar = useKartonProcedure(
+    (p) => p.browser.searchBar.activate,
+  );
 
   const { setTabUiState } = useTabUIState();
 
@@ -62,6 +67,15 @@ export function MainSection({
       }
     });
   }, [tabs, activeTabId]);
+
+  const handleFocusSearchBar = useCallback(() => {
+    activateSearchBar();
+    // Use setTimeout to ensure the SearchBar has rendered before focusing
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 50);
+  }, [activateSearchBar]);
 
   const activeTab = useMemo(() => {
     return tabs[activeTabId] as TabState | undefined;
@@ -137,6 +151,7 @@ export function MainSection({
           urlInputRef.current?.focus();
           urlInputRef.current?.select();
         }}
+        onFocusSearchBar={handleFocusSearchBar}
         onCleanAllTabs={handleCleanAllTabs}
       />
       <div className="flex h-full w-full flex-col">
@@ -213,6 +228,7 @@ export function MainSection({
                 </span>
               </div>
             </div>
+            <SearchBar ref={searchInputRef} />
             <Tooltip>
               <TooltipTrigger>
                 <Button
