@@ -115,6 +115,8 @@ export type AgentError =
       error: { name: string; message: string };
     };
 
+export type ColorScheme = 'system' | 'light' | 'dark';
+
 export type TabState = {
   id: string;
   title: string;
@@ -124,6 +126,7 @@ export type TabState = {
   isResponsive: boolean;
   isPlayingAudio: boolean;
   isMuted: boolean;
+  colorScheme: ColorScheme;
   error: {
     code: number;
     message?: string;
@@ -411,6 +414,8 @@ export type KartonContract = {
       closeDevTools: (tabId?: string) => Promise<void>;
       setAudioMuted: (muted: boolean, tabId?: string) => Promise<void>;
       toggleAudioMuted: (tabId?: string) => Promise<void>;
+      setColorScheme: (scheme: ColorScheme, tabId?: string) => Promise<void>;
+      cycleColorScheme: (tabId?: string) => Promise<void>;
       contextSelection: {
         setActive: (active: boolean) => Promise<void>;
         setMouseCoordinates: (x: number, y: number) => Promise<void>; // Used by the client to communicate where the mouse is currently located. Will be forwarded to the tab to check which element is at that point.

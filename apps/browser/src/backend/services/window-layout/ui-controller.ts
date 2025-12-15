@@ -6,6 +6,7 @@ import type { Logger } from '../logger';
 import { EventEmitter } from 'node:events';
 import { KartonService } from '../karton';
 import type { SerializableKeyboardEvent } from '@shared/karton-contracts/web-contents-preload';
+import type { ColorScheme } from '@shared/karton-contracts/ui';
 
 // These are injected by the build system
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -31,6 +32,8 @@ export interface UIControllerEventMap {
   closeDevTools: [tabId?: string];
   setAudioMuted: [muted: boolean, tabId?: string];
   toggleAudioMuted: [tabId?: string];
+  setColorScheme: [scheme: ColorScheme, tabId?: string];
+  cycleColorScheme: [tabId?: string];
   setContextSelectionMode: [active: boolean];
   setContextSelectionMouseCoordinates: [x: number, y: number];
   clearContextSelectionMouseCoordinates: [];
@@ -242,6 +245,18 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'browser.setColorScheme',
+      async (scheme: ColorScheme, tabId?: string) => {
+        this.emit('setColorScheme', scheme, tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.cycleColorScheme',
+      async (tabId?: string) => {
+        this.emit('cycleColorScheme', tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.setActive',
       async (active: boolean) => {
         this.emit('setContextSelectionMode', active);
@@ -423,6 +438,8 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.uiKarton.removeServerProcedureHandler('browser.closeDevTools');
     this.uiKarton.removeServerProcedureHandler('browser.setAudioMuted');
     this.uiKarton.removeServerProcedureHandler('browser.toggleAudioMuted');
+    this.uiKarton.removeServerProcedureHandler('browser.setColorScheme');
+    this.uiKarton.removeServerProcedureHandler('browser.cycleColorScheme');
     this.uiKarton.removeServerProcedureHandler(
       'browser.contextSelection.setActive',
     );

@@ -15,6 +15,7 @@ import {
   type TabKartonContract,
   type SerializableKeyboardEvent,
 } from '@shared/karton-contracts/web-contents-preload';
+import type { ColorScheme } from '@shared/karton-contracts/ui';
 import type { ContextElement } from '@shared/context-elements';
 import { ContextElementTracker } from './context-element-tracker';
 import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
@@ -27,6 +28,7 @@ export interface TabState {
   isResponsive: boolean;
   isPlayingAudio: boolean;
   isMuted: boolean;
+  colorScheme: ColorScheme;
   error: {
     code: number;
     message?: string;
@@ -230,6 +232,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       isResponsive: true,
       isPlayingAudio: this.webContentsView.webContents.isCurrentlyAudible(),
       isMuted: this.webContentsView.webContents.audioMuted,
+      colorScheme: 'system',
       error: null,
       navigationHistory: {
         canGoBack: false,
@@ -325,6 +328,43 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.webContentsView.webContents.setAudioMuted(!currentMuted);
     // Update state immediately to keep it in sync
     this.updateAudioState();
+  }
+
+  public async setColorScheme(scheme: ColorScheme) {
+    const wc = this.webContentsView.webContents;
+
+    // Debugger already attached by ContextElementTracker
+    if (!wc.debugger.isAttached()) {
+      this.logger.error('Debugger not attached for color scheme');
+      return;
+    }
+
+    try {
+      const features: { name: string; value: string }[] = [];
+
+      if (scheme !== 'system') {
+        features.push({
+          name: 'prefers-color-scheme',
+          value: scheme,
+        });
+      }
+
+      await wc.debugger.sendCommand('Emulation.setEmulatedMedia', {
+        media: '',
+        features: features.length > 0 ? features : undefined,
+      });
+
+      this.updateState({ colorScheme: scheme });
+    } catch (err) {
+      this.logger.error(`Failed to set color scheme: ${err}`);
+    }
+  }
+
+  public async cycleColorScheme() {
+    const schemes: ColorScheme[] = ['system', 'light', 'dark'];
+    const currentIndex = schemes.indexOf(this.currentState.colorScheme);
+    const nextScheme = schemes[(currentIndex + 1) % schemes.length];
+    await this.setColorScheme(nextScheme);
   }
 
   public focus() {

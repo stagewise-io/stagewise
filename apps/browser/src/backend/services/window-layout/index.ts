@@ -9,6 +9,7 @@ import type { GlobalDataPathService } from '../global-data-path';
 import { UIController } from './ui-controller';
 import { TabController } from './tab-controller';
 import { ChatStateController } from './chat-state-controller';
+import type { ColorScheme } from '@shared/karton-contracts/ui';
 
 interface WindowState {
   width: number;
@@ -309,6 +310,8 @@ export class WindowLayoutService {
     this.uiController.on('closeDevTools', this.handleCloseDevTools);
     this.uiController.on('setAudioMuted', this.handleSetAudioMuted);
     this.uiController.on('toggleAudioMuted', this.handleToggleAudioMuted);
+    this.uiController.on('setColorScheme', this.handleSetColorScheme);
+    this.uiController.on('cycleColorScheme', this.handleCycleColorScheme);
     this.uiController.on(
       'setContextSelectionMode',
       this.handleSetContextSelectionMode,
@@ -633,6 +636,19 @@ export class WindowLayoutService {
   private handleToggleAudioMuted = async (tabId?: string) => {
     const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.toggleAudioMuted();
+  };
+
+  private handleSetColorScheme = async (
+    scheme: ColorScheme,
+    tabId?: string,
+  ) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    await tab?.setColorScheme(scheme);
+  };
+
+  private handleCycleColorScheme = async (tabId?: string) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    await tab?.cycleColorScheme();
   };
 
   private handleSetContextSelectionMode = async (active: boolean) => {

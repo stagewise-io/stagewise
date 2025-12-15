@@ -11,7 +11,7 @@ import {
   IconCommand,
 } from 'nucleo-micro-bold';
 import { Button } from '@stagewise/stage-ui/components/button';
-import type { TabState } from '@shared/karton-contracts/ui';
+import type { ColorScheme, TabState } from '@shared/karton-contracts/ui';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { BackgroundWithCutout } from './_components/background-with-cutout';
 import {
@@ -22,8 +22,21 @@ import {
 import { StartPage } from './_components/start-page';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
 import { CoreHotkeyBindings } from './_components/core-hotkey-bindings';
-import { IconSquareCodeFillDuo18 } from 'nucleo-ui-fill-duo-18';
+import {
+  IconNightShiftFillDuo18,
+  IconSquareCodeFillDuo18,
+} from 'nucleo-ui-fill-duo-18';
+import {
+  IconMoonFill18,
+  IconBrightnessIncreaseFill18,
+} from 'nucleo-ui-fill-18';
 import { SearchBar } from './_components/search-bar';
+
+const COLOR_SCHEME_ICON_MAP: Record<ColorScheme, React.ReactNode> = {
+  light: <IconBrightnessIncreaseFill18 className="size-4 text-primary" />,
+  dark: <IconMoonFill18 className="size-4 text-primary" />,
+  system: <IconNightShiftFillDuo18 className="size-4 text-foreground" />,
+};
 
 export function MainSection({
   isSidebarCollapsed,
@@ -45,6 +58,14 @@ export function MainSection({
   const [urlBeforeEdit, setUrlBeforeEdit] = useState(
     tabs[activeTabId]?.url ?? '',
   );
+
+  const cycleColorScheme = useKartonProcedure(
+    (p) => p.browser.cycleColorScheme,
+  );
+  const colorScheme = useKartonState(
+    (s) => s.browser.tabs[activeTabId]?.colorScheme,
+  );
+
   const urlInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const activateSearchBar = useKartonProcedure(
@@ -229,6 +250,20 @@ export function MainSection({
               </div>
             </div>
             <SearchBar ref={searchInputRef} />
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
+                    cycleColorScheme(activeTabId);
+                  }}
+                >
+                  {COLOR_SCHEME_ICON_MAP[colorScheme]}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Toggle color scheme</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger>
                 <Button
