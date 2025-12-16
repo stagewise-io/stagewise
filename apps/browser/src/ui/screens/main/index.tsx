@@ -10,6 +10,8 @@ import { cn } from '@/utils';
 import { useCallback, useState } from 'react';
 import { useEventListener } from '@/hooks/use-event-listener';
 
+const layoutStorageKey = 'stagewise-panel-layout';
+
 export function DefaultLayout({ show }: { show: boolean }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   useEventListener('sidebar-chat-panel-closed', () => {
@@ -23,6 +25,14 @@ export function DefaultLayout({ show }: { show: boolean }) {
     window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
   }, []);
 
+  const layoutChangeHandler = useCallback((layout: number[]) => {
+    if (layout[0] === 0) {
+      setIsSidebarCollapsed(true);
+    } else {
+      setIsSidebarCollapsed(false);
+    }
+  }, []);
+
   return (
     <div
       className={cn(
@@ -33,8 +43,9 @@ export function DefaultLayout({ show }: { show: boolean }) {
       <div className="app-drag fixed top-0 right-0 left-0 h-2" />
       <ResizablePanelGroup
         direction="horizontal"
-        autoSaveId="stagewise-center-panel-layout"
+        autoSaveId={layoutStorageKey}
         className="overflow-visible! h-full"
+        onLayout={layoutChangeHandler}
       >
         <Sidebar />
 
