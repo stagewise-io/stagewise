@@ -114,7 +114,9 @@ export class WindowLayoutService {
       closable: true,
       frame: false,
     });
-    this.baseWindow.setWindowButtonVisibility(true);
+    if (process.platform === 'darwin') {
+      this.baseWindow.setWindowButtonVisibility(true);
+    }
 
     // Store initial state to apply after window is shown
     this.initialWindowState = {
