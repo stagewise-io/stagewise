@@ -15,13 +15,18 @@ type TooltipTriggerProps = ComponentProps<typeof BaseTooltip.Trigger> & {
   children?: ReactElement;
 };
 
-export const TooltipTrigger = ({ children, ...props }: TooltipTriggerProps) => {
+export const TooltipTrigger = ({
+  children,
+  delay = 100,
+  ...props
+}: TooltipTriggerProps) => {
   return (
     <BaseTooltip.Trigger
       render={
         props.render ||
         (children as ReactElement<Record<string, unknown>, string>)
       }
+      delay={delay}
       {...props}
     />
   );
