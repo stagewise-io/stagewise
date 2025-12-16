@@ -499,7 +499,6 @@ export const defaultState: KartonContract['state'] = {
     selectedElements: [],
     hoveredElement: null,
     viewportSize: null,
-    viewportLayout: null,
     isSearchBarActive: false,
   },
 };
