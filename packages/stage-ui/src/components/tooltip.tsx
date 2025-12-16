@@ -8,7 +8,7 @@ export const Tooltip = ({
 }: {
   children: ReactElement | ReactNode | ReactNode[];
 }) => {
-  return <BaseTooltip.Root delay={200}>{children}</BaseTooltip.Root>;
+  return <BaseTooltip.Root>{children}</BaseTooltip.Root>;
 };
 
 type TooltipTriggerProps = ComponentProps<typeof BaseTooltip.Trigger> & {

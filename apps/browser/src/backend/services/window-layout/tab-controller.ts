@@ -1249,19 +1249,11 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     const wc = this.webContentsView.webContents;
     if (wc.isDestroyed()) return;
 
-    // Stop any existing search first
-    if (this.currentSearchText !== null) {
-      this.stopSearch();
-    }
-
-    // Start new search and immediately navigate to first result
-    // We use findNext: true with forward: true to both start the search AND highlight the first match
-    const requestId = wc.findInPage(searchText, {
-      findNext: true,
-      forward: true,
-    });
-    this.currentSearchRequestId = requestId;
     this.currentSearchText = searchText;
+
+    // Start new search - use findNext: true to initiate search and highlight first result
+    const requestId = wc.findInPage(searchText, { findNext: true });
+    this.currentSearchRequestId = requestId;
 
     // Update state immediately to show search is active
     this.updateState({
@@ -1277,18 +1269,11 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     const wc = this.webContentsView.webContents;
     if (wc.isDestroyed()) return;
 
-    // Stop current search
-    if (this.currentSearchText !== null) {
-      wc.stopFindInPage('clearSelection');
-    }
-
-    // Start search with new text and navigate to first match
-    const requestId = wc.findInPage(searchText, {
-      findNext: true,
-      forward: true,
-    });
-    this.currentSearchRequestId = requestId;
     this.currentSearchText = searchText;
+
+    // Update search text - use findNext: true to initiate new search
+    const requestId = wc.findInPage(searchText, { findNext: true });
+    this.currentSearchRequestId = requestId;
 
     this.updateState({
       search: {
@@ -1303,24 +1288,22 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     const wc = this.webContentsView.webContents;
     if (wc.isDestroyed() || this.currentSearchText === null) return;
 
-    // Navigate to next match
-    const requestId = wc.findInPage(this.currentSearchText, {
-      findNext: true,
+    // Navigate to next match - use findNext: false for navigation
+    wc.findInPage(this.currentSearchText, {
+      findNext: false,
       forward: true,
     });
-    this.currentSearchRequestId = requestId;
   }
 
   public previousResult() {
     const wc = this.webContentsView.webContents;
     if (wc.isDestroyed() || this.currentSearchText === null) return;
 
-    // Navigate to previous match
-    const requestId = wc.findInPage(this.currentSearchText, {
-      findNext: true,
+    // Navigate to previous match - use findNext: false for navigation
+    wc.findInPage(this.currentSearchText, {
+      findNext: false,
       forward: false,
     });
-    this.currentSearchRequestId = requestId;
   }
 
   public stopSearch() {
@@ -1335,15 +1318,16 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   }
 
   private handleFoundInPage(result: Electron.Result) {
-    // Ignore stale results from previous searches
-    if (result.requestId !== this.currentSearchRequestId) {
+    // Ignore results if we don't have an active search
+    if (!this.currentSearchText) {
       return;
     }
 
-    // Update state with new results
+    // Update state with results - accept all events for current search text
+    // Don't check requestId since we might get results from rapid typing
     this.updateState({
       search: {
-        text: this.currentSearchText!,
+        text: this.currentSearchText,
         resultsCount: result.matches,
         activeMatchIndex: result.activeMatchOrdinal,
       },

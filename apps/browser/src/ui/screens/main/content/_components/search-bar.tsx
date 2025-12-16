@@ -43,7 +43,7 @@ export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
     if (!activeTabSearch && searchString.length > 0) {
       setSearchString('');
     }
-  }, [activeTabSearch, searchString]);
+  }, [activeTabSearch]); // Only watch activeTabSearch, not searchString
 
   // Start or update search when user types
   useEffect(() => {
@@ -64,7 +64,8 @@ export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
   }, [
     searchString,
     isSearchBarActive,
-    activeTabSearch,
+    // Removed activeTabSearch from dependencies to prevent duplicate searches
+    // when backend state updates (e.g., result count changes)
     activeTabId,
     startSearch,
     updateSearch,
@@ -94,6 +95,9 @@ export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
             if (activeTabSearch && activeTabSearch.resultsCount > 0) {
               previousSearchResult(activeTabId);
             }
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            deactivateSearchBar();
           }
         }}
         className="h-[30px] w-full flex-1 truncate rounded-full px-2 text-foreground text-sm outline-none"
