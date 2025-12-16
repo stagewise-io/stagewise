@@ -39,7 +39,7 @@ export function WithTabPreviewCard({
           className="flex w-64 flex-col items-stretch gap-2"
           sideOffset={isActive ? 0 : 2}
         >
-          {tabState.screenshot.length > 0 && (
+          {(tabState.screenshot?.length ?? 0) > 0 && (
             <>
               <img
                 src={tabState.screenshot}
