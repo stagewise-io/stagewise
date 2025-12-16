@@ -83,6 +83,19 @@ export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
         type="text"
         value={searchString}
         onChange={(e) => setSearchString(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (activeTabSearch && activeTabSearch.resultsCount > 0) {
+              nextSearchResult(activeTabId);
+            }
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (activeTabSearch && activeTabSearch.resultsCount > 0) {
+              previousSearchResult(activeTabId);
+            }
+          }
+        }}
         className="h-[30px] w-full flex-1 truncate rounded-full px-2 text-foreground text-sm outline-none"
       />
       {searchString.length > 0 && (
