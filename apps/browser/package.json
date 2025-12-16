@@ -11,10 +11,10 @@
   "type": "module",
   "main": ".vite/build/main.js",
   "scripts": {
-    "make": "BUILD_MODE=production dotenv -e ../../.env.prod -- electron-forge make",
+    "make": "dotenv -e ../../.env.prod -- electron-forge make",
     "package": "dotenv -e ../../.env -- electron-forge package",
     "publish": "dotenv -e ../../.env -- electron-forge publish",
-    "start": "BUILD_MODE=development dotenv -e ../../.env.dev -- electron-forge start",
+    "start": "dotenv -e ../../.env.dev -- electron-forge start",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
