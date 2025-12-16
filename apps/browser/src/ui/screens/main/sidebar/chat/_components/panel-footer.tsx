@@ -17,6 +17,7 @@ import {
   useKartonState,
   useKartonProcedure,
   useKartonConnected,
+  useKartonReconnectState,
   useComparingSelector,
 } from '@/hooks/use-karton';
 import {
@@ -80,6 +81,7 @@ export function ChatPanelFooter() {
   const stopAgent = useKartonProcedure((p) => p.agentChat.abortAgentCall);
   const canStop = isWorking;
   const isConnected = useKartonConnected();
+  const reconnectState = useKartonReconnectState();
   const posthog = usePostHog();
 
   const abortAgent = useCallback(() => {
@@ -95,11 +97,11 @@ export function ChatPanelFooter() {
   const isVerboseMode = useKartonState((s) => s.appInfo.verbose);
 
   const enableInputField = useMemo(() => {
-    // Disable input if agent is not connected
-    if (!isConnected) return false;
+    // Disable input if agent is not connected or reconnecting
+    if (!isConnected || reconnectState.isReconnecting) return false;
 
     return !isWorking;
-  }, [isWorking, isConnected]);
+  }, [isWorking, isConnected, reconnectState.isReconnecting]);
 
   const canSendMessage = useMemo(() => {
     return enableInputField && chatState.chatInput.trim().length > 2;

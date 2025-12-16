@@ -14,11 +14,14 @@ import type { Logger } from './logger';
  * - Better isolation between different connections
  * - Support for multiple contract instances (UI and future tabs)
  * - Graceful handling of connection failures
+ * - Auto-reconnection support
  */
 export class KartonService {
   private kartonServer: KartonServer<KartonContract>;
   private transport: ElectronServerTransport;
   private logger: Logger;
+  private currentPort?: MessagePortMain;
+  private portCloseListeners = new Map<MessagePortMain, () => void>();
 
   constructor(logger: Logger) {
     this.logger = logger;
@@ -44,8 +47,35 @@ export class KartonService {
    * @returns The connection ID assigned to this port
    */
   public setTransportPort(port: MessagePortMain): string {
+    // Remove listener from old port if it exists
+    if (this.currentPort) {
+      const oldListener = this.portCloseListeners.get(this.currentPort);
+      if (oldListener) {
+        this.currentPort.off('close', oldListener);
+        this.portCloseListeners.delete(this.currentPort);
+      }
+    }
+
+    // Store the new port
+    this.currentPort = port;
+
+    // Setup close listener for connection monitoring
+    const closeListener = () => {
+      this.logger.warn('[KartonService] MessagePort closed - connection lost');
+      // Clean up the listener reference
+      if (this.currentPort) {
+        this.portCloseListeners.delete(this.currentPort);
+      }
+    };
+
+    // Store the listener so we can remove it later
+    this.portCloseListeners.set(port, closeListener);
+    port.on('close', closeListener);
+
+    // Accept the port in the transport
     const id = this.transport.setPort(port, 'ui-main');
     this.logger.debug(`[KartonService] Accepted port connection: ${id}`);
+
     return id;
   }
 
@@ -115,6 +145,14 @@ export class KartonService {
    */
   public async teardown(): Promise<void> {
     this.logger.debug('[KartonService] Tearing down...');
+
+    // Clean up all port close listeners
+    for (const [port, listener] of this.portCloseListeners.entries()) {
+      port.off('close', listener);
+    }
+    this.portCloseListeners.clear();
+    this.currentPort = undefined;
+
     await this.transport.close();
     this.logger.debug('[KartonService] Teardown complete');
   }
