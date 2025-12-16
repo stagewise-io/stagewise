@@ -34,6 +34,7 @@ export interface UIControllerEventMap {
   toggleAudioMuted: [tabId?: string];
   setColorScheme: [scheme: ColorScheme, tabId?: string];
   cycleColorScheme: [tabId?: string];
+  setZoomPercentage: [percentage: number, tabId?: string];
   setContextSelectionMode: [active: boolean];
   setContextSelectionMouseCoordinates: [x: number, y: number];
   clearContextSelectionMouseCoordinates: [];
@@ -257,6 +258,12 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'browser.setZoomPercentage',
+      async (percentage: number, tabId?: string) => {
+        this.emit('setZoomPercentage', percentage, tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.setActive',
       async (active: boolean) => {
         this.emit('setContextSelectionMode', active);
@@ -440,6 +447,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.uiKarton.removeServerProcedureHandler('browser.toggleAudioMuted');
     this.uiKarton.removeServerProcedureHandler('browser.setColorScheme');
     this.uiKarton.removeServerProcedureHandler('browser.cycleColorScheme');
+    this.uiKarton.removeServerProcedureHandler('browser.setZoomPercentage');
     this.uiKarton.removeServerProcedureHandler(
       'browser.contextSelection.setActive',
     );

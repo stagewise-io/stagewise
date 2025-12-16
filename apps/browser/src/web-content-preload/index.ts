@@ -6,6 +6,7 @@ import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 declare global {
   interface Window {
     tunnelKeyDown: (keyDownEvent: KeyboardEvent) => void;
+    tunnelWheel: (wheelEvent: WheelEvent) => void;
   }
 }
 
@@ -30,6 +31,21 @@ window.addEventListener('keydown', (e) => {
   if (e.defaultPrevented) return;
   window.tunnelKeyDown(e);
 });
+
+// Capture wheel events with CMD/Ctrl for zoom
+window.addEventListener(
+  'wheel',
+  (e) => {
+    // Only intercept wheel events when CMD/Ctrl is pressed
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      window.tunnelWheel(e);
+    }
+  },
+  { capture: true, passive: false },
+);
 
 /**
  * Setup section for the actual app that offers the context element selection UI

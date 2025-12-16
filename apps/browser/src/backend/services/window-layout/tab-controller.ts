@@ -44,6 +44,7 @@ export interface TabState {
     resultsCount: number;
     activeMatchIndex: number;
   } | null;
+  zoomPercentage: number; // Page zoom level as percentage (100 = default)
 }
 
 export interface TabControllerEventMap {
@@ -242,12 +243,18 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       faviconUrls: [],
       screenshot: null,
       search: null,
+      zoomPercentage: 100,
     };
 
     this.setupEventListeners();
     this.startViewportTracking();
     this.startScreenshotTracking();
     this.setupScreenshotOnResize();
+
+    // Initialize zoom percentage from Electron's current zoom factor
+    // This ensures we reflect any persisted zoom from previous sessions
+    const initialZoom = this.getZoomPercentage();
+    this.updateState({ zoomPercentage: initialZoom });
 
     if (initialUrl) {
       this.loadURL(initialUrl);
@@ -328,6 +335,32 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.webContentsView.webContents.setAudioMuted(!currentMuted);
     // Update state immediately to keep it in sync
     this.updateAudioState();
+  }
+
+  public setZoomPercentage(percentage: number) {
+    if (this.webContentsView.webContents.isDestroyed()) {
+      return;
+    }
+
+    // Convert percentage to zoom factor (100% = 1.0, 200% = 2.0, etc.)
+    const factor = percentage / 100;
+
+    // Note: Chromium uses same-origin zoom policy, meaning zoom level
+    // persists per domain. Our zoom change will be applied and persisted.
+    this.webContentsView.webContents.setZoomFactor(factor);
+
+    // Verify the zoom was set - read it back immediately
+    const actualFactor = this.webContentsView.webContents.getZoomFactor();
+    const actualPercentage = Math.round(actualFactor * 100);
+
+    // Update state with the actual zoom percentage
+    this.updateState({ zoomPercentage: actualPercentage });
+  }
+
+  public getZoomPercentage(): number {
+    // Get current zoom factor and convert to percentage
+    const factor = this.webContentsView.webContents.getZoomFactor();
+    return Math.round(factor * 100);
   }
 
   public async setColorScheme(scheme: ColorScheme) {
@@ -527,6 +560,27 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         this.emit('handleKeyDown', key);
       },
     );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'handleWheelZoom',
+      async (wheelEvent) => {
+        // Handle wheel zoom: deltaY > 0 means scroll down (zoom out), deltaY < 0 means scroll up (zoom in)
+        const currentZoom = this.getZoomPercentage();
+        let newZoom = currentZoom;
+
+        if (wheelEvent.deltaY < 0) {
+          // Scroll up - zoom in
+          newZoom = Math.min(500, currentZoom + 10);
+        } else if (wheelEvent.deltaY > 0) {
+          // Scroll down - zoom out
+          newZoom = Math.max(50, currentZoom - 10);
+        }
+
+        if (newZoom !== currentZoom) {
+          this.setZoomPercentage(newZoom);
+        }
+      },
+    );
   }
 
   /**
@@ -646,6 +700,9 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       });
       // Update audio state when page finishes loading
       this.updateAudioState();
+      // Update zoom percentage when page finishes loading
+      const currentZoom = this.getZoomPercentage();
+      this.updateState({ zoomPercentage: currentZoom });
       // Capture screenshot when page finishes loading
       this.captureScreenshot().catch((err) => {
         this.logger.debug(
@@ -713,6 +770,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     wc.on('audio-state-changed', () => {
       // Use isCurrentlyAudible() for reliable state checking
       this.updateAudioState();
+    });
+
+    wc.on('zoom-changed', (_event, _zoomDirection) => {
+      // Update zoom state when user changes zoom (e.g., via mouse wheel)
+      const currentZoom = this.getZoomPercentage();
+      this.updateState({ zoomPercentage: currentZoom });
     });
 
     wc.on('found-in-page', (_event, result) => {

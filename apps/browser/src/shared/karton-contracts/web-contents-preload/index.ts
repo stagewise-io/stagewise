@@ -20,6 +20,20 @@ export type SerializableKeyboardEvent = {
   location: number;
 };
 
+/**
+ * Serializable representation of a WheelEvent for RPC transport.
+ * Contains only the serializable properties needed from a DOM WheelEvent.
+ */
+export type SerializableWheelEvent = {
+  deltaY: number;
+  deltaX: number;
+  deltaMode: number;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+};
+
 export type TabKartonContract = {
   state: TabState;
   serverProcedures: {
@@ -27,6 +41,7 @@ export type TabKartonContract = {
       panel: 'stagewise-ui' | 'tab-content',
     ) => Promise<void>; // Moves the panel to foreground (in front of UI) and is triggered if some placeholder in the tab overlay is interacted with.
     handleKeyDown: (keyDownEvent: SerializableKeyboardEvent) => Promise<void>; // Handles a key down event.
+    handleWheelZoom: (wheelEvent: SerializableWheelEvent) => Promise<void>; // Handles a wheel event for zooming.
   };
 };
 

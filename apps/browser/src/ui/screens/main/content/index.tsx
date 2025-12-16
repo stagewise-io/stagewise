@@ -31,11 +31,12 @@ import {
   IconBrightnessIncreaseFill18,
 } from 'nucleo-ui-fill-18';
 import { SearchBar } from './_components/search-bar';
+import { ZoomBar } from './_components/zoom-bar';
 
 const COLOR_SCHEME_ICON_MAP: Record<ColorScheme, React.ReactNode> = {
-  light: <IconBrightnessIncreaseFill18 className="size-4 text-primary" />,
-  dark: <IconMoonFill18 className="size-4 text-primary" />,
-  system: <IconNightShiftFillDuo18 className="size-4 text-foreground" />,
+  light: <IconBrightnessIncreaseFill18 className="size-4.5 text-primary" />,
+  dark: <IconMoonFill18 className="mb-px ml-px size-4 text-primary" />,
+  system: <IconNightShiftFillDuo18 className="size-4.5 text-foreground" />,
 };
 
 export function MainSection({
@@ -249,6 +250,7 @@ export function MainSection({
                 </span>
               </div>
             </div>
+            <ZoomBar />
             <SearchBar ref={searchInputRef} />
             <Tooltip>
               <TooltipTrigger>

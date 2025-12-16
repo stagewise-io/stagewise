@@ -1,7 +1,7 @@
 import {
   Radio as RadioBase,
   RadioGroup as RadioGroupBase,
-} from '@base-ui-components/react';
+} from '@base-ui/react';
 import { cn } from '../lib/utils';
 
 export type RadioGroupProps = React.ComponentProps<typeof RadioGroupBase>;

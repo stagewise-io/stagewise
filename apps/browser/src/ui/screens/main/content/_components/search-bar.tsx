@@ -4,9 +4,9 @@ import {
   IconChevronLeft,
   IconChevronRight,
 } from 'nucleo-micro-bold';
-import { IconMagnifierFill18 } from 'nucleo-ui-fill-18';
 import { useEffect, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { IconFindEditOutline18 } from 'nucleo-ui-outline-18';
 
 export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
   const [searchString, setSearchString] = useState('');
@@ -76,8 +76,8 @@ export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
   }
 
   return (
-    <div className="flex min-w-48 basis-1/4 flex-row items-center justify-between gap-2 rounded-full bg-zinc-500/5 px-2 pr-1.5 text-base focus-within:bg-zinc-500/10">
-      <IconMagnifierFill18 className="size-4 text-muted-foreground/50" />
+    <div className="flex min-w-48 basis-1/4 flex-row items-center justify-between gap-2 rounded-full bg-zinc-500/5 pr-1.5 pl-2.5 text-base focus-within:bg-zinc-500/10">
+      <IconFindEditOutline18 className="size-4 text-muted-foreground opacity-50" />
       <input
         ref={ref}
         placeholder="Search in tab..."
@@ -100,7 +100,7 @@ export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
             deactivateSearchBar();
           }
         }}
-        className="h-[30px] w-full flex-1 truncate rounded-full px-2 text-foreground text-sm outline-none"
+        className="h-[30px] w-full flex-1 truncate text-foreground text-sm outline-none"
       />
       {searchString.length > 0 && (
         <div className="flex flex-row items-center gap-0.5">

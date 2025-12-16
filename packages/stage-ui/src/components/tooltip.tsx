@@ -1,4 +1,4 @@
-import { Tooltip as BaseTooltip } from '@base-ui-components/react/tooltip';
+import { Tooltip as BaseTooltip } from '@base-ui/react/tooltip';
 import type { ComponentProps, ReactElement, ReactNode } from 'react';
 
 export const TooltipProvider = BaseTooltip.Provider;

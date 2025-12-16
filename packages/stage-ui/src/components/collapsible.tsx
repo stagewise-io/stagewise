@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Collapsible as CollapsibleBase } from '@base-ui-components/react/collapsible';
+import { Collapsible as CollapsibleBase } from '@base-ui/react/collapsible';
 import { cn } from '../lib/utils';
 
 export const Collapsible = CollapsibleBase.Root;

@@ -1,4 +1,4 @@
-import { PreviewCard as PreviewCardBase } from '@base-ui-components/react/preview-card';
+import { PreviewCard as PreviewCardBase } from '@base-ui/react/preview-card';
 import { cn } from '../lib/utils';
 import type { ReactElement } from 'react';
 

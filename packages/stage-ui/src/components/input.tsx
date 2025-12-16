@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Input as InputBase } from '@base-ui-components/react/input';
+import { Input as InputBase } from '@base-ui/react/input';
 import { cn } from '../lib/utils';
 
 export function Input({

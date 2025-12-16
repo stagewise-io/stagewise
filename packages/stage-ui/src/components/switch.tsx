@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Switch as BaseSwitch } from '@base-ui-components/react/switch';
+import { Switch as BaseSwitch } from '@base-ui/react/switch';
 import { cn } from '../lib/utils';
 
 export function Switch(props: React.ComponentProps<typeof BaseSwitch.Root>) {

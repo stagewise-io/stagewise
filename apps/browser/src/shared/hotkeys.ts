@@ -63,6 +63,11 @@ export enum HotkeyActions {
   F12 = 'f12',
   CTRL_SHIFT_J = 'ctrl_shift_j', // open dev tools (macOS)
   CMD_OPTION_I = 'cmd_option_i', // open dev tools (macOS)
+
+  // zoom
+  CTRL_PLUS = 'ctrl_plus', // zoom in
+  CTRL_MINUS = 'ctrl_minus', // zoom out
+  CTRL_0 = 'ctrl_0', // reset zoom
 }
 
 export const hotkeyActionDefinitions: Record<
@@ -496,6 +501,40 @@ export const hotkeyActionDefinitions: Record<
       ev.altKey &&
       !ev.shiftKey &&
       !ev.ctrlKey,
+    captureDominantly: true,
+  },
+
+  // zoom
+  [HotkeyActions.CTRL_PLUS]: {
+    keyComboDefault: 'Ctrl++',
+    keyComboMac: '⌘+',
+    isEventMatching: (ev) =>
+      ev.code === 'Equal' &&
+      (ev.ctrlKey || ev.metaKey) &&
+      ev.shiftKey &&
+      !ev.altKey,
+    captureDominantly: true,
+  },
+  [HotkeyActions.CTRL_MINUS]: {
+    keyComboDefault: 'Ctrl+-',
+    keyComboMac: '⌘-',
+    isEventMatching: (ev) =>
+      (ev.code === 'Minus' ||
+        ev.code === 'NumpadSubtract' ||
+        ev.key === '-' ||
+        ev.key === '_') &&
+      (ev.ctrlKey || ev.metaKey) &&
+      !ev.altKey,
+    captureDominantly: true,
+  },
+  [HotkeyActions.CTRL_0]: {
+    keyComboDefault: 'Ctrl+0',
+    keyComboMac: '⌘0',
+    isEventMatching: (ev) =>
+      ev.code === 'Digit0' &&
+      (ev.ctrlKey || ev.metaKey) &&
+      !ev.shiftKey &&
+      !ev.altKey,
     captureDominantly: true,
   },
 };

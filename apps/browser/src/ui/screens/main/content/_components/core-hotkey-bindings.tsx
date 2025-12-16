@@ -40,7 +40,14 @@ export function CoreHotkeyBindings({
   const reload = useKartonProcedure((p) => p.browser.reload);
   const goto = useKartonProcedure((p) => p.browser.goto);
   const toggleDevTools = useKartonProcedure((p) => p.browser.toggleDevTools);
+  const setZoomPercentage = useKartonProcedure(
+    (p) => p.browser.setZoomPercentage,
+  );
   const { tabUiState } = useTabUIState();
+
+  const currentZoomPercentage = useKartonState(
+    (s) => s.browser.tabs[activeTabId]?.zoomPercentage,
+  );
 
   const handleSwitchTab = useCallback(
     async (tabId: string) => {
@@ -197,6 +204,34 @@ export function CoreHotkeyBindings({
   useHotKeyListener(handleToggleDevTools, HotkeyActions.F12);
   useHotKeyListener(handleToggleDevTools, HotkeyActions.CTRL_SHIFT_J);
   useHotKeyListener(handleToggleDevTools, HotkeyActions.CMD_OPTION_I);
+
+  // ZOOM
+
+  // Zoom in
+  const handleZoomIn = useCallback(() => {
+    if (!activeTabId || !currentZoomPercentage) return;
+    if (currentZoomPercentage >= 500) return; // Max zoom limit
+    setZoomPercentage(currentZoomPercentage + 10, activeTabId);
+  }, [activeTabId, currentZoomPercentage, setZoomPercentage]);
+
+  useHotKeyListener(handleZoomIn, HotkeyActions.CTRL_PLUS);
+
+  // Zoom out
+  const handleZoomOut = useCallback(() => {
+    if (!activeTabId || !currentZoomPercentage) return;
+    if (currentZoomPercentage <= 50) return; // Min zoom limit
+    setZoomPercentage(currentZoomPercentage - 10, activeTabId);
+  }, [activeTabId, currentZoomPercentage, setZoomPercentage]);
+
+  useHotKeyListener(handleZoomOut, HotkeyActions.CTRL_MINUS);
+
+  // Reset zoom
+  const handleResetZoom = useCallback(() => {
+    if (!activeTabId) return;
+    setZoomPercentage(100, activeTabId);
+  }, [activeTabId, setZoomPercentage]);
+
+  useHotKeyListener(handleResetZoom, HotkeyActions.CTRL_0);
 
   return null;
 }

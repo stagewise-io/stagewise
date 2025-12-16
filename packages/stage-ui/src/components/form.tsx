@@ -2,7 +2,7 @@ import {
   Form as FormBase,
   Fieldset as FieldsetBase,
   Field as FieldBase,
-} from '@base-ui-components/react';
+} from '@base-ui/react';
 import { cn } from '../lib/utils';
 
 export type FormProps = React.ComponentProps<typeof FormBase>;

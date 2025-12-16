@@ -142,6 +142,7 @@ export type TabState = {
     resultsCount: number;
     activeMatchIndex: number; // 1-indexed position of current match
   } | null;
+  zoomPercentage: number; // Page zoom level as percentage (100 = default)
 };
 
 export type HistoryEntry = {
@@ -416,6 +417,7 @@ export type KartonContract = {
       toggleAudioMuted: (tabId?: string) => Promise<void>;
       setColorScheme: (scheme: ColorScheme, tabId?: string) => Promise<void>;
       cycleColorScheme: (tabId?: string) => Promise<void>;
+      setZoomPercentage: (percentage: number, tabId?: string) => Promise<void>;
       contextSelection: {
         setActive: (active: boolean) => Promise<void>;
         setMouseCoordinates: (x: number, y: number) => Promise<void>; // Used by the client to communicate where the mouse is currently located. Will be forwarded to the tab to check which element is at that point.

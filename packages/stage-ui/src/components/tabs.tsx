@@ -1,4 +1,4 @@
-import { Tabs as TabsBase } from '@base-ui-components/react/tabs';
+import { Tabs as TabsBase } from '@base-ui/react/tabs';
 import { cn } from '../lib/utils';
 import { buttonVariants } from './button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';

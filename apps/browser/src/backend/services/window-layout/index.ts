@@ -314,6 +314,7 @@ export class WindowLayoutService {
     this.uiController.on('toggleAudioMuted', this.handleToggleAudioMuted);
     this.uiController.on('setColorScheme', this.handleSetColorScheme);
     this.uiController.on('cycleColorScheme', this.handleCycleColorScheme);
+    this.uiController.on('setZoomPercentage', this.handleSetZoomPercentage);
     this.uiController.on(
       'setContextSelectionMode',
       this.handleSetContextSelectionMode,
@@ -651,6 +652,14 @@ export class WindowLayoutService {
   private handleCycleColorScheme = async (tabId?: string) => {
     const tab = tabId ? this.tabs[tabId] : this.activeTab;
     await tab?.cycleColorScheme();
+  };
+
+  private handleSetZoomPercentage = async (
+    percentage: number,
+    tabId?: string,
+  ) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    tab?.setZoomPercentage(percentage);
   };
 
   private handleSetContextSelectionMode = async (active: boolean) => {

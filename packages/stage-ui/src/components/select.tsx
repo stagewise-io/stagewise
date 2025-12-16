@@ -1,4 +1,4 @@
-import { Select as SelectBase } from '@base-ui-components/react/select';
+import { Select as SelectBase } from '@base-ui/react/select';
 import { CheckIcon, ChevronDownIcon } from 'lucide-react';
 import { useMemo, type ComponentProps } from 'react';
 import { cn } from '../lib/utils';

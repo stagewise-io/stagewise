@@ -1,4 +1,4 @@
-import { Dialog as BaseDialog } from '@base-ui-components/react/dialog';
+import { Dialog as BaseDialog } from '@base-ui/react/dialog';
 import { cn } from '../lib/utils';
 import type { ComponentProps, ReactElement } from 'react';
 import { Button } from './button';
