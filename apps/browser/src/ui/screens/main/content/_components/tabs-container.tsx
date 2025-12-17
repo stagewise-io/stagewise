@@ -111,7 +111,7 @@ export function TabsContainer({
               size="xs"
               className={cn(
                 'h-7.25 shrink-0 self-start rounded-[8.5px] text-zinc-200 opacity-80 transition-all duration-150 ease-out hover:bg-zinc-50/70! hover:text-muted-foreground hover:opacity-100',
-                platform !== 'darwin' ? 'mr-16' : 'mr-0',
+                platform !== 'darwin' ? 'mr-32' : 'mr-0',
               )}
               onClick={onCleanAllTabs}
             >
