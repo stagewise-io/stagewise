@@ -11,7 +11,7 @@ export function SidebarChatSection({
   return (
     <div
       className={cn(
-        'relative size-full rounded-lg bg-[#fcfcfc] p-2 group-data-[collapsed=true]:hidden',
+        'relative size-full rounded-lg bg-[#fcfcfc] p-2 group-data-[collapsed=true]:hidden dark:bg-background',
       )}
     >
       <div className="size-full group-data-[collapsed=true]:hidden">

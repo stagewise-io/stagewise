@@ -94,7 +94,7 @@ export function TabsContainer({
       <Button
         variant="ghost"
         size="xs"
-        className="-ml-1.25 h-7.25 shrink-0 self-start rounded-[8.5px] rounded-bl-md text-zinc-200 opacity-80 transition-all duration-150 ease-out hover:bg-zinc-50/70! hover:text-muted-foreground hover:opacity-100"
+        className="-ml-1.25 h-7.25 shrink-0 self-start rounded-[8.5px] rounded-bl-md text-muted opacity-80 transition-all duration-150 ease-out hover:text-muted-foreground hover:opacity-100"
         onClick={onAddTab}
       >
         <IconPlus className="size-3 text-muted-foreground" />
@@ -110,7 +110,7 @@ export function TabsContainer({
               variant="ghost"
               size="xs"
               className={cn(
-                'h-7.25 shrink-0 self-start rounded-[8.5px] text-zinc-200 opacity-80 transition-all duration-150 ease-out hover:bg-zinc-50/70! hover:text-muted-foreground hover:opacity-100',
+                'h-7.25 shrink-0 self-start rounded-[8.5px] text-muted opacity-80 transition-all duration-150 ease-out hover:text-muted-foreground hover:opacity-100',
                 platform !== 'darwin' ? 'mr-32' : 'mr-0',
               )}
               onClick={onCleanAllTabs}

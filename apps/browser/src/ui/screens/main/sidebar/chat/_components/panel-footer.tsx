@@ -313,8 +313,8 @@ export function ChatPanelFooter() {
             {activeChat && (isVerboseMode || contextUsed > 80) && (
               <ContextUsageRing
                 percentage={contextUsed}
-                usedKb={activeChat.usage.usedContextWindowSize}
-                maxKb={activeChat.usage.maxContextWindowSize}
+                usedKb={activeChat.usage.usedContextWindowSize / 1000}
+                maxKb={activeChat.usage.maxContextWindowSize / 1000}
               />
             )}
             <FileAttachmentChips

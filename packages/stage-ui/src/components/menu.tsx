@@ -51,7 +51,7 @@ export function MenuContent({
         <MenuBase.Popup
           {...props}
           className={cn(
-            'glass-body glass-body-motion flex origin-[var(--transform-origin)] flex-col items-stretch gap-0.5 rounded-lg bg-background/80 p-1 backdrop-blur-sm transition-[transform,scale,opacity] duration-150 ease-out data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0',
+            'flex origin-[var(--transform-origin)] flex-col items-stretch gap-0.5 rounded-lg bg-background/90 p-1 ring-1 ring-muted-foreground/30 backdrop-blur-sm transition-[transform,scale,opacity] duration-150 ease-out data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0',
             className,
           )}
         >

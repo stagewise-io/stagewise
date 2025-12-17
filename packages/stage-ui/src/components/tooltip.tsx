@@ -47,7 +47,7 @@ export const TooltipContent = ({
         side={side}
         className="z-50"
       >
-        <BaseTooltip.Popup className="glass-body rounded-lg px-1.5 py-0.5 text-foreground text-xs backdrop-blur-sm">
+        <BaseTooltip.Popup className="rounded-lg bg-muted/80 px-1.5 py-0.5 text-foreground text-xs shadow-md ring-1 ring-muted-foreground/30 backdrop-blur-sm">
           {children}
         </BaseTooltip.Popup>
       </BaseTooltip.Positioner>

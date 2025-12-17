@@ -1,4 +1,4 @@
-import { BaseWindow, app, ipcMain } from 'electron';
+import { BaseWindow, app, ipcMain, nativeTheme } from 'electron';
 import path from 'node:path';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import fs from 'node:fs';
@@ -10,6 +10,24 @@ import { UIController } from './ui-controller';
 import { TabController } from './tab-controller';
 import { ChatStateController } from './chat-state-controller';
 import type { ColorScheme } from '@shared/karton-contracts/ui';
+
+// Theme colors for window background and titleBarOverlay
+const THEME_COLORS = {
+  light: {
+    background: '#e4e4e7',
+    titleBarOverlay: {
+      color: '#e4e4e7',
+      symbolColor: '#3f3f46',
+    },
+  },
+  dark: {
+    background: '#18181b',
+    titleBarOverlay: {
+      color: '#18181b',
+      symbolColor: '#d4d4d8',
+    },
+  },
+};
 
 interface WindowState {
   width: number;
@@ -88,6 +106,11 @@ export class WindowLayoutService {
       y: savedState?.y,
     };
 
+    // Determine initial theme based on OS setting
+    const initialTheme = nativeTheme.shouldUseDarkColors
+      ? THEME_COLORS.dark
+      : THEME_COLORS.light;
+
     this.baseWindow = new BaseWindow({
       width: this.lastNonMaximizedBounds.width,
       height: this.lastNonMaximizedBounds.height,
@@ -100,15 +123,15 @@ export class WindowLayoutService {
       ...(process.platform !== 'darwin'
         ? {
             titleBarOverlay: {
-              color: '#e4e4e4',
-              symbolColor: '#3f3f46',
+              color: initialTheme.titleBarOverlay.color,
+              symbolColor: initialTheme.titleBarOverlay.symbolColor,
               height: 40,
             },
           }
         : {}),
       trafficLightPosition: { x: 14, y: 16 },
       backgroundMaterial: 'mica',
-      backgroundColor: '#e4e4e4',
+      backgroundColor: initialTheme.background,
       transparent: process.platform === 'darwin', // Only make transparent on macOS since we get graphic bugs without that
       roundedCorners: true,
       closable: true,
@@ -161,6 +184,11 @@ export class WindowLayoutService {
     });
     this.baseWindow.on('close', () => {
       this.saveWindowState();
+    });
+
+    // Listen for OS theme changes and update window colors accordingly
+    nativeTheme.on('updated', () => {
+      this.applyThemeColors();
     });
 
     app.on('second-instance', () => {
@@ -872,5 +900,26 @@ export class WindowLayoutService {
       width: bounds.width,
       height: bounds.height,
     });
+  }
+
+  private applyThemeColors() {
+    if (!this.baseWindow || this.baseWindow.isDestroyed()) return;
+
+    const isDark = nativeTheme.shouldUseDarkColors;
+    const theme = isDark ? THEME_COLORS.dark : THEME_COLORS.light;
+
+    this.baseWindow.setBackgroundColor(theme.background);
+
+    // titleBarOverlay is only used on non-macOS platforms
+    if (process.platform !== 'darwin') {
+      this.baseWindow.setTitleBarOverlay({
+        color: theme.titleBarOverlay.color,
+        symbolColor: theme.titleBarOverlay.symbolColor,
+      });
+    }
+
+    this.logger.debug(
+      `[WindowLayoutService] Applied ${isDark ? 'dark' : 'light'} theme colors`,
+    );
   }
 }
