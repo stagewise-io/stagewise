@@ -3,8 +3,9 @@ import path from 'node:path';
 import type { Logger } from './logger';
 import type { WindowLayoutService } from './window-layout';
 import type { AuthService } from './auth';
+import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export class AppMenuService {
   private logger: Logger;

@@ -94,7 +94,7 @@ export class WindowLayoutService {
       x: this.lastNonMaximizedBounds.x,
       y: this.lastNonMaximizedBounds.y,
       title: 'stagewise',
-      titleBarStyle: 'hiddenInset',
+      titleBarStyle: 'hidden',
       show: false, // Don't show until UI is ready to prevent visual glitches
       // fullscreenable: false,
       ...(process.platform !== 'darwin'
@@ -102,17 +102,23 @@ export class WindowLayoutService {
             titleBarOverlay: {
               color: '#e4e4e4',
               symbolColor: '#3f3f46',
-              height: 64,
+              height: 40,
             },
           }
         : {}),
       trafficLightPosition: { x: 14, y: 16 },
       backgroundMaterial: 'mica',
       backgroundColor: '#e4e4e4',
-      transparent: true,
+      transparent: process.platform === 'darwin', // Only make transparent on macOS since we get graphic bugs without that
       roundedCorners: true,
       closable: true,
-      frame: false,
+      hasShadow: true,
+      fullscreenable: true,
+      resizable: true,
+      maximizable: true,
+      minimizable: true,
+      minWidth: 350,
+      minHeight: 250,
     });
     if (process.platform === 'darwin') {
       this.baseWindow.setWindowButtonVisibility(true);

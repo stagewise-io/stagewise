@@ -7,6 +7,7 @@ import { EventEmitter } from 'node:events';
 import { KartonService } from '../karton';
 import type { SerializableKeyboardEvent } from '@shared/karton-contracts/web-contents-preload';
 import type { ColorScheme } from '@shared/karton-contracts/ui';
+import { fileURLToPath } from 'node:url';
 
 // These are injected by the build system
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -88,7 +89,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.view = new WebContentsView({
       webPreferences: {
         preload: path.join(
-          path.dirname(new URL(import.meta.url).pathname),
+          path.dirname(fileURLToPath(import.meta.url)),
           'ui-preload/index.js',
         ),
         partition: 'persist:stagewise-ui',
@@ -134,7 +135,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
   }
 
   private loadApp() {
-    const __dirname = path.dirname(new URL(import.meta.url).pathname);
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
     // and load the index.html of the app.
     if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
       this.view.webContents.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

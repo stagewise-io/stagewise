@@ -1,8 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import path, { resolve } from 'node:path';
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Read package.json to get version
 const packageJson = JSON.parse(

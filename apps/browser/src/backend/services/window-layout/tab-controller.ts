@@ -19,6 +19,7 @@ import type { ColorScheme } from '@shared/karton-contracts/ui';
 import type { ContextElement } from '@shared/context-elements';
 import { ContextElementTracker } from './context-element-tracker';
 import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
+import { fileURLToPath } from 'node:url';
 
 export interface TabState {
   title: string;
@@ -136,7 +137,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.webContentsView = new WebContentsView({
       webPreferences: {
         preload: path.join(
-          path.dirname(new URL(import.meta.url).pathname),
+          path.dirname(fileURLToPath(import.meta.url)),
           'web-content-preload/index.js',
         ),
         nodeIntegrationInSubFrames: true,

@@ -15,7 +15,8 @@ const config: ForgeConfig = {
     win32metadata: {
       CompanyName: 'stagewise GmbH',
       ProductName: 'stagewise',
-      FileDescription: "The browser dev's always wished they had.",
+      FileDescription: 'stagewise',
+      'requested-execution-level': 'asInvoker',
     },
     name:
       process.env.BUILD_MODE === 'production' ? 'stagewise' : 'stagewise-dev',
