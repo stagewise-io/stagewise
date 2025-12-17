@@ -1,4 +1,4 @@
-import { type MessagePortMain, View, WebContentsView, shell } from 'electron';
+import { type MessagePortMain, WebContentsView, shell } from 'electron';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import type { Input } from 'electron';
 import contextMenu from 'electron-context-menu';
@@ -68,7 +68,6 @@ export interface TabControllerEventMap {
 
 export class TabController extends EventEmitter<TabControllerEventMap> {
   public readonly id: string;
-  private viewContainer: View;
   private webContentsView: WebContentsView;
   private logger: Logger;
   private kartonServer: KartonServer<TabKartonContract>;
@@ -131,9 +130,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.logger = logger;
     this.onCreateTab = onCreateTab;
 
-    this.viewContainer = new View();
-    this.viewContainer.setBorderRadius(4);
-    this.viewContainer.setBackgroundColor('#FFF');
     this.webContentsView = new WebContentsView({
       webPreferences: {
         preload: path.join(
@@ -145,6 +141,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       },
     });
     this.webContentsView.setBorderRadius(4);
+    this.webContentsView.setBackgroundColor('#FFF');
     this.kartonTransport = new ElectronServerTransport();
 
     // Forward keydown events when dev tools are opened
@@ -221,8 +218,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       window: this.webContentsView.webContents,
     });
 
-    this.viewContainer.addChildView(this.webContentsView);
-
     this.webContentsView.webContents.session.setUserAgent(
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 stagewise/1.0.0-alpha',
     );
@@ -262,26 +257,19 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     }
   }
 
-  public getViewContainer(): View {
-    return this.viewContainer;
+  public getViewContainer(): WebContentsView {
+    return this.webContentsView;
   }
 
   public setBounds(bounds: Electron.Rectangle) {
-    this.viewContainer.setBounds(bounds);
-    // Resize child to match container
-    this.webContentsView.setBounds({
-      x: 0,
-      y: 0,
-      width: bounds.width,
-      height: bounds.height,
-    });
+    this.webContentsView.setBounds(bounds);
 
     // Trigger debounced screenshot capture on bounds change
     this.debouncedScreenshotCapture();
   }
 
   public setVisible(visible: boolean) {
-    this.viewContainer.setVisible(visible);
+    this.webContentsView.setVisible(visible);
     // Update audio state when tab becomes visible to ensure it's current
     if (visible) {
       this.updateAudioState();
