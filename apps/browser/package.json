@@ -43,7 +43,7 @@
     "@stagewise/agent-runtime-node": "workspace:*",
     "@stagewise/agent-tools": "workspace:*",
     "@stagewise/agent-types": "workspace:*",
-    "@stagewise/api-client": "2.0.1",
+    "@stagewise/api-client": "2.1.0",
     "@stagewise/karton": "workspace:*",
     "@stagewise/stage-ui": "workspace:*",
     "@storybook/addon-docs": "^10.0.7",

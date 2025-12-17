@@ -61,6 +61,9 @@ importers:
       '@stagewise/agent-tools':
         specifier: workspace:*
         version: link:../tools
+      '@stagewise/api-client':
+        specifier: 2.1.0
+        version: 2.1.0(typescript@5.9.3)
       ai:
         specifier: 5.0.101
         version: 5.0.101(zod@4.0.17)
@@ -166,8 +169,8 @@ importers:
         specifier: ^2.0.0
         version: 2.0.0
       '@stagewise/api-client':
-        specifier: 2.0.1
-        version: 2.0.1(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5)
+        specifier: 2.1.0
+        version: 2.1.0(typescript@5.9.3)
       ai:
         specifier: 5.0.101
         version: 5.0.101(zod@4.0.17)
@@ -204,8 +207,8 @@ importers:
         version: 5.0.101(zod@4.0.17)
     devDependencies:
       '@stagewise/api-client':
-        specifier: 2.0.1
-        version: 2.0.1(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5)
+        specifier: 2.1.0
+        version: 2.1.0(typescript@5.9.3)
       rimraf:
         specifier: ^5.0.0
         version: 5.0.10
@@ -286,8 +289,8 @@ importers:
         specifier: workspace:*
         version: link:../../agent/types
       '@stagewise/api-client':
-        specifier: 2.0.1
-        version: 2.0.1(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5)
+        specifier: 2.1.0
+        version: 2.1.0(typescript@5.9.3)
       '@stagewise/karton':
         specifier: workspace:*
         version: link:../../packages/karton
@@ -1997,8 +2000,8 @@ packages:
       '@types/react': '>=16'
       react: '>=16'
 
-  '@mendable/firecrawl-js@4.7.0':
-    resolution: {integrity: sha512-8x3YBCYafbR506Ois/GkCjYXpVZE0ak50IHdiBVPT2+1M7CImHKW2dH3+4QRWGqFFsshzj4r6oY9LPW08smfCw==}
+  '@mendable/firecrawl-js@4.9.1':
+    resolution: {integrity: sha512-eGewqZbwE8cllQ+q8n6oQWkft3WFzPfr3w6w/1XEo2+Uz6coGyAtqjrx1SHciCZZalIT+FhiaEypImVvIeooog==}
     engines: {node: '>=22.0.0'}
 
   '@mermaid-js/parser@0.6.3':
@@ -2885,8 +2888,8 @@ packages:
   '@so-ric/colorspace@1.1.6':
     resolution: {integrity: sha512-/KiKkpHNOBgkFJwu9sh48LkHSMYGyuTcSFK/qMBdnOAlrRJzRSXAOFB5qwzaVQuDl8wAvHVMkaASQDReTahxuw==}
 
-  '@stagewise/api-client@2.0.1':
-    resolution: {integrity: sha512-9t8exEjOlLXwOO3nZhnwcS6/rw2mc93vyTQtwX526NlC4GWD279Ut+WCJElUlXZYOHZChlILlxCyJvDMCVSkFQ==}
+  '@stagewise/api-client@2.1.0':
+    resolution: {integrity: sha512-TcZy36ZsFOIRDQP5t9R11dbw0/P2r21VgJ/79b/NHid2PkzVGBUMkgYHhPk3PJr+QLjDhRe4bx8RI4Ok5kzDBA==}
 
   '@standard-schema/spec@1.0.0':
     resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
@@ -10845,17 +10848,14 @@ snapshots:
       '@types/react': 19.2.6
       react: 19.2.0
 
-  '@mendable/firecrawl-js@4.7.0(bufferutil@4.0.9)(utf-8-validate@6.0.5)':
+  '@mendable/firecrawl-js@4.9.1':
     dependencies:
       axios: 1.13.2
       typescript-event-target: 1.1.1
-      ws: 8.18.3(bufferutil@4.0.9)(utf-8-validate@6.0.5)
       zod: 3.25.76
       zod-to-json-schema: 3.24.6(zod@3.25.76)
     transitivePeerDependencies:
-      - bufferutil
       - debug
-      - utf-8-validate
 
   '@mermaid-js/parser@0.6.3':
     dependencies:
@@ -11659,19 +11659,17 @@ snapshots:
       color: 5.0.3
       text-hex: 1.0.0
 
-  '@stagewise/api-client@2.0.1(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5)':
+  '@stagewise/api-client@2.1.0(typescript@5.9.3)':
     dependencies:
-      '@mendable/firecrawl-js': 4.7.0(bufferutil@4.0.9)(utf-8-validate@6.0.5)
+      '@mendable/firecrawl-js': 4.9.1
       '@trpc/client': 11.4.4(@trpc/server@11.4.4(typescript@5.9.3))(typescript@5.9.3)
       '@trpc/server': 11.4.4(typescript@5.9.3)
       ai: 5.0.9(zod@4.0.17)
       superjson: 2.2.2
       zod: 4.0.17
     transitivePeerDependencies:
-      - bufferutil
       - debug
       - typescript
-      - utf-8-validate
 
   '@standard-schema/spec@1.0.0': {}
 
