@@ -42,7 +42,7 @@ export class AuthServerInterop {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(30000), // Wait for 30 seconds maximum to get the session
     });
 
     if (!response.ok) {
@@ -72,7 +72,7 @@ export class AuthServerInterop {
       headers: {
         'Content-Type': 'application/json',
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(30000), // Wait for 30 seconds maximum to refresh the token
     }).catch((err) => {
       this.logger.error(`[AuthServerInterop] Failed to refresh token: ${err}`);
       throw err;
@@ -107,7 +107,7 @@ export class AuthServerInterop {
       headers: {
         'Content-Type': 'application/json',
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(30000), // Wait for 30 seconds maximum to revoke the token
     });
     if (!response.ok) {
       this.logger.error(
@@ -125,7 +125,7 @@ export class AuthServerInterop {
       headers: {
         'Content-Type': 'application/json',
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(30000), // Wait for 30 seconds maximum to exchange the token
     });
 
     if (!result || !result.ok) {
