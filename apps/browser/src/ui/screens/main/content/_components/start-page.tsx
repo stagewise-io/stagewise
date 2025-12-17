@@ -4,7 +4,7 @@ import type {
   InspirationWebsite,
   RecentlyOpenedWorkspace,
 } from '@shared/karton-contracts/ui';
-import LogoWithText from '@/components/ui/logo-with-text.svg';
+import { LogoWithText } from '@/components/ui/logo-with-text';
 import { cn } from '@/utils';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { useIsContainerScrollable } from '@/hooks/use-is-container-scrollable';
@@ -121,7 +121,7 @@ const StartPageWithConnectedWorkspace = () => {
   return (
     <div className="flex w-full max-w-6xl flex-col items-start gap-4 px-20">
       <div className="flex items-center gap-2">
-        <img src={LogoWithText} className="h-10" alt="stagewise-logo" />
+        <LogoWithText className="h-10 text-foreground" />
         <div className="glass-body ml-1 @[350px]:inline-flex hidden h-fit shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
           Alpha
         </div>
@@ -203,7 +203,7 @@ const StartPageWithoutConnectedWorkspace = () => {
   return (
     <div className="flex w-full max-w-2xl flex-col items-start gap-4">
       <div className="flex items-center gap-2">
-        <img src={LogoWithText} className="h-10" alt="stagewise-logo" />
+        <LogoWithText className="h-10 text-foreground" />
         <div className="glass-body ml-1 @[350px]:inline-flex hidden h-fit shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
           Alpha
         </div>
@@ -215,7 +215,7 @@ const StartPageWithoutConnectedWorkspace = () => {
         )}
       >
         <div className="flex w-full items-center justify-start">
-          <h1 className="flex items-center justify-center gap-2 font-medium text-xl">
+          <h1 className="flex items-center justify-center gap-2 font-medium text-foreground text-xl">
             Connect a workspace{' '}
             <Tooltip>
               <TooltipTrigger>
