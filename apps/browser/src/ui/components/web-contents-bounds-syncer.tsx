@@ -21,9 +21,27 @@ export const WebContentsBoundsSyncer = () => {
   useLayoutEffect(() => {
     const handleMouseEnter = (e: MouseEvent) => {
       if (e.target instanceof Element) {
+        const targetId = e.target.id;
+        const targetClass = e.target.className;
         if (e.target.id === 'dev-app-preview-container') {
+          console.log(
+            '[BoundsSyncer] mouseenter: dev-app-preview-container, setting isHovering=true',
+            {
+              targetId,
+              targetClass,
+              previousHovering: isHoveringRef.current,
+            },
+          );
           isHoveringRef.current = true;
         } else if (isHoveringRef.current) {
+          console.log(
+            '[BoundsSyncer] mouseenter: other element, setting isHovering=false',
+            {
+              targetId,
+              targetClass,
+              previousHovering: isHoveringRef.current,
+            },
+          );
           isHoveringRef.current = false;
         }
       }
@@ -31,9 +49,27 @@ export const WebContentsBoundsSyncer = () => {
 
     const handleFocusChange = (e: FocusEvent) => {
       if (e.target instanceof Element) {
-        if (e.target.id === 'dev-app-preview-container') {
+        const targetId = (e.target as Element).id;
+        const targetClass = (e.target as Element).className;
+        if ((e.target as Element).id === 'dev-app-preview-container') {
+          console.log(
+            '[BoundsSyncer] focusin: dev-app-preview-container, setting isHovering=true',
+            {
+              targetId,
+              targetClass,
+              previousHovering: isHoveringRef.current,
+            },
+          );
           isHoveringRef.current = true;
         } else if (isHoveringRef.current) {
+          console.log(
+            '[BoundsSyncer] focusin: other element, setting isHovering=false',
+            {
+              targetId,
+              targetClass,
+              previousHovering: isHoveringRef.current,
+            },
+          );
           isHoveringRef.current = false;
         }
       }
@@ -103,9 +139,14 @@ export const WebContentsBoundsSyncer = () => {
         // Check interactivity
         const isHovering = isHoveringRef.current;
         if (lastInteractiveRef.current !== isHovering) {
-          void movePanelToForeground(
-            isHovering ? 'tab-content' : 'stagewise-ui',
-          );
+          const targetPanel = isHovering ? 'tab-content' : 'stagewise-ui';
+          console.log('[BoundsSyncer] z-order change requested', {
+            isHovering,
+            previousInteractive: lastInteractiveRef.current,
+            targetPanel,
+            timestamp: Date.now(),
+          });
+          void movePanelToForeground(targetPanel);
           lastInteractiveRef.current = isHovering;
         }
       }

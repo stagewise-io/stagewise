@@ -580,6 +580,16 @@ export class WindowLayoutService {
   private handleMovePanelToForeground = async (
     panel: 'stagewise-ui' | 'tab-content',
   ) => {
+    this.logger.debug(
+      `[WindowLayoutService] handleMovePanelToForeground called`,
+      {
+        panel,
+        previousIsWebContentInteractive: this.isWebContentInteractive,
+        newIsWebContentInteractive: panel === 'tab-content',
+        platform: process.platform,
+        timestamp: Date.now(),
+      },
+    );
     this.isWebContentInteractive = panel === 'tab-content';
     this.updateZOrder();
   };
@@ -593,18 +603,44 @@ export class WindowLayoutService {
 
   private updateZOrder() {
     // re-adding views moves them to the top
+    const childViews = this.baseWindow!.contentView.children;
+    this.logger.debug(`[WindowLayoutService] updateZOrder called`, {
+      isWebContentInteractive: this.isWebContentInteractive,
+      hasActiveTab: !!this.activeTab,
+      activeTabId: this.activeTabId,
+      childViewCount: childViews.length,
+      platform: process.platform,
+      timestamp: Date.now(),
+    });
+
     if (this.isWebContentInteractive && this.activeTab) {
       // If interactive, web content is on top
       // Ensure UI is added first (bottom), then web content
       // But we can't easily reorder without removing/adding
       // Actually, if we just add child view again, it moves to end.
+      this.logger.debug(
+        `[WindowLayoutService] updateZOrder: bringing tab-content to front`,
+      );
       this.baseWindow!.contentView.addChildView(
         this.activeTab.getViewContainer(),
       );
     } else {
       // UI on top
+      this.logger.debug(
+        `[WindowLayoutService] updateZOrder: bringing stagewise-ui to front`,
+      );
       this.baseWindow!.contentView.addChildView(this.uiController!.getView());
     }
+
+    // Log final z-order
+    const finalChildViews = this.baseWindow!.contentView.children;
+    this.logger.debug(`[WindowLayoutService] updateZOrder complete`, {
+      finalChildViewCount: finalChildViews.length,
+      // Last child is topmost
+      topmostView: this.isWebContentInteractive
+        ? 'tab-content'
+        : 'stagewise-ui',
+    });
   }
 
   private handleStop = async (tabId?: string) => {

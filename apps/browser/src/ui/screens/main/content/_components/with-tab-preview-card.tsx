@@ -60,7 +60,7 @@ export function WithTabPreviewCard({
             </>
           )}
           <div className="flex flex-row items-start justify-between gap-2">
-            <span className="font-medium text-foreground text-xs">
+            <span className="mt-1 font-medium text-foreground text-xs">
               {tabState.title}
             </span>
             <div className="flex flex-row gap-0.5">
@@ -72,7 +72,7 @@ export function WithTabPreviewCard({
                     aria-label="Copy current URL"
                     onClick={() => navigator.clipboard.writeText(tabState.url)}
                   >
-                    <IconLinkFill18 className="size-4" />
+                    <IconLinkFill18 className="size-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Copy URL</TooltipContent>
