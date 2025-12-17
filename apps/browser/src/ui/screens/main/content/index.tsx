@@ -264,7 +264,7 @@ export function MainSection({
                   {COLOR_SCHEME_ICON_MAP[colorScheme]}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Toggle color scheme</TooltipContent>
+              <TooltipContent side="bottom">Toggle color scheme</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger>
@@ -285,7 +285,9 @@ export function MainSection({
                   />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Open developer tools</TooltipContent>
+              <TooltipContent side="bottom">
+                Open developer tools
+              </TooltipContent>
             </Tooltip>
           </div>
           <div className="flex size-full flex-col gap-4 rounded-lg p-2">
