@@ -201,7 +201,7 @@ const StartPageWithoutConnectedWorkspace = () => {
   }, [sortedWorkspaces]);
 
   return (
-    <div className="flex w-full max-w-2xl flex-col items-start gap-4">
+    <div className="flex w-full max-w-2xl flex-col items-start gap-4 px-20">
       <div className="flex items-center gap-2">
         <LogoWithText className="h-10 text-foreground" />
         <div className="glass-body ml-1 @[350px]:inline-flex hidden h-fit shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
