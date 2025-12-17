@@ -36,7 +36,7 @@ export function DefaultLayout({ show }: { show: boolean }) {
   return (
     <div
       className={cn(
-        'root inset-0 flex size-full flex-row items-stretch justify-between gap-2 p-2 transition-all delay-150 duration-300 ease-out',
+        'root pointer-events-auto inset-0 flex size-full flex-row items-stretch justify-between gap-2 p-2 transition-all delay-150 duration-300 ease-out',
         !show && 'pointer-events-none opacity-0 blur-lg',
       )}
     >

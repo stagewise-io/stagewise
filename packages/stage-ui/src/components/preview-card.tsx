@@ -37,7 +37,7 @@ export const PreviewCardContent = ({
 }: PreviewCardContentProps) => {
   return (
     <PreviewCardBase.Portal>
-      <PreviewCardBase.Backdrop className="fixed inset-0 z-40 h-screen w-screen" />
+      <PreviewCardBase.Backdrop className="pointer-events-auto fixed inset-0 z-40 h-screen w-screen" />
       <PreviewCardBase.Positioner
         sideOffset={sideOffset ?? 4}
         side={side}
