@@ -385,7 +385,7 @@ export type KartonContract = {
       set: (config: GlobalConfig) => Promise<void>;
     };
     browser: {
-      createTab: (url?: string) => Promise<void>;
+      createTab: (url?: string, setActive?: boolean) => Promise<void>;
       closeTab: (tabId: string) => Promise<void>;
       switchTab: (tabId: string) => Promise<void>;
       layout: {

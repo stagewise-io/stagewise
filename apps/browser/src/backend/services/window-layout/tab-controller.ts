@@ -114,7 +114,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private devToolsDeviceModeWrapperObjectId: string | null = null;
 
   // Callback to create new tabs
-  private onCreateTab?: (url: string) => void;
+  private onCreateTab?: (url: string, setActive?: boolean) => void;
 
   // Search state tracking
   private currentSearchRequestId: number | null = null;
@@ -124,7 +124,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     id: string,
     logger: Logger,
     initialUrl?: string,
-    onCreateTab?: (url: string) => void,
+    onCreateTab?: (url: string, setActive?: boolean) => void,
   ) {
     super();
     this.id = id;
@@ -780,7 +780,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
     wc.setWindowOpenHandler((details) => {
       if (this.onCreateTab) {
-        this.onCreateTab(details.url);
+        // Check disposition to determine if tab should be opened in background
+        // disposition can be: 'default', 'foreground-tab', 'background-tab', 'new-window', etc.
+        const setActive = details.disposition !== 'background-tab';
+        this.onCreateTab(details.url, setActive);
       } else {
         // Fallback to external browser if no callback is provided
         shell.openExternal(details.url);

@@ -15,7 +15,7 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 
 export interface UIControllerEventMap {
   uiReady: [];
-  createTab: [url?: string];
+  createTab: [url?: string, setActive?: boolean];
   closeTab: [tabId: string];
   switchTab: [tabId: string];
   layoutUpdate: [
@@ -98,7 +98,10 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
 
     this.view.setBackgroundColor('#00000000');
     this.view.webContents.setWindowOpenHandler((details) => {
-      this.emit('createTab', details.url);
+      // Check disposition to determine if tab should be opened in background
+      // disposition can be: 'default', 'foreground-tab', 'background-tab', 'new-window', etc.
+      const setActive = details.disposition !== 'background-tab';
+      this.emit('createTab', details.url, setActive);
       return { action: 'deny' };
     });
 
@@ -150,8 +153,8 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
   private registerKartonProcedures() {
     this.uiKarton.registerServerProcedureHandler(
       'browser.createTab',
-      async (url?: string) => {
-        this.emit('createTab', url);
+      async (url?: string, setActive?: boolean) => {
+        this.emit('createTab', url, setActive);
       },
     );
     this.uiKarton.registerServerProcedureHandler(

@@ -392,15 +392,20 @@ export class WindowLayoutService {
     return this.tabs[this.activeTabId];
   }
 
-  private handleCreateTab = async (url?: string) => {
-    await this.createTab(url, true);
+  private handleCreateTab = async (url?: string, setActive?: boolean) => {
+    await this.createTab(url, setActive ?? true);
   };
 
   private async createTab(url: string | undefined, setActive: boolean) {
     const id = randomUUID();
-    const tab = new TabController(id, this.logger, url, (newUrl: string) => {
-      void this.handleCreateTab(newUrl);
-    });
+    const tab = new TabController(
+      id,
+      this.logger,
+      url,
+      (newUrl: string, setActive?: boolean) => {
+        void this.handleCreateTab(newUrl, setActive);
+      },
+    );
 
     // Subscribe to state updates
     tab.on('stateUpdated', (updates) => {
