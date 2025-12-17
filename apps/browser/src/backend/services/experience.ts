@@ -14,11 +14,25 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { recentlyOpenedWorkspacesArraySchema } from '@shared/karton-contracts/ui';
 import type { RecentlyOpenedWorkspace } from '@shared/karton-contracts/ui';
+import {
+  type AppRouter,
+  createNodeApiClient,
+  type TRPCClient,
+} from '@stagewise/api-client';
+import { API_URL } from './auth/server-interop';
 
 export class UserExperienceService {
   private logger: Logger;
   private uiKarton: KartonService;
   private globalDataPathService: GlobalDataPathService;
+  private inspirationWebsiteListOffset = 0;
+  private inspirationWebsiteListSeed = crypto.randomUUID();
+
+  private unAuthenticatedApiClient: TRPCClient<AppRouter> = createNodeApiClient(
+    {
+      baseUrl: API_URL,
+    },
+  );
 
   private constructor(
     logger: Logger,
@@ -57,6 +71,20 @@ export class UserExperienceService {
       },
     );
 
+    this.unAuthenticatedApiClient.inspiration.list
+      .query({
+        offset: this.inspirationWebsiteListOffset,
+        limit: 5,
+        seed: this.inspirationWebsiteListSeed,
+      })
+      .then((response) => {
+        this.inspirationWebsiteListOffset += response.websites.length;
+        this.uiKarton.setState((draft) => {
+          draft.userExperience.inspirationWebsites = response;
+          draft.userExperience.inspirationWebsites.total = response.total;
+        });
+      });
+
     void this.pruneRecentlyOpenedWorkspaces({
       maxAmount: 10,
       hasBeenOpenedBeforeDate: Date.now() - 1000 * 60 * 60 * 24 * 30, // 30 days ago
@@ -85,6 +113,12 @@ export class UserExperienceService {
               : null;
           }
         });
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'userExperience.inspiration.loadMore',
+      async () => {
+        return this.loadMoreInspirationWebsites();
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -162,6 +196,11 @@ export class UserExperienceService {
                     inShowCodeMode: false,
                     customScreenSize: null,
                   },
+                  inspirationWebsites: {
+                    websites: [],
+                    total: 0,
+                    seed: crypto.randomUUID(),
+                  },
                 };
               }
             }
@@ -174,6 +213,27 @@ export class UserExperienceService {
         draft.userExperience.activeLayout = this.activeScreen;
       });
     }
+  }
+
+  private async loadMoreInspirationWebsites() {
+    const response = await this.unAuthenticatedApiClient.inspiration.list.query(
+      {
+        offset: this.inspirationWebsiteListOffset,
+        limit: 5,
+        seed: this.inspirationWebsiteListSeed,
+      },
+    );
+    this.inspirationWebsiteListOffset += response.websites.length;
+    this.uiKarton.setState((draft) => {
+      draft.userExperience.inspirationWebsites = {
+        websites: [
+          ...draft.userExperience.inspirationWebsites.websites,
+          ...response.websites,
+        ],
+        total: response.total,
+        seed: this.inspirationWebsiteListSeed,
+      };
+    });
   }
 
   private async getRecentlyOpenedWorkspacesFilePath(): Promise<string> {
@@ -209,7 +269,7 @@ export class UserExperienceService {
     openedAt,
   }: {
     path: string;
-    name?: string;
+    name: string;
     openedAt: number;
   }) {
     let recentlyOpenedWorkspaces: RecentlyOpenedWorkspace[] = [];

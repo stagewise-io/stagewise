@@ -7,6 +7,7 @@ import type {
 } from '@stagewise/agent-tools';
 import type { UserMessageMetadata, BrowserData } from './metadata';
 import type { ReactSelectedElementInfo } from '../../context-elements/react';
+import type { AppRouter, TRPCClient } from '@stagewise/api-client';
 import type { ContextElement } from '../../context-elements';
 import type {
   UIMessage,
@@ -25,6 +26,10 @@ export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
 export type { UserMessageMetadata, BrowserData, ReactSelectedElementInfo };
 export type { ContextElement } from '../../context-elements';
 export type UIMessagePart = AIMessagePart<UIDataTypes, UITools>;
+
+export type InspirationWebsite = Awaited<
+  ReturnType<TRPCClient<AppRouter>['inspiration']['list']['query']>
+>;
 
 export type { FileDiff };
 
@@ -67,7 +72,7 @@ export type WorkspaceStatus =
 
 export const recentlyOpenedWorkspaceSchema = z.object({
   path: z.string(),
-  name: z.string().optional(),
+  name: z.string(),
   openedAt: z.number(),
 });
 
@@ -229,7 +234,10 @@ export type AppState = {
   // The global configuration of the CLI.
   globalConfig: GlobalConfig;
   // State of the current user experience (getting started etc.)
-  userExperience: { recentlyOpenedWorkspaces: RecentlyOpenedWorkspace[] } & (
+  userExperience: {
+    recentlyOpenedWorkspaces: RecentlyOpenedWorkspace[];
+    inspirationWebsites: InspirationWebsite;
+  } & (
     | {
         activeLayout: Layout.SIGNIN;
       }
@@ -373,6 +381,9 @@ export type KartonContract = {
           };
         };
       };
+      inspiration: {
+        loadMore: () => Promise<void>;
+      };
     };
     filePicker: {
       createRequest: (request: FilePickerRequest) => Promise<string[]>;
@@ -491,6 +502,11 @@ export const defaultState: KartonContract['state'] = {
   userExperience: {
     recentlyOpenedWorkspaces: [],
     activeLayout: Layout.SIGNIN,
+    inspirationWebsites: {
+      websites: [],
+      total: 0,
+      seed: '',
+    },
   },
   notifications: [],
   browser: {
