@@ -153,7 +153,7 @@ export async function main({
       case 'setupCompleted':
         void _userExperienceService.saveRecentlyOpenedWorkspace({
           path: event.workspacePath,
-          name: event.name,
+          name: event.name ?? '',
           openedAt: Date.now(),
         });
         break;

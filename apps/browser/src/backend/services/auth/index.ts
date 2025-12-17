@@ -135,7 +135,6 @@ export class AuthService {
 
     this.uiKarton.removeServerProcedureHandler('userAccount.logout');
     this.uiKarton.removeServerProcedureHandler('userAccount.startLogin');
-    this.uiKarton.removeServerProcedureHandler('userAccount.abortLogin');
     this.uiKarton.removeServerProcedureHandler('userAccount.refreshStatus');
     this.uiKarton.removeServerProcedureHandler(
       'userAccount.confirmAuthenticationConfirmation',
@@ -152,7 +151,9 @@ export class AuthService {
     this.logger.debug('[AuthService] Teared down auth service');
   }
 
-  private handleAuthURI: (uri: string) => Promise<void> = ((uri) => {
+  private handleAuthURI: (uri: string) => Promise<void> = (async (
+    uri: string,
+  ) => {
     const path = uri.split('?')[0];
     const searchParams = new URLSearchParams(uri.split('?')[1]);
 
@@ -160,7 +161,10 @@ export class AuthService {
       const authCode = searchParams.get('authCode');
       const error = searchParams.get('error');
 
-      void this.handleAuthCodeExchange(authCode, error);
+      void this.handleAuthCodeExchange(
+        authCode ?? undefined,
+        error ?? undefined,
+      );
     }
   }).bind(this);
 
@@ -174,7 +178,6 @@ export class AuthService {
       this.updateAuthState((draft) => {
         draft.userAccount = {
           status: 'unauthenticated',
-          loginDialog: null,
           machineId: this.identifierService.getMachineId(),
         };
       });
@@ -350,7 +353,6 @@ export class AuthService {
     this.updateAuthState((draft) => {
       draft.userAccount = {
         ...draft.userAccount,
-        loginDialog: null,
       };
     });
     if (error) {

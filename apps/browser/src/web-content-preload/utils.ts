@@ -347,7 +347,7 @@ const getReactInfo = (element: Element): ReactSelectedElementInfo => {
     try {
       // hook.renderers is a Map-like of rendererId -> rendererInterface
       const renderers: Map<number, any> = hook.renderers;
-      for (const [, renderer] of renderers) {
+      for (const [, renderer] of Array.from(renderers.entries())) {
         if (typeof renderer?.findFiberByHostInstance === 'function') {
           const fiber = renderer.findFiberByHostInstance(node);
           if (fiber) return fiber;

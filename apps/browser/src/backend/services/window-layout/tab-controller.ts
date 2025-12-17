@@ -608,11 +608,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
     this.detachDevToolsDebugger();
 
-    // Close karton server and transport
-    this.kartonServer.close().catch((err) => {
-      this.logger.debug(`[TabController] Error closing karton server: ${err}`);
-    });
-
     // Explicitly destroy the webContents to stop all processes
     // In Electron, WebContents must be explicitly destroyed
     if (!this.webContentsView.webContents.isDestroyed()) {
