@@ -61,9 +61,6 @@ importers:
       '@stagewise/agent-tools':
         specifier: workspace:*
         version: link:../tools
-      '@stagewise/api-client':
-        specifier: 2.1.0
-        version: 2.1.0(typescript@5.9.3)
       ai:
         specifier: 5.0.101
         version: 5.0.101(zod@4.0.17)
