@@ -597,18 +597,45 @@ export class WindowLayoutService {
   };
 
   private updateZOrder() {
-    // re-adding views moves them to the top
-    if (this.isWebContentInteractive && this.activeTab) {
-      // If interactive, web content is on top
-      // Ensure UI is added first (bottom), then web content
-      // But we can't easily reorder without removing/adding
-      // Actually, if we just add child view again, it moves to end.
-      this.baseWindow!.contentView.addChildView(
-        this.activeTab.getViewContainer(),
-      );
+    if (process.platform !== 'win32') {
+      // On non-windows platforms, re-adding works fine and keep performance good
+      if (this.isWebContentInteractive && this.activeTab) {
+        this.baseWindow!.contentView.addChildView(
+          this.activeTab.getViewContainer(),
+        );
+      } else {
+        this.baseWindow!.contentView.addChildView(this.uiController!.getView());
+      }
     } else {
-      // UI on top
-      this.baseWindow!.contentView.addChildView(this.uiController!.getView());
+      // On windows, we ne explicit re-adding to prevent bugy in hitbox testing
+      if (this.isWebContentInteractive && this.activeTab) {
+        this.baseWindow!.contentView.removeChildView(
+          this.uiController!.getView(),
+        );
+        this.baseWindow!.contentView.removeChildView(
+          this.activeTab.getViewContainer(),
+        );
+
+        this.baseWindow!.contentView.addChildView(this.uiController!.getView());
+        this.baseWindow!.contentView.addChildView(
+          this.activeTab.getViewContainer(),
+        );
+      } else {
+        this.baseWindow!.contentView.removeChildView(
+          this.uiController!.getView(),
+        );
+
+        if (this.activeTab) {
+          this.baseWindow!.contentView.removeChildView(
+            this.activeTab.getViewContainer(),
+          );
+
+          this.baseWindow!.contentView.addChildView(
+            this.activeTab.getViewContainer(),
+          );
+        }
+        this.baseWindow!.contentView.addChildView(this.uiController!.getView());
+      }
     }
   }
 
