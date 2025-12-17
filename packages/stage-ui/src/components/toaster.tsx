@@ -46,10 +46,11 @@ function Toast({ notification, onDismiss }: ToastProps) {
   return (
     <div
       className={cn(
-        'glass-body flex max-w-80 flex-col gap-2 rounded-3xl bg-background/80 p-3 shadow-xl backdrop-blur-sm transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm',
+        'flex max-w-80 flex-col gap-2.5 rounded-xl bg-background p-2 text-foreground shadow-xl ring-1 transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm',
         notification.type === 'warning' &&
-          'bg-yellow-100/60 dark:bg-yellow-800/60',
-        notification.type === 'error' && 'bg-rose-100/60 dark:bg-rose-800/60',
+          'bg-yellow-100 ring-yellow-500/30 dark:bg-yellow-800',
+        notification.type === 'error' &&
+          'bg-rose-100 ring-rose-500/30 dark:bg-rose-800',
       )}
     >
       <Button
@@ -61,21 +62,27 @@ function Toast({ notification, onDismiss }: ToastProps) {
         <XIcon className="size-4" />
       </Button>
       {(notification.type !== 'info' || notification.title) && (
-        <div className="flex flex-row items-center gap-1.5">
+        <div className="flex flex-row items-start gap-2">
           {notification.type === 'warning' && (
-            <AlertTriangleIcon className="size-4" />
+            <AlertTriangleIcon className="size-5 shrink-0" />
           )}
           {notification.type === 'error' && (
-            <AlertCircleIcon className="size-4" />
+            <AlertCircleIcon className="size-5 shrink-0" />
           )}
-          {notification.title && (
-            <p className="mr-8 font-semibold text-base text-foreground">
-              {notification.title}
-            </p>
-          )}
+          <div className="flex flex-col gap-1">
+            {notification.title && (
+              <p className="mr-8 font-medium text-base text-foreground">
+                {notification.title}
+              </p>
+            )}
+            {notification.message && (
+              <p className="text-muted-foreground text-sm">
+                {notification.message}
+              </p>
+            )}
+          </div>
         </div>
       )}
-      <p className="text-muted-foreground text-sm">{notification.message}</p>
       <PopoverFooter>
         {notification.actions.length > 0 && (
           <div className="flex w-full flex-row-reverse items-center justify-start gap-2">

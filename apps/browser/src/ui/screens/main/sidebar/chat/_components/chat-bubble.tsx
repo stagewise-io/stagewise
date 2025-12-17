@@ -185,10 +185,10 @@ export function ChatBubble({
         <div className="flex max-w-full flex-col items-start gap-2">
           <div
             className={cn(
-              'glass-body group relative min-h-8 max-w-full animate-chat-bubble-appear select-text space-y-3 break-words rounded-2xl px-3 py-2 font-normal text-sm last:mb-0.5',
+              'group relative min-h-8 max-w-full animate-chat-bubble-appear select-text space-y-3 break-words rounded-xl px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
               msg.role === 'assistant'
-                ? 'min-w-1/3 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-foreground dark:bg-[#1e283d]/60'
-                : 'origin-bottom-right rounded-br-xs bg-blue-600/90 text-white',
+                ? 'min-w-1/3 origin-bottom-left rounded-bl-sm bg-zinc-100/60 text-foreground dark:bg-[#1e283d]/60'
+                : 'origin-bottom-right rounded-br-sm bg-blue-600/90 text-white',
               msg.parts.length > 1 && 'w-full',
               msg.role === 'user' &&
                 '[--color-background:var(--color-blue-600)] [--color-busy:var(--color-blue-200)] [--color-error:var(--color-rose-200)] [--color-foreground:var(--color-white)] [--color-muted-background:var(--color-blue-500)] [--color-muted-foreground:var(--color-blue-200)] [--color-primary:var(--color-blue-200)] [--color-success:var(--color-green-200)]',

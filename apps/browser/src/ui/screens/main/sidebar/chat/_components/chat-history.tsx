@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { ChatBubble } from './chat-bubble';
-import { Loader2Icon, SparklesIcon } from 'lucide-react';
+import { Loader2Icon } from 'lucide-react';
 import { useComparingSelector, useKartonState } from '@/hooks/use-karton';
 import { cn } from '@/utils';
 import { ChatErrorBubble } from './chat-error-bubble';
 import type { History } from '@shared/karton-contracts/ui';
+import { IconMsgs } from 'nucleo-glass';
 
 export const ChatHistory = () => {
   const wasAtBottomRef = useRef(true);
@@ -113,6 +114,7 @@ export const ChatHistory = () => {
       // className="scrollbar-subtle pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-2 py-4 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none"
       className={cn(
         'scrollbar-subtle mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_4px,black_100%)] pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-4 py-4 pr-1 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none',
+        renderedMessages.length === 0 && 'mb-6 h-max overflow-y-hidden',
       )}
       onScroll={handleScroll}
     >
@@ -138,9 +140,13 @@ export const ChatHistory = () => {
       </div>
 
       {renderedMessages.length === 0 && (
-        <div className="absolute inset-0 flex size-full flex-col items-center justify-center gap-3 px-4 py-2 text-black/30 text-sm dark:text-white/30">
-          <SparklesIcon className="size-8 stroke-black opacity-10 dark:stroke-white" />
-          <span>Start by writing a message</span>
+        <div className="flex size-full flex-col items-center justify-center gap-6 px-4 py-2 text-black/30 text-sm dark:text-white/30">
+          <div className="flex flex-row items-center gap-8">
+            <IconMsgs className="opactiy-60 size-24 opacity-80 drop-shadow-black/5 drop-shadow-lg dark:brightness-200 dark:contrast-75 dark:drop-shadow-black/50" />
+          </div>
+          <span className="text-center text-base italic">
+            Get started by writing a message!
+          </span>
         </div>
       )}
     </section>

@@ -51,5 +51,5 @@ export function NotificationToaster() {
     }
   }, [notifications, renderedNotificationIds, triggerAction]);
 
-  return <Toaster position="bottom-center" swipeDirections={['bottom']} />;
+  return <Toaster position="bottom-right" swipeDirections={['bottom']} />;
 }
