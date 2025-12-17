@@ -71,19 +71,25 @@ export class UserExperienceService {
       },
     );
 
-    this.unAuthenticatedApiClient.inspiration.list
-      .query({
-        offset: this.inspirationWebsiteListOffset,
-        limit: 5,
-        seed: this.inspirationWebsiteListSeed,
-      })
-      .then((response) => {
-        this.inspirationWebsiteListOffset += response.websites.length;
-        this.uiKarton.setState((draft) => {
-          draft.userExperience.inspirationWebsites = response;
-          draft.userExperience.inspirationWebsites.total = response.total;
+    try {
+      this.unAuthenticatedApiClient.inspiration.list
+        .query({
+          offset: this.inspirationWebsiteListOffset,
+          limit: 5,
+          seed: this.inspirationWebsiteListSeed,
+        })
+        .then((response) => {
+          this.inspirationWebsiteListOffset += response.websites.length;
+          this.uiKarton.setState((draft) => {
+            draft.userExperience.inspirationWebsites = response;
+            draft.userExperience.inspirationWebsites.total = response.total;
+          });
         });
-      });
+    } catch (error) {
+      this.logger.error(
+        `[UserExperienceService] Failed to load inspiration websites. Error: ${error}`,
+      );
+    }
 
     void this.pruneRecentlyOpenedWorkspaces({
       maxAmount: 10,
@@ -216,24 +222,29 @@ export class UserExperienceService {
   }
 
   private async loadMoreInspirationWebsites() {
-    const response = await this.unAuthenticatedApiClient.inspiration.list.query(
-      {
-        offset: this.inspirationWebsiteListOffset,
-        limit: 5,
-        seed: this.inspirationWebsiteListSeed,
-      },
-    );
-    this.inspirationWebsiteListOffset += response.websites.length;
-    this.uiKarton.setState((draft) => {
-      draft.userExperience.inspirationWebsites = {
-        websites: [
-          ...draft.userExperience.inspirationWebsites.websites,
-          ...response.websites,
-        ],
-        total: response.total,
-        seed: this.inspirationWebsiteListSeed,
-      };
-    });
+    try {
+      const response =
+        await this.unAuthenticatedApiClient.inspiration.list.query({
+          offset: this.inspirationWebsiteListOffset,
+          limit: 5,
+          seed: this.inspirationWebsiteListSeed,
+        });
+      this.inspirationWebsiteListOffset += response.websites.length;
+      this.uiKarton.setState((draft) => {
+        draft.userExperience.inspirationWebsites = {
+          websites: [
+            ...draft.userExperience.inspirationWebsites.websites,
+            ...response.websites,
+          ],
+          total: response.total,
+          seed: this.inspirationWebsiteListSeed,
+        };
+      });
+    } catch (error) {
+      this.logger.error(
+        `[UserExperienceService] Failed to load more inspiration websites. Error: ${error}`,
+      );
+    }
   }
 
   private async getRecentlyOpenedWorkspacesFilePath(): Promise<string> {
