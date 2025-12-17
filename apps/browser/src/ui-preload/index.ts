@@ -168,6 +168,13 @@ const messagePortProxy: MessagePortProxy = {
   },
 };
 
+// Listen for IPC messages from main process and forward as DOM events
+ipcRenderer.on('stagewise-tab-focused', (_event, tabId) => {
+  window.dispatchEvent(
+    new CustomEvent('stagewise-tab-focused', { detail: tabId }),
+  );
+});
+
 /**
  * Thin bridge API exposed to renderer.
  * The transport layer handles all the complexity.

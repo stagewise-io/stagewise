@@ -165,7 +165,7 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
         <Button
           variant="ghost"
           size="sm"
-          className="text-foreground/70 text-sm"
+          className="text-foreground/70 text-xs"
           onClick={() => {
             void closeWorkspace();
           }}
@@ -185,7 +185,7 @@ export function WorkspaceInfoBadge({ isCollapsed }: { isCollapsed: boolean }) {
               ? 'ml-4'
               : 'ml-0',
           )}
-          size={isCollapsed ? 'icon-md' : 'md'}
+          size={isCollapsed ? 'icon-sm' : 'sm'}
           variant="ghost"
         >
           {isCollapsed ? (

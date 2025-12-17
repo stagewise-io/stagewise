@@ -5,7 +5,8 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
-import { IconCommand } from 'nucleo-micro-bold';
+import { HotkeyActions } from '@shared/hotkeys';
+import { HotkeyComboText } from '@/components/hotkey-combo-text';
 
 type AgentPreviewBadgeProps = {
   onClick: () => void;
@@ -38,8 +39,9 @@ export function AgentPreviewBadge({
           <div className="flex flex-row items-center gap-1">
             <span className="text-xs">Toggle chat panel</span>
             <div className="pointer-events-none flex shrink-0 flex-row items-center gap-0 opacity-40">
-              <IconCommand className="size-3 text-muted-foreground" />
-              <span className="font-mono text-muted-foreground text-xs">I</span>
+              <span className="font-mono text-muted-foreground text-xs">
+                <HotkeyComboText action={HotkeyActions.CTRL_I} />
+              </span>
             </div>
           </div>
         </TooltipContent>

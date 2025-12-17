@@ -4,6 +4,8 @@ import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { TabsContainer } from './_components/tabs-container';
+import { HotkeyActions } from '@shared/hotkeys';
+import { HotkeyComboText } from '@/components/hotkey-combo-text';
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -286,7 +288,14 @@ export function MainSection({
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                Open developer tools
+                <div className="flex flex-row items-center gap-1">
+                  <span className="text-xs">Toggle developer tools</span>
+                  <div className="pointer-events-none flex shrink-0 flex-row items-center gap-0 opacity-40">
+                    <span className="font-mono text-muted-foreground text-xs">
+                      <HotkeyComboText action={HotkeyActions.CMD_OPTION_I} />
+                    </span>
+                  </div>
+                </div>
               </TooltipContent>
             </Tooltip>
           </div>

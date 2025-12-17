@@ -3,9 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/utils';
 
-const textSlideshowVariants = cva(
-  'relative block h-[1.2em] h-full overflow-hidden',
-);
+const textSlideshowVariants = cva('relative block h-[1.2em] overflow-hidden');
 
 interface TextSlideshowProps
   extends React.ComponentProps<'span'>,
@@ -24,6 +22,13 @@ function TextSlideshow({
 }: TextSlideshowProps) {
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [isAnimating, setIsAnimating] = React.useState(false);
+
+  // Find the longest text to maintain consistent width
+  const longestText = React.useMemo(() => {
+    return texts.reduce((longest, current) =>
+      current.length > longest.length ? current : longest,
+    );
+  }, [texts]);
 
   React.useEffect(() => {
     if (texts.length <= 1) return;
@@ -50,6 +55,11 @@ function TextSlideshow({
       className={cn(textSlideshowVariants(), className)}
       {...props}
     >
+      {/* Invisible placeholder to establish width based on longest text */}
+      <span className="invisible" aria-hidden="true">
+        {longestText}
+        {appendix}
+      </span>
       <span
         className={cn(
           'absolute inset-0 transition-all duration-300 ease-in-out',

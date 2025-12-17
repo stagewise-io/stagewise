@@ -304,7 +304,7 @@ body {
 }
 
 @utility scrollbar-hover-only {
-  @apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/30;
+  @apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/15;
 }
 
 @utility scrollbar-visible {
