@@ -78,7 +78,7 @@ export class PagesService {
       const __dirname = path.dirname(fileURLToPath(import.meta.url));
       const pagesBaseDir = path.resolve(
         __dirname,
-        `../pages/${PAGES_VITE_NAME}`,
+        `../renderer/${PAGES_VITE_NAME}`,
       );
 
       // If path is empty or just "/", serve index.html

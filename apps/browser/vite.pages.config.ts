@@ -45,6 +45,7 @@ export default defineConfig({
     preserveSymlinks: false,
   },
   build: {
+    outDir: path.resolve(__dirname, '.vite/renderer/pages'),
     rollupOptions: {
       external: ['serialport', 'sqlite3'],
     },
