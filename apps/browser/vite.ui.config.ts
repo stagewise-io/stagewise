@@ -41,4 +41,7 @@ export default defineConfig({
     },
     target: 'es2022',
   },
+  optimizeDeps: {
+    force: true,
+  },
 });
