@@ -204,7 +204,7 @@ export class WindowLayoutService {
     );
 
     // Create initial tab
-    this.createTab('https://google.com', true);
+    this.createTab('ui-main', true);
 
     this.logger.debug('[WindowLayoutService] Service initialized');
   }
@@ -252,7 +252,7 @@ export class WindowLayoutService {
 
   /**
    * Opens a URL in a new tab, or navigates the active tab if it's a new/default tab.
-   * A tab is considered "new" if it's the only tab and is on the default URL (google.com).
+   * A tab is considered "new" if it's the only tab and is on the default URL (ui-main).
    */
   public async openUrl(url: string): Promise<void> {
     this.logger.debug(`[WindowLayoutService] openUrl called with url: ${url}`);
@@ -261,7 +261,7 @@ export class WindowLayoutService {
     const shouldReuseActiveTab =
       this.activeTab &&
       Object.keys(this.tabs).length === 1 &&
-      this.activeTab.getState().url === 'https://google.com' &&
+      this.activeTab.getState().url === 'ui-main' &&
       !this.activeTab.getState().navigationHistory.canGoBack;
 
     if (shouldReuseActiveTab) {

@@ -4,8 +4,6 @@ import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import { useCallback, useMemo, useRef } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { TabsContainer } from './_components/tabs-container';
-import { HotkeyActions } from '@shared/hotkeys';
-import { HotkeyComboText } from '@/components/hotkey-combo-text';
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -35,10 +33,33 @@ import { SearchBar } from './_components/search-bar';
 import { ZoomBar } from './_components/zoom-bar';
 import { Omnibox, type OmniboxRef } from './_components/omnibox';
 
-const COLOR_SCHEME_ICON_MAP: Record<ColorScheme, React.ReactNode> = {
-  light: <IconBrightnessIncreaseFill18 className="size-4.5 text-primary" />,
-  dark: <IconMoonFill18 className="mb-px ml-px size-4 text-primary" />,
-  system: <IconNightShiftFillDuo18 className="size-4.5 text-foreground" />,
+const ColorSchemeIcon = ({
+  colorScheme,
+  className,
+}: {
+  colorScheme: ColorScheme;
+  className?: string;
+}) => {
+  switch (colorScheme) {
+    case 'light':
+      return (
+        <IconBrightnessIncreaseFill18
+          className={cn('size-4.5 text-primary', className)}
+        />
+      );
+    case 'dark':
+      return (
+        <IconMoonFill18
+          className={cn('mb-px ml-px size-4 text-primary', className)}
+        />
+      );
+    case 'system':
+      return (
+        <IconNightShiftFillDuo18
+          className={cn('size-4.5 text-foreground', className)}
+        />
+      );
+  }
 };
 
 export function MainSection({
@@ -99,6 +120,10 @@ export function MainSection({
   const activeTab = useMemo(() => {
     return tabs[activeTabId] as TabState | undefined;
   }, [activeTabId, tabs]);
+
+  const isStartPage = useMemo(() => {
+    return activeTab?.url === 'ui-main';
+  }, [activeTab?.url]);
 
   const activeTabIndex = useMemo(() => {
     return Object.keys(tabs).findIndex((_id) => _id === activeTabId) ?? 0;
@@ -165,39 +190,46 @@ export function MainSection({
         >
           {/* Background with mask for the web-content */}
           <BackgroundWithCutout className={cn(`z-0`)} borderRadius={4} />
-          <div className="flex w-full shrink-0 items-center gap-2 p-2 pb-0">
+          <div
+            className={cn('flex w-full shrink-0 items-center gap-2 p-2 pb-0')}
+          >
             <Button
               variant="ghost"
               size="icon-sm"
-              disabled={!activeTab?.navigationHistory.canGoBack}
+              disabled={isStartPage || !activeTab?.navigationHistory.canGoBack}
               onClick={() => {
                 goBack(activeTabId);
               }}
             >
               <IconArrowLeft
-                className={`size-4 ${activeTab?.navigationHistory.canGoBack ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+                className={`size-4 ${!isStartPage && activeTab?.navigationHistory.canGoBack ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
               />
             </Button>
             <Button
               variant="ghost"
               size="icon-sm"
-              disabled={!activeTab?.navigationHistory.canGoForward}
+              disabled={
+                isStartPage || !activeTab?.navigationHistory.canGoForward
+              }
               onClick={() => {
                 goForward(activeTabId);
               }}
             >
               <IconArrowRight
-                className={`size-4 ${activeTab?.navigationHistory.canGoForward ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+                className={`size-4 ${!isStartPage && activeTab?.navigationHistory.canGoForward ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
               />
             </Button>
             <Button
               variant="ghost"
               size="icon-sm"
+              disabled={isStartPage}
               onClick={() => {
                 reload(activeTabId);
               }}
             >
-              <IconArrowRotateAnticlockwise className="size-4 text-muted-foreground" />
+              <IconArrowRotateAnticlockwise
+                className={`size-4 ${!isStartPage ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+              />
             </Button>
             <Omnibox
               ref={omniboxRef}
@@ -213,11 +245,17 @@ export function MainSection({
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  disabled={isStartPage}
                   onClick={() => {
                     cycleColorScheme(activeTabId);
                   }}
                 >
-                  {COLOR_SCHEME_ICON_MAP[colorScheme]}
+                  <ColorSchemeIcon
+                    colorScheme={colorScheme}
+                    className={cn(
+                      isStartPage ? 'text-muted-foreground/40' : '',
+                    )}
+                  />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Toggle color scheme</TooltipContent>
@@ -227,6 +265,7 @@ export function MainSection({
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  disabled={isStartPage}
                   onClick={() => {
                     toggleDevTools(activeTabId);
                   }}
@@ -237,19 +276,13 @@ export function MainSection({
                       activeTab?.devToolsOpen
                         ? 'text-primary'
                         : 'text-muted-foreground',
+                      isStartPage ? 'text-muted-foreground/40' : '',
                     )}
                   />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <div className="flex flex-row items-center gap-1">
-                  <span className="text-xs">Toggle developer tools</span>
-                  <div className="pointer-events-none flex shrink-0 flex-row items-center gap-0 opacity-40">
-                    <span className="font-mono text-muted-foreground text-xs">
-                      <HotkeyComboText action={HotkeyActions.CMD_OPTION_I} />
-                    </span>
-                  </div>
-                </div>
+                Open developer tools
               </TooltipContent>
             </Tooltip>
           </div>

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2Icon } from 'lucide-react';
 import type {
   InspirationWebsite,
   RecentlyOpenedWorkspace,
@@ -9,7 +8,7 @@ import { cn } from '@/utils';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { useIsContainerScrollable } from '@/hooks/use-is-container-scrollable';
 import { IconDocFolder, IconCircleQuestion } from 'nucleo-glass';
-import { IconPlusFill18, IconChevronDownFill18 } from 'nucleo-ui-fill-18';
+import { IconPlusFill18 } from 'nucleo-ui-fill-18';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
 import { TextSlideshow } from '@/components/ui/text-slideshow';
@@ -20,18 +19,22 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
+import { IconChevronDown } from 'nucleo-micro-bold';
 
 export function StartPage() {
-  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
+  const hasSeenOnboardingFlow = useKartonState(
+    (s) => s.userExperience.storedExperienceData.hasSeenOnboardingFlow,
+  );
+
   return (
     <div
       className="flex size-full flex-col items-center justify-center overflow-hidden bg-background"
       id="start-page-container"
     >
-      {workspaceStatus === 'open' ? (
-        <StartPageWithConnectedWorkspace />
+      {!hasSeenOnboardingFlow ? (
+        <OnboardingStartPage />
       ) : (
-        <StartPageWithoutConnectedWorkspace />
+        <StartPageWithConnectedWorkspace />
       )}
     </div>
   );
@@ -44,6 +47,7 @@ const StartPageWithConnectedWorkspace = () => {
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const goto = useKartonProcedure((p) => p.browser.goto);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
   const loadMoreWebsites = useKartonProcedure(
     (p) => p.userExperience.inspiration.loadMore,
   );
@@ -119,20 +123,23 @@ const StartPageWithConnectedWorkspace = () => {
     [activeTabId, goto, createTab],
   );
   return (
-    <div className="flex w-full max-w-6xl flex-col items-start gap-4 px-20">
+    <div className="flex w-full max-w-6xl flex-col items-start gap-8 px-20">
       <div className="flex items-center gap-2">
         <LogoWithText className="h-10 text-foreground" />
         <div className="glass-body ml-1 @[350px]:inline-flex hidden h-fit shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
           Alpha
         </div>
       </div>
+      {workspaceStatus !== 'open' && <ConnectWorkspaceBanner />}
       <div className="group/design-inspiration mt-2 flex w-full flex-col items-center justify-start gap-4">
         <div className="flex w-full items-center justify-between">
           <h1 className="font-medium text-xl">
             <TextSlideshow
+              className="text-foreground"
               texts={[
                 'Grab components from',
                 'Grab styles from',
+                'Understand the layout of',
                 'Grab colors from',
                 'Grab themes from',
                 'Grab fonts from',
@@ -142,7 +149,7 @@ const StartPageWithConnectedWorkspace = () => {
         </div>
         <div
           ref={scrollContainerRef}
-          className="mask-alpha scrollbar-none -my-8 flex w-[calc(100%+4rem)] justify-start gap-4 overflow-x-auto px-8 py-8"
+          className="mask-alpha scrollbar-none -my-12 flex w-[calc(100%+4rem)] justify-start gap-4 overflow-x-auto px-8 py-12"
           style={
             {
               ...getMaskStyle(),
@@ -172,36 +179,18 @@ const StartPageWithConnectedWorkspace = () => {
   );
 };
 
-const StartPageWithoutConnectedWorkspace = () => {
-  const [showAllWorkspaces, setShowAllWorkspaces] = useState(false);
-  const recentlyOpenedWorkspaces = useKartonState(
-    (s) => s.userExperience.recentlyOpenedWorkspaces,
+const OnboardingStartPage = () => {
+  const openWorkspace = useKartonProcedure((p) => p.workspace.open);
+  const setHasSeenOnboardingFlow = useKartonProcedure(
+    (p) => p.userExperience.storedExperienceData.setHasSeenOnboardingFlow,
+  );
+  const selectAndOpenWorkspace = useCallback(
+    async () => await openWorkspace(undefined),
+    [openWorkspace],
   );
 
-  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
-
-  const isSettingUpWorkspace = useMemo(() => {
-    return workspaceStatus === 'setup';
-  }, [workspaceStatus]);
-
-  const sortedWorkspaces = useMemo(() => {
-    return [...recentlyOpenedWorkspaces].sort(
-      (a, b) => b.openedAt - a.openedAt,
-    );
-  }, [recentlyOpenedWorkspaces]);
-
-  const openWorkspace = useKartonProcedure((s) => s.workspace.open);
-
-  const selectAndOpenWorkspace = useCallback(async () => {
-    await openWorkspace(undefined);
-  }, [openWorkspace]);
-
-  const topRecentlyOpenedWorkspaces = useMemo(() => {
-    return sortedWorkspaces.slice(0, 3);
-  }, [sortedWorkspaces]);
-
   return (
-    <div className="flex w-full max-w-2xl flex-col items-start gap-4 px-20">
+    <div className="flex w-full max-w-2xl flex-col items-start gap-4 px-10">
       <div className="flex items-center gap-2">
         <LogoWithText className="h-10 text-foreground" />
         <div className="glass-body ml-1 @[350px]:inline-flex hidden h-fit shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
@@ -210,67 +199,41 @@ const StartPageWithoutConnectedWorkspace = () => {
       </div>
       <div
         className={cn(
-          'group/start-page-workspaces mt-4 flex w-full flex-col items-center justify-start gap-2',
-          isSettingUpWorkspace && 'pointer-events-none opacity-20',
+          'group/start-page-workspaces mt-2 flex w-full flex-col items-start justify-start gap-4 rounded-lg border border-muted-foreground/5 bg-linear-to-tr from-muted-foreground/8 to-muted-foreground/3 p-4',
         )}
       >
-        <div className="flex w-full items-center justify-start">
-          <h1 className="flex items-center justify-center gap-2 font-medium text-foreground text-xl">
-            Connect a workspace{' '}
-            <Tooltip>
-              <TooltipTrigger>
-                <IconCircleQuestion className="size-4 self-start text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <span>
-                  Connecting to a workspace will allow the agent to access and
-                  modify files and folders in the workspace.
-                </span>
-              </TooltipContent>
-            </Tooltip>
-          </h1>
-          {isSettingUpWorkspace && (
-            <Loader2Icon className="ml-auto size-4 animate-spin text-foreground opacity-100!" />
-          )}
-          <div
-            className={cn(
-              'ml-auto hidden cursor-pointer items-center gap-1 text-muted-foreground hover:text-foreground',
-              topRecentlyOpenedWorkspaces.length > 3 &&
-                'group-hover/start-page-workspaces:flex',
-            )}
-            onClick={() => setShowAllWorkspaces(!showAllWorkspaces)}
-          >
-            <span className="font-medium text-xs">
-              Show all ({sortedWorkspaces.length})
-            </span>
-            <IconChevronDownFill18
-              className={`-rotate-90 size-3 ${showAllWorkspaces ? 'rotate-0' : ''}`}
-            />
+        <div className="flex justify-between gap-20 ">
+          <div className="flex flex-col items-start justify-center gap-1">
+            <h1 className="flex items-center justify-center gap-2 font-medium text-foreground text-xl">
+              Connect a workspace
+            </h1>
+
+            <div className="flex w-full max-w-md flex-col items-start justify-center gap-2 text-muted-foreground text-sm">
+              Connecting a workspace will give the stagewise agent access to
+              your project.
+            </div>
           </div>
+          <IconDocFolder className="size-18" />
         </div>
-        <div className="scrollbar-subtle flex max-h-70 w-full flex-col items-center justify-start gap-2 overflow-y-auto">
-          {(showAllWorkspaces
-            ? sortedWorkspaces
-            : topRecentlyOpenedWorkspaces
-          ).map((workspace) => (
-            <RecentlyOpenedWorkspaceItem
-              onClick={() => {
-                openWorkspace(workspace.path);
-              }}
-              key={workspace.path}
-              workspace={workspace}
-            />
-          ))}
+        <div className="flex w-full items-center justify-end gap-4">
+          <Button
+            variant={'ghost'}
+            size="sm"
+            className="mt-2 rounded-lg p-2"
+            onClick={() => setHasSeenOnboardingFlow(true)}
+          >
+            Connect later
+          </Button>
+          <Button
+            variant={'primary'}
+            size="sm"
+            className="mt-2 rounded-lg p-2"
+            onClick={selectAndOpenWorkspace}
+          >
+            <IconPlusFill18 className="size-4" />
+            Connect a workspace
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="ml-auto rounded-lg p-2"
-          onClick={selectAndOpenWorkspace}
-        >
-          <IconPlusFill18 className="size-4 text-foreground" />
-          Connect new workspace
-        </Button>
       </div>
     </div>
   );
@@ -285,20 +248,23 @@ const RecentlyOpenedWorkspaceItem = ({
 }) => {
   return (
     <div
-      className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg p-2 hover:bg-muted-foreground/5"
+      className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg p-1 hover:bg-muted-foreground/5"
       onClick={onClick}
     >
-      <IconDocFolder className="size-8 text-muted-foreground" />
-      <div className="flex w-full flex-col items-center justify-center gap-1 ">
-        <div className="flex w-full justify-between rounded-b-lg text-foreground text-sm">
-          <span className="font-medium">{workspace.name}</span>
-        </div>
-        <div className="flex w-full items-center justify-between rounded-b-lg font-normal text-foreground text-sm">
-          <span className="self-start font-normal text-muted-foreground/70 text-xs">
-            {workspace.path}
-          </span>
-          <span className="font-normal text-muted-foreground/70 text-xs">
+      <IconDocFolder className="size-4 shrink-0 text-muted-foreground" />
+      <div className="flex w-full flex-col items-start justify-start gap-0">
+        <div className="flex w-full items-baseline justify-start gap-3 text-foreground text-sm">
+          <span className="truncate font-medium">{workspace.name}</span>
+          <span className="hidden shrink-0 font-normal text-muted-foreground/50 text-xs sm:inline">
             <TimeAgo date={workspace.openedAt} live={false} />
+          </span>
+        </div>
+        <div className="flex w-full items-center justify-between gap-8 rounded-b-lg font-normal text-foreground text-sm">
+          <span
+            className="min-w-0 self-start truncate font-normal text-muted-foreground/70 text-xs"
+            dir="rtl"
+          >
+            <span dir="ltr">{workspace.path}</span>
           </span>
         </div>
       </div>
@@ -339,15 +305,9 @@ const DesignInspirationCard = ({
   useEffect(() => {
     if (videoRef.current) {
       if (isHovered) {
-        videoRef.current
-          .play()
-          .then(() => {
-            setIsVideoPlaying(true);
-          })
-          .catch(() => {
-            // Video failed to play, keep showing image
-            setIsVideoPlaying(false);
-          });
+        videoRef.current.play().catch(() => {
+          // Video failed to play, keep showing image
+        });
       } else {
         videoRef.current.pause();
         videoRef.current.currentTime = 0;
@@ -356,12 +316,22 @@ const DesignInspirationCard = ({
     }
   }, [isHovered]);
 
+  const handleVideoPlaying = useCallback(() => {
+    // Double RAF: first RAF queues for next frame, second RAF runs after paint
+    // This ensures the video frame is actually rendered before we fade it in
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsVideoPlaying(true);
+      });
+    });
+  }, []);
+
   return (
     <div
       onClick={(e) => onClick(e)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="flex w-64 shrink-0 cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-border bg-card shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] transition-shadow duration-300 hover:shadow-[0_0_12px_0_rgba(0,0,0,0.12),0_-8px_56px_-24px_rgba(0,0,0,0.2)]"
+      className="flex w-64 shrink-0 cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-muted-foreground/20 bg-background text-foreground shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] transition-shadow duration-300 hover:shadow-[0_0_12px_0_rgba(0,0,0,0.12),0_-8px_56px_-24px_rgba(0,0,0,0.2)]"
     >
       <div className="relative h-40 w-full">
         {!isImageLoaded && <Skeleton className="h-40 w-full rounded-none" />}
@@ -371,8 +341,7 @@ const DesignInspirationCard = ({
           onLoad={() => setIsImageLoaded(true)}
           className={cn(
             'absolute inset-0 flex h-full w-full items-center justify-center object-cover transition-opacity duration-200',
-            !isImageLoaded && 'opacity-0',
-            isImageLoaded && (isVideoPlaying ? 'opacity-0' : 'opacity-100'),
+            isImageLoaded ? 'opacity-100' : 'opacity-0',
           )}
         />
         {website.screen_video_url && (
@@ -383,6 +352,7 @@ const DesignInspirationCard = ({
             muted
             playsInline
             preload="auto"
+            onPlaying={handleVideoPlaying}
             className={cn(
               'absolute inset-0 flex h-full w-full items-center justify-center object-cover transition-opacity duration-200',
               isVideoPlaying ? 'opacity-100' : 'opacity-0',
@@ -406,6 +376,120 @@ const DesignInspirationCard = ({
           </>
         )}
       </div>
+    </div>
+  );
+};
+
+const ConnectWorkspaceBanner = () => {
+  const openWorkspace = useKartonProcedure((p) => p.workspace.open);
+  const selectAndOpenWorkspace = useCallback(
+    async () => await openWorkspace(undefined),
+    [openWorkspace],
+  );
+  const recentlyOpenedWorkspaces = useKartonState(
+    (s) => s.userExperience.storedExperienceData.recentlyOpenedWorkspaces,
+  );
+
+  const [showAllRecentlyOpenedWorkspaces, setShowAllRecentlyOpenedWorkspaces] =
+    useState(false);
+
+  const sortedRecentlyOpenedWorkspaces = useMemo(() => {
+    const allSorted = [...recentlyOpenedWorkspaces].sort(
+      (a, b) => b.openedAt - a.openedAt,
+    );
+    if (showAllRecentlyOpenedWorkspaces) return allSorted;
+    else return allSorted.slice(0, 3);
+  }, [recentlyOpenedWorkspaces, showAllRecentlyOpenedWorkspaces]);
+
+  if (sortedRecentlyOpenedWorkspaces.length > 0) {
+    return (
+      <div className="flex w-full flex-col items-start justify-between gap-2">
+        <h1 className="flex items-center justify-center gap-2 font-medium text-foreground text-xl">
+          Connect a workspace
+          <Tooltip>
+            <TooltipTrigger>
+              <IconCircleQuestion className="size-4 self-start text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <span>
+                Connecting a workspace will give the stagewise agent access to
+                your project.
+              </span>
+            </TooltipContent>
+          </Tooltip>
+        </h1>
+        <div className="group/recent-workspaces flex w-full flex-col items-start justify-start gap-1 rounded-lg border border-muted-foreground/5 bg-linear-to-tr from-muted-foreground/8 to-muted-foreground/3 p-3">
+          <div className="flex w-full flex-row items-start justify-between gap-14">
+            <div className="flex w-full flex-col items-start gap-2">
+              <div className="flex w-full flex-row items-start justify-between gap-1">
+                <div className="shrink-0 font-medium text-muted-foreground text-xs">
+                  Recent workspaces
+                </div>
+                {recentlyOpenedWorkspaces.length > 3 && (
+                  <div
+                    className="hidden shrink-0 cursor-pointer items-center gap-1 font-medium text-muted-foreground text-xs group-hover/recent-workspaces:flex"
+                    onClick={() =>
+                      setShowAllRecentlyOpenedWorkspaces(
+                        !showAllRecentlyOpenedWorkspaces,
+                      )
+                    }
+                  >
+                    Show all ({sortedRecentlyOpenedWorkspaces.length})
+                    <IconChevronDown
+                      className={cn(
+                        'size-3 shrink-0',
+                        showAllRecentlyOpenedWorkspaces
+                          ? 'rotate-0'
+                          : '-rotate-90',
+                      )}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="scrollbar-subtle flex max-h-60 w-full flex-col items-start gap-2 overflow-y-auto">
+                {sortedRecentlyOpenedWorkspaces.map((workspace) => (
+                  <RecentlyOpenedWorkspaceItem
+                    key={workspace.path}
+                    workspace={workspace}
+                    onClick={() => {
+                      openWorkspace(workspace.path);
+                    }}
+                  />
+                ))}
+              </div>
+              <Button
+                variant={'ghost'}
+                size="sm"
+                className="shrink-0 self-end rounded-lg p-2 text-xs"
+                onClick={selectAndOpenWorkspace}
+              >
+                <IconPlusFill18 className="size-4 shrink-0" />
+                Connect a new workspace
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full items-center justify-between gap-4 rounded-lg border border-muted-foreground/5 bg-linear-to-tr from-muted-foreground/8 to-muted-foreground/3 p-4">
+      <div className="flex items-center gap-3">
+        <IconDocFolder className="size-6 shrink-0 text-muted-foreground" />
+        <span className="font-medium text-foreground text-sm">
+          Connect a workspace to give the agent access to your project.
+        </span>
+      </div>
+      <Button
+        variant={'primary'}
+        size="sm"
+        className="shrink-0 rounded-lg"
+        onClick={selectAndOpenWorkspace}
+      >
+        <IconPlusFill18 className="size-4" />
+        Connect workspace
+      </Button>
     </div>
   );
 };

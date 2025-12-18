@@ -80,6 +80,13 @@ export const recentlyOpenedWorkspacesArraySchema = z.array(
   recentlyOpenedWorkspaceSchema,
 );
 
+export const storedExperienceDataSchema = z.object({
+  recentlyOpenedWorkspaces: recentlyOpenedWorkspacesArraySchema,
+  hasSeenOnboardingFlow: z.boolean(),
+});
+
+export type StoredExperienceData = z.infer<typeof storedExperienceDataSchema>;
+
 export type RecentlyOpenedWorkspace = z.infer<
   typeof recentlyOpenedWorkspaceSchema
 >;
@@ -235,7 +242,7 @@ export type AppState = {
   globalConfig: GlobalConfig;
   // State of the current user experience (getting started etc.)
   userExperience: {
-    recentlyOpenedWorkspaces: RecentlyOpenedWorkspace[];
+    storedExperienceData: StoredExperienceData;
     inspirationWebsites: InspirationWebsite;
   } & (
     | {
@@ -384,6 +391,9 @@ export type KartonContract = {
       inspiration: {
         loadMore: () => Promise<void>;
       };
+      storedExperienceData: {
+        setHasSeenOnboardingFlow: (value: boolean) => Promise<void>;
+      };
     };
     filePicker: {
       createRequest: (request: FilePickerRequest) => Promise<string[]>;
@@ -500,7 +510,10 @@ export const defaultState: KartonContract['state'] = {
     openFilesInIde: 'other',
   },
   userExperience: {
-    recentlyOpenedWorkspaces: [],
+    storedExperienceData: {
+      recentlyOpenedWorkspaces: [],
+      hasSeenOnboardingFlow: false,
+    },
     activeLayout: Layout.SIGNIN,
     inspirationWebsites: {
       websites: [],
