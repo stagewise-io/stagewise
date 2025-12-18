@@ -2,6 +2,7 @@ import { IconMinus, IconPlus } from 'nucleo-micro-bold';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { IconMagnifierOutline18 } from 'nucleo-ui-outline-18';
+import { HotkeyComboText } from '@/components/hotkey-combo-text';
 import {
   Tooltip,
   TooltipContent,
@@ -12,6 +13,7 @@ import {
   Collapsible,
   CollapsibleContent,
 } from '@stagewise/stage-ui/components/collapsible';
+import { HotkeyActions } from '@shared/hotkeys';
 
 export function ZoomBar() {
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
@@ -121,7 +123,9 @@ export function ZoomBar() {
                   {zoomPercentage}%
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Reset zoom</TooltipContent>
+              <TooltipContent>
+                Reset zoom <HotkeyComboText action={HotkeyActions.CTRL_0} />
+              </TooltipContent>
             </Tooltip>
             <Button variant="ghost" size="icon-xs" onClick={zoomIn}>
               <IconPlus className="size-3.5" />
