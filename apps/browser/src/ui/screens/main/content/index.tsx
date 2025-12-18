@@ -1,7 +1,7 @@
 import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
 import { useTabUIState } from '@/hooks/use-tab-ui-state';
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { TabsContainer } from './_components/tabs-container';
 import { HotkeyActions } from '@shared/hotkeys';
@@ -10,7 +10,6 @@ import {
   IconArrowLeft,
   IconArrowRight,
   IconArrowRotateAnticlockwise,
-  IconCommand,
 } from 'nucleo-micro-bold';
 import { Button } from '@stagewise/stage-ui/components/button';
 import type { ColorScheme, TabState } from '@shared/karton-contracts/ui';
@@ -34,6 +33,7 @@ import {
 } from 'nucleo-ui-fill-18';
 import { SearchBar } from './_components/search-bar';
 import { ZoomBar } from './_components/zoom-bar';
+import { Omnibox, type OmniboxRef } from './_components/omnibox';
 
 const COLOR_SCHEME_ICON_MAP: Record<ColorScheme, React.ReactNode> = {
   light: <IconBrightnessIncreaseFill18 className="size-4.5 text-primary" />,
@@ -57,10 +57,6 @@ export function MainSection({
   const reload = useKartonProcedure((p) => p.browser.reload);
   const goto = useKartonProcedure((p) => p.browser.goto);
   const toggleDevTools = useKartonProcedure((p) => p.browser.toggleDevTools);
-  const [localUrl, setLocalUrl] = useState(tabs[activeTabId]?.url ?? '');
-  const [urlBeforeEdit, setUrlBeforeEdit] = useState(
-    tabs[activeTabId]?.url ?? '',
-  );
 
   const cycleColorScheme = useKartonProcedure(
     (p) => p.browser.cycleColorScheme,
@@ -69,7 +65,7 @@ export function MainSection({
     (s) => s.browser.tabs[activeTabId]?.colorScheme,
   );
 
-  const urlInputRef = useRef<HTMLInputElement>(null);
+  const omniboxRef = useRef<OmniboxRef>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const activateSearchBar = useKartonProcedure(
     (p) => p.browser.searchBar.activate,
@@ -80,8 +76,7 @@ export function MainSection({
   const handleCreateTab = useCallback(() => {
     createTab();
     // Focus URL bar
-    setLocalUrl('');
-    urlInputRef.current?.focus();
+    omniboxRef.current?.focus();
   }, [createTab]);
 
   const handleCleanAllTabs = useCallback(() => {
@@ -140,28 +135,6 @@ export function MainSection({
     return activeTabIndex !== 0 || isSidebarCollapsed;
   }, [activeTabIndex, isSidebarCollapsed]);
 
-  useEffect(() => {
-    if (activeTab?.url === 'ui-main') {
-      setLocalUrl('');
-      setUrlBeforeEdit('');
-    } else {
-      setLocalUrl(activeTab?.url ?? '');
-      setUrlBeforeEdit(activeTab?.url ?? '');
-    }
-  }, [activeTab?.url]);
-
-  useEventListener(
-    'keydown',
-    (e: KeyboardEvent) => {
-      if (e.code === 'Escape') {
-        setLocalUrl(urlBeforeEdit);
-        urlInputRef.current?.blur();
-      }
-    },
-    { capture: true },
-    urlInputRef.current,
-  );
-
   return (
     <ResizablePanel
       id="opened-content-panel"
@@ -172,8 +145,7 @@ export function MainSection({
       <CoreHotkeyBindings
         onCreateTab={handleCreateTab}
         onFocusUrlBar={() => {
-          urlInputRef.current?.focus();
-          urlInputRef.current?.select();
+          omniboxRef.current?.focus();
         }}
         onFocusSearchBar={handleFocusSearchBar}
         onCleanAllTabs={handleCleanAllTabs}
@@ -227,31 +199,13 @@ export function MainSection({
             >
               <IconArrowRotateAnticlockwise className="size-4 text-muted-foreground" />
             </Button>
-            {/* URL bar */}
-            <div className="relative flex flex-1 items-center rounded-full bg-zinc-500/5 pr-5 pl-3 focus-within:bg-zinc-500/10">
-              <input
-                ref={urlInputRef}
-                placeholder="Search or type a URL"
-                type="text"
-                value={localUrl}
-                onChange={(e) => setLocalUrl(e.target.value)}
-                onFocus={() => setUrlBeforeEdit(tabs[activeTabId]?.url ?? '')}
-                className="h-[30px] w-full truncate rounded-full px-2 text-foreground text-sm outline-none"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    goToUrl(goto, localUrl, activeTabId);
-                    setUrlBeforeEdit(localUrl);
-                    urlInputRef.current?.blur();
-                  }
-                }}
-              />
-              <div className="pointer-events-none flex shrink-0 flex-row items-center gap-1 opacity-40">
-                <IconCommand className="size-3 text-muted-foreground" />
-                <span className="font-mono text-muted-foreground text-xs">
-                  L
-                </span>
-              </div>
-            </div>
+            <Omnibox
+              ref={omniboxRef}
+              activeTab={activeTab}
+              activeTabId={activeTabId}
+              tabs={tabs}
+              goto={goto}
+            />
             <ZoomBar />
             <SearchBar ref={searchInputRef} />
             <Tooltip>
@@ -319,26 +273,4 @@ export function MainSection({
       </div>
     </ResizablePanel>
   );
-}
-
-function goToUrl(
-  goto: (url: string, tabId?: string) => void,
-  url: string,
-  tabId?: string,
-) {
-  const trimmed = url.trim();
-  // Check if it starts with stagewise:/ - always treat as URL, never search
-  if (trimmed.toLowerCase().startsWith('stagewise:/')) {
-    return goto(trimmed, tabId);
-  }
-  // Check if it's already a valid URL with protocol
-  try {
-    new URL(trimmed);
-    return goto(trimmed, tabId);
-  } catch {}
-  // Check if it looks like a domain (no spaces, has a dot)
-  if (!trimmed.includes(' ') && trimmed.includes('.'))
-    return goto(`https://${trimmed}`, tabId);
-  // Treat as search query
-  goto(`https://www.google.com/search?q=${encodeURIComponent(trimmed)}`, tabId);
 }

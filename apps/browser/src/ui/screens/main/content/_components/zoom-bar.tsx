@@ -104,7 +104,7 @@ export function ZoomBar() {
   return (
     <Collapsible open={shouldShow}>
       <CollapsibleContent
-        className="h-[30px] w-[calc-size(auto,size)] rounded-full bg-zinc-500/5 pr-1.5 pl-2.5 text-base opacity-100 blur-none transition-all duration-150 ease-out data-ending-style:h-[30px]! data-starting-style:h-[30px]! data-ending-style:w-0 data-starting-style:w-0 data-ending-style:overflow-hidden data-starting-style:overflow-hidden data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:blur-sm data-starting-style:blur-sm"
+        className="h-8 w-[calc-size(auto,size)] rounded-full bg-zinc-500/5 pr-1.5 pl-2.5 text-base opacity-100 blur-none transition-all duration-150 ease-out data-ending-style:h-8! data-starting-style:h-8! data-ending-style:w-0 data-starting-style:w-0 data-ending-style:overflow-hidden data-starting-style:overflow-hidden data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:blur-sm data-starting-style:blur-sm"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
