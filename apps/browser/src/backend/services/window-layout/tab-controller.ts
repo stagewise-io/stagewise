@@ -1,4 +1,9 @@
-import { type MessagePortMain, WebContentsView, shell } from 'electron';
+import {
+  type MessagePortMain,
+  WebContentsView,
+  shell,
+  nativeTheme,
+} from 'electron';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import type { Input } from 'electron';
 import contextMenu from 'electron-context-menu';
@@ -20,6 +25,7 @@ import type { ContextElement } from '@shared/context-elements';
 import { ContextElementTracker } from './context-element-tracker';
 import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
 import { fileURLToPath } from 'node:url';
+import { getBackgroundColor } from '@/shared/theme-colors';
 
 export interface TabState {
   title: string;
@@ -141,7 +147,11 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       },
     });
     this.webContentsView.setBorderRadius(4);
-    this.webContentsView.setBackgroundColor('#FFF');
+    // Set initial background color based on current system theme
+    const initialBackgroundColor = getBackgroundColor(
+      nativeTheme.shouldUseDarkColors,
+    );
+    this.webContentsView.setBackgroundColor(initialBackgroundColor);
     this.kartonTransport = new ElectronServerTransport();
 
     // Forward keydown events when dev tools are opened
@@ -276,6 +286,23 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     }
   }
 
+  /**
+   * Updates the background color of this tab's web-content instance.
+   * This updates the WebContentsView background, which affects the entire
+   * tab view including all frames and nested content.
+   */
+  public updateBackgroundColor(color: string) {
+    if (
+      this.webContentsView &&
+      !this.webContentsView.webContents.isDestroyed()
+    ) {
+      this.webContentsView.setBackgroundColor(color);
+      this.logger.debug(
+        `[TabController] Updated background color for tab ${this.id} to ${color}`,
+      );
+    }
+  }
+
   public loadURL(url: string) {
     this.updateState({ url });
     this.webContentsView.webContents.loadURL(url);
@@ -377,6 +404,20 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       });
 
       this.updateState({ colorScheme: scheme });
+
+      // Update webcontents background color based on the selected scheme
+      let backgroundColor: string;
+      if (scheme === 'system') {
+        // In system mode, use the current system theme
+        backgroundColor = getBackgroundColor(nativeTheme.shouldUseDarkColors);
+      } else if (scheme === 'dark') {
+        // Forced dark mode
+        backgroundColor = getBackgroundColor(true);
+      } else {
+        // Forced light mode
+        backgroundColor = getBackgroundColor(false);
+      }
+      this.updateBackgroundColor(backgroundColor);
     } catch (err) {
       this.logger.error(`Failed to set color scheme: ${err}`);
     }

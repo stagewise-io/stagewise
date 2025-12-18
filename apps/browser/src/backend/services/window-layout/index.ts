@@ -10,24 +10,7 @@ import { UIController } from './ui-controller';
 import { TabController } from './tab-controller';
 import { ChatStateController } from './chat-state-controller';
 import type { ColorScheme } from '@shared/karton-contracts/ui';
-
-// Theme colors for window background and titleBarOverlay
-const THEME_COLORS = {
-  light: {
-    background: '#e4e4e7',
-    titleBarOverlay: {
-      color: '#e4e4e7',
-      symbolColor: '#3f3f46',
-    },
-  },
-  dark: {
-    background: '#18181b',
-    titleBarOverlay: {
-      color: '#18181b',
-      symbolColor: '#d4d4d8',
-    },
-  },
-};
+import { THEME_COLORS, getBackgroundColor } from '@/shared/theme-colors';
 
 interface WindowState {
   width: number;
@@ -939,6 +922,7 @@ export class WindowLayoutService {
 
     const isDark = nativeTheme.shouldUseDarkColors;
     const theme = isDark ? THEME_COLORS.dark : THEME_COLORS.light;
+    const backgroundColor = getBackgroundColor(isDark);
 
     this.baseWindow.setBackgroundColor(theme.background);
 
@@ -950,8 +934,17 @@ export class WindowLayoutService {
       });
     }
 
+    // Update all tab webcontents backgrounds to match the window background
+    // Only update tabs that are in 'system' mode (forced light/dark tabs keep their background)
+    Object.values(this.tabs).forEach((tab) => {
+      const tabState = tab.getState();
+      if (tabState.colorScheme === 'system') {
+        tab.updateBackgroundColor(backgroundColor);
+      }
+    });
+
     this.logger.debug(
-      `[WindowLayoutService] Applied ${isDark ? 'dark' : 'light'} theme colors`,
+      `[WindowLayoutService] Applied ${isDark ? 'dark' : 'light'} theme colors to window and all tab webcontents`,
     );
   }
 }
