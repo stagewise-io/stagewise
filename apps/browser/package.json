@@ -16,7 +16,8 @@
     "publish": "dotenv -e ../../.env -- electron-forge publish",
     "start": "dotenv -e ../../.env.dev -- electron-forge start",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "clean-data": "tsx scripts/clean-data.ts"
   },
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1",
