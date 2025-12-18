@@ -51,41 +51,37 @@ export function createKartonReactClient<T>(
 ] {
   const KartonContext = createKartonContext<T>();
 
+  // Create listeners set at module scope so it survives React remounts (e.g., StrictMode)
+  const listeners = new Set<() => void>();
+
+  // Create subscribe function at module scope
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+
+  // Create client at module scope so it survives React remounts (e.g., StrictMode)
+  // This prevents the state from resetting to fallbackState on remount
+  const client = createKartonClient({
+    ...config,
+    onStateChange: () => {
+      listeners.forEach((listener) => listener());
+    },
+  });
+
   const KartonProvider: React.FC<{ children?: React.ReactNode }> = ({
     children,
   }) => {
-    const clientRef = useRef<KartonClient<T> | null>(null);
-    const listenersRef = useRef(new Set<() => void>());
-    const subscribeRef = useRef<((listener: () => void) => () => void) | null>(
-      null,
-    );
-
-    if (!clientRef.current) {
-      clientRef.current = createKartonClient({
-        ...config,
-        onStateChange: () => {
-          listenersRef.current.forEach((listener) => listener());
-        },
-      });
-
-      // Create a stable subscribe function only once
-      subscribeRef.current = (listener: () => void) => {
-        listenersRef.current.add(listener);
-        return () => {
-          listenersRef.current.delete(listener);
-        };
-      };
-    }
-
-    const client = clientRef.current;
-
     // Memoize the context value to prevent unnecessary re-renders
+    // Client and subscribe are stable module-level references
     const value = useMemo<KartonContextValue<T>>(
       () => ({
         client,
-        subscribe: subscribeRef.current!,
+        subscribe,
       }),
-      [client], // Only recreate if client changes (which should never happen)
+      [], // Empty deps - client and subscribe are stable module-level values
     );
 
     return (
