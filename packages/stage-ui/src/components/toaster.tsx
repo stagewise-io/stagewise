@@ -48,9 +48,9 @@ function Toast({ notification, onDismiss }: ToastProps) {
       className={cn(
         'flex max-w-80 flex-col gap-2.5 rounded-xl bg-background p-2 text-foreground shadow-xl ring-1 transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm',
         notification.type === 'warning' &&
-          'bg-yellow-100 ring-yellow-500/30 dark:bg-yellow-800',
+          'bg-yellow-200 ring-yellow-500/30 [--color-foreground:var(--color-yellow-800)] [--color-muted-foreground:var(--color-yellow-600)]',
         notification.type === 'error' &&
-          'bg-rose-100 ring-rose-500/30 dark:bg-rose-800',
+          'bg-rose-200 ring-rose-500/30 [--color-foreground:var(--color-rose-800)] [--color-muted-foreground:var(--color-rose-600)]',
       )}
     >
       <Button

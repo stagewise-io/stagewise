@@ -19,6 +19,7 @@ import { Logger } from './services/logger';
 import { TelemetryService } from './services/telemetry';
 import { GlobalConfigService } from './services/global-config';
 import { NotificationService } from './services/notification';
+import { PagesService } from './services/pages';
 import { WindowLayoutService } from './services/window-layout';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
 import { getRepoRootForPath } from './utils/git-tools';
@@ -104,6 +105,7 @@ export async function main({
   // Start remaining services that are irrelevant to non-regular operation of the app.
   const filePickerService = await FilePickerService.create(logger, uiKarton);
   const uriHandlerService = await URIHandlerService.create(logger);
+  const _pagesService = await PagesService.create(logger);
 
   const authService = await AuthService.create(
     globalDataPathService,
@@ -266,7 +268,7 @@ function extractUrlsFromArgs(argv: string[]): string[] {
   const urls: string[] = [];
   for (const arg of argv) {
     // Skip non-URL arguments
-    if (arg.startsWith('-') || arg.includes('stagewise://')) {
+    if (arg.startsWith('-') || arg.includes('stagewise:/')) {
       continue;
     }
     if (isValidUrl(arg)) {

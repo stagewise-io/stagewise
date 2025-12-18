@@ -1,7 +1,7 @@
 import unhandled from 'electron-unhandled';
 unhandled();
 
-import { app } from 'electron';
+import { app, protocol } from 'electron';
 import started from 'electron-squirrel-startup';
 import path from 'node:path';
 import { main } from './main';
@@ -33,6 +33,21 @@ app.setPath(
   ),
 );
 app.setPath('sessionData', path.join(app.getPath('userData'), 'session'));
+
+// reigster the "stagewise" protocol as privileged
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'stagewise',
+    privileges: {
+      standard: true,
+      secure: true,
+      allowServiceWorkers: true,
+      codeCache: true,
+      stream: true,
+      supportFetchAPI: true,
+    },
+  },
+]);
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

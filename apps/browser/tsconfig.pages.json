@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "es2022",
+    "lib": ["es2022", "dom"],
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./src/pages/*"],
+      "@shared/*": ["./src/shared/*"]
+    },
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+    "strictNullChecks": true
+  },
+  "include": ["src/pages", "forge.env.d.ts", "src/shared", ".storybook/**/*"],
+  "exclude": [
+    "**/*.stories.tsx",
+    "**/*.stories.ts",
+    "node_modules",
+    "dist",
+    "coverage",
+    "tmp",
+    ".turbo"
+  ]
+}

@@ -327,6 +327,10 @@ function goToUrl(
   tabId?: string,
 ) {
   const trimmed = url.trim();
+  // Check if it starts with stagewise:/ - always treat as URL, never search
+  if (trimmed.toLowerCase().startsWith('stagewise:/')) {
+    return goto(trimmed, tabId);
+  }
   // Check if it's already a valid URL with protocol
   try {
     new URL(trimmed);

@@ -33,6 +33,7 @@
   "files": [],
   "references": [
     { "path": "./tsconfig.ui.json" },
+    { "path": "./tsconfig.pages.json" },
     { "path": "./tsconfig.backend.json" },
     { "path": "./tsconfig.storybook.json" },
     { "path": "./tsconfig.web-content-preload.json" }
