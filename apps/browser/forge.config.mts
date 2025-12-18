@@ -31,12 +31,12 @@ const config: ForgeConfig = {
         schemes: ['stagewise'],
       },
     ],
-    osxSign: {},
+    /*osxSign: {},
     osxNotarize: {
       appleId: process.env.APPLE_ID!,
       appleIdPassword: process.env.APPLE_PASSWORD!,
       teamId: process.env.APPLE_TEAM_ID!,
-    },
+    },*/
   },
   rebuildConfig: {},
   makers: [
@@ -87,7 +87,6 @@ const config: ForgeConfig = {
           name: 'main_window',
           config: 'vite.ui.config.ts',
         },
-
         {
           name: 'pages',
           config: 'vite.pages.config.ts',

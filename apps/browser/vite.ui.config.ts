@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig({
+  root: path.resolve(__dirname, './src/ui'),
   base: './',
   plugins: [react(), tailwindcss()],
   define: {
