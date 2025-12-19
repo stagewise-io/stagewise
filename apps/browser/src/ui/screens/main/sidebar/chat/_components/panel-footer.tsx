@@ -1,5 +1,5 @@
 import { FileAttachmentChips } from '@/components/file-attachment-chips';
-import { TextSlideshow } from '@/components/ui/text-slideshow';
+import { IconXmark } from 'nucleo-micro-bold';
 import { ContextUsageRing } from './context-usage-ring';
 import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -34,18 +34,6 @@ import { usePostHog } from 'posthog-js/react';
 const GlassyTextInputClassNames =
   'origin-center rounded-md border border-black/10 ring-1 ring-white/20 transition-all duration-150 ease-out after:absolute after:inset-0 after:size-full after:content-normal after:rounded-[inherit] after:bg-gradient-to-b after:from-white/5 after:to-white/0 after:transition-colors after:duration-150 after:ease-out disabled:pointer-events-none disabled:bg-black/5 disabled:text-foreground/60 disabled:opacity-30';
 
-const chatTextSlideshowTexts: Record<MainTab | 'fallback', string[]> = {
-  [MainTab.BROWSING]: [
-    'Try: Turn this card into a reusable component',
-    'Try: Do they have the same border radius?',
-    'Try: Make this badge use our design system',
-    'Try: Does this card use a reusable component?',
-    'Try: Show me where this header is implemented',
-    "Try: Let's try a different icon for this button",
-    'Try: Make the press animation of the component more subtle',
-  ],
-  fallback: ['Ask stage any question...'],
-};
 export function ChatPanelFooter() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const openTab = useKartonState((s) =>
@@ -61,6 +49,14 @@ export function ChatPanelFooter() {
       chats: s.agentChat?.chats,
     })),
   );
+
+  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const tabs = useKartonState((s) => s.browser.tabs);
+  const activeTab = useMemo(() => {
+    return tabs[activeTabId];
+  }, [tabs, activeTabId]);
+
+  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
 
   const focusChatHotkeyText = HotkeyComboText({ action: HotkeyActions.CTRL_I });
 
@@ -106,6 +102,24 @@ export function ChatPanelFooter() {
   const canSendMessage = useMemo(() => {
     return enableInputField && chatState.chatInput.trim().length > 2;
   }, [enableInputField, chatState]);
+
+  const hasOpenedStartPage = useMemo(() => {
+    return activeTab?.url === 'ui-main';
+  }, [activeTab?.url]);
+
+  const createChat = useKartonProcedure((p) => p.agentChat.create);
+  const deleteChat = useKartonProcedure((p) => p.agentChat.delete);
+
+  const closeWorkspace = useKartonProcedure((p) => p.workspace.close);
+
+  const closeWorkspaceSetupAndCreateNewChat = useCallback(
+    async (setupChatId: string) => {
+      await closeWorkspace();
+      await createChat();
+      void deleteChat(setupChatId);
+    },
+    [closeWorkspace, createChat, deleteChat],
+  );
 
   const handleSubmit = useCallback(() => {
     if (canSendMessage) {
@@ -257,9 +271,9 @@ export function ChatPanelFooter() {
   });
 
   return (
-    <footer className="z-10 flex flex-col items-stretch gap-1 p-0 ">
+    <footer className="relative z-20 flex flex-col items-stretch gap-1 p-0">
       <div
-        className="flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.04)] ring-1 ring-muted-foreground/15 before:absolute before:inset-0 before:rounded-lg data-[chat-active=true]:bg-primary/5 data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/10"
+        className="flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.04)] ring-1 ring-muted-foreground/15 before:absolute before:inset-0 before:rounded-lg data-[chat-active=true]:bg-primary/1 data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/10"
         id="chat-input-container-box"
         data-chat-active={chatInputActive}
       >
@@ -284,28 +298,16 @@ export function ChatPanelFooter() {
                 'scrollbar-subtle z-10 h-28 w-full resize-none border-none bg-transparent px-2 py-1 text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out focus:outline-none disabled:bg-transparent',
               )}
             />
-            <div className="pointer-events-none absolute inset-0 z-20 size-full px-[9px] py-[5px]">
-              {chatState.chatInput.length > 0 ? null : activeChat?.messages
-                  .length === 0 ? (
-                <TextSlideshow
-                  appendix={
-                    <span className="text-muted-foreground/60 text-sm">
-                      {' '}
-                      {focusChatHotkeyText}
-                    </span>
-                  }
-                  className={cn('text-muted-foreground text-sm')}
-                  texts={chatTextSlideshowTexts[openTab ?? 'fallback']}
-                />
-              ) : (
+            {chatState.chatInput.length === 0 && (
+              <div className="pointer-events-none absolute inset-0 z-20 size-full px-[9px] py-[2px]">
                 <span className="text-muted-foreground text-sm">
-                  Type a message...{' '}
-                  <span className="text-muted-foreground/60 text-sm">
-                    {focusChatHotkeyText}
-                  </span>
+                  Ask anything about this page{' '}
                 </span>
-              )}
-            </div>
+                <span className="text-muted-foreground/60 text-sm">
+                  {focusChatHotkeyText}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Other attachments area */}
@@ -369,6 +371,7 @@ export function ChatPanelFooter() {
                     <Button
                       size="icon-sm"
                       variant="ghost"
+                      disabled={hasOpenedStartPage}
                       className="text-muted-foreground data-[context-selector-active=true]:bg-primary/5 data-[context-selector-active=true]:text-primary data-[context-selector-active=true]:hover:bg-primary/10"
                       data-context-selector-active={contextSelectionActive}
                       onClick={(e) => {
@@ -454,6 +457,22 @@ export function ChatPanelFooter() {
           </Tooltip>
         </div>
       </div>
+      {workspaceStatus === 'setup' && (
+        <div className="-z-10 absolute right-1 bottom-full left-1 flex flex-row items-center justify-between gap-2 rounded-t-lg border-primary/20 border-t border-r border-l bg-blue-100/10 p-0.75 pl-2.5 backdrop-blur-lg">
+          <span className="truncate text-primary/80 text-xs dark:text-blue-400">
+            You are in workspace setup-mode.
+          </span>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="shrink-0 text-muted-foreground"
+            onClick={() => closeWorkspaceSetupAndCreateNewChat(activeChatId)}
+          >
+            <IconXmark className="size-3" />
+            Cancel setup
+          </Button>
+        </div>
+      )}
     </footer>
   );
 }

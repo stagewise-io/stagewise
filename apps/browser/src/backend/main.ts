@@ -139,7 +139,8 @@ export async function main({
             rgBinaryBasePath: globalDataPathService.globalDataPath,
           }),
         );
-        if (uiKarton.state.workspaceStatus === 'setup')
+        if (uiKarton.state.workspaceStatus === 'setup') {
+          agentService.createAndActivateNewChat();
           agentService.sendUserMessage({
             id: generateId(),
             role: 'user',
@@ -147,6 +148,7 @@ export async function main({
               { type: 'text', text: 'Help me set up the selected workspace!' },
             ],
           });
+        }
         break;
       }
       case 'unloaded':

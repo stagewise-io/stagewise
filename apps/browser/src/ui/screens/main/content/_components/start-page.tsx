@@ -130,7 +130,9 @@ const StartPageWithConnectedWorkspace = () => {
           Alpha
         </div>
       </div>
-      {workspaceStatus !== 'open' && <ConnectWorkspaceBanner />}
+      {workspaceStatus !== 'open' && workspaceStatus !== 'setup' && (
+        <ConnectWorkspaceBanner />
+      )}
       <div className="group/design-inspiration mt-2 flex w-full flex-col items-center justify-start gap-4">
         <div className="flex w-full items-center justify-between">
           <h1 className="font-medium text-xl">
@@ -184,10 +186,10 @@ const OnboardingStartPage = () => {
   const setHasSeenOnboardingFlow = useKartonProcedure(
     (p) => p.userExperience.storedExperienceData.setHasSeenOnboardingFlow,
   );
-  const selectAndOpenWorkspace = useCallback(
-    async () => await openWorkspace(undefined),
-    [openWorkspace],
-  );
+  const selectAndOpenWorkspace = useCallback(async () => {
+    await openWorkspace(undefined);
+    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+  }, [openWorkspace]);
 
   return (
     <div className="flex w-full max-w-2xl flex-col items-start gap-4 px-10">
@@ -248,7 +250,7 @@ const RecentlyOpenedWorkspaceItem = ({
 }) => {
   return (
     <div
-      className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg p-1 hover:bg-muted-foreground/5"
+      className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg p-2 pt-1 hover:bg-muted-foreground/5"
       onClick={onClick}
     >
       <IconDocFolder className="size-4 shrink-0 text-muted-foreground" />
@@ -382,10 +384,10 @@ const DesignInspirationCard = ({
 
 const ConnectWorkspaceBanner = () => {
   const openWorkspace = useKartonProcedure((p) => p.workspace.open);
-  const selectAndOpenWorkspace = useCallback(
-    async () => await openWorkspace(undefined),
-    [openWorkspace],
-  );
+  const selectAndOpenWorkspace = useCallback(async () => {
+    await openWorkspace(undefined);
+    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+  }, [openWorkspace]);
   const recentlyOpenedWorkspaces = useKartonState(
     (s) => s.userExperience.storedExperienceData.recentlyOpenedWorkspaces,
   );

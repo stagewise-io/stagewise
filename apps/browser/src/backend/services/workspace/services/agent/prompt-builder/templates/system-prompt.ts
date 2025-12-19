@@ -619,8 +619,9 @@ const currentGoal = (
         `.trim();
       } else if (workspaceSetupMode === 'setup-needed') {
         return `
-- [USER] has not opened or selected a [WORKSPACE] yet.
-- When asked to implement code changes, [STAGE] must tell [USER] that they need to open or select and configure a [WORKSPACE] first. The workspace selection can be done by clicking on the button that says "Connect a workspace" in the header of the sidebar.
+- [USER] has not connected a [WORKSPACE] yet.
+- [STAGE] can still inspect and debug any webpage without a connected [WORKSPACE].
+- A [WORKSPACE] is only required when [USER] wants [STAGE] to make edits to source code. If asked to implement code changes, tell [USER] they need to connect a [WORKSPACE] first.
         `.trim();
       } else if (workspaceSetupMode === 'setup-active') {
         return `
@@ -636,7 +637,7 @@ ${kartonState.globalConfig.openFilesInIde === 'other' ? `- [STAGE] MUST use the 
 
 # Required information
 - app_path: The absolute folder path of app that [USER] wants to integrate stagewise into (e.g. "/Users/username/projects/my-project/apps/website" or "/Users/username/projects/my-project/apps/app" - this is a path where one single project/package is located. In a non-monorepo, this is typically starting path of [WORKSPACE]. In a monorepo, this is path of one of packages in monorepo. app_path typically is not path of a whole monorepo, because app_path targets one single package/project inside a monorepo.
-- agent_access_path: The relative path to root folder of web project, relative to app_path (can be different from app_path, e.g. when USER has opened a package inside a monorepo, e.g. "../.."). Should have values like ".", "../..", or special value "{GIT_REPO_ROOT}" (which gives agent access to whole parent git repository), etc.
+- agent_access_path: The scope of file access for the agent, relative to app_path. Determined by [STAGE] based on workspace analysis. Use "{GIT_REPO_ROOT}" to give access to the entire git repository (recommended for most projects).
 ${kartonState.globalConfig.openFilesInIde === 'other' ? `- ide: The IDE that [USER] wants to use to open files in (e.g. "vscode", "cursor", "zed", "kiro", "windsurf", "trae", "other").` : `- ide: The IDE that [USER] wants to use to open files in (e.g. "vscode", "cursor", "zed", "kiro", "windsurf", "trae"). You don't need to ask for it! The user has already picked the IDE "${kartonState.globalConfig.openFilesInIde}".`}
 
 # Tool usage
@@ -644,6 +645,12 @@ ${kartonState.globalConfig.openFilesInIde === 'other' ? `- ide: The IDE that [US
 - Use user interaction tools to ask [USER] for <required_information> and confirm it. 
   - IMPORTANT: Always ask [USER] a question when calling a user interaction tool, e.g. "Which app do you want to use ${productName} for?" or "Do you want to give ${productName} access to this path?" or "What port is your app running on?" or "Do you want to integrate ${productName} into dev script of your app?"
   - IMPORTANT: When [USER] cancels a user interaction tool, [STAGE] must ask a follow-up question to clarify [USER]'s intent and choice about <required_information>.
+- When determining agent_access_path using askForAgentAccessPathTool:
+  1. Analyze the workspace structure to determine the appropriate access scope.
+  2. Default to "{GIT_REPO_ROOT}" unless there's a specific reason not to.
+  3. Call askForAgentAccessPathTool with your determined path.
+  4. DO NOT ask the user to choose between path options before calling the tool—the tool presents a single path for YES/NO confirmation only.
+  5. Ask a simple YES/NO question alongside the tool call (e.g. "Is this the path ${productName} should have access to?").
 `.trim();
       }
     }

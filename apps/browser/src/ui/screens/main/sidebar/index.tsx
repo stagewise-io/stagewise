@@ -15,16 +15,6 @@ export function Sidebar() {
 
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const openChatPanel = useCallback(() => {
-    if (panelRef.current) {
-      panelRef.current.expand();
-      // Restore previous size if available, otherwise use defaultSize
-      if (previousSizeRef.current !== null)
-        panelRef.current.resize(previousSizeRef.current);
-    }
-    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
-  }, []);
-
   const handleCollapseChange = useCallback((isCollapsed: boolean) => {
     if (isCollapsed) {
       window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
@@ -95,7 +85,7 @@ export function Sidebar() {
     >
       <SidebarTopSection isCollapsed={isCollapsed} />
       {/* Chat area */}
-      <SidebarChatSection openChatPanel={openChatPanel} />
+      <SidebarChatSection />
     </ResizablePanel>
   );
 }

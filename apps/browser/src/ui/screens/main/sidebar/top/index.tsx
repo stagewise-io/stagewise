@@ -28,6 +28,16 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   const chats = useKartonState((s) => s.agentChat?.chats) || {};
   const platform = useKartonState((s) => s.appInfo.platform);
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
+  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
+  const activeChatId = useKartonState((s) => s.agentChat?.activeChatId || null);
+
+  const showChatListButton = useMemo(() => {
+    return Object.keys(chats).length > 1 && workspaceStatus !== 'setup';
+  }, [chats, workspaceStatus]);
+
+  const showNewChatButton = useMemo(() => {
+    return activeChatId && workspaceStatus !== 'setup';
+  }, [activeChatId, workspaceStatus]);
 
   const groupedChats = useMemo(() => groupChatsByTime(chats), [chats]);
 
@@ -58,101 +68,106 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
     <div
       className={cn(
         'app-drag flex h-8 max-h-8 min-h-8 flex-row items-center justify-start gap-2 pr-2 group-data-[collapsed=true]:hidden',
-        platform === 'darwin' && !isFullScreen ? 'ml-14' : 'ml-0',
+        platform === 'darwin' && !isFullScreen ? 'ml-18' : 'ml-0',
       )}
     >
-      <WorkspaceInfoBadge isCollapsed={isCollapsed} />
-      <div className="app-no-drag glass-body ml-1 @[350px]:inline-flex hidden shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
+      {!isCollapsed && <WorkspaceInfoBadge />}
+      <div className="app-no-drag glass-body ml-1 @[350px]:inline-flex hidden shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-[10px] text-primary">
         Alpha
       </div>
       <div className="flex-1 group-data-[collapsed=true]:hidden" />
       {!isCollapsed && (
         <div className="@[250px]:flex hidden shrink-0 flex-row items-center">
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="shrink-0"
-                onClick={() => createChat()}
-              >
-                <IconPlusFill18 className="size-4 text-foreground" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <span>Create new chat</span>
-            </TooltipContent>
-          </Tooltip>
-          <Menu>
+          {showNewChatButton && (
             <Tooltip>
-              <TooltipTrigger
-                render={
-                  <MenuTrigger>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="app-no-drag shrink-0"
-                    >
-                      <IconHistoryFill18 className="size-4 text-foreground" />
-                    </Button>
-                  </MenuTrigger>
-                }
-              />
+              <TooltipTrigger>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="shrink-0"
+                  onClick={() => createChat()}
+                >
+                  <IconPlusFill18 className="size-4 text-foreground" />
+                </Button>
+              </TooltipTrigger>
               <TooltipContent>
-                <span>Show chat history</span>
+                <span>Create new chat</span>
               </TooltipContent>
             </Tooltip>
-            <MenuContent>
-              <div className="scrollbar-hover-only flex max-h-48 flex-col gap-1 overflow-y-auto">
-                {Object.entries(groupedChats).map(([label, chats], index) => (
-                  <>
-                    <span className="px-2 py-1 font-normal text-muted-foreground/60 text-xs">
-                      {label}
-                    </span>
-                    {Object.entries(chats).map(([chatId, chat]) => {
-                      return (
-                        <MenuItem
-                          key={chatId}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void switchChat(chatId);
-                          }}
-                        >
-                          <div className="group flex w-64 flex-row items-center justify-start gap-2">
-                            <span className="truncate font-medium text-sm">
-                              {chat.title}
-                            </span>
-                            <span className="shrink-0 font-normal text-muted-foreground/60 text-xs">
-                              <TimeAgo
-                                date={chat.createdAt}
-                                formatter={minimalFormatter}
-                                live={false}
-                              />
-                            </span>
+          )}
+          {showChatListButton && (
+            <Menu>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <MenuTrigger>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="app-no-drag shrink-0"
+                      >
+                        <IconHistoryFill18 className="size-4 text-foreground" />
+                      </Button>
+                    </MenuTrigger>
+                  }
+                />
+                <TooltipContent>
+                  <span>Show chat history</span>
+                </TooltipContent>
+              </Tooltip>
+              <MenuContent>
+                <div className="scrollbar-hover-only flex max-h-48 flex-col gap-1 overflow-y-auto">
+                  {Object.entries(groupedChats).map(([label, chats], index) => (
+                    <>
+                      <span className="shrink-0 px-2 py-1 font-normal text-muted-foreground/60 text-xs">
+                        {label}
+                      </span>
+                      {Object.entries(chats).map(([chatId, chat]) => {
+                        return (
+                          <MenuItem
+                            key={chatId}
+                            className="shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void switchChat(chatId);
+                            }}
+                          >
+                            <div className="group flex w-64 flex-row items-center justify-start gap-2">
+                              <span className="truncate font-medium text-sm">
+                                {chat.title}
+                              </span>
+                              <span className="shrink-0 font-normal text-muted-foreground/60 text-xs">
+                                <TimeAgo
+                                  date={chat.createdAt}
+                                  formatter={minimalFormatter}
+                                  live={false}
+                                />
+                              </span>
 
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              className="ml-auto shrink-0 opacity-0 group-hover:opacity-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void deleteChat(chatId);
-                              }}
-                            >
-                              <IconTrash2Outline24 className="size-3 text-muted-foreground" />
-                            </Button>
-                          </div>
-                        </MenuItem>
-                      );
-                    })}
-                    {index < Object.entries(groupedChats).length - 1 && (
-                      <MenuSeparator />
-                    )}
-                  </>
-                ))}
-              </div>
-            </MenuContent>
-          </Menu>
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                className="ml-auto shrink-0 opacity-0 group-hover:opacity-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void deleteChat(chatId);
+                                }}
+                              >
+                                <IconTrash2Outline24 className="size-3 text-muted-foreground" />
+                              </Button>
+                            </div>
+                          </MenuItem>
+                        );
+                      })}
+                      {index < Object.entries(groupedChats).length - 1 && (
+                        <MenuSeparator />
+                      )}
+                    </>
+                  ))}
+                </div>
+              </MenuContent>
+            </Menu>
+          )}
         </div>
       )}
     </div>

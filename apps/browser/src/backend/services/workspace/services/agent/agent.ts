@@ -343,6 +343,12 @@ export class AgentService {
     );
   }
 
+  public createAndActivateNewChat() {
+    return createAndActivateNewChat(
+      this.uiKarton as KartonStateProvider<KartonContract['state']>,
+    );
+  }
+
   private setAgentWorking(isWorking: boolean): void {
     this.timeoutManager.clear('is-working');
     const wasWorking = this.isWorking;
@@ -456,6 +462,24 @@ export class AgentService {
     this.logger.debug('[AgentService] Initialized');
   }
 
+  private abortAgentCall() {
+    const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
+    if (!activeChatId) return;
+
+    this.abortController.abort();
+    this.abortController = new AbortController();
+    this.abortController.signal.addEventListener(
+      'abort',
+      () => {
+        const chatId = this.uiKarton.state.agentChat?.activeChatId;
+        if (chatId) {
+          this.cleanupPendingOperations('Agent call aborted', false, chatId);
+        }
+      },
+      { once: true },
+    );
+  }
+
   private registerProcedureHandlers() {
     // Agent Chat procedures
     try {
@@ -501,25 +525,7 @@ export class AgentService {
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.abortAgentCall',
         async () => {
-          const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
-          if (!activeChatId) return;
-
-          this.abortController.abort();
-          this.abortController = new AbortController();
-          this.abortController.signal.addEventListener(
-            'abort',
-            () => {
-              const chatId = this.uiKarton.state.agentChat?.activeChatId;
-              if (chatId) {
-                this.cleanupPendingOperations(
-                  'Agent call aborted',
-                  false,
-                  chatId,
-                );
-              }
-            },
-            { once: true },
-          );
+          this.abortAgentCall();
         },
       );
 
@@ -572,6 +578,7 @@ export class AgentService {
         async (chatId: string, _callingClientId: string) => {
           const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
           if (!activeChatId) return;
+          if (this.isWorking) this.abortAgentCall();
 
           if (activeChatId === chatId) {
             const chats = this.uiKarton.state.agentChat?.chats;
@@ -1203,9 +1210,7 @@ export class AgentService {
     this.uiKarton.setState((draft) => {
       if (userMessageIndex !== -1) {
         const chat = draft.agentChat?.chats[chatId];
-        if (chat) {
-          chat.messages = history.slice(0, userMessageIndex) as any;
-        }
+        if (chat) chat.messages = history.slice(0, userMessageIndex) as any;
       }
     });
 

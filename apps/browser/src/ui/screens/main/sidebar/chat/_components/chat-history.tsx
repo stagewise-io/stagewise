@@ -10,11 +10,12 @@ import { IconMsgs } from 'nucleo-glass';
 export const ChatHistory = () => {
   const wasAtBottomRef = useRef(true);
   const ref = useRef<HTMLDivElement>(null);
-  const { activeChatId, isWorking, chats } = useKartonState(
+  const { activeChatId, isWorking, chats, workspaceStatus } = useKartonState(
     useComparingSelector((s) => ({
       activeChatId: s.agentChat?.activeChatId,
       isWorking: s.agentChat?.isWorking,
       chats: s.agentChat?.chats,
+      workspaceStatus: s.workspaceStatus,
     })),
   );
 
@@ -111,10 +112,10 @@ export const ChatHistory = () => {
     <section
       ref={ref}
       aria-label="Agent message display"
-      // className="scrollbar-subtle pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-2 py-4 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none"
       className={cn(
-        'scrollbar-subtle mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_4px,black_100%)] pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-4 py-4 pr-1 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none',
-        renderedMessages.length === 0 && 'mb-6 h-max overflow-y-hidden',
+        'scrollbar-subtle mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_4px,black_100%)] pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-1 py-4 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none',
+        renderedMessages.length === 0 && 'mb-1 h-max overflow-y-hidden',
+        workspaceStatus === 'setup' && 'pb-12',
       )}
       onScroll={handleScroll}
     >
