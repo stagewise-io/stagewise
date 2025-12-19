@@ -308,7 +308,9 @@ const FileLink = ({
           rel="noopener noreferrer"
         >
           {filePath}
-          {lineNumber && <span className="opacity-70">:{lineNumber}</span>}
+          {lineNumber && (
+            <span className="shrink-0 opacity-70">:{lineNumber}</span>
+          )}
           <ExternalLinkIcon className="size-3 shrink-0" />
         </a>
       </TooltipTrigger>
