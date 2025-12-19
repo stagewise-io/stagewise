@@ -1,5 +1,4 @@
 import type { FileDiff, StagewiseToolMetadata } from '@stagewise/agent-types';
-import type { LanguageModelV2 } from '@ai-sdk/provider';
 import type { InferUITools, Tool, ToolSet, ToolUIPart } from 'ai';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { overwriteFileTool } from './node-runtime/file-modification/overwrite-file-tool.js';
@@ -11,6 +10,10 @@ import { multiEditTool } from './node-runtime/file-modification/multi-edit-tool.
 import { deleteFileTool } from './node-runtime/file-modification/delete-file-tool.js';
 import { getContext7LibraryDocsTool } from './node-runtime/research/get-context7-library-docs-tool.js';
 import { resolveContext7LibraryTool } from './node-runtime/research/resolve-context7-library-tool.js';
+import {
+  type BrowserRuntime,
+  executeConsoleScriptTool,
+} from './browser-runtime/execute-console-script.js';
 
 import {
   type SaveRequiredInformationParams,
@@ -31,10 +34,6 @@ import {
   askForIdeOutputSchema,
   type AskForIdeOutput,
 } from './node-runtime/project-setup/ask-for-ide.js';
-import {
-  generateComponentTool,
-  type InspirationComponent,
-} from './node-runtime/inspiration/generate-component-tool.js';
 import type { AppRouter, TRPCClient } from '@stagewise/api-client';
 
 export {
@@ -46,7 +45,6 @@ export {
   askForIdeOutputSchema,
   type AskForAppPathOutput,
   type AskForAgentAccessPathOutput,
-  type InspirationComponent,
   type AskForIdeOutput,
 };
 
@@ -108,10 +106,6 @@ export type SetupAgentCallbacks = {
   ) => Promise<void>;
 };
 
-export type InspirationAgentCallbacks = {
-  onGenerated: (component: Omit<InspirationComponent, 'compiledCode'>) => void;
-};
-
 type _ToolSet = { [key: string]: Tool<any, any> };
 /**
  * Returns a new tools object with the 'execute' property omitted from each tool.
@@ -160,6 +154,7 @@ export function setupAgentTools(
 
 export function codingAgentTools(
   clientRuntime: ClientRuntime,
+  browserRuntime: BrowserRuntime,
   apiClient: TRPCClient<AppRouter>,
 ) {
   return {
@@ -176,27 +171,15 @@ export function codingAgentTools(
     resolveContext7LibraryTool: toolWithMetadata(
       resolveContext7LibraryTool(apiClient),
     ),
-  };
-}
-
-export function inspirationAgentTools(
-  clientRuntime: ClientRuntime,
-  model: LanguageModelV2,
-  callbacks: InspirationAgentCallbacks,
-) {
-  return {
-    readFileTool: toolWithMetadata(readFileTool(clientRuntime)),
-    listFilesTool: toolWithMetadata(listFilesTool(clientRuntime)),
-    grepSearchTool: toolWithMetadata(grepSearchTool(clientRuntime)),
-    globTool: toolWithMetadata(globTool(clientRuntime)),
-    generateComponentTool: toolWithMetadata(
-      generateComponentTool(model, callbacks.onGenerated),
+    executeConsoleScriptTool: toolWithMetadata(
+      executeConsoleScriptTool(browserRuntime),
     ),
   };
 }
 
 export function noWorkspaceConfiguredAgentTools(
   apiClient: TRPCClient<AppRouter>,
+  browserRuntime: BrowserRuntime,
 ) {
   return {
     getContext7LibraryDocsTool: toolWithMetadata(
@@ -205,31 +188,28 @@ export function noWorkspaceConfiguredAgentTools(
     resolveContext7LibraryTool: toolWithMetadata(
       resolveContext7LibraryTool(apiClient),
     ),
+    executeConsoleScriptTool: toolWithMetadata(
+      executeConsoleScriptTool(browserRuntime),
+    ),
   } satisfies ToolSet;
 }
 
 // Define agent modes as a discriminated union type
-export type AgentMode = 'setup' | 'coding' | 'inspiration' | 'no-workspace';
+export type AgentMode = 'setup' | 'coding' | 'no-workspace';
 
 // Map each mode to its corresponding tool set
 export type AgentToolSet<M extends AgentMode> = M extends 'setup'
   ? ReturnType<typeof setupAgentTools>
   : M extends 'coding'
     ? ReturnType<typeof codingAgentTools>
-    : M extends 'inspiration'
-      ? ReturnType<typeof inspirationAgentTools>
-      : M extends 'no-workspace'
-        ? ReturnType<typeof noWorkspaceConfiguredAgentTools>
-        : never;
+    : M extends 'no-workspace'
+      ? ReturnType<typeof noWorkspaceConfiguredAgentTools>
+      : never;
 
 // Create a discriminated union for runtime use
 export type AgentToolsContext =
   | { mode: 'setup'; tools: ReturnType<typeof setupAgentTools> }
   | { mode: 'coding'; tools: ReturnType<typeof codingAgentTools> }
-  | {
-      mode: 'inspiration';
-      tools: ReturnType<typeof inspirationAgentTools>;
-    }
   | {
       mode: 'no-workspace';
       tools: ReturnType<typeof noWorkspaceConfiguredAgentTools>;
@@ -252,8 +232,8 @@ export type ToolNamesForMode<M extends AgentMode> = keyof AgentToolSet<M>;
 // Backwards compatibility: AllToolsUnion for intersection of all tool sets
 export type AllToolsUnion = ReturnType<typeof setupAgentTools> &
   ReturnType<typeof codingAgentTools> &
-  ReturnType<typeof inspirationAgentTools> &
   ReturnType<typeof noWorkspaceConfiguredAgentTools>;
 
 export type UITools = InferUITools<AllToolsUnion>;
 export type ToolPart = ToolUIPart<UITools>;
+export type { BrowserRuntime };

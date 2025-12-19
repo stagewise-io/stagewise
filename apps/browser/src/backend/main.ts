@@ -182,6 +182,7 @@ export async function main({
     uiKarton,
     globalConfigService,
     authService,
+    windowLayoutService,
     async (params) => {
       await workspaceManagerService.workspace?.setupService?.handleSetupSubmission(
         {

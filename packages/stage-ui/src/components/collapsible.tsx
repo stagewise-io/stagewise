@@ -49,7 +49,7 @@ export const CollapsibleContent = ({
     <CollapsibleBase.Panel
       {...props}
       className={cn(
-        'flex h-[var(--collapsible-panel-height)] flex-col justify-end overflow-hidden px-2 text-foreground text-sm transition-all ease-out data-[ending-style]:h-0 data-[starting-style]:h-0',
+        'flex h-(--collapsible-panel-height) flex-col overflow-hidden px-2 text-foreground text-sm transition-[height] duration-100 ease-out data-ending-style:h-0 data-starting-style:h-0',
         props.className,
       )}
     >

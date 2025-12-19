@@ -1,4 +1,4 @@
-import { type ReactNode, createContext, useMemo, useRef } from 'react';
+import { type ReactNode, createContext, useMemo } from 'react';
 import { useContext, useState, useCallback } from 'react';
 import { usePlugins } from './use-plugins';
 import {

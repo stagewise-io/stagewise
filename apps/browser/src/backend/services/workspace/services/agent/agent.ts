@@ -7,6 +7,7 @@ import type { TelemetryService } from '../../../telemetry';
 import type { GlobalConfigService } from '../../../global-config';
 import type { AuthService, AuthState } from '../../../auth';
 import { hasUndoMetadata, hasDiffMetadata } from '@stagewise/agent-types';
+import type { WindowLayoutService } from '../../../window-layout';
 import {
   type KartonContract,
   type History,
@@ -26,6 +27,7 @@ import {
   noWorkspaceConfiguredAgentTools,
   type UITools,
   type AgentToolsContext,
+  type BrowserRuntime,
 } from '@stagewise/agent-tools';
 import {
   streamText,
@@ -58,6 +60,34 @@ import { extractDetailsFromError } from './utils/extract-details-from-error';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
+const SCRIPT_EXECUTION_TIMEOUT_MS = 5000;
+
+function getMinimalBrowserRuntime(
+  windowLayoutService: WindowLayoutService,
+): BrowserRuntime {
+  return {
+    executeScript: async (script) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Script execution timed out after 5 seconds'));
+        }, SCRIPT_EXECUTION_TIMEOUT_MS);
+      });
+
+      const result = await Promise.race([
+        windowLayoutService.executeConsoleScript(script),
+        timeoutPromise,
+      ]);
+
+      if (!result.success) throw new Error(result.error);
+      // If the result is already a string (e.g., agent used JSON.stringify in script),
+      // return it as-is to avoid double-stringification
+      if (typeof result.result === 'string') return result.result;
+
+      return JSON.stringify(result.result);
+    },
+  };
+}
+
 function isToolCallType(type: string): type is ToolCallType {
   return type === 'dynamic-tool' || type.startsWith('tool-');
 }
@@ -73,6 +103,7 @@ export class AgentService {
   private telemetryService: TelemetryService;
   private uiKarton: KartonService;
   private globalConfigService: GlobalConfigService;
+  private windowLayoutService: WindowLayoutService;
   private authService: AuthService;
   private clientRuntime: ClientRuntime | null = null;
   private apiKey: string | null = null;
@@ -110,6 +141,7 @@ export class AgentService {
     uiKarton: KartonService,
     globalConfigService: GlobalConfigService,
     authService: AuthService,
+    windowLayoutService: WindowLayoutService,
     onSaveSetupInformation: (params: {
       agentAccessPath: string;
       ide: string | undefined;
@@ -120,6 +152,7 @@ export class AgentService {
     this.telemetryService = telemetryService;
     this.uiKarton = uiKarton;
     this.globalConfigService = globalConfigService;
+    this.windowLayoutService = windowLayoutService;
     this.authService = authService;
     this.onSaveSetupInformation = onSaveSetupInformation;
 
@@ -213,13 +246,20 @@ export class AgentService {
     if (!this.clientRuntime) {
       return {
         mode: 'no-workspace',
-        tools: noWorkspaceConfiguredAgentTools(this.client),
+        tools: noWorkspaceConfiguredAgentTools(
+          this.client,
+          getMinimalBrowserRuntime(this.windowLayoutService),
+        ),
       };
     }
 
     return {
       mode: 'coding',
-      tools: codingAgentTools(this.clientRuntime, this.client),
+      tools: codingAgentTools(
+        this.clientRuntime,
+        getMinimalBrowserRuntime(this.windowLayoutService),
+        this.client,
+      ),
     };
   }
 
@@ -1239,6 +1279,7 @@ export class AgentService {
     uiKarton: KartonService,
     globalConfigService: GlobalConfigService,
     authService: AuthService,
+    windowLayoutService: WindowLayoutService,
     onSaveSetupInformation: (params: {
       agentAccessPath: string;
       ide: string | undefined;
@@ -1251,6 +1292,7 @@ export class AgentService {
       uiKarton,
       globalConfigService,
       authService,
+      windowLayoutService,
       onSaveSetupInformation,
     );
     await instance.initialize();

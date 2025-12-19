@@ -951,4 +951,29 @@ export class WindowLayoutService {
       `[WindowLayoutService] Applied ${isDark ? 'dark' : 'light'} theme colors to window and all tab webcontents`,
     );
   }
+
+  // =========================================================================
+  // Agent Browser Tools
+  // =========================================================================
+
+  /**
+   * Executes a JavaScript expression in the console of the specified tab.
+   * If no tabId is provided, uses the currently active tab.
+   *
+   * @param expression - The JavaScript expression to execute
+   * @param tabId - Optional tab ID; uses active tab if not provided
+   * @returns An object with success status and either the result or an error message
+   */
+  public async executeConsoleScript(
+    expression: string,
+    tabId?: string,
+  ): Promise<{ success: boolean; result?: any; error?: string }> {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+
+    if (!tab) {
+      return { success: false, error: 'No active tab available' };
+    }
+
+    return await tab.executeConsoleScript(expression);
+  }
 }

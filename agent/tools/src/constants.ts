@@ -90,6 +90,22 @@ export const TOOL_OUTPUT_LIMITS = {
   },
 
   /**
+   * Execute console script tool limits
+   */
+  EXECUTE_CONSOLE_SCRIPT: {
+    /** Maximum total output size in bytes (serialized JSON) */
+    MAX_TOTAL_OUTPUT_SIZE: 200 * 1024, // 200KB ~ 50k tokens at 4 chars per token -> ~6k lines of code
+  },
+
+  /**
+   * Fallback limits for tools that don't have specific limits
+   */
+  FALLBACK: {
+    /** Maximum total output size in bytes (serialized JSON) */
+    MAX_TOTAL_OUTPUT_SIZE: 40 * 1024, // 40KB, ~10k tokens at 4 chars per token
+  },
+
+  /**
    * Default truncation message for all tools
    */
   DEFAULT_TRUNCATION_MESSAGE:

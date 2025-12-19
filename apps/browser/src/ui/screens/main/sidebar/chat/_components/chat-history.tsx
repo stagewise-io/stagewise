@@ -1,11 +1,16 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@stagewise/stage-ui/components/button';
 import { ChatBubble } from './chat-bubble';
 import { Loader2Icon } from 'lucide-react';
-import { useComparingSelector, useKartonState } from '@/hooks/use-karton';
+import {
+  useComparingSelector,
+  useKartonState,
+  useKartonProcedure,
+} from '@/hooks/use-karton';
 import { cn } from '@/utils';
 import { ChatErrorBubble } from './chat-error-bubble';
 import type { History } from '@shared/karton-contracts/ui';
-import { IconMsgs } from 'nucleo-glass';
+import { IconXmark } from 'nucleo-micro-bold';
 
 export const ChatHistory = () => {
   const wasAtBottomRef = useRef(true);
@@ -18,6 +23,35 @@ export const ChatHistory = () => {
       workspaceStatus: s.workspaceStatus,
     })),
   );
+
+  const createTab = useKartonProcedure((s) => s.browser.createTab);
+  const sendUserMessage = useKartonProcedure(
+    (s) => s.agentChat.sendUserMessage,
+  );
+
+  const [removedSuggestionUrls, setRemovedSuggestionUrls] = useState<
+    Set<string>
+  >(new Set());
+
+  // Shuffle suggestions once on mount using Fisher-Yates algorithm
+  const [shuffledSuggestions] = useState(() => {
+    const shuffled = [...suggestions];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  });
+
+  const visibleSuggestions = useMemo(() => {
+    return shuffledSuggestions
+      .filter((s) => !removedSuggestionUrls.has(s.url))
+      .slice(0, 3);
+  }, [removedSuggestionUrls, shuffledSuggestions]);
+
+  const handleRemoveSuggestion = (url: string) => {
+    setRemovedSuggestionUrls((prev) => new Set([...Array.from(prev), url]));
+  };
 
   const activeChat = useMemo(() => {
     return activeChatId ? chats?.[activeChatId] : null;
@@ -141,15 +175,128 @@ export const ChatHistory = () => {
       </div>
 
       {renderedMessages.length === 0 && (
-        <div className="flex size-full flex-col items-center justify-center gap-6 px-4 py-2 text-black/30 text-sm dark:text-white/30">
-          <div className="flex flex-row items-center gap-8">
-            <IconMsgs className="opactiy-60 size-24 opacity-80 drop-shadow-black/5 drop-shadow-lg dark:brightness-200 dark:contrast-75 dark:drop-shadow-black/50" />
-          </div>
-          <span className="text-center text-base italic">
-            Get started by writing a message!
-          </span>
+        <div className="flex w-full flex-col items-center justify-center gap-1 text-sm">
+          {visibleSuggestions.map((suggestion) => (
+            <ChatSuggestion
+              key={suggestion.url}
+              {...suggestion}
+              onClick={async () => {
+                await createTab(suggestion.url);
+                await sendUserMessage({
+                  id: crypto.randomUUID(),
+                  role: 'user',
+                  parts: [
+                    {
+                      type: 'text',
+                      text: suggestion.prompt,
+                    },
+                  ],
+                });
+              }}
+              onRemove={() => handleRemoveSuggestion(suggestion.url)}
+            />
+          ))}
         </div>
       )}
     </section>
   );
 };
+
+type ChatSuggestionProps = {
+  prompt: string;
+  suggestion: string | React.ReactNode;
+  faviconUrl: string;
+  url: string;
+};
+
+const ChatSuggestion: React.FC<
+  ChatSuggestionProps & { onClick?: () => void; onRemove?: () => void }
+> = ({ suggestion, faviconUrl, url: _url, onClick, onRemove }) => {
+  return (
+    <div
+      onClick={onClick}
+      className="group/suggestion relative flex w-full cursor-pointer flex-row items-center justify-start gap-3 rounded-lg p-2 text-muted-foreground hover:bg-muted-foreground/5"
+    >
+      <span className="flex shrink-0 items-center">
+        <img src={faviconUrl} className="size-3 rounded-sm" alt="Favicon" />
+      </span>
+      <span className="group-hover/suggestion:mask-[linear-gradient(to_left,transparent_0px,transparent_24px,black_48px)] w-full overflow-hidden text-sm leading-tight transition-[mask-image] duration-200">
+        {suggestion}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        className="-translate-y-1/2 absolute top-1/2 right-2 ml-auto hidden text-muted-foreground group-hover/suggestion:flex"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove?.();
+        }}
+      >
+        <IconXmark className="size-3" />
+      </Button>
+    </div>
+  );
+};
+
+const suggestions: ChatSuggestionProps[] = [
+  {
+    prompt:
+      'You are looking at airbnb.com. Please inspect the page to find out how their icons work, and provide a simple explanation. If possible, find and focus on a specific, interesting icon that you could clone and use in my own application.',
+    suggestion: (
+      <span className="font-normal">
+        How do <span className="font-medium text-primary/60">airbnb.com</span>{' '}
+        icons work?
+      </span>
+    ),
+    faviconUrl: 'https://airbnb.com/favicon.ico',
+    url: 'https://airbnb.com',
+  },
+  {
+    prompt:
+      'You are looking at reflect.app. Please inspect the page to find out how their glow effect works, and extract all the necessary styles you need to replicate it 1:1 in my own application.',
+    suggestion: (
+      <span className="font-normal">
+        Take the glow effect from{' '}
+        <span className="font-medium text-primary/60">reflect.app</span>
+      </span>
+    ),
+    faviconUrl: 'https://reflect.app/favicon.ico',
+    url: 'https://reflect.app',
+  },
+  {
+    prompt:
+      'You are looking at react.email. Please inspect the page to find out how their frosted glass effect works, and extract all the necessary styles you need to replicate it 1:1 in my own application.',
+    suggestion: (
+      <span className="font-normal">
+        Copy the glass effect from{' '}
+        <span className="font-medium text-primary/60">react.email</span>{' '}
+      </span>
+    ),
+    faviconUrl: 'https://react.email/meta/favicon.ico',
+    url: 'https://react.email',
+  },
+  {
+    prompt:
+      'You are looking at posthog.com. Please inspect the page to find out exactly what their button looks like, and extract all the necessary styles and animations you need to make the button in our application look and behave exactly like it.',
+    suggestion: (
+      <span className="font-normal">
+        Make our button look like{' '}
+        <span className="font-medium text-primary/60">posthog.com</span>
+      </span>
+    ),
+    faviconUrl: 'https://posthog.com/favicon-32x32.png',
+    url: 'https://posthog.com',
+  },
+  {
+    prompt:
+      'You are looking at cursor.com. Please inspect the page to find out what their color theme is, and provide a concise summary of the colors and their usage, so I can learn something from it for my own application.',
+    suggestion: (
+      <span className="font-normal">
+        What's the theme of{' '}
+        <span className="font-medium text-primary/60">cursor.com</span>?
+      </span>
+    ),
+    faviconUrl: 'https://cursor.com/favicon.ico',
+    url: 'https://cursor.com',
+  },
+];

@@ -1424,4 +1424,54 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       },
     });
   }
+
+  /**
+   * Executes a JavaScript expression in the console of this tab.
+   * Uses the Chrome DevTools Protocol (CDP) Runtime.evaluate command.
+   *
+   * @param expression - The JavaScript expression to execute
+   * @param options - Optional configuration
+   * @param options.returnByValue - If true, returns the result serialized as JSON (default: true)
+   * @returns An object with success status and either the result or an error message
+   */
+  public async executeConsoleScript(
+    expression: string,
+    options?: { returnByValue?: boolean },
+  ): Promise<{ success: boolean; result?: any; error?: string }> {
+    const wc = this.webContentsView.webContents;
+
+    if (wc.isDestroyed()) {
+      return { success: false, error: 'Tab is destroyed' };
+    }
+
+    if (!wc.debugger.isAttached()) {
+      return { success: false, error: 'Debugger not attached' };
+    }
+
+    try {
+      const evalResult = await wc.debugger.sendCommand('Runtime.evaluate', {
+        expression,
+        returnByValue: options?.returnByValue ?? true,
+        awaitPromise: true,
+        userGesture: true,
+        replMode: true,
+      });
+
+      // Check for exceptions
+      if (evalResult.exceptionDetails) {
+        const errorText =
+          evalResult.exceptionDetails.exception?.description ||
+          evalResult.exceptionDetails.text ||
+          'Script execution error';
+        return { success: false, error: errorText };
+      }
+
+      return { success: true, result: evalResult.result?.value };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
 }

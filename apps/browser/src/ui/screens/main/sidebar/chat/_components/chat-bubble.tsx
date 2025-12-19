@@ -44,6 +44,7 @@ import {
   type ReadOnlyToolPart,
 } from './message-part-ui/tools/exploring';
 import { UnknownToolPart } from './message-part-ui/tools/unknown';
+import { ExecuteConsoleScriptToolPart } from './message-part-ui/tools/execute-console-script';
 
 function isToolPart(part: UIMessagePart): part is ToolPart {
   return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
@@ -286,6 +287,13 @@ export const ChatBubble = memo(function ChatBubble({
                     return <DeleteFileToolPart key={stableKey} part={part} />;
                   case 'tool-multiEditTool':
                     return <MultiEditToolPart key={stableKey} part={part} />;
+                  case 'tool-executeConsoleScriptTool':
+                    return (
+                      <ExecuteConsoleScriptToolPart
+                        key={stableKey}
+                        part={part}
+                      />
+                    );
                   case 'tool-overwriteFileTool':
                     return (
                       <OverwriteFileToolPart key={stableKey} part={part} />
