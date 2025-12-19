@@ -1,4 +1,4 @@
-import { type ReactNode, createContext } from 'react';
+import { type ReactNode, createContext, useMemo, useRef } from 'react';
 import { useContext, useState, useCallback } from 'react';
 import { usePlugins } from './use-plugins';
 import {
@@ -58,6 +58,15 @@ const ChatHistoryContext = createContext<ChatContext>({
   selectedElements: [],
   removeSelectedElement: () => {},
   isSending: false,
+});
+
+// Separate context for stable actions that don't change - prevents unnecessary re-renders
+interface ChatActionsContext {
+  setChatInput: (value: string) => void;
+}
+
+const ChatActionsContextValue = createContext<ChatActionsContext>({
+  setChatInput: () => {},
 });
 
 interface ChatStateProviderProps {
@@ -179,23 +188,46 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     selectedElements,
   ]);
 
-  const value: ChatContext = {
-    chatInput,
-    setChatInput,
-    sendMessage,
-    fileAttachments,
-    addFileAttachment,
-    removeFileAttachment,
-    clearFileAttachments,
-    selectedElements,
-    removeSelectedElement,
-    isSending,
-  };
+  const value: ChatContext = useMemo(
+    () => ({
+      chatInput,
+      setChatInput,
+      sendMessage,
+      fileAttachments,
+      addFileAttachment,
+      removeFileAttachment,
+      clearFileAttachments,
+      selectedElements,
+      removeSelectedElement,
+      isSending,
+    }),
+    [
+      chatInput,
+      sendMessage,
+      fileAttachments,
+      addFileAttachment,
+      removeFileAttachment,
+      clearFileAttachments,
+      selectedElements,
+      removeSelectedElement,
+      isSending,
+    ],
+  );
+
+  // Stable actions context - setChatInput from useState is already stable
+  const actionsValue: ChatActionsContext = useMemo(
+    () => ({
+      setChatInput,
+    }),
+    [], // setChatInput from useState is stable and never changes
+  );
 
   return (
-    <ChatHistoryContext.Provider value={value}>
-      {children}
-    </ChatHistoryContext.Provider>
+    <ChatActionsContextValue.Provider value={actionsValue}>
+      <ChatHistoryContext.Provider value={value}>
+        {children}
+      </ChatHistoryContext.Provider>
+    </ChatActionsContextValue.Provider>
   );
 };
 
@@ -203,6 +235,19 @@ export function useChatState() {
   const context = useContext(ChatHistoryContext);
   if (!context) {
     throw new Error('useChatState must be used within a ChatStateProvider');
+  }
+  return context;
+}
+
+/**
+ * Hook to access only stable chat actions (setChatInput).
+ * Use this in components that don't need to react to chatInput changes
+ * to prevent unnecessary re-renders.
+ */
+export function useChatActions() {
+  const context = useContext(ChatActionsContextValue);
+  if (!context) {
+    throw new Error('useChatActions must be used within a ChatStateProvider');
   }
   return context;
 }

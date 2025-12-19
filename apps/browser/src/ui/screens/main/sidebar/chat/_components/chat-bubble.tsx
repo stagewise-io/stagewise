@@ -12,9 +12,9 @@ import type {
 } from '@shared/karton-contracts/ui';
 import { AgentErrorType } from '@shared/karton-contracts/ui';
 import { RefreshCcwIcon, Undo2 } from 'lucide-react';
-import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useMemo, useCallback, useState, useEffect, memo } from 'react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
-import { useChatState } from '@/hooks/use-chat-state';
+import { useChatActions } from '@/hooks/use-chat-state';
 import {
   Popover,
   PopoverTrigger,
@@ -37,6 +37,7 @@ import { DeleteFileToolPart } from './message-part-ui/tools/delete-file';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
 import { OverwriteFileToolPart } from './message-part-ui/tools/overwrite-file';
 import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
+import type { ContextElement } from '@shared/context-elements';
 import {
   ExploringToolParts,
   isReadOnlyToolPart,
@@ -48,7 +49,7 @@ function isToolPart(part: UIMessagePart): part is ToolPart {
   return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
 }
 
-export function ChatBubble({
+export const ChatBubble = memo(function ChatBubble({
   message: msg,
   chatError,
   isLastMessage,
@@ -71,7 +72,7 @@ export function ChatBubble({
   );
   const activeChatId = useKartonState((s) => s.agentChat?.activeChatId || null);
   const isWorking = useKartonState((s) => s.agentChat?.isWorking || false);
-  const { setChatInput } = useChatState();
+  const { setChatInput } = useChatActions();
   const [hasCodeChanges, setHasCodeChanges] = useState(false);
   const isEmptyMessage = useMemo(() => {
     if (
@@ -311,7 +312,7 @@ export function ChatBubble({
                 <ContextElementsChipsFlexible
                   selectedElements={selectedPreviewElements.map(
                     (selectedPreviewElement) => ({
-                      selectedElement: selectedPreviewElement,
+                      selectedElement: selectedPreviewElement as ContextElement,
                     }),
                   )}
                 />
@@ -397,4 +398,4 @@ export function ChatBubble({
       </div>
     </div>
   );
-}
+});
