@@ -279,7 +279,7 @@ export function ChatPanelFooter() {
       >
         <div className="flex flex-1 flex-col items-stretch gap-1">
           {/* Text input area */}
-          <div className="relative flex flex-1 pr-1">
+          <div className="relative flex pr-1">
             <textarea
               ref={inputRef}
               value={chatState.chatInput}
