@@ -29,6 +29,7 @@ import {
   IconMoonFill18,
   IconBrightnessIncreaseFill18,
 } from 'nucleo-ui-fill-18';
+import { IconGear } from 'nucleo-glass';
 import { SearchBar } from './_components/search-bar';
 import { ZoomBar } from './_components/zoom-bar';
 import { Omnibox, type OmniboxRef } from './_components/omnibox';
@@ -116,6 +117,10 @@ export function MainSection({
       searchInputRef.current?.select();
     }, 50);
   }, [activateSearchBar]);
+
+  const handleOpenSettings = useCallback(() => {
+    createTab('stagewise://internal/settings', true);
+  }, [createTab]);
 
   const activeTab = useMemo(() => {
     return tabs[activeTabId] as TabState | undefined;
@@ -284,6 +289,18 @@ export function MainSection({
               <TooltipContent side="bottom">
                 Open developer tools
               </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={handleOpenSettings}
+                >
+                  <IconGear className="size-4 text-muted-foreground" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Settings</TooltipContent>
             </Tooltip>
           </div>
           <div className="flex size-full flex-col gap-4 rounded-lg p-2">

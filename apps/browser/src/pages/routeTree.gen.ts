@@ -9,12 +9,36 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AboutRouteImport } from './routes/about'
+import { Route as HistoryRouteImport } from './routes/history'
+import { Route as ClearDataRouteImport } from './routes/clear-data'
+import { Route as BrowsingSettingsRouteImport } from './routes/browsing-settings'
+import { Route as AgentSettingsRouteImport } from './routes/agent-settings'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClearDataRoute = ClearDataRouteImport.update({
+  id: '/clear-data',
+  path: '/clear-data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrowsingSettingsRoute = BrowsingSettingsRouteImport.update({
+  id: '/browsing-settings',
+  path: '/browsing-settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentSettingsRoute = AgentSettingsRouteImport.update({
+  id: '/agent-settings',
+  path: '/agent-settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,37 +49,100 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
+  '/account': typeof AccountRoute
+  '/agent-settings': typeof AgentSettingsRoute
+  '/browsing-settings': typeof BrowsingSettingsRoute
+  '/clear-data': typeof ClearDataRoute
+  '/history': typeof HistoryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
+  '/account': typeof AccountRoute
+  '/agent-settings': typeof AgentSettingsRoute
+  '/browsing-settings': typeof BrowsingSettingsRoute
+  '/clear-data': typeof ClearDataRoute
+  '/history': typeof HistoryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
+  '/account': typeof AccountRoute
+  '/agent-settings': typeof AgentSettingsRoute
+  '/browsing-settings': typeof BrowsingSettingsRoute
+  '/clear-data': typeof ClearDataRoute
+  '/history': typeof HistoryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about'
+  fullPaths:
+    | '/'
+    | '/account'
+    | '/agent-settings'
+    | '/browsing-settings'
+    | '/clear-data'
+    | '/history'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about'
-  id: '__root__' | '/' | '/about'
+  to:
+    | '/'
+    | '/account'
+    | '/agent-settings'
+    | '/browsing-settings'
+    | '/clear-data'
+    | '/history'
+  id:
+    | '__root__'
+    | '/'
+    | '/account'
+    | '/agent-settings'
+    | '/browsing-settings'
+    | '/clear-data'
+    | '/history'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AboutRoute: typeof AboutRoute
+  AccountRoute: typeof AccountRoute
+  AgentSettingsRoute: typeof AgentSettingsRoute
+  BrowsingSettingsRoute: typeof BrowsingSettingsRoute
+  ClearDataRoute: typeof ClearDataRoute
+  HistoryRoute: typeof HistoryRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clear-data': {
+      id: '/clear-data'
+      path: '/clear-data'
+      fullPath: '/clear-data'
+      preLoaderRoute: typeof ClearDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/browsing-settings': {
+      id: '/browsing-settings'
+      path: '/browsing-settings'
+      fullPath: '/browsing-settings'
+      preLoaderRoute: typeof BrowsingSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agent-settings': {
+      id: '/agent-settings'
+      path: '/agent-settings'
+      fullPath: '/agent-settings'
+      preLoaderRoute: typeof AgentSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,7 +157,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AboutRoute: AboutRoute,
+  AccountRoute: AccountRoute,
+  AgentSettingsRoute: AgentSettingsRoute,
+  BrowsingSettingsRoute: BrowsingSettingsRoute,
+  ClearDataRoute: ClearDataRoute,
+  HistoryRoute: HistoryRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

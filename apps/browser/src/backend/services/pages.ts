@@ -31,10 +31,6 @@ export class PagesService {
     const ses = session.fromPartition('persist:browser-content');
 
     ses.protocol.handle('stagewise', (request) => {
-      this.logger.debug(
-        `[PagesService] Custom protocol request received: ${request.url}`,
-      );
-
       // Normalize the URL - ensure it has an origin (hostname)
       // "stagewise://" needs an origin to be valid, default to "internal"
       let normalizedRequestUrl = request.url;
@@ -68,7 +64,9 @@ export class PagesService {
 
       // In dev mode, forward all requests to the dev server
       if (PAGES_VITE_DEV_SERVER_URL) {
-        const devServerUrl = `${PAGES_VITE_DEV_SERVER_URL}${url.pathname}${url.search}`;
+        const pathname = url.pathname || '/';
+        const search = url.search || '';
+        const devServerUrl = `${PAGES_VITE_DEV_SERVER_URL}${pathname}${search}`;
         return net.fetch(devServerUrl);
       }
 

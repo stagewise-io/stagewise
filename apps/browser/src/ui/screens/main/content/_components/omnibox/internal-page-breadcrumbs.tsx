@@ -51,7 +51,7 @@ export function InternalPageBreadcrumbs({
   const pathnameSegments = useMemo(() => {
     try {
       // Extract pathname from stagewise://internal/path/to/resource
-      const pathname = url.replace('stagewise://internal', '');
+      const pathname = url.replace('stagewise://internal', '').split('?')[0];
       // Split by '/' and filter out empty segments
       return pathname.split('/').filter((segment) => segment.length > 0);
     } catch {

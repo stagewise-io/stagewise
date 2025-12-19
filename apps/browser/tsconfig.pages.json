@@ -7,13 +7,20 @@
     "jsx": "react-jsx",
     "paths": {
       "@/*": ["./src/pages/*"],
-      "@shared/*": ["./src/shared/*"]
+      "@shared/*": ["./src/shared/*"],
+      "@ui/*": ["./src/ui/*"]
     },
     "types": ["vite/client"],
     "skipLibCheck": true,
     "strictNullChecks": true
   },
-  "include": ["src/pages", "forge.env.d.ts", "src/shared", ".storybook/**/*"],
+  "include": [
+    "src/pages",
+    "forge.env.d.ts",
+    "src/shared",
+    ".storybook/**/*",
+    "src/ui"
+  ],
   "exclude": [
     "**/*.stories.tsx",
     "**/*.stories.ts",

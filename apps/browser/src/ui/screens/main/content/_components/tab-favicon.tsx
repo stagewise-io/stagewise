@@ -5,8 +5,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Loader2Icon } from 'lucide-react';
 
 export function TabFavicon({ tabState }: { tabState: TabState }) {
-  const isStartPage = useMemo(
-    () => tabState?.url === 'ui-main',
+  const isStagewisePage = useMemo(
+    () =>
+      tabState?.url === 'ui-main' ||
+      tabState?.url.startsWith('stagewise://internal/'),
     [tabState?.url],
   );
 
@@ -31,7 +33,7 @@ export function TabFavicon({ tabState }: { tabState: TabState }) {
 
   return (
     <>
-      {isStartPage ? (
+      {isStagewisePage ? (
         <div className="flex size-4 items-center justify-center rounded-full bg-linear-to-br from-blue-700 to-violet-700">
           <Logo color="current" className="size-1/2 text-white" />
         </div>

@@ -38,6 +38,9 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src/pages'),
       '@shared': path.resolve(__dirname, './src/shared'),
+      '@ui': path.resolve(__dirname, './src/ui'),
+      // 'use-sync-external-store/shim/with-selector.js': 'react',
+      // 'use-sync-external-store/shim/index.js': 'react',
     },
     mainFields: ['module', 'main'],
     extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
@@ -50,5 +53,19 @@ export default defineConfig({
       external: ['serialport', 'sqlite3'],
     },
     target: 'es2022',
+  },
+  optimizeDeps: {
+    force: true,
+    exclude: ['@tanstack/react-router', '@tanstack/react-router-devtools'],
+    include: ['use-sync-external-store', 'use-sync-external-store/**/*'],
+  },
+  server: {
+    port: 5174,
+    strictPort: true,
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: 5174,
+    },
   },
 });

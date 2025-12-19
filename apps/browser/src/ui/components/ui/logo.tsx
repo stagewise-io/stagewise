@@ -34,7 +34,7 @@ export const Logo: FC<LogoProps> = ({
     <div
       className={`relative ${
         color === 'gradient'
-          ? 'rounded-full bg-[image:var(--gradient)] bg-cover bg-no-repeat'
+          ? 'bg-(image:--gradient) rounded-full bg-cover bg-no-repeat'
           : ''
       } ${props.className || ''} ${
         loading ? 'drop-shadow-xl' : ''
