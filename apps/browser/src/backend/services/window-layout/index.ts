@@ -452,6 +452,10 @@ export class WindowLayoutService {
     tab.setVisible(false);
     this.baseWindow!.contentView.addChildView(tab.getViewContainer());
 
+    // Reinforce z-order after adding new tab view to ensure UI webcontent stays on top
+    // (or tab content if isWebContentInteractive is true)
+    this.updateZOrder();
+
     if (setActive) await this.handleSwitchTab(id);
   }
 
