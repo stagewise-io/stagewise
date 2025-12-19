@@ -71,9 +71,26 @@ export class ContextElementTracker extends EventEmitter<ElementSelectorEventMap>
 
     this.logger.debug('[ContextElementTracker] Initialized');
 
-    // Clear hover state on navigation/reload to prevent stale frameId references
+    // Clear hover state and reset initialization on navigation/reload to prevent stale frameId references
     this.webContents.on('did-start-loading', () => {
       this.clearHover();
+      // Reset initialization state since contexts will be destroyed on navigation
+      this.isInitialized = false;
+    });
+
+    // When page finishes loading, ensure we're connected if selection mode is active
+    // This handles the case where setContextSelection was called during page load
+    this.webContents.on('did-stop-loading', () => {
+      if (this.isSelectionActive && !this.isInitialized) {
+        this.logger.debug(
+          '[ContextElementTracker] Page finished loading, retrying ensureConnected',
+        );
+        this.ensureConnected().catch((err) => {
+          this.logger.error(
+            `[ContextElementTracker] Failed to connect after page load: ${err}`,
+          );
+        });
+      }
     });
 
     // Always attach debugger on construction for better performance
