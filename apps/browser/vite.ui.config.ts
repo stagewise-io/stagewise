@@ -44,4 +44,5 @@ export default defineConfig({
   optimizeDeps: {
     force: true,
   },
+  cacheDir: 'node_modules/.vite/ui',
 });

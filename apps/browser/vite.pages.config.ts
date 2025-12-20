@@ -68,4 +68,5 @@ export default defineConfig({
       port: 5174,
     },
   },
+  cacheDir: 'node_modules/.vite/pages',
 });
