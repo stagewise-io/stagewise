@@ -9,11 +9,7 @@ import {
   useKartonState,
 } from '@/hooks/use-karton';
 
-export function ChatPanel({
-  multiChatControls = true,
-}: {
-  multiChatControls?: boolean;
-}) {
+export function ChatPanel() {
   const posthog = usePostHog();
   const chatState = useChatState();
   const [_isDragging, setIsDragging] = useState(false);

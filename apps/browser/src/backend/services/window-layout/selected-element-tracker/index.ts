@@ -692,7 +692,7 @@ export class SelectedElementTracker extends EventEmitter<ElementSelectorEventMap
     }
 
     // Store element without tabId (it's added by TabController and may vary)
-    const { tabId, ...elementWithoutTabId } = element;
+    const { tabId: _tabId, ...elementWithoutTabId } = element;
     this.parsedElementCache.set(
       cacheKey,
       elementWithoutTabId as SelectedElement,

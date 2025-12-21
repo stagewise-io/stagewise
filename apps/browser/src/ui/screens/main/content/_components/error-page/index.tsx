@@ -56,8 +56,8 @@ const ErrorContentRouter = ({
 };
 
 export function SystemRelatedError({
-  code,
-  message,
+  code: _code,
+  message: _message,
 }: {
   code: number;
   message: string;
@@ -66,8 +66,8 @@ export function SystemRelatedError({
 }
 
 export function ConnectionRelatedError({
-  code,
-  message,
+  code: _code,
+  message: _message,
 }: {
   code: number;
   message: string;
@@ -76,8 +76,8 @@ export function ConnectionRelatedError({
 }
 
 export function CertificateRelatedError({
-  code,
-  message,
+  code: _code,
+  message: _message,
 }: {
   code: number;
   message: string;
@@ -86,8 +86,8 @@ export function CertificateRelatedError({
 }
 
 export function HTTPError({
-  code,
-  message,
+  code: _code,
+  message: _message,
 }: {
   code: number;
   message: string;
@@ -96,8 +96,8 @@ export function HTTPError({
 }
 
 export function CacheError({
-  code,
-  message,
+  code: _code,
+  message: _message,
 }: {
   code: number;
   message: string;
@@ -106,8 +106,8 @@ export function CacheError({
 }
 
 export function CertificateManagerError({
-  code,
-  message,
+  code: _code,
+  message: _message,
 }: {
   code: number;
   message: string;
@@ -116,8 +116,8 @@ export function CertificateManagerError({
 }
 
 export function DNSResolverError({
-  code,
-  message,
+  code: _code,
+  message: _message,
 }: {
   code: number;
   message: string;
@@ -126,8 +126,8 @@ export function DNSResolverError({
 }
 
 export function BlobError({
-  code,
-  message,
+  code: _code,
+  message: _message,
 }: {
   code: number;
   message: string;
@@ -136,8 +136,8 @@ export function BlobError({
 }
 
 export function OtherError({
-  code,
-  message,
+  code: _code,
+  message: _message,
 }: {
   code: number;
   message: string;

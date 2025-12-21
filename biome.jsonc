@@ -104,7 +104,8 @@
         "noHeadImportInDocument": "warn",
         "noDocumentImportInPage": "warn",
         "noDuplicateElseIf": "warn",
-        "noIrregularWhitespace": "warn"
+        "noIrregularWhitespace": "warn",
+        "noDocumentCookie": "off"
       },
       "nursery": {
         "useSortedClasses": {
