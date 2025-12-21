@@ -481,7 +481,7 @@ export class Agent {
       if (isFirstUserMessage && lastMessageMetadata.isUserMessage) {
         const title = await generateChatTitle(
           history,
-          this.litellm('gemini-2.5-flash'),
+          this.litellm('gemini-2.5-flash-lite'),
         );
 
         this.karton?.setState((draft) => {
@@ -508,7 +508,7 @@ export class Agent {
       });
 
       const stream = streamText({
-        model: this.litellm('claude-sonnet-4-20250514'),
+        model: this.litellm('claude-sonnet-4-5'),
         abortSignal: this.abortController.signal,
         temperature: 0.7,
         maxOutputTokens: 10000,
