@@ -33,6 +33,7 @@ import {
 } from '@shared/karton-contracts/pages-api/types';
 import type { HistoryService } from '../history';
 import type { FaviconService } from '../favicon';
+import { canBrowserHandleUrl } from './protocol-utils';
 
 export interface TabState {
   title: string;
@@ -739,6 +740,17 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private setupEventListeners() {
     const wc = this.webContentsView.webContents;
 
+    // Intercept navigation to unsupported protocols and open externally
+    wc.on('will-navigate', (event, url) => {
+      if (!canBrowserHandleUrl(url)) {
+        event.preventDefault();
+        this.logger.debug(
+          `[TabController] Intercepted navigation to external protocol: ${url}`,
+        );
+        shell.openExternal(url);
+      }
+    });
+
     wc.on('did-navigate', async (_event, url) => {
       this.stopSearch(); // Clear search on navigation
       this.updateState({
@@ -876,6 +888,16 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     });
 
     wc.setWindowOpenHandler((details) => {
+      // Check if the browser can handle this URL's protocol
+      if (!canBrowserHandleUrl(details.url)) {
+        // Open in external application (mailto:, tel:, vscode:, etc.)
+        this.logger.debug(
+          `[TabController] Opening URL with external handler: ${details.url}`,
+        );
+        shell.openExternal(details.url);
+        return { action: 'deny' };
+      }
+
       if (this.onCreateTab) {
         // Check disposition to determine if tab should be opened in background
         // disposition can be: 'default', 'foreground-tab', 'background-tab', 'new-window', etc.

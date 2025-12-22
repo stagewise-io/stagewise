@@ -1,4 +1,4 @@
-import { WebContentsView } from 'electron';
+import { WebContentsView, shell } from 'electron';
 import { domCodeToElectronKeyCode } from '../../utils/dom-code-to-electron-key-code';
 import path from 'node:path';
 import contextMenu from 'electron-context-menu';
@@ -9,6 +9,7 @@ import type { SerializableKeyboardEvent } from '@shared/karton-contracts/web-con
 import type { ColorScheme } from '@shared/karton-contracts/ui';
 import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import { fileURLToPath } from 'node:url';
+import { canBrowserHandleUrl } from './protocol-utils';
 
 // These are injected by the build system
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -99,6 +100,16 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
 
     this.view.setBackgroundColor('#00000000');
     this.view.webContents.setWindowOpenHandler((details) => {
+      // Check if the browser can handle this URL's protocol
+      if (!canBrowserHandleUrl(details.url)) {
+        // Open in external application (mailto:, tel:, vscode:, etc.)
+        this.logger.debug(
+          `[UIController] Opening URL with external handler: ${details.url}`,
+        );
+        shell.openExternal(details.url);
+        return { action: 'deny' };
+      }
+
       // Check disposition to determine if tab should be opened in background
       // disposition can be: 'default', 'foreground-tab', 'background-tab', 'new-window', etc.
       const setActive = details.disposition !== 'background-tab';
