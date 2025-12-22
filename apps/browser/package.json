@@ -17,7 +17,8 @@
     "start": "dotenv -e ../../.env.dev -- electron-forge start",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "clean-data": "tsx scripts/clean-data.ts"
+    "clean-data": "tsx scripts/clean-data.ts",
+    "clear-vite-cache": "tsx scripts/clear-vite-cache.ts"
   },
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1",
