@@ -1,11 +1,11 @@
 import { useChatState } from '@/hooks/use-chat-state';
-import { ContextElementsChipsFlexible } from './context-elements-chips-flexible';
+import { SelectedElementsChipsFlexible } from './selected-elements-chips-flexible';
 
-export function ContextElementsChips() {
+export function SelectedElementsChips() {
   const { selectedElements, removeSelectedElement } = useChatState();
 
   return (
-    <ContextElementsChipsFlexible
+    <SelectedElementsChipsFlexible
       selectedElements={selectedElements}
       removeSelectedElementById={removeSelectedElement}
     />

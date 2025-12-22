@@ -7,19 +7,19 @@ import {
   type ReactNode,
 } from 'react';
 
-interface ContextElementsState {
+interface SelectedElementsState {
   highlightedElement: Element | null;
   selectedElements: Element[];
 }
 
-const ContextElementsContext = createContext<ContextElementsState>({
+const SelectedElementsContext = createContext<SelectedElementsState>({
   highlightedElement: null,
   selectedElements: [],
 });
 
-export const useContextElements = () => useContext(ContextElementsContext);
+export const useSelectedElements = () => useContext(SelectedElementsContext);
 
-export const ContextElementProvider = ({
+export const SelectedElementsProvider = ({
   children,
 }: {
   children: ReactNode;
@@ -58,10 +58,10 @@ export const ContextElementProvider = ({
   }, []);
 
   return (
-    <ContextElementsContext.Provider
+    <SelectedElementsContext.Provider
       value={{ highlightedElement, selectedElements }}
     >
       {children}
-    </ContextElementsContext.Provider>
+    </SelectedElementsContext.Provider>
   );
 };

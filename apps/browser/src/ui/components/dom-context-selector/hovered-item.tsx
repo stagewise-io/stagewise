@@ -22,12 +22,12 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
   const hoveredElementPluginContext = useMemo(() => {
     if (!refElement) return [];
     const pluginsWithContextGetters = plugins.filter(
-      (plugin) => plugin.onContextElementSelect,
+      (plugin) => plugin.onSelectedElementSelect,
     );
 
     return pluginsWithContextGetters.map((plugin) => ({
       pluginName: plugin.pluginName,
-      context: plugin.onContextElementSelect?.(refElement),
+      context: plugin.onSelectedElementSelect?.(refElement),
     }));
   }, [refElement]);
 

@@ -1,7 +1,7 @@
 import { FileAttachmentChips } from '@/components/file-attachment-chips';
 import { IconXmark } from 'nucleo-micro-bold';
 import { ContextUsageRing } from './context-usage-ring';
-import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
+import { SelectedElementsChipsFlexible } from '@/components/selected-elements-chips-flexible';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
@@ -60,13 +60,13 @@ export function ChatPanelFooter() {
 
   const focusChatHotkeyText = HotkeyComboText({ action: HotkeyActions.CTRL_I });
 
-  const contextSelectionActive = useKartonState(
+  const elementSelectionActive = useKartonState(
     (s) => s.browser.contextSelectionMode,
   );
-  const setContextSelectionActive = useKartonProcedure(
+  const setElementSelectionActive = useKartonProcedure(
     (p) => p.browser.contextSelection.setActive,
   );
-  const clearContextElements = useKartonProcedure(
+  const clearSelectedElements = useKartonProcedure(
     (p) => p.browser.contextSelection.clearElements,
   );
 
@@ -124,7 +124,7 @@ export function ChatPanelFooter() {
   const handleSubmit = useCallback(() => {
     if (canSendMessage) {
       chatState.sendMessage();
-      setContextSelectionActive(false);
+      setElementSelectionActive(false);
       setChatInputActive(false);
     }
   }, [chatState, canSendMessage]);
@@ -198,7 +198,7 @@ export function ChatPanelFooter() {
         void inputRef.current?.focus();
       }, 0);
     } else {
-      setContextSelectionActive(false);
+      setElementSelectionActive(false);
       void inputRef.current?.blur();
     }
   }, [chatInputActive]);
@@ -231,13 +231,13 @@ export function ChatPanelFooter() {
     useCallback(async () => {
       if (!chatInputActive) {
         window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
-        setContextSelectionActive(true); // We trigger this here again because the user might go into context selection mode after already having the input active
+        setElementSelectionActive(true); // We trigger this here again because the user might go into context selection mode after already having the input active
         await togglePanelKeyboardFocus('stagewise-ui');
       } else {
         window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
         await togglePanelKeyboardFocus('tab-content');
       }
-    }, [chatInputActive, contextSelectionActive, isWorking]),
+    }, [chatInputActive, elementSelectionActive, isWorking]),
     HotkeyActions.CTRL_I,
   );
 
@@ -245,7 +245,7 @@ export function ChatPanelFooter() {
     'keydown',
     (e: KeyboardEvent) => {
       if (e.code === 'Escape') {
-        if (contextSelectionActive) setContextSelectionActive(false);
+        if (elementSelectionActive) setElementSelectionActive(false);
         else setChatInputActive(false);
       }
     },
@@ -260,13 +260,13 @@ export function ChatPanelFooter() {
 
   useEventListener('sidebar-chat-panel-closed', () => {
     setChatInputActive(false);
-    setContextSelectionActive(false);
+    setElementSelectionActive(false);
   });
 
   useEventListener('sidebar-chat-panel-opened', () => {
     if (!isWorking) {
       setChatInputActive(true);
-      setContextSelectionActive(true);
+      setElementSelectionActive(true);
     }
   });
 
@@ -323,7 +323,7 @@ export function ChatPanelFooter() {
               fileAttachments={chatState.fileAttachments}
               removeFileAttachment={chatState.removeFileAttachment}
             />
-            <ContextElementsChipsFlexible
+            <SelectedElementsChipsFlexible
               selectedElements={chatState.selectedElements}
               removeSelectedElementById={chatState.removeSelectedElement}
             />
@@ -336,7 +336,7 @@ export function ChatPanelFooter() {
                 className="text-muted-foreground"
                 onClick={() => {
                   chatState.clearFileAttachments();
-                  clearContextElements();
+                  clearSelectedElements();
                 }}
               >
                 Clear all
@@ -371,15 +371,15 @@ export function ChatPanelFooter() {
                       variant="ghost"
                       disabled={hasOpenedStartPage}
                       className="text-muted-foreground data-[context-selector-active=true]:bg-primary/5 data-[context-selector-active=true]:text-primary data-[context-selector-active=true]:hover:bg-primary/10"
-                      data-context-selector-active={contextSelectionActive}
+                      data-element-selector-active={elementSelectionActive}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (contextSelectionActive) {
-                          setContextSelectionActive(false);
+                        if (elementSelectionActive) {
+                          setElementSelectionActive(false);
                         } else {
                           setChatInputActive(true);
-                          setContextSelectionActive(true);
+                          setElementSelectionActive(true);
                         }
                       }}
                       aria-label="Select context elements"
@@ -388,7 +388,7 @@ export function ChatPanelFooter() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {contextSelectionActive ? (
+                    {elementSelectionActive ? (
                       'Stop selecting elements (Esc)'
                     ) : (
                       <>

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useContextElements } from '../hooks/cdp-interop';
+import { useSelectedElements } from '../hooks/cdp-interop';
 import { useKartonProcedure } from '../hooks/karton';
 
 const elementIds = new WeakMap<Element, string>();
@@ -12,7 +12,7 @@ function getUniqueId(element: Element): string {
 }
 
 export function HoveredElementTracker() {
-  const { highlightedElement, selectedElements } = useContextElements();
+  const { highlightedElement, selectedElements } = useSelectedElements();
   const movePanelToForeground = useKartonProcedure(
     (s) => s.movePanelToForeground,
   );

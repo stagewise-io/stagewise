@@ -25,15 +25,15 @@ import { IdeLogo } from './ide-logo';
 import { IconOpenExternalOutline18 } from 'nucleo-ui-outline-18';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
-interface ContextElementsChipsProps {
+interface SelectedElementsChipsProps {
   selectedElements: SelectedElement[];
   removeSelectedElementById?: (id: string) => void;
 }
 
-export function ContextElementsChipsFlexible({
+export function SelectedElementsChipsFlexible({
   selectedElements,
   removeSelectedElementById,
-}: ContextElementsChipsProps) {
+}: SelectedElementsChipsProps) {
   if (selectedElements.length === 0) {
     return null;
   }
@@ -41,7 +41,7 @@ export function ContextElementsChipsFlexible({
   return (
     <>
       {selectedElements.map((selectedElement) => (
-        <ContextElementChip
+        <SelectedElementChip
           key={`${selectedElement.stagewiseId}`}
           selectedElement={selectedElement}
           onDelete={
@@ -55,7 +55,7 @@ export function ContextElementsChipsFlexible({
   );
 }
 
-interface ContextElementChipProps {
+interface SelectedElementChipProps {
   selectedElement: SelectedElement;
   onDelete?: () => void;
 }
@@ -79,10 +79,10 @@ const displayedAttributes = [
   'aria-selected',
 ];
 
-function ContextElementChip({
+function SelectedElementChip({
   selectedElement,
   onDelete,
-}: ContextElementChipProps) {
+}: SelectedElementChipProps) {
   const posthog = usePostHog();
   const openInIdeSelection = useKartonState(
     (s) => s.globalConfig.openFilesInIde,

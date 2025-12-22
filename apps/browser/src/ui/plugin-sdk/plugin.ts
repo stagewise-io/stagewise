@@ -40,7 +40,7 @@ export interface PromptContext {
 export type { SelectedElement } from '@shared/selected-elements';
 
 /** Additional information that a plugin can provide when the user selects a context element */
-export interface ContextElementContext {
+export interface SelectedElementContext {
   /** Up to ~50 characters of information (element name, whatever...) that get's rendered when selecting an element */
   annotation: string | null;
 }
@@ -79,13 +79,13 @@ export interface ToolbarPlugin {
       ) => PromptContext | Promise<PromptContext> | null)
     | null;
 
-  /** Called when a context element is hovered in the context menu. This only happens in prompting mode. */
-  onContextElementHover?:
-    | ((element: HTMLElement) => ContextElementContext)
+  /** Called when a selected element is hovered in the context menu. This only happens in prompting mode. */
+  onSelectedElementHover?:
+    | ((element: HTMLElement) => SelectedElementContext)
     | null;
 
-  /** Called when a context element is selected in the context menu. This only happens in prompting mode. */
-  onContextElementSelect?:
-    | ((element: HTMLElement) => ContextElementContext)
+  /** Called when a selected element is selected in the context menu. This only happens in prompting mode. */
+  onSelectedElementSelect?:
+    | ((element: HTMLElement) => SelectedElementContext)
     | null;
 }
