@@ -47,6 +47,7 @@
   "dependencies": {},
   "devDependencies": {
     "@stagewise/plugin-sdk": "workspace:*",
+    "rimraf": "^6.0.0",
     "typescript": "~5.8.3",
     "react": "19.1.2",
     "react-dom": "19.1.2",
