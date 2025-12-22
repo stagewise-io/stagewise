@@ -279,7 +279,7 @@ export function ChatPanelFooter() {
       >
         <div className="flex flex-1 flex-col items-stretch gap-1">
           {/* Text input area */}
-          <div className="relative flex pr-1">
+          <div className="relative flex h-28 pr-1">
             <textarea
               ref={inputRef}
               value={chatState.chatInput}
@@ -295,7 +295,7 @@ export function ChatPanelFooter() {
               disabled={!enableInputField}
               className={cn(
                 GlassyTextInputClassNames,
-                'scrollbar-subtle z-10 h-28 w-full resize-none border-none bg-transparent px-2 py-1 text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out focus:outline-none disabled:bg-transparent',
+                'scrollbar-subtle relative z-10 h-full w-full resize-none border-none bg-transparent px-2 py-1 text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out focus:outline-none disabled:bg-transparent',
               )}
             />
             {chatState.chatInput.length === 0 && (
@@ -311,7 +311,7 @@ export function ChatPanelFooter() {
           </div>
 
           {/* Other attachments area */}
-          <div className="flex flex-row flex-wrap items-center justify-start gap-1 *:shrink-0">
+          <div className="flex shrink-0 flex-row flex-wrap items-center justify-start gap-1 *:shrink-0">
             {activeChat && (isVerboseMode || contextUsed > 80) && (
               <ContextUsageRing
                 percentage={contextUsed}
