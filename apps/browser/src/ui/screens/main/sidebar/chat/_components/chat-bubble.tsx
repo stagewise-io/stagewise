@@ -189,7 +189,7 @@ export const ChatBubble = memo(function ChatBubble({
             className={cn(
               'group relative min-h-8 max-w-full animate-chat-bubble-appear select-text space-y-3 break-words rounded-xl px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
               msg.role === 'assistant'
-                ? 'min-w-1/3 origin-bottom-left rounded-bl-sm bg-zinc-100/60 text-foreground dark:bg-[#1e283d]/60'
+                ? 'min-w-1/3 origin-bottom-left rounded-bl-sm bg-zinc-100/60 text-foreground dark:bg-zinc-700/50'
                 : 'origin-bottom-right rounded-br-sm bg-blue-600/90 text-white',
               msg.parts.length > 1 && 'w-full',
               msg.role === 'user' &&

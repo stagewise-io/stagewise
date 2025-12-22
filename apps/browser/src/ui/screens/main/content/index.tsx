@@ -28,8 +28,8 @@ import {
 import {
   IconMoonFill18,
   IconBrightnessIncreaseFill18,
+  IconGear2Fill18,
 } from 'nucleo-ui-fill-18';
-import { IconGear } from 'nucleo-glass';
 import { SearchBar } from './_components/search-bar';
 import { ZoomBar } from './_components/zoom-bar';
 import { Omnibox, type OmniboxRef } from './_components/omnibox';
@@ -297,7 +297,7 @@ export function MainSection({
                   size="icon-sm"
                   onClick={handleOpenSettings}
                 >
-                  <IconGear className="size-4 text-muted-foreground" />
+                  <IconGear2Fill18 className="size-4.5 text-muted-foreground" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Settings</TooltipContent>

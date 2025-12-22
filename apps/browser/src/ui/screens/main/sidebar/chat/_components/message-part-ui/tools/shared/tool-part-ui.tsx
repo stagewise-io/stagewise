@@ -204,7 +204,7 @@ export const ToolPartUI = ({
 
   if (content === undefined) {
     return (
-      <div className="-mx-1 glass-inset-chat-bubble flex h-6 items-center gap-1 truncate rounded-xl border-border/20 px-2.5 font-normal text-muted-foreground">
+      <div className="-mx-1 flex h-6 items-center gap-1 truncate rounded-xl border-border/20 bg-muted/30 px-2.5 font-normal text-muted-foreground">
         {trigger}
       </div>
     );
@@ -214,14 +214,14 @@ export const ToolPartUI = ({
     <div
       className={cn(
         // '-mx-1 block overflow-hidden rounded-xl border-border/20 bg-muted-foreground/5', // Current state of the product
-        '-mx-1 glass-inset-chat-bubble block overflow-hidden rounded-xl border-border/20', // Very heavy inset glass
+        '-mx-1 block overflow-hidden rounded-xl border-border/20', // Very heavy inset glass
         // '-mx-1 glass-inset-chat-bubble block overflow-hidden rounded-xl border-border/20',
       )}
     >
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         <CollapsibleTrigger
           size="condensed"
-          className={`h-6 gap-1 rounded-t-xl px-2 font-normal text-muted-foreground ${content !== undefined ? 'cursor-pointer' : 'cursor-default hover:bg-transparent active:bg-transparent'}`}
+          className={`h-6 gap-1 rounded-t-xl bg-muted/30 px-2 font-normal text-muted-foreground ${content !== undefined ? 'cursor-pointer' : 'cursor-default hover:bg-transparent active:bg-transparent'}`}
         >
           {trigger}
           <ChevronDownIcon
