@@ -42,7 +42,7 @@
   ],
   "license": "AGPL-3.0-only",
   "scripts": {
-    "clean": "rm -rf .turbo node_modules",
+    "clean": "rimraf .turbo node_modules",
     "dev": "tsc -b && tsx build.vite.ts development",
     "dev:examples": "tsc -b && tsx build.vite.ts development",
     "build:toolbar": "tsc -b && tsx build.vite.ts production",

@@ -2,7 +2,7 @@
   "name": "next-example",
   "private": true,
   "scripts": {
-    "clean": "rm -rf .turbo next node_modules",
+    "clean": "rimraf .turbo next node_modules",
     "dev": "next dev --turbopack --port 3002",
     "build": "next build",
     "start": "next start",

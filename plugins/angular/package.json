@@ -40,9 +40,9 @@
   ],
   "license": "AGPL-3.0-only",
   "scripts": {
-    "clean": "rm -rf .turbo node_modules",
-    "dev": "NODE_ENV=development tsc -b && vite build --mode development",
-    "build": "NODE_ENV=production tsc -b && vite build"
+    "clean": "rimraf .turbo node_modules",
+    "dev": "cross-env NODE_ENV=development tsc -b && vite build --mode development",
+    "build": "cross-env NODE_ENV=production tsc -b && vite build"
   },
   "peerDependencies": {
     "@stagewise/plugin-sdk": "workspace:*"

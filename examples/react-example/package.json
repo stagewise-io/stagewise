@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "clean": "rm -rf .turbo dist node_modules",
+    "clean": "rimraf .turbo dist node_modules",
     "dev": "vite --port 3005",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
