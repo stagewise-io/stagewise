@@ -1,5 +1,5 @@
 import type { Logger } from '../logger';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import * as schema from './schema';
 import { drizzle } from 'drizzle-orm/libsql';
 import type { GlobalDataPathService } from '../global-data-path';
@@ -382,6 +382,34 @@ export class FaviconService {
     await this.db
       .delete(schema.iconMapping)
       .where(eq(schema.iconMapping.pageUrl, pageUrl));
+  }
+
+  /**
+   * Clear all favicon data from the database.
+   * @returns Number of favicon entries that were deleted
+   */
+  async clearAllData(): Promise<number> {
+    // Get count before deletion for return value
+    const countResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.favicons)
+      .get();
+    const faviconCount = countResult?.count ?? 0;
+
+    // Delete in order: bitmaps first, then mappings, then favicons
+    await this.db.delete(schema.faviconBitmaps);
+    await this.db.delete(schema.iconMapping);
+    await this.db.delete(schema.favicons);
+    // Note: meta table is preserved (contains schema version info)
+
+    return faviconCount;
+  }
+
+  /**
+   * Run VACUUM to reclaim disk space after large deletions.
+   */
+  async vacuum(): Promise<void> {
+    await this.dbDriver.execute('VACUUM');
   }
 
   // =================================================================

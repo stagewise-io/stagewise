@@ -7,6 +7,8 @@ import {
   gte,
   lte,
   like,
+  sql,
+  inArray,
   type InferSelectModel,
   type SQL,
 } from 'drizzle-orm';
@@ -376,5 +378,150 @@ export class HistoryService {
           lte(schema.visits.visitTime, endTs),
         ),
       );
+  }
+
+  /**
+   * Clear all history data from the database.
+   * Deletes all data from all history-related tables.
+   * @returns Number of URL entries that were deleted
+   */
+  async clearAllData(): Promise<number> {
+    // Get count before deletion for return value
+    const countResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.urls)
+      .get();
+    const urlCount = countResult?.count ?? 0;
+
+    // Delete in order respecting foreign key relationships
+    // Start with dependent tables first
+    await this.db.delete(schema.clustersAndVisits);
+    await this.db.delete(schema.clusterKeywords);
+    await this.db.delete(schema.clusterVisitDuplicates);
+    await this.db.delete(schema.clusters);
+    await this.db.delete(schema.contentAnnotations);
+    await this.db.delete(schema.contextAnnotations);
+    await this.db.delete(schema.visitSource);
+    await this.db.delete(schema.visitedLinks);
+    await this.db.delete(schema.keywordSearchTerms);
+    await this.db.delete(schema.segmentUsage);
+    await this.db.delete(schema.segments);
+    await this.db.delete(schema.visits);
+    await this.db.delete(schema.urls);
+    // Note: meta table is preserved (contains schema version info)
+
+    return urlCount;
+  }
+
+  /**
+   * Clear history data within a time range.
+   * More thorough than deleteHistoryRange - also cleans up orphaned URLs.
+   * @param start - Start of range (inclusive)
+   * @param end - End of range (inclusive)
+   * @returns Number of visit entries that were deleted
+   */
+  async clearHistoryRange(start: Date, end: Date): Promise<number> {
+    const startTs = toWebKitTimestamp(start);
+    const endTs = toWebKitTimestamp(end);
+
+    // Get visit IDs in range for annotation cleanup
+    const visitsInRange = await this.db
+      .select({ id: schema.visits.id, url: schema.visits.url })
+      .from(schema.visits)
+      .where(
+        and(
+          gte(schema.visits.visitTime, startTs),
+          lte(schema.visits.visitTime, endTs),
+        ),
+      );
+
+    const visitIds = visitsInRange.map((v) => v.id);
+    const affectedUrlIds = [...new Set(visitsInRange.map((v) => v.url))];
+    const visitCount = visitIds.length;
+
+    if (visitIds.length === 0) {
+      return 0;
+    }
+
+    // Delete visit-related data
+    await this.db
+      .delete(schema.clustersAndVisits)
+      .where(inArray(schema.clustersAndVisits.visitId, visitIds));
+    await this.db
+      .delete(schema.clusterVisitDuplicates)
+      .where(inArray(schema.clusterVisitDuplicates.visitId, visitIds));
+    await this.db
+      .delete(schema.contentAnnotations)
+      .where(inArray(schema.contentAnnotations.visitId, visitIds));
+    await this.db
+      .delete(schema.contextAnnotations)
+      .where(inArray(schema.contextAnnotations.visitId, visitIds));
+    await this.db
+      .delete(schema.visitSource)
+      .where(inArray(schema.visitSource.id, visitIds));
+
+    // Delete the visits
+    await this.db
+      .delete(schema.visits)
+      .where(
+        and(
+          gte(schema.visits.visitTime, startTs),
+          lte(schema.visits.visitTime, endTs),
+        ),
+      );
+
+    // Clean up orphaned URLs (URLs with no remaining visits)
+    for (const urlId of affectedUrlIds) {
+      const remainingVisits = await this.db
+        .select({ id: schema.visits.id })
+        .from(schema.visits)
+        .where(eq(schema.visits.url, urlId))
+        .limit(1)
+        .get();
+
+      if (!remainingVisits) {
+        // No visits left for this URL, delete it and related data
+        await this.db
+          .delete(schema.keywordSearchTerms)
+          .where(eq(schema.keywordSearchTerms.urlId, urlId));
+        await this.db
+          .delete(schema.segments)
+          .where(eq(schema.segments.urlId, urlId));
+        await this.db.delete(schema.urls).where(eq(schema.urls.id, urlId));
+      }
+    }
+
+    // Clean up orphaned clusters (clusters with no visits)
+    await this.dbDriver.execute(`
+      DELETE FROM clusters
+      WHERE cluster_id NOT IN (SELECT DISTINCT cluster_id FROM clusters_and_visits)
+    `);
+
+    return visitCount;
+  }
+
+  /**
+   * Clear all download history.
+   * @returns Number of downloads cleared
+   */
+  async clearDownloads(): Promise<number> {
+    const countResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.downloads)
+      .get();
+    const count = countResult?.count ?? 0;
+
+    await this.db.delete(schema.downloadsSlices);
+    await this.db.delete(schema.downloadsUrlChains);
+    await this.db.delete(schema.downloads);
+
+    return count;
+  }
+
+  /**
+   * Run VACUUM to reclaim disk space after large deletions.
+   */
+  async vacuum(): Promise<void> {
+    await this.dbDriver.execute('VACUUM');
   }
 }

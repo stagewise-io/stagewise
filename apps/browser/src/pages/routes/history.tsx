@@ -173,7 +173,7 @@ function RowComponent({
 
   if (row.type === 'date-header') {
     return (
-      <div style={style} className="flex items-end px-4 pt-6 pb-3">
+      <div style={style} className="flex items-end pt-6 pb-3">
         <h2 className="font-medium text-foreground text-lg">{row.date}</h2>
       </div>
     );
@@ -187,7 +187,7 @@ function RowComponent({
   };
 
   return (
-    <div style={style} className="px-4">
+    <div style={style}>
       <div
         className="group flex h-full cursor-pointer select-none items-center gap-4 rounded-lg px-4 hover:bg-muted/50"
         onClick={() => onOpenUrl(row.url)}
@@ -449,112 +449,119 @@ function Page() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <div className="flex items-center gap-24 border-zinc-500/50 border-b px-6 py-4">
-        <h1 className="font-semibold text-foreground text-xl">History</h1>
-        <div className="relative flex-1 rounded-full bg-zinc-500/5 focus-within:bg-zinc-500/10">
-          <IconMagnifierFill18 className="-translate-y-1/2 absolute top-1/2 left-3.5 z-10 size-4 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search history"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="w-full rounded-full pl-10 before:hidden"
-            inputClassName="rounded-full pl-4 focus:outline-none focus:ring-0 bg-transparent"
-          />
+      <div className="flex items-center border-zinc-500/50 border-b px-6 py-4">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-24">
+          <h1 className="font-semibold text-foreground text-xl">History</h1>
+          <div className="relative flex-1 rounded-full bg-zinc-500/5 focus-within:bg-zinc-500/10">
+            <IconMagnifierFill18 className="-translate-y-1/2 absolute top-1/2 left-3.5 z-10 size-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search history"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full rounded-full pl-10 before:hidden"
+              inputClassName="rounded-full pl-4 focus:outline-none focus:ring-0 bg-transparent"
+            />
+          </div>
         </div>
       </div>
 
       {/* History entries */}
-      <div ref={containerRef} className="flex-1 overflow-hidden">
-        {isLoading ? (
-          <div className="flex h-full items-center justify-center">
-            <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : error ? (
-          <div className="flex h-full flex-col items-center justify-center px-4">
-            <div className="max-w-md space-y-2 text-center">
-              <p className="font-medium text-destructive text-sm">
-                {error.message}
-              </p>
-              {import.meta.env.DEV && error.stack && (
-                <details className="mt-4 text-left">
-                  <summary className="cursor-pointer text-muted-foreground text-xs">
-                    Technical details (dev mode)
-                  </summary>
-                  <pre className="mt-2 max-h-48 overflow-auto rounded bg-muted p-2 text-muted-foreground text-xs">
-                    {error.stack}
-                  </pre>
-                </details>
-              )}
-              {errorCauseMessage && (
-                <p className="text-muted-foreground text-xs">
-                  Cause: {errorCauseMessage}
-                </p>
-              )}
+      <div className="flex-1 overflow-hidden p-6">
+        <div
+          ref={containerRef}
+          className="mx-auto h-full max-w-3xl overflow-hidden"
+        >
+          {isLoading ? (
+            <div className="flex h-full items-center justify-center">
+              <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-4"
-              onClick={async () => {
-                setError(null);
-                setIsLoading(true);
-
-                try {
-                  const filter: HistoryFilter = {
-                    text: debouncedSearchText.trim() || undefined,
-                    limit: PAGE_SIZE,
-                    offset: 0,
-                  };
-                  const results = await getHistoryRef.current(filter);
-                  setHistory(results);
-                  setHasMore(results.length === PAGE_SIZE);
-                  setIsLoading(false);
-                  fetchFavicons(results);
-                } catch (err) {
-                  setError(
-                    err instanceof Error
-                      ? err
-                      : new Error('Failed to load history'),
-                  );
-                  setIsLoading(false);
-                }
-              }}
-            >
-              Retry
-            </Button>
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-muted-foreground text-sm">
-              {searchText
-                ? 'No history found matching your search'
-                : 'No history yet'}
-            </p>
-          </div>
-        ) : containerSize.height > 0 ? (
-          <>
-            <List
-              listRef={listRef}
-              rowCount={rows.length}
-              rowHeight={getRowHeight}
-              rowComponent={RowComponent}
-              rowProps={rowProps}
-              onRowsRendered={handleRowsRendered}
-              overscanCount={5}
-              className="scrollbar-thin scrollbar-thumb-zinc-300 hover:scrollbar-thumb-zinc-400 scrollbar-track-transparent dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500"
-              style={{
-                height: containerSize.height,
-                width: containerSize.width,
-              }}
-            />
-            {isLoadingMore && (
-              <div className="absolute inset-x-0 bottom-0 flex h-14 items-center justify-center bg-linear-to-t from-background to-transparent">
-                <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
+          ) : error ? (
+            <div className="flex h-full flex-col items-center justify-center px-4">
+              <div className="max-w-md space-y-2 text-center">
+                <p className="font-medium text-destructive text-sm">
+                  {error.message}
+                </p>
+                {import.meta.env.DEV && error.stack && (
+                  <details className="mt-4 text-left">
+                    <summary className="cursor-pointer text-muted-foreground text-xs">
+                      Technical details (dev mode)
+                    </summary>
+                    <pre className="mt-2 max-h-48 overflow-auto rounded bg-muted p-2 text-muted-foreground text-xs">
+                      {error.stack}
+                    </pre>
+                  </details>
+                )}
+                {errorCauseMessage && (
+                  <p className="text-muted-foreground text-xs">
+                    Cause: {errorCauseMessage}
+                  </p>
+                )}
               </div>
-            )}
-          </>
-        ) : null}
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-4"
+                onClick={async () => {
+                  setError(null);
+                  setIsLoading(true);
+
+                  try {
+                    const filter: HistoryFilter = {
+                      text: debouncedSearchText.trim() || undefined,
+                      limit: PAGE_SIZE,
+                      offset: 0,
+                    };
+                    const results = await getHistoryRef.current(filter);
+                    setHistory(results);
+                    setHasMore(results.length === PAGE_SIZE);
+                    setIsLoading(false);
+                    fetchFavicons(results);
+                  } catch (err) {
+                    setError(
+                      err instanceof Error
+                        ? err
+                        : new Error('Failed to load history'),
+                    );
+                    setIsLoading(false);
+                  }
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="flex h-full items-center justify-center">
+              <p className="text-muted-foreground text-sm">
+                {searchText
+                  ? 'No history found matching your search'
+                  : 'No history yet'}
+              </p>
+            </div>
+          ) : containerSize.height > 0 ? (
+            <>
+              <List
+                listRef={listRef}
+                rowCount={rows.length}
+                rowHeight={getRowHeight}
+                rowComponent={RowComponent}
+                rowProps={rowProps}
+                onRowsRendered={handleRowsRendered}
+                overscanCount={5}
+                className="scrollbar-thin scrollbar-thumb-zinc-300 hover:scrollbar-thumb-zinc-400 scrollbar-track-transparent dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500"
+                style={{
+                  height: containerSize.height,
+                  width: containerSize.width,
+                }}
+              />
+              {isLoadingMore && (
+                <div className="absolute inset-x-0 bottom-0 flex h-14 items-center justify-center bg-linear-to-t from-background to-transparent">
+                  <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
       </div>
     </div>
   );

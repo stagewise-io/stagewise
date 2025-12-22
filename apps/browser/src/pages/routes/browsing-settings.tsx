@@ -24,9 +24,11 @@ function Page() {
     <div className="flex h-full w-full flex-col">
       {/* Header */}
       <div className="flex items-center border-zinc-500/50 border-b px-6 py-4">
-        <h1 className="font-semibold text-foreground text-xl">
-          Browsing Settings
-        </h1>
+        <div className="mx-auto w-full max-w-3xl">
+          <h1 className="font-semibold text-foreground text-xl">
+            Browsing Settings
+          </h1>
+        </div>
       </div>
 
       {/* Content */}

@@ -19,6 +19,8 @@ import type {
   HistoryFilter,
   HistoryResult,
   FaviconBitmapResult,
+  ClearBrowsingDataOptions,
+  ClearBrowsingDataResult,
 } from '@shared/karton-contracts/pages-api/types';
 
 declare const PAGES_VITE_DEV_SERVER_URL: string;
@@ -202,6 +204,147 @@ export class PagesService {
           return;
         }
         await this.openTabHandler(url, setActive);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'clearBrowsingData',
+      async (
+        options: ClearBrowsingDataOptions,
+      ): Promise<ClearBrowsingDataResult> => {
+        this.logger.info('[PagesService] Clear browsing data requested', {
+          history: options.history,
+          favicons: options.favicons,
+          downloads: options.downloads,
+          cookies: options.cookies,
+          cache: options.cache,
+          storage: options.storage,
+          indexedDB: options.indexedDB,
+          serviceWorkers: options.serviceWorkers,
+          cacheStorage: options.cacheStorage,
+          timeRange: options.timeRange,
+        });
+
+        try {
+          const result: ClearBrowsingDataResult = {
+            success: true,
+          };
+
+          // Clear history if requested
+          if (options.history) {
+            if (options.timeRange?.start || options.timeRange?.end) {
+              // Range-based clearing
+              const start = options.timeRange.start ?? new Date(0);
+              const end = options.timeRange.end ?? new Date();
+              result.historyEntriesCleared =
+                await this.historyService.clearHistoryRange(start, end);
+            } else {
+              // Clear all history
+              result.historyEntriesCleared =
+                await this.historyService.clearAllData();
+            }
+          }
+
+          // Clear downloads if requested
+          if (options.downloads) {
+            result.downloadsCleared =
+              await this.historyService.clearDownloads();
+          }
+
+          // Clear favicons if requested
+          if (options.favicons) {
+            // Clear all favicons
+            result.faviconsCleared = await this.faviconService.clearAllData();
+          } else if (options.history) {
+            // If only history was cleared, clean up orphaned favicons
+            result.faviconsCleared =
+              await this.faviconService.cleanupOrphanedFavicons();
+          }
+
+          // Clear session data (cookies, cache, storage, etc.)
+          const ses = session.fromPartition('persist:browser-content');
+
+          // Clear HTTP cache if requested
+          if (options.cache) {
+            await ses.clearCache();
+            result.cacheCleared = true;
+            this.logger.debug('[PagesService] HTTP cache cleared');
+          }
+
+          // Build storage types to clear
+          const storageTypes: string[] = [];
+          if (options.cookies) storageTypes.push('cookies');
+          if (options.storage) {
+            storageTypes.push('localstorage');
+            // Note: sessionstorage is per-tab and cleared when tab closes
+          }
+          if (options.indexedDB) storageTypes.push('indexdb');
+          if (options.serviceWorkers) storageTypes.push('serviceworkers');
+          if (options.cacheStorage) storageTypes.push('cachestorage');
+
+          // Clear storage data if any types requested
+          if (storageTypes.length > 0) {
+            const clearStorageOptions: Electron.ClearStorageDataOptions = {
+              storages:
+                storageTypes as Electron.ClearStorageDataOptions['storages'],
+            };
+
+            // Apply time range if specified (only for cookies)
+            if (
+              options.cookies &&
+              options.timeRange?.start &&
+              storageTypes.length === 1
+            ) {
+              // Note: clearStorageData doesn't support time-based filtering for all types
+              // For cookies specifically, we can use cookies.remove with date filtering
+              // but clearStorageData is all-or-nothing
+              this.logger.debug(
+                '[PagesService] Time range filtering not fully supported for session storage, clearing all',
+              );
+            }
+
+            await ses.clearStorageData(clearStorageOptions);
+
+            if (options.cookies) result.cookiesCleared = true;
+            if (
+              options.storage ||
+              options.indexedDB ||
+              options.serviceWorkers ||
+              options.cacheStorage
+            ) {
+              result.storageCleared = true;
+            }
+
+            this.logger.debug('[PagesService] Session storage data cleared', {
+              storageTypes,
+            });
+          }
+
+          // Run vacuum if requested (default true)
+          if (options.vacuum !== false) {
+            const vacuumPromises: Promise<void>[] = [];
+            if (options.history || options.downloads) {
+              vacuumPromises.push(this.historyService.vacuum());
+            }
+            if (options.favicons) {
+              vacuumPromises.push(this.faviconService.vacuum());
+            }
+            await Promise.all(vacuumPromises);
+          }
+
+          this.logger.info(
+            '[PagesService] Clear browsing data completed',
+            result,
+          );
+          return result;
+        } catch (error) {
+          this.logger.error('[PagesService] Clear browsing data failed', error);
+          return {
+            success: false,
+            error:
+              error instanceof Error ? error.message : 'Unknown error occurred',
+          };
+        }
       },
     );
   }

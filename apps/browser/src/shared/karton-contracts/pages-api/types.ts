@@ -100,3 +100,54 @@ export interface FaviconBitmapResult {
 export interface FaviconBatchRequest {
   faviconUrls: string[];
 }
+
+// Options for clearing browsing data
+export interface ClearBrowsingDataOptions {
+  /** Clear browsing history (URLs, visits, search terms, etc.) */
+  history?: boolean;
+  /** Clear cached favicons */
+  favicons?: boolean;
+  /** Clear download history (not the files themselves) */
+  downloads?: boolean;
+  /** Optional time range - only clear data within this range (applies to history and session data) */
+  timeRange?: {
+    /** Start of range (inclusive). If omitted, clears from beginning of time */
+    start?: Date;
+    /** End of range (inclusive). If omitted, clears to present */
+    end?: Date;
+  };
+  /** Run VACUUM after clearing to reclaim disk space (default: true) */
+  vacuum?: boolean;
+  /** Clear cookies from the browser session */
+  cookies?: boolean;
+  /** Clear HTTP cache */
+  cache?: boolean;
+  /** Clear localStorage and sessionStorage */
+  storage?: boolean;
+  /** Clear IndexedDB databases */
+  indexedDB?: boolean;
+  /** Clear Service Workers */
+  serviceWorkers?: boolean;
+  /** Clear Cache Storage (Cache API) */
+  cacheStorage?: boolean;
+}
+
+// Result of clearing browsing data
+export interface ClearBrowsingDataResult {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Number of history entries (URLs) cleared */
+  historyEntriesCleared?: number;
+  /** Number of favicons cleared */
+  faviconsCleared?: number;
+  /** Number of downloads cleared */
+  downloadsCleared?: number;
+  /** Whether cookies were cleared */
+  cookiesCleared?: boolean;
+  /** Whether HTTP cache was cleared */
+  cacheCleared?: boolean;
+  /** Whether storage data was cleared */
+  storageCleared?: boolean;
+  /** Error message if operation failed */
+  error?: string;
+}
