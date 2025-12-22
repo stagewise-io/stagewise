@@ -22,11 +22,12 @@ import {
   type TRPCClient,
 } from '@stagewise/api-client';
 import { API_URL } from './auth/server-interop';
+import { DisposableService } from './disposable';
 
-export class UserExperienceService {
-  private logger: Logger;
-  private uiKarton: KartonService;
-  private globalDataPathService: GlobalDataPathService;
+export class UserExperienceService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly uiKarton: KartonService;
+  private readonly globalDataPathService: GlobalDataPathService;
   private inspirationWebsiteListOffset = 0;
   private inspirationWebsiteListSeed = crypto.randomUUID();
 
@@ -36,14 +37,22 @@ export class UserExperienceService {
     },
   );
 
+  // Store bound callback reference for proper unregistration
+  private readonly boundHandleServiceStateChange: () => void;
+
   private constructor(
     logger: Logger,
     uiKarton: KartonService,
     globalDataPathService: GlobalDataPathService,
   ) {
+    super();
     this.logger = logger;
     this.uiKarton = uiKarton;
     this.globalDataPathService = globalDataPathService;
+
+    // Bind once and store reference for later unregistration
+    this.boundHandleServiceStateChange =
+      this.handleServiceStateChange.bind(this);
   }
 
   public static async create(
@@ -64,7 +73,7 @@ export class UserExperienceService {
 
   private async initialize() {
     this.uiKarton.registerStateChangeCallback(
-      this.handleServiceStateChange.bind(this),
+      this.boundHandleServiceStateChange,
     );
     this.uiKarton.registerServerProcedureHandler(
       'userExperience.mainLayout.changeTab',
@@ -168,13 +177,29 @@ export class UserExperienceService {
     );
   }
 
-  public tearDown() {
+  protected onTeardown(): void {
     this.uiKarton.unregisterStateChangeCallback(
-      this.handleServiceStateChange.bind(this),
+      this.boundHandleServiceStateChange,
     );
     this.uiKarton.removeServerProcedureHandler(
       'userExperience.mainLayout.changeTab',
     );
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.storedExperienceData.setHasSeenOnboardingFlow',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.mainLayout.mainLayout.devAppPreview.changeScreenSize',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.inspiration.loadMore',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.mainLayout.mainLayout.devAppPreview.toggleShowCodeMode',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.mainLayout.mainLayout.devAppPreview.toggleFullScreen',
+    );
+    this.logger.debug('[UserExperienceService] Teardown complete');
   }
 
   private handleServiceStateChange() {
@@ -431,6 +456,7 @@ export class UserExperienceService {
   }
 
   public get activeScreen(): Layout {
+    this.assertNotDisposed();
     // Depending on the state of auth and workspace servcie, we render different screens.
     if (this.uiKarton.state.userAccount?.status === 'unauthenticated') {
       return Layout.SIGNIN;

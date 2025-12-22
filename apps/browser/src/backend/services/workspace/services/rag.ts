@@ -4,11 +4,13 @@ import type { Logger } from '../../logger';
 import type { TelemetryService } from '../../telemetry';
 import type { ReactSelectedElementInfo } from '@shared/context-elements/react';
 import type { ContextElement } from '@shared/context-elements';
-export class RagService {
-  private logger: Logger;
-  private uiKarton: KartonService;
-  private clientRuntime: ClientRuntime;
-  private telemetryService: TelemetryService;
+import { DisposableService } from '../../disposable';
+
+export class RagService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly uiKarton: KartonService;
+  private readonly clientRuntime: ClientRuntime;
+  private readonly telemetryService: TelemetryService;
 
   private constructor(
     logger: Logger,
@@ -16,6 +18,7 @@ export class RagService {
     uiKarton: KartonService,
     clientRuntime: ClientRuntime,
   ) {
+    super();
     this.logger = logger;
     this.telemetryService = telemetryService;
     this.uiKarton = uiKarton;
@@ -89,10 +92,10 @@ export class RagService {
   /**
    * Teardown the RAG service
    */
-  public teardown() {
+  protected onTeardown(): void {
     this.removeServerProcedureHandlers();
     this.cleanupPendingOperations('Rag teardown');
-    this.logger.debug('[RagService] Shutdown complete');
+    this.logger.debug('[RagService] Teardown complete');
   }
 
   private async cleanupPendingOperations(reason?: string) {

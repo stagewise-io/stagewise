@@ -15,6 +15,7 @@ import { TabController } from './tab-controller';
 import { ChatStateController } from './chat-state-controller';
 import type { ColorScheme } from '@shared/karton-contracts/ui';
 import { THEME_COLORS, getBackgroundColor } from '@/shared/theme-colors';
+import { DisposableService } from '../disposable';
 
 interface WindowState {
   width: number;
@@ -25,12 +26,12 @@ interface WindowState {
   isFullScreen: boolean;
 }
 
-export class WindowLayoutService {
-  private logger: Logger;
-  private globalDataPathService: GlobalDataPathService;
-  private historyService: HistoryService;
-  private faviconService: FaviconService;
-  private pagesService: PagesService;
+export class WindowLayoutService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly globalDataPathService: GlobalDataPathService;
+  private readonly historyService: HistoryService;
+  private readonly faviconService: FaviconService;
+  private readonly pagesService: PagesService;
 
   private baseWindow: BaseWindow | null = null;
   private uiController: UIController | null = null;
@@ -65,6 +66,7 @@ export class WindowLayoutService {
     faviconService: FaviconService,
     pagesService: PagesService,
   ) {
+    super();
     this.logger = logger;
     this.globalDataPathService = globalDataPathService;
     this.historyService = historyService;
@@ -233,13 +235,14 @@ export class WindowLayoutService {
   }
 
   public get uiKarton(): KartonService {
+    this.assertNotDisposed();
     if (!this.uiController) {
       throw new Error('UIController is not initialized or has been torn down');
     }
     return this.uiController.uiKarton;
   }
 
-  public teardown() {
+  protected onTeardown() {
     this.logger.debug('[WindowLayoutService] Teardown called');
 
     // We no longer register procedures directly, UIController does (and should unregister if needed)

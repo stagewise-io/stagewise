@@ -3,15 +3,16 @@ import type { Logger } from '@/services/logger';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { DisposableService } from '@/services/disposable';
 
 /**
  * This service offers information on where to store workspace related and global data.
  *
  * If should be used by workspace services instead of the global data path service.
  */
-export class WorkspacePathsService {
-  private logger: Logger;
-  private globalDataPathService: GlobalDataPathService;
+export class WorkspacePathsService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly globalDataPathService: GlobalDataPathService;
   private workspaceFolderName = '';
   private cacheFolderName = randomUUID();
 
@@ -19,6 +20,7 @@ export class WorkspacePathsService {
     logger: Logger,
     globalDataPathService: GlobalDataPathService,
   ) {
+    super();
     this.logger = logger;
     this.globalDataPathService = globalDataPathService;
   }
@@ -71,12 +73,12 @@ export class WorkspacePathsService {
     );
   }
 
-  public async teardown() {
-    // NO-OP
-    this.logger.debug('[WorkspacePathsService] Shutting down');
+  protected onTeardown(): void {
+    this.logger.debug('[WorkspacePathsService] Teardown complete');
   }
 
   public get workspaceDataPath(): string {
+    this.assertNotDisposed();
     return path.join(
       this.globalDataPathService.globalDataPath,
       'workspaces',
@@ -92,6 +94,7 @@ export class WorkspacePathsService {
    * It's recommended to use this folder for temporary files that are expected to be deleted by the system.
    */
   get workspaceTempPath(): string {
+    this.assertNotDisposed();
     return path.join(
       this.globalDataPathService.globalTempPath,
       'workspaces',
@@ -105,6 +108,7 @@ export class WorkspacePathsService {
    * @warning This ID is not guaranteed to be unique and should not be used for any other purpose than identifying the workspace.
    */
   get workspaceId(): string {
+    this.assertNotDisposed();
     return this.workspaceFolderName;
   }
 }

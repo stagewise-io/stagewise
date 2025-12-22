@@ -6,26 +6,28 @@ import {
   type GlobalConfig,
   globalConfigSchema,
 } from '@shared/karton-contracts/ui/shared-types';
+import { DisposableService } from './disposable';
 
 /**
  * The global config service gives access to a global config objects that's stored
  * independently of any workspace etc.
  */
-export class GlobalConfigService {
-  private globalDataPathService: GlobalDataPathService;
+export class GlobalConfigService extends DisposableService {
+  private readonly globalDataPathService: GlobalDataPathService;
   private config: GlobalConfig | null = null;
   private configUpdatedListeners: ((
     newConfig: GlobalConfig,
     oldConfig: GlobalConfig | null,
   ) => void)[] = [];
-  private logger: Logger;
-  private uiKarton: KartonService;
+  private readonly logger: Logger;
+  private readonly uiKarton: KartonService;
 
   private constructor(
     globalDataPathService: GlobalDataPathService,
     logger: Logger,
     uiKarton: KartonService,
   ) {
+    super();
     this.globalDataPathService = globalDataPathService;
     this.logger = logger;
     this.uiKarton = uiKarton;
@@ -84,7 +86,15 @@ export class GlobalConfigService {
     return instance;
   }
 
+  protected onTeardown(): void {
+    this.uiKarton.removeServerProcedureHandler('config.set');
+    this.configUpdatedListeners = [];
+    this.config = null;
+    this.logger.debug('[GlobalConfigService] Teardown complete');
+  }
+
   public get(): GlobalConfig {
+    this.assertNotDisposed();
     if (!this.config) {
       this.logger.error(
         '[GlobalConfigService] Requested global config, but it is not initialized',

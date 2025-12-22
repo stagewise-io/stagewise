@@ -11,6 +11,7 @@ import type { TelemetryService } from './telemetry';
 import type { KartonService } from './karton';
 import type { GlobalDataPathService } from './global-data-path';
 import type { NotificationService } from './notification';
+import { DisposableService } from './disposable';
 
 type WorkspaceChangedEvent =
   | { type: 'loaded'; selectedPath: string; accessPath?: string }
@@ -22,14 +23,14 @@ type WorkspaceChangedEvent =
       name?: string;
     };
 
-export class WorkspaceManagerService {
+export class WorkspaceManagerService extends DisposableService {
   private currentWorkspace: WorkspaceService | null = null;
-  private logger: Logger;
-  private filePickerService: FilePickerService;
-  private telemetryService: TelemetryService;
-  private uiKarton: KartonService;
-  private globalDataPathService: GlobalDataPathService;
-  private notificationService: NotificationService;
+  private readonly logger: Logger;
+  private readonly filePickerService: FilePickerService;
+  private readonly telemetryService: TelemetryService;
+  private readonly uiKarton: KartonService;
+  private readonly globalDataPathService: GlobalDataPathService;
+  private readonly notificationService: NotificationService;
   private workspaceChangeListeners: ((event: WorkspaceChangedEvent) => void)[] =
     [];
   private constructor(
@@ -40,6 +41,7 @@ export class WorkspaceManagerService {
     globalDataPathService: GlobalDataPathService,
     notificationService: NotificationService,
   ) {
+    super();
     this.logger = logger;
     this.filePickerService = filePickerService;
     this.telemetryService = telemetryService;
@@ -231,15 +233,20 @@ export class WorkspaceManagerService {
     this.logger.debug('[WorkspaceManagerService] Unloaded workspace');
   }
 
-  public async shutdown() {
-    this.logger.debug('[WorkspaceManagerService] Shutting down...');
+  protected async onTeardown(): Promise<void> {
+    this.logger.debug('[WorkspaceManagerService] Tearing down...');
+
+    // Unregister server procedure handlers
+    this.uiKarton.removeServerProcedureHandler('workspace.open');
+    this.uiKarton.removeServerProcedureHandler('workspace.close');
+
     // Close the opened workspace (if it exists).
     if (this.currentWorkspace) {
       await this.unloadWorkspace();
     }
     this.workspaceChangeListeners = [];
 
-    this.logger.debug('[WorkspaceManagerService] Shutdown complete');
+    this.logger.debug('[WorkspaceManagerService] Teardown complete');
   }
 
   public registerWorkspaceChangeListener(
@@ -255,6 +262,7 @@ export class WorkspaceManagerService {
   }
 
   get workspace(): WorkspaceService | null {
+    this.assertNotDisposed();
     return this.currentWorkspace;
   }
 }

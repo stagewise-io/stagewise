@@ -18,12 +18,14 @@ import type { Logger } from './logger';
 import type { KartonService } from './karton';
 import type { FilePickerRequest } from '@shared/karton-contracts/ui/shared-types';
 import { dialog } from 'electron';
+import { DisposableService } from './disposable';
 
-export class FilePickerService {
-  private logger: Logger;
-  private uiKarton: KartonService;
+export class FilePickerService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly uiKarton: KartonService;
 
   private constructor(logger: Logger, uiKarton: KartonService) {
+    super();
     this.logger = logger;
     this.uiKarton = uiKarton;
   }
@@ -42,6 +44,11 @@ export class FilePickerService {
     const instance = new FilePickerService(logger, uiKarton);
     await instance.initialize();
     return instance;
+  }
+
+  protected onTeardown(): void {
+    this.uiKarton.removeServerProcedureHandler('filePicker.createRequest');
+    this.logger.debug('[FilePickerService] Teardown complete');
   }
 
   /**

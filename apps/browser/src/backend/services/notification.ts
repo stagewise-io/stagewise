@@ -7,6 +7,7 @@
 import type { Logger } from './logger';
 import type { KartonService } from './karton';
 import { randomUUID } from 'node:crypto';
+import { DisposableService } from './disposable';
 
 export interface Notification {
   title: string;
@@ -22,12 +23,13 @@ export interface Notification {
 
 export type NotificationId = string;
 
-export class NotificationService {
-  logger: Logger;
-  uiKarton: KartonService;
-  storedNotifications: { [key: string]: Notification } = {};
+export class NotificationService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly uiKarton: KartonService;
+  private storedNotifications: { [key: string]: Notification } = {};
 
   private constructor(logger: Logger, uiKarton: KartonService) {
+    super();
     this.logger = logger;
     this.uiKarton = uiKarton;
   }
@@ -51,6 +53,13 @@ export class NotificationService {
     const instance = new NotificationService(logger, uiKarton);
     instance.initialize();
     return instance;
+  }
+
+  protected onTeardown(): void {
+    this.uiKarton.removeServerProcedureHandler('notifications.dismiss');
+    this.uiKarton.removeServerProcedureHandler('notifications.triggerAction');
+    this.storedNotifications = {};
+    this.logger.debug('[NotificationService] Teardown complete');
   }
 
   // TODO Implement this service and it's connection to the UI via Karton.

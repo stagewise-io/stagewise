@@ -6,6 +6,7 @@ import {
 } from '@stagewise/karton/server';
 import { type KartonContract, defaultState } from '@shared/karton-contracts/ui';
 import type { Logger } from './logger';
+import { DisposableService } from './disposable';
 
 /**
  * The Karton service is responsible for managing the connection to the UI (web app).
@@ -16,14 +17,15 @@ import type { Logger } from './logger';
  * - Graceful handling of connection failures
  * - Auto-reconnection support
  */
-export class KartonService {
+export class KartonService extends DisposableService {
   private kartonServer: KartonServer<KartonContract>;
   private transport: ElectronServerTransport;
-  private logger: Logger;
+  private readonly logger: Logger;
   private currentPort?: MessagePortMain;
   private portCloseListeners = new Map<MessagePortMain, () => void>();
 
   constructor(logger: Logger) {
+    super();
     this.logger = logger;
 
     // Create transport without any initial configuration
@@ -143,7 +145,7 @@ export class KartonService {
   /**
    * Close all connections and clean up resources.
    */
-  public async teardown(): Promise<void> {
+  protected async onTeardown(): Promise<void> {
     this.logger.debug('[KartonService] Tearing down...');
 
     // Clean up all port close listeners

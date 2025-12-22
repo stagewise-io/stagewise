@@ -8,16 +8,18 @@ import path from 'node:path';
 import type { GlobalDataPathService } from './global-data-path';
 import type { Logger } from './logger';
 import fs from 'node:fs/promises';
+import { DisposableService } from './disposable';
 
-export class IdentifierService {
-  private globalDataPathService: GlobalDataPathService;
-  private logger: Logger;
+export class IdentifierService extends DisposableService {
+  private readonly globalDataPathService: GlobalDataPathService;
+  private readonly logger: Logger;
   private machineId: string | null = null;
 
   private constructor(
     globalDataPathService: GlobalDataPathService,
     logger: Logger,
   ) {
+    super();
     this.globalDataPathService = globalDataPathService;
     this.logger = logger;
   }
@@ -59,5 +61,10 @@ export class IdentifierService {
       throw new Error("Machine ID not found. This shouldn't happen.");
     }
     return this.machineId;
+  }
+
+  protected onTeardown(): void {
+    this.machineId = null;
+    this.logger.debug('[IdentifierService] Teardown complete');
   }
 }

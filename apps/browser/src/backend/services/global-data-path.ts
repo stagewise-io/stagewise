@@ -2,13 +2,15 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import type { Logger } from './logger';
 import { app } from 'electron';
+import { DisposableService } from './disposable';
 
 /**
  * This service provides the paths to a variety of global data directories that this app can use to store data and configurations etc.
  */
-export class GlobalDataPathService {
-  private logger: Logger;
+export class GlobalDataPathService extends DisposableService {
+  private readonly logger: Logger;
   private constructor(logger: Logger) {
+    super();
     this.logger = logger;
   }
 
@@ -53,5 +55,9 @@ export class GlobalDataPathService {
    */
   get globalTempPath(): string {
     return app.getPath('temp');
+  }
+
+  protected onTeardown(): void {
+    this.logger.debug('[GlobalDataPathService] Teardown complete');
   }
 }

@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { StaticAnalysisService } from './static-analysis';
 import type { NotificationService } from '@/services/notification';
+import { DisposableService } from '@/services/disposable';
 
 // This is the default URL prefix for plugins that are just loaded by name.
 const DEFAULT_PLUGIN_CDN_URL = 'https://esm.sh/';
@@ -77,12 +78,12 @@ const BuiltInPlugins: BuiltInPlugin[] = [
 ];
 */
 
-export class WorkspacePluginService {
-  private logger: Logger;
-  private uiKarton: KartonService;
-  private workspaceConfigService: WorkspaceConfigService;
-  private staticAnalysisService: StaticAnalysisService;
-  private notificationService: NotificationService;
+export class WorkspacePluginService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly uiKarton: KartonService;
+  private readonly workspaceConfigService: WorkspaceConfigService;
+  private readonly staticAnalysisService: StaticAnalysisService;
+  private readonly notificationService: NotificationService;
   private _configuredPlugins: WorkspacePlugin[] = [];
 
   private constructor(
@@ -92,6 +93,7 @@ export class WorkspacePluginService {
     staticAnalysisService: StaticAnalysisService,
     notificationService: NotificationService,
   ) {
+    super();
     this.logger = logger;
     this.uiKarton = uiKarton;
     this.workspaceConfigService = workspaceConfigService;
@@ -138,9 +140,10 @@ export class WorkspacePluginService {
     return instance;
   }
 
-  public async teardown(): Promise<void> {
+  protected onTeardown(): void {
     this.logger.debug('[WorkspacePluginService] Teardown called');
     this._configuredPlugins = [];
+    this.logger.debug('[WorkspacePluginService] Teardown complete');
   }
 
   /**
@@ -309,14 +312,17 @@ export class WorkspacePluginService {
   }
 
   public get allPlugins(): WorkspacePlugin[] {
+    this.assertNotDisposed();
     return this._configuredPlugins;
   }
 
   public get loadedPlugins(): WorkspacePlugin[] {
+    this.assertNotDisposed();
     return this._configuredPlugins.filter((p) => p.available);
   }
 
   public get loadedPluginEntryPaths(): string[] {
+    this.assertNotDisposed();
     return this.loadedPlugins.map((p) => ('path' in p ? p.path : p.url));
   }
 }

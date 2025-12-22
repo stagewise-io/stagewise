@@ -4,26 +4,35 @@ import type { Logger } from './logger';
 import type { WindowLayoutService } from './window-layout';
 import type { AuthService } from './auth';
 import { fileURLToPath } from 'node:url';
+import { DisposableService } from './disposable';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export class AppMenuService {
-  private logger: Logger;
-  private authService: AuthService;
-  private windowLayoutService: WindowLayoutService;
+export class AppMenuService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly authService: AuthService;
+  private readonly windowLayoutService: WindowLayoutService;
+
+  // Store bound callback reference for proper unregistration
+  private readonly boundUpdateApplicationMenu: () => void;
 
   constructor(
     logger: Logger,
     authService: AuthService,
     windowLayoutService: WindowLayoutService,
   ) {
+    super();
     this.logger = logger;
     this.authService = authService;
     this.windowLayoutService = windowLayoutService;
+
+    // Bind once and store reference for later unregistration
+    this.boundUpdateApplicationMenu = this.updateApplicationMenu.bind(this);
+
     this.logger.debug('[AppMenuService] Initializing service');
 
     this.authService.registerAuthStateChangeCallback(
-      this.updateApplicationMenu.bind(this),
+      this.boundUpdateApplicationMenu,
     );
 
     this.updateApplicationMenu();
@@ -31,25 +40,16 @@ export class AppMenuService {
     this.logger.debug('[AppMenuService] Service initialized');
   }
 
-  public teardown() {
+  protected onTeardown(): void {
     this.logger.debug('[AppMenuService] Teardown called');
 
-    // TODO: Unregister listener for karton events
     this.authService.unregisterAuthStateChangeCallback(
-      this.updateApplicationMenu.bind(this),
+      this.boundUpdateApplicationMenu,
     );
 
     app.applicationMenu = null;
 
-    // TODO: Think thoroughly about teardown behaviour and nullability
-    // @ts-expect-error - TODO: Think thoroughly about teardown behaviour and nullability
-    this.windowLayoutService = null;
-    // @ts-expect-error - TODO: Think thoroughly about teardown behaviour and nullability
-    this.authService = null;
-    // @ts-expect-error - TODO: Think thoroughly about teardown behaviour and nullability
-    this.logger = null;
-
-    this.logger.debug('[AppMenuService] Teardown completed');
+    this.logger.debug('[AppMenuService] Teardown complete');
   }
   private updateApplicationMenu() {
     app.applicationMenu = Menu.buildFromTemplate([

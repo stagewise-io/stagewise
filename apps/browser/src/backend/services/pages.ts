@@ -22,6 +22,7 @@ import type {
   ClearBrowsingDataOptions,
   ClearBrowsingDataResult,
 } from '@shared/karton-contracts/pages-api/types';
+import { DisposableService } from './disposable';
 
 declare const PAGES_VITE_DEV_SERVER_URL: string;
 declare const PAGES_VITE_NAME: string;
@@ -33,10 +34,10 @@ declare const PAGES_VITE_NAME: string;
  *
  * Also exposes the PagesApi Karton contract for communication with the pages renderer.
  */
-export class PagesService {
-  private logger: Logger;
-  private historyService: HistoryService;
-  private faviconService: FaviconService;
+export class PagesService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly historyService: HistoryService;
+  private readonly faviconService: FaviconService;
   private kartonServer: KartonServer<PagesApiContract>;
   private transport: ElectronServerTransport;
   private currentPort?: MessagePortMain;
@@ -48,6 +49,7 @@ export class PagesService {
     historyService: HistoryService,
     faviconService: FaviconService,
   ) {
+    super();
     this.logger = logger;
     this.historyService = historyService;
     this.faviconService = faviconService;
@@ -400,8 +402,18 @@ export class PagesService {
   /**
    * Close all connections and clean up resources.
    */
-  public async teardown(): Promise<void> {
+  protected async onTeardown(): Promise<void> {
     this.logger.debug('[PagesService] Tearing down...');
+
+    // Unregister procedure handlers
+    this.kartonServer.removeServerProcedureHandler('getHistory');
+    this.kartonServer.removeServerProcedureHandler('getFaviconBitmaps');
+    this.kartonServer.removeServerProcedureHandler('openTab');
+    this.kartonServer.removeServerProcedureHandler('clearBrowsingData');
+
+    // Unregister the protocol handler from the browsing session
+    const ses = session.fromPartition('persist:browser-content');
+    ses.protocol.unhandle('stagewise');
 
     // Clean up all port close listeners
     for (const [port, listener] of this.portCloseListeners.entries()) {
@@ -409,6 +421,7 @@ export class PagesService {
     }
     this.portCloseListeners.clear();
     this.currentPort = undefined;
+    this.openTabHandler = undefined;
 
     await this.transport.close();
     this.logger.debug('[PagesService] Teardown complete');

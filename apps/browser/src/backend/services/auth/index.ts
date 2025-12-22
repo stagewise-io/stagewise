@@ -8,20 +8,25 @@ import type { NotificationService } from '../notification';
 import type { IdentifierService } from '../identifier';
 import type { URIHandlerService } from '../uri-handler';
 import { shell } from 'electron';
+import { DisposableService } from '../disposable';
 
 export type AuthState = KartonContract['state']['userAccount'];
 
 const ACCESS_TOKEN_EXPIRATION_BUFFER_TIME = 10 * 60 * 1000; // We refresh the token 10 minutes before it expires to avoid any issues
 
-export class AuthService {
-  private globalDataPathService: GlobalDataPathService;
-  private identifierService: IdentifierService;
-  private uiKarton: KartonService;
-  private notificationService: NotificationService;
-  private uriHandlerService: URIHandlerService;
-  private logger: Logger;
+export class AuthService extends DisposableService {
+  // Borrowed dependencies (passed via constructor)
+  private readonly globalDataPathService: GlobalDataPathService;
+  private readonly identifierService: IdentifierService;
+  private readonly uiKarton: KartonService;
+  private readonly notificationService: NotificationService;
+  private readonly uriHandlerService: URIHandlerService;
+  private readonly logger: Logger;
+
+  // Owned child services (created in initialize)
   private tokenStore!: AuthTokenStore;
   private serverInterop: AuthServerInterop;
+
   private _authStateCheckInterval: NodeJS.Timeout | null = null;
   private authChangeCallbacks: ((newAuthState: AuthState) => void)[] = [];
   private authenticationConfirmationCallback: (() => Promise<void>) | null =
@@ -37,6 +42,7 @@ export class AuthService {
     uriHandlerService: URIHandlerService,
     logger: Logger,
   ) {
+    super();
     this.globalDataPathService = globalDataPathService;
     this.identifierService = identifierService;
     this.uiKarton = uiKarton;
@@ -130,7 +136,7 @@ export class AuthService {
     return authService;
   }
 
-  public tearDown(): void {
+  protected onTeardown(): void {
     clearInterval(this._authStateCheckInterval!);
 
     this.uiKarton.removeServerProcedureHandler('userAccount.logout');
@@ -148,7 +154,7 @@ export class AuthService {
       this.uriHandlerService.unregisterHandler(this._uriHandlerId);
     }
 
-    this.logger.debug('[AuthService] Teared down auth service');
+    this.logger.debug('[AuthService] Teardown complete');
   }
 
   private handleAuthURI: (uri: string) => Promise<void> = (async (
@@ -411,11 +417,13 @@ export class AuthService {
   }
 
   public get authState(): AuthState {
+    this.assertNotDisposed();
     // We store everything in karton and just report it here. Makes it easier and reduces redundancy...
     return this.uiKarton.state.userAccount;
   }
 
   public get accessToken(): string | undefined {
+    this.assertNotDisposed();
     return this.tokenStore.tokenData?.accessToken;
   }
 

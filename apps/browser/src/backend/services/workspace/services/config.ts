@@ -12,6 +12,7 @@ import {
   type WorkspaceConfig,
   workspaceConfigSchema,
 } from '@shared/karton-contracts/ui/shared-types';
+import { DisposableService } from '@/services/disposable';
 
 export class ConfigNotExistingException extends Error {
   constructor() {
@@ -19,21 +20,22 @@ export class ConfigNotExistingException extends Error {
   }
 }
 
-export class WorkspaceConfigService {
+export class WorkspaceConfigService extends DisposableService {
   private config: WorkspaceConfig | null = null;
   private configUpdatedListeners: ((
     config: WorkspaceConfig,
     oldConfig: WorkspaceConfig | null,
   ) => void)[] = [];
-  private logger: Logger;
-  private uiKarton: KartonService;
-  private workspacePath: string;
+  private readonly logger: Logger;
+  private readonly uiKarton: KartonService;
+  private readonly workspacePath: string;
 
   private constructor(
     logger: Logger,
     uiKarton: KartonService,
     workspacePath: string,
   ) {
+    super();
     this.logger = logger;
     this.uiKarton = uiKarton;
     this.workspacePath = workspacePath;
@@ -123,14 +125,16 @@ export class WorkspaceConfigService {
     return instance;
   }
 
-  public async teardown(): Promise<void> {
+  protected onTeardown(): void {
     this.logger.debug('[WorkspaceConfigService] Teardown called');
     this.config = null;
     this.configUpdatedListeners = [];
     this.uiKarton.removeServerProcedureHandler('workspace.config.set');
+    this.logger.debug('[WorkspaceConfigService] Teardown complete');
   }
 
   public get(): WorkspaceConfig {
+    this.assertNotDisposed();
     if (!this.config) {
       this.logger.error(
         '[WorkspaceConfigService] Requested workspace config, but it is not initialized',

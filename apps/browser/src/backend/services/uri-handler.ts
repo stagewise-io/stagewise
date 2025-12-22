@@ -1,12 +1,13 @@
 import { app } from 'electron';
 import type { Logger } from './logger';
 import path from 'node:path';
+import { DisposableService } from './disposable';
 
 /**
  * This service provides the paths to a variety of global data directories that this app can use to store data and configurations etc.
  */
-export class URIHandlerService {
-  private logger: Logger;
+export class URIHandlerService extends DisposableService {
+  private readonly logger: Logger;
   private _handlers: Record<
     string, // ID of the handler. Is used to delete the handler later.
     {
@@ -16,6 +17,7 @@ export class URIHandlerService {
   > = {};
 
   private constructor(logger: Logger) {
+    super();
     this.logger = logger;
   }
 
@@ -45,10 +47,11 @@ export class URIHandlerService {
     app.on('open-url', this.handleOpenURL);
   }
 
-  public teardown(): void {
+  protected onTeardown(): void {
     this._handlers = {};
     app.off('second-instance', this.handleSecondInstance);
     app.off('open-url', this.handleOpenURL);
+    this.logger.debug('[URIHandlerService] Teardown complete');
   }
 
   private handleSecondInstance = ((_ev: Electron.Event, argv: string[]) => {

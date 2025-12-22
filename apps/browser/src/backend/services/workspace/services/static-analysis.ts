@@ -4,6 +4,7 @@ import {
   type DependencyMap,
 } from '@/utils/dependency-parser';
 import { countLinesOfCode } from '@/utils/count-lines-of-code';
+import { DisposableService } from '@/services/disposable';
 
 const AnalyzedFileEndings = [
   'ts',
@@ -26,15 +27,16 @@ const AnalyzedFileEndings = [
  *
  * The analysis isn't cached and happens synchronously on initialization, but can also be re-triggered throug the interface.
  */
-export class StaticAnalysisService {
-  private logger: Logger;
-  private workspacePath: string;
+export class StaticAnalysisService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly workspacePath: string;
   private _nodeDependencies: DependencyMap = {};
   private _linesOfCodeCounts: Record<string, number> = {}; // key is the file ending, value is the number of lines of code
 
   private analysisRunning = false;
 
   private constructor(logger: Logger, workspacePath: string) {
+    super();
     this.logger = logger;
     this.workspacePath = workspacePath;
   }
@@ -75,16 +77,20 @@ export class StaticAnalysisService {
     );
   }
 
-  async teardown() {
+  protected onTeardown(): void {
     this.analysisRunning = false;
     this._nodeDependencies = {};
+    this._linesOfCodeCounts = {};
+    this.logger.debug('[StaticAnalysisService] Teardown complete');
   }
 
   get nodeDependencies(): DependencyMap {
+    this.assertNotDisposed();
     return this._nodeDependencies;
   }
 
   get linesOfCodeCounts(): Record<string, number> {
+    this.assertNotDisposed();
     return this._linesOfCodeCounts;
   }
 }

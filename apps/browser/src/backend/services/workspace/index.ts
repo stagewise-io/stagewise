@@ -17,13 +17,14 @@ import type { GlobalDataPathService } from '@/services/global-data-path';
 import type { NotificationService } from '../notification';
 import path from 'node:path';
 import { getRepoRootForPath } from '@/utils/git-tools';
+import { DisposableService } from '../disposable';
 
-export class WorkspaceService {
-  private logger: Logger;
-  private telemetryService: TelemetryService;
-  private uiKarton: KartonService;
-  private globalDataPathService: GlobalDataPathService;
-  private notificationService: NotificationService;
+export class WorkspaceService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly telemetryService: TelemetryService;
+  private readonly uiKarton: KartonService;
+  private readonly globalDataPathService: GlobalDataPathService;
+  private readonly notificationService: NotificationService;
   private workspacePath: string;
   private loadedOnStart = false;
   private pathGivenInStartingArg = false;
@@ -57,6 +58,7 @@ export class WorkspaceService {
       name?: string,
     ) => void,
   ) {
+    super();
     this.logger = logger;
     this.telemetryService = telemetryService;
     this.uiKarton = uiKarton;
@@ -271,21 +273,32 @@ export class WorkspaceService {
     return instance;
   }
 
-  public async teardown() {
+  protected async onTeardown(): Promise<void> {
     this.logger.debug('[WorkspaceService] Teardown called');
 
-    this.ragService?.teardown();
-    await this.workspaceSetupService?.teardown();
+    // Teardown child services in LIFO order (reverse of creation)
+    await this.ragService?.teardown();
     await this.workspacePluginService?.teardown();
     await this.workspaceConfigService?.teardown();
     await this.staticAnalysisService?.teardown();
+    await this.workspaceSetupService?.teardown();
     await this.workspacePathsService?.teardown();
+
+    // Null out references after teardown
+    this.ragService = null;
+    this.workspacePluginService = null;
+    this.workspaceConfigService = null;
+    this.staticAnalysisService = null;
+    this.workspaceSetupService = null;
+    this.workspacePathsService = null;
 
     this.uiKarton.removeServerProcedureHandler('workspace.getGitRepoRoot');
 
     this.uiKarton.setState((draft) => {
       draft.workspace = null;
     });
+
+    this.logger.debug('[WorkspaceService] Teardown complete');
   }
 
   /**
@@ -307,23 +320,28 @@ export class WorkspaceService {
   }
 
   get id(): string {
+    this.assertNotDisposed();
     return this.workspacePathsService!.workspaceId;
   }
 
   get path(): string {
+    this.assertNotDisposed();
     return this.workspacePath;
   }
 
   get configService(): WorkspaceConfigService | null {
-    return this.workspaceConfigService!;
+    this.assertNotDisposed();
+    return this.workspaceConfigService;
   }
 
   get pluginService(): WorkspacePluginService | null {
-    return this.workspacePluginService!;
+    this.assertNotDisposed();
+    return this.workspacePluginService;
   }
 
   get setupService(): WorkspaceSetupService | null {
-    return this.workspaceSetupService!;
+    this.assertNotDisposed();
+    return this.workspaceSetupService;
   }
 }
 

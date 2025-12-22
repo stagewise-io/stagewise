@@ -16,6 +16,7 @@ import {
   type WorkspaceConfig,
   workspaceConfigSchema,
 } from '@shared/karton-contracts/ui/shared-types';
+import { DisposableService } from '@/services/disposable';
 
 export class ConfigNotExistingException extends Error {
   constructor() {
@@ -23,9 +24,9 @@ export class ConfigNotExistingException extends Error {
   }
 }
 
-export class WorkspaceSetupService {
-  private logger: Logger;
-  private uiKarton: KartonService;
+export class WorkspaceSetupService extends DisposableService {
+  private readonly logger: Logger;
+  private readonly uiKarton: KartonService;
   private workspacePath: string;
   private _setupCompleted = false;
   private onSetupCompleted?: (
@@ -42,6 +43,7 @@ export class WorkspaceSetupService {
       newWorkspacePath?: string,
     ) => Promise<void>,
   ) {
+    super();
     this.logger = logger;
     this.uiKarton = uiKarton;
     this.workspacePath = workspacePath;
@@ -122,7 +124,7 @@ export class WorkspaceSetupService {
     return instance;
   }
 
-  public async teardown(): Promise<void> {
+  protected onTeardown(): void {
     this.uiKarton.removeServerProcedureHandler(
       'workspace.setup.checkForActiveAppOnPort',
     );
@@ -137,6 +139,7 @@ export class WorkspaceSetupService {
       }
     });
     this._setupCompleted = false;
+    this.logger.debug('[WorkspaceSetupService] Teardown complete');
   }
 
   public async handleSetupSubmission(
@@ -202,6 +205,7 @@ export class WorkspaceSetupService {
   }
 
   public get setupCompleted(): boolean {
+    this.assertNotDisposed();
     return this._setupCompleted;
   }
 }

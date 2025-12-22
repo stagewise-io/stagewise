@@ -8,6 +8,7 @@ import type {
   OpenFilesInIde,
 } from '@shared/karton-contracts/ui/shared-types';
 import type { Logger } from './logger';
+import { DisposableService } from './disposable';
 
 export interface EventProperties {
   'cli-start': {
@@ -115,10 +116,10 @@ export interface UserProperties {
   user_email?: string;
 }
 
-export class TelemetryService {
-  private identifierService: IdentifierService;
-  private globalConfigService: GlobalConfigService;
-  private logger: Logger;
+export class TelemetryService extends DisposableService {
+  private readonly identifierService: IdentifierService;
+  private readonly globalConfigService: GlobalConfigService;
+  private readonly logger: Logger;
   private userProperties: UserProperties = {};
   public posthogClient: PostHog;
 
@@ -127,6 +128,7 @@ export class TelemetryService {
     globalConfigService: GlobalConfigService,
     logger: Logger,
   ) {
+    super();
     this.identifierService = identifierService;
     this.globalConfigService = globalConfigService;
     this.logger = logger;
@@ -262,8 +264,8 @@ export class TelemetryService {
     });
   }
 
-  async shutdown(): Promise<void> {
-    this.logger.debug('[TelemetryService] Shutting down...');
+  protected async onTeardown(): Promise<void> {
+    this.logger.debug('[TelemetryService] Tearing down...');
     if (this.posthogClient) {
       try {
         await this.posthogClient.shutdown();
@@ -271,7 +273,7 @@ export class TelemetryService {
         this.logger.debug(`Failed to shutdown PostHog: ${error}`);
       }
     }
-    this.logger.debug('[TelemetryService] Shutdown complete');
+    this.logger.debug('[TelemetryService] Teardown complete');
   }
 
   async onConfigUpdate(
