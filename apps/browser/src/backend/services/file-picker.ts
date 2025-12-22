@@ -63,7 +63,7 @@ export class FilePickerService {
           request.type === 'directory' ? 'openDirectory' : 'openFile',
           'createDirectory',
           'treatPackageAsDirectory',
-          request.multiple ? 'multiSelections' : undefined,
+          ...(request.multiple ? (['multiSelections'] as const) : []),
         ],
       })
       .then((result) => {

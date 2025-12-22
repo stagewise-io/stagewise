@@ -1,4 +1,3 @@
-import { useContextChipHover } from '@/hooks/use-context-chip-hover';
 import { getTruncatedFileUrl } from '@/utils';
 import {
   XIcon,
@@ -27,21 +26,14 @@ import { IconOpenExternalOutline18 } from 'nucleo-ui-outline-18';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
 interface ContextElementsChipsProps {
-  selectedElements: {
-    domElement?: HTMLElement;
-    selectedElement: ContextElement;
-  }[];
-  removeSelectedElement?: (element: HTMLElement) => void;
+  selectedElements: ContextElement[];
   removeSelectedElementById?: (id: string) => void;
 }
 
 export function ContextElementsChipsFlexible({
   selectedElements,
-  removeSelectedElement,
   removeSelectedElementById,
 }: ContextElementsChipsProps) {
-  const { setHoveredElement } = useContextChipHover();
-
   if (selectedElements.length === 0) {
     return null;
   }
@@ -50,21 +42,13 @@ export function ContextElementsChipsFlexible({
     <>
       {selectedElements.map((selectedElement) => (
         <ContextElementChip
-          key={`${selectedElement.selectedElement.stagewiseId}`}
-          element={selectedElement.domElement}
-          selectedElement={selectedElement.selectedElement}
+          key={`${selectedElement.stagewiseId}`}
+          selectedElement={selectedElement}
           onDelete={
-            removeSelectedElement && selectedElement.domElement
-              ? () => removeSelectedElement?.(selectedElement.domElement!)
-              : removeSelectedElementById
-                ? () =>
-                    removeSelectedElementById?.(
-                      selectedElement.selectedElement.stagewiseId,
-                    )
-                : undefined
+            removeSelectedElementById
+              ? () => removeSelectedElementById?.(selectedElement.stagewiseId)
+              : undefined
           }
-          onHover={setHoveredElement}
-          onUnhover={() => setHoveredElement(null)}
         />
       ))}
     </>
@@ -72,11 +56,8 @@ export function ContextElementsChipsFlexible({
 }
 
 interface ContextElementChipProps {
-  element?: HTMLElement;
   selectedElement: ContextElement;
   onDelete?: () => void;
-  onHover: (element: HTMLElement) => void;
-  onUnhover: () => void;
 }
 
 const displayedAttributes = [
@@ -99,11 +80,8 @@ const displayedAttributes = [
 ];
 
 function ContextElementChip({
-  element,
   selectedElement,
   onDelete,
-  onHover,
-  onUnhover,
 }: ContextElementChipProps) {
   const posthog = usePostHog();
   const openInIdeSelection = useKartonState(
@@ -233,8 +211,6 @@ function ContextElementChip({
         <Button
           size="xs"
           variant="secondary"
-          onMouseEnter={() => element && onHover(element)}
-          onMouseLeave={() => onUnhover()}
           className="bg-muted/10 text-foreground"
         >
           <SquareDashedMousePointer className="size-3" />

@@ -27,23 +27,9 @@ export class RagService {
     this.registerProcedureHandlers();
   }
 
-  private registerProcedureHandlers() {
-    this.uiKarton.registerServerProcedureHandler(
-      'agentChat.enrichSelectedElement',
-      async (element) => {
-        const codeMetadata =
-          await this.getRelatedContextFilesForSelectedElement(element);
+  private registerProcedureHandlers() {}
 
-        return { ...element, codeMetadata };
-      },
-    );
-  }
-
-  private removeServerProcedureHandlers() {
-    this.uiKarton.removeServerProcedureHandler(
-      'agentChat.enrichSelectedElement',
-    );
-  }
+  private removeServerProcedureHandlers() {}
 
   private async getRelatedContextFilesForSelectedElement(
     element: ContextElement,
@@ -64,7 +50,7 @@ export class RagService {
 
       // Extend codeMetadata with file content
       codeMetadata = await Promise.all(
-        codeMetadata.map(async (entry) => {
+        codeMetadata?.map(async (entry) => {
           return {
             ...entry,
             content: await this.clientRuntime.fileSystem
@@ -76,7 +62,7 @@ export class RagService {
               )
               .catch(() => '[FILE_CONTENT_UNAVAILABLE]'),
           };
-        }),
+        }) ?? [],
       );
 
       this.logger.debug(

@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
+    "baseUrl": ".",
     "module": "es2022",
     "lib": ["es2022", "dom"],
     "moduleResolution": "bundler",
@@ -12,11 +13,6 @@
     "types": ["vite/client", "node"],
     "skipLibCheck": true
   },
-  "include": [
-    "src/web-content-preload",
-    "forge.env.d.ts",
-    "src/shared",
-    ".storybook/**/*"
-  ],
+  "include": ["src/web-content-preload", "forge.env.d.ts", "src/shared"],
   "exclude": ["**/*.stories.tsx", "**/*.stories.ts"]
 }

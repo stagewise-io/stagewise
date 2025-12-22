@@ -14,11 +14,12 @@
     "make": "dotenv -e ../../.env.prod -- electron-forge make",
     "package": "dotenv -e ../../.env -- electron-forge package",
     "publish": "dotenv -e ../../.env -- electron-forge publish",
-    "start": "dotenv -e ../../.env.dev -- electron-forge start",
+    "start": "pnpm typecheck && dotenv -e ../../.env.dev -- electron-forge start",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "clean-data": "tsx scripts/clean-data.ts",
-    "clear-vite-cache": "tsx scripts/clear-vite-cache.ts"
+    "clear-vite-cache": "tsx scripts/clear-vite-cache.ts",
+    "typecheck": "concurrently -n ui,backend,preload,storybook -c blue,green,yellow,magenta \"tsc -p tsconfig.ui.json --noEmit\" \"tsc -p tsconfig.backend.json --noEmit\" \"tsc -p tsconfig.web-content-preload.json --noEmit\" \"tsc -p tsconfig.storybook.json --noEmit\""
   },
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1",
@@ -63,8 +64,8 @@
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/hast": "^3.0.4",
     "@types/node": "22.15.2",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.2.0",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
     "@types/react-window": "^2.0.0",
     "@types/react-window-infinite-loader": "^2.0.0",
     "@types/three": "^0.180.0",
@@ -77,6 +78,7 @@
     "bowser": "^2.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "concurrently": "^9.2.1",
     "diff": "^8.0.2",
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.8",

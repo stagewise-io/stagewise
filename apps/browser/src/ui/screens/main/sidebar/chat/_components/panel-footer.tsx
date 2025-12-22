@@ -324,9 +324,7 @@ export function ChatPanelFooter() {
               removeFileAttachment={chatState.removeFileAttachment}
             />
             <ContextElementsChipsFlexible
-              selectedElements={chatState.selectedElements.map((e) => ({
-                selectedElement: e,
-              }))}
+              selectedElements={chatState.selectedElements}
               removeSelectedElementById={chatState.removeSelectedElement}
             />
             {chatState.fileAttachments.length +

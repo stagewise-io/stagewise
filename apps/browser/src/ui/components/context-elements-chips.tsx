@@ -7,7 +7,7 @@ export function ContextElementsChips() {
   return (
     <ContextElementsChipsFlexible
       selectedElements={selectedElements}
-      removeSelectedElement={removeSelectedElement}
+      removeSelectedElementById={removeSelectedElement}
     />
   );
 }

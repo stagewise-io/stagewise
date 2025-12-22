@@ -205,7 +205,7 @@ export function useMetaSync() {
             }
 
             // Check added/removed nodes
-            for (const node of mutation.addedNodes) {
+            for (const node of Array.from(mutation.addedNodes)) {
               if (
                 node.nodeName === 'META' ||
                 node.nodeName === 'LINK' ||
@@ -214,7 +214,7 @@ export function useMetaSync() {
                 return true;
               }
             }
-            for (const node of mutation.removedNodes) {
+            for (const node of Array.from(mutation.removedNodes)) {
               if (
                 node.nodeName === 'META' ||
                 node.nodeName === 'LINK' ||

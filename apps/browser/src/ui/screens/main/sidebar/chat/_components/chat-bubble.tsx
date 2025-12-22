@@ -318,11 +318,7 @@ export const ChatBubble = memo(function ChatBubble({
               selectedPreviewElements.length > 0) && (
               <div className="flex flex-row flex-wrap gap-2 pt-2">
                 <ContextElementsChipsFlexible
-                  selectedElements={selectedPreviewElements.map(
-                    (selectedPreviewElement) => ({
-                      selectedElement: selectedPreviewElement as ContextElement,
-                    }),
-                  )}
+                  selectedElements={selectedPreviewElements as ContextElement[]}
                 />
               </div>
             )}

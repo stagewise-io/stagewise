@@ -58,7 +58,9 @@
     ],
     "overrides": {
       "stagewise": "link:apps/cli",
-      "lucide-react": "0.554.0"
+      "lucide-react": "0.554.0",
+      "@types/react": "19.2.7",
+      "@types/react-dom": "19.2.3"
     }
   },
   "dependencies": {

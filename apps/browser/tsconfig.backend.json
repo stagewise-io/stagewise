@@ -1,13 +1,14 @@
 {
   "compilerOptions": {
     "composite": true,
+    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
       "@/*": ["./src/backend/*"],
       "@shared/*": ["./src/shared/*"]
     },
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "skipLibCheck": true,
     "target": "ES2022",
     "strict": true

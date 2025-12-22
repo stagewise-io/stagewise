@@ -84,7 +84,7 @@ class HighlighterManager {
     if (needsDarkRecreation) {
       // If recreating dark highlighter, load all previously loaded languages plus the new one
       const langsToLoad = needsLanguageLoad
-        ? [...this.loadedLanguages].concat(
+        ? [...Array.from(this.loadedLanguages)].concat(
             isLanguageSupported ? [language] : [],
           )
         : Array.from(this.loadedLanguages);

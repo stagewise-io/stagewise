@@ -51,14 +51,14 @@ export class URIHandlerService {
     app.off('open-url', this.handleOpenURL);
   }
 
-  private handleSecondInstance = ((_ev: Event, argv: string[]) => {
+  private handleSecondInstance = ((_ev: Electron.Event, argv: string[]) => {
     const uri = argv.find((arg) => arg.startsWith('stagewise://'));
     if (uri) {
       this.handleURI(uri);
     }
   }).bind(this);
 
-  private handleOpenURL = ((ev: Event, uri: string) => {
+  private handleOpenURL = ((ev: Electron.Event, uri: string) => {
     ev.preventDefault();
     this.handleURI(uri);
   }).bind(this);

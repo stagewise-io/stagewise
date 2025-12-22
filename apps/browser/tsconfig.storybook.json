@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/ui/*"],
       "@shared/*": ["./src/shared/*"],
@@ -8,10 +9,10 @@
       "tmp/*": ["./tmp/*"]
     },
     "types": ["node", "vite/client"],
-    "target": "ES2020",
+    "target": "ES2022",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
@@ -22,6 +23,8 @@
   "include": [
     "src/ui/**/*.tsx",
     "src/ui/**/*.ts",
+    "src/shared/**/*.ts",
+    "src/shared/**/*.tsx",
     ".storybook/decorators/**/*.ts",
     ".storybook/decorators/**/*.tsx",
     ".storybook/mocks/**/*.ts",

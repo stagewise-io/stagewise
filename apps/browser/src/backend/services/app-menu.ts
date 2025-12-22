@@ -41,8 +41,12 @@ export class AppMenuService {
 
     app.applicationMenu = null;
 
+    // TODO: Think thoroughly about teardown behaviour and nullability
+    // @ts-expect-error - TODO: Think thoroughly about teardown behaviour and nullability
     this.windowLayoutService = null;
+    // @ts-expect-error - TODO: Think thoroughly about teardown behaviour and nullability
     this.authService = null;
+    // @ts-expect-error - TODO: Think thoroughly about teardown behaviour and nullability
     this.logger = null;
 
     this.logger.debug('[AppMenuService] Teardown completed');

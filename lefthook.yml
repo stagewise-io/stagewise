@@ -8,6 +8,9 @@ pre-commit:
       exclude:
        - "**/tests/**/*"
        - "**/test/**/*"
+    - name: typecheck-browser
+      run: pnpm -F stagewise typecheck
+      glob: "apps/browser/**/*.{ts,tsx}"
 
 commit-msg:
   parallel: true

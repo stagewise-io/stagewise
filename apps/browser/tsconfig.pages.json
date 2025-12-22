@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
+    "baseUrl": ".",
     "module": "es2022",
     "lib": ["es2022", "dom"],
     "moduleResolution": "bundler",
@@ -14,13 +15,7 @@
     "skipLibCheck": true,
     "strictNullChecks": true
   },
-  "include": [
-    "src/pages",
-    "forge.env.d.ts",
-    "src/shared",
-    ".storybook/**/*",
-    "src/ui"
-  ],
+  "include": ["src/pages", "forge.env.d.ts"],
   "exclude": [
     "**/*.stories.tsx",
     "**/*.stories.ts",

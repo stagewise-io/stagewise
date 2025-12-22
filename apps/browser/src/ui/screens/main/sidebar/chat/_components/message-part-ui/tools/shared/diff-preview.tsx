@@ -40,7 +40,8 @@ export const DiffPreview = memo(
     const fileLanguage = useMemo(() => {
       const filename = filePath.replace(/^.*[\\/]/, '');
       return (
-        (filename?.split('.').pop()?.toLowerCase() as BundledLanguage) ?? 'text'
+        (filename?.split('.').pop()?.toLowerCase() as BundledLanguage) ??
+        'markdown'
       );
     }, [filePath]);
 
