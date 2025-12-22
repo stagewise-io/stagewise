@@ -14,7 +14,7 @@ export function Checkbox(
         props.className,
       )}
     >
-      <BaseCheckbox.Indicator className="translate-y-1.5 scale-25 duration-150 ease-out data-[checked]:translate-y-0 data-[checked]:scale-100">
+      <BaseCheckbox.Indicator className="scale-25 duration-150 ease-out data-[checked]:scale-100">
         <CheckIcon className="h-3.5 w-3.5 stroke-3 text-white" />
       </BaseCheckbox.Indicator>
     </BaseCheckbox.Root>
