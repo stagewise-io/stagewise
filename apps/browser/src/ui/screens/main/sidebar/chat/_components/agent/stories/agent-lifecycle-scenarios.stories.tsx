@@ -30,7 +30,6 @@ const baseState: Partial<AppState> = {
       data: '/Users/user/projects/my-app/data',
       temp: '/Users/user/projects/my-app/temp',
     },
-    inspirationComponents: [],
     config: null,
     plugins: null,
     setupActive: false,
@@ -55,12 +54,17 @@ const baseState: Partial<AppState> = {
   },
   userExperience: {
     activeLayout: Layout.MAIN,
-    activeMainTab: MainTab.DEV_APP_PREVIEW,
-    devAppPreview: {
-      isFullScreen: false,
-      inShowCodeMode: false,
-      customScreenSize: null,
+    activeMainTab: MainTab.BROWSING,
+    inspirationWebsites: {
+      websites: [],
+      total: 0,
+      seed: '',
     },
+    storedExperienceData: {
+      recentlyOpenedWorkspaces: [],
+      hasSeenOnboardingFlow: false,
+    },
+    devAppPreview: null,
   },
 };
 

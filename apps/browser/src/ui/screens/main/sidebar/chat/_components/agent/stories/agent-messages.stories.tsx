@@ -38,7 +38,6 @@ const baseState: Partial<AppState> = {
       data: '/Users/user/projects/my-app/data',
       temp: '/Users/user/projects/my-app/temp',
     },
-    inspirationComponents: [],
     config: null,
     plugins: null,
     setupActive: false,
@@ -59,12 +58,17 @@ const baseState: Partial<AppState> = {
   },
   userExperience: {
     activeLayout: Layout.MAIN,
-    activeMainTab: MainTab.DEV_APP_PREVIEW,
-    devAppPreview: {
-      isFullScreen: false,
-      inShowCodeMode: false,
-      customScreenSize: null,
+    activeMainTab: MainTab.BROWSING,
+    inspirationWebsites: {
+      websites: [],
+      total: 0,
+      seed: '',
     },
+    storedExperienceData: {
+      recentlyOpenedWorkspaces: [],
+      hasSeenOnboardingFlow: false,
+    },
+    devAppPreview: null,
   },
 };
 
@@ -364,6 +368,9 @@ export const AssistantDeleteFileComplete: Story = {
                       },
                       output: {
                         message: 'File deleted successfully',
+                        nonSerializableMetadata: {
+                          undoExecute: null as any,
+                        },
                         hiddenFromLLM: {
                           diff: {
                             path: 'src/components/Button.test.tsx',
@@ -391,9 +398,6 @@ describe('Button', () => {
                             after: '',
                           },
                         },
-                      },
-                      nonSerializableMetadata: {
-                        undoExecute: null as any,
                       },
                     },
                   ],

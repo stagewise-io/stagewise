@@ -2,7 +2,6 @@ import { z } from 'zod';
 import type {
   AskForAppPathOutput,
   AskForAgentAccessPathOutput,
-  InspirationComponent,
   AskForIdeOutput,
 } from '@stagewise/agent-tools';
 import type { UserMessageMetadata, BrowserData } from './metadata';
@@ -186,7 +185,6 @@ export type AppState = {
     agent: {
       accessPath: string;
     } | null;
-    inspirationComponents: InspirationComponent[];
     config: WorkspaceConfig | null;
     plugins:
       | ({

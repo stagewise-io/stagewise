@@ -1300,10 +1300,6 @@ export class AgentService {
     return instance;
   }
 
-  public getInspirationComponents() {
-    return this.uiKarton.state.workspace?.inspirationComponents ?? [];
-  }
-
   /**
    * Performs a warm-up request to the LLM to ensure the cache is seeded and latency is minimized.
    * @returns The response from the warm-up request.

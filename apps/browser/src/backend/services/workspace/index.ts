@@ -85,7 +85,6 @@ export class WorkspaceService {
           data: '',
           temp: '',
         },
-        inspirationComponents: [],
         agent: null,
         config: null,
         plugins: null,
