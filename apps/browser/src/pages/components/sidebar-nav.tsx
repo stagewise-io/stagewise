@@ -16,7 +16,7 @@ function SidebarNavItem({ to, icon, children }: SidebarNavItemProps) {
       className={cn(
         buttonVariants({ variant: 'ghost', size: 'md' }),
         'w-full justify-start gap-3 font-normal',
-        'data-[active=true]:bg-accent/80',
+        'data-[active=true]:bg-muted-foreground/10 data-[active=true]:hover:bg-muted-foreground/15',
       )}
       activeProps={{
         'data-active': 'true',
@@ -49,7 +49,7 @@ interface SidebarNavProps {
 
 export function SidebarNav({ children }: SidebarNavProps) {
   return (
-    <div className="mt-6 mb-6 flex w-full flex-col items-stretch justify-start gap-6">
+    <div className="flex w-full flex-col items-stretch justify-start gap-6">
       {children}
     </div>
   );

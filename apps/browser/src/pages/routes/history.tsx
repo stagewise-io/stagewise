@@ -451,14 +451,14 @@ function Page() {
       {/* Search bar */}
       <div className="flex items-center gap-4 border-zinc-500/50 border-b px-6 py-4">
         <div className="relative flex-1 rounded-full bg-zinc-500/5 focus-within:bg-zinc-500/10">
-          <IconMagnifierFill18 className="-translate-y-1/2 absolute top-1/2 left-4 z-10 size-4 text-muted-foreground" />
+          <IconMagnifierFill18 className="-translate-y-1/2 absolute top-1/2 left-3.5 z-10 size-4 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search history"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="w-full rounded-full pl-12 before:hidden"
-            inputClassName="rounded-full pl-12 focus:outline-none focus:ring-0 bg-transparent"
+            className="w-full rounded-full pl-10 before:hidden"
+            inputClassName="rounded-full pl-4 focus:outline-none focus:ring-0 bg-transparent"
           />
         </div>
       </div>
