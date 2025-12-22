@@ -50,358 +50,396 @@ function isToolPart(part: UIMessagePart): part is ToolPart {
   return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
 }
 
-export const ChatBubble = memo(function ChatBubble({
-  message: msg,
-  chatError,
-  isLastMessage,
-}: {
-  message: ChatMessage;
-  chatError?: AgentError;
-  isLastMessage: boolean;
-}) {
-  const retrySendingUserMessage = useKartonProcedure(
-    (p) => p.agentChat.retrySendingUserMessage,
-  );
-  const undoToolCallsUntilUserMessage = useKartonProcedure(
-    (p) => p.agentChat.undoToolCallsUntilUserMessage,
-  );
-  const undoToolCallsUntilLatestUserMessage = useKartonProcedure(
-    (p) => p.agentChat.undoToolCallsUntilLatestUserMessage,
-  );
-  const assistantMadeCodeChangesUntilLatestUserMessage = useKartonProcedure(
-    (p) => p.agentChat.assistantMadeCodeChangesUntilLatestUserMessage,
-  );
-  const activeChatId = useKartonState((s) => s.agentChat?.activeChatId || null);
-  const isWorking = useKartonState((s) => s.agentChat?.isWorking || false);
-  const { setChatInput } = useChatActions();
-  const [hasCodeChanges, setHasCodeChanges] = useState(false);
-  const isEmptyMessage = useMemo(() => {
-    if (
-      msg.parts
-        .map((part) => part.type)
-        .some(
-          (type) =>
-            type === 'dynamic-tool' ||
-            type.startsWith('tool-') ||
-            type === 'file',
-        )
-    )
-      return false;
-
-    return msg.parts.every(
-      (part) =>
-        (part.type !== 'text' && part.type !== 'reasoning') ||
-        ((part.type === 'text' || part.type === 'reasoning') &&
-          part.text.trim() === ''),
-    );
-  }, [msg.parts]);
-
-  useEffect(() => {
-    if (
-      msg.role === 'assistant' &&
-      isLastMessage &&
-      !isWorking &&
-      activeChatId
-    ) {
-      const checkCodeChanges = async () => {
-        try {
-          const hasChanges =
-            await assistantMadeCodeChangesUntilLatestUserMessage(activeChatId);
-          setHasCodeChanges(hasChanges);
-        } catch (error) {
-          console.warn('Failed to check for code changes:', error);
-          setHasCodeChanges(false);
-        }
-      };
-      void checkCodeChanges();
-    } else {
-      setHasCodeChanges(false);
-    }
-  }, [
-    msg.role,
+export const ChatBubble = memo(
+  function ChatBubble({
+    message: msg,
+    chatError,
     isLastMessage,
-    isWorking,
-    activeChatId,
-    assistantMadeCodeChangesUntilLatestUserMessage,
-  ]);
+  }: {
+    message: ChatMessage;
+    chatError?: AgentError;
+    isLastMessage: boolean;
+  }) {
+    const retrySendingUserMessage = useKartonProcedure(
+      (p) => p.agentChat.retrySendingUserMessage,
+    );
+    const undoToolCallsUntilUserMessage = useKartonProcedure(
+      (p) => p.agentChat.undoToolCallsUntilUserMessage,
+    );
+    const undoToolCallsUntilLatestUserMessage = useKartonProcedure(
+      (p) => p.agentChat.undoToolCallsUntilLatestUserMessage,
+    );
+    const assistantMadeCodeChangesUntilLatestUserMessage = useKartonProcedure(
+      (p) => p.agentChat.assistantMadeCodeChangesUntilLatestUserMessage,
+    );
+    const activeChatId = useKartonState(
+      (s) => s.agentChat?.activeChatId || null,
+    );
+    const isWorking = useKartonState((s) => s.agentChat?.isWorking || false);
+    const { setChatInput } = useChatActions();
+    const [hasCodeChanges, setHasCodeChanges] = useState(false);
+    const isEmptyMessage = useMemo(() => {
+      if (
+        msg.parts
+          .map((part) => part.type)
+          .some(
+            (type) =>
+              type === 'dynamic-tool' ||
+              type.startsWith('tool-') ||
+              type === 'file',
+          )
+      )
+        return false;
 
-  const confirmRestore = useCallback(async () => {
-    if (!msg.id || !activeChatId) return;
+      return msg.parts.every(
+        (part) =>
+          (part.type !== 'text' && part.type !== 'reasoning') ||
+          ((part.type === 'text' || part.type === 'reasoning') &&
+            part.text.trim() === ''),
+      );
+    }, [msg.parts]);
 
-    const textContent = msg.parts
-      .filter((part) => part.type === 'text')
-      .map((part) => (part as TextUIPart).text)
-      .join('\n');
-
-    setChatInput(textContent);
-    try {
-      await undoToolCallsUntilUserMessage(msg.id, activeChatId);
-    } catch (error) {
-      console.warn('Failed to undo tool calls:', error);
-    }
-  }, [msg.id, activeChatId, setChatInput, undoToolCallsUntilUserMessage]);
-
-  const confirmUndo = useCallback(async () => {
-    if (!activeChatId) return;
-
-    try {
-      const latestUserMessage =
-        await undoToolCallsUntilLatestUserMessage(activeChatId);
-      if (!latestUserMessage) {
-        console.warn('Could not find latest user message');
-        return;
+    useEffect(() => {
+      if (
+        msg.role === 'assistant' &&
+        isLastMessage &&
+        !isWorking &&
+        activeChatId
+      ) {
+        const checkCodeChanges = async () => {
+          try {
+            const hasChanges =
+              await assistantMadeCodeChangesUntilLatestUserMessage(
+                activeChatId,
+              );
+            setHasCodeChanges(hasChanges);
+          } catch (error) {
+            console.warn('Failed to check for code changes:', error);
+            setHasCodeChanges(false);
+          }
+        };
+        void checkCodeChanges();
+      } else {
+        setHasCodeChanges(false);
       }
+    }, [
+      msg.role,
+      isLastMessage,
+      isWorking,
+      activeChatId,
+      assistantMadeCodeChangesUntilLatestUserMessage,
+    ]);
 
-      // Extract text content from message parts
-      const textContent = latestUserMessage.parts
+    const confirmRestore = useCallback(async () => {
+      if (!msg.id || !activeChatId) return;
+
+      const textContent = msg.parts
         .filter((part) => part.type === 'text')
         .map((part) => (part as TextUIPart).text)
         .join('\n');
 
-      // Populate the input with the text content
       setChatInput(textContent);
-    } catch (error) {
-      console.warn('Failed to undo tool calls:', error);
-    }
+      try {
+        await undoToolCallsUntilUserMessage(msg.id, activeChatId);
+      } catch (error) {
+        console.warn('Failed to undo tool calls:', error);
+      }
+    }, [msg.id, activeChatId, setChatInput, undoToolCallsUntilUserMessage]);
 
-    // TODO: restore selected elements
-  }, [activeChatId, setChatInput, undoToolCallsUntilLatestUserMessage]);
+    const confirmUndo = useCallback(async () => {
+      if (!activeChatId) return;
 
-  const selectedPreviewElements = useMemo(() => {
-    return msg.metadata?.selectedPreviewElements ?? [];
-  }, [msg.metadata?.selectedPreviewElements]);
-  const fileAttachments = useMemo(() => {
-    return msg.parts.filter((part) => part.type === 'file') as FileUIPart[];
-  }, [msg.parts]);
+      try {
+        const latestUserMessage =
+          await undoToolCallsUntilLatestUserMessage(activeChatId);
+        if (!latestUserMessage) {
+          console.warn('Could not find latest user message');
+          return;
+        }
 
-  if (isEmptyMessage) return null; // Message parts start long before the message is sent - bubble should only show after the first chunk is received
+        // Extract text content from message parts
+        const textContent = latestUserMessage.parts
+          .filter((part) => part.type === 'text')
+          .map((part) => (part as TextUIPart).text)
+          .join('\n');
 
-  return (
-    <div className="flex flex-col gap-1">
-      <div
-        className={cn(
-          'group/chat-bubble mt-2 flex w-full shrink-0 items-center justify-start gap-2',
-          msg.role === 'assistant' ? 'flex-row' : 'flex-row-reverse',
-        )}
-      >
-        <div className="flex max-w-full flex-col items-start gap-2">
-          <div
-            className={cn(
-              'group relative min-h-8 max-w-full animate-chat-bubble-appear select-text space-y-3 break-words rounded-xl px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
-              msg.role === 'assistant'
-                ? 'min-w-1/3 origin-bottom-left rounded-bl-sm bg-zinc-100/60 text-foreground dark:bg-zinc-700/50'
-                : 'origin-bottom-right rounded-br-sm bg-blue-600/90 text-white',
-              msg.parts.length > 1 && 'w-full',
-              msg.role === 'user' &&
-                '[--color-background:var(--color-blue-600)] [--color-busy:var(--color-blue-200)] [--color-error:var(--color-rose-200)] [--color-foreground:var(--color-white)] [--color-muted-background:var(--color-blue-500)] [--color-muted-foreground:var(--color-blue-200)] [--color-primary:var(--color-blue-200)] [--color-success:var(--color-green-200)]',
-              msg.role === 'user'
-                ? 'group/chat-bubble-user'
-                : 'group/chat-bubble-assistant',
-            )}
-          >
-            {(() => {
-              // Merge read-only tools into the previous tool part
-              const parts = msg.parts.reduce(
-                (acc, part) => {
-                  // Skip step-start parts, they don't contain information we need to render and break the ReadOnly-Part detection logic
-                  if (part.type === 'step-start') return acc;
-                  // Forward everything except read-only tools
-                  if (!isToolPart(part) || !isReadOnlyToolPart(part))
-                    acc.push(part);
+        // Populate the input with the text content
+        setChatInput(textContent);
+      } catch (error) {
+        console.warn('Failed to undo tool calls:', error);
+      }
 
-                  const previousPart = acc[acc.length - 1];
-                  // Merge read-only tools into the previous tool-part-array if one already exists
-                  if (
-                    isToolPart(part) &&
-                    isReadOnlyToolPart(part) &&
-                    Array.isArray(previousPart)
-                  ) {
-                    previousPart.push(part);
-                  }
-                  // Turn read-only tools into an array of parts if no previous tool-part-array exists
-                  else if (isToolPart(part) && isReadOnlyToolPart(part))
-                    acc.push([part]);
+      // TODO: restore selected elements
+    }, [activeChatId, setChatInput, undoToolCallsUntilLatestUserMessage]);
 
-                  return acc;
-                },
-                [] as (UIMessagePart | ReadOnlyToolPart[])[],
-              );
+    const selectedPreviewElements = useMemo(() => {
+      return msg.metadata?.selectedPreviewElements ?? [];
+    }, [msg.metadata?.selectedPreviewElements]);
+    const fileAttachments = useMemo(() => {
+      return msg.parts.filter((part) => part.type === 'file') as FileUIPart[];
+    }, [msg.parts]);
 
-              const typeCounters: Record<string, number> = {};
+    if (isEmptyMessage) return null; // Message parts start long before the message is sent - bubble should only show after the first chunk is received
 
-              return parts.map((part, index) => {
-                if (Array.isArray(part))
-                  return (
-                    // Handles glob, grep, listFiles, readFile tools
-                    <ExploringToolParts
-                      parts={part}
-                      isAutoExpanded={index === parts.length - 1}
-                      isShimmering={
-                        isWorking && index === parts.length - 1 && isLastMessage
-                      }
-                    />
-                  );
+    return (
+      <div className="flex flex-col gap-1">
+        <div
+          className={cn(
+            'group/chat-bubble mt-2 flex w-full shrink-0 items-center justify-start gap-2',
+            msg.role === 'assistant' ? 'flex-row' : 'flex-row-reverse',
+          )}
+        >
+          <div className="flex max-w-full flex-col items-start gap-2">
+            <div
+              className={cn(
+                'group relative min-h-8 max-w-full animate-chat-bubble-appear select-text space-y-3 break-words rounded-xl px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
+                msg.role === 'assistant'
+                  ? 'min-w-1/3 origin-bottom-left rounded-bl-sm bg-zinc-100/60 text-foreground dark:bg-zinc-700/50'
+                  : 'origin-bottom-right rounded-br-sm bg-blue-600/90 text-white',
+                msg.parts.length > 1 && 'w-full',
+                msg.role === 'user' &&
+                  '[--color-background:var(--color-blue-600)] [--color-busy:var(--color-blue-200)] [--color-error:var(--color-rose-200)] [--color-foreground:var(--color-white)] [--color-muted-background:var(--color-blue-500)] [--color-muted-foreground:var(--color-blue-200)] [--color-primary:var(--color-blue-200)] [--color-success:var(--color-green-200)]',
+                msg.role === 'user'
+                  ? 'group/chat-bubble-user'
+                  : 'group/chat-bubble-assistant',
+              )}
+            >
+              {(() => {
+                // Merge read-only tools into the previous tool part
+                const parts = msg.parts.reduce(
+                  (acc, part) => {
+                    // Skip step-start parts, they don't contain information we need to render and break the ReadOnly-Part detection logic
+                    if (part.type === 'step-start') return acc;
+                    // Forward everything except read-only tools
+                    if (!isToolPart(part) || !isReadOnlyToolPart(part))
+                      acc.push(part);
 
-                const currentTypeIndex = typeCounters[part.type] ?? 0;
-                typeCounters[part.type] = currentTypeIndex + 1;
-                const stableKey = `${msg.id}:${part.type}:${currentTypeIndex}`;
+                    const previousPart = acc[acc.length - 1];
+                    // Merge read-only tools into the previous tool-part-array if one already exists
+                    if (
+                      isToolPart(part) &&
+                      isReadOnlyToolPart(part) &&
+                      Array.isArray(previousPart)
+                    ) {
+                      previousPart.push(part);
+                    }
+                    // Turn read-only tools into an array of parts if no previous tool-part-array exists
+                    else if (isToolPart(part) && isReadOnlyToolPart(part))
+                      acc.push([part]);
 
-                if (isToolPart(part) && isInteractionToolPart(part)) {
-                  return (
-                    <InteractionToolPartItem
-                      key={stableKey}
-                      toolPart={part as InteractionToolPart}
-                    />
-                  );
-                }
-                switch (part.type) {
-                  case 'text':
+                    return acc;
+                  },
+                  [] as (UIMessagePart | ReadOnlyToolPart[])[],
+                );
+
+                const typeCounters: Record<string, number> = {};
+
+                return parts.map((part, index) => {
+                  if (Array.isArray(part))
                     return (
-                      <TextPart
-                        key={stableKey}
-                        part={part as TextUIPart}
-                        role={msg.role}
-                      />
-                    );
-                  case 'reasoning':
-                    if (part.text.trim() === '') return null; // Sometimes, empty reasoning parts are returned
-                    return (
-                      <ThinkingPart
-                        key={stableKey}
-                        thinkingDuration={msg.metadata?.thinkingDuration}
-                        part={part as ReasoningUIPart}
+                      // Handles glob, grep, listFiles, readFile tools
+                      <ExploringToolParts
+                        parts={part}
                         isAutoExpanded={index === parts.length - 1}
                         isShimmering={
                           isWorking &&
-                          part.state === 'streaming' &&
                           index === parts.length - 1 &&
                           isLastMessage
                         }
                       />
                     );
-                  case 'file':
-                    return (
-                      <FilePart key={stableKey} part={part as FileUIPart} />
-                    );
-                  case 'tool-deleteFileTool':
-                    return <DeleteFileToolPart key={stableKey} part={part} />;
-                  case 'tool-multiEditTool':
-                    return <MultiEditToolPart key={stableKey} part={part} />;
-                  case 'tool-executeConsoleScriptTool':
-                    return (
-                      <ExecuteConsoleScriptToolPart
-                        key={stableKey}
-                        part={part}
-                      />
-                    );
-                  case 'tool-overwriteFileTool':
-                    return (
-                      <OverwriteFileToolPart key={stableKey} part={part} />
-                    );
-                  default:
-                    return (
-                      <UnknownToolPart
-                        shimmer={
-                          isWorking &&
-                          index === parts.length - 1 &&
-                          isLastMessage
-                        }
-                        key={stableKey}
-                        part={part as ToolUIPart | DynamicToolUIPart}
-                      />
-                    );
-                }
-              });
-            })()}
 
-            {(fileAttachments.length > 0 ||
-              selectedPreviewElements.length > 0) && (
-              <div className="flex flex-row flex-wrap gap-2 pt-2">
-                <SelectedElementsChipsFlexible
-                  selectedElements={
-                    selectedPreviewElements as SelectedElement[]
+                  const currentTypeIndex = typeCounters[part.type] ?? 0;
+                  typeCounters[part.type] = currentTypeIndex + 1;
+                  const stableKey = `${msg.id}:${part.type}:${currentTypeIndex}`;
+
+                  if (isToolPart(part) && isInteractionToolPart(part)) {
+                    return (
+                      <InteractionToolPartItem
+                        key={stableKey}
+                        toolPart={part as InteractionToolPart}
+                      />
+                    );
                   }
-                />
-              </div>
-            )}
-          </div>
-          {msg.role === 'assistant' &&
-            isLastMessage &&
-            !isWorking &&
-            hasCodeChanges && (
-              <Popover>
-                <PopoverTrigger>
-                  <Button variant="secondary" size="xs">
-                    Undo changes
-                    <Undo2 className="size-3" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent>
-                  <PopoverTitle>Undo changes?</PopoverTitle>
-                  <PopoverDescription>
-                    This will undo all changes the assistant made since your
-                    last message.
-                  </PopoverDescription>
-                  <PopoverClose />
-                  <PopoverFooter>
-                    <Button variant="primary" size="sm" onClick={confirmUndo}>
-                      Undo
+                  switch (part.type) {
+                    case 'text':
+                      return (
+                        <TextPart
+                          key={stableKey}
+                          part={part as TextUIPart}
+                          role={msg.role}
+                        />
+                      );
+                    case 'reasoning':
+                      if (part.text.trim() === '') return null; // Sometimes, empty reasoning parts are returned
+                      return (
+                        <ThinkingPart
+                          key={stableKey}
+                          thinkingDuration={msg.metadata?.thinkingDuration}
+                          part={part as ReasoningUIPart}
+                          isAutoExpanded={index === parts.length - 1}
+                          isShimmering={
+                            isWorking &&
+                            part.state === 'streaming' &&
+                            index === parts.length - 1 &&
+                            isLastMessage
+                          }
+                        />
+                      );
+                    case 'file':
+                      return (
+                        <FilePart key={stableKey} part={part as FileUIPart} />
+                      );
+                    case 'tool-deleteFileTool':
+                      return <DeleteFileToolPart key={stableKey} part={part} />;
+                    case 'tool-multiEditTool':
+                      return <MultiEditToolPart key={stableKey} part={part} />;
+                    case 'tool-executeConsoleScriptTool':
+                      return (
+                        <ExecuteConsoleScriptToolPart
+                          key={stableKey}
+                          part={part}
+                        />
+                      );
+                    case 'tool-overwriteFileTool':
+                      return (
+                        <OverwriteFileToolPart key={stableKey} part={part} />
+                      );
+                    default:
+                      return (
+                        <UnknownToolPart
+                          shimmer={
+                            isWorking &&
+                            index === parts.length - 1 &&
+                            isLastMessage
+                          }
+                          key={stableKey}
+                          part={part as ToolUIPart | DynamicToolUIPart}
+                        />
+                      );
+                  }
+                });
+              })()}
+
+              {(fileAttachments.length > 0 ||
+                selectedPreviewElements.length > 0) && (
+                <div className="flex flex-row flex-wrap gap-2 pt-2">
+                  <SelectedElementsChipsFlexible
+                    selectedElements={
+                      selectedPreviewElements as SelectedElement[]
+                    }
+                  />
+                </div>
+              )}
+            </div>
+            {msg.role === 'assistant' &&
+              isLastMessage &&
+              !isWorking &&
+              hasCodeChanges && (
+                <Popover>
+                  <PopoverTrigger>
+                    <Button variant="secondary" size="xs">
+                      Undo changes
+                      <Undo2 className="size-3" />
                     </Button>
-                  </PopoverFooter>
-                </PopoverContent>
-              </Popover>
-            )}
-        </div>
+                  </PopoverTrigger>
+                  <PopoverContent>
+                    <PopoverTitle>Undo changes?</PopoverTitle>
+                    <PopoverDescription>
+                      This will undo all changes the assistant made since your
+                      last message.
+                    </PopoverDescription>
+                    <PopoverClose />
+                    <PopoverFooter>
+                      <Button variant="primary" size="sm" onClick={confirmUndo}>
+                        Undo
+                      </Button>
+                    </PopoverFooter>
+                  </PopoverContent>
+                </Popover>
+              )}
+          </div>
 
-        {msg.role === 'user' && msg.id && !isWorking && (
-          <Popover>
-            <PopoverTrigger>
-              <Button
-                aria-label="Restore checkpoint"
-                variant="secondary"
-                size="icon-sm"
-                className="shrink-0 opacity-0 blur-xs transition-all group-hover/chat-bubble:scale-100 group-hover/chat-bubble:opacity-100 group-hover/chat-bubble:blur-none"
-              >
-                <Undo2 className="size-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent>
-              <PopoverTitle>Restore checkpoint?</PopoverTitle>
-              <PopoverDescription>
-                This will clear the chat history and undo file changes after
-                this point.
-              </PopoverDescription>
-              <PopoverClose />
-              <PopoverFooter>
+          {msg.role === 'user' && msg.id && !isWorking && (
+            <Popover>
+              <PopoverTrigger>
                 <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => {
-                    confirmRestore();
-                  }}
+                  aria-label="Restore checkpoint"
+                  variant="secondary"
+                  size="icon-sm"
+                  className="shrink-0 opacity-0 blur-xs transition-all group-hover/chat-bubble:scale-100 group-hover/chat-bubble:opacity-100 group-hover/chat-bubble:blur-none"
                 >
-                  Restore
+                  <Undo2 className="size-4" />
                 </Button>
-              </PopoverFooter>
-            </PopoverContent>
-          </Popover>
-        )}
+              </PopoverTrigger>
+              <PopoverContent>
+                <PopoverTitle>Restore checkpoint?</PopoverTitle>
+                <PopoverDescription>
+                  This will clear the chat history and undo file changes after
+                  this point.
+                </PopoverDescription>
+                <PopoverClose />
+                <PopoverFooter>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      confirmRestore();
+                    }}
+                  >
+                    Restore
+                  </Button>
+                </PopoverFooter>
+              </PopoverContent>
+            </Popover>
+          )}
 
-        <div className="flex h-full min-w-12 grow flex-row items-center justify-start">
-          {msg.role === 'assistant' &&
-            chatError?.type === AgentErrorType.AGENT_ERROR && (
-              <Button
-                aria-label={'Retry'}
-                variant="secondary"
-                size="icon-sm"
-                className="opacity-0 blur-xs group-hover:opacity-100 group-hover:blur-none"
-                onClick={() => void retrySendingUserMessage()}
-              >
-                <RefreshCcwIcon className="size-4" />
-              </Button>
-            )}
+          <div className="flex h-full min-w-12 grow flex-row items-center justify-start">
+            {msg.role === 'assistant' &&
+              chatError?.type === AgentErrorType.AGENT_ERROR && (
+                <Button
+                  aria-label={'Retry'}
+                  variant="secondary"
+                  size="icon-sm"
+                  className="opacity-0 blur-xs group-hover:opacity-100 group-hover:blur-none"
+                  onClick={() => void retrySendingUserMessage()}
+                >
+                  <RefreshCcwIcon className="size-4" />
+                </Button>
+              )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-});
+    );
+  },
+  // Custom comparison to prevent re-renders when message object references change
+  (prevProps, nextProps) => {
+    if (prevProps.message.id !== nextProps.message.id) return false;
+    if (prevProps.message.role !== nextProps.message.role) return false;
+    if (prevProps.isLastMessage !== nextProps.isLastMessage) return false;
+    if (prevProps.chatError !== nextProps.chatError) return false;
+    if (prevProps.message.parts.length !== nextProps.message.parts.length)
+      return false;
+
+    // Deep compare parts by type and key content
+    for (let i = 0; i < prevProps.message.parts.length; i++) {
+      const prevPart = prevProps.message.parts[i];
+      const nextPart = nextProps.message.parts[i];
+      if (!prevPart || !nextPart) return false;
+      if (prevPart.type !== nextPart.type) return false;
+
+      // For text parts, compare text and state
+      if (prevPart.type === 'text' && nextPart.type === 'text') {
+        if (prevPart.text !== nextPart.text) return false;
+        if (prevPart.state !== nextPart.state) return false;
+      }
+      // For reasoning parts, compare text and state
+      if (prevPart.type === 'reasoning' && nextPart.type === 'reasoning') {
+        if (prevPart.text !== nextPart.text) return false;
+        if (prevPart.state !== nextPart.state) return false;
+      }
+    }
+
+    return true;
+  },
+);

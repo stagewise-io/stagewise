@@ -1,6 +1,6 @@
 'use client';
 
-import { type HTMLAttributes, useEffect, useRef, useState } from 'react';
+import { type HTMLAttributes, useEffect, useRef, useState, memo } from 'react';
 import {
   type BundledLanguage,
   bundledLanguages,
@@ -174,58 +174,66 @@ const highlighterManager = new HighlighterManager();
 export const lineAddedDiffMarker = '/*>> STAGEWISE_ADDED_LINE <<*/';
 export const lineRemovedDiffMarker = '/*>> STAGEWISE_REMOVED_LINE <<*/';
 
-export const CodeBlock = ({
-  code,
-  language,
-  className,
-  preClassName = 'flex flex-row gap-2 font-mono text-xs',
-  hideActionButtons,
-  compactDiff,
-  ...rest
-}: CodeBlockProps) => {
-  const [html, setHtml] = useState<string>('');
-  const [darkHtml, setDarkHtml] = useState<string>('');
-  const mounted = useRef(false);
+export const CodeBlock = memo(
+  ({
+    code,
+    language,
+    className,
+    preClassName = 'flex flex-row gap-2 font-mono text-xs',
+    hideActionButtons,
+    compactDiff,
+    ...rest
+  }: CodeBlockProps) => {
+    const [html, setHtml] = useState<string>('');
+    const [darkHtml, setDarkHtml] = useState<string>('');
+    const mounted = useRef(false);
 
-  useEffect(() => {
-    mounted.current = true;
+    useEffect(() => {
+      mounted.current = true;
 
-    highlighterManager
-      .highlightCode(code, language, preClassName, compactDiff)
-      .then(([light, dark]) => {
-        if (mounted.current) {
-          setHtml(light);
-          setDarkHtml(dark);
-        }
-      });
+      highlighterManager
+        .highlightCode(code, language, preClassName, compactDiff)
+        .then(([light, dark]) => {
+          if (mounted.current) {
+            setHtml(light);
+            setDarkHtml(dark);
+          }
+        });
 
-    return () => {
-      mounted.current = false;
-    };
-  }, [code, language, preClassName, compactDiff]);
+      return () => {
+        mounted.current = false;
+      };
+    }, [code, language, preClassName, compactDiff]);
 
-  return (
-    <>
-      <div
-        className={cn('group/chat-bubble-user:hidden dark:hidden', className)}
-        dangerouslySetInnerHTML={{ __html: html }}
-        data-code-block
-        data-language={language}
-        {...rest}
-      />
-      <div
-        className={cn(
-          'hidden group/chat-bubble-user:block dark:block',
-          className,
-        )}
-        dangerouslySetInnerHTML={{ __html: darkHtml }}
-        data-code-block
-        data-language={language}
-        {...rest}
-      />
-    </>
-  );
-};
+    return (
+      <>
+        <div
+          className={cn('group/chat-bubble-user:hidden dark:hidden', className)}
+          dangerouslySetInnerHTML={{ __html: html }}
+          data-code-block
+          data-language={language}
+          {...rest}
+        />
+        <div
+          className={cn(
+            'hidden group/chat-bubble-user:block dark:block',
+            className,
+          )}
+          dangerouslySetInnerHTML={{ __html: darkHtml }}
+          data-code-block
+          data-language={language}
+          {...rest}
+        />
+      </>
+    );
+  },
+  // Custom comparison - only re-render if code content or language changes
+  (prevProps, nextProps) =>
+    prevProps.code === nextProps.code &&
+    prevProps.language === nextProps.language &&
+    prevProps.compactDiff === nextProps.compactDiff &&
+    prevProps.className === nextProps.className,
+);
 
 function shikiDiffNotation(): ShikiTransformer {
   const classLineAdd = 'code-block-diff-add';

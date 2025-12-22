@@ -8,23 +8,30 @@ interface TextPartProps {
   role: 'user' | 'assistant' | 'system';
 }
 
-export const TextPart = memo(({ part, role }: TextPartProps) => {
-  const displayedText = useTypeWriterText(part.text, {
-    charsPerInterval: 2,
-    framesPerInterval: 1,
-    showAllOnFirstRender: true,
-    animateOnIncreaseOnly: true,
-  });
+export const TextPart = memo(
+  ({ part, role }: TextPartProps) => {
+    const displayedText = useTypeWriterText(part.text, {
+      charsPerInterval: 2,
+      framesPerInterval: 1,
+      showAllOnFirstRender: true,
+      animateOnIncreaseOnly: true,
+    });
 
-  // Only render markdown for assistant messages
-  if (role === 'assistant') {
-    return (
-      <Streamdown isAnimating={part.state === 'streaming'}>
-        {displayedText}
-      </Streamdown>
-    );
-  }
+    // Only render markdown for assistant messages
+    if (role === 'assistant') {
+      return (
+        <Streamdown isAnimating={part.state === 'streaming'}>
+          {displayedText}
+        </Streamdown>
+      );
+    }
 
-  // Render plain text for user messages
-  return <span className="whitespace-pre-wrap">{displayedText}</span>;
-});
+    // Render plain text for user messages
+    return <span className="whitespace-pre-wrap">{displayedText}</span>;
+  },
+  // Custom comparison to prevent re-renders when only reference changes
+  (prevProps, nextProps) =>
+    prevProps.part.text === nextProps.part.text &&
+    prevProps.part.state === nextProps.part.state &&
+    prevProps.role === nextProps.role,
+);

@@ -125,14 +125,16 @@ export const ChatHistory = () => {
         // If the last message is the same role as the current message and the role is 'assistant, we append the parts to the previous message instead of pushing the new message to the array.
         const lastMessage = curr[curr.length - 1];
         if (!lastMessage) {
-          curr.push(structuredClone(message));
+          // Shallow copy to avoid mutating original, but preserve part references
+          curr.push({ ...message, parts: [...message.parts] });
           return curr;
         }
 
         if (lastMessage.role === message.role && message.role === 'assistant') {
           lastMessage.parts = [...lastMessage.parts, ...message.parts];
         } else {
-          curr.push(structuredClone(message));
+          // Shallow copy to avoid mutating original, but preserve part references
+          curr.push({ ...message, parts: [...message.parts] });
         }
         return curr;
       }, []);
@@ -156,7 +158,7 @@ export const ChatHistory = () => {
       {renderedMessages.map((message, index) => {
         return (
           <ChatBubble
-            key={`${message.role}-${index}`}
+            key={message.id ?? `${message.role}-${index}`}
             message={message}
             isLastMessage={index === renderedMessages.length - 1}
           />

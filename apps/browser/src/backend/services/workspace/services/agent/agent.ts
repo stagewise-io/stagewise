@@ -31,6 +31,7 @@ import {
 } from '@stagewise/agent-tools';
 import {
   streamText,
+  smoothStream,
   generateId,
   readUIMessageStream,
   NoSuchToolError,
@@ -931,6 +932,10 @@ export class AgentService {
           this.authRetryCount = 0;
           this.cleanupPendingOperations('Agent call aborted');
         },
+        experimental_transform: smoothStream({
+          delayInMs: 10,
+          chunking: 'word',
+        }),
         experimental_repairToolCall: async (r) => {
           // Haiku often returns the tool input as string instead of object - we try to parse it as object
           // If the parsing fails, we simply return an invalid tool call
