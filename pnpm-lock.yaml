@@ -224,9 +224,6 @@ importers:
       electron-unhandled:
         specifier: ^5.0.0
         version: 5.0.0
-      use-sync-external-store:
-        specifier: ^1.6.0
-        version: 1.6.0(react@19.2.0)
     devDependencies:
       '@ai-sdk/anthropic':
         specifier: 2.0.45
