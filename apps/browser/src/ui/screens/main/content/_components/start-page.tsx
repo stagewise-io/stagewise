@@ -133,50 +133,52 @@ const StartPageWithConnectedWorkspace = () => {
       {workspaceStatus !== 'open' && workspaceStatus !== 'setup' && (
         <ConnectWorkspaceBanner />
       )}
-      <div className="group/design-inspiration mt-2 flex w-full flex-col items-center justify-start gap-4">
-        <div className="flex w-full items-center justify-between">
-          <h1 className="font-medium text-xl">
-            <TextSlideshow
-              className="text-foreground"
-              texts={[
-                'Grab components from',
-                'Grab styles from',
-                'Understand the layout of',
-                'Grab colors from',
-                'Grab themes from',
-                'Grab fonts from',
-              ]}
-            />
-          </h1>
-        </div>
-        <div
-          ref={scrollContainerRef}
-          className="mask-alpha scrollbar-none -my-12 flex w-[calc(100%+4rem)] justify-start gap-4 overflow-x-auto px-8 py-12"
-          style={
-            {
-              ...getMaskStyle(),
-              maskImage: `linear-gradient(to right, transparent 0px, black var(--left-fade), black calc(100% - var(--right-fade)), transparent 100%)`,
-              WebkitMaskImage: `linear-gradient(to right, transparent 0px, black var(--left-fade), black calc(100% - var(--right-fade)), transparent 100%)`,
-            } as React.CSSProperties
-          }
-        >
-          {inspirationWebsitesWithScreenshot.websites.map((website) => (
-            <DesignInspirationCard
-              key={website.url}
-              website={website}
-              onClick={(event) => handleWebsiteClick(website.url, event)}
-            />
-          ))}
-          {isLoadingMore &&
-            inspirationWebsitesWithScreenshot.websites.length <
-              inspirationWebsitesWithScreenshot.total &&
-            Array.from({ length: 5 }, (_, index) => (
-              <DesignInspirationSkeletonCard
-                key={`skeleton-${inspirationWebsitesWithScreenshot.websites.length}-${index}`}
+      {inspirationWebsitesWithScreenshot.websites.length > 0 && (
+        <div className="group/design-inspiration mt-2 flex w-full flex-col items-center justify-start gap-4">
+          <div className="flex w-full items-center justify-between">
+            <h1 className="font-medium text-xl">
+              <TextSlideshow
+                className="text-foreground"
+                texts={[
+                  'Grab components from',
+                  'Grab styles from',
+                  'Understand the layout of',
+                  'Grab colors from',
+                  'Grab themes from',
+                  'Grab fonts from',
+                ]}
+              />
+            </h1>
+          </div>
+          <div
+            ref={scrollContainerRef}
+            className="mask-alpha scrollbar-none -my-12 flex w-[calc(100%+4rem)] justify-start gap-4 overflow-x-auto px-8 py-12"
+            style={
+              {
+                ...getMaskStyle(),
+                maskImage: `linear-gradient(to right, transparent 0px, black var(--left-fade), black calc(100% - var(--right-fade)), transparent 100%)`,
+                WebkitMaskImage: `linear-gradient(to right, transparent 0px, black var(--left-fade), black calc(100% - var(--right-fade)), transparent 100%)`,
+              } as React.CSSProperties
+            }
+          >
+            {inspirationWebsitesWithScreenshot.websites.map((website) => (
+              <DesignInspirationCard
+                key={website.url}
+                website={website}
+                onClick={(event) => handleWebsiteClick(website.url, event)}
               />
             ))}
+            {isLoadingMore &&
+              inspirationWebsitesWithScreenshot.websites.length <
+                inspirationWebsitesWithScreenshot.total &&
+              Array.from({ length: 5 }, (_, index) => (
+                <DesignInspirationSkeletonCard
+                  key={`skeleton-${inspirationWebsitesWithScreenshot.websites.length}-${index}`}
+                />
+              ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
