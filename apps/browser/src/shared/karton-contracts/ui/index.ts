@@ -5,9 +5,9 @@ import type {
   AskForIdeOutput,
 } from '@stagewise/agent-tools';
 import type { UserMessageMetadata, BrowserData } from './metadata';
-import type { ReactSelectedElementInfo } from '../../context-elements/react';
+import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { AppRouter, TRPCClient } from '@stagewise/api-client';
-import type { ContextElement } from '../../context-elements';
+import type { SelectedElement } from '../../selected-elements';
 import type {
   UIMessage,
   UIDataTypes,
@@ -24,7 +24,7 @@ import type { PageTransition } from '../pages-api/types';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
 export type { UserMessageMetadata, BrowserData, ReactSelectedElementInfo };
-export type { ContextElement } from '../../context-elements';
+export type { SelectedElement } from '../../selected-elements';
 export type UIMessagePart = AIMessagePart<UIDataTypes, UITools>;
 
 export type InspirationWebsite = Awaited<
@@ -280,8 +280,8 @@ export type AppState = {
     activeTabId: string | null;
     history: HistoryEntry[];
     contextSelectionMode: boolean;
-    selectedElements: ContextElement[];
-    hoveredElement: ContextElement | null;
+    selectedElements: SelectedElement[];
+    hoveredElement: SelectedElement | null;
     viewportSize: {
       top: number;
       left: number;

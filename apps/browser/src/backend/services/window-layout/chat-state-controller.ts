@@ -1,6 +1,6 @@
 import type { KartonService } from '../karton';
 import type { TabController } from './tab-controller';
-import type { ContextElement } from '@shared/context-elements';
+import type { SelectedElement } from '@shared/selected-elements';
 
 export class ChatStateController {
   private uiKarton: KartonService;
@@ -23,7 +23,7 @@ export class ChatStateController {
    * Add an element to the selected elements list.
    * Prevents duplicates based on stagewiseId.
    */
-  public addElement(element: ContextElement): void {
+  public addElement(element: SelectedElement): void {
     this.uiKarton.setState((draft) => {
       // Add if not exists
       if (
@@ -62,7 +62,7 @@ export class ChatStateController {
   /**
    * Get the current list of selected elements.
    */
-  public getSelectedElements(): ContextElement[] {
+  public getSelectedElements(): SelectedElement[] {
     return this.uiKarton.state.browser.selectedElements;
   }
 

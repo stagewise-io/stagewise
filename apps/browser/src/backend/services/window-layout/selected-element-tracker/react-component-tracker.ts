@@ -1,5 +1,5 @@
 import type { Logger } from '@/services/logger';
-import type { ReactSelectedElementInfo } from '@shared/context-elements/react';
+import type { ReactSelectedElementInfo } from '@shared/selected-elements/react';
 
 /**
  * Fetches and builds React component tree information from DOM elements.

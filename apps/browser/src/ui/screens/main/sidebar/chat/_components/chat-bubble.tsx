@@ -37,7 +37,7 @@ import { DeleteFileToolPart } from './message-part-ui/tools/delete-file';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
 import { OverwriteFileToolPart } from './message-part-ui/tools/overwrite-file';
 import { ContextElementsChipsFlexible } from '@/components/context-elements-chips-flexible';
-import type { ContextElement } from '@shared/context-elements';
+import type { SelectedElement } from '@shared/selected-elements';
 import {
   ExploringToolParts,
   isReadOnlyToolPart,
@@ -318,7 +318,9 @@ export const ChatBubble = memo(function ChatBubble({
               selectedPreviewElements.length > 0) && (
               <div className="flex flex-row flex-wrap gap-2 pt-2">
                 <ContextElementsChipsFlexible
-                  selectedElements={selectedPreviewElements as ContextElement[]}
+                  selectedElements={
+                    selectedPreviewElements as SelectedElement[]
+                  }
                 />
               </div>
             )}

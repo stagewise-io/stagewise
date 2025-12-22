@@ -2,7 +2,7 @@ import type {
   BrowserData,
   UserMessageMetadata,
 } from '@shared/karton-contracts/ui';
-import type { ContextElement } from '@shared/context-elements';
+import type { SelectedElement } from '@shared/selected-elements';
 
 export const companionAnchorTagName = 'stagewise-companion-anchor';
 
@@ -408,7 +408,7 @@ export const getSelectedElementInfo = (
   mode: 'originalElement' | 'children' | 'parents' = 'originalElement',
   callDepth?: number,
   childrenCount?: number,
-): ContextElement => {
+): SelectedElement => {
   const boundingRect = element.getBoundingClientRect();
 
   // Collect raw attributes
@@ -560,7 +560,7 @@ export const getBrowserData = (): BrowserData | null => {
 };
 
 export const collectUserMessageMetadata = (
-  selectedElements: ContextElement[],
+  selectedElements: SelectedElement[],
   _sentByPlugin?: boolean,
 ): UserMessageMetadata => {
   const browserData = getBrowserData();

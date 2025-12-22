@@ -1,4 +1,4 @@
-import type { ContextElement } from '@shared/context-elements';
+import type { SelectedElement } from '@shared/selected-elements';
 import type { ReactSelectedElementInfo } from '@shared/karton-contracts/ui';
 
 // Properties that should be excluded to prevent prototype pollution and reduce noise
@@ -195,7 +195,7 @@ const truncateValue = (
 const getComputedStyles = (
   element: Element,
   mode: 'originalElement' | 'children' | 'parents' | 'siblings',
-): ContextElement['computedStyles'] | undefined => {
+): SelectedElement['computedStyles'] | undefined => {
   // Only extract computed styles for the original element
   if (mode !== 'originalElement') {
     return undefined;
@@ -203,7 +203,7 @@ const getComputedStyles = (
 
   try {
     const computed = window.getComputedStyle(element);
-    const styles: ContextElement['computedStyles'] = {};
+    const styles: SelectedElement['computedStyles'] = {};
 
     // Font-family
     const fontFamily = computed.fontFamily;
@@ -489,7 +489,7 @@ const serializeElementRecursive = (
   mode: 'originalElement' | 'children' | 'parents' | 'siblings',
   depth: number,
   backendNodeId?: number | undefined,
-): ContextElement => {
+): SelectedElement => {
   const boundingRect = element.getBoundingClientRect();
 
   // Collect raw attributes
@@ -523,9 +523,9 @@ const serializeElementRecursive = (
       {} as Record<string, unknown>,
     );
 
-  let children: ContextElement[] = [];
-  let parent: ContextElement | null = null;
-  let siblings: ContextElement[] = [];
+  let children: SelectedElement[] = [];
+  let parent: SelectedElement | null = null;
+  let siblings: SelectedElement[] = [];
 
   // Limit recursion depth
   if (depth < 10) {
@@ -594,7 +594,7 @@ const serializeElementRecursive = (
 export const serializeElement = (
   element: Element,
   backendNodeId: number,
-): ContextElement => {
+): SelectedElement => {
   const result = serializeElementRecursive(
     element,
     'originalElement',

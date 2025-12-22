@@ -13,7 +13,7 @@ import {
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import type { ContextElement } from '@shared/context-elements';
+import type { SelectedElement } from '@shared/selected-elements';
 import {
   Tooltip,
   TooltipTrigger,
@@ -26,7 +26,7 @@ import { IconOpenExternalOutline18 } from 'nucleo-ui-outline-18';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
 interface ContextElementsChipsProps {
-  selectedElements: ContextElement[];
+  selectedElements: SelectedElement[];
   removeSelectedElementById?: (id: string) => void;
 }
 
@@ -56,7 +56,7 @@ export function ContextElementsChipsFlexible({
 }
 
 interface ContextElementChipProps {
-  selectedElement: ContextElement;
+  selectedElement: SelectedElement;
   onDelete?: () => void;
 }
 

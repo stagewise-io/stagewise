@@ -21,8 +21,8 @@ import {
   type SerializableKeyboardEvent,
 } from '@shared/karton-contracts/web-contents-preload';
 import type { ColorScheme } from '@shared/karton-contracts/ui';
-import type { ContextElement } from '@shared/context-elements';
-import { ContextElementTracker } from './context-element-tracker';
+import type { SelectedElement } from '@shared/selected-elements';
+import { SelectedElementTracker } from './selected-element-tracker';
 import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
 import { fileURLToPath } from 'node:url';
 import { getBackgroundColor } from '@/shared/theme-colors';
@@ -66,8 +66,8 @@ export interface TabControllerEventMap {
   stateUpdated: [state: Partial<TabState>];
   movePanelToForeground: [panel: 'stagewise-ui' | 'tab-content'];
   handleKeyDown: [keyDownEvent: SerializableKeyboardEvent];
-  elementHovered: [element: ContextElement | null];
-  elementSelected: [element: ContextElement];
+  elementHovered: [element: SelectedElement | null];
+  elementSelected: [element: SelectedElement];
   tabFocused: [tabId: string];
   viewportSizeChanged: [
     size: {
@@ -88,7 +88,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private faviconService: FaviconService;
   private kartonServer: KartonServer<TabKartonContract>;
   private kartonTransport: ElectronServerTransport;
-  private contextElementTracker: ContextElementTracker;
+  private selectedElementTracker: SelectedElementTracker;
 
   // Current state cache
   private currentState: TabState;
@@ -209,7 +209,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       transport: this.kartonTransport,
     });
     this.registerKartonProcedureHandlers();
-    this.contextElementTracker = new ContextElementTracker(
+    this.selectedElementTracker = new SelectedElementTracker(
       this.webContentsView.webContents,
       this.logger,
     );
@@ -218,7 +218,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     let pendingInfoCollection: NodeJS.Timeout | null = null;
     let lastHoveredElementId: string | null = null;
 
-    this.contextElementTracker.on('hoverChanged', (elementId) => {
+    this.selectedElementTracker.on('hoverChanged', (elementId) => {
       // Clear any pending info collection
       if (pendingInfoCollection) {
         clearTimeout(pendingInfoCollection);
@@ -238,7 +238,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         pendingInfoCollection = setTimeout(async () => {
           pendingInfoCollection = null;
           const info =
-            await this.contextElementTracker.collectHoveredElementInfo();
+            await this.selectedElementTracker.collectHoveredElementInfo();
           if (info && lastHoveredElementId === elementId) {
             // Double-check elementId hasn't changed during async operation
             info.tabId = this.id;
@@ -441,7 +441,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   public async setColorScheme(scheme: ColorScheme) {
     const wc = this.webContentsView.webContents;
 
-    // Debugger already attached by ContextElementTracker
+    // Debugger already attached by SelectedElementTracker
     if (!wc.debugger.isAttached()) {
       this.logger.error('Debugger not attached for color scheme');
       return;
@@ -523,19 +523,19 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       }
     }
 
-    this.contextElementTracker.setContextSelection(active);
+    this.selectedElementTracker.setContextSelection(active);
   }
 
   public async selectHoveredElement() {
-    const info = await this.contextElementTracker.collectHoveredElementInfo();
+    const info = await this.selectedElementTracker.collectHoveredElementInfo();
     if (info) {
       info.tabId = this.id;
       this.emit('elementSelected', info);
     }
   }
 
-  public async updateContextSelection(selectedElements: ContextElement[]) {
-    await this.contextElementTracker.updateHighlights(
+  public async updateContextSelection(selectedElements: SelectedElement[]) {
+    await this.selectedElementTracker.updateHighlights(
       selectedElements,
       this.id,
     );
@@ -545,7 +545,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     backendNodeId: number,
     frameId: string,
   ): Promise<boolean> {
-    return await this.contextElementTracker.scrollToElement(
+    return await this.selectedElementTracker.scrollToElement(
       backendNodeId,
       frameId,
     );
@@ -555,7 +555,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     frameId: string,
     expectedFrameLocation: string,
   ): Promise<boolean> {
-    return await this.contextElementTracker.checkFrameValidity(
+    return await this.selectedElementTracker.checkFrameValidity(
       frameId,
       expectedFrameLocation,
     );
@@ -565,7 +565,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     backendNodeId: number,
     frameId: string,
   ): Promise<boolean> {
-    return await this.contextElementTracker.checkElementExists(
+    return await this.selectedElementTracker.checkElementExists(
       backendNodeId,
       frameId,
     );
@@ -586,7 +586,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       x: adjustedX,
       y: adjustedY,
     });
-    this.contextElementTracker.updateMousePosition(adjustedX, adjustedY);
+    this.selectedElementTracker.updateMousePosition(adjustedX, adjustedY);
 
     // Trigger immediate viewport update on mouse move when context selection is active
     // This ensures viewport size is up-to-date for accurate coordinate calculations
@@ -600,7 +600,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   }
 
   public async clearContextSelectionMouseCoordinates() {
-    await this.contextElementTracker.clearMousePosition();
+    await this.selectedElementTracker.clearMousePosition();
   }
 
   public passthroughWheelEvent(event: {
@@ -677,11 +677,11 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
    * This will toggle the hovered elment to be reported as one of the stored elements.
    */
   // public selectHoveredElement() {
-  //   this.contextElementTracker.selectHoveredElement();
+  //   this.selectedElementTracker.selectHoveredElement();
   // }
 
   // public removeSelectedElement(id: string) {
-  //   this.contextElementTracker.removeSelectedElement(id);
+  //   this.selectedElementTracker.removeSelectedElement(id);
   // }
 
   public destroy() {
@@ -1050,8 +1050,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       clientHeight: number;
     } | null = null;
 
-    // Check if debugger is already attached (ContextElementTracker keeps it attached)
-    // If not attached, we can't proceed - ContextElementTracker should have attached it
+    // Check if debugger is already attached (SelectedElementTracker keeps it attached)
+    // If not attached, we can't proceed - SelectedElementTracker should have attached it
     if (!wc.debugger.isAttached()) {
       this.logger.debug(
         '[TabController] Debugger not attached, cannot get viewport info',

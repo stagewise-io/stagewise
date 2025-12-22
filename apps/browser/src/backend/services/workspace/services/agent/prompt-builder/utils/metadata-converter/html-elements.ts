@@ -1,18 +1,18 @@
-import type { ReactSelectedElementInfo } from '@shared/context-elements/react';
-import type { ContextElement } from '@shared/context-elements';
+import type { ReactSelectedElementInfo } from '@shared/selected-elements/react.js';
+import type { SelectedElement } from '@shared/selected-elements/index.js';
 import xml from 'xml';
 import specialTokens from '../special-tokens.js';
 
 /**
  * Gets siblings of the selected element from its parent
  */
-function getSiblings(element: ContextElement): ContextElement[] {
+function getSiblings(element: SelectedElement): SelectedElement[] {
   if (!element.parent?.children) {
     return [];
   }
 
   return element.parent.children.filter(
-    (child: ContextElement) => child.stagewiseId !== element.stagewiseId,
+    (child: SelectedElement) => child.stagewiseId !== element.stagewiseId,
   );
 }
 
@@ -34,13 +34,13 @@ const serializeReactComponentTree = (
 };
 
 export function relevantCodebaseFilesToContextSnippet(
-  selectedElements: ContextElement[],
+  selectedElements: SelectedElement[],
   maxFileCount = 20,
   maxFilesPerSelectedElement = 2,
 ): string {
   // We don't simply flatten the code metadata for every element because that would overly focus the files of the first selected elements.
   // Instead, we interleave and then deduplicate to can as many relevant files as possible.
-  const interleavedCodeMetadata: NonNullable<ContextElement['codeMetadata']> =
+  const interleavedCodeMetadata: NonNullable<SelectedElement['codeMetadata']> =
     [];
   for (let index = 0; index < maxFilesPerSelectedElement; index++) {
     for (const element of selectedElements) {
@@ -52,7 +52,7 @@ export function relevantCodebaseFilesToContextSnippet(
   }
 
   const combinedDedupedCodeMetadata = interleavedCodeMetadata
-    .reduce<NonNullable<ContextElement['codeMetadata']>>((acc, curr) => {
+    .reduce<NonNullable<SelectedElement['codeMetadata']>>((acc, curr) => {
       if (!acc) return [curr];
       return acc.find((m) => m.relativePath === curr.relativePath)
         ? acc
@@ -86,7 +86,7 @@ export function relevantCodebaseFilesToContextSnippet(
  * @returns Formatted XML-style string that the LLM can parse
  */
 export function selectedElementToContextSnippet(
-  element: ContextElement,
+  element: SelectedElement,
 ): string {
   if (!element) {
     throw new Error('Element cannot be null or undefined');
@@ -122,7 +122,7 @@ const importantAttributes: Set<string> = new Set([
 ]);
 
 function serializeSelectedElementPart(
-  element: ContextElement,
+  element: SelectedElement,
   depth = 0,
 ): xml.XmlObject {
   const truncateParent = depth < minSerializationDepth;
@@ -231,7 +231,7 @@ function serializeSelectedElementPart(
     !truncateChildren && depth >= 0 && element.children
       ? element.children.slice(0, 3).map((child) => ({
           child: [
-            serializeSelectedElementPart(child as ContextElement, depth + 1),
+            serializeSelectedElementPart(child as SelectedElement, depth + 1),
           ],
         }))
       : [];

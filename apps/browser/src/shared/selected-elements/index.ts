@@ -7,7 +7,7 @@ import {
 export type { ReactSelectedElementInfo };
 
 // Define the base schema without recursive fields
-const baseContextElementSchema = z.object({
+const baseSelectedElementSchema = z.object({
   id: z.string().optional(),
   stagewiseId: z.string().optional(),
   tagName: z.string(),
@@ -58,15 +58,15 @@ const baseContextElementSchema = z.object({
 });
 
 // Extend the base schema with recursive fields using z.lazy
-export const contextElementSchema = baseContextElementSchema.extend({
-  parent: baseContextElementSchema.optional(),
-  siblings: z.array(baseContextElementSchema),
-  children: z.array(baseContextElementSchema),
+export const selectedElementSchema = baseSelectedElementSchema.extend({
+  parent: baseSelectedElementSchema.optional(),
+  siblings: z.array(baseSelectedElementSchema),
+  children: z.array(baseSelectedElementSchema),
 });
 
 // Derive the TypeScript type from the schema
-export type ContextElement = z.infer<typeof contextElementSchema> & {
-  parent?: ContextElement;
-  siblings: ContextElement[];
-  children: ContextElement[];
+export type SelectedElement = z.infer<typeof selectedElementSchema> & {
+  parent?: SelectedElement;
+  siblings: SelectedElement[];
+  children: SelectedElement[];
 };

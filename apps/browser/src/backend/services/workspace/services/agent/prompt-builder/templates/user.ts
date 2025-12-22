@@ -1,4 +1,4 @@
-import type { ChatMessage, ContextElement } from '@shared/karton-contracts/ui';
+import type { ChatMessage, SelectedElement } from '@shared/karton-contracts/ui';
 import { convertToModelMessages, type UserModelMessage } from 'ai';
 import xml from 'xml';
 import specialTokens from '../utils/special-tokens';
@@ -55,7 +55,7 @@ export function getUserMessage(userMessage: ChatMessage): UserModelMessage {
       .slice(0, 5)
       .forEach((element) => {
         systemAttachmentTextPart.push(
-          selectedElementToContextSnippet(element as ContextElement),
+          selectedElementToContextSnippet(element as SelectedElement),
         );
       });
 
@@ -64,7 +64,7 @@ export function getUserMessage(userMessage: ChatMessage): UserModelMessage {
     systemAttachmentTextPart.push(
       relevantCodebaseFilesToContextSnippet(
         (userMessage.metadata?.selectedPreviewElements ??
-          []) as ContextElement[],
+          []) as SelectedElement[],
         3,
       ),
     );

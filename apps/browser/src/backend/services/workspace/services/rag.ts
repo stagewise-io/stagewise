@@ -2,8 +2,8 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { KartonService } from '../../karton';
 import type { Logger } from '../../logger';
 import type { TelemetryService } from '../../telemetry';
-import type { ReactSelectedElementInfo } from '@shared/context-elements/react';
-import type { ContextElement } from '@shared/context-elements';
+import type { ReactSelectedElementInfo } from '@shared/selected-elements/react';
+import type { SelectedElement } from '@shared/selected-elements';
 import { DisposableService } from '../../disposable';
 
 export class RagService extends DisposableService {
@@ -35,9 +35,9 @@ export class RagService extends DisposableService {
   private removeServerProcedureHandlers() {}
 
   private async getRelatedContextFilesForSelectedElement(
-    element: ContextElement,
-  ): Promise<ContextElement['codeMetadata']> {
-    let codeMetadata: ContextElement['codeMetadata'] = [];
+    element: SelectedElement,
+  ): Promise<SelectedElement['codeMetadata']> {
+    let codeMetadata: SelectedElement['codeMetadata'] = [];
 
     // We check if framework-specific info exists that may help us. If yes, we can statically infer fitting files and line numbers.
     if (element.frameworkInfo?.react) {
@@ -124,7 +124,7 @@ const getFilePathsForReactComponentInfo = async (
   componentInfo: ReactSelectedElementInfo,
   clientRuntime: ClientRuntime,
 ): Promise<{
-  codeMetadata: ContextElement['codeMetadata'];
+  codeMetadata: SelectedElement['codeMetadata'];
   coveredLevels: number;
 }> => {
   const componentNames: string[] = [];
@@ -178,7 +178,7 @@ const getFilePathsForReactComponentInfo = async (
       [],
     );
 
-  const results: ContextElement['codeMetadata'] = foundFiles.map((file) => {
+  const results: SelectedElement['codeMetadata'] = foundFiles.map((file) => {
     const relationTextParts = file.relationGrades.map((grade, index) => {
       return `${coveredLevels[grade]! > 1 && grade === 0 ? 'potentially ' : ''}${index === 0 ? 'contains' : ''} ${grade === 0 ? 'implementation' : `${grade}${grade === 1 ? 'st' : grade === 2 ? 'nd' : grade === 3 ? 'rd' : 'th'} grade${index === (file.relationGrades.length - 1) ? ' parent' : ''}`}`;
     });

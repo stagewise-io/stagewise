@@ -9,7 +9,7 @@ import {
 } from '@/utils';
 import { useKartonProcedure, useKartonState } from './use-karton';
 import type { ChatMessage, FileUIPart } from '@shared/karton-contracts/ui';
-import type { ContextElement } from '@shared/context-elements';
+import type { SelectedElement } from '@shared/selected-elements';
 
 interface ContextSnippet {
   promptContextName: string;
@@ -40,7 +40,7 @@ interface ChatContext {
   clearFileAttachments: () => void;
 
   // Context elements
-  selectedElements: ContextElement[];
+  selectedElements: SelectedElement[];
   removeSelectedElement: (elementId: string) => void;
 
   // UI state
@@ -79,7 +79,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const _isContextSelectorMode = useKartonState(
     (s) => s.browser.contextSelectionMode,
   );
-  const clearContextElements = useKartonProcedure(
+  const clearSelectedElements = useKartonProcedure(
     (p) => p.browser.contextSelection.clearElements,
   );
   const setContextSelectionActive = useKartonProcedure(
@@ -170,7 +170,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       // Reset state after sending
       setChatInput('');
-      clearContextElements();
+      clearSelectedElements();
       clearFileAttachments();
 
       // Send the message using the chat capability
@@ -184,7 +184,7 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     plugins,
     sendChatMessage,
     clearFileAttachments,
-    clearContextElements,
+    clearSelectedElements,
     selectedElements,
   ]);
 
