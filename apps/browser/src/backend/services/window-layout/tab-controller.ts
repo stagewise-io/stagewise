@@ -135,8 +135,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private devToolsPlaceholderObjectId: string | null = null;
   private devToolsDeviceModeWrapperObjectId: string | null = null;
 
-  // Callback to create new tabs
-  private onCreateTab?: (url: string, setActive?: boolean) => void;
+  // Callback to create new tabs (sourceTabId is passed to enable inserting new tab next to source)
+  private onCreateTab?: (
+    url: string,
+    setActive?: boolean,
+    sourceTabId?: string,
+  ) => void;
 
   // Search state tracking
   private currentSearchRequestId: number | null = null;
@@ -148,7 +152,11 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     historyService: HistoryService,
     faviconService: FaviconService,
     initialUrl?: string,
-    onCreateTab?: (url: string, setActive?: boolean) => void,
+    onCreateTab?: (
+      url: string,
+      setActive?: boolean,
+      sourceTabId?: string,
+    ) => void,
   ) {
     super();
     this.id = id;
@@ -902,7 +910,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         // Check disposition to determine if tab should be opened in background
         // disposition can be: 'default', 'foreground-tab', 'background-tab', 'new-window', etc.
         const setActive = details.disposition !== 'background-tab';
-        this.onCreateTab(details.url, setActive);
+        // Pass this tab's ID as source so new tab can be inserted next to it
+        this.onCreateTab(details.url, setActive, this.id);
       } else {
         // Fallback to external browser if no callback is provided
         shell.openExternal(details.url);

@@ -419,11 +419,19 @@ export class WindowLayoutService {
     return this.tabs[this.activeTabId];
   }
 
-  private handleCreateTab = async (url?: string, setActive?: boolean) => {
-    await this.createTab(url, setActive ?? true);
+  private handleCreateTab = async (
+    url?: string,
+    setActive?: boolean,
+    sourceTabId?: string,
+  ) => {
+    await this.createTab(url, setActive ?? true, sourceTabId);
   };
 
-  private async createTab(url: string | undefined, setActive: boolean) {
+  private async createTab(
+    url: string | undefined,
+    setActive: boolean,
+    sourceTabId?: string,
+  ) {
     const id = randomUUID();
     const tab = new TabController(
       id,
@@ -431,8 +439,8 @@ export class WindowLayoutService {
       this.historyService,
       this.faviconService,
       url,
-      (newUrl: string, setActive?: boolean) => {
-        void this.handleCreateTab(newUrl, setActive);
+      (newUrl: string, setActive?: boolean, newSourceTabId?: string) => {
+        void this.handleCreateTab(newUrl, setActive, newSourceTabId);
       },
     );
 
@@ -481,17 +489,52 @@ export class WindowLayoutService {
       }
     });
 
-    this.tabs[id] = tab;
+    // Insert after source tab when opened from another tab, otherwise append to end
+    const shouldInsertAfterSource = !!sourceTabId && !!this.tabs[sourceTabId];
+
+    if (shouldInsertAfterSource) {
+      // Insert new tab right after the source tab by reconstructing the tabs object
+      const newTabs: Record<string, TabController> = {};
+      for (const [existingId, existingTab] of Object.entries(this.tabs)) {
+        newTabs[existingId] = existingTab;
+        if (existingId === sourceTabId) {
+          // Insert new tab right after source
+          newTabs[id] = tab;
+        }
+      }
+      this.tabs = newTabs;
+    } else {
+      // Append to end (default behavior for UI-created tabs)
+      this.tabs[id] = tab;
+    }
 
     // Update ChatStateController tabs reference
     this.chatStateController?.updateTabsReference(this.tabs);
 
-    // Initialize state in Karton
+    // Initialize state in Karton with proper ordering
     this.uiKarton.setState((draft) => {
-      draft.browser.tabs[id] = {
+      const newTabState = {
         id,
         ...tab.getState(),
       };
+
+      if (shouldInsertAfterSource && sourceTabId) {
+        // Reconstruct tabs object to maintain order
+        const newBrowserTabs: typeof draft.browser.tabs = {};
+        for (const [existingId, existingState] of Object.entries(
+          draft.browser.tabs,
+        )) {
+          newBrowserTabs[existingId] = existingState;
+          if (existingId === sourceTabId) {
+            // Insert new tab right after source
+            newBrowserTabs[id] = newTabState;
+          }
+        }
+        draft.browser.tabs = newBrowserTabs;
+      } else {
+        // Append to end (default behavior)
+        draft.browser.tabs[id] = newTabState;
+      }
     });
 
     // Initially hide
@@ -502,7 +545,11 @@ export class WindowLayoutService {
     // (or tab content if isWebContentInteractive is true)
     this.updateZOrder();
 
-    if (setActive) await this.handleSwitchTab(id);
+    // Only activate new tab if requested AND source tab is active (or no source tab)
+    // This prevents background tabs from stealing focus when they open links
+    const shouldActivate =
+      setActive && (!sourceTabId || sourceTabId === this.activeTabId);
+    if (shouldActivate) await this.handleSwitchTab(id);
   }
 
   private handleCloseTab = async (tabId: string) => {
