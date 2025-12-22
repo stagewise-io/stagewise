@@ -32,7 +32,7 @@ function Page() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent hover:scrollbar-thumb-zinc-400 dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500 flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-3xl space-y-8">
           {/* Telemetry Section */}
           <section className="space-y-4">

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as DownloadsRouteImport } from './routes/downloads'
 import { Route as ClearDataRouteImport } from './routes/clear-data'
 import { Route as BrowsingSettingsRouteImport } from './routes/browsing-settings'
 import { Route as AgentSettingsRouteImport } from './routes/agent-settings'
@@ -19,6 +20,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadsRoute = DownloadsRouteImport.update({
+  id: '/downloads',
+  path: '/downloads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClearDataRoute = ClearDataRouteImport.update({
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/agent-settings': typeof AgentSettingsRoute
   '/browsing-settings': typeof BrowsingSettingsRoute
   '/clear-data': typeof ClearDataRoute
+  '/downloads': typeof DownloadsRoute
   '/history': typeof HistoryRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/agent-settings': typeof AgentSettingsRoute
   '/browsing-settings': typeof BrowsingSettingsRoute
   '/clear-data': typeof ClearDataRoute
+  '/downloads': typeof DownloadsRoute
   '/history': typeof HistoryRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/agent-settings': typeof AgentSettingsRoute
   '/browsing-settings': typeof BrowsingSettingsRoute
   '/clear-data': typeof ClearDataRoute
+  '/downloads': typeof DownloadsRoute
   '/history': typeof HistoryRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/agent-settings'
     | '/browsing-settings'
     | '/clear-data'
+    | '/downloads'
     | '/history'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/agent-settings'
     | '/browsing-settings'
     | '/clear-data'
+    | '/downloads'
     | '/history'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/agent-settings'
     | '/browsing-settings'
     | '/clear-data'
+    | '/downloads'
     | '/history'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   AgentSettingsRoute: typeof AgentSettingsRoute
   BrowsingSettingsRoute: typeof BrowsingSettingsRoute
   ClearDataRoute: typeof ClearDataRoute
+  DownloadsRoute: typeof DownloadsRoute
   HistoryRoute: typeof HistoryRoute
 }
 
@@ -115,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/downloads': {
+      id: '/downloads'
+      path: '/downloads'
+      fullPath: '/downloads'
+      preLoaderRoute: typeof DownloadsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/clear-data': {
@@ -161,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgentSettingsRoute: AgentSettingsRoute,
   BrowsingSettingsRoute: BrowsingSettingsRoute,
   ClearDataRoute: ClearDataRoute,
+  DownloadsRoute: DownloadsRoute,
   HistoryRoute: HistoryRoute,
 }
 export const routeTree = rootRouteImport

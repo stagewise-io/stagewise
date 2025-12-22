@@ -23,6 +23,7 @@ import { PagesService } from './services/pages';
 import { WindowLayoutService } from './services/window-layout';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
+import { DownloadsService } from './services/download-manager';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
 import { getRepoRootForPath } from './utils/git-tools';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
@@ -56,11 +57,15 @@ export async function main({
     globalDataPathService,
   );
 
+  // Create DownloadsService to track active downloads for pause/resume/cancel
+  const downloadsService = DownloadsService.create(logger, historyService);
+
   // Create PagesService early so it can be passed to WindowLayoutService
   const pagesService = await PagesService.create(
     logger,
     historyService,
     faviconService,
+    downloadsService,
   );
 
   const windowLayoutService = await WindowLayoutService.create(

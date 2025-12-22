@@ -4,15 +4,31 @@ import type {
   FaviconBitmapResult,
   ClearBrowsingDataOptions,
   ClearBrowsingDataResult,
+  DownloadsFilter,
+  DownloadResult,
+  ActiveDownloadInfo,
+  DownloadControlResult,
 } from './types';
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export type PagesApiState = Record<string, never>;
+export type PagesApiState = {
+  /** Active downloads currently in progress, keyed by download ID */
+  activeDownloads: Record<number, ActiveDownloadInfo>;
+};
 
 export type PagesApiContract = {
   state: PagesApiState;
   serverProcedures: {
     getHistory: (filter: HistoryFilter) => Promise<HistoryResult[]>;
+    getDownloads: (filter: DownloadsFilter) => Promise<DownloadResult[]>;
+    getActiveDownloads: () => Promise<ActiveDownloadInfo[]>;
+    deleteDownload: (downloadId: number) => Promise<DownloadControlResult>;
+    pauseDownload: (downloadId: number) => Promise<DownloadControlResult>;
+    resumeDownload: (downloadId: number) => Promise<DownloadControlResult>;
+    cancelDownload: (downloadId: number) => Promise<DownloadControlResult>;
+    /** Open a downloaded file using the system default application */
+    openDownloadFile: (filePath: string) => Promise<DownloadControlResult>;
+    /** Show a downloaded file in the system file manager (Finder/Explorer) */
+    showDownloadInFolder: (filePath: string) => Promise<DownloadControlResult>;
     getFaviconBitmaps: (
       faviconUrls: string[],
     ) => Promise<Record<string, FaviconBitmapResult>>;
@@ -23,4 +39,6 @@ export type PagesApiContract = {
   };
 };
 
-export const defaultState: PagesApiState = {};
+export const defaultState: PagesApiState = {
+  activeDownloads: {},
+};

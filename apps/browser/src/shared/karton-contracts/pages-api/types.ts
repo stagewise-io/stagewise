@@ -151,3 +151,99 @@ export interface ClearBrowsingDataResult {
   /** Error message if operation failed */
   error?: string;
 }
+
+// Download state enum (matches Chrome's internal values)
+export enum DownloadState {
+  IN_PROGRESS = 0,
+  COMPLETE = 1,
+  CANCELLED = 2,
+  INTERRUPTED = 3,
+}
+
+// Filter for querying downloads
+export interface DownloadsFilter {
+  /** Search text (matches filename or URL) */
+  text?: string;
+  /** Filter by download state */
+  state?: DownloadState;
+  /** Start date filter */
+  startDate?: Date;
+  /** End date filter */
+  endDate?: Date;
+  /** Maximum number of results */
+  limit?: number;
+  /** Offset for pagination */
+  offset?: number;
+}
+
+// Rich return type for downloads view
+export interface DownloadResult {
+  /** Unique download ID */
+  id: number;
+  /** Download GUID */
+  guid: string;
+  /** Current file path (may have .crdownload suffix if incomplete) */
+  currentPath: string;
+  /** Target file path */
+  targetPath: string;
+  /** Filename extracted from target path */
+  filename: string;
+  /** Download start time */
+  startTime: Date;
+  /** Download end time (if completed) */
+  endTime: Date | null;
+  /** Bytes received so far */
+  receivedBytes: number;
+  /** Total bytes to download */
+  totalBytes: number;
+  /** Download state */
+  state: DownloadState;
+  /** MIME type of the file */
+  mimeType: string;
+  /** URL the file was downloaded from */
+  siteUrl: string;
+  /** Whether the file still exists on disk */
+  fileExists: boolean;
+  /** Whether this is an active/in-progress download */
+  isActive?: boolean;
+  /** Progress percentage for active downloads (0-100) */
+  progress?: number;
+  /** Whether the download is paused (only for active downloads) */
+  isPaused?: boolean;
+  /** Whether the download can be resumed (only for active downloads) */
+  canResume?: boolean;
+}
+
+// Active download info (for real-time tracking via state)
+export interface ActiveDownloadInfo {
+  /** Download ID */
+  id: number;
+  /** Current state */
+  state: DownloadState;
+  /** Bytes received so far */
+  receivedBytes: number;
+  /** Total bytes to download */
+  totalBytes: number;
+  /** Whether the download is paused */
+  isPaused: boolean;
+  /** Whether the download can be resumed */
+  canResume: boolean;
+  /** Progress percentage (0-100) */
+  progress: number;
+  /** Filename extracted from target path */
+  filename: string;
+  /** URL the file is being downloaded from */
+  url: string;
+  /** Target path on disk */
+  targetPath: string;
+  /** Download start time */
+  startTime: Date;
+}
+
+// Result of a download control operation
+export interface DownloadControlResult {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Error message if operation failed */
+  error?: string;
+}

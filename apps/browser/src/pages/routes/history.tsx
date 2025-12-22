@@ -15,7 +15,7 @@ import React, {
   useState,
 } from 'react';
 import { Loader2Icon, LinkIcon } from 'lucide-react';
-import { useKartonProcedure } from '@/hooks/use-karton';
+import { useKartonProcedure, useKartonConnected } from '@/hooks/use-karton';
 import type {
   HistoryFilter,
   HistoryResult,
@@ -232,6 +232,9 @@ function Page() {
     Record<string, FaviconBitmapResult>
   >({});
 
+  // Wait for Karton connection before fetching data
+  const isConnected = useKartonConnected();
+
   const getHistory = useKartonProcedure((s) => s.getHistory);
   const getFaviconBitmaps = useKartonProcedure((s) => s.getFaviconBitmaps);
   const openTab = useKartonProcedure((s) => s.openTab);
@@ -305,8 +308,11 @@ function Page() {
     }
   }, []);
 
-  // Load initial history when search changes
+  // Load initial history when search changes or connection is established
   useEffect(() => {
+    // Don't fetch until connection is established
+    if (!isConnected) return;
+
     let cancelled = false;
 
     async function fetchInitialHistory() {
@@ -353,7 +359,7 @@ function Page() {
     // Note: fetchFavicons is stable (useCallback with []) and listRef is a ref,
     // so they don't need to be in the dependency array
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchText]);
+  }, [debouncedSearchText, isConnected]);
 
   // Load more history (for infinite scroll)
   const loadMoreHistory = useCallback(async () => {

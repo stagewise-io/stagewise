@@ -14,6 +14,7 @@ import {
   IconHistoryFillDuo18,
   IconBroomFillDuo18,
   IconRobotFillDuo18,
+  IconDownloadFillDuo18,
 } from 'nucleo-ui-fill-duo-18';
 import { IconGithub, IconLinkedin, IconDiscord } from 'nucleo-social-media';
 import { SidebarNav } from '@/components/sidebar-nav';
@@ -62,6 +63,12 @@ const RootLayout = () => (
                   icon={<IconHistoryFillDuo18 className="size-5" />}
                 >
                   History
+                </SidebarNav.Item>
+                <SidebarNav.Item
+                  to="/downloads"
+                  icon={<IconDownloadFillDuo18 className="size-5" />}
+                >
+                  Downloads
                 </SidebarNav.Item>
                 <SidebarNav.Item
                   to="/clear-data"
@@ -131,7 +138,7 @@ const RootLayout = () => (
             </Tooltip>
           </div>
         </div>
-        <div className="scrollbar-thin h-full flex-1 overflow-y-auto rounded-lg bg-background">
+        <div className="scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent hover:scrollbar-thumb-zinc-400 dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500 h-full flex-1 overflow-y-auto rounded-lg bg-background">
           <Outlet />
         </div>
       </div>
