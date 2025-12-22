@@ -448,8 +448,9 @@ function Page() {
 
   return (
     <div className="flex h-full w-full flex-col">
-      {/* Search bar */}
-      <div className="flex items-center gap-4 border-zinc-500/50 border-b px-6 py-4">
+      {/* Header */}
+      <div className="flex items-center gap-24 border-zinc-500/50 border-b px-6 py-4">
+        <h1 className="font-semibold text-foreground text-xl">History</h1>
         <div className="relative flex-1 rounded-full bg-zinc-500/5 focus-within:bg-zinc-500/10">
           <IconMagnifierFill18 className="-translate-y-1/2 absolute top-1/2 left-3.5 z-10 size-4 text-muted-foreground" />
           <Input
