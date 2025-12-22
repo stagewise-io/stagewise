@@ -4,6 +4,7 @@ pre-commit:
     - name: check
       run: pnpm biome check --write --unsafe --staged --no-errors-on-unmatched
       glob: "*.{js,ts,jsx,tsx,json,jsonc,css,md,mdx,yaml,yml}"
+      stage_fixed: true
       exclude:
        - "**/tests/**/*"
        - "**/test/**/*"
