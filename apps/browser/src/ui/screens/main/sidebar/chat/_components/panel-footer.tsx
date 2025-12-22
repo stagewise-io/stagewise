@@ -217,7 +217,7 @@ export function ChatPanelFooter() {
       if (
         !target ||
         (!target.closest('#chat-input-container-box') &&
-          !target.closest('#context-selector-element-canvas'))
+          !target.closest('#element-selector-element-canvas'))
       ) {
         setChatInputActive(false);
       } else if (chatInputActive) {
@@ -370,7 +370,7 @@ export function ChatPanelFooter() {
                       size="icon-sm"
                       variant="ghost"
                       disabled={hasOpenedStartPage}
-                      className="text-muted-foreground data-[context-selector-active=true]:bg-primary/5 data-[context-selector-active=true]:text-primary data-[context-selector-active=true]:hover:bg-primary/10"
+                      className="text-muted-foreground data-[element-selector-active=true]:bg-primary/5 data-[element-selector-active=true]:text-primary data-[element-selector-active=true]:hover:bg-primary/10"
                       data-element-selector-active={elementSelectionActive}
                       onClick={(e) => {
                         e.preventDefault();

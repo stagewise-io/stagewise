@@ -92,7 +92,7 @@ export function DOMContextSelector() {
       {/* Size-adapting selection box */}
       {contextSelectionActive && viewportSize && (
         <div
-          id="context-selector-element-canvas"
+          id="element-selector-element-canvas"
           className="pointer-events-auto absolute z-50 cursor-copy"
           style={{
             top: `${viewportSize.top}px`,
