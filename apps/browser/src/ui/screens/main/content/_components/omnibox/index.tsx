@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { IconCommand } from 'nucleo-micro-bold';
 import type { TabState } from '@shared/karton-contracts/ui';
+import { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { InternalPageBreadcrumbs } from './internal-page-breadcrumbs';
 
@@ -20,29 +21,34 @@ interface OmniboxProps {
   activeTab: TabState | undefined;
   activeTabId: string | undefined;
   tabs: Record<string, TabState>;
-  goto: (url: string, tabId?: string) => void;
+  goto: (url: string, tabId?: string, transition?: PageTransition) => void;
 }
 
 function goToUrl(
-  goto: (url: string, tabId?: string) => void,
+  goto: (url: string, tabId?: string, transition?: PageTransition) => void,
   url: string,
   tabId?: string,
+  transition?: PageTransition,
 ) {
   const trimmed = url.trim();
   // Check if it starts with stagewise:/ - always treat as URL, never search
   if (trimmed.toLowerCase().startsWith('stagewise:/')) {
-    return goto(trimmed, tabId);
+    return goto(trimmed, tabId, transition);
   }
   // Check if it's already a valid URL with protocol
   try {
     new URL(trimmed);
-    return goto(trimmed, tabId);
+    return goto(trimmed, tabId, transition);
   } catch {}
   // Check if it looks like a domain (no spaces, has a dot)
   if (!trimmed.includes(' ') && trimmed.includes('.'))
-    return goto(`https://${trimmed}`, tabId);
+    return goto(`https://${trimmed}`, tabId, transition);
   // Treat as search query
-  goto(`https://www.google.com/search?q=${encodeURIComponent(trimmed)}`, tabId);
+  goto(
+    `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`,
+    tabId,
+    transition,
+  );
 }
 
 export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
@@ -108,7 +114,8 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
-          goToUrl(goto, localUrl, activeTabId);
+          // When user types in omnibox and presses Enter, mark as TYPED transition
+          goToUrl(goto, localUrl, activeTabId, PageTransition.TYPED);
           setUrlBeforeEdit(localUrl);
           urlInputRef.current?.blur();
         }

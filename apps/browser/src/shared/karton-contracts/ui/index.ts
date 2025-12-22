@@ -20,6 +20,7 @@ import type {
   FilePickerRequest,
   GlobalConfig,
 } from './shared-types';
+import type { PageTransition } from '../pages-api/types';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
 export type { UserMessageMetadata, BrowserData, ReactSelectedElementInfo };
@@ -426,7 +427,11 @@ export type KartonContract = {
       };
       stop: (tabId?: string) => Promise<void>;
       reload: (tabId?: string) => Promise<void>;
-      goto: (url: string, tabId?: string) => Promise<void>;
+      goto: (
+        url: string,
+        tabId?: string,
+        transition?: PageTransition,
+      ) => Promise<void>;
       goBack: (tabId?: string) => Promise<void>;
       goForward: (tabId?: string) => Promise<void>;
       toggleDevTools: (tabId?: string) => Promise<void>;

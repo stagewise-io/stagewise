@@ -6,6 +6,10 @@ import { randomUUID } from 'node:crypto';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { GlobalDataPathService } from '../global-data-path';
+import type { HistoryService } from '../history';
+import type { FaviconService } from '../favicon';
+import type { PagesService } from '../pages';
+import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import { UIController } from './ui-controller';
 import { TabController } from './tab-controller';
 import { ChatStateController } from './chat-state-controller';
@@ -24,6 +28,9 @@ interface WindowState {
 export class WindowLayoutService {
   private logger: Logger;
   private globalDataPathService: GlobalDataPathService;
+  private historyService: HistoryService;
+  private faviconService: FaviconService;
+  private pagesService: PagesService;
 
   private baseWindow: BaseWindow | null = null;
   private uiController: UIController | null = null;
@@ -54,16 +61,31 @@ export class WindowLayoutService {
   private constructor(
     logger: Logger,
     globalDataPathService: GlobalDataPathService,
+    historyService: HistoryService,
+    faviconService: FaviconService,
+    pagesService: PagesService,
   ) {
     this.logger = logger;
     this.globalDataPathService = globalDataPathService;
+    this.historyService = historyService;
+    this.faviconService = faviconService;
+    this.pagesService = pagesService;
   }
 
   public static async create(
     logger: Logger,
     globalDataPathService: GlobalDataPathService,
+    historyService: HistoryService,
+    faviconService: FaviconService,
+    pagesService: PagesService,
   ): Promise<WindowLayoutService> {
-    const instance = new WindowLayoutService(logger, globalDataPathService);
+    const instance = new WindowLayoutService(
+      logger,
+      globalDataPathService,
+      historyService,
+      faviconService,
+      pagesService,
+    );
     await instance.initialize();
     return instance;
   }
@@ -140,6 +162,7 @@ export class WindowLayoutService {
 
     this.setupKartonConnectionListener();
     this.setupUIControllerListeners();
+    this.setupPagesServiceHandlers();
 
     this.handleMainWindowResize();
     this.baseWindow.on('resize', () => {
@@ -283,7 +306,7 @@ export class WindowLayoutService {
         this.uiKarton.setTransportPort(event.ports[0]);
       } else if (connectionId === 'tab') {
         this.logger.debug(
-          `[WindowLayoutService] Received karton connection request for tab connection...`,
+          `[WindowLayoutService] Received karton connection request for tab connection from webContentsId: ${event.sender.id}`,
         );
         // Trigger the right tab controller to store the connection in it's internal map.
         const tab = Object.values(this.tabs).find(
@@ -294,7 +317,20 @@ export class WindowLayoutService {
             `[WindowLayoutService] Adding karton connection to tab ${tab.id}...`,
           );
           tab.addKartonConnection(event.ports[0]);
+        } else {
+          const tabIds = Object.keys(this.tabs);
+          const tabWebContentIds = Object.values(this.tabs).map(
+            (t) => t.webContentsId,
+          );
+          this.logger.warn(
+            `[WindowLayoutService] No tab found for webContentsId: ${event.sender.id}. Available tabs: ${tabIds.join(', ')}. Tab webContentsIds: ${tabWebContentIds.join(', ')}`,
+          );
         }
+      } else if (connectionId === 'pages-api') {
+        this.logger.debug(
+          `[WindowLayoutService] Received karton connection request for pages-api...`,
+        );
+        this.pagesService.acceptPort(event.ports[0]);
       }
     };
     ipcMain.on('karton-connect', this.kartonConnectListener);
@@ -370,6 +406,14 @@ export class WindowLayoutService {
     this.uiController.on('deactivateSearchBar', this.handleDeactivateSearchBar);
   }
 
+  private setupPagesServiceHandlers() {
+    this.pagesService.setOpenTabHandler(
+      async (url: string, setActive?: boolean) => {
+        await this.handleCreateTab(url, setActive);
+      },
+    );
+  }
+
   private get activeTab(): TabController | undefined {
     if (!this.activeTabId) return undefined;
     return this.tabs[this.activeTabId];
@@ -384,6 +428,8 @@ export class WindowLayoutService {
     const tab = new TabController(
       id,
       this.logger,
+      this.historyService,
+      this.faviconService,
       url,
       (newUrl: string, setActive?: boolean) => {
         void this.handleCreateTab(newUrl, setActive);
@@ -636,13 +682,17 @@ export class WindowLayoutService {
     tab?.reload();
   };
 
-  private handleGoto = async (url: string, tabId?: string) => {
+  private handleGoto = async (
+    url: string,
+    tabId?: string,
+    transition?: PageTransition,
+  ) => {
     this.logger.debug(
-      `[WindowLayoutService] handleGoto called with url: ${url}, tabId: ${tabId}, activeTabId: ${this.activeTabId}`,
+      `[WindowLayoutService] handleGoto called with url: ${url}, tabId: ${tabId}, activeTabId: ${this.activeTabId}, transition: ${transition}`,
     );
     const tab = tabId ? this.tabs[tabId] : this.activeTab;
     if (tab) {
-      tab.loadURL(url);
+      tab.loadURL(url, transition);
     } else {
       this.logger.error(
         `[WindowLayoutService] handleGoto: No tab found for tabId: ${tabId} or activeTabId: ${this.activeTabId}`,

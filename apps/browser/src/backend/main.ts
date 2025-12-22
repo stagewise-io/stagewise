@@ -21,6 +21,8 @@ import { GlobalConfigService } from './services/global-config';
 import { NotificationService } from './services/notification';
 import { PagesService } from './services/pages';
 import { WindowLayoutService } from './services/window-layout';
+import { HistoryService } from './services/history';
+import { FaviconService } from './services/favicon';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
 import { getRepoRootForPath } from './utils/git-tools';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
@@ -44,9 +46,29 @@ export async function main({
 
   const globalDataPathService = await GlobalDataPathService.create(logger);
 
+  // Create HistoryService and FaviconService early so they can be passed to other services
+  const historyService = await HistoryService.create(
+    logger,
+    globalDataPathService,
+  );
+  const faviconService = await FaviconService.create(
+    logger,
+    globalDataPathService,
+  );
+
+  // Create PagesService early so it can be passed to WindowLayoutService
+  const pagesService = await PagesService.create(
+    logger,
+    historyService,
+    faviconService,
+  );
+
   const windowLayoutService = await WindowLayoutService.create(
     logger,
     globalDataPathService,
+    historyService,
+    faviconService,
+    pagesService,
   );
   const uiKarton = windowLayoutService.uiKarton;
 
@@ -105,7 +127,6 @@ export async function main({
   // Start remaining services that are irrelevant to non-regular operation of the app.
   const filePickerService = await FilePickerService.create(logger, uiKarton);
   const uriHandlerService = await URIHandlerService.create(logger);
-  const _pagesService = await PagesService.create(logger);
 
   const authService = await AuthService.create(
     globalDataPathService,

@@ -7,6 +7,7 @@ import { EventEmitter } from 'node:events';
 import { KartonService } from '../karton';
 import type { SerializableKeyboardEvent } from '@shared/karton-contracts/web-contents-preload';
 import type { ColorScheme } from '@shared/karton-contracts/ui';
+import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import { fileURLToPath } from 'node:url';
 
 // These are injected by the build system
@@ -25,7 +26,7 @@ export interface UIControllerEventMap {
   togglePanelKeyboardFocus: [panel: 'stagewise-ui' | 'tab-content'];
   stop: [tabId?: string];
   reload: [tabId?: string];
-  goto: [url: string, tabId?: string];
+  goto: [url: string, tabId?: string, transition?: PageTransition];
   goBack: [tabId?: string];
   goForward: [tabId?: string];
   toggleDevTools: [tabId?: string];
@@ -203,8 +204,8 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.goto',
-      async (url: string, tabId?: string) => {
-        this.emit('goto', url, tabId);
+      async (url: string, tabId?: string, transition?: PageTransition) => {
+        this.emit('goto', url, tabId, transition);
       },
     );
     this.uiKarton.registerServerProcedureHandler(

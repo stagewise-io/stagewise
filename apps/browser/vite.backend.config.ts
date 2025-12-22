@@ -21,6 +21,9 @@ export default defineConfig({
       name: 'main',
       fileName: 'main',
     },
+    rollupOptions: {
+      external: ['@libsql/client', /^@libsql\/.*/],
+    },
   },
   resolve: {
     alias: {

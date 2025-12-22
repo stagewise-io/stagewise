@@ -64,6 +64,8 @@
     "@types/node": "22.15.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.2.0",
+    "@types/react-window": "^2.0.0",
+    "@types/react-window-infinite-loader": "^2.0.0",
     "@types/three": "^0.180.0",
     "@types/xml": "^1.0.11",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
@@ -76,6 +78,7 @@
     "clsx": "^2.1.1",
     "diff": "^8.0.2",
     "dotenv-cli": "^11.0.0",
+    "drizzle-kit": "^0.31.8",
     "electron": "39.2.6",
     "electron-context-menu": "^4.1.1",
     "ignore": "^6.0.2",
@@ -96,6 +99,8 @@
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
     "react-timeago": "^8.3.0",
+    "react-window": "^2.2.3",
+    "react-window-infinite-loader": "^2.0.0",
     "seti-icons": "^0.0.4",
     "shiki": "^3.14.0",
     "streamdown": "^1.4.0",
@@ -108,7 +113,9 @@
     "vite": "7.2.7",
     "winston": "^3.17.0",
     "xml": "^1.0.1",
-    "zod": "4.1.12"
+    "zod": "4.1.12",
+    "@libsql/client": "^0.15.15",
+    "drizzle-orm": "^0.45.1"
   },
   "productName": "stagewise"
 }

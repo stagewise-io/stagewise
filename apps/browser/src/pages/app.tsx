@@ -6,6 +6,7 @@ import './app.css';
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
 import { NotFound } from './not-found';
+import { Providers } from './providers';
 
 // Create a new router instance
 const router = createRouter({
@@ -26,7 +27,9 @@ if (!rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <StrictMode>
-      <RouterProvider router={router} />
+      <Providers>
+        <RouterProvider router={router} />
+      </Providers>
     </StrictMode>,
   );
 }

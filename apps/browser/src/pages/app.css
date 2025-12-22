@@ -23,24 +23,6 @@ body {
   height: 100vh;
   margin: 0;
   padding: 0;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
-  user-select: none;
-}
-
-@utility app-drag {
-  -webkit-app-region: drag !important;
-  app-region: drag !important;
-  user-select: none !important;
-}
-
-@utility app-no-drag {
-  -webkit-app-region: no-drag !important;
-  app-region: no-drag !important;
-}
-
-@utility non-interactive {
-  -electron-interaction: passthrough;
 }
 
 .root {

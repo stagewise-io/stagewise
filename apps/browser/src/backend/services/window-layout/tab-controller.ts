@@ -26,6 +26,13 @@ import { ContextElementTracker } from './context-element-tracker';
 import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
 import { fileURLToPath } from 'node:url';
 import { getBackgroundColor } from '@/shared/theme-colors';
+import {
+  PageTransition,
+  PageTransitionQualifier,
+  makeQualifiedTransition,
+} from '@shared/karton-contracts/pages-api/types';
+import type { HistoryService } from '../history';
+import type { FaviconService } from '../favicon';
 
 export interface TabState {
   title: string;
@@ -76,12 +83,21 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   public readonly id: string;
   private webContentsView: WebContentsView;
   private logger: Logger;
+  private historyService: HistoryService;
+  private faviconService: FaviconService;
   private kartonServer: KartonServer<TabKartonContract>;
   private kartonTransport: ElectronServerTransport;
   private contextElementTracker: ContextElementTracker;
 
   // Current state cache
   private currentState: TabState;
+
+  // History tracking
+  private lastVisitId: number | null = null;
+  private pendingNavigation: {
+    transition: PageTransition;
+    referrerVisitId?: number;
+  } | null = null;
 
   // Viewport size cache
   private currentViewportSize: {
@@ -128,12 +144,16 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   constructor(
     id: string,
     logger: Logger,
+    historyService: HistoryService,
+    faviconService: FaviconService,
     initialUrl?: string,
     onCreateTab?: (url: string, setActive?: boolean) => void,
   ) {
     super();
     this.id = id;
     this.logger = logger;
+    this.historyService = historyService;
+    this.faviconService = faviconService;
     this.onCreateTab = onCreateTab;
 
     this.webContentsView = new WebContentsView({
@@ -303,12 +323,28 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     }
   }
 
-  public loadURL(url: string) {
+  public loadURL(url: string, transition?: PageTransition) {
+    // Default to LINK if not specified (covers programmatic navigation, external services, etc.)
+    // Only use TYPED when explicitly passed from UI layer (omnibox)
+    const navTransition = transition ?? PageTransition.LINK;
+
+    // For initial page load, use START_PAGE if this is the first navigation
+    const finalTransition =
+      this.lastVisitId === null ? PageTransition.START_PAGE : navTransition;
+
+    this.pendingNavigation = {
+      transition: finalTransition,
+      referrerVisitId: this.lastVisitId || undefined,
+    };
     this.updateState({ url });
     this.webContentsView.webContents.loadURL(url);
   }
 
   public reload() {
+    this.pendingNavigation = {
+      transition: PageTransition.RELOAD,
+      referrerVisitId: this.lastVisitId || undefined,
+    };
     this.webContentsView.webContents.reload();
   }
 
@@ -318,12 +354,26 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   public goBack() {
     if (this.webContentsView.webContents.navigationHistory.canGoBack()) {
+      this.pendingNavigation = {
+        transition: makeQualifiedTransition(
+          PageTransition.LINK,
+          PageTransitionQualifier.FORWARD_BACK,
+        ),
+        referrerVisitId: this.lastVisitId || undefined,
+      };
       this.webContentsView.webContents.navigationHistory.goBack();
     }
   }
 
   public goForward() {
     if (this.webContentsView.webContents.navigationHistory.canGoForward()) {
+      this.pendingNavigation = {
+        transition: makeQualifiedTransition(
+          PageTransition.LINK,
+          PageTransitionQualifier.FORWARD_BACK,
+        ),
+        referrerVisitId: this.lastVisitId || undefined,
+      };
       this.webContentsView.webContents.navigationHistory.goForward();
     }
   }
@@ -689,7 +739,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private setupEventListeners() {
     const wc = this.webContentsView.webContents;
 
-    wc.on('did-navigate', (_event, url) => {
+    wc.on('did-navigate', async (_event, url) => {
       this.stopSearch(); // Clear search on navigation
       this.updateState({
         url,
@@ -698,9 +748,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
           canGoForward: wc.navigationHistory.canGoForward(),
         },
       });
+
+      // Log to history
+      await this.logNavigationToHistory(url);
     });
 
-    wc.on('did-navigate-in-page', (_event, url) => {
+    wc.on('did-navigate-in-page', async (_event, url) => {
       this.stopSearch(); // Clear search on in-page navigation
       this.updateState({
         url,
@@ -709,6 +762,9 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
           canGoForward: wc.navigationHistory.canGoForward(),
         },
       });
+
+      // Log to history (in-page navigations like hash changes, pushState)
+      await this.logNavigationToHistory(url);
     });
 
     wc.on('did-start-loading', () => {
@@ -748,6 +804,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
           },
         });
       }
+      // Clear pending navigation on failure - don't log failed navigations
+      this.pendingNavigation = null;
     });
 
     wc.on('focus', () => {
@@ -790,6 +848,16 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
     wc.on('page-favicon-updated', (_event, faviconUrls) => {
       this.updateState({ faviconUrls });
+      // Store favicon in database for history view
+      if (faviconUrls.length > 0 && this.currentState.url) {
+        this.faviconService
+          .storeFavicons(this.currentState.url, faviconUrls)
+          .catch((err) => {
+            this.logger.debug(
+              `[TabController] Failed to store favicon: ${err}`,
+            );
+          });
+      }
     });
 
     wc.on('audio-state-changed', () => {
@@ -1472,6 +1540,43 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         success: false,
         error: err instanceof Error ? err.message : String(err),
       };
+    }
+  }
+
+  /*
+   * Logs a navigation to history service.
+   * Uses pendingNavigation if set, otherwise defaults to LINK transition.
+   * Skips logging for internal stagewise:// URLs.
+   */
+  private async logNavigationToHistory(url: string): Promise<void> {
+    // Skip internal URLs
+    if (url.startsWith('stagewise://')) {
+      this.pendingNavigation = null;
+      return;
+    }
+
+    // Determine transition type - use pendingNavigation if set, otherwise default to LINK
+    const transition =
+      this.pendingNavigation?.transition ?? PageTransition.LINK;
+    const referrerVisitId = this.pendingNavigation?.referrerVisitId;
+
+    try {
+      const title = this.currentState.title || '';
+      const visitId = await this.historyService.addVisit({
+        url,
+        title,
+        transition,
+        referrerVisitId,
+        isLocal: true,
+      });
+      this.lastVisitId = visitId;
+    } catch (err) {
+      this.logger.error(
+        `[TabController] Failed to log navigation to history: ${err}`,
+      );
+    } finally {
+      // Clear pending navigation after logging (or if skipped)
+      this.pendingNavigation = null;
     }
   }
 }

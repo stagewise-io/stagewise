@@ -1,12 +1,6 @@
-import {
-  createRootRoute,
-  Link,
-  Outlet,
-  HeadContent,
-} from '@tanstack/react-router';
+import { createRootRoute, Outlet, HeadContent } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
-import { buttonVariants } from '@stagewise/stage-ui/components/button';
-import { cn } from '@ui/utils';
+
 import { Logo } from '@ui/components/ui/logo';
 import { AnimatedGradientBackground } from '@ui/components/ui/animated-gradient-background';
 import {
@@ -16,6 +10,7 @@ import {
   IconBroomFillDuo18,
   IconRobotFillDuo18,
 } from 'nucleo-ui-fill-duo-18';
+import { SidebarNav } from '@/components/sidebar-nav';
 
 const RootLayout = () => (
   <>
@@ -32,69 +27,43 @@ const RootLayout = () => (
               />
             </div>
           </div>
-          <div className="mt-6 mb-6 flex w-full flex-col items-stretch justify-start gap-6">
-            <div className="flex w-full flex-col items-stretch justify-start gap-2">
-              <span className="ml-1 text-muted-foreground text-sm">
-                Settings
-              </span>
-              <Link
+          <SidebarNav>
+            <SidebarNav.Group label="Settings">
+              <SidebarNav.Item
                 to="/browsing-settings"
-                className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'md' }),
-                  'w-full justify-start gap-3 font-normal',
-                )}
+                icon={<IconGearFillDuo18 className="size-5" />}
               >
-                <IconGearFillDuo18 className="size-5" />
                 Browsing settings
-              </Link>
-              <Link
+              </SidebarNav.Item>
+              <SidebarNav.Item
                 to="/agent-settings"
-                className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'md' }),
-                  'w-full justify-start gap-3 font-normal',
-                )}
+                icon={<IconRobotFillDuo18 className="size-5" />}
               >
-                <IconRobotFillDuo18 className="size-5" />
                 Agent settings
-              </Link>
-              <Link
+              </SidebarNav.Item>
+              <SidebarNav.Item
                 to="/account"
-                className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'md' }),
-                  'w-full justify-start gap-3 font-normal',
-                )}
+                icon={<IconUserSettingsFillDuo18 className="size-5" />}
               >
-                <IconUserSettingsFillDuo18 className="size-5" />
                 Account
-              </Link>
-            </div>
+              </SidebarNav.Item>
+            </SidebarNav.Group>
             <hr className="ml-1 border-zinc-500/50" />
-            <div className="flex w-full flex-col items-stretch justify-start gap-2">
-              <span className="ml-1 text-muted-foreground text-sm">
-                Browsing data
-              </span>
-              <Link
+            <SidebarNav.Group label="Browsing data">
+              <SidebarNav.Item
                 to="/history"
-                className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'md' }),
-                  'w-full justify-start gap-3 font-normal',
-                )}
+                icon={<IconHistoryFillDuo18 className="size-5" />}
               >
-                <IconHistoryFillDuo18 className="size-5" />
                 History
-              </Link>
-              <Link
+              </SidebarNav.Item>
+              <SidebarNav.Item
                 to="/clear-data"
-                className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'md' }),
-                  'w-full justify-start gap-3 font-normal',
-                )}
+                icon={<IconBroomFillDuo18 className="size-5" />}
               >
-                <IconBroomFillDuo18 className="size-5" />
                 Clear data
-              </Link>
-            </div>
-          </div>
+              </SidebarNav.Item>
+            </SidebarNav.Group>
+          </SidebarNav>
         </div>
         <div className="scrollbar-thin h-full flex-1 overflow-y-auto rounded-lg bg-background">
           <Outlet />
