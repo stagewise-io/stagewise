@@ -189,15 +189,132 @@ const truncateValue = (
 };
 
 /**
+ * Extract pseudo-element styles (::before, ::after) from an element.
+ * Only captures for the original element to reduce payload.
+ */
+const getPseudoElementStyles = (
+  element: Element,
+  mode: 'originalElement' | 'children' | 'parents' | 'siblings',
+): SelectedElement['pseudoElements'] | undefined => {
+  // Only capture pseudo-elements for the original element
+  if (mode !== 'originalElement') {
+    return undefined;
+  }
+
+  try {
+    const result: SelectedElement['pseudoElements'] = {};
+
+    // Helper to extract relevant pseudo-element styles
+    const extractPseudoStyles = (
+      pseudoType: '::before' | '::after',
+    ): NonNullable<SelectedElement['pseudoElements']>['before'] | undefined => {
+      const computed = window.getComputedStyle(element, pseudoType);
+      const content = computed.content;
+
+      // Skip if no content (pseudo-element not rendered)
+      if (!content || content === 'none' || content === 'normal') {
+        return undefined;
+      }
+
+      const styles: NonNullable<SelectedElement['pseudoElements']>['before'] =
+        {};
+
+      styles.content = content;
+
+      // Display & position
+      if (computed.display && computed.display !== 'none') {
+        styles.display = computed.display;
+      }
+      if (computed.position && computed.position !== 'static') {
+        styles.position = computed.position;
+      }
+
+      // Dimensions
+      if (computed.width && computed.width !== 'auto') {
+        styles.width = computed.width;
+      }
+      if (computed.height && computed.height !== 'auto') {
+        styles.height = computed.height;
+      }
+
+      // Background
+      if (
+        computed.backgroundColor &&
+        computed.backgroundColor !== 'rgba(0, 0, 0, 0)'
+      ) {
+        styles.backgroundColor = computed.backgroundColor;
+      }
+      if (computed.backgroundImage && computed.backgroundImage !== 'none') {
+        styles.backgroundImage =
+          truncateString(computed.backgroundImage, 500) ?? undefined;
+      }
+
+      // Border & effects
+      if (computed.border && computed.border !== 'none') {
+        styles.border = computed.border;
+      }
+      if (computed.borderRadius && computed.borderRadius !== '0px') {
+        styles.borderRadius = computed.borderRadius;
+      }
+      if (computed.boxShadow && computed.boxShadow !== 'none') {
+        styles.boxShadow = truncateString(computed.boxShadow, 500) ?? undefined;
+      }
+
+      // Transform & opacity
+      if (computed.transform && computed.transform !== 'none') {
+        styles.transform = computed.transform;
+      }
+      if (computed.opacity && computed.opacity !== '1') {
+        styles.opacity = computed.opacity;
+      }
+
+      // Positioning
+      if (computed.top && computed.top !== 'auto') {
+        styles.top = computed.top;
+      }
+      if (computed.left && computed.left !== 'auto') {
+        styles.left = computed.left;
+      }
+      if (computed.right && computed.right !== 'auto') {
+        styles.right = computed.right;
+      }
+      if (computed.bottom && computed.bottom !== 'auto') {
+        styles.bottom = computed.bottom;
+      }
+      if (computed.zIndex && computed.zIndex !== 'auto') {
+        styles.zIndex = computed.zIndex;
+      }
+
+      return Object.keys(styles).length > 0 ? styles : undefined;
+    };
+
+    const beforeStyles = extractPseudoStyles('::before');
+    const afterStyles = extractPseudoStyles('::after');
+
+    if (beforeStyles) {
+      result.before = beforeStyles;
+    }
+    if (afterStyles) {
+      result.after = afterStyles;
+    }
+
+    return Object.keys(result).length > 0 ? result : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * Extract computed styles from an element.
- * Only extracts styles for the original element (not for children/parents/siblings).
+ * Captures comprehensive styling info for design cloning workflows.
+ * For 'parents' and 'children' modes, we still capture styles to understand context.
  */
 const getComputedStyles = (
   element: Element,
   mode: 'originalElement' | 'children' | 'parents' | 'siblings',
 ): SelectedElement['computedStyles'] | undefined => {
-  // Only extract computed styles for the original element
-  if (mode !== 'originalElement') {
+  // Skip styles for siblings to reduce payload (they share parent context)
+  if (mode === 'siblings') {
     return undefined;
   }
 
@@ -205,43 +322,110 @@ const getComputedStyles = (
     const computed = window.getComputedStyle(element);
     const styles: SelectedElement['computedStyles'] = {};
 
-    // Font-family
-    const fontFamily = computed.fontFamily;
-    if (fontFamily && fontFamily !== 'initial' && fontFamily !== 'inherit') {
-      styles.fontFamily = truncateString(fontFamily, 256) ?? undefined;
+    // Helper to add non-default values
+    const addIfMeaningful = (
+      key: keyof NonNullable<SelectedElement['computedStyles']>,
+      value: string | null,
+      maxLen = 512,
+    ) => {
+      if (
+        value &&
+        value !== 'initial' &&
+        value !== 'inherit' &&
+        value !== 'normal' &&
+        value !== 'auto' &&
+        value !== 'none'
+      ) {
+        (styles as Record<string, string>)[key] =
+          truncateString(value, maxLen) ?? '';
+      }
+    };
+
+    // ===== Typography =====
+    addIfMeaningful('fontFamily', computed.fontFamily, 256);
+    addIfMeaningful('fontSize', computed.fontSize);
+    addIfMeaningful('fontWeight', computed.fontWeight);
+    addIfMeaningful('lineHeight', computed.lineHeight);
+    addIfMeaningful('letterSpacing', computed.letterSpacing);
+    // Color is always meaningful
+    if (computed.color) {
+      styles.color = computed.color;
+    }
+    addIfMeaningful('textAlign', computed.textAlign);
+
+    // ===== Box Model =====
+    // Padding/margin - always include if non-zero
+    const padding = computed.padding;
+    if (padding && padding !== '0px') {
+      styles.padding = padding;
+    }
+    const margin = computed.margin;
+    if (margin && margin !== '0px') {
+      styles.margin = margin;
+    }
+    // Dimensions
+    addIfMeaningful('width', computed.width);
+    addIfMeaningful('height', computed.height);
+    addIfMeaningful('maxWidth', computed.maxWidth);
+    addIfMeaningful('minWidth', computed.minWidth);
+    addIfMeaningful('maxHeight', computed.maxHeight);
+    addIfMeaningful('minHeight', computed.minHeight);
+
+    // ===== Background & Borders =====
+    // Background color - always include
+    if (computed.backgroundColor) {
+      styles.backgroundColor = computed.backgroundColor;
+    }
+    // Background image - important for gradients (increase limit for complex gradients)
+    addIfMeaningful('backgroundImage', computed.backgroundImage, 1000);
+    // Border
+    addIfMeaningful('border', computed.border, 256);
+    addIfMeaningful('borderRadius', computed.borderRadius);
+
+    // ===== Layout =====
+    // Display is always meaningful
+    if (computed.display) {
+      styles.display = computed.display;
+    }
+    addIfMeaningful('position', computed.position);
+    addIfMeaningful('top', computed.top);
+    addIfMeaningful('right', computed.right);
+    addIfMeaningful('bottom', computed.bottom);
+    addIfMeaningful('left', computed.left);
+    // z-index is critical for stacking context
+    if (computed.zIndex && computed.zIndex !== 'auto') {
+      styles.zIndex = computed.zIndex;
     }
 
-    // Background-color
-    const backgroundColor = computed.backgroundColor;
-    styles.backgroundColor = backgroundColor;
+    // ===== Flexbox/Grid =====
+    addIfMeaningful('flexDirection', computed.flexDirection);
+    addIfMeaningful('alignItems', computed.alignItems);
+    addIfMeaningful('justifyContent', computed.justifyContent);
+    addIfMeaningful('gap', computed.gap);
+    addIfMeaningful('flexWrap', computed.flexWrap);
+    // Grid-specific properties (critical for layout cloning)
+    addIfMeaningful('gridTemplateColumns', computed.gridTemplateColumns, 1000);
+    addIfMeaningful('gridTemplateRows', computed.gridTemplateRows, 1000);
+    addIfMeaningful('gridColumn', computed.gridColumn);
+    addIfMeaningful('gridRow', computed.gridRow);
 
-    // Background-image (truncated to 500 characters)
-    const backgroundImage = computed.backgroundImage;
-    if (
-      backgroundImage &&
-      backgroundImage !== 'initial' &&
-      backgroundImage !== 'inherit' &&
-      backgroundImage !== 'none'
-    ) {
-      styles.backgroundImage =
-        truncateString(backgroundImage, 500) ?? undefined;
-    }
+    // ===== Effects =====
+    // Box shadow - critical for design cloning (increase limit for multi-layer shadows)
+    addIfMeaningful('boxShadow', computed.boxShadow, 1000);
+    addIfMeaningful('opacity', computed.opacity);
+    addIfMeaningful('overflow', computed.overflow);
+    addIfMeaningful('filter', computed.filter, 512);
+    addIfMeaningful('backdropFilter', computed.backdropFilter, 512);
+    addIfMeaningful('transform', computed.transform, 512);
 
-    // Border style (use shorthand to get all border properties)
-    const border = computed.border;
-    styles.border = border ? truncateString(border, 256) : undefined;
+    // ===== Transitions & Animations =====
+    addIfMeaningful('transition', computed.transition, 512);
+    addIfMeaningful('animation', computed.animation, 512);
 
-    // Box-shadow
-    const boxShadow = computed.boxShadow;
-    styles.boxShadow = boxShadow ? truncateString(boxShadow, 256) : undefined;
-
-    // Filter
-    const filter = computed.filter;
-    styles.filter = filter ? truncateString(filter, 256) : undefined;
-
-    // Transform
-    const transform = computed.transform;
-    styles.transform = transform ? truncateString(transform, 256) : undefined;
+    // ===== Interactivity & Visibility =====
+    addIfMeaningful('cursor', computed.cursor);
+    addIfMeaningful('visibility', computed.visibility);
+    addIfMeaningful('pointerEvents', computed.pointerEvents);
 
     // Only return if we have at least one style
     return Object.keys(styles).length > 0 ? styles : undefined;
@@ -563,8 +747,11 @@ const serializeElementRecursive = (
   const reactInfo =
     mode === 'originalElement' ? getReactInfo(element) : undefined;
 
-  // Extract computed styles only for the original element
+  // Extract computed styles for element (original, parents, and children)
   const computedStyles = getComputedStyles(element, mode);
+
+  // Extract pseudo-element styles (::before, ::after) only for original element
+  const pseudoElements = getPseudoElementStyles(element, mode);
 
   return {
     id: backendNodeId ? backendNodeId.toString() : undefined,
@@ -588,6 +775,7 @@ const serializeElementRecursive = (
         ? { react: reactInfo }
         : undefined,
     computedStyles,
+    pseudoElements,
   };
 };
 

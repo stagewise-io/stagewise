@@ -46,13 +46,108 @@ const baseSelectedElementSchema = z.object({
     .optional(),
   computedStyles: z
     .object({
+      // Typography
       fontFamily: z.string().optional(),
+      fontSize: z.string().optional(),
+      fontWeight: z.string().optional(),
+      lineHeight: z.string().optional(),
+      letterSpacing: z.string().optional(),
+      color: z.string().optional(),
+      textAlign: z.string().optional(),
+      // Box model
+      padding: z.string().optional(),
+      margin: z.string().optional(),
+      width: z.string().optional(),
+      height: z.string().optional(),
+      maxWidth: z.string().optional(),
+      minWidth: z.string().optional(),
+      maxHeight: z.string().optional(),
+      minHeight: z.string().optional(),
+      // Background & borders
       backgroundColor: z.string().optional(),
-      backgroundImage: z.string().optional(), // Truncated to 500 characters
+      backgroundImage: z.string().optional(),
       border: z.string().optional(),
+      borderRadius: z.string().optional(),
+      // Layout
+      display: z.string().optional(),
+      position: z.string().optional(),
+      top: z.string().optional(),
+      right: z.string().optional(),
+      bottom: z.string().optional(),
+      left: z.string().optional(),
+      zIndex: z.string().optional(),
+      // Flexbox/Grid
+      flexDirection: z.string().optional(),
+      alignItems: z.string().optional(),
+      justifyContent: z.string().optional(),
+      gap: z.string().optional(),
+      flexWrap: z.string().optional(),
+      // Grid-specific
+      gridTemplateColumns: z.string().optional(),
+      gridTemplateRows: z.string().optional(),
+      gridColumn: z.string().optional(),
+      gridRow: z.string().optional(),
+      // Effects
       boxShadow: z.string().optional(),
+      opacity: z.string().optional(),
+      overflow: z.string().optional(),
       filter: z.string().optional(),
+      backdropFilter: z.string().optional(),
       transform: z.string().optional(),
+      // Transitions & animations
+      transition: z.string().optional(),
+      animation: z.string().optional(),
+      // Interactivity & visibility
+      cursor: z.string().optional(),
+      visibility: z.string().optional(),
+      pointerEvents: z.string().optional(),
+    })
+    .optional(),
+  // Pseudo-element styles (::before, ::after)
+  pseudoElements: z
+    .object({
+      before: z
+        .object({
+          content: z.string().optional(),
+          display: z.string().optional(),
+          position: z.string().optional(),
+          width: z.string().optional(),
+          height: z.string().optional(),
+          backgroundColor: z.string().optional(),
+          backgroundImage: z.string().optional(),
+          border: z.string().optional(),
+          borderRadius: z.string().optional(),
+          boxShadow: z.string().optional(),
+          transform: z.string().optional(),
+          opacity: z.string().optional(),
+          top: z.string().optional(),
+          left: z.string().optional(),
+          right: z.string().optional(),
+          bottom: z.string().optional(),
+          zIndex: z.string().optional(),
+        })
+        .optional(),
+      after: z
+        .object({
+          content: z.string().optional(),
+          display: z.string().optional(),
+          position: z.string().optional(),
+          width: z.string().optional(),
+          height: z.string().optional(),
+          backgroundColor: z.string().optional(),
+          backgroundImage: z.string().optional(),
+          border: z.string().optional(),
+          borderRadius: z.string().optional(),
+          boxShadow: z.string().optional(),
+          transform: z.string().optional(),
+          opacity: z.string().optional(),
+          top: z.string().optional(),
+          left: z.string().optional(),
+          right: z.string().optional(),
+          bottom: z.string().optional(),
+          zIndex: z.string().optional(),
+        })
+        .optional(),
     })
     .optional(),
 });

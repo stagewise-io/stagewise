@@ -106,10 +106,10 @@ export function selectedElementToContextSnippet(
   return xmlResult;
 }
 
-const minSerializationDepth = -1; // level of parents that are included
-const maxSerializationDepth = 2; // level of children that are included
-const minUntruncatedDepth = -1; // parent level where we start truncating to minimize size
-const maxUntruncatedDepth = 1; // child level where we start truncating to minimize size
+const minSerializationDepth = -3; // level of parents that are included (3 ancestor levels for stacking context)
+const maxSerializationDepth = 4; // level of children that are included (4 descendant levels)
+const minUntruncatedDepth = -2; // parent level where we start truncating to minimize size
+const maxUntruncatedDepth = 2; // child level where we start truncating to minimize size
 
 const importantAttributes: Set<string> = new Set([
   'class',
@@ -152,13 +152,13 @@ function serializeSelectedElementPart(
   )
     .filter(([key]) => !minimizeContent || importantAttributes.has(key))
     .sort((a, _) => (importantAttributes.has(a[0]) ? -1 : 1)) // We should make sure that important attributes are never cut off
-    .slice(0, 12)
+    .slice(0, 16)
     .map(([key, value]) => ({
       attr: {
         _attr: { name: key },
         _cdata: truncateTextContent(
           JSON.stringify(value),
-          importantAttributes.has(key) ? 128 : 64,
+          importantAttributes.has(key) ? 512 : 256,
         ),
       },
     }));
@@ -169,7 +169,20 @@ function serializeSelectedElementPart(
           computedStyles: {
             _cdata: truncateTextContent(
               JSON.stringify(element.computedStyles ?? {}),
-              200,
+              2000,
+            ),
+          },
+        }
+      : {};
+
+  // Pseudo-element styles (::before, ::after) - only for original element (depth === 0)
+  const pseudoElementsChildNode: xml.XmlObject =
+    depth === 0 && element.pseudoElements
+      ? {
+          pseudoElements: {
+            _cdata: truncateTextContent(
+              JSON.stringify(element.pseudoElements ?? {}),
+              1000,
             ),
           },
         }
@@ -196,7 +209,7 @@ function serializeSelectedElementPart(
           textContent: {
             _cdata: truncateTextContent(
               element.textContent,
-              minimizeContent ? 32 : 128,
+              minimizeContent ? 64 : 256,
             ),
           },
         }
@@ -229,7 +242,7 @@ function serializeSelectedElementPart(
 
   const childrenChildNodes: xml.XmlObject[] =
     !truncateChildren && depth >= 0 && element.children
-      ? element.children.slice(0, 3).map((child) => ({
+      ? element.children.slice(0, 5).map((child) => ({
           child: [
             serializeSelectedElementPart(child as SelectedElement, depth + 1),
           ],
@@ -263,6 +276,7 @@ function serializeSelectedElementPart(
       xpathChildNode,
       positionChildNode,
       computedStylesChildNode,
+      pseudoElementsChildNode,
       ...ownPropertiesChildNodes,
       ...attributesChildNodes,
       textContentChildNode,

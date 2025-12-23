@@ -94,7 +94,7 @@ export const TOOL_OUTPUT_LIMITS = {
    */
   EXECUTE_CONSOLE_SCRIPT: {
     /** Maximum total output size in bytes (serialized JSON) */
-    MAX_TOTAL_OUTPUT_SIZE: 200 * 1024, // 200KB ~ 50k tokens at 4 chars per token -> ~6k lines of code
+    MAX_TOTAL_OUTPUT_SIZE: 100 * 1024, // 100KB ~ 25k tokens at 4 chars per token -> ~3k lines of code
   },
 
   /**

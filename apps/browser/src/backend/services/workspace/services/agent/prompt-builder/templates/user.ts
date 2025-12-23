@@ -60,12 +60,12 @@ export function getUserMessage(userMessage: ChatMessage): UserModelMessage {
       });
 
     // We add the relevant codebase files to the system attachment to provide the LLM with the codebase context.
-    // We limit this to max 3 files to avoid overwhelming the model with too much information.
+    // We limit this to max 6 files to provide sufficient context for design cloning.
     systemAttachmentTextPart.push(
       relevantCodebaseFilesToContextSnippet(
         (userMessage.metadata?.selectedPreviewElements ??
           []) as SelectedElement[],
-        3,
+        6,
       ),
     );
   }
