@@ -438,6 +438,19 @@ export const ChatBubble = memo(
         if (prevPart.text !== nextPart.text) return false;
         if (prevPart.state !== nextPart.state) return false;
       }
+      // For tool parts, compare state and input to allow streaming updates
+      if (
+        prevPart.type.startsWith('tool-') ||
+        prevPart.type === 'dynamic-tool'
+      ) {
+        const prevState = (prevPart as any).state;
+        const nextState = (nextPart as any).state;
+        if (prevState !== nextState) return false;
+        // Compare input by JSON stringification for deep equality
+        const prevInput = JSON.stringify((prevPart as any).input);
+        const nextInput = JSON.stringify((nextPart as any).input);
+        if (prevInput !== nextInput) return false;
+      }
     }
 
     return true;
