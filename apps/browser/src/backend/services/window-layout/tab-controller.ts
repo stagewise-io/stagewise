@@ -1119,7 +1119,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         appliedDeviceScaleFactor: 1,
       };
       // Only emit if values actually changed
-      if (
+      const hasChanged =
         !this.currentViewportSize ||
         this.currentViewportSize.width !== viewportSize.width ||
         this.currentViewportSize.height !== viewportSize.height ||
@@ -1128,8 +1128,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         this.currentViewportSize.scale !== viewportSize.scale ||
         this.currentViewportSize.fitScale !== viewportSize.fitScale ||
         this.currentViewportSize.appliedDeviceScaleFactor !==
-          viewportSize.appliedDeviceScaleFactor
-      ) {
+          viewportSize.appliedDeviceScaleFactor;
+      if (hasChanged) {
         this.currentViewportSize = viewportSize;
         this.emit('viewportSizeChanged', viewportSize);
       }

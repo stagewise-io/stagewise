@@ -619,10 +619,11 @@ export class WindowLayoutService extends DisposableService {
       newTab.setVisible(false);
     }
 
-    // Clear viewport size - it will be updated by the new tab's tracking
+    // Set viewport size to the new tab's current viewport size
+    // Don't set to null and wait for event - the event only fires on size CHANGE
     this.uiKarton.setState((draft) => {
       draft.browser.activeTabId = tabId;
-      draft.browser.viewportSize = null;
+      draft.browser.viewportSize = newTab.getViewportSize();
     });
   };
 
@@ -816,13 +817,20 @@ export class WindowLayoutService extends DisposableService {
   };
 
   private handleSetContextSelectionMode = async (active: boolean) => {
+    // Update tab first (triggers viewport update when activating), then UI state.
+    // This prevents a race condition where selector-canvas renders with
+    // contextSelectionActive=true but viewportSize=null.
+    if (this.activeTab) {
+      try {
+        await this.activeTab.setContextSelectionMode(active);
+      } catch (err) {
+        this.logger.error(
+          `[WindowLayoutService] Failed to set context selection mode: ${err}`,
+        );
+      }
+    }
     this.uiKarton.setState((draft) => {
       draft.browser.contextSelectionMode = active;
-    });
-    this.activeTab?.setContextSelectionMode(active).catch((err) => {
-      this.logger.error(
-        `[WindowLayoutService] Failed to set context selection mode: ${err}`,
-      );
     });
   };
 
