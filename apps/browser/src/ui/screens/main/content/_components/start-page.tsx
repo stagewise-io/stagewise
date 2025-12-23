@@ -71,7 +71,7 @@ const StartPageWithConnectedWorkspace = () => {
       const { scrollLeft, scrollWidth, clientWidth } = container;
       const hasMoreWebsites =
         inspirationWebsites.websites.length < inspirationWebsites.total;
-      const isNearEnd = scrollLeft + clientWidth >= scrollWidth - 200;
+      const isNearEnd = scrollLeft + clientWidth >= scrollWidth - 400;
 
       if (isNearEnd && !isLoadingMore && hasMoreWebsites) {
         setIsLoadingMore(true);
