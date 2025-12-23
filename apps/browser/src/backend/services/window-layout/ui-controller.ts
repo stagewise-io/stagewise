@@ -20,6 +20,7 @@ export interface UIControllerEventMap {
   createTab: [url?: string, setActive?: boolean];
   closeTab: [tabId: string];
   switchTab: [tabId: string];
+  reorderTabs: [tabIds: string[]];
   layoutUpdate: [
     bounds: { x: number; y: number; width: number; height: number } | null,
   ];
@@ -179,6 +180,12 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       'browser.switchTab',
       async (tabId: string) => {
         this.emit('switchTab', tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.reorderTabs',
+      async (tabIds: string[]) => {
+        this.emit('reorderTabs', tabIds);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -444,6 +451,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.uiKarton.removeServerProcedureHandler('browser.createTab');
     this.uiKarton.removeServerProcedureHandler('browser.closeTab');
     this.uiKarton.removeServerProcedureHandler('browser.switchTab');
+    this.uiKarton.removeServerProcedureHandler('browser.reorderTabs');
     this.uiKarton.removeServerProcedureHandler('browser.layout.update');
     this.uiKarton.removeServerProcedureHandler(
       'browser.layout.movePanelToForeground',

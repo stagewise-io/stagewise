@@ -349,6 +349,7 @@ export class WindowLayoutService extends DisposableService {
     this.uiController.on('createTab', this.handleCreateTab);
     this.uiController.on('closeTab', this.handleCloseTab);
     this.uiController.on('switchTab', this.handleSwitchTab);
+    this.uiController.on('reorderTabs', this.handleReorderTabs);
     this.uiController.on('layoutUpdate', this.handleLayoutUpdate);
     this.uiController.on(
       'movePanelToForeground',
@@ -624,6 +625,35 @@ export class WindowLayoutService extends DisposableService {
     this.uiKarton.setState((draft) => {
       draft.browser.activeTabId = tabId;
       draft.browser.viewportSize = newTab.getViewportSize();
+    });
+  };
+
+  private handleReorderTabs = async (tabIds: string[]) => {
+    // Validate that all provided tab IDs exist
+    const validTabIds = tabIds.filter((id) => this.tabs[id]);
+    if (validTabIds.length !== tabIds.length) {
+      this.logger.warn(
+        '[WindowLayoutService] Some tab IDs in reorder request are invalid',
+      );
+    }
+
+    // Reorder internal tabs record
+    const newTabs: Record<string, TabController> = {};
+    for (const id of validTabIds) {
+      newTabs[id] = this.tabs[id]!;
+    }
+    this.tabs = newTabs;
+
+    // Update ChatStateController tabs reference
+    this.chatStateController?.updateTabsReference(this.tabs);
+
+    // Update Karton state with new tab order
+    this.uiKarton.setState((draft) => {
+      const newBrowserTabs: typeof draft.browser.tabs = {};
+      for (const id of validTabIds) {
+        newBrowserTabs[id] = draft.browser.tabs[id]!;
+      }
+      draft.browser.tabs = newBrowserTabs;
     });
   };
 

@@ -76,7 +76,7 @@ export function Tab({
       <div
         data-state={isActive ? 'active' : 'inactive'}
         className={cn(
-          '@container w-52 min-w-24',
+          '@container w-full',
           isActive
             ? 'relative px-2'
             : cn(
