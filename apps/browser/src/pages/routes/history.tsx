@@ -455,7 +455,7 @@ function Page() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <div className="flex items-center border-zinc-500/50 border-b px-6 py-4">
+      <div className="flex items-center border-border/30 border-b px-6 py-4">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-24">
           <h1 className="font-semibold text-foreground text-xl">History</h1>
           <div className="relative flex-1 rounded-full bg-zinc-500/5 focus-within:bg-zinc-500/10">

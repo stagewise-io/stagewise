@@ -22,7 +22,7 @@ import { SidebarNav } from '@/components/sidebar-nav';
 const RootLayout = () => (
   <>
     <HeadContent />
-    <div className="flex h-screen w-screen items-center justify-center bg-muted p-3">
+    <div className="flex h-screen w-screen items-center justify-center bg-muted/50 p-3">
       <div className="flex h-full w-full flex-row items-start justify-start gap-6">
         <div className="flex h-full min-w-fit max-w-64 basis-1/4 flex-col items-start justify-between gap-2 py-2 pl-2">
           <div className="flex flex-row items-center justify-start gap-4 dark:drop-shadow-md">
@@ -56,7 +56,7 @@ const RootLayout = () => (
                   Account
                 </SidebarNav.Item>
               </SidebarNav.Group>
-              <hr className="ml-1 border-zinc-500/50" />
+              <hr className="ml-1 border-border/30" />
               <SidebarNav.Group label="Browsing data">
                 <SidebarNav.Item
                   to="/history"
@@ -81,7 +81,7 @@ const RootLayout = () => (
           </div>
           <div className="mb-4 flex w-full flex-row items-center justify-start gap-3">
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <a
                   href="https://stagewise.io/socials/x"
                   target="_blank"
@@ -95,7 +95,7 @@ const RootLayout = () => (
               <TooltipContent>X (Twitter)</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <a
                   href="https://stagewise.io/socials/linkedin"
                   target="_blank"
@@ -109,7 +109,7 @@ const RootLayout = () => (
               <TooltipContent>LinkedIn</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <a
                   href="https://stagewise.io/socials/discord"
                   target="_blank"
@@ -123,7 +123,7 @@ const RootLayout = () => (
               <TooltipContent>Discord</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <a
                   href="https://github.com/stagewise-io/stagewise"
                   target="_blank"
@@ -138,7 +138,7 @@ const RootLayout = () => (
             </Tooltip>
           </div>
         </div>
-        <div className="scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent hover:scrollbar-thumb-zinc-400 dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500 h-full flex-1 overflow-y-auto rounded-lg bg-background">
+        <div className="scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent hover:scrollbar-thumb-zinc-400 dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500 h-full flex-1 overflow-y-auto rounded-lg bg-background ring-1 ring-border/30">
           <Outlet />
         </div>
       </div>
