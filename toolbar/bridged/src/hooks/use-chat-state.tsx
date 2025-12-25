@@ -201,7 +201,9 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
 
       const pluginProcessingPromises = plugins.map(async (plugin) => {
         try {
-          const handlerResult = await plugin.onPromptSend?.(baseUserMessage);
+          const handlerResult = await plugin.onPromptSend?.(
+            baseUserMessage as any, // TODO: fix
+          );
 
           if (
             !handlerResult ||

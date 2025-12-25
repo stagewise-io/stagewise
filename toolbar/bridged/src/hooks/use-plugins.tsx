@@ -41,7 +41,12 @@ export function PluginProvider({ children }: { children?: ReactNode }) {
     return {
       sendPrompt: async (prompt: PluginChatMessage) => {
         const userMessage: UserMessage = {
-          contentItems: [{ type: 'text', text: prompt.parts[0].text }],
+          contentItems: [
+            {
+              type: 'text',
+              text: prompt.parts[0].type === 'text' ? prompt.parts[0].text : '',
+            },
+          ],
           id: generateId(),
           createdAt: new Date(),
           sentByPlugin: true,

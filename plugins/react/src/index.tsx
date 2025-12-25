@@ -16,7 +16,7 @@ const ReactPlugin: ToolbarPlugin = {
   onContextElementSelect: getSelectedElementAnnotation,
   onPromptSend: (prompt) => {
     const content = getSelectedElementsPrompt(
-      prompt.metadata.selectedElements ??
+      prompt.metadata.browserData.selectedElements ??
         prompt.metadata.browserData?.selectedElements,
     );
 
