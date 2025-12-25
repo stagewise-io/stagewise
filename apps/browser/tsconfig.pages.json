@@ -15,7 +15,7 @@
     "skipLibCheck": true,
     "strictNullChecks": true
   },
-  "include": ["src/pages", "forge.env.d.ts"],
+  "include": ["src/pages", "forge.env.d.ts", "src/shared", "src/ui"],
   "exclude": [
     "**/*.stories.tsx",
     "**/*.stories.ts",
