@@ -812,21 +812,24 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       });
     });
 
-    wc.on('did-fail-load', (_event, errorCode, errorDescription) => {
-      // Ignore "abort" errors (like when a user hits the Stop button)
-      if (errorCode !== -3) {
-        this.logger.error(`Page failed: ${errorDescription}`);
-        this.updateState({
-          isLoading: false,
-          error: {
-            code: errorCode,
-            message: errorDescription,
-          },
-        });
-      }
-      // Clear pending navigation on failure - don't log failed navigations
-      this.pendingNavigation = null;
-    });
+    wc.on(
+      'did-fail-load',
+      (_event, errorCode, errorDescription, _validatedUrl, isMainFrame) => {
+        // Ignore "abort" errors (like when a user hits the Stop button) and sub-frames
+        if (errorCode !== -3 && isMainFrame) {
+          this.logger.error(`Page failed: ${errorDescription}`);
+          this.updateState({
+            isLoading: false,
+            error: {
+              code: errorCode,
+              message: errorDescription,
+            },
+          });
+        }
+        // Clear pending navigation on failure - don't log failed navigations
+        this.pendingNavigation = null;
+      },
+    );
 
     wc.on('focus', () => {
       this.emit('tabFocused', this.id);
