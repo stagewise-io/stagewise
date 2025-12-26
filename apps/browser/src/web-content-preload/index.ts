@@ -400,8 +400,19 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener(
   'wheel',
   (e) => {
-    // Only intercept wheel events when CMD/Ctrl is pressed
-    if (e.ctrlKey || e.metaKey) {
+    // Pinch-to-zoom on trackpad synthesizes ctrlKey - always allow this for native zoom feel
+    if (e.ctrlKey) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      window.tunnelWheel(e);
+      return;
+    }
+
+    // For CMD+wheel (metaKey on Mac), only zoom if it's a mouse wheel, not trackpad scroll.
+    // Trackpads use deltaMode 0 (DOM_DELTA_PIXEL), mouse wheels use deltaMode 1 (DOM_DELTA_LINE).
+    // This prevents two-finger trackpad scrolling with CMD from triggering zoom.
+    if (e.metaKey && e.deltaMode !== 0) {
       e.preventDefault();
       e.stopImmediatePropagation();
       e.stopPropagation();
