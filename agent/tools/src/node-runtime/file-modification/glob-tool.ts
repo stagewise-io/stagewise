@@ -9,7 +9,7 @@ import {
 } from '../../utils/tool-output-capper.js';
 import { rethrowCappedToolOutputError } from '../../utils/error';
 
-export const DESCRIPTION = `Search for files and directories matching a glob pattern (like 'find' command). Use when searching by name or file type patterns.
+export const DESCRIPTION = `Find files and directories BY THEIR PATH/NAME using glob patterns (like 'find' command). Use when searching for files by name or extension. NOT for searching inside file contents (use grepSearchTool for that).
 
 Parameters:
 - pattern (string, REQUIRED): Glob pattern supporting standard syntax (*, **, ?, [abc]). Examples: '**/*.test.ts' for test files, 'src/**/config.json' for configs.

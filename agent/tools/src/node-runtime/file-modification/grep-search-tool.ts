@@ -10,7 +10,7 @@ import {
 } from '../../utils/tool-output-capper.js';
 import { rethrowCappedToolOutputError } from '../../utils/error';
 
-export const DESCRIPTION = `Fast regex search across text files using ripgrep. Use to find code patterns, function definitions, or specific text.
+export const DESCRIPTION = `Fast regex search INSIDE file contents using ripgrep. Use to find code patterns, function definitions, or specific text within files. NOT for finding files by name (use globTool for that).
 
 Parameters:
 - query (string, REQUIRED): Regex pattern using ripgrep syntax (similar to PCRE). Search for exact code strings or patterns.
