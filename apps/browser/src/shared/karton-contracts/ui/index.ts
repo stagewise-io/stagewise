@@ -155,6 +155,8 @@ export type TabState = {
     activeMatchIndex: number; // 1-indexed position of current match
   } | null;
   zoomPercentage: number; // Page zoom level as percentage (100 = default)
+  lastFocusedAt: number; // Timestamp (Date.now()) of when this tab was last focused
+  handle: string; // Human-readable handle for LLM addressing (e.g., t_1, t_2)
 };
 
 export type HistoryEntry = {

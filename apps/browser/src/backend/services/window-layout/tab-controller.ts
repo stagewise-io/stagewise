@@ -60,6 +60,8 @@ export interface TabState {
     activeMatchIndex: number;
   } | null;
   zoomPercentage: number; // Page zoom level as percentage (100 = default)
+  lastFocusedAt: number; // Timestamp (Date.now()) of when this tab was last focused
+  handle: string; // Human-readable handle for LLM addressing (e.g., t_1, t_2)
 }
 
 export interface TabControllerEventMap {
@@ -84,7 +86,15 @@ export interface TabControllerEventMap {
 }
 
 export class TabController extends EventEmitter<TabControllerEventMap> {
+  // Static handle allocation state (shared across all instances)
+  private static nextHandleNumber = 1;
+  private static activeHandles = new Set<string>();
+  private static retiredHandles: { handle: string; retiredAt: number }[] = [];
+  private static generationCounter = 0;
+  private static readonly MIN_REUSE_DISTANCE = 10;
+
   public readonly id: string;
+  public readonly handle: string;
   private webContentsView: WebContentsView;
   private logger: Logger;
   private historyService: HistoryService;
@@ -149,6 +159,56 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private currentSearchRequestId: number | null = null;
   private currentSearchText: string | null = null;
 
+  /**
+   * Allocates a handle for a new tab.
+   * Tries to reuse a retired handle if one is old enough (MIN_REUSE_DISTANCE generations),
+   * otherwise creates a new handle with an incrementing number.
+   */
+  private static allocateHandle(): string {
+    TabController.generationCounter++;
+
+    // Find eligible retired handles (those with sufficient distance)
+    const eligibleHandles = TabController.retiredHandles.filter(
+      (h) =>
+        TabController.generationCounter - h.retiredAt >=
+        TabController.MIN_REUSE_DISTANCE,
+    );
+
+    if (eligibleHandles.length > 0) {
+      // Sort by handle number to get the lowest one first (t_1 before t_2)
+      eligibleHandles.sort((a, b) => {
+        const numA = Number.parseInt(a.handle.split('_')[1], 10);
+        const numB = Number.parseInt(b.handle.split('_')[1], 10);
+        return numA - numB;
+      });
+
+      const toReuse = eligibleHandles[0];
+      // Remove from retired pool
+      TabController.retiredHandles = TabController.retiredHandles.filter(
+        (h) => h.handle !== toReuse.handle,
+      );
+      // Add to active set
+      TabController.activeHandles.add(toReuse.handle);
+      return toReuse.handle;
+    }
+
+    // Create a new handle
+    const handle = `t_${TabController.nextHandleNumber++}`;
+    TabController.activeHandles.add(handle);
+    return handle;
+  }
+
+  /**
+   * Releases a handle back to the retired pool when a tab is destroyed.
+   */
+  private static releaseHandle(handle: string): void {
+    TabController.activeHandles.delete(handle);
+    TabController.retiredHandles.push({
+      handle,
+      retiredAt: TabController.generationCounter,
+    });
+  }
+
   constructor(
     id: string,
     logger: Logger,
@@ -163,6 +223,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   ) {
     super();
     this.id = id;
+    this.handle = TabController.allocateHandle();
     this.logger = logger;
     this.historyService = historyService;
     this.faviconService = faviconService;
@@ -282,6 +343,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       screenshot: null,
       search: null,
       zoomPercentage: 100,
+      lastFocusedAt: Date.now(),
+      handle: this.handle,
     };
 
     this.setupEventListeners();
@@ -862,6 +925,9 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   // }
 
   public destroy() {
+    // Release the handle back to the pool for future reuse
+    TabController.releaseHandle(this.handle);
+
     this.stopViewportTracking();
     this.stopScreenshotTracking();
 
@@ -1009,6 +1075,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     );
 
     wc.on('focus', () => {
+      this.updateState({ lastFocusedAt: Date.now() });
       this.emit('tabFocused', this.id);
     });
 

@@ -67,7 +67,7 @@ function getMinimalBrowserRuntime(
   windowLayoutService: WindowLayoutService,
 ): BrowserRuntime {
   return {
-    executeScript: async (script) => {
+    executeScript: async (script, tabId) => {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new Error('Script execution timed out after 5 seconds'));
@@ -75,7 +75,7 @@ function getMinimalBrowserRuntime(
       });
 
       const result = await Promise.race([
-        windowLayoutService.executeConsoleScript(script),
+        windowLayoutService.executeConsoleScript(script, tabId),
         timeoutPromise,
       ]);
 
@@ -157,10 +157,10 @@ export class AgentService {
     this.authService = authService;
     this.onSaveSetupInformation = onSaveSetupInformation;
 
-    // Initialize prompt builder
+    // Initialize prompt builder with state getter to ensure fresh state on each conversion
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
-      this.uiKarton.state,
+      () => this.uiKarton.state,
     );
 
     // Initialize timeout manager
@@ -301,7 +301,7 @@ export class AgentService {
     this.clientRuntime = clientRuntime;
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
-      this.uiKarton.state,
+      () => this.uiKarton.state,
     );
   }
 
@@ -380,7 +380,7 @@ export class AgentService {
     );
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
-      this.uiKarton.state,
+      () => this.uiKarton.state,
     );
   }
 

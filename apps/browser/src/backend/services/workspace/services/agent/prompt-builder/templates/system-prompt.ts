@@ -3,6 +3,7 @@ import {
   MainTab,
   Layout,
   type KartonContract,
+  type TabState,
 } from '@shared/karton-contracts/ui';
 import xml from 'xml';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
@@ -42,6 +43,7 @@ export async function getSystemPrompt(
   ${codingGuidelines}
   ${dontDos}
   ${clientRuntime ? await workspaceInformation(kartonState, clientRuntime) : ''}
+  ${await getBrowserInformation(kartonState)}
   ${currentGoal(kartonState, workspaceSetupMode)}
   `
     .trim()
@@ -173,6 +175,59 @@ ${productName} offers different UI modes showing different information and funct
     },
   ],
 });
+
+async function getBrowserInformation(kartonState: KartonContract['state']) {
+  const browser = kartonState.browser;
+  const activeTab = browser.activeTabId
+    ? browser.tabs[browser.activeTabId]
+    : null;
+  const lastOpenedTabsWithoutActiveTab = Object.entries(browser.tabs)
+    .sort((a, b) => b[1].lastFocusedAt - a[1].lastFocusedAt)
+    .filter(([id]) => id !== browser.activeTabId);
+
+  const getInformationForTab = (tab: TabState) => {
+    return xml({
+      tab: {
+        _attr: {
+          id: tab.handle,
+          title: tab.title,
+          url: tab.url,
+          ...(tab.error
+            ? { error: `${tab.error.code}: ${tab.error.message}` }
+            : {}),
+        },
+      },
+    });
+  };
+
+  return xml({
+    'browser-information': [
+      {
+        _attr: {
+          description:
+            'Information about the browser and tabs that [USER] has opened and [STAGE] has access to.',
+          'total-tabs-open-count': Object.values(browser.tabs).length,
+        },
+      },
+      ...(activeTab
+        ? [
+            {
+              'focused-tab': getInformationForTab(activeTab),
+            },
+          ]
+        : []),
+      ...(lastOpenedTabsWithoutActiveTab.length > 0
+        ? [
+            {
+              'last-opened-tabs': lastOpenedTabsWithoutActiveTab.map(
+                ([_id, tab]) => getInformationForTab(tab),
+              ),
+            },
+          ]
+        : []),
+    ],
+  });
+}
 
 // XML-friendly formatted object. TODO
 /*

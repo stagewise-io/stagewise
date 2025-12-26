@@ -10,15 +10,16 @@ import { getUserMessage } from './templates/user';
 export class PromptBuilder {
   constructor(
     private readonly clientRuntime: ClientRuntime | null,
-    private readonly kartonState: KartonContract['state'],
+    private readonly getKartonState: () => KartonContract['state'],
   ) {}
 
   public async convertUIToModelMessages(
     chatMessages: ChatMessage[],
   ): Promise<ModelMessage[]> {
     // Get the system prompt and put that on the start
+    // Always use current state via getter to avoid stale data
     const systemPrompt = await getSystemPrompt(
-      this.kartonState,
+      this.getKartonState(),
       this.clientRuntime,
     );
     const modelMessages: ModelMessage[] = [systemPrompt];

@@ -3,7 +3,7 @@ import { rethrowCappedToolOutputError } from '../utils/error';
 import { capToolOutput } from '../utils/tool-output-capper';
 import { TOOL_OUTPUT_LIMITS } from '../constants';
 
-export const DESCRIPTION = `Execute synchronous JavaScript in the browser console of the currently active tab. Works on ANY website (external sites or localhost).
+export const DESCRIPTION = `Execute synchronous JavaScript in the browser console of a specific tab. Works on ANY website (external sites or localhost).
 
 IMPORTANT LIMITATIONS:
 - Scripts must be SYNCHRONOUS (no async/await, no Promise.then, no setTimeout/setInterval)
@@ -40,15 +40,17 @@ Example - Checking animation properties:
   })
 
 Parameters:
+- id (string, REQUIRED): The tab ID to execute the script on. Use the tab ID from browser-information in the system prompt.
 - script (string, REQUIRED): Synchronous JavaScript code to execute.
 `;
 
 export type BrowserRuntime = {
-  executeScript: (script: string) => Promise<string>;
+  executeScript: (script: string, tabId: string) => Promise<string>;
 };
 
 export const executeConsoleScriptParamsSchema = z.object({
-  script: z.string(),
+  id: z.string().describe('The tab ID to execute the script on'),
+  script: z.string().describe('Synchronous JavaScript code to execute'),
 });
 
 export type ExecuteConsoleScriptParams = z.infer<
@@ -70,7 +72,7 @@ async function executeConsoleScriptToolExecute(
   runtime: BrowserRuntime,
 ) {
   try {
-    const result = await runtime.executeScript(params.script);
+    const result = await runtime.executeScript(params.script, params.id);
     return {
       message: 'Successfully executed console script',
       result: capToolOutput(result, {

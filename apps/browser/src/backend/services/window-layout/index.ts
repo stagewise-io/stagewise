@@ -1117,21 +1117,41 @@ export class WindowLayoutService extends DisposableService {
   // =========================================================================
 
   /**
+   * Resolves a tab handle (e.g., "t_1") or UUID to a TabController instance.
+   * Handles can be used by the agent for easier addressing.
+   *
+   * @param tabHandleOrId - Either a handle like "t_1" or a UUID
+   * @returns The TabController instance or null if not found
+   */
+  private resolveTabByHandleOrId(tabHandleOrId: string): TabController | null {
+    // First, try direct ID lookup (for UUIDs)
+    if (this.tabs[tabHandleOrId]) return this.tabs[tabHandleOrId];
+
+    // Then, try to find by handle
+    for (const tab of Object.values(this.tabs))
+      if (tab.handle === tabHandleOrId) return tab;
+
+    return null;
+  }
+
+  /**
    * Executes a JavaScript expression in the console of the specified tab.
-   * If no tabId is provided, uses the currently active tab.
    *
    * @param expression - The JavaScript expression to execute
-   * @param tabId - Optional tab ID; uses active tab if not provided
+   * @param tabHandleOrId - Tab handle (e.g., "t_1") or UUID to execute the script on
    * @returns An object with success status and either the result or an error message
    */
   public async executeConsoleScript(
     expression: string,
-    tabId?: string,
+    tabHandleOrId: string,
   ): Promise<{ success: boolean; result?: any; error?: string }> {
-    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    const tab = this.resolveTabByHandleOrId(tabHandleOrId);
 
     if (!tab) {
-      return { success: false, error: 'No active tab available' };
+      return {
+        success: false,
+        error: `Tab not found: "${tabHandleOrId}". Check browser-information for available tabs.`,
+      };
     }
 
     return await tab.executeConsoleScript(expression);
