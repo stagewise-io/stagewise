@@ -919,7 +919,8 @@ export class AgentService {
           openai: {},
         },
         headers: {
-          'anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
+          'anthropic-beta':
+            'fine-grained-tool-streaming-2025-05-14, interleaved-thinking-2025-05-14',
         },
         messages: await this.promptBuilder.convertUIToModelMessages(
           history ?? [],
