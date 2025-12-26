@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useSelectedElements } from '../hooks/cdp-interop';
-import { useKartonProcedure } from '../hooks/karton';
+import { useKartonProcedure, useKartonState } from '../hooks/karton';
 
 const elementIds = new WeakMap<Element, string>();
 let idCounter = 0;
@@ -16,6 +16,12 @@ export function HoveredElementTracker() {
   const movePanelToForeground = useKartonProcedure(
     (s) => s.movePanelToForeground,
   );
+  const overlaysHidden = useKartonState((s) => s.overlaysHidden);
+
+  // When overlaysHidden is true, don't render any overlays (used during screenshot capture)
+  if (overlaysHidden) {
+    return null;
+  }
 
   return (
     <>
@@ -97,7 +103,12 @@ function ElementOverlay({
         };
 
   return (
-    <div ref={divRef} onMouseEnter={onHover} style={overlayStyles}>
+    <div
+      ref={divRef}
+      onMouseEnter={onHover}
+      style={overlayStyles}
+      data-stagewise-overlay
+    >
       <div
         style={{
           position: 'absolute',

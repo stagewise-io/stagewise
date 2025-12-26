@@ -218,6 +218,7 @@ export class WindowLayoutService extends DisposableService {
         hoveredElement: null,
         viewportSize: null,
         isSearchBarActive: false,
+        pendingElementScreenshots: [],
       };
       draft.appInfo.isFullScreen = this.baseWindow?.isFullScreen() ?? false;
     });
@@ -383,6 +384,10 @@ export class WindowLayoutService extends DisposableService {
     this.uiController.on('removeElement', this.handleRemoveElement);
     this.uiController.on('clearElements', this.handleClearElements);
     this.uiController.on(
+      'clearPendingScreenshots',
+      this.handleClearPendingScreenshots,
+    );
+    this.uiController.on(
       'setContextSelectionMouseCoordinates',
       this.handleSetContextSelectionMouseCoordinates,
     );
@@ -482,6 +487,17 @@ export class WindowLayoutService extends DisposableService {
 
     tab.on('elementSelected', (element) => {
       this.chatStateController?.addElement(element);
+    });
+
+    tab.on('elementScreenshotCaptured', (screenshot) => {
+      // Add screenshot to pending list for UI to pick up
+      this.uiKarton.setState((draft) => {
+        draft.browser.pendingElementScreenshots.push({
+          id: randomUUID(),
+          elementId: screenshot.elementId,
+          dataUrl: screenshot.dataUrl,
+        });
+      });
     });
 
     tab.on('viewportSizeChanged', (size) => {
@@ -930,6 +946,12 @@ export class WindowLayoutService extends DisposableService {
 
   private handleClearElements = () => {
     this.chatStateController?.clearElements();
+  };
+
+  private handleClearPendingScreenshots = () => {
+    this.uiKarton.setState((draft) => {
+      draft.browser.pendingElementScreenshots = [];
+    });
   };
 
   private handleStartSearchInPage = (searchText: string, tabId?: string) => {

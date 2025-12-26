@@ -54,6 +54,7 @@ export interface UIControllerEventMap {
   selectHoveredElement: [];
   removeElement: [elementId: string];
   clearElements: [];
+  clearPendingScreenshots: [];
   scrollToElement: [tabId: string, backendNodeId: number, frameId: string];
   checkFrameValidity: [
     tabId: string,
@@ -329,6 +330,12 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       async () => {
         // TODO: Implement by clearing all stored elements in the chat state controller.
         this.emit('clearElements');
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.contextSelection.clearPendingScreenshots',
+      async () => {
+        this.emit('clearPendingScreenshots');
       },
     );
     this.uiKarton.registerServerProcedureHandler(

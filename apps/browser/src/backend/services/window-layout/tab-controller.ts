@@ -68,6 +68,9 @@ export interface TabControllerEventMap {
   handleKeyDown: [keyDownEvent: SerializableKeyboardEvent];
   elementHovered: [element: SelectedElement | null];
   elementSelected: [element: SelectedElement];
+  elementScreenshotCaptured: [
+    screenshot: { elementId: string; dataUrl: string },
+  ];
   tabFocused: [tabId: string];
   viewportSizeChanged: [
     size: {
@@ -531,6 +534,180 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     if (info) {
       info.tabId = this.id;
       this.emit('elementSelected', info);
+
+      // Capture screenshot of the element (async, non-blocking)
+      this.captureElementScreenshot(
+        info.boundingClientRect,
+        50,
+        info.isMainFrame ?? true,
+        info.frameId,
+      )
+        .then((screenshot) => {
+          if (screenshot && info.stagewiseId) {
+            this.emit('elementScreenshotCaptured', {
+              elementId: info.stagewiseId,
+              dataUrl: screenshot,
+            });
+          }
+        })
+        .catch((err) => {
+          this.logger.debug(
+            `[TabController] Failed to capture element screenshot: ${err}`,
+          );
+        });
+    }
+  }
+
+  /**
+   * Capture a screenshot of a specific element region with padding.
+   * Supports both main frame and iframe elements.
+   * Temporarily hides stagewise overlay elements during capture via Karton state.
+   *
+   * @param boundingRect - The element's bounding rect in viewport coordinates (iframe-local for iframe elements)
+   * @param padding - Padding in pixels around the element (default 50)
+   * @param isMainFrame - Whether the element is in the main frame (default true)
+   * @param frameId - The frame ID if the element is in an iframe
+   * @returns Data URL of the screenshot, or null if capture fails
+   */
+  public async captureElementScreenshot(
+    boundingRect: { top: number; left: number; width: number; height: number },
+    padding = 50,
+    isMainFrame = true,
+    frameId?: string,
+  ): Promise<string | null> {
+    const wc = this.webContentsView.webContents;
+
+    // Don't capture if webContents is unavailable
+    if (
+      wc.isDestroyed() ||
+      wc.isLoading() ||
+      this.currentState.error !== null ||
+      this.currentState.url === 'ui-main'
+    ) {
+      return null;
+    }
+
+    try {
+      // Get viewport info to clip to visible area
+      const viewportLayout = this.currentViewportLayout;
+      const viewportSize = this.currentViewportSize;
+
+      if (!viewportSize) {
+        this.logger.debug(
+          '[TabController] No viewport size available for element screenshot',
+        );
+        return null;
+      }
+
+      // Calculate capture rect with padding, accounting for scroll position
+      const scale = viewportLayout?.scale ?? 1;
+
+      // For iframe elements, transform coordinates to main frame
+      let effectiveBoundingRect = boundingRect;
+      if (!isMainFrame && frameId) {
+        const iframeOffset =
+          await this.selectedElementTracker.getIframeOffsetInMainFrame(frameId);
+        if (iframeOffset) {
+          effectiveBoundingRect = {
+            top: boundingRect.top + iframeOffset.top,
+            left: boundingRect.left + iframeOffset.left,
+            width: boundingRect.width,
+            height: boundingRect.height,
+          };
+          this.logger.debug(
+            `[TabController] Transformed iframe element coords: offset=(${iframeOffset.top}, ${iframeOffset.left})`,
+          );
+        }
+      }
+
+      // Element position relative to viewport (now in main frame coords)
+      let x = Math.floor(effectiveBoundingRect.left - padding);
+      let y = Math.floor(effectiveBoundingRect.top - padding);
+      let width = Math.ceil(effectiveBoundingRect.width + padding * 2);
+      let height = Math.ceil(effectiveBoundingRect.height + padding * 2);
+
+      // Clip to viewport bounds (can't capture outside visible area)
+      if (x < 0) {
+        width += x;
+        x = 0;
+      }
+      if (y < 0) {
+        height += y;
+        y = 0;
+      }
+
+      // Limit to viewport dimensions
+      const maxWidth = viewportSize.width;
+      const maxHeight = viewportSize.height;
+
+      if (x + width > maxWidth) {
+        width = maxWidth - x;
+      }
+      if (y + height > maxHeight) {
+        height = maxHeight - y;
+      }
+
+      // Skip if resulting rect is too small or invalid
+      if (width < 10 || height < 10) {
+        this.logger.debug(
+          '[TabController] Element screenshot rect too small, skipping',
+        );
+        return null;
+      }
+
+      // Cap max dimensions to avoid huge screenshots
+      // 2048px covers most MacBook/monitor effective resolutions while keeping file size reasonable
+      const MAX_DIMENSION = 2048;
+      if (width > MAX_DIMENSION) {
+        width = MAX_DIMENSION;
+      }
+      if (height > MAX_DIMENSION) {
+        height = MAX_DIMENSION;
+      }
+
+      // Hide overlays via Karton state before capture
+      this.kartonServer.setState((draft) => {
+        draft.overlaysHidden = true;
+      });
+
+      // Wait for React to update the DOM (2 frames to be safe)
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Capture the specific region
+      const image = await wc.capturePage({
+        x: Math.round(x * scale),
+        y: Math.round(y * scale),
+        width: Math.round(width * scale),
+        height: Math.round(height * scale),
+      });
+
+      // Restore overlays via Karton state after capture
+      this.kartonServer.setState((draft) => {
+        draft.overlaysHidden = false;
+      });
+
+      // Convert to data URL (JPEG for smaller size)
+      const dataUrl = image.toDataURL({ scaleFactor: 1.0 });
+
+      this.logger.debug(
+        `[TabController] Captured element screenshot: ${width}x${height}`,
+      );
+
+      return dataUrl;
+    } catch (err) {
+      // Ensure overlays are restored even on error
+      try {
+        this.kartonServer.setState((draft) => {
+          draft.overlaysHidden = false;
+        });
+      } catch {
+        // Ignore errors during cleanup
+      }
+
+      this.logger.debug(
+        `[TabController] Error capturing element screenshot: ${err}`,
+      );
+      return null;
     }
   }
 

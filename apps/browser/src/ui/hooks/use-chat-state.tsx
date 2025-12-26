@@ -1,4 +1,10 @@
-import { type ReactNode, createContext, useMemo } from 'react';
+import {
+  type ReactNode,
+  createContext,
+  useMemo,
+  useEffect,
+  useRef,
+} from 'react';
 import { useContext, useState, useCallback } from 'react';
 import { usePlugins } from './use-plugins';
 import {
@@ -10,6 +16,22 @@ import {
 import { useKartonProcedure, useKartonState } from './use-karton';
 import type { ChatMessage, FileUIPart } from '@shared/karton-contracts/ui';
 import type { SelectedElement } from '@shared/selected-elements';
+
+/**
+ * Convert a data URL to a File object
+ */
+function dataUrlToFile(dataUrl: string, filename: string): File {
+  const arr = dataUrl.split(',');
+  const mimeMatch = arr[0]?.match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+  const bstr = atob(arr[1] ?? '');
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
 
 interface ContextSnippet {
   promptContextName: string;
@@ -91,6 +113,17 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     (p) => p.browser.contextSelection.removeElement,
   );
 
+  // Watch for pending element screenshots and auto-add as file attachments
+  const pendingScreenshots = useKartonState(
+    (s) => s.browser.pendingElementScreenshots,
+  );
+  const clearPendingScreenshots = useKartonProcedure(
+    (p) => p.browser.contextSelection.clearPendingScreenshots,
+  );
+
+  // Track which screenshots we've already processed to avoid duplicates
+  const processedScreenshotIds = useRef<Set<string>>(new Set());
+
   const [isSending, setIsSending] = useState<boolean>(false);
 
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
@@ -125,6 +158,37 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
       return [];
     });
   }, []);
+
+  // Auto-add pending element screenshots as file attachments
+  useEffect(() => {
+    if (pendingScreenshots.length === 0) return;
+
+    // Process new screenshots
+    const newScreenshots = pendingScreenshots.filter(
+      (s) => !processedScreenshotIds.current.has(s.id),
+    );
+
+    if (newScreenshots.length === 0) return;
+
+    // Add each screenshot as a file attachment
+    newScreenshots.forEach((screenshot) => {
+      processedScreenshotIds.current.add(screenshot.id);
+
+      // Convert data URL to File
+      const file = dataUrlToFile(
+        screenshot.dataUrl,
+        `element-${screenshot.elementId.slice(0, 8)}.png`,
+      );
+
+      // Add as attachment
+      const id = generateId();
+      const url = URL.createObjectURL(file);
+      setFileAttachments((prev) => [...prev, { id, file, url }]);
+    });
+
+    // Clear processed screenshots from state
+    void clearPendingScreenshots();
+  }, [pendingScreenshots, clearPendingScreenshots]);
 
   const _startContextSelector = useCallback(() => {
     setContextSelectionActive(true);

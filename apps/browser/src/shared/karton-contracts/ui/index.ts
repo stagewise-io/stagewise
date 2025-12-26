@@ -290,6 +290,12 @@ export type AppState = {
       scale: number;
     } | null;
     isSearchBarActive: boolean;
+    // Screenshots of selected elements to be auto-attached to chat
+    pendingElementScreenshots: {
+      id: string; // Unique ID for this screenshot
+      elementId: string; // stagewiseId of the element
+      dataUrl: string; // Base64 data URL of the screenshot
+    }[];
   };
 };
 
@@ -457,6 +463,7 @@ export type KartonContract = {
         selectHoveredElement: () => Promise<void>; // If the user triggers the element to actually be selected as context, this will trigger a storage operation on the server side.
         removeElement: (elementId: string) => Promise<void>;
         clearElements: () => Promise<void>; // Removes all elements from selection
+        clearPendingScreenshots: () => Promise<void>; // Clears pending element screenshots after UI has picked them up
       };
       scrollToElement: (
         tabId: string,
@@ -535,5 +542,6 @@ export const defaultState: KartonContract['state'] = {
     hoveredElement: null,
     viewportSize: null,
     isSearchBarActive: false,
+    pendingElementScreenshots: [],
   },
 };

@@ -47,7 +47,12 @@ export class SelectedElementTracker extends EventEmitter<ElementSelectorEventMap
   // Cache for Frame Information: Map<FrameId, FrameInfo>
   private frameCache: Map<
     string,
-    { url: string; title: string | null; isMainFrame: boolean }
+    {
+      url: string;
+      title: string | null;
+      isMainFrame: boolean;
+      parentFrameId?: string;
+    }
   > = new Map();
   private mainFrameId: string | null = null;
 
@@ -534,6 +539,7 @@ export class SelectedElementTracker extends EventEmitter<ElementSelectorEventMap
           url: '',
           title: null,
           isMainFrame: false,
+          parentFrameId,
         });
       }
     } else if (method === 'Page.frameDetached') {
@@ -873,6 +879,83 @@ export class SelectedElementTracker extends EventEmitter<ElementSelectorEventMap
     } catch {
       // If resolving fails, the element doesn't exist
       return false;
+    }
+  }
+
+  /**
+   * Get the cumulative offset of an iframe in main frame coordinates.
+   * This is used to transform element coordinates from iframe-local to main-frame-global.
+   *
+   * @param frameId - The frame ID of the iframe
+   * @returns The offset {top, left} to add to element coordinates, or null if main frame or error
+   */
+  public async getIframeOffsetInMainFrame(
+    frameId: string,
+  ): Promise<{ top: number; left: number } | null> {
+    // If this is the main frame, no offset needed
+    const frameInfo = this.frameCache.get(frameId);
+    if (!frameInfo || frameInfo.isMainFrame) {
+      return null;
+    }
+
+    try {
+      let cumulativeTop = 0;
+      let cumulativeLeft = 0;
+      let currentFrameId = frameId;
+
+      // Walk up the frame hierarchy until we reach the main frame
+      while (currentFrameId) {
+        const currentFrameInfo = this.frameCache.get(currentFrameId);
+        if (!currentFrameInfo || currentFrameInfo.isMainFrame) {
+          break;
+        }
+
+        // Get the iframe element that owns this frame using CDP
+        const frameOwnerResult = (await this.sendCommand('DOM.getFrameOwner', {
+          frameId: currentFrameId,
+        })) as { backendNodeId: number; nodeId?: number };
+
+        if (!frameOwnerResult.backendNodeId) {
+          this.logger.debug(
+            `[SelectedElementTracker] Could not get frame owner for ${currentFrameId}`,
+          );
+          return null;
+        }
+
+        // Get the bounding box of the iframe element
+        // First we need to get the box model which gives us the content quad
+        const boxModel = (await this.sendCommand('DOM.getBoxModel', {
+          backendNodeId: frameOwnerResult.backendNodeId,
+        })) as {
+          model?: {
+            content: number[];
+            border: number[];
+          };
+        };
+
+        if (boxModel.model?.border) {
+          // border array format: [x1, y1, x2, y2, x3, y3, x4, y4] (quad corners)
+          // The first point (x1, y1) is the top-left corner
+          const borderQuad = boxModel.model.border;
+          cumulativeTop += borderQuad[1]; // y1
+          cumulativeLeft += borderQuad[0]; // x1
+        } else {
+          this.logger.debug(
+            `[SelectedElementTracker] Could not get box model for iframe in frame ${currentFrameId}`,
+          );
+          return null;
+        }
+
+        // Move to the parent frame
+        currentFrameId = currentFrameInfo.parentFrameId || '';
+      }
+
+      return { top: cumulativeTop, left: cumulativeLeft };
+    } catch (err) {
+      this.logger.debug(
+        `[SelectedElementTracker] Error getting iframe offset: ${err}`,
+      );
+      return null;
     }
   }
 

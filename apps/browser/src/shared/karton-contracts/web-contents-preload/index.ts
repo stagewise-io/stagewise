@@ -1,5 +1,6 @@
 export type TabState = {
   isInForeground: boolean; // If true, the tab content is in front of the UI. Has impact on interactivity of the overlays.
+  overlaysHidden: boolean; // If true, overlay elements should be hidden (used during screenshot capture).
 };
 
 /**
@@ -47,4 +48,5 @@ export type TabKartonContract = {
 
 export const defaultState: TabState = {
   isInForeground: false,
+  overlaysHidden: false,
 };
