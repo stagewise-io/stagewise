@@ -10,6 +10,7 @@ import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import specialTokens from '../utils/special-tokens.js';
 import { getWorkspaceInfo } from '../utils/workspace-info/index.js';
 import path from 'node:path';
+import { readStagewiseMd } from '../utils/read-stagewise-md';
 
 /**
  * The (system) prompt design we implement right now follows the following rules:
@@ -24,12 +25,17 @@ import path from 'node:path';
 export async function getSystemPrompt(
   kartonState: KartonContract['state'],
   clientRuntime: ClientRuntime | null = null,
+  stagewiseMdPath: string | null = null,
 ): Promise<SystemModelMessage> {
   let workspaceSetupMode: 'setup-active' | 'setup-needed' | 'setup-finished';
   if (clientRuntime === null) workspaceSetupMode = 'setup-needed';
   else if (kartonState.workspaceStatus === 'setup')
     workspaceSetupMode = 'setup-active';
   else workspaceSetupMode = 'setup-finished';
+
+  const stagewiseMdContent = stagewiseMdPath
+    ? await readStagewiseMd(stagewiseMdPath)
+    : null;
 
   const newPrompt = `
   ${prefix}
@@ -42,8 +48,9 @@ export async function getSystemPrompt(
   ${toolCallGuidelines}
   ${codingGuidelines}
   ${dontDos}
-  ${clientRuntime ? await workspaceInformation(kartonState, clientRuntime) : ''}
+  ${clientRuntime ? await workspaceInformation(kartonState, clientRuntime, !!stagewiseMdContent) : ''}
   ${await getBrowserInformation(kartonState)}
+  ${stagewiseMdContent ? `\n${stagewiseMdContent}` : ''}
   ${currentGoal(kartonState, workspaceSetupMode)}
   `
     .trim()
@@ -552,9 +559,12 @@ const dontDos = xml({
 });
 
 // XML-friendly formatted object.
+// When stagewiseMdExists is true, we skip the detailed packages-in-repo list
+// since STAGEWISE.md contains curated, semantic project info that's more valuable.
 const workspaceInformation = async (
   kartonState: KartonContract['state'],
   clientRuntime: ClientRuntime,
+  includePackageList: boolean,
   onError?: (error: Error) => void,
 ) => {
   const workspaceInfo = await getWorkspaceInfo(clientRuntime, onError);
@@ -598,7 +608,7 @@ const workspaceInformation = async (
                 },
               ]
             : []),
-          ...(workspaceInfo.packagesInRepo.length > 0
+          ...(includePackageList && workspaceInfo.packagesInRepo.length > 0
             ? [
                 {
                   'packages-in-repo': [

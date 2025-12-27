@@ -1,6 +1,8 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { resolve } from 'node:path';
+import type { GlobalDataPathService } from '../../../global-data-path';
 import { isContextLimitError } from './utils/is-context-limit-error';
+import { generateStagewiseMd } from './generate-stagewise-md';
 import type { KartonService } from '../../../karton';
 import type { Logger } from '../../../logger';
 import type { TelemetryService } from '../../../telemetry';
@@ -58,6 +60,7 @@ import { processToolCalls } from './utils/tool-call-utils';
 import { generateChatTitle } from './utils/generate-chat-title';
 import { isAuthenticationError } from './utils/is-authentication-error';
 import { extractDetailsFromError } from './utils/extract-details-from-error';
+import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -109,7 +112,7 @@ export class AgentService {
   private clientRuntime: ClientRuntime | null = null;
   private apiKey: string | null = null;
   private promptBuilder: PromptBuilder;
-
+  private globalDataPathService: GlobalDataPathService;
   private client!: TRPCClient<AppRouter>;
   private isWorking = false;
   private timeoutManager: TimeoutManager;
@@ -143,6 +146,7 @@ export class AgentService {
     globalConfigService: GlobalConfigService,
     authService: AuthService,
     windowLayoutService: WindowLayoutService,
+    globalDataPathService: GlobalDataPathService,
     onSaveSetupInformation: (params: {
       agentAccessPath: string;
       ide: string | undefined;
@@ -155,12 +159,14 @@ export class AgentService {
     this.globalConfigService = globalConfigService;
     this.windowLayoutService = windowLayoutService;
     this.authService = authService;
+    this.globalDataPathService = globalDataPathService;
     this.onSaveSetupInformation = onSaveSetupInformation;
 
     // Initialize prompt builder with state getter to ensure fresh state on each conversion
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
       () => this.uiKarton.state,
+      this.globalDataPathService.globalDataPath,
     );
 
     // Initialize timeout manager
@@ -232,6 +238,8 @@ export class AgentService {
               appPath: params.appPath,
             });
 
+            void this.updateStagewiseMd();
+
             const absoluteAgentAccessPath =
               params.agentAccessPath === '{GIT_REPO_ROOT}'
                 ? getRepoRootForPath(params.appPath)
@@ -260,6 +268,9 @@ export class AgentService {
         this.clientRuntime,
         getMinimalBrowserRuntime(this.windowLayoutService),
         this.client,
+        {
+          onUpdateStagewiseMd: () => this.updateStagewiseMd(),
+        },
       ),
     };
   }
@@ -297,11 +308,30 @@ export class AgentService {
     this.client = createAuthenticatedClient(accessToken);
   }
 
+  private async updateStagewiseMd() {
+    if (!this.clientRuntime) return;
+    await generateStagewiseMd(
+      this.telemetryService.withTracing(this.litellm!('claude-haiku-4-5'), {
+        posthogTraceId: 'update-stagewise-md',
+        posthogProperties: {
+          $ai_span_name: 'update-stagewise-md',
+        },
+      }),
+      this.clientRuntime!,
+      new ClientRuntimeNode({
+        workingDirectory: this.globalDataPathService.globalDataPath,
+        rgBinaryBasePath: this.globalDataPathService.globalDataPath,
+      }),
+      this.globalDataPathService.globalDataPath,
+    );
+  }
+
   public setClientRuntime(clientRuntime: ClientRuntime | null): void {
     this.clientRuntime = clientRuntime;
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
       () => this.uiKarton.state,
+      this.globalDataPathService.globalDataPath,
     );
   }
 
@@ -381,6 +411,7 @@ export class AgentService {
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
       () => this.uiKarton.state,
+      this.globalDataPathService.globalDataPath,
     );
   }
 
@@ -1291,6 +1322,7 @@ export class AgentService {
       ide: string | undefined;
       appPath: string;
     }) => Promise<void>,
+    globalDataPathService: GlobalDataPathService,
   ) {
     const instance = new AgentService(
       logger,
@@ -1299,6 +1331,7 @@ export class AgentService {
       globalConfigService,
       authService,
       windowLayoutService,
+      globalDataPathService,
       onSaveSetupInformation,
     );
     await instance.initialize();

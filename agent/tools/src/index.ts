@@ -14,7 +14,7 @@ import {
   type BrowserRuntime,
   executeConsoleScriptTool,
 } from './browser-runtime/execute-console-script.js';
-
+import { updateStagewiseMdTool } from './node-runtime/file-modification/trigger-stagewise-md-update.js';
 import {
   type SaveRequiredInformationParams,
   saveRequiredInformationTool,
@@ -129,6 +129,36 @@ export function toolsWithoutExecute<T extends _ToolSet>(tools: T): T {
   return out;
 }
 
+/**
+ * Wraps a toolset's execute functions to strip internal metadata fields
+ * (hiddenFromLLM, nonSerializableMetadata) from results.
+ * Useful for simplified agents that don't need undo/diff tracking.
+ */
+export function stripToolMetadata<T extends _ToolSet>(tools: T): T {
+  const strippedTools = {} as T;
+  for (const key in tools) {
+    const tool = tools[key]!;
+    (strippedTools as any)[key] = {
+      ...tool,
+      execute: tool.execute
+        ? async (...args: Parameters<NonNullable<typeof tool.execute>>) => {
+            const result = await tool.execute!(...args);
+            if (result && typeof result === 'object') {
+              const {
+                hiddenFromLLM: _hiddenFromLLM,
+                nonSerializableMetadata: _nonSerializableMetadata,
+                ...cleanResult
+              } = result as Record<string, unknown>;
+              return cleanResult;
+            }
+            return result;
+          }
+        : undefined,
+    };
+  }
+  return strippedTools;
+}
+
 export function setupAgentTools(
   clientRuntime: ClientRuntime,
   callbacks: SetupAgentCallbacks,
@@ -152,10 +182,32 @@ export function setupAgentTools(
   };
 }
 
+export function knowledgeAgentTools(
+  clientRuntime: ClientRuntime,
+  overwriteClientRuntime: ClientRuntime,
+) {
+  return {
+    overwriteFileTool: toolWithMetadata(
+      overwriteFileTool(overwriteClientRuntime),
+    ),
+    readFileTool: toolWithMetadata(readFileTool(clientRuntime)),
+    listFilesTool: toolWithMetadata(listFilesTool(clientRuntime)),
+    grepSearchTool: toolWithMetadata(grepSearchTool(clientRuntime)),
+    globTool: toolWithMetadata(globTool(clientRuntime)),
+    multiEditTool: toolWithMetadata(multiEditTool(clientRuntime)),
+    deleteFileTool: toolWithMetadata(deleteFileTool(clientRuntime)),
+  } satisfies ToolSet;
+}
+
+export type CodingAgentCallbacks = {
+  onUpdateStagewiseMd: () => Promise<void>;
+};
+
 export function codingAgentTools(
   clientRuntime: ClientRuntime,
   browserRuntime: BrowserRuntime,
   apiClient: TRPCClient<AppRouter>,
+  callbacks: CodingAgentCallbacks,
 ) {
   return {
     overwriteFileTool: toolWithMetadata(overwriteFileTool(clientRuntime)),
@@ -173,6 +225,9 @@ export function codingAgentTools(
     ),
     executeConsoleScriptTool: toolWithMetadata(
       executeConsoleScriptTool(browserRuntime),
+    ),
+    updateStagewiseMdTool: toolWithMetadata(
+      updateStagewiseMdTool(callbacks.onUpdateStagewiseMd),
     ),
   };
 }

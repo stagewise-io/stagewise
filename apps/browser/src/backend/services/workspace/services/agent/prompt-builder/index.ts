@@ -11,6 +11,7 @@ export class PromptBuilder {
   constructor(
     private readonly clientRuntime: ClientRuntime | null,
     private readonly getKartonState: () => KartonContract['state'],
+    private readonly stagewiseMdPath: string | null,
   ) {}
 
   public async convertUIToModelMessages(
@@ -21,6 +22,7 @@ export class PromptBuilder {
     const systemPrompt = await getSystemPrompt(
       this.getKartonState(),
       this.clientRuntime,
+      this.stagewiseMdPath,
     );
     const modelMessages: ModelMessage[] = [systemPrompt];
 

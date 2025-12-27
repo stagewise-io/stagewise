@@ -159,12 +159,11 @@ export async function main({
           accessPath === '{GIT_REPO_ROOT}'
             ? getRepoRootForPath(event.selectedPath)
             : resolve(event.selectedPath, accessPath);
-        agentService.setClientRuntime(
-          new ClientRuntimeNode({
-            workingDirectory: absoluteAccessPath,
-            rgBinaryBasePath: globalDataPathService.globalDataPath,
-          }),
-        );
+        const clientRuntime = new ClientRuntimeNode({
+          workingDirectory: absoluteAccessPath,
+          rgBinaryBasePath: globalDataPathService.globalDataPath,
+        });
+        agentService.setClientRuntime(clientRuntime);
         if (uiKarton.state.workspaceStatus === 'setup') {
           agentService.createAndActivateNewChat();
           agentService.sendUserMessage({
@@ -222,6 +221,7 @@ export async function main({
           : resolve(params.appPath, params.agentAccessPath),
       );
     },
+    globalDataPathService,
   );
 
   // No need to unregister this callback, as it will be destroyed when the main app shuts down
