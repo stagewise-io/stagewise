@@ -232,7 +232,10 @@ const OnboardingStartPage = () => {
             variant={'primary'}
             size="sm"
             className="mt-2 rounded-lg p-2"
-            onClick={selectAndOpenWorkspace}
+            onClick={async () => {
+              setHasSeenOnboardingFlow(true);
+              await selectAndOpenWorkspace();
+            }}
           >
             <IconPlusFill18 className="size-4" />
             Connect a workspace
