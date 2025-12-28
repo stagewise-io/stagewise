@@ -45,6 +45,7 @@ import {
 } from './message-part-ui/tools/exploring';
 import { UnknownToolPart } from './message-part-ui/tools/unknown';
 import { ExecuteConsoleScriptToolPart } from './message-part-ui/tools/execute-console-script';
+import { ReadConsoleLogsToolPart } from './message-part-ui/tools/read-console-logs';
 
 function isToolPart(part: UIMessagePart): part is ToolPart {
   return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
@@ -300,6 +301,10 @@ export const ChatBubble = memo(
                           key={stableKey}
                           part={part}
                         />
+                      );
+                    case 'tool-readConsoleLogsTool':
+                      return (
+                        <ReadConsoleLogsToolPart key={stableKey} part={part} />
                       );
                     case 'tool-overwriteFileTool':
                       return (

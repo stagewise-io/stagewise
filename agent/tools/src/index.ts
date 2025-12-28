@@ -10,10 +10,30 @@ import { multiEditTool } from './node-runtime/file-modification/multi-edit-tool.
 import { deleteFileTool } from './node-runtime/file-modification/delete-file-tool.js';
 import { getContext7LibraryDocsTool } from './node-runtime/research/get-context7-library-docs-tool.js';
 import { resolveContext7LibraryTool } from './node-runtime/research/resolve-context7-library-tool.js';
+import { executeConsoleScriptTool } from './browser-runtime/execute-console-script.js';
 import {
-  type BrowserRuntime,
-  executeConsoleScriptTool,
-} from './browser-runtime/execute-console-script.js';
+  type ConsoleLogEntry,
+  type ConsoleLogLevel,
+  readConsoleLogsTool,
+} from './browser-runtime/read-console-logs.js';
+
+export type BrowserRuntime = {
+  executeScript: (script: string, tabId: string) => Promise<string>;
+  getConsoleLogs: (
+    tabId: string,
+    options?: {
+      filter?: string;
+      limit?: number;
+      levels?: ConsoleLogLevel[];
+    },
+  ) => {
+    success: boolean;
+    logs?: ConsoleLogEntry[];
+    totalCount?: number;
+    error?: string;
+  };
+};
+
 import { updateStagewiseMdTool } from './node-runtime/file-modification/trigger-stagewise-md-update.js';
 import {
   type SaveRequiredInformationParams,
@@ -226,6 +246,7 @@ export function codingAgentTools(
     executeConsoleScriptTool: toolWithMetadata(
       executeConsoleScriptTool(browserRuntime),
     ),
+    readConsoleLogsTool: toolWithMetadata(readConsoleLogsTool(browserRuntime)),
     updateStagewiseMdTool: toolWithMetadata(
       updateStagewiseMdTool(callbacks.onUpdateStagewiseMd),
     ),
@@ -246,6 +267,7 @@ export function noWorkspaceConfiguredAgentTools(
     executeConsoleScriptTool: toolWithMetadata(
       executeConsoleScriptTool(browserRuntime),
     ),
+    readConsoleLogsTool: toolWithMetadata(readConsoleLogsTool(browserRuntime)),
   } satisfies ToolSet;
 }
 
@@ -291,4 +313,3 @@ export type AllToolsUnion = ReturnType<typeof setupAgentTools> &
 
 export type UITools = InferUITools<AllToolsUnion>;
 export type ToolPart = ToolUIPart<UITools>;
-export type { BrowserRuntime };

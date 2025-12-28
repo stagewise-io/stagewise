@@ -157,6 +157,8 @@ export type TabState = {
   zoomPercentage: number; // Page zoom level as percentage (100 = default)
   lastFocusedAt: number; // Timestamp (Date.now()) of when this tab was last focused
   handle: string; // Human-readable handle for LLM addressing (e.g., t_1, t_2)
+  consoleLogCount: number; // Total number of console logs captured since page load
+  consoleErrorCount: number; // Number of error-level console logs
 };
 
 export type HistoryEntry = {

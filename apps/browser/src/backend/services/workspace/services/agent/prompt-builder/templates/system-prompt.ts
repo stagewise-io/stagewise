@@ -202,6 +202,13 @@ async function getBrowserInformation(kartonState: KartonContract['state']) {
           ...(tab.error
             ? { error: `${tab.error.code}: ${tab.error.message}` }
             : {}),
+          // Include console log counts if there are any logs
+          ...(tab.consoleLogCount > 0
+            ? { 'console-logs': tab.consoleLogCount }
+            : {}),
+          ...(tab.consoleErrorCount > 0
+            ? { 'console-errors': tab.consoleErrorCount }
+            : {}),
         },
       },
     });

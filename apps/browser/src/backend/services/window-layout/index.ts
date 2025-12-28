@@ -11,7 +11,11 @@ import type { FaviconService } from '../favicon';
 import type { PagesService } from '../pages';
 import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import { UIController } from './ui-controller';
-import { TabController } from './tab-controller';
+import {
+  TabController,
+  type ConsoleLogEntry,
+  type GetConsoleLogsOptions,
+} from './tab-controller';
 import { ChatStateController } from './chat-state-controller';
 import type { ColorScheme } from '@shared/karton-contracts/ui';
 import { THEME_COLORS, getBackgroundColor } from '@/shared/theme-colors';
@@ -1155,5 +1159,63 @@ export class WindowLayoutService extends DisposableService {
     }
 
     return await tab.executeConsoleScript(expression);
+  }
+
+  /**
+   * Gets console logs from the specified tab with optional filtering.
+   *
+   * @param tabHandleOrId - Tab handle (e.g., "t_1") or UUID to get logs from
+   * @param options - Optional filter and limit options
+   * @returns An object with success status and either the logs or an error message
+   */
+  public getConsoleLogs(
+    tabHandleOrId: string,
+    options?: GetConsoleLogsOptions,
+  ): {
+    success: boolean;
+    logs?: ConsoleLogEntry[];
+    totalCount?: number;
+    error?: string;
+  } {
+    const tab = this.resolveTabByHandleOrId(tabHandleOrId);
+
+    if (!tab) {
+      return {
+        success: false,
+        error: `Tab not found: "${tabHandleOrId}". Check browser-information for available tabs.`,
+      };
+    }
+
+    const logs = tab.getConsoleLogs(options);
+    const totalCount = tab.getConsoleLogCount();
+
+    return {
+      success: true,
+      logs,
+      totalCount,
+    };
+  }
+
+  /**
+   * Clears console logs for the specified tab.
+   *
+   * @param tabHandleOrId - Tab handle (e.g., "t_1") or UUID to clear logs for
+   * @returns An object with success status or an error message
+   */
+  public clearConsoleLogs(tabHandleOrId: string): {
+    success: boolean;
+    error?: string;
+  } {
+    const tab = this.resolveTabByHandleOrId(tabHandleOrId);
+
+    if (!tab) {
+      return {
+        success: false,
+        error: `Tab not found: "${tabHandleOrId}". Check browser-information for available tabs.`,
+      };
+    }
+
+    tab.clearConsoleLogs();
+    return { success: true };
   }
 }

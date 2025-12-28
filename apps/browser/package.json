@@ -83,6 +83,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "concurrently": "^9.2.1",
+    "devtools-protocol": "^0.0.1561482",
     "diff": "^8.0.2",
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.8",

@@ -4,6 +4,7 @@ import {
   shell,
   nativeTheme,
 } from 'electron';
+import type { Protocol } from 'devtools-protocol';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import type { Input } from 'electron';
 import contextMenu from 'electron-context-menu';
@@ -62,6 +63,42 @@ export interface TabState {
   zoomPercentage: number; // Page zoom level as percentage (100 = default)
   lastFocusedAt: number; // Timestamp (Date.now()) of when this tab was last focused
   handle: string; // Human-readable handle for LLM addressing (e.g., t_1, t_2)
+  consoleLogCount: number; // Total number of console logs captured since page load
+  consoleErrorCount: number; // Number of error-level console logs
+}
+
+/**
+ * Console log levels from the CDP Runtime.consoleAPICalled event.
+ * Extracted from the official devtools-protocol types.
+ */
+export type ConsoleLogLevel = Protocol.Runtime.ConsoleAPICalledEvent['type'];
+
+/**
+ * Represents a single console log entry captured from the page.
+ */
+export interface ConsoleLogEntry {
+  /** Timestamp when the log was captured (Date.now()) */
+  timestamp: number;
+  /** The log level (log, warn, error, etc.) */
+  level: ConsoleLogLevel;
+  /** The stringified log message/arguments */
+  message: string;
+  /** The URL of the page when the log was captured */
+  pageUrl: string;
+  /** Stack trace if available (for errors) */
+  stackTrace?: string;
+}
+
+/**
+ * Options for filtering console logs.
+ */
+export interface GetConsoleLogsOptions {
+  /** Filter logs containing this string (case-insensitive) */
+  filter?: string;
+  /** Maximum number of logs to return (most recent first) */
+  limit?: number;
+  /** Filter by log level(s) */
+  levels?: ConsoleLogLevel[];
 }
 
 export interface TabControllerEventMap {
@@ -158,6 +195,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   // Search state tracking
   private currentSearchRequestId: number | null = null;
   private currentSearchText: string | null = null;
+
+  // Console log capturing
+  private consoleLogs: ConsoleLogEntry[] = [];
+  private readonly MAX_CONSOLE_LOGS = 1000; // Ring buffer max size
+  private isConsoleLogListenerSetup = false;
+  private isRuntimeEnabled = false;
 
   /**
    * Allocates a handle for a new tab.
@@ -345,12 +388,15 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       zoomPercentage: 100,
       lastFocusedAt: Date.now(),
       handle: this.handle,
+      consoleLogCount: 0,
+      consoleErrorCount: 0,
     };
 
     this.setupEventListeners();
     this.startViewportTracking();
     this.startScreenshotTracking();
     this.setupScreenshotOnResize();
+    this.setupConsoleLogCapture();
 
     // Initialize zoom percentage from Electron's current zoom factor
     // This ensures we reflect any persisted zoom from previous sessions
@@ -937,6 +983,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       this.screenshotOnResizeTimeout = null;
     }
 
+    // Clear any pending console log count update
+    if (this.consoleLogCountUpdateTimeout) {
+      clearTimeout(this.consoleLogCountUpdateTimeout);
+      this.consoleLogCountUpdateTimeout = null;
+    }
+
     this.detachDevToolsDebugger();
 
     // Explicitly destroy the webContents to stop all processes
@@ -1035,6 +1087,11 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         isLoading: true,
         error: null,
       });
+      // NOTE: We no longer clear console logs on navigation.
+      // The ring buffer (MAX_CONSOLE_LOGS) handles overflow automatically.
+      // Logs persist across navigations so the agent can see the full history.
+      // Reset Runtime enabled flag - will be re-enabled on did-stop-loading
+      this.isRuntimeEnabled = false;
     });
 
     wc.on('did-stop-loading', () => {
@@ -1053,6 +1110,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
           `[TabController] Failed to capture screenshot on page load: ${err}`,
         );
       });
+      // Re-enable CDP domains for console log capture after navigation
+      this.enableCdpDomainsForConsole();
     });
 
     wc.on(
@@ -1819,6 +1878,498 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         error: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  // =========================================================================
+  // Console Log Capture
+  // =========================================================================
+
+  /**
+   * Sets up console log capturing using CDP events.
+   * This replicates Chrome DevTools behavior by listening to:
+   * - Runtime.consoleAPICalled: for console.log(), console.error(), etc.
+   * - Runtime.exceptionThrown: for uncaught exceptions
+   * - Log.entryAdded: for browser-level logs
+   * - Console.messageAdded: deprecated but catches some edge cases
+   *
+   * The debugger is already attached by SelectedElementTracker on construction.
+   */
+  private setupConsoleLogCapture() {
+    const wc = this.webContentsView.webContents;
+
+    // Listen for CDP debugger messages
+    if (!this.isConsoleLogListenerSetup) {
+      wc.debugger.on('message', (_event, method, params) => {
+        if (method === 'Runtime.consoleAPICalled')
+          this.handleConsoleAPICalled(params);
+        else if (method === 'Runtime.exceptionThrown')
+          this.handleExceptionThrown(params);
+        else if (method === 'Log.entryAdded') this.handleLogEntry(params);
+        else if (method === 'Console.messageAdded')
+          this.handleConsoleMessage(params);
+      });
+      this.isConsoleLogListenerSetup = true;
+    }
+
+    // Enable CDP domains immediately (like DevTools does)
+    this.enableCdpDomainsForConsole();
+  }
+
+  /**
+   * Enables CDP domains for console log capture.
+   * This is called immediately after debugger attach (like DevTools does).
+   * No delays or loading checks - we want to capture everything from the start.
+   */
+  private async enableCdpDomainsForConsole() {
+    const wc = this.webContentsView.webContents;
+
+    if (wc.isDestroyed()) return;
+    if (this.isRuntimeEnabled) return;
+
+    // Wait briefly for debugger to be attached by SelectedElementTracker
+    // (it attaches in its constructor, so this should be very quick)
+    if (!wc.debugger.isAttached()) {
+      // Retry once after a short delay
+      setTimeout(() => this.enableCdpDomainsForConsole(), 50);
+      return;
+    }
+
+    try {
+      // Enable Runtime domain - captures console.log/error/etc. and exceptions
+      await wc.debugger.sendCommand('Runtime.enable');
+
+      // Enable Log domain - captures browser-level logs
+      try {
+        await wc.debugger.sendCommand('Log.enable');
+      } catch {
+        // May already be enabled
+      }
+
+      // Enable Console domain - deprecated but catches some edge cases
+      try {
+        await wc.debugger.sendCommand('Console.enable');
+      } catch {
+        // May already be enabled or not available
+      }
+
+      this.isRuntimeEnabled = true;
+      this.logger.debug(
+        `[TabController] CDP domains enabled for console capture on tab ${this.id}`,
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes('already enabled')) {
+        // Already enabled, that's fine
+        this.isRuntimeEnabled = true;
+      } else {
+        this.logger.debug(
+          `[TabController] Failed to enable CDP domains: ${err}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Adds a console log entry to the ring buffer with deduplication.
+   * Multiple CDP events (Runtime.consoleAPICalled, Console.messageAdded) can fire
+   * for the same console message, so we deduplicate within a short time window.
+   *
+   * @param entry - The log entry to add
+   * @returns true if the entry was added, false if it was a duplicate
+   */
+  private addConsoleLogEntry(entry: ConsoleLogEntry): boolean {
+    // Check for duplicates in recent logs (same message and level within 50ms)
+    const isDuplicate = this.consoleLogs.slice(-30).some((log) => {
+      // Check if levels are equivalent ('log' and 'info' are functionally identical)
+      const levelsMatch =
+        log.level === entry.level ||
+        (log.level === 'log' && entry.level === 'info') ||
+        (log.level === 'info' && entry.level === 'log');
+      if (!levelsMatch) return false;
+
+      // Must be within 50ms time window
+      if (Math.abs(log.timestamp - entry.timestamp) > 50) return false;
+
+      // Check if messages match (first 200 chars)
+      const existingMsg = log.message.trim().substring(0, 200);
+      const newMsg = entry.message.trim().substring(0, 200);
+      return existingMsg === newMsg;
+    });
+
+    if (isDuplicate) return false;
+
+    // Add to ring buffer (remove oldest if at capacity)
+    if (this.consoleLogs.length >= this.MAX_CONSOLE_LOGS)
+      this.consoleLogs.shift();
+
+    this.consoleLogs.push(entry);
+
+    // Update state with new counts (debounced)
+    this.scheduleConsoleLogCountUpdate();
+
+    return true;
+  }
+
+  /**
+   * Handles CDP Console.messageAdded events (deprecated but might catch different errors).
+   */
+  private handleConsoleMessage(params: {
+    message: {
+      source: string;
+      level: 'log' | 'warning' | 'error' | 'debug' | 'info';
+      text: string;
+      url?: string;
+      line?: number;
+      column?: number;
+    };
+  }) {
+    try {
+      const msg = params.message;
+      if (!msg) return;
+
+      // Map Console.message level to ConsoleLogLevel
+      let level: ConsoleLogLevel;
+      switch (msg.level) {
+        case 'error':
+          level = 'error';
+          break;
+        case 'warning':
+          level = 'warning';
+          break;
+        case 'info':
+          level = 'info';
+          break;
+        case 'debug':
+          level = 'debug';
+          break;
+        default:
+          level = 'log';
+      }
+
+      const logEntry: ConsoleLogEntry = {
+        timestamp: Date.now(),
+        level,
+        message: msg.text,
+        pageUrl: msg.url || this.currentState.url,
+        stackTrace: msg.line
+          ? `  at ${msg.url}:${msg.line}:${msg.column || 0}`
+          : undefined,
+      };
+
+      // Add with deduplication
+      this.addConsoleLogEntry(logEntry);
+    } catch (err) {
+      this.logger.debug(
+        `[TabController] Error parsing console message: ${err}`,
+      );
+    }
+  }
+
+  /**
+   * Handles CDP Log.entryAdded events and stores them as logs.
+   * These include errors that appear in the console but aren't from console.* calls.
+   */
+  private handleLogEntry(params: {
+    entry: {
+      source: string;
+      level: 'verbose' | 'info' | 'warning' | 'error';
+      text: string;
+      timestamp: number;
+      url?: string;
+      lineNumber?: number;
+      stackTrace?: {
+        callFrames: Array<{
+          functionName: string;
+          scriptId: string;
+          url: string;
+          lineNumber: number;
+          columnNumber: number;
+        }>;
+      };
+    };
+  }) {
+    try {
+      const entry = params.entry;
+      if (!entry) return;
+
+      // Map Log.entry level to ConsoleLogLevel
+      let level: ConsoleLogLevel;
+      switch (entry.level) {
+        case 'error':
+          level = 'error';
+          break;
+        case 'warning':
+          level = 'warning';
+          break;
+        case 'info':
+          level = 'info';
+          break;
+        case 'verbose':
+          level = 'debug';
+          break;
+        default:
+          level = 'log';
+      }
+
+      // Format stack trace if available
+      let stackTrace: string | undefined;
+      if (entry.stackTrace?.callFrames.length) {
+        stackTrace = entry.stackTrace.callFrames
+          .map(
+            (frame) =>
+              `  at ${frame.functionName || '(anonymous)'} (${frame.url}:${frame.lineNumber + 1}:${frame.columnNumber + 1})`,
+          )
+          .join('\n');
+      }
+
+      const logEntry: ConsoleLogEntry = {
+        timestamp: entry.timestamp || Date.now(),
+        level,
+        message: entry.text,
+        pageUrl: entry.url || this.currentState.url,
+        stackTrace,
+      };
+
+      // Add with deduplication
+      this.addConsoleLogEntry(logEntry);
+    } catch (err) {
+      this.logger.debug(`[TabController] Error parsing log entry: ${err}`);
+    }
+  }
+
+  /**
+   * Handles CDP Runtime.exceptionThrown events and stores them as error logs.
+   * These are uncaught exceptions that bubble up to the console.
+   */
+  private handleExceptionThrown(params: {
+    timestamp: number;
+    exceptionDetails: {
+      exceptionId: number;
+      text: string;
+      lineNumber: number;
+      columnNumber: number;
+      scriptId?: string;
+      url?: string;
+      stackTrace?: {
+        callFrames: Array<{
+          functionName: string;
+          scriptId: string;
+          url: string;
+          lineNumber: number;
+          columnNumber: number;
+        }>;
+      };
+      exception?: {
+        type: string;
+        subtype?: string;
+        className?: string;
+        description?: string;
+        value?: unknown;
+      };
+      executionContextId: number;
+    };
+  }) {
+    try {
+      const details = params.exceptionDetails;
+
+      // Build message from exception details
+      let message = details.text || 'Uncaught exception';
+      if (details.exception?.description) {
+        message = details.exception.description;
+      } else if (details.exception?.value !== undefined) {
+        message = `${details.text}: ${JSON.stringify(details.exception.value)}`;
+      }
+
+      // Format stack trace if available
+      let stackTrace: string | undefined;
+      if (details.stackTrace?.callFrames.length) {
+        stackTrace = details.stackTrace.callFrames
+          .map(
+            (frame) =>
+              `  at ${frame.functionName || '(anonymous)'} (${frame.url}:${frame.lineNumber + 1}:${frame.columnNumber + 1})`,
+          )
+          .join('\n');
+      }
+
+      const logEntry: ConsoleLogEntry = {
+        timestamp: params.timestamp || Date.now(),
+        level: 'error',
+        message,
+        pageUrl: this.currentState.url,
+        stackTrace,
+      };
+
+      // Add with deduplication
+      this.addConsoleLogEntry(logEntry);
+    } catch (err) {
+      this.logger.debug(`[TabController] Error parsing exception: ${err}`);
+    }
+  }
+
+  /**
+   * Handles CDP Runtime.consoleAPICalled events and stores them in the ring buffer.
+   */
+  private handleConsoleAPICalled(params: {
+    type: ConsoleLogLevel;
+    args: Array<{
+      type: string;
+      value?: unknown;
+      description?: string;
+      preview?: {
+        description?: string;
+        properties?: Array<{ name: string; value?: string }>;
+      };
+    }>;
+    executionContextId: number;
+    timestamp: number;
+    stackTrace?: {
+      callFrames: Array<{
+        functionName: string;
+        url: string;
+        lineNumber: number;
+        columnNumber: number;
+      }>;
+    };
+  }) {
+    try {
+      // Convert args to a readable string
+      const messageParts: string[] = [];
+      for (const arg of params.args) {
+        if (arg.value !== undefined) {
+          // Primitive values
+          if (typeof arg.value === 'string') messageParts.push(arg.value);
+          else messageParts.push(JSON.stringify(arg.value));
+        } else if (arg.description) {
+          // Objects, functions, etc.
+          messageParts.push(arg.description);
+        } else if (arg.preview?.description) {
+          // Preview for complex objects
+          messageParts.push(arg.preview.description);
+        } else if (arg.type) {
+          // Fallback to type
+          messageParts.push(`[${arg.type}]`);
+        }
+      }
+
+      const message = messageParts.join(' ');
+
+      // Format stack trace if available
+      let stackTrace: string | undefined;
+      if (params.stackTrace?.callFrames.length) {
+        stackTrace = params.stackTrace.callFrames
+          .map(
+            (frame) =>
+              `  at ${frame.functionName || '(anonymous)'} (${frame.url}:${frame.lineNumber + 1}:${frame.columnNumber + 1})`,
+          )
+          .join('\n');
+      }
+
+      const logEntry: ConsoleLogEntry = {
+        timestamp: params.timestamp || Date.now(),
+        level: params.type,
+        message,
+        pageUrl: this.currentState.url,
+        stackTrace,
+      };
+
+      // Add with deduplication
+      this.addConsoleLogEntry(logEntry);
+    } catch (err) {
+      // Don't let console log parsing errors break anything
+      this.logger.debug(`[TabController] Error parsing console log: ${err}`);
+    }
+  }
+
+  // Debounce timer for console log count updates
+  private consoleLogCountUpdateTimeout: NodeJS.Timeout | null = null;
+  private readonly CONSOLE_LOG_COUNT_UPDATE_DEBOUNCE_MS = 100;
+
+  /**
+   * Schedules a debounced update of console log counts in state.
+   * This prevents excessive state updates when logs come in rapidly.
+   */
+  private scheduleConsoleLogCountUpdate() {
+    if (this.consoleLogCountUpdateTimeout) {
+      return; // Already scheduled
+    }
+
+    this.consoleLogCountUpdateTimeout = setTimeout(() => {
+      this.consoleLogCountUpdateTimeout = null;
+      const errorCount = this.consoleLogs.filter(
+        (log) => log.level === 'error',
+      ).length;
+      this.updateState({
+        consoleLogCount: this.consoleLogs.length,
+        consoleErrorCount: errorCount,
+      });
+    }, this.CONSOLE_LOG_COUNT_UPDATE_DEBOUNCE_MS);
+  }
+
+  /**
+   * Clears all stored console logs.
+   * Called on page navigation to start fresh.
+   */
+  public clearConsoleLogs() {
+    this.consoleLogs = [];
+
+    // Clear any pending count update
+    if (this.consoleLogCountUpdateTimeout) {
+      clearTimeout(this.consoleLogCountUpdateTimeout);
+      this.consoleLogCountUpdateTimeout = null;
+    }
+
+    // Reset counts in state
+    this.updateState({
+      consoleLogCount: 0,
+      consoleErrorCount: 0,
+    });
+
+    this.logger.debug(
+      `[TabController] Cleared console logs for tab ${this.id}`,
+    );
+  }
+
+  /**
+   * Gets console logs with optional filtering and limiting.
+   *
+   * @param options - Filter and limit options
+   * @returns Array of console log entries (most recent first)
+   */
+  public getConsoleLogs(options?: GetConsoleLogsOptions): ConsoleLogEntry[] {
+    let logs = [...this.consoleLogs];
+
+    // Filter by level if specified
+    if (options?.levels && options.levels.length > 0) {
+      const levelSet = new Set(options.levels);
+      logs = logs.filter((log) => levelSet.has(log.level));
+    }
+
+    // Filter by search string if specified (case-insensitive)
+    if (options?.filter) {
+      const filterLower = options.filter.toLowerCase();
+      logs = logs.filter(
+        (log) =>
+          log.message.toLowerCase().includes(filterLower) ||
+          (log.stackTrace?.toLowerCase().includes(filterLower) ?? false),
+      );
+    }
+
+    // Reverse to get most recent first
+    logs.reverse();
+
+    // Apply limit if specified
+    if (options?.limit && options.limit > 0) {
+      logs = logs.slice(0, options.limit);
+    }
+
+    return logs;
+  }
+
+  /**
+   * Gets the total count of stored console logs (before filtering).
+   */
+  public getConsoleLogCount(): number {
+    return this.consoleLogs.length;
   }
 
   /*

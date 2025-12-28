@@ -89,6 +89,9 @@ function getMinimalBrowserRuntime(
 
       return JSON.stringify(result.result);
     },
+    getConsoleLogs: (tabId, options) => {
+      return windowLayoutService.getConsoleLogs(tabId, options);
+    },
   };
 }
 

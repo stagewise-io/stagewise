@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { BrowserRuntime } from '../index.js';
 import { rethrowCappedToolOutputError } from '../utils/error';
 import { capToolOutput } from '../utils/tool-output-capper';
 import { TOOL_OUTPUT_LIMITS } from '../constants';
@@ -43,10 +44,6 @@ Parameters:
 - id (string, REQUIRED): The tab ID to execute the script on. Use the tab ID from browser-information in the system prompt.
 - script (string, REQUIRED): Synchronous JavaScript code to execute.
 `;
-
-export type BrowserRuntime = {
-  executeScript: (script: string, tabId: string) => Promise<string>;
-};
 
 export const executeConsoleScriptParamsSchema = z.object({
   id: z.string().describe('The tab ID to execute the script on'),
