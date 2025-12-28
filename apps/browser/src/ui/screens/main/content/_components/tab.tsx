@@ -2,6 +2,11 @@ import { useLayoutEffect, useMemo, useRef, useState, useId } from 'react';
 import type { TabState } from '@shared/karton-contracts/ui';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 
 import { WithTabPreviewCard } from './with-tab-preview-card';
 import { TabFavicon } from './tab-favicon';
@@ -9,6 +14,8 @@ import { IconVolumeUpFill18, IconVolumeXmarkFill18 } from 'nucleo-ui-fill-18';
 import { IconXmark } from 'nucleo-micro-bold';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { useTabUIState } from '@/hooks/use-tab-ui-state';
+import { HotkeyActions } from '@shared/hotkeys';
+import { HotkeyComboText } from '@/components/hotkey-combo-text';
 
 const CUBIC_BEZIER_CONTROL_POINT_FACTOR = 0.5522847498;
 
@@ -193,17 +200,26 @@ function TabContent({
         </Button>
       )}
       {!shouldHideCloseButton && (
-        <Button
-          variant="ghost"
-          size="icon-2xs"
-          className={cn(
-            'ml-auto shrink-0 text-muted-foreground hover:text-foreground',
-            !isActive && '@[40px]:flex hidden',
-          )}
-          onClick={handleClose}
-        >
-          <IconXmark className="size-3" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              variant="ghost"
+              size="icon-2xs"
+              className={cn(
+                'ml-auto shrink-0 text-muted-foreground hover:text-foreground',
+                !isActive && '@[40px]:flex hidden',
+              )}
+              onClick={handleClose}
+            >
+              <IconXmark className="size-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <span>
+              Close tab (<HotkeyComboText action={HotkeyActions.CTRL_W} />)
+            </span>
+          </TooltipContent>
+        </Tooltip>
       )}
     </>
   );

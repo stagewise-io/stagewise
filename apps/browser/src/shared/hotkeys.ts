@@ -8,6 +8,7 @@ export interface HotkeyActionDefinition {
 export enum HotkeyActions {
   // stagewise specific
   CTRL_I = 'ctrl_i',
+  CTRL_N = 'ctrl_n', // new agent chat
 
   // tab & window navigation
   CTRL_T = 'ctrl_t', // new tab
@@ -80,6 +81,16 @@ export const hotkeyActionDefinitions: Record<
     keyComboMac: '⌘I',
     isEventMatching: (ev) =>
       ev.code === 'KeyI' &&
+      (ev.ctrlKey || ev.metaKey) &&
+      !ev.shiftKey &&
+      !ev.altKey,
+    captureDominantly: true,
+  },
+  [HotkeyActions.CTRL_N]: {
+    keyComboDefault: 'Ctrl+N',
+    keyComboMac: '⌘N',
+    isEventMatching: (ev) =>
+      ev.code === 'KeyN' &&
       (ev.ctrlKey || ev.metaKey) &&
       !ev.shiftKey &&
       !ev.altKey,

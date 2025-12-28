@@ -20,6 +20,9 @@ import TimeAgo from 'react-timeago';
 import buildFormatter from 'react-timeago/lib/formatters/buildFormatter';
 import type { Chat } from '@shared/karton-contracts/ui';
 import { useMemo } from 'react';
+import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
+import { HotkeyActions } from '@shared/hotkeys';
+import { HotkeyComboText } from '@/components/hotkey-combo-text';
 
 export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   const createChat = useKartonProcedure((p) => p.agentChat.create);
@@ -30,6 +33,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
   const workspaceStatus = useKartonState((s) => s.workspaceStatus);
   const activeChatId = useKartonState((s) => s.agentChat?.activeChatId || null);
+  const isWorking = useKartonState((s) => s.agentChat?.isWorking);
 
   const showChatListButton = useMemo(() => {
     return Object.keys(chats).length > 1 && workspaceStatus !== 'setup';
@@ -40,6 +44,11 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   }, [activeChatId, workspaceStatus]);
 
   const groupedChats = useMemo(() => groupChatsByTime(chats), [chats]);
+
+  // Hotkey: CTRL+N to create new agent chat (disabled when agent is working)
+  useHotKeyListener(() => {
+    if (showNewChatButton && !isWorking) createChat();
+  }, HotkeyActions.CTRL_N);
 
   const minimalFormatter = buildFormatter({
     prefixAgo: '',
@@ -85,13 +94,17 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
                   variant="ghost"
                   size="icon-sm"
                   className="shrink-0"
+                  disabled={isWorking}
                   onClick={() => createChat()}
                 >
                   <IconPlusFill18 className="size-4 text-foreground" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <span>Create new chat</span>
+                <span>
+                  Create new chat (
+                  <HotkeyComboText action={HotkeyActions.CTRL_N} />)
+                </span>
               </TooltipContent>
             </Tooltip>
           )}
@@ -105,6 +118,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
                         variant="ghost"
                         size="icon-sm"
                         className="app-no-drag shrink-0"
+                        disabled={isWorking}
                       >
                         <IconHistoryFill18 className="size-4 text-foreground" />
                       </Button>
@@ -127,9 +141,10 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
                           <MenuItem
                             key={chatId}
                             className="shrink-0"
+                            disabled={isWorking}
                             onClick={(e) => {
                               e.stopPropagation();
-                              void switchChat(chatId);
+                              if (!isWorking) void switchChat(chatId);
                             }}
                           >
                             <div className="group flex w-64 flex-row items-center justify-start gap-2">
@@ -148,9 +163,10 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
                                 variant="ghost"
                                 size="icon-xs"
                                 className="ml-auto shrink-0 opacity-0 group-hover:opacity-100"
+                                disabled={isWorking}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  void deleteChat(chatId);
+                                  if (!isWorking) void deleteChat(chatId);
                                 }}
                               >
                                 <IconTrash2Outline24 className="size-3 text-muted-foreground" />
