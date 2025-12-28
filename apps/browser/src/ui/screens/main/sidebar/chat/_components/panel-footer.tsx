@@ -230,14 +230,25 @@ export function ChatPanelFooter() {
   useHotKeyListener(
     useCallback(async () => {
       if (!chatInputActive) {
+        // State 1: Sidebar is closed → open it
         window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
-        setElementSelectionActive(true); // We trigger this here again because the user might go into context selection mode after already having the input active
+        if (!isWorking) setElementSelectionActive(true);
         await togglePanelKeyboardFocus('stagewise-ui');
+      } else if (!elementSelectionActive && !isWorking) {
+        // State 2: Sidebar open, element selection OFF, agent not working → activate element selection
+        setElementSelectionActive(true);
       } else {
+        // State 3: Sidebar open AND (element selection ON OR agent is working) → close sidebar
         window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
         await togglePanelKeyboardFocus('tab-content');
       }
-    }, [chatInputActive, elementSelectionActive, isWorking]),
+    }, [
+      chatInputActive,
+      elementSelectionActive,
+      isWorking,
+      setElementSelectionActive,
+      togglePanelKeyboardFocus,
+    ]),
     HotkeyActions.CTRL_I,
   );
 
@@ -258,16 +269,20 @@ export function ChatPanelFooter() {
       window.dispatchEvent(new Event('sidebar-chat-panel-focused'));
   }, [chatInputActive]);
 
+  // Ensure element selection is always turned off when agent starts working
+  useEffect(() => {
+    if (isWorking) setElementSelectionActive(false);
+  }, [isWorking, setElementSelectionActive]);
+
   useEventListener('sidebar-chat-panel-closed', () => {
     setChatInputActive(false);
     setElementSelectionActive(false);
   });
 
   useEventListener('sidebar-chat-panel-opened', () => {
-    if (!isWorking) {
-      setChatInputActive(true);
-      setElementSelectionActive(true);
-    }
+    setChatInputActive(true);
+    // Only enable element selection if agent is not working
+    if (!isWorking) setElementSelectionActive(true);
   });
 
   return (
