@@ -188,6 +188,7 @@ body {
   --animate-spin-slow: spin 1500ms linear infinite;
   --animate-spin-fast: spin 500ms linear infinite;
   --animate-thinking-part-brain-pulse: thinking-part-brain-pulse 750ms linear infinite alternate;
+  --animate-agent-working-pulse: agent-working-pulse 1500ms ease-in-out infinite;
 
   @keyframes chat-bubble-appear {
     0% {
@@ -219,6 +220,15 @@ body {
     }
     100% {
       stroke-width: 1.5px;
+    }
+  }
+
+  @keyframes agent-working-pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
     }
   }
 

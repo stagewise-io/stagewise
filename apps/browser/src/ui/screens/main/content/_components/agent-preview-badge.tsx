@@ -7,6 +7,8 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { HotkeyActions } from '@shared/hotkeys';
 import { HotkeyComboText } from '@/components/hotkey-combo-text';
+import { useKartonState } from '@/hooks/use-karton';
+import { cn } from '@/utils';
 
 type AgentPreviewBadgeProps = {
   onClick: () => void;
@@ -17,6 +19,8 @@ export function AgentPreviewBadge({
   onClick,
   unreadCount,
 }: AgentPreviewBadgeProps) {
+  const isWorking = useKartonState((s) => s.agentChat?.isWorking || false);
+
   return (
     <div className="flex h-full shrink-0 flex-row items-center rounded-lg rounded-br-[6px] p-1 pr-2">
       <Tooltip>
@@ -27,7 +31,14 @@ export function AgentPreviewBadge({
             className="relative shrink-0"
             onClick={onClick}
           >
-            <IconMessagesFillDuo18 className="size-4 text-foreground/80" />
+            <IconMessagesFillDuo18
+              className={cn(
+                'size-4',
+                isWorking
+                  ? 'animate-agent-working-pulse text-primary'
+                  : 'text-foreground/80',
+              )}
+            />
             {unreadCount > 0 && (
               <div className="absolute top-0.5 right-0.5 flex size-3 items-center justify-center rounded-full bg-yellow-300 opacity-80">
                 <span className="font-mono text-[10px] text-yellow-700">2</span>
