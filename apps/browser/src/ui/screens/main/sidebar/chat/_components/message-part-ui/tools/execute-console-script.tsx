@@ -188,7 +188,7 @@ const SuccessHeader = () => {
     <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
       <div className="pointer-events-auto flex flex-row items-center justify-start gap-1 text-muted-foreground">
         <span className="shrink-0 text-muted-foreground text-xs">
-          Executed console script
+          Ran console script
         </span>
       </div>
     </div>
@@ -203,7 +203,7 @@ const LoadingHeader = () => {
         dir="ltr"
         className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 text-xs"
       >
-        Executing console script...
+        Running console script...
       </span>
     </div>
   );

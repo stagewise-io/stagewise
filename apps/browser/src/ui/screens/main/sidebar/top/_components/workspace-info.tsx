@@ -93,7 +93,7 @@ export function WorkspaceInfoBadge() {
                 className="w-full"
                 onClick={selectAndOpenWorkspace}
               >
-                Change workspace
+                <span className="shrink-0">Change workspace</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>Switch workspace</TooltipContent>
