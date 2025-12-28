@@ -193,7 +193,7 @@ async function getBrowserInformation(kartonState: KartonContract['state']) {
     .filter(([id]) => id !== browser.activeTabId);
 
   const getInformationForTab = (tab: TabState) => {
-    return xml({
+    return {
       tab: {
         _attr: {
           id: tab.handle,
@@ -211,7 +211,7 @@ async function getBrowserInformation(kartonState: KartonContract['state']) {
             : {}),
         },
       },
-    });
+    };
   };
 
   return xml({
@@ -226,7 +226,7 @@ async function getBrowserInformation(kartonState: KartonContract['state']) {
       ...(activeTab
         ? [
             {
-              'focused-tab': getInformationForTab(activeTab),
+              'focused-tab': [getInformationForTab(activeTab)],
             },
           ]
         : []),
@@ -242,20 +242,6 @@ async function getBrowserInformation(kartonState: KartonContract['state']) {
     ],
   });
 }
-
-// XML-friendly formatted object. TODO
-/*
-const generalKnowledgeBase = xml({
-  'general-knowledge-base': {
-    _attr: {
-      description:
-        'Description of general knowledge that [STAGE] MUST use (if relevant) to generate good and correct code, answer questions of [USER], and assist with best practice suggestions.',
-    },
-    _cdata: `
-    `.trim(),
-  },
-});
-*/
 
 // XML-friendly formatted object.
 const userMessageFormatDescription = xml({
