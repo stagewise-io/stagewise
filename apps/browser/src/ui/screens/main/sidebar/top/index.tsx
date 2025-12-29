@@ -19,7 +19,7 @@ import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import TimeAgo from 'react-timeago';
 import buildFormatter from 'react-timeago/lib/formatters/buildFormatter';
 import type { Chat } from '@shared/karton-contracts/ui';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
 import { HotkeyComboText } from '@/components/hotkey-combo-text';
@@ -45,9 +45,15 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
 
   const groupedChats = useMemo(() => groupChatsByTime(chats), [chats]);
 
+  // Helper to create a new chat and focus the input
+  const createChatAndFocus = useCallback(async () => {
+    await createChat();
+    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+  }, [createChat]);
+
   // Hotkey: CTRL+N to create new agent chat (disabled when agent is working)
   useHotKeyListener(() => {
-    if (showNewChatButton && !isWorking) createChat();
+    if (showNewChatButton && !isWorking) void createChatAndFocus();
   }, HotkeyActions.CTRL_N);
 
   const minimalFormatter = buildFormatter({
@@ -95,7 +101,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
                   size="icon-sm"
                   className="shrink-0"
                   disabled={isWorking}
-                  onClick={() => createChat()}
+                  onClick={() => void createChatAndFocus()}
                 >
                   <IconPlusFill18 className="size-4 text-foreground" />
                 </Button>
