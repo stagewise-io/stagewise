@@ -139,6 +139,17 @@ export const ChatHistory = () => {
 
         if (lastMessage.role === message.role && message.role === 'assistant') {
           lastMessage.parts = [...lastMessage.parts, ...message.parts];
+          // Use the longer thinkingDurations array (each message has cumulative durations)
+          if (
+            message.metadata?.thinkingDurations &&
+            message.metadata.thinkingDurations.length >
+              (lastMessage.metadata?.thinkingDurations?.length ?? 0)
+          ) {
+            lastMessage.metadata = {
+              ...lastMessage.metadata,
+              thinkingDurations: message.metadata.thinkingDurations,
+            };
+          }
         } else {
           // Shallow copy to avoid mutating original, but preserve part references
           curr.push({ ...message, parts: [...message.parts] });
