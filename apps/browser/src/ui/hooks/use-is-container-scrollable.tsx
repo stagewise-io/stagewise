@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export function useIsContainerScrollable(
   containerRef: React.RefObject<HTMLElement>,
@@ -7,44 +7,69 @@ export function useIsContainerScrollable(
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [canScrollUp, setCanScrollUp] = useState(false);
   const [canScrollDown, setCanScrollDown] = useState(false);
+  // Track the element via state so we can re-run the effect when ref becomes available
+  const [element, setElement] = useState<HTMLElement | null>(null);
 
+  // Sync the ref to state - this runs on every render to catch when ref changes
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (el !== element) {
+      setElement(el);
+    }
+  });
 
-    const update = () => {
-      const {
-        scrollLeft,
-        scrollTop,
-        scrollWidth,
-        scrollHeight,
-        clientWidth,
-        clientHeight,
-      } = el;
+  const update = useCallback(() => {
+    const el = element;
+    if (!el) {
+      setCanScrollLeft(false);
+      setCanScrollRight(false);
+      setCanScrollUp(false);
+      setCanScrollDown(false);
+      return;
+    }
 
-      // Horizontal scroll
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft + clientWidth < scrollWidth);
+    const {
+      scrollLeft,
+      scrollTop,
+      scrollWidth,
+      scrollHeight,
+      clientWidth,
+      clientHeight,
+    } = el;
 
-      // Vertical scroll
-      setCanScrollUp(scrollTop > 0);
-      setCanScrollDown(scrollTop + clientHeight < scrollHeight);
-    };
+    // Horizontal scroll
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth);
+
+    // Vertical scroll
+    setCanScrollUp(scrollTop > 0);
+    setCanScrollDown(scrollTop + clientHeight < scrollHeight);
+  }, [element]);
+
+  useEffect(() => {
+    if (!element) return;
 
     update();
 
-    el.addEventListener('scroll', update);
+    element.addEventListener('scroll', update);
     window.addEventListener('resize', update);
 
+    // ResizeObserver to detect container size changes
     const ro = new ResizeObserver(update);
-    ro.observe(el);
+    ro.observe(element);
+
+    // MutationObserver to detect when children are added/removed,
+    // which changes scrollWidth/scrollHeight without changing the container's size
+    const mo = new MutationObserver(update);
+    mo.observe(element, { childList: true, subtree: true });
 
     return () => {
-      el.removeEventListener('scroll', update);
+      element.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
       ro.disconnect();
+      mo.disconnect();
     };
-  }, [containerRef]);
+  }, [element, update]);
 
   return {
     canScrollLeft,
