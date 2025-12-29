@@ -117,6 +117,7 @@ export function ChatPanelFooter() {
       await closeWorkspace();
       await createChat();
       void deleteChat(setupChatId);
+      window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
     },
     [closeWorkspace, createChat, deleteChat],
   );
@@ -126,6 +127,8 @@ export function ChatPanelFooter() {
       chatState.sendMessage();
       setElementSelectionActive(false);
       setChatInputActive(false);
+      // Dispatch event to force scroll to bottom in chat history
+      window.dispatchEvent(new Event('chat-message-sent'));
     }
   }, [chatState, canSendMessage]);
 
