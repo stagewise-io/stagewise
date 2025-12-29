@@ -3,7 +3,10 @@ import { useTabUIState } from '@/hooks/use-tab-ui-state';
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { TabsContainer } from './_components/tabs-container';
+import {
+  TabsContainer,
+  DND_DROP_ANIMATION_DURATION,
+} from './_components/tabs-container';
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -98,10 +101,24 @@ export function MainSection({
 
   // Track interpolated border radius during tab drag (for smooth corner transition)
   const [dragBorderRadius, setDragBorderRadius] = useState<number | null>(null);
+  // Track if the active tab is being dragged to position 0
+  const [isActiveTabDragAtPositionZero, setIsActiveTabDragAtPositionZero] =
+    useState(false);
 
   const handleDragBorderRadiusChange = useCallback((radius: number | null) => {
     setDragBorderRadius(radius);
   }, []);
+
+  const handleActiveTabDragAtPositionZero = useCallback(
+    (isAtPositionZero: boolean) => {
+      if (isAtPositionZero)
+        setTimeout(() => {
+          setIsActiveTabDragAtPositionZero(true);
+        }, DND_DROP_ANIMATION_DURATION - 50);
+      else setIsActiveTabDragAtPositionZero(false);
+    },
+    [],
+  );
 
   const handleCreateTab = useCallback(() => {
     createTab();
@@ -195,11 +212,12 @@ export function MainSection({
           onAddTab={handleCreateTab}
           onCleanAllTabs={handleCleanAllTabs}
           onDragBorderRadiusChange={handleDragBorderRadiusChange}
+          onActiveTabDragAtPositionZero={handleActiveTabDragAtPositionZero}
         />
         {/* URL, Controls, etc. area */}
         <div
           className={cn(
-            'relative flex size-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg',
+            'relative flex size-full flex-col rounded-b-lg rounded-tr-lg',
             // Only apply the static rounded-tl-lg class when not during a drag with interpolated radius
             dragBorderRadius === null && showTopLeftCornerRadius
               ? 'rounded-tl-lg'
@@ -211,131 +229,143 @@ export function MainSection({
               : undefined
           }
         >
-          {/* Background with mask for the web-content */}
-          <BackgroundWithCutout className={cn(`z-0`)} borderRadius={4} />
-          <div
-            className={cn('flex w-full shrink-0 items-center gap-2 p-2 pb-0')}
-          >
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              disabled={isStartPage || !activeTab?.navigationHistory.canGoBack}
-              onClick={() => {
-                goBack(activeTabId);
-              }}
+          {/* Background layer that can extend beyond rounded corners
+              Only show when actively dragging the active tab to position 0 */}
+          {dragBorderRadius !== null && isActiveTabDragAtPositionZero && (
+            <div className="-z-30 absolute inset-0 rounded-lg rounded-tl-none bg-background/40" />
+          )}
+          {/* Inner container with overflow clipping */}
+          <div className="flex size-full flex-col overflow-hidden rounded-[inherit]">
+            {/* Background with mask for the web-content */}
+            <BackgroundWithCutout className={cn(`z-0`)} borderRadius={4} />
+            <div
+              className={cn('flex w-full shrink-0 items-center gap-2 p-2 pb-0')}
             >
-              <IconArrowLeft
-                className={`size-4 ${!isStartPage && activeTab?.navigationHistory.canGoBack ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={
+                  isStartPage || !activeTab?.navigationHistory.canGoBack
+                }
+                onClick={() => {
+                  goBack(activeTabId);
+                }}
+              >
+                <IconArrowLeft
+                  className={`size-4 ${!isStartPage && activeTab?.navigationHistory.canGoBack ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+                />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={
+                  isStartPage || !activeTab?.navigationHistory.canGoForward
+                }
+                onClick={() => {
+                  goForward(activeTabId);
+                }}
+              >
+                <IconArrowRight
+                  className={`size-4 ${!isStartPage && activeTab?.navigationHistory.canGoForward ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+                />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={isStartPage}
+                onClick={() => {
+                  reload(activeTabId);
+                }}
+              >
+                <IconArrowRotateAnticlockwise
+                  className={`size-4 ${!isStartPage ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+                />
+              </Button>
+              <Omnibox
+                ref={omniboxRef}
+                activeTab={activeTab}
+                activeTabId={activeTabId}
+                tabs={tabs}
+                goto={goto}
               />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              disabled={
-                isStartPage || !activeTab?.navigationHistory.canGoForward
-              }
-              onClick={() => {
-                goForward(activeTabId);
-              }}
-            >
-              <IconArrowRight
-                className={`size-4 ${!isStartPage && activeTab?.navigationHistory.canGoForward ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
-              />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              disabled={isStartPage}
-              onClick={() => {
-                reload(activeTabId);
-              }}
-            >
-              <IconArrowRotateAnticlockwise
-                className={`size-4 ${!isStartPage ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
-              />
-            </Button>
-            <Omnibox
-              ref={omniboxRef}
-              activeTab={activeTab}
-              activeTabId={activeTabId}
-              tabs={tabs}
-              goto={goto}
-            />
-            <ZoomBar />
-            <SearchBar ref={searchInputRef} />
-            <DownloadsControlButton />
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={isStartPage}
-                  onClick={() => {
-                    cycleColorScheme(activeTabId);
-                  }}
-                >
-                  <ColorSchemeIcon
-                    colorScheme={colorScheme}
-                    className={cn(
-                      isStartPage ? 'text-muted-foreground/40' : '',
-                    )}
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Toggle color scheme</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={isStartPage}
-                  onClick={() => {
-                    toggleDevTools(activeTabId);
-                  }}
-                >
-                  <IconSquareCodeFillDuo18
-                    className={cn(
-                      'size-5',
-                      activeTab?.devToolsOpen
-                        ? 'text-primary'
-                        : 'text-muted-foreground',
-                      isStartPage ? 'text-muted-foreground/40' : '',
-                    )}
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                Open developer tools
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={handleOpenSettings}
-                >
-                  <IconGear2Fill18 className="size-4.5 text-muted-foreground" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Settings</TooltipContent>
-            </Tooltip>
-          </div>
-          <div className="flex size-full flex-col gap-4 rounded-lg p-2">
-            <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-sm shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] ring-1 ring-foreground/10">
-              {activeTab?.url === 'ui-main' ? (
-                <StartPage />
-              ) : activeTab?.error ? (
-                <div>Error: {activeTab?.error?.message}</div>
-              ) : (
-                <div
-                  id="dev-app-preview-container"
-                  className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
-                >
-                  <DOMContextSelector />
-                </div>
-              )}
+              <ZoomBar />
+              <SearchBar ref={searchInputRef} />
+              <DownloadsControlButton />
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={isStartPage}
+                    onClick={() => {
+                      cycleColorScheme(activeTabId);
+                    }}
+                  >
+                    <ColorSchemeIcon
+                      colorScheme={colorScheme}
+                      className={cn(
+                        isStartPage ? 'text-muted-foreground/40' : '',
+                      )}
+                    />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Toggle color scheme
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={isStartPage}
+                    onClick={() => {
+                      toggleDevTools(activeTabId);
+                    }}
+                  >
+                    <IconSquareCodeFillDuo18
+                      className={cn(
+                        'size-5',
+                        activeTab?.devToolsOpen
+                          ? 'text-primary'
+                          : 'text-muted-foreground',
+                        isStartPage ? 'text-muted-foreground/40' : '',
+                      )}
+                    />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Open developer tools
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={handleOpenSettings}
+                  >
+                    <IconGear2Fill18 className="size-4.5 text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Settings</TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="flex size-full flex-col gap-4 rounded-lg p-2">
+              <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-sm shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] ring-1 ring-foreground/10">
+                {activeTab?.url === 'ui-main' ? (
+                  <StartPage />
+                ) : activeTab?.error ? (
+                  <div>Error: {activeTab?.error?.message}</div>
+                ) : (
+                  <div
+                    id="dev-app-preview-container"
+                    className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
+                  >
+                    <DOMContextSelector />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

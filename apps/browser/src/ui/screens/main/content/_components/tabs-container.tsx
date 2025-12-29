@@ -23,6 +23,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
   type DragMoveEvent,
+  type DragOverEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -39,18 +40,24 @@ import { Tab } from './tab';
 
 const DEFAULT_BORDER_RADIUS = 8;
 
+// Default dnd-kit drop animation duration in ms
+// See: @dnd-kit/core defaultDropAnimationConfiguration
+export const DND_DROP_ANIMATION_DURATION = 250;
+
 export function TabsContainer({
   openSidebarChatPanel,
   isSidebarCollapsed,
   onAddTab,
   onCleanAllTabs,
   onDragBorderRadiusChange,
+  onActiveTabDragAtPositionZero,
 }: {
   openSidebarChatPanel: () => void;
   isSidebarCollapsed: boolean;
   onAddTab: () => void;
   onCleanAllTabs: () => void;
   onDragBorderRadiusChange?: (radius: number | null) => void;
+  onActiveTabDragAtPositionZero?: (isAtPositionZero: boolean) => void;
 }) {
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
@@ -154,6 +161,40 @@ export function TabsContainer({
     [activeTabId, isSidebarCollapsed, onDragBorderRadiusChange],
   );
 
+  // Handle drag over to track projected position
+  const handleDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const { active, over } = event;
+      const currentOverId = (over?.id as string) ?? null;
+
+      // Check if the active tab is being dragged to position 0
+      // This happens when:
+      // 1. The dragged tab is the active tab
+      // 2. It's hovering over the first tab in the list
+      // 3. Or the dragged tab itself was already first (and still is)
+      const isDraggingActiveTab = active.id === activeTabId;
+      const firstTabId = optimisticTabIds[0];
+
+      if (isDraggingActiveTab && !isSidebarCollapsed) {
+        // Projected position is 0 if:
+        // - We're over the first tab (and will swap with it)
+        // - OR we're the first tab and not over anything else
+        const projectedPositionIsZero =
+          currentOverId === firstTabId ||
+          (active.id === firstTabId && !currentOverId);
+        onActiveTabDragAtPositionZero?.(projectedPositionIsZero);
+      } else {
+        onActiveTabDragAtPositionZero?.(false);
+      }
+    },
+    [
+      activeTabId,
+      isSidebarCollapsed,
+      optimisticTabIds,
+      onActiveTabDragAtPositionZero,
+    ],
+  );
+
   // Handle drag end to reorder tabs with optimistic update
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -194,12 +235,14 @@ export function TabsContainer({
           setDragBorderRadius(null);
           setDisableDropAnimation(false);
           onDragBorderRadiusChange?.(null);
+          onActiveTabDragAtPositionZero?.(false);
         }, 50);
       } else {
         // Reset immediately for other cases
         setActiveId(null);
         setDragBorderRadius(null);
         onDragBorderRadiusChange?.(null);
+        onActiveTabDragAtPositionZero?.(false);
       }
     },
     [
@@ -208,6 +251,7 @@ export function TabsContainer({
       optimisticTabIds,
       reorderTabs,
       onDragBorderRadiusChange,
+      onActiveTabDragAtPositionZero,
     ],
   );
 
@@ -244,6 +288,7 @@ export function TabsContainer({
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       modifiers={[restrictToHorizontalAxis, restrictToFirstScrollableAncestor]}
     >
