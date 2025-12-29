@@ -114,6 +114,7 @@ You have access to these file system tools:
 4. **Discover component structure** - Find UI components, design system
 5. **Identify key directories** - src/, app/, components/, styles/, etc.
 6. **Check for design tokens** - CSS variables, theme files, color schemes
+7. **Find linting/formatting config** - Look for Biome, ESLint, Prettier configs (biome.json, .eslintrc.*, .prettierrc.*, etc.)
 
 ## ${STAGEWISE_MD_FILENAME} Structure
 
@@ -132,6 +133,25 @@ This file provides context to stagewise when working with this codebase.
 - **Styling**: [e.g., Tailwind CSS v4, CSS Modules, styled-components]
 - **UI Library**: [e.g., Radix UI, shadcn/ui, Material UI, if applicable]
 - **Language**: [TypeScript/JavaScript]
+
+## Linting & Formatting
+
+### Tools
+- **Linter**: [e.g., ESLint, Biome, or none detected]
+- **Formatter**: [e.g., Prettier, Biome, or none detected]
+
+### Configuration Files
+[List the config files found, e.g.:]
+- \`biome.json\` or \`biome.jsonc\` - Biome configuration
+- \`.eslintrc.js\` / \`eslint.config.js\` - ESLint configuration
+- \`.prettierrc\` - Prettier configuration
+
+### Key Rules or Conventions
+[Note any important formatting/linting conventions, e.g.:]
+- Indent: 2 spaces / tabs
+- Quotes: single / double
+- Semicolons: required / omitted
+- Import sorting: [describe if configured]
 
 ## Styling Configuration
 
@@ -222,8 +242,9 @@ export async function generateStagewiseMd(
 Start by:
 1. Reading the package.json to understand the tech stack
 2. Using globTool to find configs, e.g. \`**/tailwind.config.*\`, \`**/postcss.config.*\`, \`**/*.css\`
-3. Exploring the directory structure with listFilesTool
-4. Reading key configuration files you discover
+3. Using globTool to find linting/formatting configs, e.g. \`**/biome.json*\`, \`**/.eslintrc*\`, \`**/eslint.config.*\`, \`**/.prettierrc*\`
+4. Exploring the directory structure with listFilesTool
+5. Reading key configuration files you discover
 
 Once you have a clear picture, create the ${STAGEWISE_MD_FILENAME} file at the app root using saveFileTool.
 
