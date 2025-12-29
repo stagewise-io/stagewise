@@ -24,7 +24,6 @@ export function SortableTab({
     transition,
     opacity: isDragging ? 0.4 : 1,
     overflow: 'visible',
-    cursor: isDragging ? 'grabbing' : 'grab',
     // Width constraints: start at 13rem (w-52), shrink to min 6rem (min-w-24)
     width: '13rem',
     minWidth: '6rem',

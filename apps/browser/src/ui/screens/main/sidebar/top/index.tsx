@@ -1,6 +1,7 @@
 import { WorkspaceInfoBadge } from './_components/workspace-info';
 import { cn } from '@/utils';
 import { IconHistoryFill18, IconPlusFill18 } from 'nucleo-ui-fill-18';
+import { IconMessagesFillDuo18 } from 'nucleo-ui-fill-duo-18';
 import {
   Menu,
   MenuContent,
@@ -154,6 +155,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
                             }}
                           >
                             <div className="group flex w-64 flex-row items-center justify-start gap-2">
+                              <IconMessagesFillDuo18 className="size-4 text-muted-foreground" />
                               <span className="truncate font-medium text-sm">
                                 {chat.title}
                               </span>

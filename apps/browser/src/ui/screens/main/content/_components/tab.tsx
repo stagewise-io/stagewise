@@ -216,7 +216,13 @@ function TabContent({
           </TooltipTrigger>
           <TooltipContent>
             <span>
-              Close tab (<HotkeyComboText action={HotkeyActions.CTRL_W} />)
+              Close (<HotkeyComboText action={HotkeyActions.CTRL_W} />)
+            </span>
+            <br />
+            <span className="text-muted-foreground/70">
+              {' '}
+              Close all other (
+              <HotkeyComboText action={HotkeyActions.CTRL_SHIFT_W} />)
             </span>
           </TooltipContent>
         </Tooltip>

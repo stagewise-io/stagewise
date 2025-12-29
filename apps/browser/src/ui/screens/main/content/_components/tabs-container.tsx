@@ -225,7 +225,7 @@ export function TabsContainer({
       </div>
       <DragOverlay>
         {activeTab ? (
-          <div style={{ cursor: 'grabbing', width: '13rem' }}>
+          <div style={{ width: '13rem' }}>
             <Tab
               tabState={activeTab}
               activateBottomLeftCornerRadius={activateBottomLeftCornerRadius}
