@@ -221,7 +221,6 @@ export class WindowLayoutService extends DisposableService {
         selectedElements: [],
         hoveredElement: null,
         viewportSize: null,
-        isSearchBarActive: false,
         pendingElementScreenshots: [],
       };
       draft.appInfo.isFullScreen = this.baseWindow?.isFullScreen() ?? false;
@@ -1001,14 +1000,22 @@ export class WindowLayoutService extends DisposableService {
   };
 
   private handleActivateSearchBar = () => {
+    if (!this.activeTabId) return;
     this.uiKarton.setState((draft) => {
-      draft.browser.isSearchBarActive = true;
+      const tab = draft.browser.tabs[this.activeTabId!];
+      if (tab) {
+        tab.isSearchBarActive = true;
+      }
     });
   };
 
   private handleDeactivateSearchBar = () => {
+    if (!this.activeTabId) return;
     this.uiKarton.setState((draft) => {
-      draft.browser.isSearchBarActive = false;
+      const tab = draft.browser.tabs[this.activeTabId!];
+      if (tab) {
+        tab.isSearchBarActive = false;
+      }
     });
     // Also stop any active search
     this.activeTab?.stopSearch();

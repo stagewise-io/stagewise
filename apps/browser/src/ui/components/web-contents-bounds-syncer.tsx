@@ -1,7 +1,8 @@
-import { useKartonProcedure } from '@/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { useCallback, useLayoutEffect, useRef } from 'react';
 
 export const WebContentsBoundsSyncer = () => {
+  const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const updateBounds = useKartonProcedure((p) => p.browser.layout.update);
   const movePanelToForeground = useKartonProcedure(
     (p) => p.browser.layout.movePanelToForeground,
@@ -21,7 +22,8 @@ export const WebContentsBoundsSyncer = () => {
   useLayoutEffect(() => {
     const handleMouseEnter = (e: MouseEvent) => {
       if (e.target instanceof Element) {
-        if (e.target.id === 'dev-app-preview-container') {
+        // Check if element is a per-tab preview container
+        if (e.target.id.startsWith('dev-app-preview-container-')) {
           isHoveringRef.current = true;
         } else if (isHoveringRef.current) {
           isHoveringRef.current = false;
@@ -31,7 +33,8 @@ export const WebContentsBoundsSyncer = () => {
 
     const handleFocusChange = (e: FocusEvent) => {
       if (e.target instanceof Element) {
-        if (e.target.id === 'dev-app-preview-container') {
+        // Check if element is a per-tab preview container
+        if (e.target.id.startsWith('dev-app-preview-container-')) {
           isHoveringRef.current = true;
         } else if (isHoveringRef.current) {
           isHoveringRef.current = false;
@@ -58,7 +61,10 @@ export const WebContentsBoundsSyncer = () => {
   }, []);
 
   const check = useCallback(() => {
-    let container = document.getElementById('dev-app-preview-container');
+    const containerId = activeTabId
+      ? `dev-app-preview-container-${activeTabId}`
+      : null;
+    let container = containerId ? document.getElementById(containerId) : null;
 
     if (container) {
       const opacity = getEffectiveOpacity(container);
@@ -113,9 +119,11 @@ export const WebContentsBoundsSyncer = () => {
     }
 
     requestRef.current = requestAnimationFrame(check);
-  }, []);
+  }, [activeTabId, updateBounds, movePanelToForeground]);
 
   useLayoutEffect(() => {
+    // Reset last bounds when tab changes to force an update
+    lastBoundsRef.current = null;
     requestRef.current = requestAnimationFrame(check);
 
     return () => {
@@ -125,7 +133,7 @@ export const WebContentsBoundsSyncer = () => {
       // Clean up by hiding
       void updateBounds(null);
     };
-  }, [check]);
+  }, [check, activeTabId, updateBounds]);
 
   return null;
 };

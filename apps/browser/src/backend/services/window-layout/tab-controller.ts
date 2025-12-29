@@ -61,6 +61,7 @@ export interface TabState {
     resultsCount: number;
     activeMatchIndex: number;
   } | null;
+  isSearchBarActive: boolean; // Whether the search bar UI is active for this tab
   zoomPercentage: number; // Page zoom level as percentage (100 = default)
   lastFocusedAt: number; // Timestamp (Date.now()) of when this tab was last focused
   handle: string; // Human-readable handle for LLM addressing (e.g., t_1, t_2)
@@ -386,6 +387,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       faviconUrls: [],
       screenshot: null,
       search: null,
+      isSearchBarActive: false,
       zoomPercentage: 100,
       lastFocusedAt: Date.now(),
       handle: this.handle,

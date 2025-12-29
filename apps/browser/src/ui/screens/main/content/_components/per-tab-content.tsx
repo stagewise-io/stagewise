@@ -1,0 +1,202 @@
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
+import { cn } from '@stagewise/stage-ui/lib/utils';
+import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
+import type { ColorScheme, TabState } from '@shared/karton-contracts/ui';
+import { Button } from '@stagewise/stage-ui/components/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
+import {
+  IconNightShiftFillDuo18,
+  IconSquareCodeFillDuo18,
+} from 'nucleo-ui-fill-duo-18';
+import {
+  IconMoonFill18,
+  IconBrightnessIncreaseFill18,
+  IconGear2Fill18,
+} from 'nucleo-ui-fill-18';
+import { NavButtons } from './nav-buttons';
+import { Omnibox, type OmniboxRef } from './omnibox';
+import { ZoomBar } from './zoom-bar';
+import { SearchBar } from './search-bar';
+import { DownloadsControlButton } from './control-buttons/downloads';
+import { StartPage } from './start-page';
+import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
+
+const ColorSchemeIcon = ({
+  colorScheme,
+  className,
+}: {
+  colorScheme: ColorScheme;
+  className?: string;
+}) => {
+  switch (colorScheme) {
+    case 'light':
+      return (
+        <IconBrightnessIncreaseFill18
+          className={cn('size-4.5 text-primary', className)}
+        />
+      );
+    case 'dark':
+      return (
+        <IconMoonFill18
+          className={cn('mb-px ml-px size-4 text-primary', className)}
+        />
+      );
+    case 'system':
+      return (
+        <IconNightShiftFillDuo18
+          className={cn('size-4.5 text-foreground', className)}
+        />
+      );
+  }
+};
+
+export interface PerTabContentRef {
+  focusOmnibox: () => void;
+  focusSearchBar: () => void;
+}
+
+interface PerTabContentProps {
+  tabId: string;
+  isActive: boolean;
+}
+
+export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
+  ({ tabId, isActive }, ref) => {
+    const tab = useKartonState((s) => s.browser.tabs[tabId]) as
+      | TabState
+      | undefined;
+
+    const cycleColorScheme = useKartonProcedure(
+      (p) => p.browser.cycleColorScheme,
+    );
+    const toggleDevTools = useKartonProcedure((p) => p.browser.toggleDevTools);
+    const activateSearchBar = useKartonProcedure(
+      (p) => p.browser.searchBar.activate,
+    );
+    const createTab = useKartonProcedure((p) => p.browser.createTab);
+
+    const omniboxRef = useRef<OmniboxRef>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    const isStartPage = useMemo(() => {
+      return tab?.url === 'ui-main';
+    }, [tab?.url]);
+
+    const colorScheme = tab?.colorScheme ?? 'system';
+
+    // Expose methods via ref for parent to call
+    useImperativeHandle(
+      ref,
+      () => ({
+        focusOmnibox: () => {
+          omniboxRef.current?.focus();
+        },
+        focusSearchBar: () => {
+          activateSearchBar();
+          setTimeout(() => {
+            searchInputRef.current?.focus();
+            searchInputRef.current?.select();
+          }, 50);
+        },
+      }),
+      [activateSearchBar],
+    );
+
+    return (
+      <div
+        className={cn(
+          'absolute inset-0 flex flex-col',
+          isActive ? 'z-10' : 'hidden',
+        )}
+      >
+        {/* Control Bar */}
+        <div className={cn('flex w-full shrink-0 items-center gap-2 p-2 pb-0')}>
+          <NavButtons tabId={tabId} tab={tab} />
+          <Omnibox ref={omniboxRef} tabId={tabId} tab={tab} />
+          <ZoomBar tabId={tabId} />
+          <SearchBar tabId={tabId} ref={searchInputRef} />
+          <DownloadsControlButton />
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={isStartPage}
+                onClick={() => {
+                  cycleColorScheme(tabId);
+                }}
+              >
+                <ColorSchemeIcon
+                  colorScheme={colorScheme}
+                  className={cn(isStartPage ? 'text-muted-foreground/40' : '')}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Toggle color scheme</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={isStartPage}
+                onClick={() => {
+                  toggleDevTools(tabId);
+                }}
+              >
+                <IconSquareCodeFillDuo18
+                  className={cn(
+                    'size-5',
+                    tab?.devToolsOpen
+                      ? 'text-primary'
+                      : 'text-muted-foreground',
+                    isStartPage ? 'text-muted-foreground/40' : '',
+                  )}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Open developer tools</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => {
+                  createTab('stagewise://internal/settings', true);
+                }}
+              >
+                <IconGear2Fill18 className="size-4.5 text-muted-foreground" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Settings</TooltipContent>
+          </Tooltip>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex size-full flex-col gap-4 rounded-lg p-2">
+          <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-sm shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] ring-1 ring-foreground/10">
+            {tab?.url === 'ui-main' ? (
+              <StartPage tabId={tabId} />
+            ) : tab?.error ? (
+              <div>Error: {tab?.error?.message}</div>
+            ) : (
+              <div
+                id={`dev-app-preview-container-${tabId}`}
+                className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
+              >
+                {isActive && <DOMContextSelector />}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  },
+);
+
+PerTabContent.displayName = 'PerTabContent';

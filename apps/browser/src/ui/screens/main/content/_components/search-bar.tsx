@@ -12,16 +12,21 @@ import {
   CollapsibleContent,
 } from '@stagewise/stage-ui/components/collapsible';
 
-export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
+interface SearchBarProps {
+  tabId: string;
+  ref: React.RefObject<HTMLInputElement>;
+}
+
+export function SearchBar({ tabId, ref }: SearchBarProps) {
   const [searchString, setSearchString] = useState('');
   const [isHovered, setIsHovered] = useState(false);
   const [shouldShow, setShouldShow] = useState(false);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isSearchBarActive = useKartonState((s) => s.browser.isSearchBarActive);
-  const activeTabId = useKartonState((s) => s.browser.activeTabId);
-  const tabs = useKartonState((s) => s.browser.tabs);
-  const activeTabSearch = activeTabId ? tabs[activeTabId]?.search : null;
+  const isSearchBarActive = useKartonState(
+    (s) => s.browser.tabs[tabId]?.isSearchBarActive ?? false,
+  );
+  const tabSearch = useKartonState((s) => s.browser.tabs[tabId]?.search);
 
   const startSearch = useKartonProcedure((p) => p.browser.searchInPage.start);
   const updateSearch = useKartonProcedure(
@@ -90,33 +95,33 @@ export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
 
   // Clear local search string when backend search is cleared (e.g., on navigation)
   useEffect(() => {
-    if (!activeTabSearch && searchString.length > 0) {
+    if (!tabSearch && searchString.length > 0) {
       setSearchString('');
     }
-  }, [activeTabSearch]); // Only watch activeTabSearch, not searchString
+  }, [tabSearch]); // Only watch tabSearch, not searchString
 
   // Start or update search when user types
   useEffect(() => {
-    if (!isSearchBarActive || !activeTabId) return;
+    if (!isSearchBarActive || !tabId) return;
 
     if (searchString.length === 0) {
       // Don't search for empty string
       return;
     }
 
-    if (!activeTabSearch) {
+    if (!tabSearch) {
       // First time typing - start search
-      startSearch(searchString, activeTabId);
-    } else if (searchString !== activeTabSearch.text) {
+      startSearch(searchString, tabId);
+    } else if (searchString !== tabSearch.text) {
       // Text changed - update search
-      updateSearch(searchString, activeTabId);
+      updateSearch(searchString, tabId);
     }
   }, [
     searchString,
     isSearchBarActive,
-    // Removed activeTabSearch from dependencies to prevent duplicate searches
+    // Removed tabSearch from dependencies to prevent duplicate searches
     // when backend state updates (e.g., result count changes)
-    activeTabId,
+    tabId,
     startSearch,
     updateSearch,
   ]);
@@ -139,13 +144,13 @@ export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                if (activeTabSearch && activeTabSearch.resultsCount > 0) {
-                  nextSearchResult(activeTabId);
+                if (tabSearch && tabSearch.resultsCount > 0) {
+                  nextSearchResult(tabId);
                 }
               } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                if (activeTabSearch && activeTabSearch.resultsCount > 0) {
-                  previousSearchResult(activeTabId);
+                if (tabSearch && tabSearch.resultsCount > 0) {
+                  previousSearchResult(tabId);
                 }
               } else if (e.key === 'Escape') {
                 e.preventDefault();
@@ -159,24 +164,20 @@ export function SearchBar({ ref }: { ref: React.RefObject<HTMLInputElement> }) {
               <Button
                 variant="ghost"
                 size="icon-xs"
-                disabled={
-                  !activeTabSearch || activeTabSearch.resultsCount === 0
-                }
-                onClick={() => previousSearchResult(activeTabId)}
+                disabled={!tabSearch || tabSearch.resultsCount === 0}
+                onClick={() => previousSearchResult(tabId)}
               >
                 <IconChevronLeft className="size-3" />
               </Button>
               <span className="text-muted-foreground text-xs">
-                {activeTabSearch?.activeMatchIndex ?? 0} /{' '}
-                {activeTabSearch?.resultsCount ?? 0}
+                {tabSearch?.activeMatchIndex ?? 0} /{' '}
+                {tabSearch?.resultsCount ?? 0}
               </span>
               <Button
                 variant="ghost"
                 size="icon-xs"
-                disabled={
-                  !activeTabSearch || activeTabSearch.resultsCount === 0
-                }
-                onClick={() => nextSearchResult(activeTabId)}
+                disabled={!tabSearch || tabSearch.resultsCount === 0}
+                onClick={() => nextSearchResult(tabId)}
               >
                 <IconChevronRight className="size-3" />
               </Button>

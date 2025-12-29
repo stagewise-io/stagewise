@@ -15,10 +15,13 @@ import {
 } from '@stagewise/stage-ui/components/collapsible';
 import { HotkeyActions } from '@shared/hotkeys';
 
-export function ZoomBar() {
-  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+interface ZoomBarProps {
+  tabId: string;
+}
+
+export function ZoomBar({ tabId }: ZoomBarProps) {
   const zoomPercentage = useKartonState(
-    (s) => s.browser.tabs[activeTabId]?.zoomPercentage,
+    (s) => s.browser.tabs[tabId]?.zoomPercentage,
   );
   const setZoomPercentage = useKartonProcedure(
     (p) => p.browser.setZoomPercentage,
@@ -33,19 +36,19 @@ export function ZoomBar() {
     if (zoomPercentage <= 50) {
       return;
     }
-    setZoomPercentage(zoomPercentage - 10, activeTabId);
-  }, [zoomPercentage, setZoomPercentage, activeTabId]);
+    setZoomPercentage(zoomPercentage - 10, tabId);
+  }, [zoomPercentage, setZoomPercentage, tabId]);
 
   const zoomIn = useCallback(() => {
     if (zoomPercentage >= 500) {
       return;
     }
-    setZoomPercentage(zoomPercentage + 10, activeTabId);
-  }, [zoomPercentage, setZoomPercentage, activeTabId]);
+    setZoomPercentage(zoomPercentage + 10, tabId);
+  }, [zoomPercentage, setZoomPercentage, tabId]);
 
   const resetZoom = useCallback(() => {
-    setZoomPercentage(100, activeTabId);
-  }, [setZoomPercentage, activeTabId]);
+    setZoomPercentage(100, tabId);
+  }, [setZoomPercentage, tabId]);
 
   // Handle auto-hide logic
   useEffect(() => {
@@ -87,6 +90,9 @@ export function ZoomBar() {
       }
     };
   }, [zoomPercentage, isHovered, shouldShow]);
+
+  // Note: The previous useEffect that reset on activeTabId change is no longer needed
+  // because each tab now has its own ZoomBar instance with isolated state
 
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);

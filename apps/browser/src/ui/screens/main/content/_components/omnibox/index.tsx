@@ -12,16 +12,15 @@ import type { TabState } from '@shared/karton-contracts/ui';
 import { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { InternalPageBreadcrumbs } from './internal-page-breadcrumbs';
+import { useKartonProcedure } from '@/hooks/use-karton';
 
 export interface OmniboxRef {
   focus: () => void;
 }
 
 interface OmniboxProps {
-  activeTab: TabState | undefined;
-  activeTabId: string | undefined;
-  tabs: Record<string, TabState>;
-  goto: (url: string, tabId?: string, transition?: PageTransition) => void;
+  tabId: string;
+  tab: TabState | undefined;
 }
 
 function goToUrl(
@@ -52,9 +51,11 @@ function goToUrl(
 }
 
 export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
-  ({ activeTab, activeTabId, tabs, goto }, ref) => {
-    const [localUrl, setLocalUrl] = useState(activeTab?.url ?? '');
-    const [urlBeforeEdit, setUrlBeforeEdit] = useState(activeTab?.url ?? '');
+  ({ tabId, tab }, ref) => {
+    const goto = useKartonProcedure((p) => p.browser.goto);
+
+    const [localUrl, setLocalUrl] = useState(tab?.url ?? '');
+    const [urlBeforeEdit, setUrlBeforeEdit] = useState(tab?.url ?? '');
     const [isUrlInputFocused, setIsUrlInputFocused] = useState(false);
     const urlInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,24 +74,24 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
       [],
     );
 
-    // Update local URL when tab changes
+    // Update local URL when tab URL changes
     useEffect(() => {
-      if (activeTab?.url === 'ui-main') {
+      if (tab?.url === 'ui-main') {
         setLocalUrl('');
         setUrlBeforeEdit('');
       } else {
-        setLocalUrl(activeTab?.url ?? '');
-        setUrlBeforeEdit(activeTab?.url ?? '');
+        setLocalUrl(tab?.url ?? '');
+        setUrlBeforeEdit(tab?.url ?? '');
       }
-      // Reset focus state when tab changes
+      // Reset focus state when tab URL changes
       setIsUrlInputFocused(false);
-    }, [activeTab?.url, activeTabId]);
+    }, [tab?.url]);
 
     // Check if URL is a stagewise://internal/ URL
     const isStagewiseInternalUrl = useMemo(() => {
-      const url = activeTab?.url ?? '';
+      const url = tab?.url ?? '';
       return url.startsWith('stagewise://internal/');
-    }, [activeTab?.url]);
+    }, [tab?.url]);
 
     const handleBreadcrumbClick = useCallback(() => {
       // Set focus state first to render the input
@@ -103,9 +104,9 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
     }, []);
 
     const handleInputFocus = useCallback(() => {
-      setUrlBeforeEdit(tabs[activeTabId ?? '']?.url ?? '');
+      setUrlBeforeEdit(tab?.url ?? '');
       setIsUrlInputFocused(true);
-    }, [tabs, activeTabId]);
+    }, [tab?.url]);
 
     const handleInputBlur = useCallback(() => {
       setIsUrlInputFocused(false);
@@ -115,12 +116,12 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
       (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
           // When user types in omnibox and presses Enter, mark as TYPED transition
-          goToUrl(goto, localUrl, activeTabId, PageTransition.TYPED);
+          goToUrl(goto, localUrl, tabId, PageTransition.TYPED);
           setUrlBeforeEdit(localUrl);
           urlInputRef.current?.blur();
         }
       },
-      [goto, localUrl, activeTabId],
+      [goto, localUrl, tabId],
     );
 
     // Handle Escape key to cancel editing
@@ -138,9 +139,9 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
 
     return (
       <div className="relative flex flex-1 items-center rounded-full bg-zinc-500/5 pr-5 pl-3 focus-within:bg-zinc-500/10">
-        {!isUrlInputFocused && isStagewiseInternalUrl && activeTab?.url ? (
+        {!isUrlInputFocused && isStagewiseInternalUrl && tab?.url ? (
           <InternalPageBreadcrumbs
-            url={activeTab.url}
+            url={tab.url}
             onFocusInput={handleBreadcrumbClick}
           />
         ) : (

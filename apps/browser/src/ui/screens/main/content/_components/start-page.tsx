@@ -21,7 +21,11 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { IconChevronDown } from 'nucleo-micro-bold';
 
-export function StartPage() {
+interface StartPageProps {
+  tabId: string;
+}
+
+export function StartPage({ tabId }: StartPageProps) {
   const hasSeenOnboardingFlow = useKartonState(
     (s) => s.userExperience.storedExperienceData.hasSeenOnboardingFlow,
   );
@@ -34,17 +38,16 @@ export function StartPage() {
       {!hasSeenOnboardingFlow ? (
         <OnboardingStartPage />
       ) : (
-        <StartPageWithConnectedWorkspace />
+        <StartPageWithConnectedWorkspace tabId={tabId} />
       )}
     </div>
   );
 }
 
-const StartPageWithConnectedWorkspace = () => {
+const StartPageWithConnectedWorkspace = ({ tabId }: { tabId: string }) => {
   const inspirationWebsites = useKartonState(
     (s) => s.userExperience.inspirationWebsites,
   );
-  const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const goto = useKartonProcedure((p) => p.browser.goto);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
   const workspaceStatus = useKartonState((s) => s.workspaceStatus);
@@ -116,11 +119,10 @@ const StartPageWithConnectedWorkspace = () => {
         createTab(url, false);
       } else {
         // Navigate current tab
-        if (!activeTabId) return;
-        goto(url, activeTabId);
+        goto(url, tabId);
       }
     },
-    [activeTabId, goto, createTab],
+    [tabId, goto, createTab],
   );
   return (
     <div className="flex w-full max-w-6xl flex-col items-start gap-8 px-20">
