@@ -5,13 +5,11 @@ import type {
   TextUIPart,
   FileUIPart,
   ReasoningUIPart,
-  AgentError,
   UIMessagePart,
   ToolUIPart,
   DynamicToolUIPart,
 } from '@shared/karton-contracts/ui';
-import { AgentErrorType } from '@shared/karton-contracts/ui';
-import { RefreshCcwIcon, Undo2 } from 'lucide-react';
+import { Undo2 } from 'lucide-react';
 import { useMemo, useCallback, useState, useEffect, memo } from 'react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { useChatActions } from '@/hooks/use-chat-state';
@@ -54,16 +52,11 @@ function isToolPart(part: UIMessagePart): part is ToolPart {
 export const ChatBubble = memo(
   function ChatBubble({
     message: msg,
-    chatError,
     isLastMessage,
   }: {
     message: ChatMessage;
-    chatError?: AgentError;
     isLastMessage: boolean;
   }) {
-    const retrySendingUserMessage = useKartonProcedure(
-      (p) => p.agentChat.retrySendingUserMessage,
-    );
     const undoToolCallsUntilUserMessage = useKartonProcedure(
       (p) => p.agentChat.undoToolCallsUntilUserMessage,
     );
@@ -193,7 +186,7 @@ export const ChatBubble = memo(
           <div className="flex max-w-full flex-col items-start gap-2">
             <div
               className={cn(
-                'group relative min-h-8 max-w-full animate-chat-bubble-appear select-text space-y-3 break-words rounded-xl px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
+                'group wrap-break-word relative min-h-8 max-w-full animate-chat-bubble-appear select-text space-y-3 rounded-xl px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
                 msg.role === 'assistant'
                   ? 'min-w-1/3 origin-bottom-left rounded-bl-sm border border-muted-foreground/10 bg-zinc-100/60 text-foreground dark:bg-zinc-700/50'
                   : 'origin-bottom-right rounded-br-sm border border-muted-foreground/10 bg-blue-600/90 text-white',
@@ -400,21 +393,6 @@ export const ChatBubble = memo(
               </PopoverContent>
             </Popover>
           )}
-
-          <div className="flex h-full min-w-12 grow flex-row items-center justify-start">
-            {msg.role === 'assistant' &&
-              chatError?.type === AgentErrorType.AGENT_ERROR && (
-                <Button
-                  aria-label={'Retry'}
-                  variant="secondary"
-                  size="icon-sm"
-                  className="opacity-0 blur-xs group-hover:opacity-100 group-hover:blur-none"
-                  onClick={() => void retrySendingUserMessage()}
-                >
-                  <RefreshCcwIcon className="size-4" />
-                </Button>
-              )}
-          </div>
         </div>
       </div>
     );
@@ -424,7 +402,6 @@ export const ChatBubble = memo(
     if (prevProps.message.id !== nextProps.message.id) return false;
     if (prevProps.message.role !== nextProps.message.role) return false;
     if (prevProps.isLastMessage !== nextProps.isLastMessage) return false;
-    if (prevProps.chatError !== nextProps.chatError) return false;
     if (prevProps.message.parts.length !== nextProps.message.parts.length)
       return false;
 

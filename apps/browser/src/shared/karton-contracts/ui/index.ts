@@ -85,6 +85,32 @@ export enum AgentErrorType {
   OTHER = 'other',
 }
 
+/**
+ * Known AI SDK error types for classification
+ */
+export type AISDKErrorType =
+  | 'AI_APICallError'
+  | 'AI_InvalidArgumentError'
+  | 'AI_TypeValidationError'
+  | 'NetworkError'
+  | 'UnknownError';
+
+/**
+ * Structured error info for detailed error display
+ */
+export type StructuredAgentErrorInfo = {
+  /** Human-readable error message */
+  message: string;
+  /** HTTP status code or error code (e.g., "400", "ECONNREFUSED", "VALIDATION_ERROR") */
+  code: string;
+  /** The type of AI SDK error for UI classification */
+  errorType: AISDKErrorType;
+  /** Anthropic-specific error type (e.g., "invalid_request_error", "rate_limit_error") */
+  anthropicType?: string;
+  /** Request ID for support/debugging */
+  requestId?: string;
+};
+
 export type WorkspaceStatus =
   | 'open'
   | 'closed'
@@ -144,7 +170,7 @@ export type AgentError =
     }
   | {
       type: AgentErrorType.AGENT_ERROR;
-      error: { name: string; message: string };
+      error: StructuredAgentErrorInfo;
     }
   | {
       type: AgentErrorType.OTHER;

@@ -3,6 +3,11 @@ import {
   isCustomTRPCError,
   getCustomErrorData,
 } from '@stagewise/api-client';
+import {
+  extractDetailsFromError,
+  type AISDKErrorType,
+} from './extract-details-from-error.js';
+import type { StructuredAgentErrorInfo } from '@shared/karton-contracts/ui';
 
 /**
  * Utility functions for formatting and handling errors in the agent
@@ -20,6 +25,10 @@ function sanitizeErrorMessage(message: string): string {
     /https?:\/\/[a-zA-Z0-9._-]{1,50}:[a-zA-Z0-9._-]{1,50}@[a-zA-Z0-9.-]{1,100}/gi,
     // Email addresses (might be sensitive)
     /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+    // Internal file paths (Unix)
+    /\/(?:home|var|usr|tmp|etc|opt)\/[^\s'"]+/g,
+    // Internal file paths (Windows)
+    /[A-Za-z]:\\(?:Users|Windows|Program Files)[^\s'"]+/gi,
   ];
 
   let sanitized = message;
@@ -30,7 +39,9 @@ function sanitizeErrorMessage(message: string): string {
 }
 
 /**
- * Extracts the most meaningful error message from an error object
+ * Extracts the most meaningful error message from an error object.
+ * Uses multiple strategies including the enhanced extractDetailsFromError
+ * to provide the most informative message possible.
  */
 function extractErrorMessage(error: unknown): string {
   if (!error) return 'Unknown error';
@@ -40,6 +51,7 @@ function extractErrorMessage(error: unknown): string {
   const discordLink =
     process.env.DISCORD_INVITE_LINK || 'https://discord.gg/gkdGsDYaKA';
 
+  // Strategy 1: Handle TRPC client errors with custom codes
   if (isTRPCClientError(error)) {
     if (isCustomTRPCError(error)) {
       const customErrorData = getCustomErrorData(error);
@@ -54,6 +66,19 @@ function extractErrorMessage(error: unknown): string {
     }
   }
 
+  // Strategy 2: Try enhanced extraction for AI SDK errors (provider/network/validation)
+  const extractedDetails = extractDetailsFromError(error);
+  if (extractedDetails) {
+    const { code, message } = extractedDetails;
+    // Format with status code if it's a numeric HTTP status
+    if (/^\d{3}$/.test(code)) {
+      return `${code} - ${message}`;
+    }
+    // For non-numeric codes (ECONNREFUSED, VALIDATION_ERROR, etc.)
+    return message;
+  }
+
+  // Strategy 3: Handle standard Error instances
   if (error instanceof Error) {
     // For TRPC errors, try to get the detailed message
     if ('data' in error && error.data && typeof error.data === 'object') {
@@ -64,10 +89,12 @@ function extractErrorMessage(error: unknown): string {
     return error.message;
   }
 
+  // Strategy 4: Handle plain strings
   if (typeof error === 'string') {
     return error;
   }
 
+  // Strategy 5: Handle objects with message or error properties
   if (typeof error === 'object' && error !== null) {
     if ('message' in error && typeof error.message === 'string') {
       return error.message;
@@ -77,7 +104,59 @@ function extractErrorMessage(error: unknown): string {
     }
   }
 
+  // Last resort: stringify the error
   return JSON.stringify(error);
+}
+
+/**
+ * Extracts structured error information from an error object.
+ * Returns a StructuredAgentErrorInfo object that can be used directly in the UI.
+ *
+ * @param error - The error object to extract information from
+ * @returns StructuredAgentErrorInfo with all available error details
+ */
+export function extractStructuredError(
+  error: unknown,
+): StructuredAgentErrorInfo {
+  // Try enhanced extraction for AI SDK errors
+  const extractedDetails = extractDetailsFromError(error);
+
+  if (extractedDetails) {
+    return {
+      message: sanitizeErrorMessage(extractedDetails.message),
+      code: extractedDetails.code,
+      errorType: extractedDetails.errorType,
+      anthropicType: extractedDetails.anthropicType,
+      requestId: extractedDetails.requestId,
+    };
+  }
+
+  // Fallback for other error types
+  const errorMessage = extractErrorMessage(error);
+  const sanitizedMessage = sanitizeErrorMessage(errorMessage);
+
+  // Try to determine error type from error object
+  let errorType: AISDKErrorType = 'UnknownError';
+  let code = 'ERROR';
+
+  if (error && typeof error === 'object') {
+    const e = error as Record<string, any>;
+    if (e.name === 'AI_APICallError') {
+      errorType = 'AI_APICallError';
+      code = e.statusCode ? String(e.statusCode) : 'API_ERROR';
+    } else if (e.name === 'AI_InvalidArgumentError') {
+      errorType = 'AI_InvalidArgumentError';
+      code = 'VALIDATION_ERROR';
+    } else if (e.name) {
+      code = e.name;
+    }
+  }
+
+  return {
+    message: sanitizedMessage,
+    code,
+    errorType,
+  };
 }
 
 /**

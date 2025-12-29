@@ -1,8 +1,9 @@
 import { cn } from '@/utils';
+import { IconTriangleWarning } from 'nucleo-micro-bold';
 import { AgentErrorType, type AgentError } from '@shared/karton-contracts/ui';
 import { RefreshCcwIcon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
-import { Streamdown } from 'streamdown';
+import { Streamdown } from '@/components/streamdown';
 import { useMemo } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 
@@ -78,13 +79,6 @@ export function ChatErrorBubble({ error }: { error: AgentError }) {
     }
   }, [error, subscription?.active]);
 
-  const isHandledError = useMemo(() => {
-    return (
-      error.type === AgentErrorType.INSUFFICIENT_CREDITS ||
-      error.type === AgentErrorType.PLAN_LIMITS_EXCEEDED
-    );
-  }, [error.type]);
-
   return (
     <div className="flex flex-col gap-1">
       <div
@@ -94,17 +88,16 @@ export function ChatErrorBubble({ error }: { error: AgentError }) {
       >
         <div
           className={cn(
-            'markdown group relative min-h-8 animate-chat-bubble-appear space-y-3 break-words rounded-2xl bg-white/5 px-2.5 py-1.5 font-normal text-sm shadow-lg shadow-zinc-950/10 ring-1 ring-inset last:mb-0.5',
-            isHandledError
-              ? 'min-w-48 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-zinc-950 ring-zinc-950/5 dark:bg-zinc-800/60 dark:text-zinc-50'
-              : 'min-w-48 origin-bottom-left rounded-bl-xs bg-rose-600/90 text-white ring-rose-100/5',
+            'markdown group wrap-break-word relative min-h-8 animate-chat-bubble-appear space-y-3 rounded-2xl bg-white/5 px-2.5 py-1.5 font-normal text-sm ring-1 ring-inset last:mb-0.5',
+            'min-w-48 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-zinc-950 ring-zinc-950/5 dark:bg-zinc-800/60 dark:text-zinc-50',
           )}
         >
-          <Streamdown isAnimating={false}>{errorMessage}</Streamdown>
-          {!isHandledError && (
-            <span className="mt-2 block text-xs italic">
-              {error.type}: {error.error.name}
-            </span>
+          {error.type === AgentErrorType.AGENT_ERROR ? (
+            <AgentErrorMessage error={error} />
+          ) : error.type === AgentErrorType.OTHER ? (
+            <OtherErrorMessage error={error} />
+          ) : (
+            <Streamdown isAnimating={false}>{errorMessage}</Streamdown>
           )}
         </div>
 
@@ -119,6 +112,67 @@ export function ChatErrorBubble({ error }: { error: AgentError }) {
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+type AgentErrorWithStructuredError = Extract<
+  AgentError,
+  { type: AgentErrorType.AGENT_ERROR }
+>;
+
+function AgentErrorMessage({
+  error,
+}: {
+  error: AgentErrorWithStructuredError;
+}) {
+  const heading = useMemo(() => {
+    switch (error.error.errorType) {
+      case 'AI_APICallError':
+        return 'API Error';
+      case 'AI_InvalidArgumentError':
+        return 'Invalid Argument Error';
+      case 'NetworkError':
+        return 'Network Error';
+      case 'AI_TypeValidationError':
+        return 'Type Validation Error';
+      default:
+        return error.error.errorType;
+    }
+  }, [error.error.errorType]);
+  return (
+    <div className="flex select-text flex-col gap-1">
+      <div className="flex select-text flex-row items-baseline justify-start gap-1">
+        <IconTriangleWarning className="size-3 translate-y-[2px]" />
+        <span className="select-text font-medium text-foreground text-sm">
+          {heading}
+        </span>
+      </div>
+      <span className="select-text text-muted-foreground text-xs">
+        <Streamdown isAnimating={false}>{error.error.message}</Streamdown>
+      </span>
+    </div>
+  );
+}
+
+type AgentErrorWithOtherError = Extract<
+  AgentError,
+  { type: AgentErrorType.OTHER }
+>;
+function OtherErrorMessage({ error }: { error: AgentErrorWithOtherError }) {
+  return (
+    <div className="flex select-text flex-col gap-1">
+      <div className="flex select-text flex-row items-baseline justify-start gap-1">
+        <IconTriangleWarning className="size-3 translate-y-[2px]" />
+        <span className="select-text font-medium text-foreground text-sm">
+          Agent Error
+        </span>
+      </div>
+      <span className="select-text text-muted-foreground text-xs">
+        <Streamdown isAnimating={false}>
+          {`${error.error.name} - ${error.error.message}`}
+        </Streamdown>
+      </span>
     </div>
   );
 }

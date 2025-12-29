@@ -52,14 +52,13 @@ import {
 } from './utils/karton-helpers';
 import type { GenericToolCallResult } from './utils/tool-call-utils';
 import { createAndActivateNewChat } from './utils/karton-helpers';
-import { ErrorDescriptions, formatErrorDescription } from './utils/error-utils';
+import { extractStructuredError } from './utils/error-utils';
 import { isAbortError } from './utils/is-abort-error';
 import { isPlanLimitsExceededError } from './utils/is-plan-limit-error';
 import type { PlanLimitsExceededError } from './utils/is-plan-limit-error';
 import { processToolCalls } from './utils/tool-call-utils';
 import { generateChatTitle } from './utils/generate-chat-title';
 import { isAuthenticationError } from './utils/is-authentication-error';
-import { extractDetailsFromError } from './utils/extract-details-from-error';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
@@ -875,17 +874,17 @@ export class AgentService {
     if (!this.isWarmedUp) this.isWarmedUp = true;
 
     if (this.recursionDepth >= MAX_RECURSION_DEPTH) {
-      const errorDesc = ErrorDescriptions.recursionDepthExceeded(
-        this.recursionDepth,
-        MAX_RECURSION_DEPTH,
-      );
       this.setAgentWorking(false);
       this.uiKarton.setState((draft) => {
         const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
             type: AgentErrorType.AGENT_ERROR,
-            error: new Error(errorDesc),
+            error: {
+              message: `Maximum recursion depth exceeded: Reached depth ${this.recursionDepth} of ${MAX_RECURSION_DEPTH}`,
+              code: 'RECURSION_LIMIT',
+              errorType: 'UnknownError',
+            },
           };
         }
       });
@@ -1144,14 +1143,14 @@ export class AgentService {
         `[AgentService] Agent failed: ${error instanceof Error ? error.message : JSON.stringify(error)} ${error instanceof Error ? error.stack : ''}`,
       );
       this.telemetryService.captureException(error as Error);
-      const errorDesc = formatErrorDescription('Agent failed', error);
+      const structuredError = extractStructuredError(error);
       this.setAgentWorking(false);
       this.uiKarton.setState((draft) => {
         const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
             type: AgentErrorType.AGENT_ERROR,
-            error: new Error(errorDesc),
+            error: structuredError,
           };
         }
       });
@@ -1504,7 +1503,11 @@ export class AgentService {
         if (chat) {
           chat.error = {
             type: AgentErrorType.AGENT_ERROR,
-            error: new Error('Authentication failed, please restart the cli.'),
+            error: {
+              message: 'Authentication failed, please restart the app.',
+              code: '401',
+              errorType: 'AI_APICallError',
+            },
           };
         }
       });
@@ -1525,17 +1528,16 @@ export class AgentService {
       this.cleanupPendingOperations('Context limit exceeded');
       return;
     } else {
-      const errorDetails = extractDetailsFromError(error.error);
       this.logger.debug(`[Agent Service] Agent failed: ${error.error}`);
       this.telemetryService.captureException(error.error as Error);
-      const errorDesc = formatErrorDescription('Agent failed', errorDetails);
+      const structuredError = extractStructuredError(error.error);
       this.setAgentWorking(false);
       this.uiKarton.setState((draft) => {
         const chat = draft.agentChat?.chats[chatId];
         if (chat) {
           chat.error = {
             type: AgentErrorType.AGENT_ERROR,
-            error: new Error(errorDesc),
+            error: structuredError,
           };
         }
       });
