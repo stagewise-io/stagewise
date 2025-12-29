@@ -25,15 +25,20 @@ function s(...path: string[]) {
 
 export function Tab({
   borderRadius = 8,
+  bottomLeftBorderRadius,
   className = '',
   activateBottomLeftCornerRadius = true,
   tabState,
 }: {
   borderRadius?: number;
+  /** Optional override for just the bottom-left S-curve radius (used during drag interpolation) */
+  bottomLeftBorderRadius?: number;
   className?: string;
   activateBottomLeftCornerRadius?: boolean;
   tabState: TabState;
 }) {
+  // Use the override if provided, otherwise use the general borderRadius
+  const effectiveBottomLeftRadius = bottomLeftBorderRadius ?? borderRadius;
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const isActive = tabState.id === activeTabId;
@@ -66,6 +71,8 @@ export function Tab({
   const dimensions = useElementDimensions(tabRef, [
     activateBottomLeftCornerRadius,
     isActive,
+    borderRadius,
+    effectiveBottomLeftRadius,
   ]);
 
   const svgPath = useMemo(() => {
@@ -74,9 +81,16 @@ export function Tab({
       height: dimensions.height,
       width: dimensions.width,
       borderRadius,
+      bottomLeftBorderRadius: effectiveBottomLeftRadius,
       activateBottomLeftCornerRadius,
     });
-  }, [dimensions, borderRadius, activateBottomLeftCornerRadius, isActive]);
+  }, [
+    dimensions,
+    borderRadius,
+    effectiveBottomLeftRadius,
+    activateBottomLeftCornerRadius,
+    isActive,
+  ]);
 
   return (
     <WithTabPreviewCard tabState={tabState} activeTabId={activeTabId}>
@@ -118,8 +132,12 @@ export function Tab({
               )}
               style={{
                 clipPath: `url(#${clipPathId})`,
-                paddingLeft: activateBottomLeftCornerRadius ? borderRadius : 0,
-                marginLeft: activateBottomLeftCornerRadius ? -borderRadius : 0,
+                paddingLeft: activateBottomLeftCornerRadius
+                  ? effectiveBottomLeftRadius
+                  : 0,
+                marginLeft: activateBottomLeftCornerRadius
+                  ? -effectiveBottomLeftRadius
+                  : 0,
                 paddingRight: borderRadius,
                 marginRight: -borderRadius,
                 borderTopLeftRadius: borderRadius,
@@ -270,18 +288,27 @@ function getTabSvgPath({
   height,
   width,
   borderRadius,
+  bottomLeftBorderRadius,
   activateBottomLeftCornerRadius,
 }: {
   height: number;
   width: number;
   borderRadius: number;
+  /** Separate radius for the bottom-left S-curve (for drag interpolation) */
+  bottomLeftBorderRadius: number;
   activateBottomLeftCornerRadius: boolean;
 }) {
+  // Use the separate bottomLeftBorderRadius for the bottom-left S-curve
+  const blRadius = bottomLeftBorderRadius;
+
   const turningPoints = {
+    // Bottom-left S-curve uses its own radius
     bottomLeft: { x: 0, y: height },
-    bottomLeftInner: { x: borderRadius, y: height - borderRadius },
-    topLeft: { x: borderRadius, y: borderRadius },
-    topLeftInner: { x: 2 * borderRadius, y: 0 },
+    bottomLeftInner: { x: blRadius, y: height - blRadius },
+    topLeft: { x: blRadius, y: borderRadius },
+    // Top-left curve: starts at x=blRadius (where bottom-left ends), uses borderRadius for its width
+    topLeftInner: { x: blRadius + borderRadius, y: 0 },
+    // Rest of the tab uses the standard borderRadius
     topRightInner: { x: width - 2 * borderRadius, y: 0 },
     topRight: { x: width - borderRadius, y: borderRadius },
     bottomRightInner: { x: width - borderRadius, y: height - borderRadius },
@@ -289,19 +316,21 @@ function getTabSvgPath({
   };
   const p = turningPoints;
   const K = borderRadius * CUBIC_BEZIER_CONTROL_POINT_FACTOR;
+  const Kbl = blRadius * CUBIC_BEZIER_CONTROL_POINT_FACTOR; // Control point for bottom-left curve
+
   const bottomLeftUntilTopRightInner =
     activateBottomLeftCornerRadius === false
       ? s(
           `M ${p.bottomLeft.x} ${p.bottomLeft.y}`, // Start at bottom left corner
-          `L ${p.topLeft.x - borderRadius} ${p.topLeft.y}`, // Move to top left corner
-          `C ${p.topLeft.x - borderRadius} ${p.topLeft.y - K}, ${p.topLeftInner.x - borderRadius - K} ${p.topLeftInner.y}, ${p.topLeftInner.x - borderRadius} ${p.topLeftInner.y}`, // Curve to top left inner
+          `L ${p.topLeft.x - blRadius} ${p.topLeft.y}`, // Move to top left corner
+          `C ${p.topLeft.x - blRadius} ${p.topLeft.y - K}, ${p.topLeftInner.x - blRadius - K} ${p.topLeftInner.y}, ${p.topLeftInner.x - blRadius} ${p.topLeftInner.y}`, // Curve to top left inner
           `L ${p.topRightInner.x} ${p.topRightInner.y}`, // Move to top right inner corner
         )
       : s(
           `M ${p.bottomLeft.x} ${p.bottomLeft.y}`, // Start at bottom left corner
-          `C ${p.bottomLeft.x + K} ${p.bottomLeft.y}, ${p.bottomLeftInner.x} ${p.bottomLeftInner.y + K}, ${p.bottomLeftInner.x} ${p.bottomLeftInner.y}`, // Curve to bottom left inner
+          `C ${p.bottomLeft.x + Kbl} ${p.bottomLeft.y}, ${p.bottomLeftInner.x} ${p.bottomLeftInner.y + Kbl}, ${p.bottomLeftInner.x} ${p.bottomLeftInner.y}`, // Curve to bottom left inner (uses blRadius)
           `L ${p.topLeft.x} ${p.topLeft.y}`, // Move to top left corner
-          `C ${p.topLeft.x} ${p.topLeft.y - K}, ${p.topLeftInner.x - K} ${p.topLeftInner.y}, ${p.topLeftInner.x} ${p.topLeftInner.y}`, // Curve to top left inner
+          `C ${p.topLeft.x} ${p.topLeft.y - K}, ${p.topLeftInner.x - K} ${p.topLeftInner.y}, ${p.topLeftInner.x} ${p.topLeftInner.y}`, // Curve to top left inner (uses standard radius for top-left curve)
           `L ${p.topRightInner.x} ${p.topRightInner.y}`, // Move to top right inner corner
         );
   return s(

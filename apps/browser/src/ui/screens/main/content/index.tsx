@@ -1,7 +1,7 @@
 import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
 import { useTabUIState } from '@/hooks/use-tab-ui-state';
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { TabsContainer } from './_components/tabs-container';
 import {
@@ -96,6 +96,13 @@ export function MainSection({
 
   const { setTabUiState } = useTabUIState();
 
+  // Track interpolated border radius during tab drag (for smooth corner transition)
+  const [dragBorderRadius, setDragBorderRadius] = useState<number | null>(null);
+
+  const handleDragBorderRadiusChange = useCallback((radius: number | null) => {
+    setDragBorderRadius(radius);
+  }, []);
+
   const handleCreateTab = useCallback(() => {
     createTab();
     // Focus URL bar
@@ -187,12 +194,22 @@ export function MainSection({
           isSidebarCollapsed={isSidebarCollapsed}
           onAddTab={handleCreateTab}
           onCleanAllTabs={handleCleanAllTabs}
+          onDragBorderRadiusChange={handleDragBorderRadiusChange}
         />
         {/* URL, Controls, etc. area */}
         <div
           className={cn(
-            `flex size-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg ${showTopLeftCornerRadius ? 'rounded-tl-lg' : ''} relative`,
+            'relative flex size-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg',
+            // Only apply the static rounded-tl-lg class when not during a drag with interpolated radius
+            dragBorderRadius === null && showTopLeftCornerRadius
+              ? 'rounded-tl-lg'
+              : '',
           )}
+          style={
+            dragBorderRadius !== null
+              ? { borderTopLeftRadius: `${dragBorderRadius}px` }
+              : undefined
+          }
         >
           {/* Background with mask for the web-content */}
           <BackgroundWithCutout className={cn(`z-0`)} borderRadius={4} />

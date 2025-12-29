@@ -3,6 +3,7 @@ import { cn } from '@/utils';
 import { IconPlus } from 'nucleo-micro-bold';
 import { useIsContainerScrollable } from '@/hooks/use-is-container-scrollable';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { AgentPreviewBadge } from './agent-preview-badge';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { IconBrush2Fill18 } from 'nucleo-ui-fill-18';
@@ -21,6 +22,7 @@ import {
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
+  type DragMoveEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -28,20 +30,27 @@ import {
   sortableKeyboardCoordinates,
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
+import {
+  restrictToHorizontalAxis,
+  restrictToFirstScrollableAncestor,
+} from '@dnd-kit/modifiers';
 import { SortableTab } from './sortable-tab';
 import { Tab } from './tab';
+
+const DEFAULT_BORDER_RADIUS = 8;
 
 export function TabsContainer({
   openSidebarChatPanel,
   isSidebarCollapsed,
   onAddTab,
   onCleanAllTabs,
+  onDragBorderRadiusChange,
 }: {
   openSidebarChatPanel: () => void;
   isSidebarCollapsed: boolean;
   onAddTab: () => void;
   onCleanAllTabs: () => void;
+  onDragBorderRadiusChange?: (radius: number | null) => void;
 }) {
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
@@ -64,6 +73,12 @@ export function TabsContainer({
 
   // Track which tab is currently being dragged (for DragOverlay)
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Track the interpolated border radius during drag (8 to 0 as tab approaches left edge)
+  const [dragBorderRadius, setDragBorderRadius] = useState<number | null>(null);
+
+  // Track if we should disable the drop animation (when dropping at position 0)
+  const [disableDropAnimation, setDisableDropAnimation] = useState(false);
 
   // Sync optimistic state with server state when server updates
   // (e.g., when tabs are added/removed, or after backend confirms reorder)
@@ -88,15 +103,68 @@ export function TabsContainer({
     setActiveId(event.active.id as string);
   }, []);
 
+  // Handle drag move to track position and calculate interpolated border radius
+  const handleDragMove = useCallback(
+    (event: DragMoveEvent) => {
+      const { active, delta } = event;
+      const container = scrollContainerRef.current;
+
+      if (!container || !active.rect.current.initial) {
+        return;
+      }
+
+      // Only interpolate when the dragged tab is the active tab
+      // (we only care about smoothing the active tab's S-curve)
+      const draggedTabId = active.id as string;
+      if (draggedTabId !== activeTabId) {
+        // Not dragging the active tab, reset to null
+        setDragBorderRadius(null);
+        onDragBorderRadiusChange?.(null);
+        return;
+      }
+
+      // When sidebar is collapsed, we always show the S-curve at full radius
+      // because there's space on the left for the agent preview badge
+      if (isSidebarCollapsed) {
+        setDragBorderRadius(DEFAULT_BORDER_RADIUS);
+        onDragBorderRadiusChange?.(DEFAULT_BORDER_RADIUS);
+        return;
+      }
+
+      // Get the container's left edge position
+      const containerLeft = container.getBoundingClientRect().left;
+
+      // Calculate the tab's current left position (initial + delta)
+      const tabCurrentLeft = active.rect.current.initial.left + delta.x;
+
+      // Calculate distance from container's left edge
+      const distanceFromLeftEdge = tabCurrentLeft - containerLeft;
+
+      // The S-curve consists of two 8px radius curves meeting (tab + container),
+      // so they occupy 16px total horizontal space.
+      // Interpolate: when distance >= 16, radius is 8; when distance <= 0, radius is 0
+      const interpolatedRadius = Math.max(
+        0,
+        Math.min(DEFAULT_BORDER_RADIUS, distanceFromLeftEdge / 2),
+      );
+
+      setDragBorderRadius(interpolatedRadius);
+      onDragBorderRadiusChange?.(interpolatedRadius);
+    },
+    [activeTabId, isSidebarCollapsed, onDragBorderRadiusChange],
+  );
+
   // Handle drag end to reorder tabs with optimistic update
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
 
+      let newTabIds = optimisticTabIds;
+
       if (over && active.id !== over.id) {
         const oldIndex = optimisticTabIds.indexOf(active.id as string);
         const newIndex = optimisticTabIds.indexOf(over.id as string);
-        const newTabIds = arrayMove(optimisticTabIds, oldIndex, newIndex);
+        newTabIds = arrayMove(optimisticTabIds, oldIndex, newIndex);
 
         // Optimistically update local state immediately
         setOptimisticTabIds(newTabIds);
@@ -105,9 +173,42 @@ export function TabsContainer({
         reorderTabs(newTabIds);
       }
 
-      setActiveId(null);
+      // Check if the active tab will end up at position 0 after the drop
+      const activeTabWillBeFirst =
+        active.id === activeTabId && newTabIds[0] === activeTabId;
+
+      if (activeTabWillBeFirst && !isSidebarCollapsed) {
+        // Disable the drop animation when landing at position 0 to avoid
+        // the S-curve being visible during the snap animation.
+        // The dnd-kit DragOverlay doesn't re-render during its CSS animation,
+        // so we need to skip the animation entirely.
+        flushSync(() => {
+          setDisableDropAnimation(true);
+          setDragBorderRadius(0);
+        });
+        onDragBorderRadiusChange?.(0);
+
+        // Reset after a short delay (no animation, so minimal delay needed)
+        setTimeout(() => {
+          setActiveId(null);
+          setDragBorderRadius(null);
+          setDisableDropAnimation(false);
+          onDragBorderRadiusChange?.(null);
+        }, 50);
+      } else {
+        // Reset immediately for other cases
+        setActiveId(null);
+        setDragBorderRadius(null);
+        onDragBorderRadiusChange?.(null);
+      }
     },
-    [optimisticTabIds, reorderTabs],
+    [
+      activeTabId,
+      isSidebarCollapsed,
+      optimisticTabIds,
+      reorderTabs,
+      onDragBorderRadiusChange,
+    ],
   );
 
   // Get the tab being dragged for the overlay
@@ -142,8 +243,9 @@ export function TabsContainer({
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
-      modifiers={[restrictToHorizontalAxis]}
+      modifiers={[restrictToHorizontalAxis, restrictToFirstScrollableAncestor]}
     >
       <div
         className={cn(
@@ -223,12 +325,19 @@ export function TabsContainer({
           </Tooltip>
         )}
       </div>
-      <DragOverlay>
+      <DragOverlay dropAnimation={disableDropAnimation ? null : undefined}>
         {activeTab ? (
           <div style={{ width: '13rem' }}>
             <Tab
               tabState={activeTab}
-              activateBottomLeftCornerRadius={activateBottomLeftCornerRadius}
+              activateBottomLeftCornerRadius={
+                dragBorderRadius !== null
+                  ? dragBorderRadius > 0 // During drag, show curve only if radius > 0
+                  : activateBottomLeftCornerRadius
+              }
+              bottomLeftBorderRadius={
+                dragBorderRadius !== null ? dragBorderRadius : undefined
+              }
             />
           </div>
         ) : null}
