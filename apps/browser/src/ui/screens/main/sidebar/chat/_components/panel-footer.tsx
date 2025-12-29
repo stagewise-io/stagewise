@@ -234,8 +234,12 @@ export function ChatPanelFooter() {
         window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
         if (!isWorking) setElementSelectionActive(true);
         await togglePanelKeyboardFocus('stagewise-ui');
-      } else if (!elementSelectionActive && !isWorking) {
-        // State 2: Sidebar open, element selection OFF, agent not working → activate element selection
+      } else if (
+        !elementSelectionActive &&
+        !isWorking &&
+        activeTab.url !== 'ui-main'
+      ) {
+        // State 2: Sidebar open, element selection OFF, agent not working and *not* on the start page (start page doesn't allow element selection) → activate element selection
         setElementSelectionActive(true);
       } else {
         // State 3: Sidebar open AND (element selection ON OR agent is working) → close sidebar

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEventListener } from '@/hooks/use-event-listener';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { ChatBubble } from './chat-bubble';
 import { Loader2Icon } from 'lucide-react';
@@ -14,6 +15,7 @@ import { IconXmark } from 'nucleo-micro-bold';
 
 export const ChatHistory = () => {
   const wasAtBottomRef = useRef(true);
+  const isScrollingProgrammaticallyRef = useRef(false);
   const ref = useRef<HTMLDivElement>(null);
   const { activeChatId, isWorking, chats, workspaceStatus } = useKartonState(
     useComparingSelector((s) => ({
@@ -64,7 +66,12 @@ export const ChatHistory = () => {
 
     // Use setTimeout to ensure DOM has updated
     setTimeout(() => {
+      isScrollingProgrammaticallyRef.current = true;
       container.scrollTop = container.scrollHeight;
+      // Reset after scroll event has been processed
+      requestAnimationFrame(() => {
+        isScrollingProgrammaticallyRef.current = false;
+      });
     }, 0);
   };
 
@@ -83,36 +90,36 @@ export const ChatHistory = () => {
 
   // Handle scroll events to track user scroll position
   const handleScroll = () => {
+    // Ignore programmatic scrolls - only track user-initiated scrolls
+    if (isScrollingProgrammaticallyRef.current) {
+      return;
+    }
     const isAtBottom = checkIfAtBottom();
     wasAtBottomRef.current = isAtBottom;
   };
 
   // Auto-scroll to bottom when content changes, but only if user was at bottom
   useEffect(() => {
-    const container = (ref as React.RefObject<HTMLDivElement>)?.current;
-    if (!container) return;
-
     if (wasAtBottomRef.current) {
       // Always scroll to bottom if user was at bottom before the update
       scrollToBottom();
     }
   }, [activeChat]);
 
-  // Initialize scroll position tracking
+  // Initialize scroll position to bottom on mount
   useEffect(() => {
-    const container = (ref as React.RefObject<HTMLDivElement>)?.current;
-    if (!container) return;
-
-    container.addEventListener('scroll', handleScroll);
-
     // Set initial position to bottom
     scrollToBottom();
     wasAtBottomRef.current = true;
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-    };
   }, []);
+
+  // Force scroll to bottom when user sends a message
+  const handleMessageSent = useCallback(() => {
+    scrollToBottom();
+    wasAtBottomRef.current = true;
+  }, []);
+
+  useEventListener('chat-message-sent', handleMessageSent);
 
   const renderedMessages = useMemo(() => {
     if (!activeChat?.messages) return [];
