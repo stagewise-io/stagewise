@@ -903,6 +903,10 @@ export class AgentService {
         ? { isUserMessage: true as const, message: lastMessage }
         : { isUserMessage: false as const, message: lastMessage };
 
+      // Capture the current abort signal before any async operations
+      // This ensures we can detect if abort was called during async operations
+      const signalBeforeAsyncOps = this.abortController.signal;
+
       if (isFirstUserMessage && lastMessageMetadata.isUserMessage) {
         const title = await generateChatTitle(
           history,
@@ -921,6 +925,13 @@ export class AgentService {
           const chat = draft.agentChat?.chats[chatId];
           if (chat) chat.title = title;
         });
+      }
+
+      // Check if abort was called during the async operations above
+      // If the original signal was aborted, we should not proceed with streaming
+      if (signalBeforeAsyncOps.aborted) {
+        this.cleanupPendingOperations('Aborted during async operations');
+        return;
       }
 
       if (lastMessageMetadata.isUserMessage) {
@@ -948,9 +959,23 @@ export class AgentService {
         ? toolsWithoutExecute(toolsContext.tools)
         : null;
 
+      // Prepare messages before starting the stream
+      // This is an async operation, so we do it before and check abort status after
+      const messages = await this.promptBuilder.convertUIToModelMessages(
+        history ?? [],
+      );
+
+      // Check again if abort was called during message preparation
+      if (signalBeforeAsyncOps.aborted) {
+        this.cleanupPendingOperations('Aborted during message preparation');
+        return;
+      }
+
       const stream = streamText({
         model,
-        abortSignal: this.abortController.signal,
+        // Use the captured signal instead of this.abortController.signal
+        // This ensures abort is respected even if called during async operations above
+        abortSignal: signalBeforeAsyncOps,
         temperature: 0.7,
         maxOutputTokens: 10000,
         maxRetries: 0,
@@ -966,9 +991,7 @@ export class AgentService {
           'anthropic-beta':
             'fine-grained-tool-streaming-2025-05-14, interleaved-thinking-2025-05-14',
         },
-        messages: await this.promptBuilder.convertUIToModelMessages(
-          history ?? [],
-        ),
+        messages,
         onError: async (error) => {
           await this.handleStreamingError(error, chatId);
         },
