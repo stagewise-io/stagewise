@@ -437,6 +437,20 @@ export class WindowLayoutService extends DisposableService {
     setActive?: boolean,
     sourceTabId?: string,
   ) => {
+    // For internal pages, check if a non-active tab with the same URL already exists
+    // If the active tab already has this URL, we still create a new tab (user explicitly wants another)
+    if (url?.startsWith('stagewise://')) {
+      const existingTab = Object.entries(this.tabs).find(
+        ([id, tab]) => id !== this.activeTabId && tab.getState().url === url,
+      );
+
+      if (existingTab) {
+        const [existingTabId] = existingTab;
+        await this.handleSwitchTab(existingTabId);
+        return;
+      }
+    }
+
     await this.createTab(url, setActive ?? true, sourceTabId);
   };
 
