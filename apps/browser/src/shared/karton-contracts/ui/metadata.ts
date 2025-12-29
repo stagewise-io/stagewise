@@ -22,7 +22,7 @@ const metadataSchema = z.object({
   selectedPreviewElements: z.array(selectedElementSchema).optional(),
   currentTab: z.enum(MainTab).optional(), // optional because it is set by the agent -> TODO: find a type-safe way
   browserData: browserDataSchema.optional(),
-  thinkingDuration: z.number().optional(),
+  thinkingDurations: z.array(z.number()).optional(),
 });
 
 export type UserMessageMetadata = z.infer<typeof metadataSchema>;

@@ -140,6 +140,10 @@ export class AgentService {
       undoExecute?: () => Promise<void>;
     }[]
   > = new Map();
+  private thinkingDurationsPerChat: Map<
+    ChatId,
+    { durations: number[]; currentStartTime: number | null }
+  > = new Map();
   private thinkingEnabled = true;
 
   private constructor(
@@ -342,6 +346,12 @@ export class AgentService {
     this.logger.debug('[AgentService] Sending user message');
     const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
     if (!activeChatId) return;
+
+    // Reset thinking durations for this chat (new user message = new turn)
+    this.thinkingDurationsPerChat.set(activeChatId, {
+      durations: [],
+      currentStartTime: null,
+    });
     // Set thinking 'enabled' in main layout. IMPORTANT: Thinking mode must not be switched immediately after tool-responses!
     const layout = this.uiKarton.state.userExperience.activeLayout;
     if (
@@ -1135,37 +1145,60 @@ export class AgentService {
     const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
     if (!activeChatId) return;
 
-    let thinkingStartTime: number | null = null;
-    let thinkingDuration: number | null = null;
+    // Initialize or get thinking durations state for this chat (persists across agent recursions)
+    if (!this.thinkingDurationsPerChat.has(activeChatId)) {
+      this.thinkingDurationsPerChat.set(activeChatId, {
+        durations: [],
+        currentStartTime: null,
+      });
+    }
+    const thinkingState = this.thinkingDurationsPerChat.get(activeChatId)!;
 
     for await (const uiMessage of readUIMessageStream<ChatMessage>({
       stream: uiStream,
     })) {
-      if (
-        uiMessage.parts.some(
-          (p) => p.type === 'reasoning' && p.state === 'streaming',
-        ) &&
-        thinkingStartTime === null
-      ) {
-        thinkingStartTime = Date.now();
+      // Count reasoning parts in the accumulated message (from stream parts)
+      const reasoningParts = uiMessage.parts.filter(
+        (p) => p.type === 'reasoning',
+      );
+      const lastReasoningPart = reasoningParts[reasoningParts.length - 1];
+
+      // The current reasoning part index is based on durations already recorded
+      const nextExpectedIndex = thinkingState.durations.length;
+
+      if (lastReasoningPart) {
+        // Check if this is a NEW reasoning part we haven't recorded a duration for yet
+        if (
+          lastReasoningPart.state === 'streaming' &&
+          thinkingState.currentStartTime === null &&
+          thinkingState.durations[nextExpectedIndex] === undefined
+        ) {
+          // A new reasoning part has started
+          thinkingState.currentStartTime = Date.now();
+        } else if (
+          lastReasoningPart.state === 'done' &&
+          thinkingState.currentStartTime !== null &&
+          thinkingState.durations[nextExpectedIndex] === undefined
+        ) {
+          // The current reasoning part has finished
+          thinkingState.durations[nextExpectedIndex] =
+            Date.now() - thinkingState.currentStartTime;
+          thinkingState.currentStartTime = null;
+        }
       }
-      if (
-        uiMessage.parts.some(
-          (p) => p.type === 'reasoning' && p.state === 'done',
-        ) &&
-        thinkingStartTime !== null
-      ) {
-        thinkingDuration = Date.now() - thinkingStartTime;
-        thinkingStartTime = null;
-      }
+
       const chat = this.uiKarton.state.agentChat?.chats[activeChatId];
-      const messageExists = chat?.messages.find((m) => m.id === uiMessage.id);
+      const existingMessage = chat?.messages.find((m) => m.id === uiMessage.id);
+      const messageExists = !!existingMessage;
+
+      // Use the accumulated durations from class-level state
+      const thinkingDurations = [...thinkingState.durations];
 
       const uiMessageWithMetadata: ChatMessage = {
         ...uiMessage,
         metadata: {
           ...(uiMessage.metadata ?? {}),
-          ...(thinkingDuration ? { thinkingDuration } : {}),
+          ...(thinkingDurations.length > 0 ? { thinkingDurations } : {}),
           createdAt: new Date(),
         },
       };

@@ -276,7 +276,9 @@ export const ChatBubble = memo(
                       return (
                         <ThinkingPart
                           key={stableKey}
-                          thinkingDuration={msg.metadata?.thinkingDuration}
+                          thinkingDuration={
+                            msg.metadata?.thinkingDurations?.[currentTypeIndex]
+                          }
                           part={part as ReasoningUIPart}
                           isAutoExpanded={index === parts.length - 1}
                           isShimmering={
