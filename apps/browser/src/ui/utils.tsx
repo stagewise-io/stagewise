@@ -623,22 +623,28 @@ export const isAnthropicSupportedFileType = (mimeType: string): boolean => {
 export const isAnthropicSupportedFile = (
   file: File,
 ): { supported: boolean; reason?: string } => {
-  const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB in bytes
+  // Type-specific size limits
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB for images (Claude API limit)
+  const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024; // 20MB for documents
 
-  // Check file size first
-  if (file.size > MAX_FILE_SIZE) {
-    const sizeMB = Math.round(file.size / (1024 * 1024));
-    return {
-      supported: false,
-      reason: `File too large (${sizeMB}MB). Maximum size is 20MB`,
-    };
-  }
-
-  // Check file type
+  // Check file type first
   if (!isAnthropicSupportedFileType(file.type)) {
     return {
       supported: false,
       reason: 'Unsupported file type',
+    };
+  }
+
+  // Apply type-specific size limits
+  const isImage = file.type.startsWith('image/');
+  const maxSize = isImage ? MAX_IMAGE_SIZE : MAX_DOCUMENT_SIZE;
+  const maxSizeLabel = isImage ? '5MB' : '20MB';
+
+  if (file.size > maxSize) {
+    const sizeMB = Math.round(file.size / (1024 * 1024));
+    return {
+      supported: false,
+      reason: `File too large (${sizeMB}MB). Maximum size for ${isImage ? 'images' : 'documents'} is ${maxSizeLabel}`,
     };
   }
 

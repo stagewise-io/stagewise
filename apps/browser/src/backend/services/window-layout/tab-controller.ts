@@ -1,5 +1,6 @@
 import {
   type MessagePortMain,
+  type NativeImage,
   WebContentsView,
   shell,
   nativeTheme,
@@ -667,6 +668,46 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     }
   }
 
+  // Maximum file size for images (5MB - Claude API limit)
+  private readonly MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+
+  /**
+   * Compresses a NativeImage to stay under the target size using JPEG with progressive quality reduction.
+   * If quality reduction alone isn't enough, it will resize the image and retry.
+   *
+   * @param image - The NativeImage to compress
+   * @param maxSizeBytes - Maximum file size in bytes (default: 5MB)
+   * @returns Data URL of the compressed JPEG image
+   */
+  private compressImageToTargetSize(
+    image: NativeImage,
+    maxSizeBytes: number = this.MAX_IMAGE_SIZE_BYTES,
+  ): string {
+    // Try different quality levels, starting high and decreasing
+    const qualities = [85, 70, 50, 30];
+
+    for (const quality of qualities) {
+      const buffer = image.toJPEG(quality);
+      if (buffer.length <= maxSizeBytes)
+        return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    }
+
+    // If still too large at lowest quality, resize to 50% and retry
+    const size = image.getSize();
+    if (size.width <= 100 || size.height <= 100) {
+      // Image is already very small, return it at lowest quality
+      const buffer = image.toJPEG(30);
+      return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    }
+
+    const scaledImage = image.resize({
+      width: Math.floor(size.width * 0.5),
+      height: Math.floor(size.height * 0.5),
+    });
+
+    return this.compressImageToTargetSize(scaledImage, maxSizeBytes);
+  }
+
   /**
    * Capture a screenshot of a specific element region with padding.
    * Supports both main frame and iframe elements.
@@ -795,11 +836,11 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         draft.overlaysHidden = false;
       });
 
-      // Convert to data URL (JPEG for smaller size)
-      const dataUrl = image.toDataURL({ scaleFactor: 1.0 });
+      // Compress to JPEG and ensure size is under 5MB (Claude API limit)
+      const dataUrl = this.compressImageToTargetSize(image);
 
       this.logger.debug(
-        `[TabController] Captured element screenshot: ${width}x${height}`,
+        `[TabController] Captured element screenshot: ${width}x${height}, size: ${Math.round(dataUrl.length / 1024)}KB`,
       );
 
       return dataUrl;
@@ -1327,8 +1368,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     try {
       // Capture the page as a NativeImage
       const image = await wc.capturePage();
-      // Convert to data URL (PNG format)
-      const dataUrl = image.toDataURL();
+      // Compress to JPEG and ensure size is under 5MB (Claude API limit)
+      const dataUrl = this.compressImageToTargetSize(image);
       // Update state with screenshot
       this.updateState({ screenshot: dataUrl });
     } catch (err) {

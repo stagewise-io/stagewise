@@ -174,11 +174,20 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
     newScreenshots.forEach((screenshot) => {
       processedScreenshotIds.current.add(screenshot.id);
 
-      // Convert data URL to File
+      // Convert data URL to File (now using JPEG format)
       const file = dataUrlToFile(
         screenshot.dataUrl,
-        `element-${screenshot.elementId.slice(0, 8)}.png`,
+        `element-${screenshot.elementId.slice(0, 8)}.jpg`,
       );
+
+      // Validate file size before adding (safety net in case compression failed)
+      const validation = isAnthropicSupportedFile(file);
+      if (!validation.supported) {
+        console.warn(
+          `[ChatState] Skipping oversized screenshot: ${validation.reason}`,
+        );
+        return;
+      }
 
       // Add as attachment
       const id = generateId();
