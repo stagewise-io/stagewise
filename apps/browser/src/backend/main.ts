@@ -9,7 +9,7 @@ import { UserExperienceService } from './services/experience';
 import { getEnvMode } from './utils/env';
 import { WorkspaceManagerService } from './services/workspace-manager';
 import { FilePickerService } from './services/file-picker';
-import { existsSync } from 'node:fs';
+import { existsSync, unlinkSync } from 'node:fs';
 import path, { resolve } from 'node:path';
 import { AppMenuService } from './services/app-menu';
 import { URIHandlerService } from './services/uri-handler';
@@ -24,7 +24,15 @@ import { WindowLayoutService } from './services/window-layout';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
 import { DownloadsService } from './services/download-manager';
+import { DownloadState } from '@shared/karton-contracts/pages-api/types';
+import type {
+  DownloadSummary,
+  StoredExperienceData,
+} from '@shared/karton-contracts/ui';
+import { storedExperienceDataSchema } from '@shared/karton-contracts/ui';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
+import fs from 'node:fs/promises';
+import { shell } from 'electron';
 import { getRepoRootForPath } from './utils/git-tools';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { generateId } from 'ai';
@@ -76,6 +84,389 @@ export async function main({
     pagesService,
   );
   const uiKarton = windowLayoutService.uiKarton;
+
+  // Set up downloads UI state updates
+  // This callback updates the UI karton with running + recent finished downloads
+  const MAX_DOWNLOADS_TO_SHOW = 5;
+  const storedExperienceDataPath = path.join(
+    globalDataPathService.globalDataPath,
+    'stored-experience-data.json',
+  );
+
+  // Cache for lastSeenAt to avoid disk reads on every state update
+  let cachedLastSeenAt: Date | null = null;
+  let lastSeenAtInitialized = false;
+
+  // Cache for finished downloads to avoid database queries on every progress update
+  let cachedFinishedDownloads: DownloadSummary[] = [];
+  let finishedDownloadsDirty = true; // Start dirty to fetch on first call
+  let previousActiveCount = 0;
+
+  // Helper to read lastSeenAt from stored experience data (only on startup)
+  const initializeLastSeenAt = async (): Promise<void> => {
+    if (lastSeenAtInitialized) return;
+    try {
+      const content = await fs.readFile(storedExperienceDataPath, 'utf-8');
+      const data = storedExperienceDataSchema.parse(JSON.parse(content));
+      cachedLastSeenAt = data.downloadsLastSeenAt
+        ? new Date(data.downloadsLastSeenAt)
+        : null;
+    } catch {
+      cachedLastSeenAt = null;
+    }
+    lastSeenAtInitialized = true;
+  };
+
+  // Helper to save lastSeenAt to stored experience data (updates cache and persists to disk)
+  const setDownloadsLastSeenAt = async (date: Date): Promise<void> => {
+    // Update cache immediately
+    cachedLastSeenAt = date;
+
+    try {
+      let data: StoredExperienceData;
+      try {
+        const content = await fs.readFile(storedExperienceDataPath, 'utf-8');
+        data = storedExperienceDataSchema.parse(JSON.parse(content));
+      } catch {
+        data = { recentlyOpenedWorkspaces: [], hasSeenOnboardingFlow: false };
+      }
+      data.downloadsLastSeenAt = date.toISOString();
+      await fs.writeFile(
+        storedExperienceDataPath,
+        JSON.stringify(data, null, 2),
+        'utf-8',
+      );
+    } catch (err) {
+      logger.warn('[Main] Failed to save downloads lastSeenAt', err);
+    }
+  };
+
+  // Initialize lastSeenAt from disk on startup
+  await initializeLastSeenAt();
+
+  // Helper to mark finished downloads cache as dirty (needs refetch)
+  const invalidateFinishedDownloadsCache = () => {
+    finishedDownloadsDirty = true;
+  };
+
+  const updateUIDownloadsState = async (
+    activeDownloads: {
+      id: number;
+      filename: string;
+      progress: number;
+      state: DownloadState;
+      isPaused: boolean;
+      targetPath: string;
+      startTime: Date;
+    }[],
+  ) => {
+    const activeCount = activeDownloads.length;
+    const finishedToFetch = Math.max(0, MAX_DOWNLOADS_TO_SHOW - activeCount);
+    // Use cached lastSeenAt instead of reading from disk
+    const lastSeenAt = cachedLastSeenAt;
+
+    // Build items from active downloads
+    const items: DownloadSummary[] = activeDownloads.map((d) => ({
+      id: d.id,
+      filename: d.filename,
+      progress: d.progress,
+      isActive: true,
+      state: d.state,
+      isPaused: d.isPaused,
+      targetPath: d.targetPath,
+      startTime: d.startTime,
+    }));
+
+    let hasUnseenDownloads = false;
+
+    // Detect if active count changed (download completed or new download started)
+    // If so, we need to refetch finished downloads
+    if (activeCount !== previousActiveCount) {
+      finishedDownloadsDirty = true;
+      previousActiveCount = activeCount;
+    }
+
+    // Fetch recent finished downloads only when cache is dirty
+    if (finishedToFetch > 0 && finishedDownloadsDirty) {
+      try {
+        // Query all finished downloads (COMPLETE, CANCELLED, INTERRUPTED) - no state filter
+        const allDownloads = await historyService.queryDownloads({
+          limit: MAX_DOWNLOADS_TO_SHOW * 2, // Fetch extra to filter out IN_PROGRESS
+        });
+
+        // Filter to only include finished downloads (exclude IN_PROGRESS which might be stale)
+        const finishedDownloads = allDownloads.filter(
+          (d) => d.state !== DownloadState.IN_PROGRESS,
+        );
+
+        cachedFinishedDownloads = finishedDownloads
+          .slice(0, MAX_DOWNLOADS_TO_SHOW)
+          .map((d) => {
+            // Use guid (parsed as number) as id for consistency with DownloadManager
+            // This matches what PagesService does in getDownloads
+            const parsedGuid = Number.parseInt(d.guid, 10);
+            const downloadId = Number.isNaN(parsedGuid) ? d.id : parsedGuid;
+
+            // Calculate progress - only show 100% for complete downloads
+            const progress =
+              d.state === DownloadState.COMPLETE
+                ? 100
+                : d.totalBytes > 0
+                  ? Math.round((d.receivedBytes / d.totalBytes) * 100)
+                  : 0;
+
+            return {
+              id: downloadId,
+              filename: d.targetPath
+                ? (d.targetPath.split('/').pop() ?? 'Unknown')
+                : 'Unknown',
+              progress,
+              isActive: false,
+              state: d.state,
+              targetPath: d.targetPath,
+              startTime: d.startTime,
+              endTime: d.endTime ?? undefined,
+            };
+          });
+
+        finishedDownloadsDirty = false;
+      } catch (err) {
+        logger.warn('[Main] Failed to fetch recent finished downloads', err);
+      }
+    }
+
+    // Add finished downloads from cache (limited to finishedToFetch)
+    if (finishedToFetch > 0) {
+      for (const d of cachedFinishedDownloads.slice(0, finishedToFetch)) {
+        // Skip if this download is already in active list (shouldn't happen but be safe)
+        if (items.some((item) => item.id === d.id)) continue;
+
+        // Check if this download is unseen (completed after lastSeenAt)
+        if (d.endTime && (!lastSeenAt || d.endTime > lastSeenAt)) {
+          hasUnseenDownloads = true;
+        }
+
+        items.push(d);
+      }
+    }
+
+    // Update UI karton state
+    uiKarton.setState((draft) => {
+      draft.downloads = {
+        items,
+        activeCount,
+        hasUnseenDownloads,
+        lastSeenAt,
+      };
+    });
+  };
+
+  downloadsService.setOnUIDownloadsChange(updateUIDownloadsState);
+
+  // Helper to map active downloads to UI format (avoids code duplication)
+  const mapActiveDownloadsToUIFormat = () =>
+    downloadsService.getActiveDownloads().map((d) => ({
+      id: d.id,
+      filename: d.filename,
+      progress:
+        d.totalBytes > 0
+          ? Math.round((d.receivedBytes / d.totalBytes) * 100)
+          : 0,
+      state: d.state,
+      isPaused: d.isPaused,
+      targetPath: d.targetPath,
+      startTime: d.startTime,
+    }));
+
+  // Shared handler for marking downloads as seen (used by both UI and pages-api contracts)
+  const markDownloadsSeen = async () => {
+    const now = new Date();
+    await setDownloadsLastSeenAt(now);
+    // Trigger state refresh to update hasUnseenDownloads
+    await updateUIDownloadsState(mapActiveDownloadsToUIFormat()).catch(
+      (err) => {
+        logger.warn(
+          '[Main] Failed to update downloads state after marking seen',
+          err,
+        );
+      },
+    );
+  };
+
+  // Register the markSeen procedure handler for UI contract
+  uiKarton.registerServerProcedureHandler(
+    'downloads.markSeen',
+    markDownloadsSeen,
+  );
+
+  // Register download control procedure handlers for UI contract
+  uiKarton.registerServerProcedureHandler(
+    'downloads.pause',
+    async (downloadId: number) => {
+      const paused = downloadsService.pauseDownload(downloadId);
+      if (paused) {
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: 'Download not found or cannot be paused',
+      };
+    },
+  );
+
+  uiKarton.registerServerProcedureHandler(
+    'downloads.resume',
+    async (downloadId: number) => {
+      const resumed = downloadsService.resumeDownload(downloadId);
+      if (resumed) {
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: 'Download not found or cannot be resumed',
+      };
+    },
+  );
+
+  uiKarton.registerServerProcedureHandler(
+    'downloads.cancel',
+    async (downloadId: number) => {
+      const cancelled = await downloadsService.cancelDownload(downloadId);
+      if (cancelled) {
+        return { success: true };
+      }
+      return { success: false, error: 'Download not found' };
+    },
+  );
+
+  // Helper to validate that a file path is a known download (security measure)
+  const isKnownDownloadPath = async (filePath: string): Promise<boolean> => {
+    try {
+      // Query the database to verify this path belongs to a download
+      const downloads = await historyService.queryDownloads({ limit: 1000 });
+      return downloads.some((d) => d.targetPath === filePath);
+    } catch {
+      return false;
+    }
+  };
+
+  uiKarton.registerServerProcedureHandler(
+    'downloads.openFile',
+    async (filePath: string) => {
+      try {
+        if (!filePath) {
+          return { success: false, error: 'No file path provided' };
+        }
+        // Validate the path is a known download (security check)
+        const isKnown = await isKnownDownloadPath(filePath);
+        if (!isKnown) {
+          logger.warn('[Main] Attempted to open unknown file path', {
+            filePath,
+          });
+          return { success: false, error: 'File is not a known download' };
+        }
+        if (!existsSync(filePath)) {
+          return { success: false, error: 'File not found' };
+        }
+        const errorMessage = await shell.openPath(filePath);
+        if (errorMessage) {
+          return { success: false, error: errorMessage };
+        }
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    },
+  );
+
+  uiKarton.registerServerProcedureHandler(
+    'downloads.showInFolder',
+    async (filePath: string) => {
+      try {
+        if (!filePath) {
+          return { success: false, error: 'No file path provided' };
+        }
+        // Validate the path is a known download (security check)
+        const isKnown = await isKnownDownloadPath(filePath);
+        if (!isKnown) {
+          logger.warn('[Main] Attempted to show unknown file path in folder', {
+            filePath,
+          });
+          return { success: false, error: 'File is not a known download' };
+        }
+        if (!existsSync(filePath)) {
+          return { success: false, error: 'File not found' };
+        }
+        shell.showItemInFolder(filePath);
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    },
+  );
+
+  uiKarton.registerServerProcedureHandler(
+    'downloads.delete',
+    async (downloadId: number) => {
+      try {
+        // Cancel active download if in progress
+        const activeDownload = downloadsService.getActiveDownload(downloadId);
+        if (activeDownload) {
+          await downloadsService.cancelDownload(downloadId);
+        }
+
+        // Get download info to find file path before deleting from DB
+        const download = await historyService.getDownloadByGuid(
+          `${downloadId}`,
+        );
+        const filePath = download?.targetPath;
+
+        // Delete from database
+        const deleted = await historyService.deleteDownloadByGuid(
+          `${downloadId}`,
+        );
+
+        // Delete the file from disk if it exists
+        if (filePath && existsSync(filePath)) {
+          try {
+            unlinkSync(filePath);
+          } catch (err) {
+            // Log but don't fail if file deletion fails
+            logger.warn('[Main] Failed to delete download file', {
+              filePath,
+              error: err,
+            });
+          }
+        }
+
+        if (deleted) {
+          // Invalidate cache since we deleted a download from DB
+          invalidateFinishedDownloadsCache();
+          // Trigger state refresh
+          await updateUIDownloadsState(mapActiveDownloadsToUIFormat());
+          return { success: true };
+        }
+        return { success: false, error: 'Download not found' };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    },
+  );
+
+  // Set the markDownloadsSeen handler for pages-api contract
+  pagesService.setMarkDownloadsSeenHandler(markDownloadsSeen);
+
+  // Trigger initial load of downloads state (loads recent finished downloads)
+  void updateUIDownloadsState([]);
 
   // Set up URL handlers
   setupUrlHandlers(windowLayoutService, logger);

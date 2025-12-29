@@ -69,6 +69,9 @@ export enum HotkeyActions {
   CTRL_PLUS = 'ctrl_plus', // zoom in
   CTRL_MINUS = 'ctrl_minus', // zoom out
   CTRL_0 = 'ctrl_0', // reset zoom
+
+  // downloads
+  CTRL_J = 'ctrl_j',
 }
 
 export const hotkeyActionDefinitions: Record<
@@ -95,6 +98,15 @@ export const hotkeyActionDefinitions: Record<
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
+  },
+  [HotkeyActions.CTRL_J]: {
+    keyComboDefault: 'Ctrl+J',
+    keyComboMac: '⌘J',
+    isEventMatching: (ev) =>
+      ev.code === 'KeyJ' &&
+      (ev.ctrlKey || ev.metaKey) &&
+      !ev.shiftKey &&
+      !ev.altKey,
   },
 
   // tab & window navigation

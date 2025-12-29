@@ -20,9 +20,31 @@ import type {
   FilePickerRequest,
   GlobalConfig,
 } from './shared-types';
-import type { PageTransition } from '../pages-api/types';
+import type { PageTransition, DownloadState } from '../pages-api/types';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
+
+/** Summary download info for the control button display */
+export type DownloadSummary = {
+  /** Download ID */
+  id: number;
+  /** Filename */
+  filename: string;
+  /** Progress percentage (0-100) */
+  progress: number;
+  /** Whether this is an active/running download */
+  isActive: boolean;
+  /** Download state */
+  state: DownloadState;
+  /** Whether the download is paused (only for active) */
+  isPaused?: boolean;
+  /** Target path on disk */
+  targetPath: string;
+  /** Download start time */
+  startTime: Date;
+  /** Download end time (for completed) */
+  endTime?: Date;
+};
 export type { UserMessageMetadata, BrowserData, ReactSelectedElementInfo };
 export type { SelectedElement } from '../../selected-elements';
 export type UIMessagePart = AIMessagePart<UIDataTypes, UITools>;
@@ -83,6 +105,8 @@ export const recentlyOpenedWorkspacesArraySchema = z.array(
 export const storedExperienceDataSchema = z.object({
   recentlyOpenedWorkspaces: recentlyOpenedWorkspacesArraySchema,
   hasSeenOnboardingFlow: z.boolean(),
+  /** ISO timestamp when downloads were last marked as seen */
+  downloadsLastSeenAt: z.string().nullable().optional(),
 });
 
 export type StoredExperienceData = z.infer<typeof storedExperienceDataSchema>;
@@ -301,6 +325,19 @@ export type AppState = {
       dataUrl: string; // Base64 data URL of the screenshot
     }[];
   };
+
+  // Downloads state for the control button
+  // Contains running downloads + recent finished downloads (up to 5 total)
+  downloads: {
+    /** List of downloads to display (running + recent finished) */
+    items: DownloadSummary[];
+    /** Number of currently active downloads */
+    activeCount: number;
+    /** Whether there are finished downloads the user hasn't seen yet */
+    hasUnseenDownloads: boolean;
+    /** Timestamp when downloads were last marked as seen (null if never) */
+    lastSeenAt: Date | null;
+  };
 };
 
 export type AuthStatus =
@@ -496,6 +533,34 @@ export type KartonContract = {
         deactivate: () => Promise<void>;
       };
     };
+    downloads: {
+      /** Mark all current downloads as seen (updates lastSeenAt timestamp) */
+      markSeen: () => Promise<void>;
+      /** Pause an active download */
+      pause: (
+        downloadId: number,
+      ) => Promise<{ success: boolean; error?: string }>;
+      /** Resume a paused download */
+      resume: (
+        downloadId: number,
+      ) => Promise<{ success: boolean; error?: string }>;
+      /** Cancel an active download */
+      cancel: (
+        downloadId: number,
+      ) => Promise<{ success: boolean; error?: string }>;
+      /** Open a downloaded file using the system default application */
+      openFile: (
+        filePath: string,
+      ) => Promise<{ success: boolean; error?: string }>;
+      /** Show a downloaded file in the system file manager (Finder/Explorer) */
+      showInFolder: (
+        filePath: string,
+      ) => Promise<{ success: boolean; error?: string }>;
+      /** Delete a download record and its file */
+      delete: (
+        downloadId: number,
+      ) => Promise<{ success: boolean; error?: string }>;
+    };
   };
 };
 
@@ -547,5 +612,11 @@ export const defaultState: KartonContract['state'] = {
     viewportSize: null,
     isSearchBarActive: false,
     pendingElementScreenshots: [],
+  },
+  downloads: {
+    items: [],
+    activeCount: 0,
+    hasUnseenDownloads: false,
+    lastSeenAt: null,
   },
 };

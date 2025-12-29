@@ -49,6 +49,7 @@ export class PagesService extends DisposableService {
   private currentPort?: MessagePortMain;
   private portCloseListeners = new Map<MessagePortMain, () => void>();
   private openTabHandler?: (url: string, setActive?: boolean) => Promise<void>;
+  private markDownloadsSeenHandler?: () => Promise<void>;
 
   private constructor(
     logger: Logger,
@@ -299,7 +300,7 @@ export class PagesService extends DisposableService {
             const activeDownload =
               this.downloadsService.getActiveDownload(downloadId);
             if (activeDownload) {
-              this.downloadsService.cancelDownload(downloadId);
+              await this.downloadsService.cancelDownload(downloadId);
               this.logger.info(
                 '[PagesService] Cancelled active download before deletion',
                 { id: downloadId },
@@ -469,11 +470,25 @@ export class PagesService extends DisposableService {
           };
         }
 
-        const cancelled = this.downloadsService.cancelDownload(downloadId);
+        const cancelled =
+          await this.downloadsService.cancelDownload(downloadId);
         if (cancelled) {
           return { success: true };
         }
         return { success: false, error: 'Download not found' };
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'markDownloadsSeen',
+      async (): Promise<void> => {
+        if (!this.markDownloadsSeenHandler) {
+          this.logger.warn(
+            '[PagesService] markDownloadsSeen called but no handler is set',
+          );
+          return;
+        }
+        await this.markDownloadsSeenHandler();
       },
     );
 
@@ -655,6 +670,13 @@ export class PagesService extends DisposableService {
     handler: (url: string, setActive?: boolean) => Promise<void>,
   ): void {
     this.openTabHandler = handler;
+  }
+
+  /**
+   * Set the handler for marking downloads as seen. This should be called by main.ts.
+   */
+  public setMarkDownloadsSeenHandler(handler: () => Promise<void>): void {
+    this.markDownloadsSeenHandler = handler;
   }
 
   /**

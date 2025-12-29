@@ -31,7 +31,6 @@ import {
   DownloadState,
   type DownloadsFilter,
   type DownloadResult,
-  type ActiveDownloadInfo,
 } from '@shared/karton-contracts/pages-api/types';
 import { List } from 'react-window';
 
@@ -409,22 +408,10 @@ function Page() {
   // Wait for Karton connection before fetching data
   const isConnected = useKartonConnected();
 
-  // Get active downloads from state (pushed in real-time)
-  const activeDownloadsFromState = useKartonState((s) => s.activeDownloads);
-  // Also track active downloads fetched via procedure (for initial load)
-  const [fetchedActiveDownloads, setFetchedActiveDownloads] = useState<
-    Record<number, ActiveDownloadInfo>
-  >({});
-
-  // Merge state-based and fetched active downloads (state takes priority as it's real-time)
-  const activeDownloads = useMemo(() => {
-    // State-based downloads take priority (real-time updates)
-    // Fetched downloads fill in until state syncs
-    return { ...fetchedActiveDownloads, ...activeDownloadsFromState };
-  }, [activeDownloadsFromState, fetchedActiveDownloads]);
+  // Get active downloads from state (pushed in real-time from backend)
+  const activeDownloads = useKartonState((s) => s.activeDownloads);
 
   const getDownloads = useKartonProcedure((s) => s.getDownloads);
-  const getActiveDownloads = useKartonProcedure((s) => s.getActiveDownloads);
   const openDownloadFile = useKartonProcedure((s) => s.openDownloadFile);
   const showDownloadInFolder = useKartonProcedure(
     (s) => s.showDownloadInFolder,
@@ -433,9 +420,9 @@ function Page() {
   const resumeDownload = useKartonProcedure((s) => s.resumeDownload);
   const cancelDownload = useKartonProcedure((s) => s.cancelDownload);
   const deleteDownload = useKartonProcedure((s) => s.deleteDownload);
+  const markDownloadsSeen = useKartonProcedure((s) => s.markDownloadsSeen);
 
   const getDownloadsRef = useRef(getDownloads);
-  const getActiveDownloadsRef = useRef(getActiveDownloads);
   const listRef = useRef<{
     readonly element: HTMLDivElement | null;
     scrollToRow: (config: {
@@ -452,38 +439,11 @@ function Page() {
     getDownloadsRef.current = getDownloads;
   }, [getDownloads]);
 
-  useEffect(() => {
-    getActiveDownloadsRef.current = getActiveDownloads;
-  }, [getActiveDownloads]);
-
-  // Fetch active downloads when connection is established (for immediate visibility)
+  // Mark downloads as seen when the page is opened
   useEffect(() => {
     if (!isConnected) return;
-
-    let cancelled = false;
-
-    async function fetchActiveDownloads() {
-      try {
-        const activeList = await getActiveDownloadsRef.current();
-        if (!cancelled && activeList.length > 0) {
-          // Convert array to record keyed by ID
-          const activeRecord: Record<number, ActiveDownloadInfo> = {};
-          for (const download of activeList) {
-            activeRecord[download.id] = download;
-          }
-          setFetchedActiveDownloads(activeRecord);
-        }
-      } catch (err) {
-        console.error('Failed to fetch active downloads:', err);
-      }
-    }
-
-    fetchActiveDownloads();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isConnected]);
+    void markDownloadsSeen();
+  }, [isConnected, markDownloadsSeen]);
 
   // Debounce search text
   useEffect(() => {
@@ -533,6 +493,48 @@ function Page() {
       return [];
     }
   }, [debouncedSearchText]);
+
+  // Create a stable string key from active download IDs to detect when downloads are added/removed
+  // This avoids triggering the effect on every progress update
+  const activeDownloadIds = useMemo(
+    () => Object.keys(activeDownloads).sort().join(','),
+    [activeDownloads],
+  );
+
+  // Track previous active download IDs to detect when downloads are removed
+  const prevActiveIdsRef = useRef<string>('');
+
+  // Refetch historical downloads when an active download disappears
+  // (e.g., cancelled/completed from another UI like the popover)
+  useEffect(() => {
+    const prevIds = prevActiveIdsRef.current;
+    const currentIds = activeDownloadIds;
+
+    // Only compare if we have a previous state
+    if (prevIds !== '') {
+      const prevIdSet = new Set(prevIds.split(',').filter(Boolean));
+      const currentIdSet = new Set(currentIds.split(',').filter(Boolean));
+
+      // Check if any downloads were removed (present in prev but not in current)
+      const hasRemovedDownloads = [...prevIdSet].some(
+        (id) => !currentIdSet.has(id),
+      );
+
+      if (hasRemovedDownloads && isConnected) {
+        // A download was removed, refetch historical to show updated state
+        // Small delay to ensure DB update has fully propagated
+        const timeoutId = setTimeout(() => {
+          void refetchHistoricalDownloads();
+        }, 150);
+        // Update ref before returning cleanup
+        prevActiveIdsRef.current = currentIds;
+        return () => clearTimeout(timeoutId);
+      }
+    }
+
+    // Update ref for next comparison
+    prevActiveIdsRef.current = currentIds;
+  }, [activeDownloadIds, isConnected, refetchHistoricalDownloads]);
 
   // Merge active downloads (from state) with historical downloads (from procedure)
   const downloads = useMemo(() => {

@@ -33,6 +33,7 @@ import {
 import { SearchBar } from './_components/search-bar';
 import { ZoomBar } from './_components/zoom-bar';
 import { Omnibox, type OmniboxRef } from './_components/omnibox';
+import { DownloadsControlButton } from './_components/control-buttons/downloads';
 
 const ColorSchemeIcon = ({
   colorScheme,
@@ -245,6 +246,7 @@ export function MainSection({
             />
             <ZoomBar />
             <SearchBar ref={searchInputRef} />
+            <DownloadsControlButton />
             <Tooltip>
               <TooltipTrigger>
                 <Button

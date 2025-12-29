@@ -9,6 +9,55 @@ import {
 } from '@shared/karton-contracts/pages-api/types';
 import { DisposableService } from '../disposable';
 
+/**
+ * Simple throttle implementation for state change notifications.
+ * Ensures the function is called at most once per `wait` milliseconds.
+ */
+function throttle<T extends (...args: unknown[]) => void>(
+  fn: T,
+  wait: number,
+): T & { cancel: () => void } {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let lastCallTime = 0;
+  let pendingArgs: Parameters<T> | null = null;
+
+  const throttled = ((...args: Parameters<T>) => {
+    const now = Date.now();
+    const remaining = wait - (now - lastCallTime);
+
+    if (remaining <= 0) {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      lastCallTime = now;
+      fn(...args);
+    } else {
+      pendingArgs = args;
+      if (!timeoutId) {
+        timeoutId = setTimeout(() => {
+          lastCallTime = Date.now();
+          timeoutId = null;
+          if (pendingArgs) {
+            fn(...pendingArgs);
+            pendingArgs = null;
+          }
+        }, remaining);
+      }
+    }
+  }) as T & { cancel: () => void };
+
+  throttled.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    pendingArgs = null;
+  };
+
+  return throttled;
+}
+
 export interface ActiveDownload {
   id: number;
   item: DownloadItem;
@@ -29,6 +78,11 @@ export type ActiveDownloadsChangeCallback = (
   downloads: Record<number, ActiveDownloadInfo>,
 ) => void;
 
+/** Callback type for UI downloads state changes (used by KartonService) */
+export type UIDownloadsChangeCallback = (
+  activeDownloads: ActiveDownloadInfo[],
+) => void;
+
 /**
  * Service responsible for managing active downloads.
  * Tracks DownloadItem objects from Electron to enable pause/resume/cancel.
@@ -42,9 +96,12 @@ export class DownloadsService extends DisposableService {
   private readonly sessionBase: number;
   private downloadIdCounter = 0;
   private onActiveDownloadsChange?: ActiveDownloadsChangeCallback;
+  private onUIDownloadsChange?: UIDownloadsChangeCallback;
   // Track pending cleanup timeouts for proper cleanup
   private pendingCleanupTimeouts: Set<ReturnType<typeof setTimeout>> =
     new Set();
+  // Throttled state change notification (100ms = max 10 updates/sec)
+  private throttledNotifyStateChange: (() => void) & { cancel: () => void };
 
   private constructor(logger: Logger, historyService: HistoryService) {
     super();
@@ -52,6 +109,11 @@ export class DownloadsService extends DisposableService {
     this.historyService = historyService;
     // Use seconds since 2024-01-01 as base to keep IDs smaller but unique
     this.sessionBase = Math.floor((Date.now() - 1704067200000) / 1000) * 1000;
+    // Initialize throttled state change notification
+    this.throttledNotifyStateChange = throttle(
+      () => this.notifyStateChangeImmediate(),
+      100,
+    );
   }
 
   /**
@@ -60,6 +122,14 @@ export class DownloadsService extends DisposableService {
    */
   setOnActiveDownloadsChange(callback: ActiveDownloadsChangeCallback): void {
     this.onActiveDownloadsChange = callback;
+  }
+
+  /**
+   * Set a callback to be notified when downloads change for UI state.
+   * Used by main.ts to push state updates to KartonService (UI contract).
+   */
+  setOnUIDownloadsChange(callback: UIDownloadsChangeCallback): void {
+    this.onUIDownloadsChange = callback;
   }
 
   /**
@@ -89,11 +159,30 @@ export class DownloadsService extends DisposableService {
   }
 
   /**
-   * Notify listeners of active downloads state change.
+   * Notify listeners of active downloads state change (immediate, no throttling).
+   * Use this for important state changes like download complete/cancelled.
    */
-  private notifyStateChange(): void {
+  private notifyStateChangeImmediate(): void {
+    const stateRecord = this.buildActiveDownloadsState();
     if (this.onActiveDownloadsChange) {
-      this.onActiveDownloadsChange(this.buildActiveDownloadsState());
+      this.onActiveDownloadsChange(stateRecord);
+    }
+    if (this.onUIDownloadsChange) {
+      this.onUIDownloadsChange(Object.values(stateRecord));
+    }
+  }
+
+  /**
+   * Notify listeners of active downloads state change.
+   * @param immediate - If true, bypasses throttling for important state changes
+   */
+  private notifyStateChange(immediate = false): void {
+    if (immediate) {
+      // Cancel any pending throttled call and notify immediately
+      this.throttledNotifyStateChange.cancel();
+      this.notifyStateChangeImmediate();
+    } else {
+      this.throttledNotifyStateChange();
     }
   }
 
@@ -150,8 +239,8 @@ export class DownloadsService extends DisposableService {
 
     this.activeDownloads.set(downloadId, activeDownload);
 
-    // Notify state change for new download
-    this.notifyStateChange();
+    // Notify state change for new download (immediate - important event)
+    this.notifyStateChange(true);
 
     // Helper to record download to database once we have the save path
     const recordToDatabase = () => {
@@ -171,8 +260,8 @@ export class DownloadsService extends DisposableService {
         savePath,
       });
 
-      // Notify state change with updated metadata
-      this.notifyStateChange();
+      // Notify state change with updated metadata (immediate - important event)
+      this.notifyStateChange(true);
 
       this.historyService
         .startDownload({
@@ -183,7 +272,10 @@ export class DownloadsService extends DisposableService {
           mimeType: item.getMimeType(),
         })
         .catch((err) => {
-          this.logger.error('[DownloadsService] Failed to record download', err);
+          this.logger.error(
+            '[DownloadsService] Failed to record download',
+            err,
+          );
         });
     };
 
@@ -275,8 +367,8 @@ export class DownloadsService extends DisposableService {
       const timeoutId = setTimeout(() => {
         this.pendingCleanupTimeouts.delete(timeoutId);
         this.activeDownloads.delete(downloadId);
-        // Notify state change after removal
-        this.notifyStateChange();
+        // Notify state change after removal (immediate - important event)
+        this.notifyStateChange(true);
       }, 5000);
       this.pendingCleanupTimeouts.add(timeoutId);
     });
@@ -334,7 +426,7 @@ export class DownloadsService extends DisposableService {
     download.item.pause();
     download.isPaused = true;
     this.logger.info('[DownloadsService] Download paused', { id: downloadId });
-    this.notifyStateChange();
+    this.notifyStateChange(true);
     return true;
   }
 
@@ -368,7 +460,7 @@ export class DownloadsService extends DisposableService {
     download.item.resume();
     download.isPaused = false;
     this.logger.info('[DownloadsService] Download resumed', { id: downloadId });
-    this.notifyStateChange();
+    this.notifyStateChange(true);
     return true;
   }
 
@@ -376,7 +468,7 @@ export class DownloadsService extends DisposableService {
    * Cancel a download and delete the partial file.
    * @returns true if cancelled, false if download not found
    */
-  cancelDownload(downloadId: number): boolean {
+  async cancelDownload(downloadId: number): Promise<boolean> {
     const download = this.activeDownloads.get(downloadId);
     if (!download) {
       this.logger.warn('[DownloadsService] Cannot cancel: download not found', {
@@ -393,26 +485,26 @@ export class DownloadsService extends DisposableService {
     download.item.cancel();
     download.state = DownloadState.CANCELLED;
 
-    // Update the database immediately with cancelled state
-    this.historyService
-      .updateDownload(`${downloadId}`, {
+    // Update the database with cancelled state - await to ensure it's done before notifying
+    try {
+      await this.historyService.updateDownload(`${downloadId}`, {
         receivedBytes,
         totalBytes,
         state: DownloadState.CANCELLED,
         endTime: new Date(),
-      })
-      .catch((err) => {
-        this.logger.error(
-          '[DownloadsService] Failed to update cancelled download',
-          err,
-        );
       });
+    } catch (err) {
+      this.logger.error(
+        '[DownloadsService] Failed to update cancelled download',
+        err,
+      );
+    }
 
-    // Remove from active downloads immediately so UI shows DB values
+    // Remove from active downloads after DB update
     this.activeDownloads.delete(downloadId);
 
-    // Notify state change after removal
-    this.notifyStateChange();
+    // Notify state change after removal (immediate - important event)
+    this.notifyStateChange(true);
 
     // Delete the partial file if it exists
     if (savePath && existsSync(savePath)) {
@@ -441,6 +533,9 @@ export class DownloadsService extends DisposableService {
    * Cleanup resources.
    */
   protected onTeardown(): void {
+    // Cancel throttled notifications
+    this.throttledNotifyStateChange.cancel();
+
     // Clear all pending cleanup timeouts
     for (const timeoutId of this.pendingCleanupTimeouts) {
       clearTimeout(timeoutId);

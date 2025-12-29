@@ -29,6 +29,8 @@ export type PagesApiContract = {
     openDownloadFile: (filePath: string) => Promise<DownloadControlResult>;
     /** Show a downloaded file in the system file manager (Finder/Explorer) */
     showDownloadInFolder: (filePath: string) => Promise<DownloadControlResult>;
+    /** Mark all downloads as seen (updates lastSeenAt timestamp for UI) */
+    markDownloadsSeen: () => Promise<void>;
     getFaviconBitmaps: (
       faviconUrls: string[],
     ) => Promise<Record<string, FaviconBitmapResult>>;
