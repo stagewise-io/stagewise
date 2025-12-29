@@ -97,11 +97,11 @@ export function Tab({
       <div
         data-state={isActive ? 'active' : 'inactive'}
         className={cn(
-          '@container w-full',
+          '@container w-full px-2',
           isActive
-            ? 'relative px-2'
+            ? 'relative h-8'
             : cn(
-                'flex h-7.25 items-center gap-2 self-start rounded-[8.5px] px-2 py-1 transition-colors hover:bg-muted-foreground/5 has-[+[data-state="active"]]:rounded-br-md [[data-state="active"]+&]:rounded-bl-md',
+                'mb-0.75 flex h-7.25 items-center gap-2 self-start rounded-[8.5px] py-1 transition-colors hover:bg-muted-foreground/5 has-[+[data-state="active"]]:rounded-br-md [[data-state="active"]+&]:rounded-bl-md',
                 shouldShowRightSeparator &&
                   'after:-right-[2px] after:absolute after:h-4 after:border-muted-foreground/20 after:border-r after:content-[""]',
               ),
