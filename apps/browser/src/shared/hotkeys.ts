@@ -180,11 +180,8 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_TAB]: {
     keyComboDefault: 'Ctrl+Tab',
     keyComboMac: '⌘Tab',
-    isEventMatching: (ev, platform) =>
-      ev.code === 'Tab' &&
-      isPrimaryModifierPressed(ev, platform) &&
-      !ev.shiftKey &&
-      !ev.altKey,
+    isEventMatching: (ev, _platform) =>
+      ev.code === 'Tab' && ev.ctrlKey && !ev.shiftKey && !ev.altKey,
     captureDominantly: true,
   },
   [HotkeyActions.CTRL_PAGE_DOWN]: {
@@ -222,11 +219,8 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_SHIFT_TAB]: {
     keyComboDefault: 'Ctrl+Shift+Tab',
     keyComboMac: '⇧⌘Tab',
-    isEventMatching: (ev, platform) =>
-      ev.code === 'Tab' &&
-      isPrimaryModifierPressed(ev, platform) &&
-      ev.shiftKey &&
-      !ev.altKey,
+    isEventMatching: (ev, _platform) =>
+      ev.code === 'Tab' && ev.ctrlKey && ev.shiftKey && !ev.altKey,
     captureDominantly: true,
   },
   [HotkeyActions.CMD_OPTION_ARROW_LEFT]: {
