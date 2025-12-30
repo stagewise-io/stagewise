@@ -1,8 +1,35 @@
+export type Platform = 'mac' | 'windows' | 'linux';
+
 export interface HotkeyActionDefinition {
   keyComboDefault: string;
   keyComboMac: string;
-  isEventMatching: (ev: KeyboardEvent) => boolean;
+  isEventMatching: (ev: KeyboardEvent, platform: Platform) => boolean;
   captureDominantly?: boolean;
+}
+
+/**
+ * Detects the current platform based on navigator.
+ */
+export function getCurrentPlatform(): Platform {
+  if (typeof navigator !== 'undefined') {
+    const platform = navigator.platform.toLowerCase();
+    if (platform.includes('mac')) return 'mac';
+    if (platform.includes('win')) return 'windows';
+  }
+  return 'linux';
+}
+
+/**
+ * Helper to check if the primary modifier key is pressed for the given platform.
+ * On Mac, this is the Command key (metaKey). On Windows/Linux, this is Ctrl.
+ */
+export function isPrimaryModifierPressed(
+  ev: KeyboardEvent,
+  platform: Platform,
+): boolean {
+  return platform === 'mac'
+    ? ev.metaKey && !ev.ctrlKey
+    : ev.ctrlKey && !ev.metaKey;
 }
 
 export enum HotkeyActions {
@@ -82,9 +109,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_I]: {
     keyComboDefault: 'Ctrl+I',
     keyComboMac: '⌘I',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyI' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -92,9 +119,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_N]: {
     keyComboDefault: 'Ctrl+N',
     keyComboMac: '⌘N',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyN' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -102,9 +129,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_J]: {
     keyComboDefault: 'Ctrl+J',
     keyComboMac: '⌘J',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyJ' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
   },
@@ -113,9 +140,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_T]: {
     keyComboDefault: 'Ctrl+T',
     keyComboMac: '⌘T',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyT' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -123,9 +150,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_SHIFT_T]: {
     keyComboDefault: 'Ctrl+Shift+T',
     keyComboMac: '⇧⌘T',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyT' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -133,9 +160,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_W]: {
     keyComboDefault: 'Ctrl+W',
     keyComboMac: '⌘W',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyW' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -143,9 +170,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_SHIFT_W]: {
     keyComboDefault: 'Ctrl+Shift+W',
     keyComboMac: '⇧⌘W',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyW' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -153,9 +180,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_TAB]: {
     keyComboDefault: 'Ctrl+Tab',
     keyComboMac: '⌘Tab',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Tab' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -163,9 +190,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_PAGE_DOWN]: {
     keyComboDefault: 'Ctrl+PageDown',
     keyComboMac: '⌘PageDown',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'PageDown' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -173,7 +200,8 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CMD_OPTION_ARROW_RIGHT]: {
     keyComboDefault: 'Ctrl+PageDown',
     keyComboMac: '⌥⌘→',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
+      platform === 'mac' &&
       ev.code === 'ArrowRight' &&
       ev.metaKey &&
       ev.altKey &&
@@ -184,9 +212,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_PAGE_UP]: {
     keyComboDefault: 'Ctrl+PageUp',
     keyComboMac: '⌘PageUp',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'PageUp' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -194,9 +222,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_SHIFT_TAB]: {
     keyComboDefault: 'Ctrl+Shift+Tab',
     keyComboMac: '⇧⌘Tab',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Tab' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -204,7 +232,8 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CMD_OPTION_ARROW_LEFT]: {
     keyComboDefault: 'Ctrl+PageUp',
     keyComboMac: '⌥⌘←',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
+      platform === 'mac' &&
       ev.code === 'ArrowLeft' &&
       ev.metaKey &&
       ev.altKey &&
@@ -215,9 +244,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_1]: {
     keyComboDefault: 'Ctrl+1',
     keyComboMac: '⌘1',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Digit1' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -225,9 +254,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_2]: {
     keyComboDefault: 'Ctrl+2',
     keyComboMac: '⌘2',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Digit2' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -235,9 +264,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_3]: {
     keyComboDefault: 'Ctrl+3',
     keyComboMac: '⌘3',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Digit3' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -245,9 +274,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_4]: {
     keyComboDefault: 'Ctrl+4',
     keyComboMac: '⌘4',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Digit4' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -255,9 +284,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_5]: {
     keyComboDefault: 'Ctrl+5',
     keyComboMac: '⌘5',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Digit5' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -265,9 +294,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_6]: {
     keyComboDefault: 'Ctrl+6',
     keyComboMac: '⌘6',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Digit6' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -275,9 +304,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_7]: {
     keyComboDefault: 'Ctrl+7',
     keyComboMac: '⌘7',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Digit7' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -285,9 +314,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_8]: {
     keyComboDefault: 'Ctrl+8',
     keyComboMac: '⌘8',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Digit8' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -295,9 +324,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_9]: {
     keyComboDefault: 'Ctrl+9',
     keyComboMac: '⌘9',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Digit9' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -305,32 +334,34 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CMD_BRACKET_LEFT]: {
     keyComboDefault: 'Alt+←',
     keyComboMac: '⌘[',
-    isEventMatching: (ev) =>
-      (ev.code === 'BracketLeft' &&
-        ev.metaKey &&
-        !ev.shiftKey &&
-        !ev.altKey &&
-        !ev.ctrlKey) ||
-      (ev.code === 'ArrowLeft' &&
-        ev.altKey &&
-        !ev.shiftKey &&
-        !ev.metaKey &&
-        !ev.ctrlKey),
+    isEventMatching: (ev, platform) =>
+      platform === 'mac'
+        ? ev.code === 'BracketLeft' &&
+          ev.metaKey &&
+          !ev.shiftKey &&
+          !ev.altKey &&
+          !ev.ctrlKey
+        : ev.code === 'ArrowLeft' &&
+          ev.altKey &&
+          !ev.shiftKey &&
+          !ev.metaKey &&
+          !ev.ctrlKey,
     captureDominantly: true,
   },
   [HotkeyActions.CMD_ARROW_LEFT]: {
     keyComboDefault: 'Alt+←',
     keyComboMac: '⌘←',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'ArrowLeft' &&
-      ((ev.metaKey && !ev.shiftKey && !ev.altKey && !ev.ctrlKey) ||
-        (ev.altKey && !ev.shiftKey && !ev.metaKey && !ev.ctrlKey)),
+      (platform === 'mac'
+        ? ev.metaKey && !ev.shiftKey && !ev.altKey && !ev.ctrlKey
+        : ev.altKey && !ev.shiftKey && !ev.metaKey && !ev.ctrlKey),
     captureDominantly: true,
   },
   [HotkeyActions.ALT_ARROW_LEFT]: {
     keyComboDefault: 'Alt+←',
     keyComboMac: '⌥←',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, _platform) =>
       ev.code === 'ArrowLeft' &&
       ev.altKey &&
       !ev.shiftKey &&
@@ -341,32 +372,34 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CMD_BRACKET_RIGHT]: {
     keyComboDefault: 'Alt+→',
     keyComboMac: '⌘]',
-    isEventMatching: (ev) =>
-      (ev.code === 'BracketRight' &&
-        ev.metaKey &&
-        !ev.shiftKey &&
-        !ev.altKey &&
-        !ev.ctrlKey) ||
-      (ev.code === 'ArrowRight' &&
-        ev.altKey &&
-        !ev.shiftKey &&
-        !ev.metaKey &&
-        !ev.ctrlKey),
+    isEventMatching: (ev, platform) =>
+      platform === 'mac'
+        ? ev.code === 'BracketRight' &&
+          ev.metaKey &&
+          !ev.shiftKey &&
+          !ev.altKey &&
+          !ev.ctrlKey
+        : ev.code === 'ArrowRight' &&
+          ev.altKey &&
+          !ev.shiftKey &&
+          !ev.metaKey &&
+          !ev.ctrlKey,
     captureDominantly: true,
   },
   [HotkeyActions.CMD_ARROW_RIGHT]: {
     keyComboDefault: 'Alt+→',
     keyComboMac: '⌘→',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'ArrowRight' &&
-      ((ev.metaKey && !ev.shiftKey && !ev.altKey && !ev.ctrlKey) ||
-        (ev.altKey && !ev.shiftKey && !ev.metaKey && !ev.ctrlKey)),
+      (platform === 'mac'
+        ? ev.metaKey && !ev.shiftKey && !ev.altKey && !ev.ctrlKey
+        : ev.altKey && !ev.shiftKey && !ev.metaKey && !ev.ctrlKey),
     captureDominantly: true,
   },
   [HotkeyActions.ALT_ARROW_RIGHT]: {
     keyComboDefault: 'Alt+→',
     keyComboMac: '⌥→',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, _platform) =>
       ev.code === 'ArrowRight' &&
       ev.altKey &&
       !ev.shiftKey &&
@@ -377,9 +410,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CMD_SHIFT_H]: {
     keyComboDefault: 'Ctrl+Shift+H',
     keyComboMac: '⇧⌘H',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyH' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -387,9 +420,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_L]: {
     keyComboDefault: 'Ctrl+L',
     keyComboMac: '⌘L',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyL' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -397,7 +430,7 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.ALT_D]: {
     keyComboDefault: 'Alt+D',
     keyComboMac: '⌥D',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, _platform) =>
       ev.code === 'KeyD' &&
       ev.altKey &&
       !ev.shiftKey &&
@@ -408,7 +441,7 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.F6]: {
     keyComboDefault: 'F6',
     keyComboMac: 'F6',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, _platform) =>
       ev.code === 'F6' &&
       !ev.shiftKey &&
       !ev.altKey &&
@@ -421,9 +454,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_R]: {
     keyComboDefault: 'Ctrl+R',
     keyComboMac: '⌘R',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyR' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -431,7 +464,7 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.F5]: {
     keyComboDefault: 'F5',
     keyComboMac: 'F5',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, _platform) =>
       ev.code === 'F5' &&
       !ev.shiftKey &&
       !ev.altKey &&
@@ -442,9 +475,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_SHIFT_R]: {
     keyComboDefault: 'Ctrl+Shift+R',
     keyComboMac: '⇧⌘R',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyR' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -454,9 +487,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_F]: {
     keyComboDefault: 'Ctrl+F',
     keyComboMac: '⌘F',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyF' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -464,7 +497,7 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.F3]: {
     keyComboDefault: 'F3',
     keyComboMac: 'F3',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, _platform) =>
       ev.code === 'F3' &&
       !ev.shiftKey &&
       !ev.altKey &&
@@ -475,9 +508,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_G]: {
     keyComboDefault: 'Ctrl+G',
     keyComboMac: '⌘G',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyG' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -485,9 +518,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_SHIFT_G]: {
     keyComboDefault: 'Ctrl+Shift+G',
     keyComboMac: '⇧⌘G',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyG' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -497,7 +530,7 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.F12]: {
     keyComboDefault: 'F12',
     keyComboMac: 'F12',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, _platform) =>
       ev.code === 'F12' &&
       !ev.shiftKey &&
       !ev.altKey &&
@@ -508,9 +541,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_SHIFT_J]: {
     keyComboDefault: 'Ctrl+Shift+J',
     keyComboMac: '⇧⌘J',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'KeyJ' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -518,12 +551,18 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CMD_OPTION_I]: {
     keyComboDefault: 'Ctrl+Shift+I',
     keyComboMac: '⌥⌘I',
-    isEventMatching: (ev) =>
-      ev.code === 'KeyI' &&
-      ev.metaKey &&
-      ev.altKey &&
-      !ev.shiftKey &&
-      !ev.ctrlKey,
+    isEventMatching: (ev, platform) =>
+      platform === 'mac'
+        ? ev.code === 'KeyI' &&
+          ev.metaKey &&
+          ev.altKey &&
+          !ev.shiftKey &&
+          !ev.ctrlKey
+        : ev.code === 'KeyI' &&
+          ev.ctrlKey &&
+          ev.shiftKey &&
+          !ev.altKey &&
+          !ev.metaKey,
     captureDominantly: true,
   },
 
@@ -531,9 +570,9 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_PLUS]: {
     keyComboDefault: 'Ctrl++',
     keyComboMac: '⌘+',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Equal' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -541,21 +580,21 @@ export const hotkeyActionDefinitions: Record<
   [HotkeyActions.CTRL_MINUS]: {
     keyComboDefault: 'Ctrl+-',
     keyComboMac: '⌘-',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       (ev.code === 'Minus' ||
         ev.code === 'NumpadSubtract' ||
         ev.key === '-' ||
         ev.key === '_') &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.altKey,
     captureDominantly: true,
   },
   [HotkeyActions.CTRL_0]: {
     keyComboDefault: 'Ctrl+0',
     keyComboMac: '⌘0',
-    isEventMatching: (ev) =>
+    isEventMatching: (ev, platform) =>
       ev.code === 'Digit0' &&
-      (ev.ctrlKey || ev.metaKey) &&
+      isPrimaryModifierPressed(ev, platform) &&
       !ev.shiftKey &&
       !ev.altKey,
     captureDominantly: true,
@@ -564,8 +603,9 @@ export const hotkeyActionDefinitions: Record<
 
 export function getHotkeyDefinitionForEvent(
   ev: KeyboardEvent,
+  platform: Platform = getCurrentPlatform(),
 ): HotkeyActionDefinition | undefined {
   return Object.values(hotkeyActionDefinitions).find((definition) =>
-    definition.isEventMatching(ev),
+    definition.isEventMatching(ev, platform),
   );
 }

@@ -1,6 +1,10 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useEventListener } from './use-event-listener';
-import { hotkeyActionDefinitions, type HotkeyActions } from '@shared/hotkeys';
+import {
+  hotkeyActionDefinitions,
+  getCurrentPlatform,
+  type HotkeyActions,
+} from '@shared/hotkeys';
 import { usePostHog } from 'posthog-js/react';
 
 export function useHotKeyListener(
@@ -8,10 +12,11 @@ export function useHotKeyListener(
   hotKeyAction: HotkeyActions,
 ) {
   const posthog = usePostHog();
+  const platform = useMemo(() => getCurrentPlatform(), []);
   const hotKeyListener = useCallback(
     (ev: KeyboardEvent) => {
       // The first matching hotkey action will be executed and abort further processing of other hotkey actions.
-      if (hotkeyActionDefinitions[hotKeyAction].isEventMatching(ev)) {
+      if (hotkeyActionDefinitions[hotKeyAction].isEventMatching(ev, platform)) {
         posthog.capture('agent_select_elements_hotkey_pressed', {
           hotkey_action: hotKeyAction,
         });
@@ -20,7 +25,7 @@ export function useHotKeyListener(
         ev.stopPropagation();
       }
     },
-    [action],
+    [action, platform],
   );
 
   useEventListener('keydown', hotKeyListener);
