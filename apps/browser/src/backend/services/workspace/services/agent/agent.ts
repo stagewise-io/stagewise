@@ -172,7 +172,7 @@ export class AgentService {
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
       () => this.uiKarton.state,
-      this.globalDataPathService.globalDataPath,
+      this.uiKarton.state.workspace?.paths.data ?? null,
     );
 
     // Initialize timeout manager
@@ -316,6 +316,7 @@ export class AgentService {
 
   private async updateStagewiseMd() {
     if (!this.clientRuntime) return;
+    if (!this.uiKarton.state.workspace?.paths.data) return;
     await generateStagewiseMd(
       this.telemetryService.withTracing(this.litellm!('claude-haiku-4-5'), {
         posthogTraceId: 'update-stagewise-md',
@@ -325,10 +326,11 @@ export class AgentService {
       }),
       this.clientRuntime!,
       new ClientRuntimeNode({
-        workingDirectory: this.globalDataPathService.globalDataPath,
+        workingDirectory: this.uiKarton.state.workspace.paths.data,
         rgBinaryBasePath: this.globalDataPathService.globalDataPath,
       }),
-      this.globalDataPathService.globalDataPath,
+      this.uiKarton.state.workspace?.path ??
+        (this.clientRuntime?.fileSystem.getCurrentWorkingDirectory() || ''),
     );
   }
 
@@ -337,7 +339,7 @@ export class AgentService {
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
       () => this.uiKarton.state,
-      this.globalDataPathService.globalDataPath,
+      this.uiKarton.state.workspace?.paths.data ?? null,
     );
   }
 
@@ -423,7 +425,7 @@ export class AgentService {
     this.promptBuilder = new PromptBuilder(
       this.clientRuntime,
       () => this.uiKarton.state,
-      this.globalDataPathService.globalDataPath,
+      this.uiKarton.state.workspace?.paths.data ?? null,
     );
   }
 
