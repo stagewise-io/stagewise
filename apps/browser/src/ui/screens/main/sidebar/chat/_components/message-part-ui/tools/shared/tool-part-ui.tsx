@@ -15,6 +15,7 @@ export const ToolPartUI = ({
   contentFooterClassName,
   expanded: controlledExpanded,
   setExpanded: controlledSetExpanded,
+  showBorder = true,
 }: {
   trigger?: React.ReactNode;
   content?: React.ReactNode;
@@ -23,6 +24,7 @@ export const ToolPartUI = ({
   contentFooterClassName?: string;
   expanded?: boolean;
   setExpanded?: (expanded: boolean) => void;
+  showBorder?: boolean;
 }) => {
   // Internal state for uncontrolled mode
   const [internalExpanded, setInternalExpanded] = useState(true);
@@ -35,8 +37,8 @@ export const ToolPartUI = ({
   const [containerReady, setContainerReady] = useState(false);
   const scrollContainerRef = useRef<HTMLElement>(null);
   const isUserScrolledRef = useRef(false);
-  const [topFadeDistance, setTopFadeDistance] = useState(6);
-  const [bottomFadeDistance, setBottomFadeDistance] = useState(6);
+  const [topFadeDistance, setTopFadeDistance] = useState(0);
+  const [bottomFadeDistance, setBottomFadeDistance] = useState(0);
   const [hasVerticalScrollbar, setHasVerticalScrollbar] = useState(false);
   const [hasHorizontalScrollbar, setHasHorizontalScrollbar] = useState(false);
   const contentScrollRef = useRef<HTMLDivElement>(null);
@@ -147,6 +149,20 @@ export const ToolPartUI = ({
       const maxFade = 16; // Normal fade when scrolling
       const transitionDistance = 24; // Distance over which to transition
 
+      // Check if content is actually scrollable
+      const isScrollable = contentDiv.scrollHeight > contentDiv.clientHeight;
+
+      // If not scrollable, no fade should be shown
+      if (!isScrollable) {
+        setTopFadeDistance(0);
+        setBottomFadeDistance(0);
+        setHasVerticalScrollbar(false);
+        setHasHorizontalScrollbar(
+          contentDiv.scrollWidth > contentDiv.clientWidth,
+        );
+        return;
+      }
+
       // Calculate distance from top
       const distanceFromTop = contentDiv.scrollTop;
       const topFadeAmount = Math.min(
@@ -169,9 +185,7 @@ export const ToolPartUI = ({
       setBottomFadeDistance(bottomFadeAmount);
 
       // Check for scrollbar visibility
-      setHasVerticalScrollbar(
-        contentDiv.scrollHeight > contentDiv.clientHeight,
-      );
+      setHasVerticalScrollbar(true);
       setHasHorizontalScrollbar(
         contentDiv.scrollWidth > contentDiv.clientWidth,
       );
@@ -189,8 +203,16 @@ export const ToolPartUI = ({
     updateScrollPosition();
 
     contentDiv.addEventListener('scroll', handleScroll);
+
+    // ResizeObserver to detect size changes after CSS animation completes
+    const resizeObserver = new ResizeObserver(() => {
+      updateScrollPosition();
+    });
+    resizeObserver.observe(contentDiv);
+
     return () => {
       contentDiv.removeEventListener('scroll', handleScroll);
+      resizeObserver.disconnect();
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, [expanded, content]);
@@ -204,7 +226,13 @@ export const ToolPartUI = ({
 
   if (content === undefined) {
     return (
-      <div className="-mx-1 flex h-6 items-center gap-1 truncate rounded-xl border-muted-foreground/10 bg-muted/30 px-2.5 font-normal text-muted-foreground dark:border-muted-foreground/5">
+      <div
+        className={cn(
+          '-mx-1 flex h-6 items-center gap-1 truncate rounded-xl px-2.5 font-normal text-muted-foreground',
+          showBorder &&
+            'border-muted-foreground/10 bg-muted/30 dark:border-muted-foreground/5',
+        )}
+      >
         {trigger}
       </div>
     );
@@ -214,29 +242,47 @@ export const ToolPartUI = ({
     <div
       className={cn(
         // '-mx-1 block overflow-hidden rounded-xl border-border/20 bg-muted-foreground/5', // Current state of the product
-        '-mx-1 block overflow-hidden rounded-xl border border-muted-foreground/10 dark:border-muted-foreground/5', // Very heavy inset glass
+        'block overflow-hidden rounded-xl', // Very heavy inset glass
+        showBorder &&
+          '-mx-1 border border-muted-foreground/10 dark:border-muted-foreground/5',
         // '-mx-1 glass-inset-chat-bubble block overflow-hidden rounded-xl border-border/20',
       )}
     >
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         <CollapsibleTrigger
           size="condensed"
-          className={`h-6 gap-1 rounded-t-xl bg-muted/30 px-2 font-normal text-muted-foreground ${content !== undefined ? 'cursor-pointer' : 'cursor-default hover:bg-transparent active:bg-transparent'}`}
+          className={cn(
+            `group/trigger gap-1 rounded-t-xl px-0 font-normal text-muted-foreground`,
+            content !== undefined
+              ? 'cursor-pointer'
+              : 'cursor-default hover:bg-transparent active:bg-transparent',
+            showBorder && 'h-6 bg-muted/30 px-2',
+            !showBorder &&
+              'justify-start py-0 hover:bg-transparent active:bg-transparent',
+          )}
         >
           {trigger}
           <ChevronDownIcon
             className={cn(
-              'size-3 shrink-0 pl-auto transition-transform duration-150',
+              'size-3 shrink-0 transition-transform duration-150',
               expanded && 'rotate-180',
+              !showBorder && !expanded && 'hidden group-hover/trigger:block',
+              showBorder && 'pl-auto',
             )}
           />
         </CollapsibleTrigger>
         {content && (
-          <CollapsibleContent className="relative flex flex-col pb-0 text-xs">
+          <CollapsibleContent
+            className={cn(
+              'relative flex flex-col pb-0 text-xs',
+              !showBorder && 'pt-1',
+            )}
+          >
             <div
               ref={contentScrollRef}
               className={cn(
                 'mask-alpha scrollbar-hover-only block max-h-32 overscroll-contain py-0.5 transition-[max-height] duration-300 ease-[var(--ease-spring-soft)]',
+                !showBorder && 'max-h-none',
                 contentClassName,
               )}
               style={
