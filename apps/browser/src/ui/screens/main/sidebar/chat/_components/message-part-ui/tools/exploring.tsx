@@ -1,5 +1,13 @@
 import type { ToolPart } from '@shared/karton-contracts/ui';
-import { useMemo, useState, useEffect } from 'react';
+import {
+  useMemo,
+  useState,
+  useEffect,
+  createContext,
+  useContext,
+  useCallback,
+} from 'react';
+import type { ReasoningUIPart } from 'ai';
 import { GlobToolPart } from './glob';
 import { SearchIcon } from 'lucide-react';
 import { GrepSearchToolPart } from './grep-search';
@@ -9,28 +17,53 @@ import { GetContext7LibraryDocsToolPart } from './get-context7-library-docs';
 import { ResolveContext7LibraryToolPart } from './resolve-context7-library';
 import { cn } from '@/utils';
 import { ToolPartUI } from './shared/tool-part-ui';
+import { ThinkingPart } from '../thinking';
+import { ReadConsoleLogsToolPart } from './read-console-logs';
+import { ExecuteConsoleScriptToolPart } from './execute-console-script';
 
-export type ReadOnlyToolPart = Extract<
-  ToolPart,
-  {
-    type:
-      | 'tool-globTool'
-      | 'tool-grepSearchTool'
-      | 'tool-listFilesTool'
-      | 'tool-readFileTool'
-      | 'tool-getContext7LibraryDocsTool'
-      | 'tool-resolveContext7LibraryTool';
-  }
->;
+// Context for tracking expanded children within exploring section
+interface ExploringContentContextValue {
+  registerExpanded: (id: string) => void;
+  unregisterExpanded: (id: string) => void;
+}
 
-export function isReadOnlyToolPart(part: ToolPart): part is ReadOnlyToolPart {
+export const ExploringContentContext =
+  createContext<ExploringContentContextValue | null>(null);
+
+export const useExploringContentContext = () => {
+  return useContext(ExploringContentContext);
+};
+
+export type ReadOnlyToolPart =
+  | Extract<
+      ToolPart,
+      {
+        type:
+          | 'tool-globTool'
+          | 'tool-grepSearchTool'
+          | 'tool-listFilesTool'
+          | 'tool-readFileTool'
+          | 'tool-getContext7LibraryDocsTool'
+          | 'tool-resolveContext7LibraryTool'
+          | 'tool-executeConsoleScriptTool'
+          | 'tool-readConsoleLogsTool';
+      }
+    >
+  | ReasoningUIPart;
+
+export function isReadOnlyToolPart(
+  part: ToolPart | ReasoningUIPart,
+): part is ReadOnlyToolPart {
   return (
+    part.type === 'reasoning' ||
     part.type === 'tool-globTool' ||
     part.type === 'tool-grepSearchTool' ||
     part.type === 'tool-listFilesTool' ||
     part.type === 'tool-readFileTool' ||
     part.type === 'tool-getContext7LibraryDocsTool' ||
-    part.type === 'tool-resolveContext7LibraryTool'
+    part.type === 'tool-resolveContext7LibraryTool' ||
+    part.type === 'tool-executeConsoleScriptTool' ||
+    part.type === 'tool-readConsoleLogsTool'
   );
 }
 
@@ -38,12 +71,24 @@ const PartContent = ({
   part,
   minimal = false,
   disableShimmer = false,
+  thinkingDuration,
 }: {
   part: ReadOnlyToolPart;
   minimal?: boolean;
   disableShimmer?: boolean;
+  thinkingDuration?: number;
 }) => {
   switch (part.type) {
+    case 'reasoning':
+      return (
+        <ThinkingPart
+          part={part}
+          isAutoExpanded={part.state === 'streaming'}
+          isShimmering={false}
+          thinkingDuration={thinkingDuration}
+          showBorder={!minimal}
+        />
+      );
     case 'tool-globTool':
       return (
         <GlobToolPart
@@ -98,6 +143,24 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
+    case 'tool-executeConsoleScriptTool':
+      return (
+        <ExecuteConsoleScriptToolPart
+          key={part.toolCallId}
+          showBorder={!minimal}
+          part={part}
+          disableShimmer={disableShimmer}
+        />
+      );
+    case 'tool-readConsoleLogsTool':
+      return (
+        <ReadConsoleLogsToolPart
+          key={part.toolCallId}
+          showBorder={!minimal}
+          part={part}
+          disableShimmer={disableShimmer}
+        />
+      );
     default:
       return null;
   }
@@ -107,34 +170,77 @@ export const ExploringToolParts = ({
   parts,
   isAutoExpanded,
   isShimmering,
+  thinkingDurations,
 }: {
   parts: ReadOnlyToolPart[];
   isAutoExpanded: boolean;
   isShimmering: boolean;
+  thinkingDurations?: number[];
 }) => {
   const [expanded, setExpanded] = useState(isAutoExpanded);
+  const [expandedChildren, setExpandedChildren] = useState<Set<string>>(
+    new Set(),
+  );
   const isOnlyOnePart = useMemo(() => parts.length === 1, [parts]);
 
   useEffect(() => {
     setExpanded(isAutoExpanded);
   }, [isAutoExpanded]);
 
+  const registerExpanded = useCallback((id: string) => {
+    setExpandedChildren((prev) => new Set(prev).add(id));
+  }, []);
+
+  const unregisterExpanded = useCallback((id: string) => {
+    setExpandedChildren((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({ registerExpanded, unregisterExpanded }),
+    [registerExpanded, unregisterExpanded],
+  );
+
+  const hasExpandedChild = expandedChildren.size > 0;
+
   const partContents = useMemo(() => {
-    return parts.map((part) => (
-      <PartContent
-        key={part.toolCallId}
-        part={part}
-        minimal={true}
-        disableShimmer
-      />
-    ));
-  }, [parts]);
+    let reasoningIndex = -1;
+    return parts.map((part) => {
+      if (part.type === 'reasoning') reasoningIndex++;
+      // Use a stable key for reasoning parts (index-based) instead of part.text which changes during streaming
+      const stableKey =
+        part.type === 'reasoning'
+          ? `reasoning-${reasoningIndex}`
+          : part.toolCallId;
+      return (
+        <PartContent
+          key={stableKey}
+          part={part}
+          minimal={true}
+          disableShimmer
+          thinkingDuration={
+            part.type === 'reasoning'
+              ? thinkingDurations?.[reasoningIndex]
+              : undefined
+          }
+        />
+      );
+    });
+  }, [parts, thinkingDurations]);
 
   const explorationMetadata = useMemo(() => {
     let filesRead = 0;
     let filesFound = 0;
     let linesRead = 0;
     let docsRead = 0;
+    let consoleLogsRead = 0;
+    let consoleScriptsExecuted = 0;
+    let hasUsedBrowserTools = false;
+    let hasUsedContext7Tools = false;
+    let hasUsedFileTools = false;
 
     const finishedParts = parts.filter(
       (part) => part.state === 'output-available',
@@ -144,41 +250,104 @@ export const ExploringToolParts = ({
         case 'tool-readFileTool':
           filesRead += 1;
           linesRead += part.output?.result?.totalLines ?? 0;
+          hasUsedFileTools = true;
           break;
         case 'tool-globTool':
         case 'tool-grepSearchTool':
           filesFound += part.output?.result?.totalMatches ?? 0;
+          hasUsedFileTools = true;
           break;
         case 'tool-listFilesTool':
           filesFound += part.output?.result?.totalFiles ?? 0;
+          hasUsedFileTools = true;
           break;
         case 'tool-getContext7LibraryDocsTool':
           docsRead += 1;
+          hasUsedContext7Tools = true;
+          break;
+        case 'tool-executeConsoleScriptTool':
+          consoleScriptsExecuted += 1;
+          hasUsedBrowserTools = true;
+          break;
+        case 'tool-readConsoleLogsTool':
+          consoleLogsRead += 1;
           break;
       }
     });
-    return { filesRead, filesFound, linesRead, docsRead };
+    return {
+      filesRead,
+      filesFound,
+      linesRead,
+      docsRead,
+      consoleLogsRead,
+      consoleScriptsExecuted,
+      hasUsedBrowserTools,
+      hasUsedContext7Tools,
+      hasUsedFileTools,
+    };
   }, [parts]);
 
   const explorationFinishedText = useMemo(() => {
-    const { filesFound, filesRead, docsRead } = explorationMetadata;
-
-    if (filesFound === 0 && filesRead === 0) {
-      return 'Explored directory';
-    }
+    const {
+      filesFound,
+      filesRead,
+      docsRead,
+      consoleLogsRead,
+      consoleScriptsExecuted,
+      hasUsedBrowserTools,
+      hasUsedContext7Tools,
+      hasUsedFileTools,
+    } = explorationMetadata;
 
     const parts: string[] = [];
-    if (filesFound > 0)
-      parts.push(`Found ${filesFound} file${filesFound !== 1 ? 's' : ''}`);
+    if (filesFound > 0 || filesRead > 0)
+      parts.push(
+        `${filesFound + filesRead} file${filesFound + filesRead !== 1 ? 's' : ''}`,
+      );
 
-    if (docsRead > 0)
-      parts.push(`Read ${docsRead} doc${docsRead !== 1 ? 's' : ''}`);
+    if (docsRead > 0) parts.push(`${docsRead} doc${docsRead !== 1 ? 's' : ''}`);
 
-    if (filesRead > 0)
-      parts.push(`Read ${filesRead} file${filesRead !== 1 ? 's' : ''}`);
+    if (consoleLogsRead > 0)
+      parts.push(
+        `${consoleLogsRead} console log${consoleLogsRead !== 1 ? 's' : ''}`,
+      );
 
-    return parts.join(', ');
+    if (consoleScriptsExecuted > 0)
+      parts.push(
+        `${consoleScriptsExecuted} tab${consoleScriptsExecuted !== 1 ? 's' : ''}`,
+      );
+
+    if (parts.length === 0) {
+      if (hasUsedBrowserTools) parts.push('the DOM');
+      if (hasUsedContext7Tools) parts.push('documentation');
+      if (hasUsedFileTools) parts.push('files');
+    }
+
+    if (parts.length === 0) return 'Explored the codebase';
+    if (parts.length === 1) return `Explored ${parts[0]}`;
+    return `Explored  ${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
   }, [explorationMetadata]);
+
+  const explorationInProgressText = useMemo(() => {
+    const lastNonReasoningPart = parts
+      .filter((part) => part.type !== 'reasoning')
+      .at(-1);
+    switch (lastNonReasoningPart?.type || '') {
+      case 'tool-readFileTool':
+      case 'tool-globTool':
+      case 'tool-grepSearchTool':
+      case 'tool-listFilesTool':
+        return 'Exploring files...';
+      case 'tool-getContext7LibraryDocsTool':
+      case 'tool-resolveContext7LibraryTool':
+        return 'Exploring documentation...';
+      case 'tool-executeConsoleScriptTool':
+      case 'tool-readConsoleLogsTool':
+        return 'Exploring the browser...';
+      default:
+        return 'Exploring...';
+    }
+  }, [parts]);
 
   // For single part, show it inline in the trigger without expand/collapse
   if (isOnlyOnePart)
@@ -187,6 +356,7 @@ export const ExploringToolParts = ({
         part={parts[0]!}
         minimal={false}
         disableShimmer={!isShimmering}
+        thinkingDuration={thinkingDurations?.[0]}
       />
     );
 
@@ -206,7 +376,7 @@ export const ExploringToolParts = ({
               <>
                 <SearchIcon className="size-3 shrink-0 text-primary" />
                 <span className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 truncate">
-                  Exploring...
+                  {explorationInProgressText}
                 </span>
               </>
             ) : (
@@ -221,11 +391,13 @@ export const ExploringToolParts = ({
         </div>
       }
       content={
-        <div className="flex flex-col gap-1 pb-1 opacity-75">
-          {partContents}
-        </div>
+        <ExploringContentContext.Provider value={contextValue}>
+          <div className="flex flex-col gap-1.25 pb-1 opacity-75">
+            {partContents}
+          </div>
+        </ExploringContentContext.Provider>
       }
-      contentClassName="max-h-24"
+      contentClassName={hasExpandedChild ? 'max-h-96' : 'max-h-52'}
     />
   );
 };

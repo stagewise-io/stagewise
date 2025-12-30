@@ -1,6 +1,6 @@
 import type { ToolPart } from '@shared/karton-contracts/ui';
 import { Loader2Icon, XIcon, TerminalIcon } from 'lucide-react';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useId, useCallback } from 'react';
 import {
   Tooltip,
   TooltipContent,
@@ -8,13 +8,22 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { CodeBlock } from '@/components/ui/code-block';
+import { cn } from '@/utils';
+import { useExploringContentContext } from './exploring';
 
 export const ReadConsoleLogsToolPart = ({
   part,
+  showBorder = true,
+  disableShimmer = false,
 }: {
   part: Extract<ToolPart, { type: 'tool-readConsoleLogsTool' }>;
+  showBorder?: boolean;
+  disableShimmer?: boolean;
 }) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
+  const exploringContext = useExploringContentContext();
+  const id = useId();
 
   const streaming = useMemo(() => {
     return part.state === 'input-streaming' || part.state === 'input-available';
@@ -49,14 +58,38 @@ export const ReadConsoleLogsToolPart = ({
     return JSON.stringify(logInfo.logs, null, 2);
   }, [logInfo]);
 
-  // Force expanded to false when in error state
+  // Sync expanded state with streaming state (expand while streaming, collapse when done)
+  // This is auto-expansion, not user-initiated
   useEffect(() => {
-    if (state === 'error') setExpanded(false);
-  }, [state]);
+    setExpanded(streaming);
+    setIsManuallyExpanded(false);
+  }, [streaming]);
+
+  // Handle user-initiated expansion toggle
+  const handleUserSetExpanded = useCallback((newExpanded: boolean) => {
+    setExpanded(newExpanded);
+    setIsManuallyExpanded(newExpanded);
+  }, []);
+
+  // Report expansion state to parent exploring context (only for manual expansion)
+  useEffect(() => {
+    if (!exploringContext) return;
+    if (isManuallyExpanded && expanded) exploringContext.registerExpanded(id);
+    else exploringContext.unregisterExpanded(id);
+
+    return () => {
+      exploringContext.unregisterExpanded(id);
+    };
+  }, [expanded, isManuallyExpanded, exploringContext, id]);
 
   if (state === 'error') {
     return (
-      <div className="group/exploring-part -mx-1 block min-w-32 rounded-xl border-border/20 bg-muted-foreground/5">
+      <div
+        className={cn(
+          'group/exploring-part block min-w-32 rounded-xl',
+          showBorder && '-mx-1 border-border/20 bg-muted-foreground/5',
+        )}
+      >
         <div className="flex h-6 cursor-default items-center gap-1 rounded-xl px-2.5 text-muted-foreground">
           <div className="flex w-full flex-row items-center justify-start gap-1">
             <ErrorHeader errorText={part.errorText ?? undefined} />
@@ -68,18 +101,27 @@ export const ReadConsoleLogsToolPart = ({
 
   return (
     <ToolPartUI
+      showBorder={showBorder}
       expanded={expanded}
-      setExpanded={setExpanded}
+      setExpanded={handleUserSetExpanded}
       trigger={
         <>
           {!streaming && (
             <TerminalIcon className="size-3 shrink-0 text-muted-foreground" />
           )}
-          <div className="flex w-full flex-row items-center justify-start gap-1">
+          <div
+            className={cn(
+              'flex flex-row items-center justify-start gap-1',
+              showBorder && 'flex-1',
+            )}
+          >
             {streaming ? (
-              <LoadingHeader />
+              <LoadingHeader disableShimmer={disableShimmer} />
             ) : (
-              <SuccessHeader logsReturned={logInfo?.logsReturned ?? 0} />
+              <SuccessHeader
+                logsReturned={logInfo?.logsReturned ?? 0}
+                showBorder={showBorder}
+              />
             )}
           </div>
         </>
@@ -96,7 +138,14 @@ export const ReadConsoleLogsToolPart = ({
             </pre>
           )}
           {state === 'success' && formattedLogs && (
-            <div className="scrollbar-hover-only max-h-48 overflow-auto rounded border border-border/10">
+            <div
+              className={cn(
+                'scrollbar-hover-only rounded border border-border/10',
+                showBorder
+                  ? 'max-h-48 overflow-auto'
+                  : 'overflow-x-auto overflow-y-hidden',
+              )}
+            >
               <CodeBlock
                 code={formattedLogs}
                 language="json"
@@ -112,7 +161,9 @@ export const ReadConsoleLogsToolPart = ({
           )}
         </>
       }
-      contentClassName={streaming ? 'max-h-24' : 'max-h-80'}
+      contentClassName={
+        showBorder ? (streaming ? 'max-h-24' : 'max-h-80') : undefined
+      }
       contentFooterClassName="px-0"
     />
   );
@@ -138,23 +189,44 @@ const ErrorHeader = ({ errorText }: { errorText?: string }) => {
   );
 };
 
-const SuccessHeader = ({ logsReturned }: { logsReturned: number }) => {
+const SuccessHeader = ({
+  logsReturned,
+  showBorder,
+}: {
+  logsReturned: number;
+  showBorder?: boolean;
+}) => {
   return (
     <div className="pointer-events-none flex flex-row items-center justify-start gap-1 overflow-hidden">
-      <span className="truncate text-muted-foreground text-xs">
-        Read {logsReturned} console log{logsReturned !== 1 ? 's' : ''}
+      <span
+        className={cn(
+          'shrink-0 text-muted-foreground text-xs',
+          !showBorder && 'font-normal text-muted-foreground/75',
+        )}
+      >
+        {showBorder ? (
+          'Read '
+        ) : (
+          <span className="font-medium text-muted-foreground">Read </span>
+        )}
+        {logsReturned} console log{logsReturned !== 1 ? 's' : ''}
       </span>
     </div>
   );
 };
 
-const LoadingHeader = () => {
+const LoadingHeader = ({ disableShimmer }: { disableShimmer?: boolean }) => {
   return (
     <div className="flex flex-row items-center justify-start gap-1 overflow-hidden">
       <Loader2Icon className="size-3 shrink-0 animate-spin text-primary" />
       <span
         dir="ltr"
-        className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 truncate text-xs"
+        className={cn(
+          'truncate text-xs',
+          disableShimmer
+            ? 'text-muted-foreground'
+            : 'shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300',
+        )}
       >
         Reading console logs...
       </span>

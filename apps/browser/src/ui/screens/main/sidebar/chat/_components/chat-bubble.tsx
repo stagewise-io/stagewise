@@ -49,6 +49,16 @@ function isToolPart(part: UIMessagePart): part is ToolPart {
   return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
 }
 
+function isToolOrReasoningPart(
+  part: UIMessagePart,
+): part is ToolPart | ReasoningUIPart {
+  return (
+    part.type === 'dynamic-tool' ||
+    part.type.startsWith('tool-') ||
+    part.type === 'reasoning'
+  );
+}
+
 export const ChatBubble = memo(
   function ChatBubble({
     message: msg,
@@ -205,20 +215,26 @@ export const ChatBubble = memo(
                     // Skip step-start parts, they don't contain information we need to render and break the ReadOnly-Part detection logic
                     if (part.type === 'step-start') return acc;
                     // Forward everything except read-only tools
-                    if (!isToolPart(part) || !isReadOnlyToolPart(part))
+                    if (
+                      !isToolOrReasoningPart(part) ||
+                      !isReadOnlyToolPart(part)
+                    )
                       acc.push(part);
 
                     const previousPart = acc[acc.length - 1];
                     // Merge read-only tools into the previous tool-part-array if one already exists
                     if (
-                      isToolPart(part) &&
+                      isToolOrReasoningPart(part) &&
                       isReadOnlyToolPart(part) &&
                       Array.isArray(previousPart)
                     ) {
                       previousPart.push(part);
                     }
                     // Turn read-only tools into an array of parts if no previous tool-part-array exists
-                    else if (isToolPart(part) && isReadOnlyToolPart(part))
+                    else if (
+                      isToolOrReasoningPart(part) &&
+                      isReadOnlyToolPart(part)
+                    )
                       acc.push([part]);
 
                     return acc;
@@ -234,6 +250,7 @@ export const ChatBubble = memo(
                       // Handles glob, grep, listFiles, readFile tools
                       <ExploringToolParts
                         parts={part}
+                        thinkingDurations={msg.metadata?.thinkingDurations}
                         isAutoExpanded={index === parts.length - 1}
                         isShimmering={
                           isWorking &&
