@@ -47,7 +47,7 @@ export function MainSection({
       if (isAtPositionZero)
         setTimeout(() => {
           setIsActiveTabDragAtPositionZero(true);
-        }, DND_DROP_ANIMATION_DURATION - 50);
+        }, DND_DROP_ANIMATION_DURATION - 100);
       else setIsActiveTabDragAtPositionZero(false);
     },
     [],
