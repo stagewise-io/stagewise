@@ -42,7 +42,12 @@ import {
 import type { AppRouter, TRPCClient } from '@stagewise/api-client';
 import type { AsyncIterableStream, InferUIMessageChunk, ToolUIPart } from 'ai';
 import { getRepoRootForPath } from '@/utils/git-tools';
-import { PromptBuilder } from './prompt-builder';
+import {
+  PromptBuilder,
+  ORIGINAL_USER_MESSAGES_KEPT_WHEN_SUMMARIZING,
+  findEndOfFirstNPairs,
+} from './prompt-builder';
+import { summarizeChatHistory } from './prompt-builder/utils/summarize-chat-history';
 import { TimeoutManager } from './utils/time-out-manager';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import {
@@ -144,6 +149,7 @@ export class AgentService {
     { durations: number[]; currentStartTime: number | null }
   > = new Map();
   private thinkingEnabled = true;
+  private isCompacting = false; // Guard to prevent concurrent compaction attempts
 
   private constructor(
     logger: Logger,
@@ -1100,13 +1106,16 @@ export class AgentService {
             },
           );
 
-          // Updating the used context window size of the chat.
+          // Update the used context window size of the chat
           this.uiKarton.setState((draft) => {
             const chat = draft.agentChat?.chats[chatId];
-            if (chat && r.totalUsage.inputTokens)
+            if (chat && r.totalUsage.inputTokens) {
               chat.usage.usedContextWindowSize = r.totalUsage.inputTokens;
-            return draft;
+            }
           });
+
+          // Check if we need to compact the chat history (separate from state update)
+          this.triggerCompactionIfNeeded(chatId);
 
           const requiresUserInteraction = toolResults.some(
             (r) => 'userInteractionrequired' in r && r.userInteractionrequired,
@@ -1274,6 +1283,150 @@ export class AgentService {
       }
     }
     return hasMadeCodeChanges;
+  }
+
+  /** Triggers compaction if context window usage exceeds 80%. */
+  private triggerCompactionIfNeeded(chatId: string): void {
+    if (this.isCompacting) return;
+
+    const chat = this.uiKarton.state.agentChat?.chats[chatId];
+    if (!chat) return;
+
+    const usedSize = chat.usage.usedContextWindowSize || 0;
+    const maxSize = chat.usage.maxContextWindowSize;
+
+    if (!maxSize || usedSize / maxSize <= 0.8) return;
+
+    void this.compactChatHistory();
+  }
+
+  /**
+   * Summarizes the middle portion of chat history and attaches it to the last user message.
+   * Keeps first N pairs and last pair as raw messages; only the middle is summarized.
+   * Supports indefinite compaction (can re-compact previously compacted content).
+   */
+  private async compactChatHistory() {
+    if (this.isCompacting) {
+      this.logger.debug(
+        '[AgentService] Compaction already in progress, skipping',
+      );
+      return;
+    }
+
+    if (!this.litellm) {
+      this.logger.debug(
+        '[AgentService] Cannot compact chat history: litellm not initialized',
+      );
+      return;
+    }
+
+    const chatId = this.uiKarton.state.agentChat?.activeChatId;
+    if (!chatId) return;
+
+    // Set compacting flag before any async operations
+    this.isCompacting = true;
+
+    const chat = this.uiKarton.state.agentChat?.chats[chatId];
+    const history = chat?.messages ?? [];
+
+    // Find the last user message (where we'll attach the summary)
+    let lastUserMessageIndex = -1;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i]!.role === 'user') {
+        lastUserMessageIndex = i;
+        break;
+      }
+    }
+
+    // Find where first N pairs end (these are kept raw, not summarized)
+    const endOfFirstNPairs = findEndOfFirstNPairs(
+      history,
+      ORIGINAL_USER_MESSAGES_KEPT_WHEN_SUMMARIZING,
+    );
+
+    // Nothing to compact if no middle portion exists
+    if (endOfFirstNPairs >= lastUserMessageIndex) {
+      this.logger.debug(
+        '[AgentService] Cannot compact: no messages between first N pairs and last user message',
+      );
+      this.isCompacting = false;
+      return;
+    }
+
+    // Extract middle portion (between first N pairs and last user message)
+    const messagesToCompact = history.slice(
+      endOfFirstNPairs,
+      lastUserMessageIndex,
+    );
+
+    // Convert to model messages and remove system prompt
+    const allModelMessages =
+      await this.promptBuilder.convertUIToModelMessages(messagesToCompact);
+    const messagesForSummary = allModelMessages.slice(1);
+
+    if (messagesForSummary.length === 0) {
+      this.logger.debug(
+        '[AgentService] Cannot compact: no messages to summarize in the middle portion',
+      );
+      this.isCompacting = false;
+      return;
+    }
+
+    this.logger.debug(
+      `[AgentService] Compacting ${messagesForSummary.length} model messages from middle portion`,
+    );
+
+    try {
+      const summary = await summarizeChatHistory(
+        messagesForSummary,
+        this.telemetryService.withTracing(this.litellm('gemini-2.5-flash'), {
+          // TODO: update to use 3-flash when the backend supports it
+          posthogTraceId: `compact-chat-${chatId}`,
+          posthogProperties: {
+            $ai_span_name: 'compact-chat-history',
+          },
+        }),
+      );
+
+      // Attach summary to last user message's metadata
+      this.uiKarton.setState((draft) => {
+        const draftChat = draft.agentChat?.chats[chatId];
+        if (draftChat) {
+          const userMessage = draftChat.messages[lastUserMessageIndex];
+          if (userMessage && userMessage.role === 'user') {
+            const existingMetadata = userMessage.metadata ?? {
+              createdAt: new Date(),
+            };
+            userMessage.metadata = {
+              ...existingMetadata,
+              autoCompactInformation: {
+                isAutoCompacted: true,
+                compactedAt: new Date(),
+                chatSummary: summary,
+              },
+            };
+          }
+        }
+      });
+
+      this.logger.debug(
+        `[AgentService] Chat history compacted successfully. Summary length: ${summary.length} chars`,
+      );
+
+      this.telemetryService.capture('chat-history-compacted', {
+        chat_id: chatId,
+        messages_compacted: messagesForSummary.length,
+        summary_length: summary.length,
+      });
+    } catch (error) {
+      this.logger.debug('[AgentService] Failed to compact chat history', {
+        cause: error,
+      });
+      this.telemetryService.captureException(error as Error);
+    } finally {
+      // Always reset the compacting flag
+      this.isCompacting = false;
+    }
   }
 
   private async undoToolCallsUntilLatestUserMessage(

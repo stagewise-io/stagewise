@@ -297,6 +297,40 @@ body {
   }
 }
 
+/* One-shot shimmer that settles to normal text color */
+@utility shimmer-text-once {
+  background-image: linear-gradient(
+    120deg,
+    var(--shimmer-color-1) 0%,
+    var(--shimmer-color-1) 40%,
+    var(--shimmer-color-2) 50%,
+    var(--shimmer-color-1) 60%,
+    var(--shimmer-color-1) 100%
+  );
+  background-size: 240% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-once calc(var(--shimmer-duration, 1500) * 1ms) linear forwards;
+}
+
+@keyframes shimmer-once {
+  0% {
+    /* Start with shimmer highlight already entering visible area */
+    background-position: 100% 0%;
+  }
+  75% {
+    background-position: -40% 0%;
+  }
+  100% {
+    background-position: -40% 0%;
+    color: var(--color-muted-foreground);
+    -webkit-text-fill-color: var(--color-muted-foreground);
+    background-image: none;
+  }
+}
+
 @utility shimmer-duration-* {
   --shimmer-duration: --value(integer);
 }

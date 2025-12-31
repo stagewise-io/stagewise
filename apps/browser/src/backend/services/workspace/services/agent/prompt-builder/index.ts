@@ -4,8 +4,51 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import type { ChatMessage, KartonContract } from '@shared/karton-contracts/ui';
 import { convertToModelMessages, type ModelMessage } from 'ai';
+import { getSummarizationUserMessage } from './utils/summarize-chat-history';
 import { getSystemPrompt } from './templates/system-prompt';
 import { getUserMessage } from './templates/user';
+
+// Number of user-assistant pairs to keep before the auto-compacting summary.
+export const ORIGINAL_USER_MESSAGES_KEPT_WHEN_SUMMARIZING = 1;
+
+type AutoCompactInfo = { index: number; summary: string };
+
+/** Finds the latest user message with valid auto-compact info (scans in reverse). */
+function findLatestAutoCompactMessage(
+  chatMessages: ChatMessage[],
+): AutoCompactInfo | null {
+  for (let i = chatMessages.length - 1; i >= 0; i--) {
+    const message = chatMessages[i]!;
+    if (message.role !== 'user') continue;
+
+    const autoCompactInfo = message.metadata?.autoCompactInformation;
+    if (
+      autoCompactInfo?.isAutoCompacted === true &&
+      autoCompactInfo.chatSummary &&
+      autoCompactInfo.chatSummary.length > 0
+    ) {
+      return { index: i, summary: autoCompactInfo.chatSummary };
+    }
+  }
+  return null;
+}
+
+/** Returns the end index (exclusive) of the first N user-assistant pairs. */
+export function findEndOfFirstNPairs(
+  chatMessages: ChatMessage[],
+  pairsToKeep: number,
+): number {
+  let userMessageCount = 0;
+
+  for (let i = 0; i < chatMessages.length; i++) {
+    const message = chatMessages[i]!;
+    if (message.role === 'user') {
+      userMessageCount++;
+      if (userMessageCount > pairsToKeep) return i;
+    }
+  }
+  return chatMessages.length;
+}
 
 export class PromptBuilder {
   constructor(
@@ -14,6 +57,10 @@ export class PromptBuilder {
     private readonly stagewiseMdPath: string | null,
   ) {}
 
+  /**
+   * Converts UI messages to model messages. If auto-compact info exists,
+   * applies compaction: [first N pairs] + [summary] + [last pair].
+   */
   public async convertUIToModelMessages(
     chatMessages: ChatMessage[],
   ): Promise<ModelMessage[]> {
@@ -26,65 +73,118 @@ export class PromptBuilder {
     );
     const modelMessages: ModelMessage[] = [systemPrompt];
 
-    for (const message of chatMessages) {
-      switch (message.role) {
-        case 'user':
-          modelMessages.push(getUserMessage(message));
-          break;
-        case 'assistant': {
-          if (
-            message.parts.every(
-              (part) => part.type === 'reasoning' || part.type === 'step-start',
-            )
-          )
-            continue; // skip assistant messages with only reasoning parts
+    const autoCompactInfo = findLatestAutoCompactMessage(chatMessages);
 
-          // Create a new message with cleaned tool outputs
-          const cleanedMessage = {
-            ...message,
-            parts: message.parts.map((part) => {
-              if (
-                part.type === 'tool-deleteFileTool' ||
-                part.type === 'tool-overwriteFileTool' ||
-                part.type === 'tool-multiEditTool'
-              ) {
-                // Create a new part without diff and undoExecute
-                if (part.output) {
-                  // Extract part.output.hiddenFromLLM
-                  if ('hiddenFromLLM' in part.output) {
-                    const { hiddenFromLLM: _hiddenFromLLM, ...cleanOutput } =
-                      part.output;
-                    return {
-                      ...part,
-                      output: cleanOutput,
-                    };
-                  } else {
-                    return {
-                      ...part,
-                      output: part.output,
-                    };
-                  }
-                }
-              }
-              return part;
-            }),
-          };
-          const convertedMessages = convertToModelMessages([cleanedMessage]);
-          const sanitizedConvertedMessages = convertedMessages.map((message) =>
-            sanitizeModelMessageToolCallInput(message),
-          );
-          modelMessages.push(...sanitizedConvertedMessages);
-          break;
-        }
-        default: {
-          const convertedMessages = convertToModelMessages([message]);
-          modelMessages.push(...convertedMessages);
-          break;
-        }
-      }
+    if (autoCompactInfo) {
+      this.convertWithAutoCompacting(
+        chatMessages,
+        autoCompactInfo,
+        modelMessages,
+      );
+    } else {
+      this.convertAllMessages(chatMessages, modelMessages);
     }
 
     return modelMessages;
+  }
+
+  /** Converts all messages without compaction. */
+  private convertAllMessages(
+    chatMessages: ChatMessage[],
+    modelMessages: ModelMessage[],
+  ): void {
+    for (const message of chatMessages)
+      this.convertSingleMessage(message, modelMessages);
+  }
+
+  /** Applies compaction: [first N pairs] + [summary] + [last pair with all following]. */
+  private convertWithAutoCompacting(
+    chatMessages: ChatMessage[],
+    autoCompactInfo: AutoCompactInfo,
+    modelMessages: ModelMessage[],
+  ): void {
+    const { index: autoCompactIndex, summary } = autoCompactInfo;
+
+    // Find where the first N pairs end
+    // This is the boundary between "kept" messages and "skipped" messages
+    const endOfKeptPairs = findEndOfFirstNPairs(
+      chatMessages,
+      ORIGINAL_USER_MESSAGES_KEPT_WHEN_SUMMARIZING,
+    );
+
+    const keptMessagesEndIndex = Math.min(endOfKeptPairs, autoCompactIndex);
+
+    // Add first N pairs
+    for (let i = 0; i < keptMessagesEndIndex; i++)
+      this.convertSingleMessage(chatMessages[i]!, modelMessages);
+
+    // Add summary (middle messages are skipped)
+    modelMessages.push(getSummarizationUserMessage(summary));
+
+    // Add last pair and any following messages
+    for (let i = autoCompactIndex; i < chatMessages.length; i++)
+      this.convertSingleMessage(chatMessages[i]!, modelMessages);
+  }
+
+  /** Converts a single ChatMessage to ModelMessage(s). */
+  private convertSingleMessage(
+    message: ChatMessage,
+    modelMessages: ModelMessage[],
+  ): void {
+    switch (message.role) {
+      case 'user':
+        modelMessages.push(getUserMessage(message));
+        break;
+      case 'assistant': {
+        // Skip empty reasoning/step-start messages
+        if (
+          message.parts.every(
+            (part) => part.type === 'reasoning' || part.type === 'step-start',
+          )
+        )
+          return;
+
+        // Clean tool outputs (remove hiddenFromLLM fields)
+        const cleanedMessage = {
+          ...message,
+          parts: message.parts.map((part) => {
+            if (
+              part.type === 'tool-deleteFileTool' ||
+              part.type === 'tool-overwriteFileTool' ||
+              part.type === 'tool-multiEditTool'
+            ) {
+              if (part.output) {
+                if ('hiddenFromLLM' in part.output) {
+                  const { hiddenFromLLM: _hiddenFromLLM, ...cleanOutput } =
+                    part.output;
+                  return {
+                    ...part,
+                    output: cleanOutput,
+                  };
+                } else {
+                  return {
+                    ...part,
+                    output: part.output,
+                  };
+                }
+              }
+            }
+            return part;
+          }),
+        };
+        const convertedMessages = convertToModelMessages([cleanedMessage]);
+        const sanitizedConvertedMessages = convertedMessages.map((msg) =>
+          sanitizeModelMessageToolCallInput(msg),
+        );
+        modelMessages.push(...sanitizedConvertedMessages);
+        break;
+      }
+      default: {
+        const convertedMessages = convertToModelMessages([message]);
+        modelMessages.push(...convertedMessages);
+        break;
+      }
+    }
   }
 }
 

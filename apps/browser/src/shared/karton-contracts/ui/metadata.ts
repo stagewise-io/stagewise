@@ -23,6 +23,13 @@ const metadataSchema = z.object({
   currentTab: z.enum(MainTab).optional(), // optional because it is set by the agent -> TODO: find a type-safe way
   browserData: browserDataSchema.optional(),
   thinkingDurations: z.array(z.number()).optional(),
+  autoCompactInformation: z
+    .object({
+      isAutoCompacted: z.literal(true),
+      compactedAt: z.date(),
+      chatSummary: z.string(),
+    })
+    .optional(),
 });
 
 export type UserMessageMetadata = z.infer<typeof metadataSchema>;

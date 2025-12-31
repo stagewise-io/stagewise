@@ -1,4 +1,5 @@
 import { cn } from '@/utils';
+import { IconMagicWandSparkle } from 'nucleo-glass';
 import type {
   ToolPart,
   ChatMessage,
@@ -411,6 +412,17 @@ export const ChatBubble = memo(
             </Popover>
           )}
         </div>
+        {msg.metadata?.autoCompactInformation?.isAutoCompacted && (
+          <div
+            key={`compact-${msg.id}`}
+            className="flex w-full flex-row items-center gap-2 text-xs"
+          >
+            <IconMagicWandSparkle className="size-3 text-muted-foreground" />
+            <span className="shimmer-duration-1500 shimmer-from-muted-foreground shimmer-text-once shimmer-to-foreground font-normal">
+              Summarized chat history
+            </span>
+          </div>
+        )}
       </div>
     );
   },
@@ -421,6 +433,13 @@ export const ChatBubble = memo(
     if (prevProps.isLastMessage !== nextProps.isLastMessage) return false;
     if (prevProps.message.parts.length !== nextProps.message.parts.length)
       return false;
+
+    // Check for autoCompactInformation changes
+    const prevAutoCompact =
+      prevProps.message.metadata?.autoCompactInformation?.isAutoCompacted;
+    const nextAutoCompact =
+      nextProps.message.metadata?.autoCompactInformation?.isAutoCompacted;
+    if (prevAutoCompact !== nextAutoCompact) return false;
 
     // Deep compare parts by type and key content
     for (let i = 0; i < prevProps.message.parts.length; i++) {

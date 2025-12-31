@@ -109,6 +109,11 @@ export interface EventProperties {
     error: string;
   };
   'cli-ripgrep-installation-succeeded': undefined;
+  'chat-history-compacted': {
+    chat_id: string;
+    messages_compacted: number;
+    summary_length: number;
+  };
 }
 
 export interface UserProperties {
