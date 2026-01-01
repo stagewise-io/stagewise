@@ -24,6 +24,16 @@ import type { PageTransition, DownloadState } from '../pages-api/types';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
 
+/** Speed data point for download speed history */
+export type DownloadSpeedDataPoint = {
+  /** Unix timestamp in ms */
+  timestamp: number;
+  /** Speed in KB/s */
+  speedKBps: number;
+  /** Total bytes received at this point */
+  totalBytes: number;
+};
+
 /** Summary download info for the control button display */
 export type DownloadSummary = {
   /** Download ID */
@@ -44,6 +54,10 @@ export type DownloadSummary = {
   startTime: Date;
   /** Download end time (for completed) */
   endTime?: Date;
+  /** Current download speed in KB/s (only for active downloads) */
+  currentSpeedKBps?: number;
+  /** Speed history for graphing (up to 100 data points covering 10 minutes) */
+  speedHistory?: DownloadSpeedDataPoint[];
 };
 export type { UserMessageMetadata, BrowserData, ReactSelectedElementInfo };
 export type { SelectedElement } from '../../selected-elements';

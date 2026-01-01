@@ -1,9 +1,11 @@
 import type { Logger } from '../logger';
 import {
   eq,
+  ne,
   and,
   or,
   desc,
+  gt,
   gte,
   lte,
   like,
@@ -702,6 +704,50 @@ export class HistoryService {
       .limit(1);
 
     return result.length > 0 ? { targetPath: result[0].targetPath } : null;
+  }
+
+  /**
+   * Check if a download (by GUID) is the newest one for its target path.
+   * This is used to determine whether the file should be deleted when removing a download entry.
+   * @param guid - The GUID of the download to check
+   * @returns Object with isNewest flag and targetPath
+   */
+  async isNewestDownloadForPath(
+    guid: string,
+  ): Promise<{ isNewest: boolean; targetPath: string | null }> {
+    // First get the target path and start time of this download
+    const download = await this.db
+      .select({
+        targetPath: schema.downloads.targetPath,
+        startTime: schema.downloads.startTime,
+      })
+      .from(schema.downloads)
+      .where(eq(schema.downloads.guid, guid))
+      .limit(1);
+
+    if (download.length === 0) {
+      return { isNewest: false, targetPath: null };
+    }
+
+    const { targetPath, startTime } = download[0];
+
+    // Check if there's any other download with the same target path that is newer
+    const newerDownloads = await this.db
+      .select({ id: schema.downloads.id })
+      .from(schema.downloads)
+      .where(
+        and(
+          eq(schema.downloads.targetPath, targetPath),
+          ne(schema.downloads.guid, guid),
+          gt(schema.downloads.startTime, startTime),
+        ),
+      )
+      .limit(1);
+
+    return {
+      isNewest: newerDownloads.length === 0,
+      targetPath,
+    };
   }
 
   /**

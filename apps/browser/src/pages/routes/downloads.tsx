@@ -31,8 +31,10 @@ import {
   DownloadState,
   type DownloadsFilter,
   type DownloadResult,
+  type DownloadSpeedDataPoint,
 } from '@shared/karton-contracts/pages-api/types';
 import { List } from 'react-window';
+import { AreaChart, Area, ResponsiveContainer, XAxis } from 'recharts';
 
 export const Route = createFileRoute('/downloads')({
   component: Page,
@@ -70,6 +72,10 @@ type EntryRow = {
   progress: number;
   isPaused: boolean;
   canResume: boolean;
+  // Speed tracking (for active downloads)
+  startTime: Date;
+  currentSpeedKBps?: number;
+  speedHistory?: DownloadSpeedDataPoint[];
 };
 
 type Row = DateHeaderRow | EntryRow;
@@ -96,6 +102,13 @@ function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}
+
+function formatSpeed(kbps: number): string {
+  if (kbps < 1000) {
+    return `${Math.round(kbps)} KB/s`;
+  }
+  return `${(kbps / 1024).toFixed(1)} MB/s`;
 }
 
 function getDownloadStateLabel(state: DownloadState): string {
@@ -125,6 +138,110 @@ function getUrlDomain(url: string): string {
   }
 }
 
+// Constants for speed graph
+const MIN_GRAPH_DURATION_MS = 60 * 1000; // 1 minute minimum
+const MAX_GRAPH_DURATION_MS = 10 * 60 * 1000; // 10 minutes maximum
+
+// Speed graph component for active downloads
+function SpeedGraph({
+  speedHistory,
+  startTime,
+}: {
+  speedHistory?: DownloadSpeedDataPoint[];
+  startTime: Date;
+}) {
+  const chartData = useMemo(() => {
+    const now = Date.now();
+    const downloadStartMs = startTime.getTime();
+    const downloadDuration = now - downloadStartMs;
+
+    // Determine the time window to display (1-10 minutes)
+    const displayDuration = Math.max(
+      MIN_GRAPH_DURATION_MS,
+      Math.min(MAX_GRAPH_DURATION_MS, downloadDuration),
+    );
+
+    // Calculate start of the display window
+    const windowStart = now - displayDuration;
+
+    // Build data array using actual timestamps for proper variable spacing
+    const data: { timestamp: number; speed: number }[] = [];
+
+    // Add a zero point at window start (or download start if later)
+    const effectiveStart = Math.max(windowStart, downloadStartMs);
+    data.push({ timestamp: windowStart, speed: 0 });
+
+    if (windowStart < downloadStartMs) {
+      // Add a zero point right at download start for a flat line before download
+      data.push({ timestamp: downloadStartMs, speed: 0 });
+    }
+
+    // Add actual speed data points within the window
+    if (speedHistory && speedHistory.length > 0) {
+      for (const point of speedHistory) {
+        if (point.timestamp >= effectiveStart) {
+          data.push({
+            timestamp: point.timestamp,
+            speed: point.speedKBps,
+          });
+        }
+      }
+    }
+
+    // Add current time point with last known speed
+    const lastSpeed =
+      speedHistory && speedHistory.length > 0
+        ? speedHistory[speedHistory.length - 1].speedKBps
+        : 0;
+    data.push({ timestamp: now, speed: lastSpeed });
+
+    return data;
+  }, [speedHistory, startTime]);
+
+  // Don't render if no data
+  if (chartData.length === 0) return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 bottom-0.5 opacity-15">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={chartData}
+          margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+        >
+          <defs>
+            <linearGradient id="speedGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="0%"
+                stopColor="var(--color-primary)"
+                stopOpacity={0.8}
+              />
+              <stop
+                offset="195%"
+                stopColor="var(--color-primary)"
+                stopOpacity={0.0}
+              />
+            </linearGradient>
+          </defs>
+          <XAxis
+            dataKey="timestamp"
+            type="number"
+            domain={['dataMin', 'dataMax']}
+            hide
+          />
+          <Area
+            type="monotone"
+            dataKey="speed"
+            stroke="var(--color-primary)"
+            strokeWidth={1.5}
+            fill="url(#speedGradient)"
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // Safely convert a value to a Date object
 function toDate(value: Date | string | number | null | undefined): Date | null {
   if (!value) return null;
@@ -133,8 +250,14 @@ function toDate(value: Date | string | number | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+// Extended download result with speed data for active downloads
+type ExtendedDownloadResult = DownloadResult & {
+  currentSpeedKBps?: number;
+  speedHistory?: DownloadSpeedDataPoint[];
+};
+
 // Convert download results to flat row list with date headers
-function downloadsToRows(downloads: DownloadResult[]): Row[] {
+function downloadsToRows(downloads: ExtendedDownloadResult[]): Row[] {
   const rows: Row[] = [];
   let currentDate: string | null = null;
 
@@ -166,6 +289,9 @@ function downloadsToRows(downloads: DownloadResult[]): Row[] {
       progress: entry.progress ?? 0,
       isPaused: entry.isPaused ?? false,
       canResume: entry.canResume ?? false,
+      startTime,
+      currentSpeedKBps: entry.currentSpeedKBps,
+      speedHistory: entry.speedHistory,
     });
   }
 
@@ -217,9 +343,14 @@ function RowComponent({
   const isComplete = row.state === DownloadState.COMPLETE;
 
   return (
-    <div style={style}>
+    <div style={style} className="relative">
+      {/* Speed graph background for active downloads */}
+      {row.isActive && (
+        <SpeedGraph speedHistory={row.speedHistory} startTime={row.startTime} />
+      )}
+
       <div
-        className={`group flex h-full cursor-pointer select-none flex-col justify-center gap-2 rounded-lg px-4 ${
+        className={`group relative z-10 flex h-full cursor-pointer select-none flex-col justify-center gap-2 rounded-lg px-4 ${
           row.fileExists || row.isActive ? 'hover:bg-muted/50' : 'opacity-60'
         }`}
         onClick={() => {
@@ -243,7 +374,7 @@ function RowComponent({
               <span>{getUrlDomain(row.url)}</span>
               <span>•</span>
               {row.isActive ? (
-                // During download: show received / total
+                // During download: show received / total and speed or paused status
                 <>
                   <span>{formatBytes(row.receivedBytes)}</span>
                   {row.totalBytes > 0 && (
@@ -252,11 +383,16 @@ function RowComponent({
                       <span>{formatBytes(row.totalBytes)}</span>
                     </>
                   )}
-                  {row.isPaused && (
-                    <>
-                      <span>•</span>
-                      <span>Paused</span>
-                    </>
+                  <span>•</span>
+                  {row.isPaused ? (
+                    <span>Paused</span>
+                  ) : (
+                    <span>
+                      {row.currentSpeedKBps !== undefined &&
+                      row.currentSpeedKBps > 0
+                        ? formatSpeed(row.currentSpeedKBps)
+                        : 'Starting...'}
+                    </span>
                   )}
                 </>
               ) : (
@@ -372,7 +508,7 @@ function RowComponent({
         {/* Progress bar for active downloads */}
         {row.isActive && (
           <div className="ml-8 flex items-center gap-2">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/10">
               {row.totalBytes > 0 ? (
                 // Determinate progress bar
                 <div
@@ -422,7 +558,12 @@ function Page() {
   const deleteDownload = useKartonProcedure((s) => s.deleteDownload);
   const markDownloadsSeen = useKartonProcedure((s) => s.markDownloadsSeen);
 
+  // Ref to avoid getDownloads in useCallback dependencies (it's not stable)
   const getDownloadsRef = useRef(getDownloads);
+  useEffect(() => {
+    getDownloadsRef.current = getDownloads;
+  }, [getDownloads]);
+
   const listRef = useRef<{
     readonly element: HTMLDivElement | null;
     scrollToRow: (config: {
@@ -433,11 +574,6 @@ function Page() {
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-
-  // Update refs when procedures change
-  useEffect(() => {
-    getDownloadsRef.current = getDownloads;
-  }, [getDownloads]);
 
   // Mark downloads as seen when the page is opened
   useEffect(() => {
@@ -516,7 +652,7 @@ function Page() {
       const currentIdSet = new Set(currentIds.split(',').filter(Boolean));
 
       // Check if any downloads were removed (present in prev but not in current)
-      const hasRemovedDownloads = [...prevIdSet].some(
+      const hasRemovedDownloads = Array.from(prevIdSet).some(
         (id) => !currentIdSet.has(id),
       );
 
@@ -537,12 +673,12 @@ function Page() {
   }, [activeDownloadIds, isConnected, refetchHistoricalDownloads]);
 
   // Merge active downloads (from state) with historical downloads (from procedure)
-  const downloads = useMemo(() => {
+  const downloads = useMemo((): ExtendedDownloadResult[] => {
     // Get active download IDs to exclude them from historical list
     const activeIds = new Set(Object.keys(activeDownloads).map(Number));
 
-    // Convert active downloads to DownloadResult format for display
-    const activeList: DownloadResult[] = Object.values(activeDownloads)
+    // Convert active downloads to ExtendedDownloadResult format for display
+    const activeList: ExtendedDownloadResult[] = Object.values(activeDownloads)
       .filter((d) => {
         // Filter by search text if provided
         if (!debouncedSearchText.trim()) return true;
@@ -573,6 +709,8 @@ function Page() {
           progress: d.progress,
           isPaused: d.isPaused,
           canResume: d.canResume,
+          currentSpeedKBps: d.currentSpeedKBps,
+          speedHistory: d.speedHistory,
         };
       })
       // Sort by start time descending (most recent first)

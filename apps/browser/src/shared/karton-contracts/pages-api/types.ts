@@ -160,6 +160,16 @@ export enum DownloadState {
   INTERRUPTED = 3,
 }
 
+/** Speed data point for download speed history */
+export interface DownloadSpeedDataPoint {
+  /** Unix timestamp in ms */
+  timestamp: number;
+  /** Speed in KB/s */
+  speedKBps: number;
+  /** Total bytes received at this point */
+  totalBytes: number;
+}
+
 // Filter for querying downloads
 export interface DownloadsFilter {
   /** Search text (matches filename or URL) */
@@ -238,6 +248,10 @@ export interface ActiveDownloadInfo {
   targetPath: string;
   /** Download start time */
   startTime: Date;
+  /** Current download speed in KB/s (most recent measurement) */
+  currentSpeedKBps: number;
+  /** Speed history for graphing (up to 100 data points covering 10 minutes) */
+  speedHistory: DownloadSpeedDataPoint[];
 }
 
 // Result of a download control operation

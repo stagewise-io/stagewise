@@ -111,6 +111,7 @@
     "react-timeago": "^8.3.0",
     "react-window": "^2.2.3",
     "react-window-infinite-loader": "^2.0.0",
+    "recharts": "^3.6.0",
     "seti-icons": "^0.0.4",
     "shiki": "^3.14.0",
     "streamdown": "^1.4.0",

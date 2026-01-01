@@ -24,7 +24,10 @@ import { WindowLayoutService } from './services/window-layout';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
 import { DownloadsService } from './services/download-manager';
-import { DownloadState } from '@shared/karton-contracts/pages-api/types';
+import {
+  DownloadState,
+  type DownloadSpeedDataPoint,
+} from '@shared/karton-contracts/pages-api/types';
 import type {
   DownloadSummary,
   StoredExperienceData,
@@ -158,6 +161,8 @@ export async function main({
       isPaused: boolean;
       targetPath: string;
       startTime: Date;
+      currentSpeedKBps: number;
+      speedHistory: DownloadSpeedDataPoint[];
     }[],
   ) => {
     const activeCount = activeDownloads.length;
@@ -175,6 +180,8 @@ export async function main({
       isPaused: d.isPaused,
       targetPath: d.targetPath,
       startTime: d.startTime,
+      currentSpeedKBps: d.currentSpeedKBps,
+      speedHistory: d.speedHistory,
     }));
 
     let hasUnseenDownloads = false;
@@ -276,6 +283,8 @@ export async function main({
       isPaused: d.isPaused,
       targetPath: d.targetPath,
       startTime: d.startTime,
+      currentSpeedKBps: d.currentSpeedKBps,
+      speedHistory: d.speedHistory,
     }));
 
   // Shared handler for marking downloads as seen (used by both UI and pages-api contracts)

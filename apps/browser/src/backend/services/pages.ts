@@ -287,6 +287,8 @@ export class PagesService extends DisposableService {
           url: download.url,
           targetPath: download.targetPath,
           startTime: download.startTime,
+          currentSpeedKBps: download.currentSpeedKBps,
+          speedHistory: download.speedHistory,
         }));
       },
     );
@@ -308,31 +310,49 @@ export class PagesService extends DisposableService {
             }
           }
 
-          // Get download info to find file path before deleting from DB
-          const download = await this.historyService.getDownloadByGuid(
-            `${downloadId}`,
-          );
-          const filePath = download?.targetPath;
+          // Check if this is the newest download for its filepath
+          // Only delete the file if it's the newest entry (no newer downloads with same path)
+          const { isNewest, targetPath } =
+            await this.historyService.isNewestDownloadForPath(`${downloadId}`);
+
+          // Also check if there's an active download with the same path
+          let hasActiveWithSamePath = false;
+          if (targetPath && this.downloadsService) {
+            const activeDownloads = this.downloadsService.getActiveDownloads();
+            hasActiveWithSamePath = activeDownloads.some(
+              (d) => d.targetPath === targetPath && d.id !== downloadId,
+            );
+          }
 
           // Delete from database (using guid as the ID)
           const deleted = await this.historyService.deleteDownloadByGuid(
             `${downloadId}`,
           );
 
-          // Delete the file from disk if it exists
-          if (filePath && existsSync(filePath)) {
+          // Only delete the file if this is the newest entry and no active downloads use it
+          const shouldDeleteFile = isNewest && !hasActiveWithSamePath;
+          if (shouldDeleteFile && targetPath && existsSync(targetPath)) {
             try {
-              unlinkSync(filePath);
+              unlinkSync(targetPath);
               this.logger.info('[PagesService] Deleted download file', {
-                path: filePath,
+                path: targetPath,
               });
             } catch (fileError) {
               this.logger.warn('[PagesService] Failed to delete file', {
-                path: filePath,
+                path: targetPath,
                 error: fileError,
               });
               // Don't fail the operation if file deletion fails
             }
+          } else if (
+            targetPath &&
+            existsSync(targetPath) &&
+            !shouldDeleteFile
+          ) {
+            this.logger.info(
+              '[PagesService] Skipped file deletion - newer download exists for path',
+              { path: targetPath, isNewest, hasActiveWithSamePath },
+            );
           }
 
           if (deleted) {

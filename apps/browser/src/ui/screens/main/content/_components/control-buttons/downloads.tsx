@@ -14,7 +14,10 @@ import {
 } from '@stagewise/stage-ui/components/popover';
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import { DownloadState } from '@shared/karton-contracts/pages-api/types';
-import type { DownloadSummary } from '@shared/karton-contracts/ui';
+import type {
+  DownloadSummary,
+  DownloadSpeedDataPoint,
+} from '@shared/karton-contracts/ui';
 import { IconArrowRight } from 'nucleo-micro-bold';
 import {
   PlayIcon,
@@ -26,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
+import { AreaChart, Area, ResponsiveContainer, XAxis } from 'recharts';
 
 function getDownloadStateLabel(state: DownloadState): string {
   switch (state) {
@@ -40,6 +44,70 @@ function getDownloadStateLabel(state: DownloadState): string {
     default:
       return 'Unknown';
   }
+}
+
+function formatSpeed(speedKBps: number): string {
+  if (speedKBps >= 1024) {
+    return `${(speedKBps / 1024).toFixed(1)} MB/s`;
+  }
+  return `${Math.round(speedKBps)} KB/s`;
+}
+
+function SpeedGraph({
+  speedHistory,
+}: {
+  speedHistory: DownloadSpeedDataPoint[];
+}) {
+  const chartData = useMemo(() => {
+    if (speedHistory.length === 0) return [];
+    return speedHistory.map((point) => ({
+      timestamp: point.timestamp,
+      speed: point.speedKBps,
+    }));
+  }, [speedHistory]);
+
+  if (chartData.length < 2) return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 opacity-15">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={chartData}
+          margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+        >
+          <defs>
+            <linearGradient
+              id="speedGradientPopover"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
+              <stop
+                offset="0%"
+                stopColor="var(--color-primary)"
+                stopOpacity={0.8}
+              />
+              <stop
+                offset="195%"
+                stopColor="var(--color-primary)"
+                stopOpacity={0}
+              />
+            </linearGradient>
+          </defs>
+          <XAxis dataKey="timestamp" hide />
+          <Area
+            type="monotone"
+            dataKey="speed"
+            stroke="var(--color-primary)"
+            strokeWidth={1.5}
+            fill="url(#speedGradientPopover)"
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
 function DownloadItemRow({
@@ -72,11 +140,17 @@ function DownloadItemRow({
 
   return (
     <div
-      className={`group -mx-1.5 flex cursor-pointer select-none flex-col gap-1 rounded-lg px-1.5 py-1.5 ${
+      className={`group -mx-1.5 relative flex cursor-pointer select-none flex-col gap-1 overflow-hidden rounded-lg px-1.5 py-1.5 ${
         download.isActive || isComplete ? 'hover:bg-muted/50' : 'opacity-60'
       }`}
       onClick={handleRowClick}
     >
+      {/* Speed graph background for active downloads */}
+      {download.isActive &&
+        download.speedHistory &&
+        download.speedHistory.length >= 2 && (
+          <SpeedGraph speedHistory={download.speedHistory} />
+        )}
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
           <span className="block truncate text-foreground text-sm">
@@ -86,11 +160,19 @@ function DownloadItemRow({
             {download.isActive ? (
               <>
                 <span>{download.progress}%</span>
-                {isPaused && (
+                {isPaused ? (
                   <>
                     <span>•</span>
                     <span>Paused</span>
                   </>
+                ) : (
+                  download.currentSpeedKBps !== undefined &&
+                  download.currentSpeedKBps > 0 && (
+                    <>
+                      <span>•</span>
+                      <span>{formatSpeed(download.currentSpeedKBps)}</span>
+                    </>
+                  )
                 )}
               </>
             ) : (
@@ -319,6 +401,7 @@ export function DownloadsControlButton() {
             href="stagewise://internal/downloads"
             target="_blank"
             className="flex flex-row items-center gap-0.5 p-0.5 font-medium text-primary text-sm hover:opacity-80"
+            onClick={() => setIsOpen(false)}
           >
             Show all <IconArrowRight className="size-3" />
           </a>

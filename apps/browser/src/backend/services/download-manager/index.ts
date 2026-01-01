@@ -58,6 +58,12 @@ function throttle<T extends (...args: unknown[]) => void>(
   return throttled;
 }
 
+export interface DownloadSpeedDataPoint {
+  timestamp: number;
+  speedKBps: number;
+  totalBytes: number;
+}
+
 export interface ActiveDownload {
   id: number;
   item: DownloadItem;
@@ -71,6 +77,10 @@ export interface ActiveDownload {
   targetPath: string;
   filename: string;
   startTime: Date;
+  // Speed tracking
+  speedHistory: DownloadSpeedDataPoint[];
+  lastSpeedUpdateTime: number;
+  lastSpeedUpdateBytes: number;
 }
 
 /** Callback type for active downloads state changes */
@@ -140,6 +150,11 @@ export class DownloadsService extends DisposableService {
     for (const download of this.activeDownloads.values()) {
       const receivedBytes = download.item.getReceivedBytes();
       const totalBytes = download.item.getTotalBytes();
+      // Get the most recent speed from history, or 0 if no data yet
+      const currentSpeedKBps =
+        download.speedHistory.length > 0
+          ? download.speedHistory[download.speedHistory.length - 1].speedKBps
+          : 0;
       state[download.id] = {
         id: download.id,
         state: download.state,
@@ -153,6 +168,8 @@ export class DownloadsService extends DisposableService {
         url: download.url,
         targetPath: download.targetPath,
         startTime: download.startTime,
+        currentSpeedKBps,
+        speedHistory: download.speedHistory,
       };
     }
     return state;
@@ -235,6 +252,9 @@ export class DownloadsService extends DisposableService {
       targetPath: item.getSavePath() || '',
       filename: item.getFilename() || 'Unknown',
       startTime,
+      speedHistory: [],
+      lastSpeedUpdateTime: Date.now(),
+      lastSpeedUpdateBytes: 0,
     };
 
     this.activeDownloads.set(downloadId, activeDownload);
@@ -295,6 +315,86 @@ export class DownloadsService extends DisposableService {
       download.isPaused = item.isPaused();
       download.canResume = item.canResume();
 
+      // Calculate and record speed (only when actively downloading, not paused)
+      if (state === 'progressing' && !download.isPaused) {
+        const now = Date.now();
+        const timeDelta = now - download.lastSpeedUpdateTime;
+
+        // Record a data point every 1 second for high resolution recent data
+        if (timeDelta >= 1000) {
+          const bytesDelta =
+            download.receivedBytes - download.lastSpeedUpdateBytes;
+          const speedKBps = ((bytesDelta / timeDelta) * 1000) / 1024;
+
+          const newPoint = {
+            timestamp: now,
+            speedKBps: Math.max(0, speedKBps),
+            totalBytes: download.receivedBytes,
+          };
+
+          // Consolidate older data points (older than 10 seconds) to 6-second intervals
+          const recentThreshold = now - 10000; // 10 seconds ago
+          const consolidationInterval = 6000; // 6 seconds for older data
+
+          let consolidatedHistory = [...download.speedHistory];
+
+          // Find points older than 10 seconds that need consolidation
+          const recentPoints = consolidatedHistory.filter(
+            (p) => p.timestamp >= recentThreshold,
+          );
+          const olderPoints = consolidatedHistory.filter(
+            (p) => p.timestamp < recentThreshold,
+          );
+
+          // Consolidate older points by averaging within 6-second buckets
+          if (olderPoints.length > 0) {
+            const consolidated: typeof olderPoints = [];
+            let bucketStart = olderPoints[0].timestamp;
+            let bucketPoints: typeof olderPoints = [];
+
+            for (const point of olderPoints) {
+              if (point.timestamp - bucketStart < consolidationInterval) {
+                bucketPoints.push(point);
+              } else {
+                // Emit average for this bucket
+                if (bucketPoints.length > 0) {
+                  const avgSpeed =
+                    bucketPoints.reduce((sum, p) => sum + p.speedKBps, 0) /
+                    bucketPoints.length;
+                  consolidated.push({
+                    timestamp: bucketPoints[0].timestamp,
+                    speedKBps: avgSpeed,
+                    totalBytes:
+                      bucketPoints[bucketPoints.length - 1].totalBytes,
+                  });
+                }
+                bucketStart = point.timestamp;
+                bucketPoints = [point];
+              }
+            }
+            // Don't forget the last bucket
+            if (bucketPoints.length > 0) {
+              const avgSpeed =
+                bucketPoints.reduce((sum, p) => sum + p.speedKBps, 0) /
+                bucketPoints.length;
+              consolidated.push({
+                timestamp: bucketPoints[0].timestamp,
+                speedKBps: avgSpeed,
+                totalBytes: bucketPoints[bucketPoints.length - 1].totalBytes,
+              });
+            }
+
+            consolidatedHistory = [...consolidated, ...recentPoints];
+          }
+
+          // Create new array to avoid frozen array issues from state management
+          download.speedHistory = [...consolidatedHistory, newPoint];
+
+          download.lastSpeedUpdateTime = now;
+          download.lastSpeedUpdateBytes = download.receivedBytes;
+        }
+      }
+
       if (state === 'interrupted') {
         download.state = DownloadState.INTERRUPTED;
         this.logger.debug('[DownloadsService] Download interrupted', {
@@ -302,9 +402,30 @@ export class DownloadsService extends DisposableService {
         });
       } else if (state === 'progressing') {
         if (item.isPaused()) {
-          this.logger.debug('[DownloadsService] Download paused', {
-            id: downloadId,
-          });
+          // Add a zero speed point when paused to show drop in graph (only once)
+          const lastPoint =
+            download.speedHistory.length > 0
+              ? download.speedHistory[download.speedHistory.length - 1]
+              : null;
+          const alreadyHasZeroPoint = lastPoint && lastPoint.speedKBps === 0;
+
+          if (!alreadyHasZeroPoint) {
+            const now = Date.now();
+            download.speedHistory = [
+              ...download.speedHistory,
+              {
+                timestamp: now,
+                speedKBps: 0,
+                totalBytes: download.receivedBytes,
+              },
+            ];
+            download.lastSpeedUpdateTime = now;
+            download.lastSpeedUpdateBytes = download.receivedBytes;
+
+            this.logger.debug('[DownloadsService] Download paused', {
+              id: downloadId,
+            });
+          }
         }
       }
 
@@ -377,7 +498,7 @@ export class DownloadsService extends DisposableService {
   /**
    * Get all active downloads with fresh values from DownloadItem.
    */
-  getActiveDownloads(): ActiveDownload[] {
+  getActiveDownloads(): (ActiveDownload & { currentSpeedKBps: number })[] {
     return Array.from(this.activeDownloads.values()).map((download) => ({
       ...download,
       // Read fresh values directly from the DownloadItem
@@ -385,6 +506,11 @@ export class DownloadsService extends DisposableService {
       totalBytes: download.item.getTotalBytes(),
       isPaused: download.item.isPaused(),
       canResume: download.item.canResume(),
+      // Compute current speed from history
+      currentSpeedKBps:
+        download.speedHistory.length > 0
+          ? download.speedHistory[download.speedHistory.length - 1].speedKBps
+          : 0,
     }));
   }
 
@@ -459,6 +585,11 @@ export class DownloadsService extends DisposableService {
 
     download.item.resume();
     download.isPaused = false;
+
+    // Reset speed tracking to avoid misleading calculation after pause
+    download.lastSpeedUpdateTime = Date.now();
+    download.lastSpeedUpdateBytes = download.item.getReceivedBytes();
+
     this.logger.info('[DownloadsService] Download resumed', { id: downloadId });
     this.notifyStateChange(true);
     return true;

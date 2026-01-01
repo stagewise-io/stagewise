@@ -114,7 +114,7 @@ export class KartonService extends DisposableService {
     return this.kartonServer.state;
   }
 
-  get setState() {
+  get setState(): KartonServer<KartonContract>['setState'] {
     return this.kartonServer.setState.bind(this.kartonServer);
   }
 
