@@ -2434,7 +2434,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
     try {
       const title = this.currentState.title || '';
-      const visitId = await this.historyService.addVisit({
+      const { visitId } = await this.historyService.addVisit({
         url,
         title,
         transition,

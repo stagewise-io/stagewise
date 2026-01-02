@@ -23,6 +23,7 @@ import { PagesService } from './services/pages';
 import { WindowLayoutService } from './services/window-layout';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
+import { WebDataService } from './services/webdata';
 import { DownloadsService } from './services/download-manager';
 import {
   DownloadState,
@@ -58,10 +59,17 @@ export async function main({
 
   const globalDataPathService = await GlobalDataPathService.create(logger);
 
-  // Create HistoryService and FaviconService early so they can be passed to other services
+  // Create database services early so they can be passed to other services
+  // WebDataService must be created first as HistoryService depends on it
+  // for search term extraction (keyword IDs reference the keywords table)
+  const webDataService = await WebDataService.create(
+    logger,
+    globalDataPathService,
+  );
   const historyService = await HistoryService.create(
     logger,
     globalDataPathService,
+    webDataService,
   );
   const faviconService = await FaviconService.create(
     logger,
@@ -676,6 +684,17 @@ export async function main({
 
   // Handle command line arguments for URLs on initial startup
   handleCommandLineUrls(process.argv, windowLayoutService, logger);
+
+  // Set up graceful shutdown to clean up database connections
+  const shutdown = () => {
+    logger.debug('[Main] Shutting down services...');
+    webDataService.teardown();
+    historyService.teardown();
+    faviconService.teardown();
+    logger.debug('[Main] Services shut down');
+  };
+
+  app.on('will-quit', shutdown);
 }
 
 /**

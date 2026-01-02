@@ -28,6 +28,7 @@ import {
 } from '@shared/karton-contracts/pages-api/types';
 import { toWebKitTimestamp, fromWebKitTimestamp } from '../chrome-db-utils';
 import startScript from './start-script.sql?raw';
+import type { WebDataService } from '../webdata';
 
 // Internal result type without favicon (added by PagesService)
 export interface HistoryQueryResult {
@@ -62,9 +63,15 @@ export class HistoryService {
   private logger: Logger;
   private dbDriver;
   private db;
+  private webDataService: WebDataService | null;
 
-  private constructor(logger: Logger, paths: GlobalDataPathService) {
+  private constructor(
+    logger: Logger,
+    paths: GlobalDataPathService,
+    webDataService: WebDataService | null,
+  ) {
     this.logger = logger;
+    this.webDataService = webDataService;
     const dbPath = path.join(paths.globalDataPath, 'History');
     this.dbDriver = createClient({
       url: `file:${dbPath}`,
@@ -78,8 +85,13 @@ export class HistoryService {
   public static async create(
     logger: Logger,
     globalDataPathService: GlobalDataPathService,
+    webDataService: WebDataService | null = null,
   ): Promise<HistoryService> {
-    const instance = new HistoryService(logger, globalDataPathService);
+    const instance = new HistoryService(
+      logger,
+      globalDataPathService,
+      webDataService,
+    );
     await instance.initialize();
     logger.debug('[HistoryService] Created service');
     return instance;
@@ -105,9 +117,12 @@ export class HistoryService {
   // =================================================================
 
   /**
-   * Records a page visit. Creates or updates URL entry, then inserts visit record.
+   * Internal helper: inserts the visit record into the database.
+   * @returns Object containing the visit ID and URL ID
    */
-  async addVisit(input: VisitInput): Promise<number> {
+  private async _insertVisitRecord(
+    input: VisitInput,
+  ): Promise<{ visitId: number; urlId: number }> {
     return await this.db.transaction(async (tx) => {
       const now = input.visitTime
         ? toWebKitTimestamp(input.visitTime)
@@ -181,22 +196,67 @@ export class HistoryService {
         });
       }
 
-      return visitId;
+      return { visitId, urlId };
     });
   }
 
   /**
    * Log a search term that resulted in a click (for Omnibox suggestions).
+   * @param keywordId - The keyword ID from the Web Data keywords table
+   * @param urlId - The URL ID from the urls table
+   * @param term - The search term entered by the user
    */
-  async addSearchTerm(term: string, targetUrlId: number): Promise<void> {
-    // Usually mapped to a keyword_id, simplified here to raw insert
-    // In a real app, you'd check `keywords` table first.
+  async addSearchTerm(
+    keywordId: number,
+    urlId: number,
+    term: string,
+  ): Promise<void> {
     await this.db.insert(schema.keywordSearchTerms).values({
-      keywordId: 0, // Placeholder
-      urlId: targetUrlId,
-      term: term,
+      keywordId,
+      urlId,
+      term,
       normalizedTerm: term.toLowerCase().trim(),
     });
+  }
+
+  /**
+   * Records a page visit. Creates or updates URL entry, inserts visit record,
+   * and extracts/stores search term if the URL is a search engine.
+   * @returns Object containing the visit ID and URL ID
+   */
+  async addVisit(
+    input: VisitInput,
+  ): Promise<{ visitId: number; urlId: number }> {
+    // Extract search term (uses cached keywords, so fast)
+    let extracted: { term: string; keywordId: number } | null = null;
+    if (this.webDataService) {
+      extracted = await this.webDataService.extractSearchTerm(input.url);
+    } else {
+      this.logger.debug(
+        '[HistoryService] WebDataService not available - search term extraction disabled',
+      );
+    }
+
+    // Record the visit
+    const result = await this._insertVisitRecord(input);
+
+    // Insert search term if this is a search engine URL
+    if (extracted) {
+      try {
+        await this.addSearchTerm(
+          extracted.keywordId,
+          result.urlId,
+          extracted.term,
+        );
+      } catch (error) {
+        // Log but don't fail the visit recording if search term insert fails
+        this.logger.warn(
+          `[HistoryService] Failed to record search term: ${error}`,
+        );
+      }
+    }
+
+    return result;
   }
 
   /**
