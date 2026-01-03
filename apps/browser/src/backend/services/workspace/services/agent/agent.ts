@@ -155,8 +155,8 @@ export class AgentService {
   private thinkingEnabled = true;
   private isCompacting = false; // Guard to prevent concurrent compaction attempts
   private lspService: LspService | null = null;
-  /** Files modified during this session - used to collect LSP diagnostics */
-  private modifiedFilesThisSession: Set<string> = new Set();
+  /** Files modified per chat - used to collect LSP diagnostics */
+  private modifiedFilesPerChat: Map<ChatId, Set<string>> = new Map();
 
   private constructor(
     logger: Logger,
@@ -300,12 +300,28 @@ export class AgentService {
    * Used by the getLintingDiagnosticsTool.
    */
   private async getStructuredLintingDiagnostics(): Promise<LintingDiagnosticsResult> {
+    const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
+    if (!activeChatId) {
+      return {
+        files: [],
+        summary: {
+          totalFiles: 0,
+          totalIssues: 0,
+          errors: 0,
+          warnings: 0,
+          infos: 0,
+          hints: 0,
+        },
+      };
+    }
+
     // Wait briefly for LSP servers to finish analyzing
     // TypeScript and ESLint can take a few hundred ms to report diagnostics
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Collect current diagnostics from LSP servers
-    const diagnosticsByFile = await this.collectDiagnosticsForModifiedFiles();
+    const diagnosticsByFile =
+      await this.collectDiagnosticsForModifiedFiles(activeChatId);
 
     const agentAccessPath = this.clientRuntime
       ? this.clientRuntime.fileSystem.getCurrentWorkingDirectory()
@@ -424,7 +440,7 @@ export class AgentService {
     );
 
     // Clear modified files tracking when workspace changes
-    this.modifiedFilesThisSession.clear();
+    this.modifiedFilesPerChat.clear();
 
     // Teardown old LspService and create new one with the new clientRuntime
     void this.lspService?.teardown();
@@ -807,6 +823,11 @@ export class AgentService {
             }
           }
 
+          // Clean up per-chat data structures
+          this.undoToolCallStack.delete(chatId);
+          this.modifiedFilesPerChat.delete(chatId);
+          this.thinkingDurationsPerChat.delete(chatId);
+
           this.uiKarton.setState((draft) => {
             if (draft.agentChat?.chats[chatId])
               delete draft.agentChat?.chats[chatId];
@@ -996,6 +1017,9 @@ export class AgentService {
     if (!this.undoToolCallStack.has(chatId))
       this.undoToolCallStack.set(chatId, []);
 
+    if (!this.modifiedFilesPerChat.has(chatId))
+      this.modifiedFilesPerChat.set(chatId, new Set());
+
     // If the LLM proxy cache is not warmed up yet, this agent request acts as a warm-up request
     if (!this.isWarmedUp) this.isWarmedUp = true;
 
@@ -1084,9 +1108,9 @@ export class AgentService {
         ? toolsWithoutExecute(toolsContext.tools)
         : null;
 
-      // Collect LSP diagnostics for modified files
+      // Collect LSP diagnostics for modified files in this chat
       const lspDiagnosticsByFile =
-        await this.collectDiagnosticsForModifiedFiles();
+        await this.collectDiagnosticsForModifiedFiles(chatId);
 
       // Prepare messages before starting the stream
       // This is an async operation, so we do it before and check abort status after
@@ -1237,8 +1261,8 @@ export class AgentService {
             if ('result' in result && hasDiffMetadata(result.result)) {
               const diff = result.result.hiddenFromLLM.diff;
               if (diff.after !== null) {
-                // Track modified files for diagnostics collection
-                this.modifiedFilesThisSession.add(diff.path);
+                // Track modified files for diagnostics collection (per chat)
+                this.modifiedFilesPerChat.get(chatId)?.add(diff.path);
 
                 // Update LSP if available - first touch (spawns clients + opens doc), then update content
                 if (this.lspService) {
@@ -1684,17 +1708,20 @@ export class AgentService {
   }
 
   /**
-   * Collect LSP diagnostics for all files modified during this session.
+   * Collect LSP diagnostics for all files modified in the specified chat.
    * Returns a Map of file paths to their aggregated diagnostics.
    */
-  private async collectDiagnosticsForModifiedFiles(): Promise<DiagnosticsByFile> {
+  private async collectDiagnosticsForModifiedFiles(
+    chatId: ChatId,
+  ): Promise<DiagnosticsByFile> {
     const result: DiagnosticsByFile = new Map();
 
-    if (!this.lspService || this.modifiedFilesThisSession.size === 0) {
+    const modifiedFiles = this.modifiedFilesPerChat.get(chatId);
+    if (!this.lspService || !modifiedFiles || modifiedFiles.size === 0) {
       return result;
     }
 
-    for (const filePath of this.modifiedFilesThisSession) {
+    for (const filePath of modifiedFiles) {
       try {
         const diagnostics =
           await this.lspService.getDiagnosticsForFile(filePath);
@@ -1720,7 +1747,7 @@ export class AgentService {
     this.lspService = null;
 
     // Clear modified files tracking
-    this.modifiedFilesThisSession.clear();
+    this.modifiedFilesPerChat.clear();
 
     this.logger.debug('[AgentService] Shutdown complete');
   }
