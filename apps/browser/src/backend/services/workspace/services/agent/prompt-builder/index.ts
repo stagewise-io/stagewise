@@ -7,6 +7,10 @@ import { convertToModelMessages, type ModelMessage } from 'ai';
 import { getSummarizationUserMessage } from './utils/summarize-chat-history';
 import { getSystemPrompt } from './templates/system-prompt';
 import { getUserMessage } from './templates/user';
+import type { AggregatedDiagnostic } from '../../lsp';
+
+/** Map of file paths to their LSP diagnostics */
+export type DiagnosticsByFile = Map<string, AggregatedDiagnostic[]>;
 
 // Number of user-assistant pairs to keep before the auto-compacting summary.
 export const ORIGINAL_USER_MESSAGES_KEPT_WHEN_SUMMARIZING = 1;
@@ -60,9 +64,13 @@ export class PromptBuilder {
   /**
    * Converts UI messages to model messages. If auto-compact info exists,
    * applies compaction: [first N pairs] + [summary] + [last pair].
+   *
+   * @param chatMessages - The chat messages to convert
+   * @param lspDiagnosticsByFile - Map of file paths to their LSP diagnostics (from recently touched files)
    */
   public async convertUIToModelMessages(
     chatMessages: ChatMessage[],
+    lspDiagnosticsByFile: DiagnosticsByFile = new Map(),
   ): Promise<ModelMessage[]> {
     // Get the system prompt and put that on the start
     // Always use current state via getter to avoid stale data
@@ -70,6 +78,7 @@ export class PromptBuilder {
       this.getKartonState(),
       this.clientRuntime,
       this.stagewiseMdPath,
+      lspDiagnosticsByFile,
     );
     const modelMessages: ModelMessage[] = [systemPrompt];
 

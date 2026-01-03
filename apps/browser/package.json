@@ -11,8 +11,9 @@
   "type": "module",
   "main": ".vite/build/main.js",
   "scripts": {
-    "make": "dotenv -e ../../.env.prod -- electron-forge make",
-    "package": "dotenv -e ../../.env -- electron-forge package",
+    "bundle:eslint": "tsx scripts/bundle-eslint-server.ts",
+    "make": "pnpm bundle:eslint && dotenv -e ../../.env.prod -- electron-forge make",
+    "package": "pnpm bundle:eslint && dotenv -e ../../.env -- electron-forge package",
     "publish": "dotenv -e ../../.env -- electron-forge publish",
     "start": "pnpm typecheck && dotenv -e ../../.env.dev -- electron-forge start",
     "storybook": "storybook dev -p 6006",
@@ -122,6 +123,9 @@
     "typescript": "^5.8.3",
     "utf-8-validate": "^6.0.5",
     "vite": "7.2.7",
+    "vscode-jsonrpc": "^8.2.1",
+    "vscode-languageserver-protocol": "^3.17.5",
+    "vscode-languageserver-types": "^3.17.5",
     "winston": "^3.17.0",
     "xml": "^1.0.1",
     "zod": "4.1.12"

@@ -8,6 +8,21 @@ import { grepSearchTool } from './node-runtime/file-modification/grep-search-too
 import { globTool } from './node-runtime/file-modification/glob-tool.js';
 import { multiEditTool } from './node-runtime/file-modification/multi-edit-tool.js';
 import { deleteFileTool } from './node-runtime/file-modification/delete-file-tool.js';
+import {
+  getLintingDiagnosticsTool,
+  type LintingDiagnosticsResult,
+  type LintingDiagnostic,
+  type FileDiagnostics,
+  type DiagnosticsSummary,
+} from './node-runtime/file-modification/get-linting-diagnostics.js';
+
+// Re-export linting diagnostic types for external use
+export type {
+  LintingDiagnosticsResult,
+  LintingDiagnostic,
+  FileDiagnostics,
+  DiagnosticsSummary,
+};
 import { getContext7LibraryDocsTool } from './node-runtime/research/get-context7-library-docs-tool.js';
 import { resolveContext7LibraryTool } from './node-runtime/research/resolve-context7-library-tool.js';
 import { executeConsoleScriptTool } from './browser-runtime/execute-console-script.js';
@@ -221,6 +236,7 @@ export function knowledgeAgentTools(
 
 export type CodingAgentCallbacks = {
   onUpdateStagewiseMd: () => Promise<void>;
+  getLintingDiagnostics: () => Promise<LintingDiagnosticsResult>;
 };
 
 export function codingAgentTools(
@@ -249,6 +265,9 @@ export function codingAgentTools(
     readConsoleLogsTool: toolWithMetadata(readConsoleLogsTool(browserRuntime)),
     updateStagewiseMdTool: toolWithMetadata(
       updateStagewiseMdTool(callbacks.onUpdateStagewiseMd),
+    ),
+    getLintingDiagnosticsTool: toolWithMetadata(
+      getLintingDiagnosticsTool(callbacks.getLintingDiagnostics),
     ),
   };
 }

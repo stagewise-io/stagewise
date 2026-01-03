@@ -20,6 +20,7 @@ import { ToolPartUI } from './shared/tool-part-ui';
 import { ThinkingPart } from '../thinking';
 import { ReadConsoleLogsToolPart } from './read-console-logs';
 import { ExecuteConsoleScriptToolPart } from './execute-console-script';
+import { GetLintingDiagnosticsToolPart } from './get-linting-diagnostics';
 
 // Context for tracking expanded children within exploring section
 interface ExploringContentContextValue {
@@ -46,7 +47,8 @@ export type ReadOnlyToolPart =
           | 'tool-getContext7LibraryDocsTool'
           | 'tool-resolveContext7LibraryTool'
           | 'tool-executeConsoleScriptTool'
-          | 'tool-readConsoleLogsTool';
+          | 'tool-readConsoleLogsTool'
+          | 'tool-getLintingDiagnosticsTool';
       }
     >
   | ReasoningUIPart;
@@ -63,7 +65,8 @@ export function isReadOnlyToolPart(
     part.type === 'tool-getContext7LibraryDocsTool' ||
     part.type === 'tool-resolveContext7LibraryTool' ||
     part.type === 'tool-executeConsoleScriptTool' ||
-    part.type === 'tool-readConsoleLogsTool'
+    part.type === 'tool-readConsoleLogsTool' ||
+    part.type === 'tool-getLintingDiagnosticsTool'
   );
 }
 
@@ -161,6 +164,15 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
+    case 'tool-getLintingDiagnosticsTool':
+      return (
+        <GetLintingDiagnosticsToolPart
+          key={part.toolCallId}
+          showBorder={!minimal}
+          part={part}
+          disableShimmer={disableShimmer}
+        />
+      );
     default:
       return null;
   }
@@ -241,6 +253,9 @@ export const ExploringToolParts = ({
     let hasUsedBrowserTools = false;
     let hasUsedContext7Tools = false;
     let hasUsedFileTools = false;
+    let lintingErrors = 0;
+    let lintingWarnings = 0;
+    let hasCheckedLinting = false;
 
     const finishedParts = parts.filter(
       (part) => part.state === 'output-available',
@@ -272,6 +287,11 @@ export const ExploringToolParts = ({
         case 'tool-readConsoleLogsTool':
           consoleLogsRead += 1;
           break;
+        case 'tool-getLintingDiagnosticsTool':
+          hasCheckedLinting = true;
+          lintingErrors += part.output?.summary?.errors ?? 0;
+          lintingWarnings += part.output?.summary?.warnings ?? 0;
+          break;
       }
     });
     return {
@@ -284,6 +304,9 @@ export const ExploringToolParts = ({
       hasUsedBrowserTools,
       hasUsedContext7Tools,
       hasUsedFileTools,
+      lintingErrors,
+      lintingWarnings,
+      hasCheckedLinting,
     };
   }, [parts]);
 
@@ -297,35 +320,68 @@ export const ExploringToolParts = ({
       hasUsedBrowserTools,
       hasUsedContext7Tools,
       hasUsedFileTools,
+      lintingErrors,
+      lintingWarnings,
+      hasCheckedLinting,
     } = explorationMetadata;
 
-    const parts: string[] = [];
+    const textParts: string[] = [];
     if (filesFound > 0 || filesRead > 0)
-      parts.push(
+      textParts.push(
         `${filesFound + filesRead} file${filesFound + filesRead !== 1 ? 's' : ''}`,
       );
 
-    if (docsRead > 0) parts.push(`${docsRead} doc${docsRead !== 1 ? 's' : ''}`);
+    if (docsRead > 0)
+      textParts.push(`${docsRead} doc${docsRead !== 1 ? 's' : ''}`);
 
     if (consoleLogsRead > 0)
-      parts.push(
+      textParts.push(
         `${consoleLogsRead} console log${consoleLogsRead !== 1 ? 's' : ''}`,
       );
 
     if (consoleScriptsExecuted > 0)
-      parts.push(
+      textParts.push(
         `${consoleScriptsExecuted} tab${consoleScriptsExecuted !== 1 ? 's' : ''}`,
       );
 
-    if (parts.length === 0) {
-      if (hasUsedBrowserTools) parts.push('the DOM');
-      if (hasUsedContext7Tools) parts.push('documentation');
-      if (hasUsedFileTools) parts.push('files');
+    const hasExploredFiles = filesFound > 0 || filesRead > 0;
+
+    // Add linting results
+    if (hasCheckedLinting)
+      if (lintingErrors > 0 || lintingWarnings > 0) {
+        const lintParts: string[] = [];
+        if (lintingErrors > 0)
+          lintParts.push(
+            `${lintingErrors} error${lintingErrors !== 1 ? 's' : ''}`,
+          );
+        if (lintingWarnings > 0)
+          lintParts.push(
+            `${lintingWarnings} warning${lintingWarnings !== 1 ? 's' : ''}`,
+          );
+        textParts.push(lintParts.join(', '));
+      }
+
+    if (textParts.length === 0) {
+      if (hasCheckedLinting && lintingErrors === 0 && lintingWarnings === 0)
+        return 'Checked linting - no issues';
+      if (hasUsedBrowserTools) textParts.push('the DOM');
+      if (hasUsedContext7Tools) textParts.push('documentation');
+      if (hasUsedFileTools) textParts.push('files');
     }
 
-    if (parts.length === 0) return 'Explored the codebase';
-    if (parts.length === 1) return `Explored ${parts[0]}`;
-    return `Explored  ${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
+    if (
+      !hasExploredFiles &&
+      hasCheckedLinting &&
+      !!lintingErrors &&
+      !!lintingWarnings
+    )
+      return `Found ${textParts.slice(0, -1).join(', ')} and ${textParts.at(-1)}`;
+    else if (!hasExploredFiles && hasCheckedLinting)
+      return `Found ${textParts.at(-1)}`;
+
+    if (textParts.length === 0) return 'Explored the codebase';
+    if (textParts.length === 1) return `Explored ${textParts[0]}`;
+    return `Explored ${textParts.slice(0, -1).join(', ')} and ${textParts.at(-1)}`;
   }, [explorationMetadata]);
 
   const explorationInProgressText = useMemo(() => {
@@ -344,6 +400,8 @@ export const ExploringToolParts = ({
       case 'tool-executeConsoleScriptTool':
       case 'tool-readConsoleLogsTool':
         return 'Exploring the browser...';
+      case 'tool-getLintingDiagnosticsTool':
+        return 'Checking linting...';
       default:
         return 'Exploring...';
     }

@@ -11,6 +11,8 @@ import specialTokens from '../utils/special-tokens.js';
 import { getWorkspaceInfo } from '../utils/workspace-info/index.js';
 import path from 'node:path';
 import { readStagewiseMd } from '../utils/read-stagewise-md';
+import type { AggregatedDiagnostic } from '../../../lsp/index.js';
+import { DiagnosticSeverity } from 'vscode-languageserver-types';
 
 /**
  * The (system) prompt design we implement right now follows the following rules:
@@ -26,6 +28,7 @@ export async function getSystemPrompt(
   kartonState: KartonContract['state'],
   clientRuntime: ClientRuntime | null = null,
   stagewiseMdPath: string | null = null,
+  lspDiagnosticsByFile: Map<string, AggregatedDiagnostic[]> = new Map(),
 ): Promise<SystemModelMessage> {
   let workspaceSetupMode: 'setup-active' | 'setup-needed' | 'setup-finished';
   if (clientRuntime === null) workspaceSetupMode = 'setup-needed';
@@ -36,6 +39,15 @@ export async function getSystemPrompt(
   const stagewiseMdContent = stagewiseMdPath
     ? await readStagewiseMd(stagewiseMdPath)
     : null;
+
+  const agentAccessPath = clientRuntime
+    ? clientRuntime.fileSystem.getCurrentWorkingDirectory()
+    : '';
+
+  const diagnosticsSection = formatLspDiagnosticsByFile(
+    lspDiagnosticsByFile,
+    agentAccessPath,
+  );
 
   const newPrompt = `
   ${prefix}
@@ -52,6 +64,7 @@ export async function getSystemPrompt(
   ${await getBrowserInformation(kartonState)}
   ${stagewiseMdContent ? `\n${stagewiseMdContent}` : ''}
   ${currentGoal(kartonState, workspaceSetupMode)}
+  ${diagnosticsSection}
   `
     .trim()
     .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1'); // We remove all CDATA tags because they add unnecessary tokens and we can trust the system prompt content to not do bullshit.
@@ -387,6 +400,16 @@ const toolCallGuidelines = xml({
         `.trim(),
       },
     },
+    {
+      'linting-verification': {
+        _cdata: `
+- If \`<lsp-diagnostics>\` section is present in this system prompt, fix those issues first without calling the tool
+- Otherwise, call \`getLintingDiagnosticsTool\` after completing code modifications
+- Fix any errors or warnings before presenting changes to [USER]
+- This ensures code quality and prevents broken builds
+        `.trim(),
+      },
+    },
   ],
 });
 
@@ -638,6 +661,94 @@ const workspaceInformation = async (
   });
 };
 
+/**
+ * Format LSP diagnostics grouped by file for inclusion in the system prompt.
+ * This version takes a Map of file paths to diagnostics.
+ */
+export function formatLspDiagnosticsByFile(
+  diagnosticsByFile: Map<string, AggregatedDiagnostic[]>,
+  agentAccessPath: string,
+): string {
+  if (diagnosticsByFile.size === 0) return '';
+
+  const getSeverityLabel = (severity: number | undefined): string => {
+    switch (severity) {
+      case DiagnosticSeverity.Error:
+        return 'ERROR';
+      case DiagnosticSeverity.Warning:
+        return 'WARNING';
+      case DiagnosticSeverity.Information:
+        return 'INFO';
+      case DiagnosticSeverity.Hint:
+        return 'HINT';
+      default:
+        return 'ISSUE';
+    }
+  };
+
+  let totalErrors = 0;
+  let totalWarnings = 0;
+  let totalIssues = 0;
+
+  const fileEntries: Array<{ file: object[] }> = [];
+
+  for (const [filePath, diagnostics] of diagnosticsByFile) {
+    if (diagnostics.length === 0) continue;
+
+    // Make path relative to agent access path for cleaner display
+    const relativePath = filePath.startsWith(agentAccessPath)
+      ? filePath.slice(agentAccessPath.length).replace(/^\//, '')
+      : filePath;
+
+    const issues: string[] = [];
+    for (const diag of diagnostics) {
+      const d = diag.diagnostic;
+      const severity = getSeverityLabel(d.severity);
+      const line = d.range.start.line + 1;
+      const col = d.range.start.character + 1;
+      const source = d.source ?? diag.serverID;
+      const code = d.code ? ` (${d.code})` : '';
+      issues.push(
+        `[${severity}] L${line}:${col} [${source}]${code}: ${d.message}`,
+      );
+
+      if (d.severity === DiagnosticSeverity.Error) totalErrors++;
+      else if (d.severity === DiagnosticSeverity.Warning) totalWarnings++;
+      totalIssues++;
+    }
+
+    fileEntries.push({
+      file: [
+        { _attr: { path: relativePath, 'issue-count': diagnostics.length } },
+        { _cdata: issues.join('\n') },
+      ],
+    });
+  }
+
+  if (totalIssues === 0) return '';
+
+  return xml({
+    'lsp-diagnostics': [
+      {
+        _attr: {
+          description:
+            'Current linting/type-checking issues in recently touched files. [STAGE] MUST fix errors and SHOULD fix warnings caused by recent changes.',
+          'total-issues': totalIssues,
+          errors: totalErrors,
+          warnings: totalWarnings,
+        },
+      },
+      ...fileEntries,
+      {
+        action: {
+          _cdata:
+            'If any issues were introduced by recent code changes, fix them before proceeding. Prioritize errors over warnings.',
+        },
+      },
+    ],
+  });
+}
+
 const currentGoal = (
   kartonState: KartonContract['state'],
   workspaceSetupMode: 'setup-active' | 'setup-needed' | 'setup-finished',
@@ -694,8 +805,26 @@ const currentGoal = (
 - Make sure that every change is done in a way that doesn't break existing dark-mode support or responsive design.
 - Always adhere to coding and styling guidelines.
 
+## Linting and type-checking (MANDATORY)
+After completing ALL code changes for a task, [STAGE] MUST:
+1. Check if \`<lsp-diagnostics>\` section is present in this system prompt - if so, those are the current issues and you can skip calling the tool.
+2. If no diagnostics are shown in the system prompt, call \`getLintingDiagnosticsTool\` to check for linting errors and type errors in modified files.
+3. If errors or warnings are found (either from system prompt or tool):
+   - FIX them immediately before asking [USER] for feedback.
+   - Errors (red) MUST always be fixed - they indicate broken code.
+   - Warnings (yellow) SHOULD be fixed unless they are intentional or unfixable without major refactoring.
+4. Only after linting is clean (or only contains expected/unfixable issues), proceed to ask [USER] for feedback.
+
+Exceptions where linting issues may be left unfixed:
+- The issue existed before [STAGE]'s changes (pre-existing technical debt).
+- Fixing it would require changes outside the scope of [USER]'s request.
+- The warning is intentional (e.g., unused variable that will be used later).
+- [USER] explicitly asks to skip linting fixes.
+
+NEVER leave the codebase in a broken state with unresolved type errors or critical linting issues caused by your changes.
+
 ## After changes
-- After making changes, ask USER if they are happy with changes.
+- After making changes AND verifying linting is clean, ask USER if they are happy with changes.
 - Be proactive in proposing similar changes to other places of app that could benefit from same changes or that would fit to theme of change that USER triggered. Make sensible and atomic proposals that USER could simply approve. You should thus only make proposals that affect code you already saw.
 
 ## Copying styles & debugging with executeConsoleScript

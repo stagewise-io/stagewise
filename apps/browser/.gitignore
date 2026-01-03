@@ -90,3 +90,7 @@ typings/
 
 # Electron-Forge
 out/
+
+# Generated ESLint server bundle
+bundled/
+.eslint-build-temp/

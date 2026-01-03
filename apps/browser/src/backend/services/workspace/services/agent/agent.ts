@@ -30,6 +30,8 @@ import {
   type UITools,
   type AgentToolsContext,
   type BrowserRuntime,
+  type LintingDiagnosticsResult,
+  type LintingDiagnostic,
 } from '@stagewise/agent-tools';
 import {
   streamText,
@@ -65,6 +67,8 @@ import { processToolCalls } from './utils/tool-call-utils';
 import { generateChatTitle } from './utils/generate-chat-title';
 import { isAuthenticationError } from './utils/is-authentication-error';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
+import { LspService } from '../lsp';
+import type { DiagnosticsByFile } from './prompt-builder';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -150,6 +154,9 @@ export class AgentService {
   > = new Map();
   private thinkingEnabled = true;
   private isCompacting = false; // Guard to prevent concurrent compaction attempts
+  private lspService: LspService | null = null;
+  /** Files modified during this session - used to collect LSP diagnostics */
+  private modifiedFilesThisSession: Set<string> = new Set();
 
   private constructor(
     logger: Logger,
@@ -282,8 +289,76 @@ export class AgentService {
         this.client,
         {
           onUpdateStagewiseMd: () => this.updateStagewiseMd(),
+          getLintingDiagnostics: () => this.getStructuredLintingDiagnostics(),
         },
       ),
+    };
+  }
+
+  /**
+   * Get structured linting diagnostics for modified files.
+   * Used by the getLintingDiagnosticsTool.
+   */
+  private async getStructuredLintingDiagnostics(): Promise<LintingDiagnosticsResult> {
+    // Wait briefly for LSP servers to finish analyzing
+    // TypeScript and ESLint can take a few hundred ms to report diagnostics
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // Collect current diagnostics from LSP servers
+    const diagnosticsByFile = await this.collectDiagnosticsForModifiedFiles();
+
+    const agentAccessPath = this.clientRuntime
+      ? this.clientRuntime.fileSystem.getCurrentWorkingDirectory()
+      : '';
+
+    // Build structured result
+    const files: LintingDiagnosticsResult['files'] = [];
+
+    let totalErrors = 0;
+    let totalWarnings = 0;
+    let totalInfos = 0;
+    let totalHints = 0;
+
+    for (const [filePath, aggregatedDiagnostics] of diagnosticsByFile) {
+      const relativePath = filePath.startsWith(agentAccessPath)
+        ? filePath.slice(agentAccessPath.length).replace(/^\//, '')
+        : filePath;
+
+      const fileDiagnostics: LintingDiagnostic[] = [];
+
+      for (const { serverID, diagnostic } of aggregatedDiagnostics) {
+        const severity = (diagnostic.severity ?? 1) as 1 | 2 | 3 | 4;
+        fileDiagnostics.push({
+          line: diagnostic.range.start.line + 1,
+          column: diagnostic.range.start.character + 1,
+          severity,
+          source: diagnostic.source ?? serverID,
+          message: diagnostic.message,
+          code: diagnostic.code,
+        });
+
+        if (severity === 1) totalErrors++;
+        else if (severity === 2) totalWarnings++;
+        else if (severity === 3) totalInfos++;
+        else if (severity === 4) totalHints++;
+      }
+
+      if (fileDiagnostics.length > 0)
+        files.push({ path: relativePath, diagnostics: fileDiagnostics });
+    }
+
+    const totalIssues = totalErrors + totalWarnings + totalInfos + totalHints;
+
+    return {
+      files,
+      summary: {
+        totalFiles: files.length,
+        totalIssues,
+        errors: totalErrors,
+        warnings: totalWarnings,
+        infos: totalInfos,
+        hints: totalHints,
+      },
     };
   }
 
@@ -347,6 +422,28 @@ export class AgentService {
       () => this.uiKarton.state,
       this.uiKarton.state.workspace?.paths.data ?? null,
     );
+
+    // Clear modified files tracking when workspace changes
+    this.modifiedFilesThisSession.clear();
+
+    // Teardown old LspService and create new one with the new clientRuntime
+    void this.lspService?.teardown();
+    this.lspService = null;
+
+    if (clientRuntime) {
+      LspService.create(this.logger, clientRuntime)
+        .then((lsp) => {
+          this.lspService = lsp;
+          this.logger.debug('[AgentService] LspService created');
+        })
+        .catch((error) => {
+          this.logger.error(
+            '[AgentService] Failed to create LspService',
+            error,
+          );
+          this.telemetryService.captureException(error as Error);
+        });
+    }
   }
 
   public async sendUserMessage(message: ChatMessage): Promise<void> {
@@ -433,6 +530,27 @@ export class AgentService {
       () => this.uiKarton.state,
       this.uiKarton.state.workspace?.paths.data ?? null,
     );
+
+    // Recreate LspService with the new working directory as root
+    if (this.clientRuntime) {
+      void this.lspService?.teardown();
+      this.lspService = null;
+
+      LspService.create(this.logger, this.clientRuntime)
+        .then((lsp) => {
+          this.lspService = lsp;
+          this.logger.debug(
+            '[AgentService] LspService recreated with new working directory',
+          );
+        })
+        .catch((error) => {
+          this.logger.error(
+            '[AgentService] Failed to recreate LspService',
+            error,
+          );
+          this.telemetryService.captureException(error as Error);
+        });
+    }
   }
 
   public createAndActivateNewChat() {
@@ -966,10 +1084,15 @@ export class AgentService {
         ? toolsWithoutExecute(toolsContext.tools)
         : null;
 
+      // Collect LSP diagnostics for modified files
+      const lspDiagnosticsByFile =
+        await this.collectDiagnosticsForModifiedFiles();
+
       // Prepare messages before starting the stream
       // This is an async operation, so we do it before and check abort status after
       const messages = await this.promptBuilder.convertUIToModelMessages(
         history ?? [],
+        lspDiagnosticsByFile,
       );
 
       // Check again if abort was called during message preparation
@@ -1105,6 +1228,50 @@ export class AgentService {
               this.telemetryService.captureException(error as Error);
             },
           );
+
+          // Sync modified files with LSP server for diagnostics
+          // Collect promises so we can wait for LSP updates before next agent call
+          const lspUpdatePromises: Promise<void>[] = [];
+
+          for (const result of toolResults) {
+            if ('result' in result && hasDiffMetadata(result.result)) {
+              const diff = result.result.hiddenFromLLM.diff;
+              if (diff.after !== null) {
+                // Track modified files for diagnostics collection
+                this.modifiedFilesThisSession.add(diff.path);
+
+                // Update LSP if available - first touch (spawns clients + opens doc), then update content
+                if (this.lspService) {
+                  const content = diff.after; // Capture for closure
+                  const updatePromise = this.lspService
+                    .touchFile(diff.path)
+                    .then(() => this.lspService?.updateFile(diff.path, content))
+                    .catch((err: unknown) => {
+                      this.logger.debug(
+                        '[AgentService] Failed to update LSP document',
+                        { error: err, path: diff.path },
+                      );
+                    });
+                  lspUpdatePromises.push(updatePromise);
+                }
+              }
+            }
+          }
+
+          // If file edits occurred, wait for LSP updates and diagnostics to settle
+          // This ensures diagnostics are available in the system prompt for the next agent call
+          if (lspUpdatePromises.length > 0) {
+            // Wait for LSP updates with a timeout to prevent hanging if LSP is unresponsive
+            const LSP_UPDATE_TIMEOUT_MS = 2000;
+            await Promise.race([
+              Promise.all(lspUpdatePromises),
+              new Promise<void>((resolve) =>
+                setTimeout(resolve, LSP_UPDATE_TIMEOUT_MS),
+              ),
+            ]);
+            // Wait briefly for diagnostics to arrive after file edits
+            await new Promise((resolve) => setTimeout(resolve, 150));
+          }
 
           // Update the used context window size of the chat
           this.uiKarton.setState((draft) => {
@@ -1516,10 +1683,45 @@ export class AgentService {
     });
   }
 
+  /**
+   * Collect LSP diagnostics for all files modified during this session.
+   * Returns a Map of file paths to their aggregated diagnostics.
+   */
+  private async collectDiagnosticsForModifiedFiles(): Promise<DiagnosticsByFile> {
+    const result: DiagnosticsByFile = new Map();
+
+    if (!this.lspService || this.modifiedFilesThisSession.size === 0) {
+      return result;
+    }
+
+    for (const filePath of this.modifiedFilesThisSession) {
+      try {
+        const diagnostics =
+          await this.lspService.getDiagnosticsForFile(filePath);
+        if (diagnostics.length > 0) result.set(filePath, diagnostics);
+      } catch (err) {
+        this.logger.debug('[AgentService] Failed to get diagnostics for file', {
+          error: err,
+          path: filePath,
+        });
+      }
+    }
+
+    return result;
+  }
+
   public teardown() {
     this.removeServerProcedureHandlers();
     this.authService.unregisterAuthStateChangeCallback(this.onAuthStateChange);
     this.cleanupPendingOperations('Agent teardown');
+
+    // Teardown LspService
+    void this.lspService?.teardown();
+    this.lspService = null;
+
+    // Clear modified files tracking
+    this.modifiedFilesThisSession.clear();
+
     this.logger.debug('[AgentService] Shutdown complete');
   }
 

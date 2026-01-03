@@ -11,6 +11,7 @@ import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-nati
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    extraResource: ['./bundled'],
     icon: './assets/icons/icon',
     appCopyright: 'Copyright © 2025 stagewise GmbH',
     win32metadata: {
