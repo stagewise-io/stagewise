@@ -7,6 +7,27 @@ import { Streamdown } from '@/components/streamdown';
 import { useMemo } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 
+/** Maximum characters to display in error messages (UI-level safety net) */
+const MAX_DISPLAY_LENGTH = 250;
+
+/**
+ * Sanitizes and truncates error messages to prevent leaking sensitive content.
+ * This is a UI-level safety net in case backend sanitization fails.
+ */
+function sanitizeDisplayMessage(message: string | undefined): string {
+  if (!message || typeof message !== 'string') {
+    return 'An unexpected error occurred.';
+  }
+
+  // Truncate to max length
+  const truncated =
+    message.length > MAX_DISPLAY_LENGTH
+      ? `${message.slice(0, MAX_DISPLAY_LENGTH)}...`
+      : message;
+
+  return truncated;
+}
+
 const formatDuration = (minutes: number): string => {
   if (minutes < 60) {
     return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
@@ -131,15 +152,22 @@ function AgentErrorMessage({
       case 'AI_APICallError':
         return 'API Error';
       case 'AI_InvalidArgumentError':
-        return 'Invalid Argument Error';
+        return 'Internal Error';
       case 'NetworkError':
         return 'Network Error';
       case 'AI_TypeValidationError':
-        return 'Type Validation Error';
+        return 'Processing Error';
       default:
-        return error.error.errorType;
+        // Generic heading for other internal errors
+        return 'Error';
     }
   }, [error.error.errorType]);
+
+  const displayMessage = useMemo(
+    () => sanitizeDisplayMessage(error.error.message),
+    [error.error.message],
+  );
+
   return (
     <div className="flex select-text flex-col gap-1">
       <div className="flex select-text flex-row items-baseline justify-start gap-1">
@@ -149,7 +177,7 @@ function AgentErrorMessage({
         </span>
       </div>
       <span className="select-text text-muted-foreground text-xs">
-        <Streamdown isAnimating={false}>{error.error.message}</Streamdown>
+        <Streamdown isAnimating={false}>{displayMessage}</Streamdown>
       </span>
     </div>
   );
@@ -160,6 +188,12 @@ type AgentErrorWithOtherError = Extract<
   { type: AgentErrorType.OTHER }
 >;
 function OtherErrorMessage({ error }: { error: AgentErrorWithOtherError }) {
+  const displayMessage = useMemo(() => {
+    const name = error.error.name || 'Error';
+    const message = sanitizeDisplayMessage(error.error.message);
+    return `${name} - ${message}`;
+  }, [error.error.name, error.error.message]);
+
   return (
     <div className="flex select-text flex-col gap-1">
       <div className="flex select-text flex-row items-baseline justify-start gap-1">
@@ -169,9 +203,7 @@ function OtherErrorMessage({ error }: { error: AgentErrorWithOtherError }) {
         </span>
       </div>
       <span className="select-text text-muted-foreground text-xs">
-        <Streamdown isAnimating={false}>
-          {`${error.error.name} - ${error.error.message}`}
-        </Streamdown>
+        <Streamdown isAnimating={false}>{displayMessage}</Streamdown>
       </span>
     </div>
   );

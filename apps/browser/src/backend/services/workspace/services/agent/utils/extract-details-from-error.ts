@@ -5,6 +5,8 @@ export type AISDKErrorType =
   | 'AI_APICallError'
   | 'AI_InvalidArgumentError'
   | 'AI_TypeValidationError'
+  | 'AI_InvalidPromptError'
+  | 'AI_NoContentGeneratedError'
   | 'NetworkError'
   | 'UnknownError';
 
