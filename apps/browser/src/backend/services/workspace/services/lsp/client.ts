@@ -255,6 +255,51 @@ export class LspClient extends EventEmitter {
         // Log messages from server acknowledged but not displayed
       },
     );
+
+    // Handle workspace/diagnostic/refresh (ESLint sends this when settings change)
+    // Server is telling us to re-pull diagnostics for all open documents
+    this.connection.onNotification('workspace/diagnostic/refresh', () => {
+      this.refreshAllDiagnostics();
+    });
+  }
+
+  /**
+   * Re-pull diagnostics for all open documents.
+   * Called when server sends workspace/diagnostic/refresh notification.
+   */
+  private refreshAllDiagnostics(): void {
+    if (
+      !this.connection ||
+      this.disposed ||
+      !(this.capabilities as Record<string, unknown>)?.diagnosticProvider
+    ) {
+      return;
+    }
+
+    for (const [uri, _version] of this.openDocuments) {
+      const filePath = fileURLToPath(uri);
+
+      const requestPullDiagnostics = async () => {
+        if (!this.connection || this.disposed) return;
+
+        try {
+          const diagResult = await this.connection.sendRequest(
+            'textDocument/diagnostic',
+            { textDocument: { uri } },
+          );
+          const items = (diagResult as { items?: Diagnostic[] })?.items ?? [];
+          this.updateDiagnostics(filePath, items);
+        } catch (error) {
+          this.logger.debug(
+            `[LspClient:${this.serverID}] Pull diagnostics failed during refresh for ${filePath}:`,
+            error,
+          );
+        }
+      };
+
+      // Small delay to avoid overwhelming the server
+      requestPullDiagnostics().catch(() => {});
+    }
   }
 
   private async initialize(
@@ -481,6 +526,39 @@ export class LspClient extends EventEmitter {
       DidChangeTextDocumentNotification.type,
       params,
     );
+
+    // Request pull diagnostics after update for servers that use pull model (e.g., ESLint)
+    // Without this, servers with diagnosticProvider won't re-validate after content changes
+    if (
+      (this.capabilities as Record<string, unknown>)?.diagnosticProvider &&
+      this.connection
+    ) {
+      const requestPullDiagnostics = async (delay: number) => {
+        if (!this.connection || this.disposed) return;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        if (!this.connection || this.disposed) return;
+
+        try {
+          const diagResult = await this.connection.sendRequest(
+            'textDocument/diagnostic',
+            {
+              textDocument: { uri },
+            },
+          );
+          const items = (diagResult as { items?: Diagnostic[] })?.items ?? [];
+          // Always update diagnostics (even if empty) to clear stale ones
+          this.updateDiagnostics(filePath, items);
+        } catch (pullError) {
+          this.logger.debug(
+            `[LspClient:${this.serverID}] Pull diagnostics failed after update for ${filePath}:`,
+            pullError,
+          );
+        }
+      };
+      // Request pull diagnostics with delays to give the server time to process the change
+      requestPullDiagnostics(100).catch(() => {});
+      requestPullDiagnostics(500).catch(() => {});
+    }
   }
 
   /**
