@@ -98,7 +98,7 @@ export type FormFieldErrorProps = React.ComponentProps<typeof FieldBase.Error>;
 export function FormFieldError({ className, ...props }: FormFieldErrorProps) {
   return (
     <FieldBase.Error
-      className={cn('text-rose-600 text-sm dark:text-rose-400', className)}
+      className={cn('text-error text-sm', className)}
       {...props}
     />
   );

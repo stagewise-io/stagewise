@@ -155,7 +155,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
                             }}
                           >
                             <div className="group flex w-64 flex-row items-center justify-start gap-2">
-                              <IconMessagesFillDuo18 className="size-4 text-muted-foreground" />
+                              <IconMessagesFillDuo18 className="size-4 shrink-0 text-muted-foreground" />
                               <span className="truncate font-medium text-sm">
                                 {chat.title}
                               </span>

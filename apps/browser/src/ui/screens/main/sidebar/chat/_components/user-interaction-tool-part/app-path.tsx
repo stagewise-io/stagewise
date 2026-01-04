@@ -79,12 +79,12 @@ export const AskForAppPathToolPartContent = memo(
         )}
         {toolPart.state === 'output-error' && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
-            <XIcon className="size-3 text-rose-600" />
+            <XIcon className="size-3 text-error" />
           </div>
         )}
         {toolPart.state === 'output-available' && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
-            <CheckIcon className="size-3 text-green-600" />
+            <CheckIcon className="size-3 text-success" />
           </div>
         )}
       </div>

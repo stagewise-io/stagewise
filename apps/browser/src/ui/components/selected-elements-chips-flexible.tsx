@@ -224,7 +224,7 @@ function SelectedElementChip({
               }}
               className={cn(
                 buttonVariants({ variant: 'ghost', size: 'icon-xs' }),
-                '-mr-2 text-muted-foreground transition-colors hover:text-red-500',
+                '-mr-2 text-muted-foreground transition-colors hover:text-error',
               )}
             >
               <XIcon className="size-3" />

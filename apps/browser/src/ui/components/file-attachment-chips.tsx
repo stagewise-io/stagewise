@@ -91,7 +91,7 @@ function FileAttachmentChip({ attachment, onDelete }: FileAttachmentChipProps) {
           e.stopPropagation();
           onDelete();
         }}
-        className="text-muted-foreground transition-colors hover:text-red-500"
+        className="text-muted-foreground transition-colors hover:text-error"
       >
         <XIcon className="size-3" />
       </button>

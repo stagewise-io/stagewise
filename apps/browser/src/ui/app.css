@@ -176,8 +176,9 @@ body {
   
   --text-2xs: 0.625rem;
 
-  --color-success: var(--color-green-600);
-  --color-error: var(--color-rose-600);
+  --color-success: var(--color-emerald-500);
+  --color-error: var(--color-red-500);
+  --color-warning: var(--color-amber-500);
   --color-busy: var(--color-blue-600);
   
   --shadow-glass: var(--shadow-lg), 0px -48px 48px -48px rgba(0, 0, 0, 0.05) inset, 0 5px 42px -5px rgba(255, 255, 255, 0.25) inset;

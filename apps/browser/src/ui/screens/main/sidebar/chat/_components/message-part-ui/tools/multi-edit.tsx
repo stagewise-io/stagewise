@@ -282,8 +282,12 @@ const SuccessHeader = ({
           <TooltipContent>{relativePath ?? ''}</TooltipContent>
         </Tooltip>
       </div>
-      <span className="shrink-0 text-success text-xs">+{newLineCount}</span>
-      <span className="shrink-0 text-error text-xs">-{deletedLineCount}</span>
+      {newLineCount > 0 && (
+        <span className="shrink-0 text-success text-xs">+{newLineCount}</span>
+      )}
+      {deletedLineCount > 0 && (
+        <span className="shrink-0 text-error text-xs">-{deletedLineCount}</span>
+      )}
     </div>
   );
 };

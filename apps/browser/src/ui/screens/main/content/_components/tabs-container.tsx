@@ -302,7 +302,7 @@ export function TabsContainer({
       >
         {isSidebarCollapsed && (
           <div className="flex h-7 flex-row items-center gap-2 pr-2">
-            <AgentPreviewBadge onClick={openSidebarChatPanel} unreadCount={0} />
+            <AgentPreviewBadge onClick={openSidebarChatPanel} />
           </div>
         )}
         <div

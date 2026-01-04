@@ -170,9 +170,9 @@ const DiagnosticRow = ({ diagnostic }: { diagnostic: LintingDiagnostic }) => {
   return (
     <div className="flex flex-row items-start gap-1.5 text-xs">
       {isError ? (
-        <XCircleIcon className="mt-0.5 size-3 shrink-0 text-red-500" />
+        <XCircleIcon className="mt-0.5 size-3 shrink-0 text-error" />
       ) : (
-        <IconTriangleWarningOutline18 className="mt-0.5 size-3 shrink-0 text-yellow-500" />
+        <IconTriangleWarningOutline18 className="mt-0.5 size-3 shrink-0 text-warning" />
       )}
       <span className="min-w-0 flex-1 truncate text-muted-foreground/75">
         {diagnostic.message}

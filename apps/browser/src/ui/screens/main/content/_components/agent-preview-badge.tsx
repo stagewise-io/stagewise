@@ -12,13 +12,9 @@ import { cn } from '@/utils';
 
 type AgentPreviewBadgeProps = {
   onClick: () => void;
-  unreadCount: number;
 };
 
-export function AgentPreviewBadge({
-  onClick,
-  unreadCount,
-}: AgentPreviewBadgeProps) {
+export function AgentPreviewBadge({ onClick }: AgentPreviewBadgeProps) {
   const isWorking = useKartonState((s) => s.agentChat?.isWorking || false);
 
   return (
@@ -39,11 +35,6 @@ export function AgentPreviewBadge({
                   : 'text-foreground/80',
               )}
             />
-            {unreadCount > 0 && (
-              <div className="absolute top-0.5 right-0.5 flex size-3 items-center justify-center rounded-full bg-yellow-300 opacity-80">
-                <span className="font-mono text-[10px] text-yellow-700">2</span>
-              </div>
-            )}
           </Button>
         </TooltipTrigger>
         <TooltipContent>

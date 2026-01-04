@@ -91,16 +91,16 @@ export const Mermaid = ({ chart, className, config }: MermaidProps) => {
     return (
       <div
         className={cn(
-          'rounded-lg border border-red-200 bg-red-50 p-4',
+          'rounded-lg border border-error/30 bg-error/10 p-4',
           className,
         )}
       >
-        <p className="font-mono text-red-700 text-sm">Mermaid Error: {error}</p>
+        <p className="font-mono text-error text-sm">Mermaid Error: {error}</p>
         <details className="mt-2">
-          <summary className="cursor-pointer text-red-600 text-xs">
+          <summary className="cursor-pointer text-error text-xs">
             Show Code
           </summary>
-          <pre className="mt-2 overflow-x-auto rounded bg-red-100 p-2 text-red-800 text-xs">
+          <pre className="mt-2 overflow-x-auto rounded bg-error/10 p-2 text-error text-xs">
             {chart}
           </pre>
         </details>

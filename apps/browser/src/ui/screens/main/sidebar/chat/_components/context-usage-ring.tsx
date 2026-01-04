@@ -17,8 +17,8 @@ export function ContextUsageRing({
   maxKb,
 }: ContextUsageRingProps) {
   const ringColor = useMemo(() => {
-    if (percentage >= 90) return 'text-rose-600';
-    if (percentage >= 70) return 'text-yellow-500';
+    if (percentage >= 90) return 'text-error';
+    if (percentage >= 70) return 'text-warning';
     return 'text-primary';
   }, [percentage]);
 
