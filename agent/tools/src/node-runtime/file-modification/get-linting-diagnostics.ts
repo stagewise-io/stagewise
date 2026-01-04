@@ -50,8 +50,8 @@ export interface LintingDiagnostic {
   source: string;
   /** The diagnostic message */
   message: string;
-  /** Optional error/rule code */
-  code?: string | number;
+  /** Optional error/rule code (always string for AI SDK compatibility) */
+  code?: string;
 }
 
 /**

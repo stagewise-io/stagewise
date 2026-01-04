@@ -350,7 +350,9 @@ export class AgentService {
           severity,
           source: diagnostic.source ?? serverID,
           message: diagnostic.message,
-          code: diagnostic.code,
+          // Convert code to string for AI SDK type validation compatibility
+          code:
+            diagnostic.code !== undefined ? String(diagnostic.code) : undefined,
         });
 
         if (severity === 1) totalErrors++;
@@ -935,10 +937,10 @@ export class AgentService {
       'agentChat.submitUserInteractionToolInput',
     );
     this.uiKarton.removeServerProcedureHandler(
-      'agentChat.cancelUserInteractionToolInput',
+      'agentChat.undoToolCallsUntilLatestUserMessage',
     );
     this.uiKarton.removeServerProcedureHandler(
-      'agentChat.undoToolCallsUntilLatestUserMessage',
+      'agentChat.cancelUserInteractionToolInput',
     );
     this.uiKarton.removeServerProcedureHandler(
       'agentChat.retrySendingUserMessage',
