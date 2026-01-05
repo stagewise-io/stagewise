@@ -1,0 +1,16 @@
+name: "Release Browser: Beta"
+
+on:
+  workflow_dispatch:
+
+run-name: "Release Browser Beta"
+
+jobs:
+  release:
+    # Only run on main or release-tests branch
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release-tests'
+    uses: ./.github/workflows/_release-package.yml
+    with:
+      package: browser
+      channel: beta
+    secrets: inherit

@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/tsconfig.storybook.tsbuildinfo",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/ui/*"],

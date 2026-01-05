@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    passWithNoTests: true,
     testTimeout: 10000, // 10 seconds default timeout
     hookTimeout: 10000, // 10 seconds for hooks
     fileParallelism: false,

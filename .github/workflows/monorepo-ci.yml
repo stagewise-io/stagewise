@@ -2,28 +2,39 @@ name: CI
 
 on:
   pull_request:
-    branches: 
+    branches:
       - main
-
-env:
-  POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
-  POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+      - release-tests
+  push:
+    branches:
+      - main
+      - release-tests
 
 jobs:
+  # Linting - runs on all triggers
   check:
     runs-on: ubuntu-latest
+    env:
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Biome
-        uses: biomejs/setup-biome@v2
+      - uses: pnpm/action-setup@v4
         with:
-          version: 2.0.6
-      - name: Run Biome
-        run: biome ci .
+          version: 10.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Run Biome Check
+        run: pnpm check
 
+  # Basic build and test - runs on all triggers
   build:
     runs-on: ubuntu-latest
+    env:
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -31,8 +42,98 @@ jobs:
           version: 10.10.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
+
+  # Cross-platform browser builds - only on push to main
+  # This validates that release builds will work
+  build-browser-platforms:
+    if: github.event_name == 'push'
+    needs: [check, build]
+    environment: Dev
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-large
+            platform: darwin-arm64
+            arch: arm64
+          - os: ubuntu-latest
+            platform: linux-x64
+            arch: x64
+          - os: windows-latest
+            platform: win32-x64
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      # Increase Node.js memory limit for large builds
+      NODE_OPTIONS: "--max-old-space-size=8192"
+      # From GitHub secrets
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
+      # From GitHub environment secrets
+      POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+      VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
+      # From GitHub environment variables
+      API_URL: ${{ vars.API_URL }}
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      STAGEWISE_CONSOLE_URL: ${{ vars.STAGEWISE_CONSOLE_URL }}
+      VITE_STAGEWISE_CONSOLE_URL: ${{ vars.VITE_STAGEWISE_CONSOLE_URL }}
+      LLM_PROXY_URL: ${{ vars.LLM_PROXY_URL }}
+      VITE_DISABLE_TELEMETRY: ${{ vars.VITE_DISABLE_TELEMETRY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.10.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build All Packages
+        run: pnpm build
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+
+      - name: Build Browser App (${{ matrix.platform }})
+        working-directory: apps/browser
+        run: pnpm make --arch=${{ matrix.arch }}
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+          BUILD_MODE: production
+          RELEASE_CHANNEL: dev
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-ci-${{ matrix.platform }}
+          path: |
+            apps/browser/out/make/**/*.dmg
+            apps/browser/out/make/**/*.zip
+            apps/browser/out/make/**/*.exe
+            apps/browser/out/make/**/*.deb
+            apps/browser/out/make/**/*.rpm
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Summary job that other workflows can depend on
+  ci-success:
+    if: github.event_name == 'push'
+    needs: [check, build, build-browser-platforms]
+    runs-on: ubuntu-latest
+    steps:
+      - name: CI Success
+        run: |
+          echo "## CI Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All checks passed. Release workflows are now available." >> $GITHUB_STEP_SUMMARY

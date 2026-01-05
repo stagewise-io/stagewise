@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     globals: false,
     environment: 'node',
+    passWithNoTests: true,
+    setupFiles: ['./test/setup.ts'],
     environmentMatchGlobs: [['test/react/**', 'jsdom']],
     coverage: {
       provider: 'v8',

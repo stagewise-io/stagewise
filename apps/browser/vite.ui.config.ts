@@ -3,8 +3,18 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Read version from package.json
+const packageJson = JSON.parse(
+  readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'),
+);
+const appVersion = packageJson.version;
+
+// Release channel: 'dev' | 'prerelease' | 'release'
+const releaseChannel = process.env.RELEASE_CHANNEL || 'dev';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -12,17 +22,10 @@ export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss()],
   define: {
-    'process.env': 'import.meta.env' /*JSON.stringify({
-      BUILD_MODE: process.env.BUILD_MODE ?? 'production',
-      NODE_ENV: process.env.NODE_ENV ?? 'production',
-      POSTHOG_API_KEY: process.env.POSTHOG_API_KEY,
-      POSTHOG_HOST: process.env.POSTHOG_HOST ?? 'https://eu.i.posthog.com',
-      STAGEWISE_CONSOLE_URL:
-        process.env.STAGEWISE_CONSOLE_URL ?? 'https://console.stagewise.io',
-      API_URL: process.env.API_URL ?? 'https://v1.api.stagewise.io',
-      LLM_PROXY_URL: process.env.LLM_PROXY_URL ?? 'https://llm.stagewise.io',
-      CLI_VERSION: version,
-    }),*/,
+    'process.env': 'import.meta.env',
+    // Inject build-time constants (access via __APP_VERSION__ and __RELEASE_CHANNEL__)
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __RELEASE_CHANNEL__: JSON.stringify(releaseChannel),
   },
   resolve: {
     alias: {

@@ -17,21 +17,37 @@ if (!singleInstanceLock) {
   app.quit();
 }
 
+const appDisplayName = (() => {
+  switch (__RELEASE_CHANNEL__) {
+    case 'release':
+      return 'stagewise';
+    case 'prerelease':
+      return 'stagewise (Pre-Release)';
+    case 'dev':
+    default:
+      return 'stagewise (Dev-Build)';
+  }
+})();
+
+const appDataPath = (() => {
+  switch (__RELEASE_CHANNEL__) {
+    case 'release':
+      return 'stagewise';
+    case 'prerelease':
+      return 'stagewise-prerelease';
+    case 'dev':
+    default:
+      return 'stagewise-dev';
+  }
+})();
+
 // Set the app name for macOS menu bar
-app.setName(
-  process.env.BUILD_MODE === 'production' ? 'stagewise' : 'stagewise-dev',
-);
+app.setName(appDisplayName);
 app.applicationMenu = null;
 
 // Set the right path structure for the app
 // We keep userData where it is, but we will put session data into a sub-folder called "session"
-app.setPath(
-  'userData',
-  path.join(
-    app.getPath('appData'),
-    process.env.BUILD_MODE === 'production' ? 'stagewise' : 'stagewise-dev',
-  ),
-);
+app.setPath('userData', path.join(app.getPath('appData'), appDataPath));
 app.setPath('sessionData', path.join(app.getPath('userData'), 'session'));
 
 // reigster the "stagewise" protocol as privileged

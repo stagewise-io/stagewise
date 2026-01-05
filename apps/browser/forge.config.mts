@@ -8,24 +8,64 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 
+/**
+ * Release channel for the build.
+ * Set via RELEASE_CHANNEL environment variable in CI workflows.
+ *
+ * - 'dev': Local development or CI builds on non-release commits
+ * - 'prerelease': Alpha or beta releases (alpha.x, beta.x versions)
+ * - 'release': Production releases (stable versions without prerelease suffix)
+ */
+type ReleaseChannel = 'dev' | 'prerelease' | 'release';
+
+const releaseChannel: ReleaseChannel =
+  (process.env.RELEASE_CHANNEL as ReleaseChannel) || 'dev';
+
+// Log the release channel for debugging
+console.log(`[forge.config] Release channel: ${releaseChannel}`);
+console.log(
+  `[forge.config] Build mode: ${process.env.BUILD_MODE || 'development'}`,
+);
+
+const appName = (() => {
+  switch (releaseChannel) {
+    case 'release':
+      return 'stagewise';
+    case 'prerelease':
+      return 'stagewise (Pre-Release)';
+    case 'dev':
+    default:
+      return 'stagewise (Dev-Build)';
+  }
+})();
+
+const appBundleId = (() => {
+  switch (releaseChannel) {
+    case 'release':
+      return 'io.stagewise.app';
+    case 'prerelease':
+      return 'io.stagewise.prerelease';
+    case 'dev':
+    default:
+      return 'io.stagewise.dev';
+  }
+})();
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     extraResource: ['./bundled'],
-    icon: './assets/icons/icon',
-    appCopyright: 'Copyright © 2025 stagewise GmbH',
+    icon: `./assets/icons/${releaseChannel}/icon`,
+    appCopyright: `Copyright © ${new Date().getFullYear()} stagewise GmbH`,
     win32metadata: {
       CompanyName: 'stagewise GmbH',
-      ProductName: 'stagewise',
-      FileDescription: 'stagewise',
+      ProductName: appName,
+      FileDescription: appName,
       'requested-execution-level': 'asInvoker',
     },
-    name:
-      process.env.BUILD_MODE === 'production' ? 'stagewise' : 'stagewise-dev',
-    appBundleId:
-      process.env.BUILD_MODE === 'production'
-        ? 'io.stagewise.app'
-        : 'io.stagewise.dev',
+    name: appName,
+    executableName: 'stagewise',
+    appBundleId: appBundleId,
     appCategoryType: 'public.app-category.developer-tools',
     protocols: [
       {
@@ -33,22 +73,34 @@ const config: ForgeConfig = {
         schemes: ['stagewise'],
       },
     ],
-    /*osxSign: {},
-    osxNotarize: {
-      appleId: process.env.APPLE_ID!,
-      appleIdPassword: process.env.APPLE_PASSWORD!,
-      teamId: process.env.APPLE_TEAM_ID!,
-    },*/
+    ...(releaseChannel !== 'dev'
+      ? {
+          osxSign: {
+            optionsForFile: (_filePath) => {
+              return {
+                entitlements: 'etc/macos/entitlements.plist',
+              };
+            },
+          },
+          osxNotarize: {
+            appleId: process.env.APPLE_ID!,
+            appleIdPassword: process.env.APPLE_PASSWORD!,
+            teamId: process.env.APPLE_TEAM_ID!,
+          },
+        }
+      : {}),
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+    force: true,
+  },
   makers: [
     new MakerSquirrel({}),
     new MakerRpm({}),
     new MakerDeb({}),
     new MakerDMG({
       format: 'UDZO',
-      title: 'Install stagewise',
-      icon: './assets/icons/icon.icns',
+      title: `Install ${appName}`,
+      icon: `./assets/icons/${releaseChannel}/icon.icns`,
       additionalDMGOptions: {},
       background: './assets/install/macos-dmg-background.png',
       contents: [
@@ -57,7 +109,7 @@ const config: ForgeConfig = {
           x: 192,
           y: 200,
           type: 'file',
-          path: './out/stagewise-darwin-arm64/stagewise.app',
+          path: `./out/${appName}-darwin-arm64/${appName}.app`,
         },
       ],
     }),

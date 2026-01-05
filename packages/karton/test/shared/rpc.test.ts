@@ -4,11 +4,11 @@ import {
   RPCManager,
   RPCCallOptions
 } from '../../src/shared/rpc.js';
-import { 
-  createRPCCallMessage, 
-  createRPCReturnMessage, 
-  createRPCExceptionMessage 
-} from '../../src/shared/websocket-messages.js';
+import {
+  createRPCCallMessage,
+  createRPCReturnMessage,
+  createRPCExceptionMessage
+} from '../../src/shared/messages.js';
 import { KartonRPCException, KartonRPCErrorReason } from '../../src/shared/types.js';
 import type { WebSocketMessage } from '../../src/shared/types.js';
 

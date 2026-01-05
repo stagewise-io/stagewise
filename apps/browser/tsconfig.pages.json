@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/tsconfig.pages.tsbuildinfo",
     "baseUrl": ".",
     "module": "es2022",
     "lib": ["es2022", "dom"],
