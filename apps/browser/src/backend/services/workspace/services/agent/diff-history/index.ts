@@ -115,9 +115,27 @@ export class DiffHistoryService extends DisposableService {
       this.history.length > 0 &&
       this.history[0].trigger === 'INITIAL_LOAD'
     ) {
-      for (const file of Object.keys(files))
-        if (!this.history[0].files[file])
+      for (const file of Object.keys(files)) {
+        if (!this.history[0].files[file]) {
+          // File doesn't exist in initial snapshot, add it
           this.history[0].files[file] = files[file];
+        } else {
+          // File exists - check if disk content differs from computed baseline
+          // This handles cases where user reverted changes externally (e.g., git checkout)
+          const baseline = this.getComputedBaseline(this.currentIndex);
+          if (baseline[file] !== files[file]) {
+            // External change detected - push a new snapshot to record the change
+            // This preserves undo history while correctly updating the baseline
+            const currentFiles =
+              this.currentIndex >= 0
+                ? this.history[this.currentIndex].files
+                : {};
+            const newFiles = { ...currentFiles, [file]: files[file] };
+            // Mark the file as accepted so it becomes the new baseline
+            this.pushSnapshot('USER_SAVE', newFiles, [file]);
+          }
+        }
+      }
     }
   }
 
