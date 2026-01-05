@@ -51,6 +51,19 @@ const appBundleId = (() => {
   }
 })();
 
+// DMG volume name must be <= 27 characters
+const dmgVolumeName = (() => {
+  switch (releaseChannel) {
+    case 'release':
+      return 'Install stagewise';
+    case 'prerelease':
+      return 'stagewise Pre-Release';
+    case 'dev':
+    default:
+      return 'stagewise Dev';
+  }
+})();
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
@@ -99,7 +112,7 @@ const config: ForgeConfig = {
     new MakerDeb({}),
     new MakerDMG({
       format: 'UDZO',
-      title: `Install ${appName}`,
+      title: dmgVolumeName,
       icon: `./assets/icons/${releaseChannel}/icon.icns`,
       additionalDMGOptions: {},
       background: './assets/install/macos-dmg-background.png',
