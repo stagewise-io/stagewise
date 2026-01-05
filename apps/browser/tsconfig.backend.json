@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/tsconfig.backend.tsbuildinfo",
     "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",

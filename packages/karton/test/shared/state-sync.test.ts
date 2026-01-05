@@ -4,7 +4,7 @@ import {
   StateManager,
   ClientStateManager
 } from '../../src/shared/state-sync.js';
-import { createStateSyncMessage, createStatePatchMessage } from '../../src/shared/websocket-messages.js';
+import { createStateSyncMessage, createStatePatchMessage } from '../../src/shared/messages.js';
 import type { WebSocketMessage } from '../../src/shared/types.js';
 
 // Enable Immer patches

@@ -1,0 +1,317 @@
+name: "Retry Failed Release"
+
+# Use this workflow to retry a release that failed after version bump
+# The version is already bumped and tag exists, this just rebuilds and publishes
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to retry (e.g., browser@1.0.0-alpha.1)'
+        required: true
+        type: string
+
+run-name: "Retry Release: ${{ inputs.tag }}"
+
+jobs:
+  # Parse the tag to determine package and version
+  parse-tag:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release-tests'
+    outputs:
+      package: ${{ steps.parse.outputs.package }}
+      version: ${{ steps.parse.outputs.version }}
+      channel: ${{ steps.parse.outputs.channel }}
+      tag-exists: ${{ steps.check.outputs.exists }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse Tag
+        id: parse
+        run: |
+          TAG="${{ inputs.tag }}"
+          echo "Parsing tag: $TAG"
+
+          # Determine package from tag prefix
+          if [[ "$TAG" == browser@* ]]; then
+            PACKAGE="browser"
+            VERSION="${TAG#browser@}"
+          elif [[ "$TAG" == @stagewise/karton@* ]]; then
+            PACKAGE="karton"
+            VERSION="${TAG#@stagewise/karton@}"
+          else
+            echo "::error::Unknown tag format: $TAG"
+            echo "Expected: browser@x.x.x or @stagewise/karton@x.x.x"
+            exit 1
+          fi
+
+          # Determine channel from version
+          if [[ "$VERSION" == *"-alpha."* ]]; then
+            CHANNEL="alpha"
+          elif [[ "$VERSION" == *"-beta."* ]]; then
+            CHANNEL="beta"
+          else
+            CHANNEL="release"
+          fi
+
+          echo "package=$PACKAGE" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+
+          echo "Package: $PACKAGE"
+          echo "Version: $VERSION"
+          echo "Channel: $CHANNEL"
+
+      - name: Check Tag Exists
+        id: check
+        run: |
+          if git rev-parse "${{ inputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Tag ${{ inputs.tag }} exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::error::Tag ${{ inputs.tag }} does not exist"
+          fi
+
+      - name: Fail if tag doesn't exist
+        if: steps.check.outputs.exists != 'true'
+        run: |
+          echo "::error::Tag ${{ inputs.tag }} does not exist. Cannot retry."
+          exit 1
+
+  # Build browser on multiple platforms
+  build-browser:
+    if: needs.parse-tag.outputs.package == 'browser'
+    needs: parse-tag
+    environment: Release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            artifact-name: browser-macos-arm64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            artifact-name: browser-linux-x64
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            artifact-name: browser-windows-x64
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      # From GitHub secrets
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
+      # From GitHub environment secrets
+      POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+      VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
+      # From GitHub environment variables
+      API_URL: ${{ vars.API_URL }}
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      STAGEWISE_CONSOLE_URL: ${{ vars.STAGEWISE_CONSOLE_URL }}
+      VITE_STAGEWISE_CONSOLE_URL: ${{ vars.VITE_STAGEWISE_CONSOLE_URL }}
+      LLM_PROXY_URL: ${{ vars.LLM_PROXY_URL }}
+      VITE_DISABLE_TELEMETRY: ${{ vars.VITE_DISABLE_TELEMETRY }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.10.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build All Packages
+        run: pnpm build
+
+      - name: Build Electron App
+        working-directory: apps/browser
+        run: pnpm make
+        env:
+          BUILD_MODE: production
+          # Set release channel: alpha/beta → prerelease, release → release
+          RELEASE_CHANNEL: ${{ needs.parse-tag.outputs.channel == 'release' && 'release' || 'prerelease' }}
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            apps/browser/out/make/**/*.dmg
+            apps/browser/out/make/**/*.zip
+            apps/browser/out/make/**/*.exe
+            apps/browser/out/make/**/*.deb
+            apps/browser/out/make/**/*.rpm
+          if-no-files-found: warn
+
+  # Create/Update GitHub Release with all artifacts (browser)
+  release-browser:
+    if: needs.parse-tag.outputs.package == 'browser'
+    needs: [parse-tag, build-browser]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.10.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          # Read from CHANGELOG or generate minimal notes
+          PACKAGE_DIR="apps/browser"
+          VERSION="${{ needs.parse-tag.outputs.version }}"
+
+          if [ -f "$PACKAGE_DIR/CHANGELOG.md" ]; then
+            # Try to extract notes for this version from changelog
+            NOTES=$(sed -n "/## $VERSION/,/## [0-9]/p" "$PACKAGE_DIR/CHANGELOG.md" | head -n -1)
+          fi
+
+          if [ -z "$NOTES" ]; then
+            NOTES="Release $VERSION (retry build)"
+          fi
+
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List Artifacts
+        run: find artifacts -type f | head -50
+
+      - name: Create/Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: "Browser ${{ needs.parse-tag.outputs.version }}"
+          body: ${{ steps.notes.outputs.notes }}
+          prerelease: ${{ needs.parse-tag.outputs.channel != 'release' }}
+          draft: false
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## Retry Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package:** browser" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.parse-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Channel:** ${{ needs.parse-tag.outputs.channel }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          find artifacts -type f -name "*.dmg" -o -name "*.exe" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" | while read f; do
+            echo "- $(basename $f)" >> $GITHUB_STEP_SUMMARY
+          done
+
+  # Publish karton to npm
+  release-karton:
+    if: needs.parse-tag.outputs.package == 'karton'
+    needs: parse-tag
+    environment: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      # From GitHub secrets
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
+      # From GitHub environment secrets
+      POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+      VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
+      # From GitHub environment variables
+      API_URL: ${{ vars.API_URL }}
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      STAGEWISE_CONSOLE_URL: ${{ vars.STAGEWISE_CONSOLE_URL }}
+      VITE_STAGEWISE_CONSOLE_URL: ${{ vars.VITE_STAGEWISE_CONSOLE_URL }}
+      LLM_PROXY_URL: ${{ vars.LLM_PROXY_URL }}
+      VITE_DISABLE_TELEMETRY: ${{ vars.VITE_DISABLE_TELEMETRY }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.10.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build All Packages
+        run: pnpm build
+
+      - name: Publish to npm
+        run: |
+          cd packages/karton
+          CHANNEL="${{ needs.parse-tag.outputs.channel }}"
+          TAG=$([[ "$CHANNEL" == "release" ]] && echo "latest" || echo "$CHANNEL")
+          npm publish --access public --tag $TAG
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_ACCESS_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## Retry Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package:** karton" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.parse-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Channel:** ${{ needs.parse-tag.outputs.channel }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY

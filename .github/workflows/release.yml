@@ -1,9 +1,11 @@
-name: Monorepo Release
+name: VSCode Extension Release
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'apps/vscode-extension/**'
   workflow_dispatch:
 
 env:
@@ -14,21 +16,21 @@ env:
   LLM_PROXY_URL: ${{ vars.LLM_PROXY_URL }}
 
 jobs:
-  release:
+  release-vscode-extension:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # To push commits and tags
-      pull-requests: write # To create PRs (though commit: is used here)
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Needed for commit history checks
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.10.0 
+          version: 10.10.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -42,86 +44,63 @@ jobs:
       - name: Build All Packages
         run: pnpm build
 
-      - name: Version Packages, Format, Publish to npm, and Create GitHub Releases
-        id: changesets # Add an ID here
-        uses: changesets/action@v1.5.2
-        with:
-          # Assumes you have the version-and-format script in your root package.json
-          version: pnpm run version-and-format 
-          publish: pnpm changeset publish
-          commit: "chore: release packages [skip ci]" # This commits the changes
-          title: "Release: New Package Versions"
-          createGitHubReleases: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_PUBLISH_ACCESS_TOKEN }} # Ensure secret name is correct
-
-      - name: Check for VSCode Extension Version Change and Release
-        # This step runs after changesets/action has committed the version bump
+      - name: Check Version and Prepare Release
         run: |
-          # Get the SHA of the commit made by changesets/action (should be HEAD)
-          RELEASE_COMMIT_SHA=$(git rev-parse HEAD)
-          echo "Checking for changes to VSCode extension in commit $RELEASE_COMMIT_SHA"
-
-          # Check if the specific package.json was changed in this commit compared to its parent
-          # Use exit code: 0 = no changes, 1 = changes.
-          # Use git diff-tree to check files changed in the commit.
-          # The `!` negates the exit code, so the block executes if grep finds the file (exit code 0 -> !0 -> true)
-          if ! git diff-tree --no-commit-id --name-only -r $RELEASE_COMMIT_SHA | grep -q "^apps/vscode-extension/package.json$"; then
-            echo "VSCode extension package.json not modified in this release commit. Skipping VSCode extension release."
-            echo "VSCODE_EXTENSION_CHANGED=false" >> $GITHUB_ENV
-            exit 0 # Exit successfully, no release needed
-          fi
-
-          echo "VSCode extension package.json was modified. Proceeding with VSCode extension release."
-          echo "VSCODE_EXTENSION_CHANGED=true" >> $GITHUB_ENV
-
-          # Read the new version directly from the package.json at the release commit
-          # Ensure we're in the workspace root for pnpm filter to work correctly
+          # Read the version from package.json
           cd $GITHUB_WORKSPACE
           VERSION=$(pnpm --filter stagewise-vscode-extension exec node -p "require('./package.json').version")
 
           if [ -z "$VERSION" ]; then
             echo "Error: Could not read version from apps/vscode-extension/package.json"
-            exit 1 # Exit with error
+            exit 1
           fi
 
-          # Store version for subsequent steps
+          # Check if a tag for this version already exists
+          TAG_NAME="stagewise-vscode-extension@$VERSION"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME already exists. Skipping release."
+            echo "SHOULD_RELEASE=false" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          echo "Preparing release for version $VERSION"
+          echo "SHOULD_RELEASE=true" >> $GITHUB_ENV
           echo "VSCODE_EXTENSION_VERSION=$VERSION" >> $GITHUB_ENV
           echo "VSIX_FILENAME=stagewise-vscode-extension-$VERSION.vsix" >> $GITHUB_ENV
-          echo "TAG_NAME=stagewise-vscode-extension@$VERSION" >> $GITHUB_ENV
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Package VSCode Extension
-        if: env.VSCODE_EXTENSION_CHANGED == 'true'
+        if: env.SHOULD_RELEASE == 'true'
         run: |
-          cd apps/vscode-extension 
+          cd apps/vscode-extension
           pnpm exec vsce package --out ${{ env.VSIX_FILENAME }} --no-dependencies
 
       - name: Publish to Visual Studio Marketplace
-        if: env.VSCODE_EXTENSION_CHANGED == 'true'
+        if: env.SHOULD_RELEASE == 'true'
         run: |
           cd apps/vscode-extension
           pnpm exec vsce publish --packagePath ${{ env.VSIX_FILENAME }} --pat ${{ secrets.VSCE_PAT }} --no-dependencies
 
       - name: Publish to Open VSX Registry
-        if: env.VSCODE_EXTENSION_CHANGED == 'true'
+        if: env.SHOULD_RELEASE == 'true'
         run: |
           cd apps/vscode-extension
           pnpm exec ovsx publish ${{ env.VSIX_FILENAME }} -p ${{ secrets.OPEN_VSX_ACCESS_TOKEN }}
 
       - name: Create Git Tag for VSCode Extension
-        if: env.VSCODE_EXTENSION_CHANGED == 'true'
+        if: env.SHOULD_RELEASE == 'true'
         run: |
-          RELEASE_COMMIT_SHA=$(git rev-parse HEAD)
-          git tag ${{ env.TAG_NAME }} $RELEASE_COMMIT_SHA
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ env.TAG_NAME }}
           git push origin ${{ env.TAG_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release for VSCode Extension
-        if: env.VSCODE_EXTENSION_CHANGED == 'true'
+        if: env.SHOULD_RELEASE == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}

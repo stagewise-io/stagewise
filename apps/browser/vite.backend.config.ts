@@ -9,7 +9,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageJson = JSON.parse(
   await readFile(resolve(__dirname, 'package.json'), 'utf-8'),
 );
-const version = packageJson.version;
+const appVersion = packageJson.version;
+
+// Release channel: 'dev' | 'prerelease' | 'release'
+const releaseChannel = process.env.RELEASE_CHANNEL || 'dev';
 
 // https://vitejs.dev/config
 export default defineConfig({
@@ -43,7 +46,8 @@ export default defineConfig({
         process.env.STAGEWISE_CONSOLE_URL ?? 'https://console.stagewise.io',
       API_URL: process.env.API_URL ?? 'https://v1.api.stagewise.io',
       LLM_PROXY_URL: process.env.LLM_PROXY_URL ?? 'https://llm.stagewise.io',
-      CLI_VERSION: version,
     }),
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __RELEASE_CHANNEL__: JSON.stringify(releaseChannel),
   },
 });

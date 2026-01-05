@@ -1,13 +1,15 @@
 pre-commit:
   parallel: true
   jobs:
-    - name: check
+    - name: biome-staged
       run: pnpm biome check --write --unsafe --staged --no-errors-on-unmatched
       glob: "*.{js,ts,jsx,tsx,json,jsonc,css,md,mdx,yaml,yml}"
       stage_fixed: true
       exclude:
        - "**/tests/**/*"
        - "**/test/**/*"
+    - name: biome-check
+      run: pnpm check
     - name: typecheck-browser
       run: pnpm -F stagewise typecheck
       glob: "apps/browser/**/*.{ts,tsx}"

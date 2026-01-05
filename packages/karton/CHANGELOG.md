@@ -1,7 +1,4 @@
-# @stagewise/karton
+# Changelog
 
-## 0.0.1
+All notable changes to this package will be documented in this file.
 
-### Patch Changes
-
-- 02140ae: Adding karton - a interop package with rpc calling and state syncing between browser and cli.

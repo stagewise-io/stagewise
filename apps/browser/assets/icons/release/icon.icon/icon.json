@@ -1,0 +1,64 @@
+{
+  "fill": "system-dark",
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "inkscape-nobg.svg",
+          "name": "inkscape-nobg",
+          "position": {
+            "scale": 0.22,
+            "translation-in-points": [0, 0]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.5
+      }
+    },
+    {
+      "blend-mode": "normal",
+      "blur-material": 1,
+      "layers": [
+        {
+          "blend-mode": "normal",
+          "glass": false,
+          "hidden-specializations": [
+            {
+              "value": false
+            },
+            {
+              "appearance": "tinted",
+              "value": true
+            }
+          ],
+          "image-name": "inkscape-bgonly.svg",
+          "name": "inkscape-bgonly",
+          "position": {
+            "scale": 0.2,
+            "translation-in-points": [0, 0]
+          }
+        }
+      ],
+      "lighting": "combined",
+      "shadow": {
+        "kind": "none",
+        "opacity": 0.5
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": ["watchOS"],
+    "squares": "shared"
+  }
+}

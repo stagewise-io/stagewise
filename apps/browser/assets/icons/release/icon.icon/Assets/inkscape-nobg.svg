@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="2048mm"
+   height="2048mm"
+   viewBox="0 0 2048 2048"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.2 (ebf0e940, 2025-05-08)"
+   sodipodi:docname="inkscape-nobg.svg"
+   inkscape:export-filename="../macos/icon_16x16.png"
+   inkscape:export-xdpi="1"
+   inkscape:export-ydpi="1"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="0.042425196"
+     inkscape:cx="1249.2576"
+     inkscape:cy="1378.8976"
+     inkscape:window-width="1712"
+     inkscape:window-height="962"
+     inkscape:window-x="0"
+     inkscape:window-y="39"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg1" />
+  <defs
+     id="defs1">
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath13">
+      <circle
+         style="opacity:0.581784;fill:#000000;stroke-width:0;stroke-dasharray:none;paint-order:stroke fill markers"
+         id="circle13"
+         cx="1024"
+         cy="1024"
+         r="1024" />
+    </clipPath>
+    <filter
+       style="color-interpolation-filters:sRGB;"
+       inkscape:label="Drop Shadow"
+       id="filter41"
+       x="-0.23509216"
+       y="-0.23509216"
+       width="1.4701843"
+       height="1.4995098">
+      <feFlood
+         result="flood"
+         in="SourceGraphic"
+         flood-opacity="0.149020"
+         flood-color="rgb(0,0,0)"
+         id="feFlood40" />
+      <feGaussianBlur
+         result="blur"
+         in="SourceGraphic"
+         stdDeviation="50.000000"
+         id="feGaussianBlur40" />
+      <feOffset
+         result="offset"
+         in="blur"
+         dx="0.000000"
+         dy="15.000000"
+         id="feOffset40" />
+      <feComposite
+         result="comp1"
+         operator="in"
+         in="flood"
+         in2="offset"
+         id="feComposite40" />
+      <feComposite
+         result="fbSourceGraphic"
+         operator="over"
+         in="SourceGraphic"
+         in2="comp1"
+         id="feComposite41" />
+      <feColorMatrix
+         result="fbSourceGraphicAlpha"
+         in="fbSourceGraphic"
+         values="0 0 0 -1 0 0 0 0 -1 0 0 0 0 -1 0 0 0 0 1 0"
+         id="feColorMatrix41" />
+      <feFlood
+         id="feFlood41"
+         result="flood"
+         in="fbSourceGraphic"
+         flood-opacity="0.149020"
+         flood-color="rgb(0,0,0)" />
+      <feGaussianBlur
+         id="feGaussianBlur41"
+         result="blur"
+         in="fbSourceGraphic"
+         stdDeviation="50.000000" />
+      <feOffset
+         id="feOffset41"
+         result="offset"
+         in="blur"
+         dx="0.000000"
+         dy="15.000000" />
+      <feComposite
+         id="feComposite42"
+         result="comp1"
+         operator="in"
+         in="flood"
+         in2="offset" />
+      <feComposite
+         id="feComposite43"
+         result="comp2"
+         operator="over"
+         in="fbSourceGraphic"
+         in2="comp1" />
+    </filter>
+  </defs>
+  <g
+     inkscape:groupmode="layer"
+     id="layer2"
+     inkscape:label="Logo"
+     style="filter:url(#filter41)">
+    <path
+       id="path4"
+       style="fill:#ffffff;fill-opacity:1;stroke:#09090b;stroke-width:0.999023;stroke-dasharray:none;stroke-opacity:1"
+       d="M 1000,488.49951 A 511.50049,511.5005 0 0 0 488.49951,999.9999 511.50049,511.5005 0 0 0 1000,1511.5005 h 355.6527 55.9454 c 55.3459,0 99.9024,-44.5564 99.9024,-99.9023 V 1355.6527 999.9999 A 511.50049,511.5005 0 0 0 1000,488.49951 Z m 0.4702,99.90244 A 411.59806,411.59807 0 0 1 1412.0683,999.9999 411.59806,411.59807 0 0 1 1000.4702,1411.5982 411.59806,411.59807 0 0 1 588.87219,999.9999 411.59806,411.59807 0 0 1 1000.4702,588.40195 Z" />
+    <ellipse
+       style="display:inline;fill:#ffffff;fill-opacity:1;stroke:#09090b;stroke-width:0.999023;stroke-dasharray:none;stroke-opacity:1"
+       id="path3"
+       ry="312.00809"
+       rx="312.04849"
+       cy="1000"
+       cx="1000" />
+  </g>
+</svg>
