@@ -261,3 +261,18 @@ export interface DownloadControlResult {
   /** Error message if operation failed */
   error?: string;
 }
+
+// File diff for pending edits
+export interface FileDiffResult {
+  path: string;
+  before: string | null;
+  after: string | null;
+}
+
+// Result of getting pending edits for a chat
+export interface PendingEditsResult {
+  /** Whether the chat was found */
+  found: boolean;
+  /** Pending file diffs */
+  edits: FileDiffResult[];
+}

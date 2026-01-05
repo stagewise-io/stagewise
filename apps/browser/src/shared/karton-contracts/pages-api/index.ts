@@ -8,11 +8,15 @@ import type {
   DownloadResult,
   ActiveDownloadInfo,
   DownloadControlResult,
+  PendingEditsResult,
+  FileDiffResult,
 } from './types';
 
 export type PagesApiState = {
   /** Active downloads currently in progress, keyed by download ID */
   activeDownloads: Record<number, ActiveDownloadInfo>;
+  /** Pending file edits by chat ID, pushed in real-time */
+  pendingEditsByChat: Record<string, FileDiffResult[]>;
 };
 
 export type PagesApiContract = {
@@ -38,9 +42,20 @@ export type PagesApiContract = {
     clearBrowsingData: (
       options: ClearBrowsingDataOptions,
     ) => Promise<ClearBrowsingDataResult>;
+    /** Get pending file edits for a specific chat */
+    getPendingEdits: (chatId: string) => Promise<PendingEditsResult>;
+    /** Accept all pending edits for a specific chat */
+    acceptAllPendingEdits: (chatId: string) => Promise<void>;
+    /** Reject all pending edits for a specific chat */
+    rejectAllPendingEdits: (chatId: string) => Promise<void>;
+    /** Accept a single pending edit by file path */
+    acceptPendingEdit: (chatId: string, path: string) => Promise<void>;
+    /** Reject a single pending edit by file path */
+    rejectPendingEdit: (chatId: string, path: string) => Promise<void>;
   };
 };
 
 export const defaultState: PagesApiState = {
   activeDownloads: {},
+  pendingEditsByChat: {},
 };

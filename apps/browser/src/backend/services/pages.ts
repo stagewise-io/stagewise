@@ -13,6 +13,7 @@ import {
   type PagesApiContract,
   defaultState,
 } from '@shared/karton-contracts/pages-api';
+import type { FileDiffResult } from '@shared/karton-contracts/pages-api/types';
 import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
 import type { DownloadsService } from './download-manager';
@@ -26,6 +27,7 @@ import type {
   DownloadResult,
   ActiveDownloadInfo,
   DownloadControlResult,
+  PendingEditsResult,
 } from '@shared/karton-contracts/pages-api/types';
 import { DisposableService } from './disposable';
 
@@ -50,6 +52,19 @@ export class PagesService extends DisposableService {
   private portCloseListeners = new Map<MessagePortMain, () => void>();
   private openTabHandler?: (url: string, setActive?: boolean) => Promise<void>;
   private markDownloadsSeenHandler?: () => Promise<void>;
+  private getPendingEditsHandler?: (
+    chatId: string,
+  ) => Promise<PendingEditsResult>;
+  private acceptAllPendingEditsHandler?: (chatId: string) => Promise<void>;
+  private rejectAllPendingEditsHandler?: (chatId: string) => Promise<void>;
+  private acceptPendingEditHandler?: (
+    chatId: string,
+    path: string,
+  ) => Promise<void>;
+  private rejectPendingEditHandler?: (
+    chatId: string,
+    path: string,
+  ) => Promise<void>;
 
   private constructor(
     logger: Logger,
@@ -681,6 +696,71 @@ export class PagesService extends DisposableService {
         }
       },
     );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'getPendingEdits',
+      async (chatId: string): Promise<PendingEditsResult> => {
+        if (!this.getPendingEditsHandler) {
+          this.logger.warn(
+            '[PagesService] getPendingEdits called but no handler is set',
+          );
+          return { found: false, edits: [] };
+        }
+        return this.getPendingEditsHandler(chatId);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'acceptAllPendingEdits',
+      async (chatId: string): Promise<void> => {
+        if (!this.acceptAllPendingEditsHandler) {
+          this.logger.warn(
+            '[PagesService] acceptAllPendingEdits called but no handler is set',
+          );
+          return;
+        }
+        await this.acceptAllPendingEditsHandler(chatId);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'rejectAllPendingEdits',
+      async (chatId: string): Promise<void> => {
+        if (!this.rejectAllPendingEditsHandler) {
+          this.logger.warn(
+            '[PagesService] rejectAllPendingEdits called but no handler is set',
+          );
+          return;
+        }
+        await this.rejectAllPendingEditsHandler(chatId);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'acceptPendingEdit',
+      async (chatId: string, filePath: string): Promise<void> => {
+        if (!this.acceptPendingEditHandler) {
+          this.logger.warn(
+            '[PagesService] acceptPendingEdit called but no handler is set',
+          );
+          return;
+        }
+        await this.acceptPendingEditHandler(chatId, filePath);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'rejectPendingEdit',
+      async (chatId: string, filePath: string): Promise<void> => {
+        if (!this.rejectPendingEditHandler) {
+          this.logger.warn(
+            '[PagesService] rejectPendingEdit called but no handler is set',
+          );
+          return;
+        }
+        await this.rejectPendingEditHandler(chatId, filePath);
+      },
+    );
   }
 
   /**
@@ -697,6 +777,63 @@ export class PagesService extends DisposableService {
    */
   public setMarkDownloadsSeenHandler(handler: () => Promise<void>): void {
     this.markDownloadsSeenHandler = handler;
+  }
+
+  /**
+   * Set the handler for getting pending edits. This should be called by main.ts.
+   */
+  public setGetPendingEditsHandler(
+    handler: (chatId: string) => Promise<PendingEditsResult>,
+  ): void {
+    this.getPendingEditsHandler = handler;
+  }
+
+  /**
+   * Set the handler for accepting all pending edits. This should be called by main.ts.
+   */
+  public setAcceptAllPendingEditsHandler(
+    handler: (chatId: string) => Promise<void>,
+  ): void {
+    this.acceptAllPendingEditsHandler = handler;
+  }
+
+  /**
+   * Set the handler for rejecting all pending edits. This should be called by main.ts.
+   */
+  public setRejectAllPendingEditsHandler(
+    handler: (chatId: string) => Promise<void>,
+  ): void {
+    this.rejectAllPendingEditsHandler = handler;
+  }
+
+  /**
+   * Set the handler for accepting a single pending edit. This should be called by main.ts.
+   */
+  public setAcceptPendingEditHandler(
+    handler: (chatId: string, path: string) => Promise<void>,
+  ): void {
+    this.acceptPendingEditHandler = handler;
+  }
+
+  /**
+   * Set the handler for rejecting a single pending edit. This should be called by main.ts.
+   */
+  public setRejectPendingEditHandler(
+    handler: (chatId: string, path: string) => Promise<void>,
+  ): void {
+    this.rejectPendingEditHandler = handler;
+  }
+
+  /**
+   * Update the pending edits state for a specific chat. Called when edits change.
+   */
+  public updatePendingEditsState(
+    chatId: string,
+    edits: FileDiffResult[],
+  ): void {
+    this.kartonServer.setState((draft) => {
+      draft.pendingEditsByChat[chatId] = edits;
+    });
   }
 
   /**
@@ -749,6 +886,11 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('getFaviconBitmaps');
     this.kartonServer.removeServerProcedureHandler('openTab');
     this.kartonServer.removeServerProcedureHandler('clearBrowsingData');
+    this.kartonServer.removeServerProcedureHandler('getPendingEdits');
+    this.kartonServer.removeServerProcedureHandler('acceptAllPendingEdits');
+    this.kartonServer.removeServerProcedureHandler('rejectAllPendingEdits');
+    this.kartonServer.removeServerProcedureHandler('acceptPendingEdit');
+    this.kartonServer.removeServerProcedureHandler('rejectPendingEdit');
 
     // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');

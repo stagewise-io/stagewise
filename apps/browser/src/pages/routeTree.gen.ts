@@ -8,81 +8,90 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as HistoryRouteImport } from './routes/history'
-import { Route as DownloadsRouteImport } from './routes/downloads'
-import { Route as ClearDataRouteImport } from './routes/clear-data'
-import { Route as BrowsingSettingsRouteImport } from './routes/browsing-settings'
-import { Route as AgentSettingsRouteImport } from './routes/agent-settings'
-import { Route as AccountRouteImport } from './routes/account'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as rootRouteImport } from './routes/__root';
+import { Route as HistoryRouteImport } from './routes/history';
+import { Route as DownloadsRouteImport } from './routes/downloads';
+import { Route as ClearDataRouteImport } from './routes/clear-data';
+import { Route as BrowsingSettingsRouteImport } from './routes/browsing-settings';
+import { Route as AgentSettingsRouteImport } from './routes/agent-settings';
+import { Route as AccountRouteImport } from './routes/account';
+import { Route as IndexRouteImport } from './routes/index';
+import { Route as DiffReviewChatIdRouteImport } from './routes/diff-review.$chatId';
 
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const DownloadsRoute = DownloadsRouteImport.update({
   id: '/downloads',
   path: '/downloads',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const ClearDataRoute = ClearDataRouteImport.update({
   id: '/clear-data',
   path: '/clear-data',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const BrowsingSettingsRoute = BrowsingSettingsRouteImport.update({
   id: '/browsing-settings',
   path: '/browsing-settings',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AgentSettingsRoute = AgentSettingsRouteImport.update({
   id: '/agent-settings',
   path: '/agent-settings',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
+const DiffReviewChatIdRoute = DiffReviewChatIdRouteImport.update({
+  id: '/diff-review/$chatId',
+  path: '/diff-review/$chatId',
+  getParentRoute: () => rootRouteImport,
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/account': typeof AccountRoute
-  '/agent-settings': typeof AgentSettingsRoute
-  '/browsing-settings': typeof BrowsingSettingsRoute
-  '/clear-data': typeof ClearDataRoute
-  '/downloads': typeof DownloadsRoute
-  '/history': typeof HistoryRoute
+  '/': typeof IndexRoute;
+  '/account': typeof AccountRoute;
+  '/agent-settings': typeof AgentSettingsRoute;
+  '/browsing-settings': typeof BrowsingSettingsRoute;
+  '/clear-data': typeof ClearDataRoute;
+  '/downloads': typeof DownloadsRoute;
+  '/history': typeof HistoryRoute;
+  '/diff-review/$chatId': typeof DiffReviewChatIdRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/account': typeof AccountRoute
-  '/agent-settings': typeof AgentSettingsRoute
-  '/browsing-settings': typeof BrowsingSettingsRoute
-  '/clear-data': typeof ClearDataRoute
-  '/downloads': typeof DownloadsRoute
-  '/history': typeof HistoryRoute
+  '/': typeof IndexRoute;
+  '/account': typeof AccountRoute;
+  '/agent-settings': typeof AgentSettingsRoute;
+  '/browsing-settings': typeof BrowsingSettingsRoute;
+  '/clear-data': typeof ClearDataRoute;
+  '/downloads': typeof DownloadsRoute;
+  '/history': typeof HistoryRoute;
+  '/diff-review/$chatId': typeof DiffReviewChatIdRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/account': typeof AccountRoute
-  '/agent-settings': typeof AgentSettingsRoute
-  '/browsing-settings': typeof BrowsingSettingsRoute
-  '/clear-data': typeof ClearDataRoute
-  '/downloads': typeof DownloadsRoute
-  '/history': typeof HistoryRoute
+  __root__: typeof rootRouteImport;
+  '/': typeof IndexRoute;
+  '/account': typeof AccountRoute;
+  '/agent-settings': typeof AgentSettingsRoute;
+  '/browsing-settings': typeof BrowsingSettingsRoute;
+  '/clear-data': typeof ClearDataRoute;
+  '/downloads': typeof DownloadsRoute;
+  '/history': typeof HistoryRoute;
+  '/diff-review/$chatId': typeof DiffReviewChatIdRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
+  fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | '/'
     | '/account'
@@ -91,7 +100,8 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
-  fileRoutesByTo: FileRoutesByTo
+    | '/diff-review/$chatId';
+  fileRoutesByTo: FileRoutesByTo;
   to:
     | '/'
     | '/account'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
+    | '/diff-review/$chatId';
   id:
     | '__root__'
     | '/'
@@ -109,69 +120,78 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
-  fileRoutesById: FileRoutesById
+    | '/diff-review/$chatId';
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AccountRoute: typeof AccountRoute
-  AgentSettingsRoute: typeof AgentSettingsRoute
-  BrowsingSettingsRoute: typeof BrowsingSettingsRoute
-  ClearDataRoute: typeof ClearDataRoute
-  DownloadsRoute: typeof DownloadsRoute
-  HistoryRoute: typeof HistoryRoute
+  IndexRoute: typeof IndexRoute;
+  AccountRoute: typeof AccountRoute;
+  AgentSettingsRoute: typeof AgentSettingsRoute;
+  BrowsingSettingsRoute: typeof BrowsingSettingsRoute;
+  ClearDataRoute: typeof ClearDataRoute;
+  DownloadsRoute: typeof DownloadsRoute;
+  HistoryRoute: typeof HistoryRoute;
+  DiffReviewChatIdRoute: typeof DiffReviewChatIdRoute;
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/history': {
-      id: '/history'
-      path: '/history'
-      fullPath: '/history'
-      preLoaderRoute: typeof HistoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/history';
+      path: '/history';
+      fullPath: '/history';
+      preLoaderRoute: typeof HistoryRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/downloads': {
-      id: '/downloads'
-      path: '/downloads'
-      fullPath: '/downloads'
-      preLoaderRoute: typeof DownloadsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/downloads';
+      path: '/downloads';
+      fullPath: '/downloads';
+      preLoaderRoute: typeof DownloadsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/clear-data': {
-      id: '/clear-data'
-      path: '/clear-data'
-      fullPath: '/clear-data'
-      preLoaderRoute: typeof ClearDataRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/clear-data';
+      path: '/clear-data';
+      fullPath: '/clear-data';
+      preLoaderRoute: typeof ClearDataRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/browsing-settings': {
-      id: '/browsing-settings'
-      path: '/browsing-settings'
-      fullPath: '/browsing-settings'
-      preLoaderRoute: typeof BrowsingSettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/browsing-settings';
+      path: '/browsing-settings';
+      fullPath: '/browsing-settings';
+      preLoaderRoute: typeof BrowsingSettingsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/agent-settings': {
-      id: '/agent-settings'
-      path: '/agent-settings'
-      fullPath: '/agent-settings'
-      preLoaderRoute: typeof AgentSettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/agent-settings';
+      path: '/agent-settings';
+      fullPath: '/agent-settings';
+      preLoaderRoute: typeof AgentSettingsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/account': {
-      id: '/account'
-      path: '/account'
-      fullPath: '/account'
-      preLoaderRoute: typeof AccountRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/account';
+      path: '/account';
+      fullPath: '/account';
+      preLoaderRoute: typeof AccountRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/';
+      path: '/';
+      fullPath: '/';
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/diff-review/$chatId': {
+      id: '/diff-review/$chatId';
+      path: '/diff-review/$chatId';
+      fullPath: '/diff-review/$chatId';
+      preLoaderRoute: typeof DiffReviewChatIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
@@ -183,7 +203,8 @@ const rootRouteChildren: RootRouteChildren = {
   ClearDataRoute: ClearDataRoute,
   DownloadsRoute: DownloadsRoute,
   HistoryRoute: HistoryRoute,
-}
+  DiffReviewChatIdRoute: DiffReviewChatIdRoute,
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();

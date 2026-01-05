@@ -4,7 +4,7 @@ import {
   CodeBlock,
   lineAddedDiffMarker,
   lineRemovedDiffMarker,
-} from '@/components/ui/code-block';
+} from '@ui/components/ui/code-block';
 import type { BundledLanguage } from 'shiki';
 
 export const DiffPreview = memo(

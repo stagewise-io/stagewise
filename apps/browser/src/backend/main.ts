@@ -482,6 +482,54 @@ export async function main({
   // Set the markDownloadsSeen handler for pages-api contract
   pagesService.setMarkDownloadsSeenHandler(markDownloadsSeen);
 
+  // Set the getPendingEdits handler for pages-api contract
+  // This allows pages routes to fetch pending file edits from the main UI state
+  pagesService.setGetPendingEditsHandler(async (chatId: string) => {
+    const agentChat = uiKarton.state.agentChat;
+    if (!agentChat || !agentChat.chats[chatId]) {
+      return { found: false, edits: [] };
+    }
+    const pendingEdits = agentChat.chats[chatId].pendingEdits ?? [];
+    return {
+      found: true,
+      edits: pendingEdits.map((edit) => ({
+        path: edit.path,
+        before: edit.before,
+        after: edit.after,
+      })),
+    };
+  });
+
+  // Subscribe to UI Karton state changes to sync pending edits to Pages API state
+  // This enables real-time updates in the diff-review page
+  const previousPendingEditsSnapshot: Record<string, string> = {};
+  const pendingEditsSyncCallback = (state: typeof uiKarton.state) => {
+    const agentChat = state.agentChat;
+    if (!agentChat) return;
+
+    // Check each chat for pending edits changes
+    for (const [chatId, chat] of Object.entries(agentChat.chats)) {
+      const pendingEdits = chat.pendingEdits ?? [];
+      // Create a simple snapshot key to detect changes (stringify paths)
+      const snapshotKey = pendingEdits.map((e) => e.path).join(',');
+      const previousKey = previousPendingEditsSnapshot[chatId] ?? '';
+
+      if (snapshotKey !== previousKey) {
+        previousPendingEditsSnapshot[chatId] = snapshotKey;
+        // Push update to Pages API state
+        pagesService.updatePendingEditsState(
+          chatId,
+          pendingEdits.map((edit) => ({
+            path: edit.path,
+            before: edit.before,
+            after: edit.after,
+          })),
+        );
+      }
+    }
+  };
+  uiKarton.registerStateChangeCallback(pendingEditsSyncCallback);
+
   // Trigger initial load of downloads state (loads recent finished downloads)
   void updateUIDownloadsState([]);
 
@@ -646,6 +694,57 @@ export async function main({
     } else
       logger.debug('[Main] No user data available, not identifying user...');
   });
+
+  // Set up accept/reject pending edits handlers for pages-api contract
+  // These call AgentService methods which handle the actual diff history logic
+  pagesService.setAcceptAllPendingEditsHandler(async (chatId: string) => {
+    // First ensure the correct chat is active
+    const currentActiveChatId = uiKarton.state.agentChat?.activeChatId;
+    if (currentActiveChatId !== chatId) {
+      logger.warn(
+        `[Main] acceptAllPendingEdits: chat ${chatId} is not active, skipping`,
+      );
+      return;
+    }
+    agentService.acceptAllPendingEdits();
+  });
+
+  pagesService.setRejectAllPendingEditsHandler(async (chatId: string) => {
+    const currentActiveChatId = uiKarton.state.agentChat?.activeChatId;
+    if (currentActiveChatId !== chatId) {
+      logger.warn(
+        `[Main] rejectAllPendingEdits: chat ${chatId} is not active, skipping`,
+      );
+      return;
+    }
+    agentService.rejectAllPendingEdits();
+  });
+
+  pagesService.setAcceptPendingEditHandler(
+    async (chatId: string, filePath: string) => {
+      const currentActiveChatId = uiKarton.state.agentChat?.activeChatId;
+      if (currentActiveChatId !== chatId) {
+        logger.warn(
+          `[Main] acceptPendingEdit: chat ${chatId} is not active, skipping`,
+        );
+        return;
+      }
+      agentService.acceptPendingEdit(filePath);
+    },
+  );
+
+  pagesService.setRejectPendingEditHandler(
+    async (chatId: string, filePath: string) => {
+      const currentActiveChatId = uiKarton.state.agentChat?.activeChatId;
+      if (currentActiveChatId !== chatId) {
+        logger.warn(
+          `[Main] rejectPendingEdit: chat ${chatId} is not active, skipping`,
+        );
+        return;
+      }
+      agentService.rejectPendingEdit(filePath);
+    },
+  );
 
   logger.debug('[Main] Normal operation services bootstrapped');
 

@@ -749,6 +749,34 @@ export class AgentService {
       );
 
       this.uiKarton.registerServerProcedureHandler(
+        'agentChat.acceptPendingEdit',
+        async (filePath: string) => {
+          // Use partialAccept to accept only this specific file
+          this.diffHistoryService?.partialAccept([filePath]);
+        },
+      );
+
+      this.uiKarton.registerServerProcedureHandler(
+        'agentChat.rejectPendingEdit',
+        async (filePath: string) => {
+          const rejected = this.diffHistoryService?.partialReject([filePath]);
+          const chatId = this.uiKarton.state.agentChat?.activeChatId;
+          if (!rejected || !chatId) return;
+
+          // Track rejected edits for this chat
+          const existingRejectedEdits = this.rejectedEditsPerChat.get(chatId);
+          this.rejectedEditsPerChat.set(
+            chatId,
+            new Set([
+              ...(existingRejectedEdits ?? []),
+              ...Object.keys(rejected.filesToWrite),
+              ...Object.keys(rejected.filesToDelete),
+            ]),
+          );
+        },
+      );
+
+      this.uiKarton.registerServerProcedureHandler(
         'agentChat.retrySendingUserMessage',
         async () => {
           this.setAgentWorking(true);
@@ -952,6 +980,8 @@ export class AgentService {
     this.uiKarton.removeServerProcedureHandler(
       'agentChat.rejectAllPendingEdits',
     );
+    this.uiKarton.removeServerProcedureHandler('agentChat.acceptPendingEdit');
+    this.uiKarton.removeServerProcedureHandler('agentChat.rejectPendingEdit');
     this.uiKarton.removeServerProcedureHandler(
       'agentChat.submitUserInteractionToolInput',
     );
@@ -1879,5 +1909,59 @@ export class AgentService {
         }
       });
     }
+  }
+
+  // Public methods for accepting/rejecting pending edits (called from main.ts via pages-api)
+
+  /**
+   * Accept all pending edits for the active chat
+   */
+  public acceptAllPendingEdits(): void {
+    this.diffHistoryService?.acceptPendingChanges();
+  }
+
+  /**
+   * Reject all pending edits for the active chat
+   */
+  public rejectAllPendingEdits(): void {
+    const rejected = this.diffHistoryService?.rejectPendingChanges();
+    const chatId = this.uiKarton.state.agentChat?.activeChatId;
+    if (!rejected || !chatId) return;
+
+    const existingRejectedEdits = this.rejectedEditsPerChat.get(chatId);
+    this.rejectedEditsPerChat.set(
+      chatId,
+      new Set([
+        ...(existingRejectedEdits ?? []),
+        ...Object.keys(rejected.filesToWrite),
+        ...Object.keys(rejected.filesToDelete),
+      ]),
+    );
+  }
+
+  /**
+   * Accept a single pending edit by file path
+   */
+  public acceptPendingEdit(filePath: string): void {
+    this.diffHistoryService?.partialAccept([filePath]);
+  }
+
+  /**
+   * Reject a single pending edit by file path
+   */
+  public rejectPendingEdit(filePath: string): void {
+    const rejected = this.diffHistoryService?.partialReject([filePath]);
+    const chatId = this.uiKarton.state.agentChat?.activeChatId;
+    if (!rejected || !chatId) return;
+
+    const existingRejectedEdits = this.rejectedEditsPerChat.get(chatId);
+    this.rejectedEditsPerChat.set(
+      chatId,
+      new Set([
+        ...(existingRejectedEdits ?? []),
+        ...Object.keys(rejected.filesToWrite),
+        ...Object.keys(rejected.filesToDelete),
+      ]),
+    );
   }
 }

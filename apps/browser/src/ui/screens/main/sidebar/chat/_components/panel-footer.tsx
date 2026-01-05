@@ -521,6 +521,20 @@ function FileDiffCard() {
   const acceptAllPendingEdits = useKartonProcedure(
     (p) => p.agentChat.acceptAllPendingEdits,
   );
+  const createTab = useKartonProcedure((p) => p.browser.createTab);
+
+  const openDiffReviewPage = useCallback(
+    (filePath?: string) => {
+      if (activeChatId) {
+        const hash = filePath ? `#${encodeURIComponent(filePath)}` : '';
+        void createTab(
+          `stagewise://internal/diff-review/${activeChatId}${hash}`,
+          true,
+        );
+      }
+    },
+    [activeChatId, createTab],
+  );
 
   const pendingEdits = useMemo(() => {
     return activeChat?.pendingEdits ?? [];
@@ -646,8 +660,9 @@ function FileDiffCard() {
             {formattedEdits.map((edit) => (
               <button
                 type="button"
-                className="flex w-full flex-col items-start justify-start gap-2 rounded px-1 py-0.5 hover:bg-muted/50"
+                className="flex w-full cursor-pointer flex-col items-start justify-start gap-2 rounded px-1 py-0.5 hover:bg-muted/50"
                 key={edit.path}
+                onClick={() => openDiffReviewPage(edit.path)}
               >
                 <span className="flex flex-row items-center justify-start gap-1 truncate text-muted-foreground text-xs">
                   <FileIcon
