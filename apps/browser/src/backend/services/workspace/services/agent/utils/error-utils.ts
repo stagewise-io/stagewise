@@ -109,6 +109,30 @@ function extractErrorMessage(error: unknown): string {
 }
 
 /**
+ * AI SDK error types that include prompt/message content in their messages.
+ * These should show generic messages to avoid leaking system prompts.
+ */
+const INTERNAL_ERROR_TYPES = [
+  'AI_TypeValidationError',
+  'AI_InvalidArgumentError',
+  'AI_InvalidPromptError',
+  'AI_NoContentGeneratedError',
+];
+
+/**
+ * Generic messages for internal errors to avoid leaking sensitive content.
+ */
+const GENERIC_ERROR_MESSAGES: Record<string, string> = {
+  AI_TypeValidationError:
+    'The AI response could not be processed. Please try again.',
+  AI_InvalidArgumentError:
+    'An internal configuration error occurred. Please try again.',
+  AI_InvalidPromptError: 'An internal prompt error occurred. Please try again.',
+  AI_NoContentGeneratedError:
+    'The AI did not generate a response. Please try again.',
+};
+
+/**
  * Extracts structured error information from an error object.
  * Returns a StructuredAgentErrorInfo object that can be used directly in the UI.
  *
@@ -118,6 +142,20 @@ function extractErrorMessage(error: unknown): string {
 export function extractStructuredError(
   error: unknown,
 ): StructuredAgentErrorInfo {
+  // Check for internal AI SDK errors that leak prompt content
+  if (error && typeof error === 'object') {
+    const e = error as Record<string, any>;
+    if (e.name && INTERNAL_ERROR_TYPES.includes(e.name)) {
+      return {
+        message:
+          GENERIC_ERROR_MESSAGES[e.name] ??
+          'An internal error occurred. Please try again.',
+        code: e.name,
+        errorType: e.name as AISDKErrorType,
+      };
+    }
+  }
+
   // Try enhanced extraction for AI SDK errors
   const extractedDetails = extractDetailsFromError(error);
 
@@ -144,9 +182,6 @@ export function extractStructuredError(
     if (e.name === 'AI_APICallError') {
       errorType = 'AI_APICallError';
       code = e.statusCode ? String(e.statusCode) : 'API_ERROR';
-    } else if (e.name === 'AI_InvalidArgumentError') {
-      errorType = 'AI_InvalidArgumentError';
-      code = 'VALIDATION_ERROR';
     } else if (e.name) {
       code = e.name;
     }
