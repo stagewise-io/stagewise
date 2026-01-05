@@ -233,8 +233,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15-large
-            platform: darwin
+          - os: macos-15-intel
+            platform: darwin-arm64
             arch: arm64
             artifact-name: browser-macos-arm64
           - os: ubuntu-latest
