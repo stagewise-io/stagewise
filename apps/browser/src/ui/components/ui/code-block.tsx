@@ -10,7 +10,7 @@ import {
   type ShikiTransformer,
 } from 'shiki';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
-import { cn } from '@/utils';
+import { cn } from '@ui/utils';
 import CodeBlockLightTheme from './code-block-light-theme.json';
 import CodeBlockDarkTheme from './code-block-dark-theme.json';
 import type { Element } from 'hast';
@@ -433,7 +433,7 @@ function shikiDiffCollapse({
     name: 'shiki-diff-collapse',
     pre(node) {
       if (!enabled) return;
-      // If this feature is enabled (according to the config), we collapse everything aroung the diffs (remove the lines and prevent them from being rendered).
+      // If this feature is enabled (according to the config), we collapse everything around the diffs (remove the lines and prevent them from being rendered).
       // We may include lines before and after the diffs if configured to do so.
       // We need to watch out that in the code block, after every "line" element, there is a text with the content "\n". This should be omitted as well if we should collapse those lines.
 
@@ -476,15 +476,21 @@ function shikiDiffCollapse({
         [],
       );
 
+      // If no diffs, nothing to collapse
+      if (diffLineIndexes.length === 0) return;
+
+      // Get boundaries of the diff region for determining edge vs middle
+      const firstDiffIndex = Math.min(...diffLineIndexes);
+      const lastDiffIndex = Math.max(...diffLineIndexes);
+
       const displayedLinesMask = new Array(lineElements.length).fill(false);
       diffLineIndexes.forEach((index) => {
         displayedLinesMask[index] = true;
       });
 
       // Now, we make one forward and one backwards pass over the displayed lines mask and we set the lines to true if they are within the includeSurroundingLines config.
-      // We check this by setting a "last line with diff" index and updatign that whenever we see a true value in the displayed lines mask.
+      // We check this by setting a "last line with diff" index and updating that whenever we see a true value in the displayed lines mask.
       // Then, we check if the distance isn't too high (smaller than or equal to includeSurroundingLines) and if so, we set the mask to true at this point.
-      // (Glenn): I couldn't come up with a more fficient way of doing this. I have a gut feel this is not performant enough but meh.
       let lastLineWithDiffIndex = -(includeSurroundingLines + 1);
       for (let i = 0; i < displayedLinesMask.length; i++) {
         if (displayedLinesMask[i]) {
@@ -506,26 +512,96 @@ function shikiDiffCollapse({
         }
       }
 
-      // Now that we now which lines should be rendered and which shouldn't, we go over the line numb er elements and the line elements and remove the ones that shouldn't be rendered.
-      // We go reverse over the entries because removing entries will shift the indices of the remaining entries so we have to do the stuff reverse.
-      // Also, we delete the line break after the last line element that's not hidden. (We go reverse, so we delete the line after the first non-hidden line element.)
+      // First pass: classify each line and build a classification array
+      type LineClassification =
+        | 'visible'
+        | 'edge-top'
+        | 'edge-bottom'
+        | 'middle';
+      const lineClassifications: LineClassification[] = displayedLinesMask.map(
+        (shouldRender, index) => {
+          if (shouldRender) return 'visible';
+          if (index < firstDiffIndex) return 'edge-top';
+          if (index > lastDiffIndex) return 'edge-bottom';
+          return 'middle';
+        },
+      );
+
+      // Second pass: find groups of consecutive 'middle' lines and count them
+      // We'll store the count on the last line of each group
+      const middleGroupCounts: Map<number, number> = new Map();
+      let currentMiddleGroupStart = -1;
+      let currentMiddleGroupCount = 0;
+
+      for (let i = 0; i <= lineClassifications.length; i++) {
+        const classification = lineClassifications[i];
+        if (classification === 'middle') {
+          if (currentMiddleGroupStart === -1) {
+            currentMiddleGroupStart = i;
+          }
+          currentMiddleGroupCount++;
+        } else {
+          // End of a middle group (or never started one)
+          if (currentMiddleGroupCount > 0) {
+            // Store count on the last index of this group
+            const lastIndexOfGroup = i - 1;
+            middleGroupCounts.set(lastIndexOfGroup, currentMiddleGroupCount);
+          }
+          currentMiddleGroupStart = -1;
+          currentMiddleGroupCount = 0;
+        }
+      }
+
+      // Now apply classes and remove line breaks, going in reverse
       let clearedLastDisplayLineBreak = false;
       displayedLinesMask
+        .slice()
         .reverse()
-        .forEach((shouldRenderIndex, revserseIndex) => {
-          const index = displayedLinesMask.length - revserseIndex - 1;
+        .forEach((shouldRender, reverseIndex) => {
+          const index = displayedLinesMask.length - reverseIndex - 1;
+          const classification = lineClassifications[index];
 
-          if (!shouldRenderIndex) {
-            this.addClassToHast(
-              codeElement.children[index * 2] as unknown as Element,
-              'code-line-collapsed',
-            );
+          if (!shouldRender) {
+            let collapseClass: string;
+            let lineNumberCollapseClass: string;
+
+            if (classification === 'edge-top') {
+              collapseClass = 'code-line-collapsed-edge-top';
+              lineNumberCollapseClass = 'code-line-number-collapsed-edge-top';
+            } else if (classification === 'edge-bottom') {
+              collapseClass = 'code-line-collapsed-edge-bottom';
+              lineNumberCollapseClass =
+                'code-line-number-collapsed-edge-bottom';
+            } else {
+              collapseClass = 'code-line-collapsed-middle';
+              lineNumberCollapseClass = 'code-line-number-collapsed-middle';
+            }
+
+            const lineElement = codeElement.children[
+              index * 2
+            ] as unknown as Element;
+
+            this.addClassToHast(lineElement, collapseClass);
+
+            // If this is the last line of a middle group, add the count and inject text
+            const groupCount = middleGroupCounts.get(index);
+            if (groupCount !== undefined) {
+              lineElement.properties = lineElement.properties || {};
+              lineElement.properties['data-hidden-count'] = String(groupCount);
+              // Clear existing children and add the "X hidden lines" text
+              lineElement.children = [
+                {
+                  type: 'text',
+                  value: `${groupCount} hidden line${groupCount === 1 ? '' : 's'}`,
+                },
+              ];
+            }
 
             codeElement.children.splice(index * 2 + 1, 1);
 
             this.addClassToHast(
               lineNumbersContainer?.children[index] as unknown as Element,
-              'code-line-number-collapsed',
+              lineNumberCollapseClass,
             );
           } else if (!clearedLastDisplayLineBreak) {
             clearedLastDisplayLineBreak = true;

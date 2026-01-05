@@ -244,24 +244,45 @@ body {
   @apply bg-rose-600/10 dark:bg-rose-400/10 -m-px p-px;
 }
 
-@utility code-line-collapsed {
-  @apply block size-0 select-none invisible;
-  &:has(+ :not(.code-line-collapsed)), &:last-child {
-    @apply mb-6 relative;
-  }
-  &:has(+ :not(.code-line-collapsed))::after, &:last-child::after {
-    @apply absolute top-1 pl-2 pr-2 flex items-center w-max h-4 content-["Hidden_code"] text-muted-foreground bg-black/5 dark:bg-white/5 italic visible rounded-full font-medium text-xs;
+/* Edge-top collapsed lines (before first diff) - hidden */
+@utility code-line-collapsed-edge-top {
+  @apply hidden;
+}
+
+/* Edge-bottom collapsed lines (after last diff) - hidden */
+@utility code-line-collapsed-edge-bottom {
+  @apply hidden;
+}
+
+/* Middle collapsed lines (between diffs) - divider with centered count */
+@utility code-line-collapsed-middle {
+  @apply hidden;
+  &[data-hidden-count] {
+    @apply flex items-center gap-2 my-3 text-muted-foreground/50 text-[10px];
+    &::before, &::after {
+      @apply flex-1 h-px bg-muted-foreground/20 content-[""];
+    }
   }
 }
 
 @utility line-numbers-container {
-  @apply bg-muted-foreground/5 pl-2 pr-1 flex flex-col items-end text-muted-foreground shrink-0;
+  /* @apply bg-muted-foreground/5 pl-2 pr-1 flex flex-col items-end text-muted-foreground shrink-0; */
+  @apply hidden;
 }
 
-@utility code-line-number-collapsed {
+/* Line number variants for collapsed lines */
+@utility code-line-number-collapsed-edge-top {
+  @apply hidden;
+}
+
+@utility code-line-number-collapsed-edge-bottom {
+  @apply hidden;
+}
+
+@utility code-line-number-collapsed-middle {
   @apply block size-0 select-none invisible;
-  &:has(+ :not(.code-line-number-collapsed)) {
-    @apply mb-6;
+  &:has(+ :not(.code-line-number-collapsed-middle)) {
+    @apply my-3;
   }
 }
 
