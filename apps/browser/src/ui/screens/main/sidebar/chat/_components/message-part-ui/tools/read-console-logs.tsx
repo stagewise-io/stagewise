@@ -141,9 +141,7 @@ export const ReadConsoleLogsToolPart = ({
             <div
               className={cn(
                 'scrollbar-hover-only rounded border border-border/10',
-                showBorder
-                  ? 'max-h-48 overflow-auto'
-                  : 'overflow-x-auto overflow-y-hidden',
+                showBorder ? 'max-h-48 overflow-auto' : 'overflow-y-hidden',
               )}
             >
               <CodeBlock

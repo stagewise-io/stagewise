@@ -163,7 +163,28 @@ class HighlighterManager {
       return html.replace(PRE_TAG_REGEX, `<pre class="${preClassName}"$1`);
     };
 
-    return [addPreClass(light!), addPreClass(dark!)];
+    const addCodeScroll = (html: string) => {
+      // Add overflow-x: auto and scrollbar-subtle to code element so it scrolls instead of the container
+      return html.replace(/<code([^>]*)>/, (_match, attrs) => {
+        // Check if there's already a class attribute
+        if (attrs.includes('class=')) {
+          // Add to existing class
+          const withClass = attrs.replace(
+            /class="([^"]*)"/,
+            'class="$1 scrollbar-subtle"',
+          );
+          return `<code${withClass} style="overflow-x: auto;">`;
+        } else {
+          // Add new class attribute
+          return `<code${attrs} class="scrollbar-subtle" style="overflow-x: auto;">`;
+        }
+      });
+    };
+
+    return [
+      addCodeScroll(addPreClass(light!)),
+      addCodeScroll(addPreClass(dark!)),
+    ];
   }
 }
 

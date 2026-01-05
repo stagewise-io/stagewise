@@ -152,7 +152,7 @@ export const ExecuteConsoleScriptToolPart = ({
                       'scrollbar-hover-only rounded border border-border/10',
                       showBorder
                         ? 'max-h-28 overflow-auto'
-                        : 'overflow-x-auto overflow-y-hidden',
+                        : 'overflow-y-hidden',
                     )}
                   >
                     <CodeBlock
@@ -187,7 +187,7 @@ export const ExecuteConsoleScriptToolPart = ({
                         'scrollbar-hover-only rounded border border-border/10',
                         showBorder
                           ? 'max-h-28 overflow-auto'
-                          : 'overflow-x-auto overflow-y-hidden',
+                          : 'overflow-y-hidden',
                       )}
                     >
                       <CodeBlock
