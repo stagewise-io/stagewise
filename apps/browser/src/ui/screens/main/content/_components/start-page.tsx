@@ -31,10 +31,7 @@ export function StartPage({ tabId }: StartPageProps) {
   );
 
   return (
-    <div
-      className="flex size-full flex-col items-center justify-center overflow-hidden bg-background"
-      id="start-page-container"
-    >
+    <div className="flex size-full flex-col items-center justify-center overflow-hidden bg-background">
       {!hasSeenOnboardingFlow ? (
         <OnboardingStartPage />
       ) : (

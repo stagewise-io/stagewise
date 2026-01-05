@@ -181,7 +181,7 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
         <div className="flex size-full flex-col gap-4 rounded-lg p-2">
           <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-sm shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] ring-1 ring-foreground/10">
             {tab?.url === 'ui-main' ? (
-              <StartPage tabId={tabId} />
+              isActive && <StartPage tabId={tabId} />
             ) : tab?.error ? (
               <div>Error: {tab?.error?.message}</div>
             ) : (
