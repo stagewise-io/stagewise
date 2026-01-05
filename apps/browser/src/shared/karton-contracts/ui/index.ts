@@ -89,6 +89,7 @@ export type Chat = {
   messages: History;
   error?: AgentError;
   usage: { maxContextWindowSize: number; usedContextWindowSize: number };
+  pendingEdits: FileDiff[];
 };
 
 export enum AgentErrorType {
@@ -106,6 +107,8 @@ export type AISDKErrorType =
   | 'AI_APICallError'
   | 'AI_InvalidArgumentError'
   | 'AI_TypeValidationError'
+  | 'AI_InvalidPromptError'
+  | 'AI_NoContentGeneratedError'
   | 'NetworkError'
   | 'UnknownError';
 
@@ -416,17 +419,15 @@ export type KartonContract = {
             }),
       ) => Promise<{ success: true } | { success: false; error: string }>; // Returns zod validation success or failure
       cancelUserInteractionToolInput: (toolCallId: string) => Promise<void>; // Cancels the user interaction tool input.
-      undoToolCallsUntilUserMessage: (
+      acceptAllPendingEdits: () => Promise<void>;
+      rejectAllPendingEdits: () => Promise<void>;
+      acceptPendingEdit: (path: string) => Promise<void>;
+      rejectPendingEdit: (path: string) => Promise<void>;
+      undoEditsUntilUserMessage: (
         userMessageId: string,
         chatId: string,
         shouldUndoUserMessage?: boolean,
       ) => Promise<void>;
-      undoToolCallsUntilLatestUserMessage: (
-        chatId: string,
-      ) => Promise<ChatMessage | null>;
-      assistantMadeCodeChangesUntilLatestUserMessage: (
-        chatId: string,
-      ) => Promise<boolean>;
     };
     userAccount: {
       refreshStatus: () => Promise<void>;

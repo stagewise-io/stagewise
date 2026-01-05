@@ -232,6 +232,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.0)
+      chokidar:
+        specifier: ^4.0.3
+        version: 4.0.3
       electron-squirrel-startup:
         specifier: ^1.0.1
         version: 1.0.1

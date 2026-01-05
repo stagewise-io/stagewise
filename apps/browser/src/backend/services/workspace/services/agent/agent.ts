@@ -1,6 +1,7 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import { resolve } from 'node:path';
 import type { GlobalDataPathService } from '../../../global-data-path';
+import { DiffHistoryService } from './diff-history';
 import { isContextLimitError } from './utils/is-context-limit-error';
 import { generateStagewiseMd } from './generate-stagewise-md';
 import type { KartonService } from '../../../karton';
@@ -8,7 +9,7 @@ import type { Logger } from '../../../logger';
 import type { TelemetryService } from '../../../telemetry';
 import type { GlobalConfigService } from '../../../global-config';
 import type { AuthService, AuthState } from '../../../auth';
-import { hasUndoMetadata, hasDiffMetadata } from '@stagewise/agent-types';
+import { hasDiffMetadata } from '@stagewise/agent-types';
 import type { WindowLayoutService } from '../../../window-layout';
 import {
   type KartonContract,
@@ -27,7 +28,6 @@ import {
   setupAgentTools,
   toolsWithoutExecute,
   noWorkspaceConfiguredAgentTools,
-  type UITools,
   type AgentToolsContext,
   type BrowserRuntime,
   type LintingDiagnosticsResult,
@@ -108,12 +108,14 @@ function isToolCallType(type: string): type is ToolCallType {
 }
 
 type ChatId = string;
+type FilePath = string;
 
 // Configuration constants
 const DEFAULT_AGENT_TIMEOUT = 180000; // 3 minutes
 const MAX_RECURSION_DEPTH = 50;
 
 export class AgentService {
+  private diffHistoryService: DiffHistoryService | null = null;
   private logger: Logger;
   private telemetryService: TelemetryService;
   private uiKarton: KartonService;
@@ -140,18 +142,11 @@ export class AgentService {
     ide: string | undefined;
     appPath: string;
   }) => Promise<void>;
-  private undoToolCallStack: Map<
-    ChatId,
-    {
-      toolCallId: string;
-      toolName: string; // used for telemetry
-      undoExecute?: () => Promise<void>;
-    }[]
-  > = new Map();
   private thinkingDurationsPerChat: Map<
     ChatId,
     { durations: number[]; currentStartTime: number | null }
   > = new Map();
+  private rejectedEditsPerChat: Map<ChatId, Set<FilePath>> = new Map();
   private thinkingEnabled = true;
   private isCompacting = false; // Guard to prevent concurrent compaction attempts
   private lspService: LspService | null = null;
@@ -520,10 +515,14 @@ export class AgentService {
           ...message,
           metadata: {
             ...message.metadata,
-            currentTab: this.getCurrentTab(),
+            currentTab: this.getCurrentTab() ?? undefined,
+            rejectedEdits: Array.from(
+              this.rejectedEditsPerChat.get(activeChatId) ?? [],
+            ),
           },
         } as any);
         chat.error = undefined;
+        this.rejectedEditsPerChat.delete(activeChatId);
       }
     });
 
@@ -669,6 +668,11 @@ export class AgentService {
       }
     });
 
+    this.diffHistoryService = await DiffHistoryService.create(
+      this.logger,
+      this.uiKarton,
+    );
+
     // Initialize client and litellm
     await this.initializeClient();
     await this.initializeLitellm();
@@ -712,16 +716,35 @@ export class AgentService {
     // Agent Chat procedures
     try {
       this.uiKarton.registerServerProcedureHandler(
-        'agentChat.undoToolCallsUntilUserMessage',
+        'agentChat.undoEditsUntilUserMessage',
         async (userMessageId: string, chatId: string) => {
-          await this.undoToolCallsUntilUserMessage(userMessageId, chatId);
+          await this.undoEditsUntilUserMessage(userMessageId, chatId);
         },
       );
 
       this.uiKarton.registerServerProcedureHandler(
-        'agentChat.undoToolCallsUntilLatestUserMessage',
-        async (chatId: string): Promise<ChatMessage | null> => {
-          return await this.undoToolCallsUntilLatestUserMessage(chatId);
+        'agentChat.acceptAllPendingEdits',
+        async () => {
+          this.diffHistoryService?.acceptPendingChanges();
+        },
+      );
+
+      this.uiKarton.registerServerProcedureHandler(
+        'agentChat.rejectAllPendingEdits',
+        async () => {
+          const rejected = this.diffHistoryService?.rejectPendingChanges();
+          const chatId = this.uiKarton.state.agentChat?.activeChatId;
+          if (!rejected || !chatId) return;
+
+          const existingRejectedEdits = this.rejectedEditsPerChat.get(chatId);
+          this.rejectedEditsPerChat.set(
+            chatId,
+            new Set([
+              ...(existingRejectedEdits ?? []),
+              ...Object.keys(rejected.filesToWrite),
+              ...Object.keys(rejected.filesToDelete),
+            ]),
+          );
         },
       );
 
@@ -826,7 +849,6 @@ export class AgentService {
           }
 
           // Clean up per-chat data structures
-          this.undoToolCallStack.delete(chatId);
           this.modifiedFilesPerChat.delete(chatId);
           this.thinkingDurationsPerChat.delete(chatId);
 
@@ -905,15 +927,6 @@ export class AgentService {
       );
 
       this.uiKarton.registerServerProcedureHandler(
-        'agentChat.assistantMadeCodeChangesUntilLatestUserMessage',
-        async (chatId: string) => {
-          return await this.assistantMadeCodeChangesUntilLatestUserMessage(
-            chatId,
-          );
-        },
-      );
-
-      this.uiKarton.registerServerProcedureHandler(
         'userAccount.refreshSubscription',
         async () => {
           await this.fetchSubscription();
@@ -931,13 +944,16 @@ export class AgentService {
 
   private removeServerProcedureHandlers() {
     this.uiKarton.removeServerProcedureHandler(
-      'agentChat.undoToolCallsUntilUserMessage',
+      'agentChat.undoEditsUntilUserMessage',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'agentChat.acceptAllPendingEdits',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'agentChat.rejectAllPendingEdits',
     );
     this.uiKarton.removeServerProcedureHandler(
       'agentChat.submitUserInteractionToolInput',
-    );
-    this.uiKarton.removeServerProcedureHandler(
-      'agentChat.undoToolCallsUntilLatestUserMessage',
     );
     this.uiKarton.removeServerProcedureHandler(
       'agentChat.cancelUserInteractionToolInput',
@@ -952,9 +968,6 @@ export class AgentService {
     this.uiKarton.removeServerProcedureHandler('agentChat.switch');
     this.uiKarton.removeServerProcedureHandler('agentChat.delete');
     this.uiKarton.removeServerProcedureHandler('agentChat.sendUserMessage');
-    this.uiKarton.removeServerProcedureHandler(
-      'agentChat.assistantMadeCodeChangesUntilLatestUserMessage',
-    );
     this.uiKarton.removeServerProcedureHandler(
       'userAccount.refreshSubscription',
     );
@@ -1015,9 +1028,6 @@ export class AgentService {
         "[AgentService] Tools are null, agent without workspace configured won't use any tools",
       );
     }
-
-    if (!this.undoToolCallStack.has(chatId))
-      this.undoToolCallStack.set(chatId, []);
 
     if (!this.modifiedFilesPerChat.has(chatId))
       this.modifiedFilesPerChat.set(chatId, new Set());
@@ -1204,18 +1214,21 @@ export class AgentService {
             messages,
             (result) => {
               if (!this.isWorking) return;
-              if ('result' in result && hasUndoMetadata(result.result)) {
-                this.undoToolCallStack.get(chatId)?.push({
-                  toolCallId: result.toolCallId,
-                  toolName:
-                    r.toolCalls.find(
-                      (tc) => tc.toolCallId === result.toolCallId,
-                    )?.toolName ?? '',
-                  undoExecute:
-                    result.result.nonSerializableMetadata?.undoExecute,
+              if ('result' in result && hasDiffMetadata(result.result)) {
+                const absolutePath = this.clientRuntime?.fileSystem.resolvePath(
+                  result.result.hiddenFromLLM.diff.path,
+                );
+                if (!absolutePath) return;
+                this.diffHistoryService?.addInitialFileSnapshotIfNeeded({
+                  [absolutePath]: result.result.hiddenFromLLM.diff.before ?? '',
                 });
+                // Use pushAgentFileEdit which handles merging with current state
+                // Pass null for deletions, content for creates/updates
+                this.diffHistoryService?.pushAgentFileEdit(
+                  absolutePath,
+                  result.result.hiddenFromLLM.diff.after ?? null,
+                );
               }
-
               // Strip 'nonSerializableMetadata' from result, attach the rest to the tool output
               const cleanResult =
                 'result' in result
@@ -1452,32 +1465,6 @@ export class AgentService {
     }
   }
 
-  private async assistantMadeCodeChangesUntilLatestUserMessage(
-    chatId: string,
-  ): Promise<boolean> {
-    const chat = this.uiKarton.state.agentChat?.chats[chatId];
-    const history = chat?.messages ?? [];
-    const reversedHistory = [...history].reverse();
-    const userMessageIndex = reversedHistory.findIndex(
-      (m) => m.role === 'user' && 'id' in m,
-    );
-
-    let hasMadeCodeChanges = false;
-    for (let i = 0; i < userMessageIndex; i++) {
-      const message = reversedHistory[i]!;
-      for (const part of message.parts) {
-        if (isToolCallType(part.type)) {
-          const toolCall = part as ToolUIPart<UITools>;
-          if (toolCall.output && hasDiffMetadata(toolCall.output)) {
-            hasMadeCodeChanges = true;
-            break;
-          }
-        }
-      }
-    }
-    return hasMadeCodeChanges;
-  }
-
   /** Triggers compaction if context window usage exceeds 80%. */
   private triggerCompactionIfNeeded(chatId: string): void {
     if (this.isCompacting) return;
@@ -1622,36 +1609,11 @@ export class AgentService {
     }
   }
 
-  private async undoToolCallsUntilLatestUserMessage(
-    chatId: string,
-  ): Promise<ChatMessage | null> {
-    if (!this.undoToolCallStack.has(chatId)) return null;
-
-    const chat = this.uiKarton.state.agentChat?.chats[chatId];
-    const history = chat?.messages ?? [];
-    const reversedHistory = [...history].reverse();
-    const userMessageIndex = reversedHistory.findIndex(
-      (m) => m.role === 'user' && 'id' in m,
-    );
-
-    if (userMessageIndex === -1) return null;
-
-    const latestUserMessage = reversedHistory[userMessageIndex]!;
-    await this.undoToolCallsUntilUserMessage(
-      reversedHistory[userMessageIndex]!.id,
-      chatId,
-      'undo-changes',
-    );
-    return latestUserMessage;
-  }
-
-  private async undoToolCallsUntilUserMessage(
+  private async undoEditsUntilUserMessage(
     userMessageId: string,
     chatId: string,
     type: 'restore-checkpoint' | 'undo-changes' = 'restore-checkpoint',
   ): Promise<void> {
-    if (!this.undoToolCallStack.has(chatId)) return;
-
     const chat = this.uiKarton.state.agentChat?.chats[chatId];
     const history = chat?.messages ?? [];
     const userMessageIndex = history.findIndex(
@@ -1674,21 +1636,10 @@ export class AgentService {
       }
     }
 
-    const idsAfter = new Set(toolCallIdsAfterUserMessage);
+    const _idsAfter = new Set(toolCallIdsAfterUserMessage);
     const toolCallsUndone: Map<string, number> = new Map();
 
-    while (
-      this.undoToolCallStack.get(chatId)?.at(-1)?.toolCallId &&
-      idsAfter.has(this.undoToolCallStack.get(chatId)?.at(-1)?.toolCallId!)
-    ) {
-      const undo = this.undoToolCallStack.get(chatId)?.pop();
-      if (!undo) break;
-      toolCallsUndone.set(
-        undo.toolName,
-        (toolCallsUndone.get(undo.toolName) ?? 0) + 1,
-      );
-      await undo.undoExecute?.();
-    }
+    this.diffHistoryService?.revertToMessage(userMessageId);
 
     this.uiKarton.setState((draft) => {
       if (userMessageIndex !== -1) {

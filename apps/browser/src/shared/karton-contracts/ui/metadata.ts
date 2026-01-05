@@ -30,6 +30,7 @@ const metadataSchema = z.object({
       chatSummary: z.string(),
     })
     .optional(),
+  rejectedEdits: z.array(z.string()).optional(),
 });
 
 export type UserMessageMetadata = z.infer<typeof metadataSchema>;

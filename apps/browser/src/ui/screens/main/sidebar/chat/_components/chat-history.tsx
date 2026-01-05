@@ -121,6 +121,31 @@ export const ChatHistory = () => {
 
   useEventListener('chat-message-sent', handleMessageSent);
 
+  // Adjust scroll position when FileDiffCard height changes
+  // This makes it look like the container grew/shrank at the bottom
+  const handleFileDiffCardHeightChanged = useCallback(
+    (e: CustomEvent<{ delta: number; height: number }>) => {
+      const container = ref.current;
+      if (!container) return;
+
+      const { delta } = e.detail;
+      if (delta !== 0) {
+        // Adjust scroll by the delta to keep content visually in place
+        isScrollingProgrammaticallyRef.current = true;
+        container.scrollTop += delta;
+        requestAnimationFrame(() => {
+          isScrollingProgrammaticallyRef.current = false;
+        });
+      }
+    },
+    [],
+  );
+
+  useEventListener(
+    'file-diff-card-height-changed',
+    handleFileDiffCardHeightChanged as EventListener,
+  );
+
   const renderedMessages = useMemo(() => {
     if (!activeChat?.messages) return [];
 
@@ -167,10 +192,12 @@ export const ChatHistory = () => {
       ref={ref}
       aria-label="Agent message display"
       className={cn(
-        'scrollbar-subtle mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_4px,black_100%)] pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-1 py-4 pb-4 text-foreground text-sm focus-within:outline-none focus:outline-none',
+        'scrollbar-subtle mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_4px,black_100%)] pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-1 pt-4 text-foreground text-sm focus-within:outline-none focus:outline-none',
         renderedMessages.length === 0 && 'mb-1 h-max overflow-y-hidden',
-        workspaceStatus === 'setup' && 'pb-12',
       )}
+      style={{
+        paddingBottom: `calc(1rem + var(--file-diff-card-height, 0px)${workspaceStatus === 'setup' ? ' + 2rem' : ''})`,
+      }}
       onScroll={handleScroll}
     >
       {renderedMessages.map((message, index) => {

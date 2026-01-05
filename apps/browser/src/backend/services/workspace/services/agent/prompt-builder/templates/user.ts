@@ -39,6 +39,15 @@ export function getUserMessage(userMessage: ChatMessage): UserModelMessage {
     );
   }
 
+  if (
+    userMessage.metadata?.rejectedEdits &&
+    userMessage.metadata.rejectedEdits.length > 0
+  ) {
+    systemAttachmentTextPart.push(
+      `<${specialTokens.userMsgAttachmentXmlTag} type="rejected-edits" value="${userMessage.metadata.rejectedEdits.join(',')}"/>`,
+    );
+  }
+
   if (userMessage.metadata?.browserData) {
     systemAttachmentTextPart.push(
       browserMetadataToContextSnippet(userMessage.metadata.browserData),

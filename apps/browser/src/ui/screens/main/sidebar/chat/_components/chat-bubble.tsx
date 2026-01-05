@@ -11,7 +11,7 @@ import type {
   DynamicToolUIPart,
 } from '@shared/karton-contracts/ui';
 import { Undo2 } from 'lucide-react';
-import { useMemo, useCallback, useState, useEffect, memo } from 'react';
+import { useMemo, useCallback, memo } from 'react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { useChatActions } from '@/hooks/use-chat-state';
 import {
@@ -68,21 +68,14 @@ export const ChatBubble = memo(
     message: ChatMessage;
     isLastMessage: boolean;
   }) {
-    const undoToolCallsUntilUserMessage = useKartonProcedure(
-      (p) => p.agentChat.undoToolCallsUntilUserMessage,
-    );
-    const undoToolCallsUntilLatestUserMessage = useKartonProcedure(
-      (p) => p.agentChat.undoToolCallsUntilLatestUserMessage,
-    );
-    const assistantMadeCodeChangesUntilLatestUserMessage = useKartonProcedure(
-      (p) => p.agentChat.assistantMadeCodeChangesUntilLatestUserMessage,
+    const undoEditsUntilUserMessage = useKartonProcedure(
+      (p) => p.agentChat.undoEditsUntilUserMessage,
     );
     const activeChatId = useKartonState(
       (s) => s.agentChat?.activeChatId || null,
     );
     const isWorking = useKartonState((s) => s.agentChat?.isWorking || false);
     const { setChatInput } = useChatActions();
-    const [hasCodeChanges, setHasCodeChanges] = useState(false);
     const isEmptyMessage = useMemo(() => {
       if (
         msg.parts
@@ -104,37 +97,6 @@ export const ChatBubble = memo(
       );
     }, [msg.parts]);
 
-    useEffect(() => {
-      if (
-        msg.role === 'assistant' &&
-        isLastMessage &&
-        !isWorking &&
-        activeChatId
-      ) {
-        const checkCodeChanges = async () => {
-          try {
-            const hasChanges =
-              await assistantMadeCodeChangesUntilLatestUserMessage(
-                activeChatId,
-              );
-            setHasCodeChanges(hasChanges);
-          } catch (error) {
-            console.warn('Failed to check for code changes:', error);
-            setHasCodeChanges(false);
-          }
-        };
-        void checkCodeChanges();
-      } else {
-        setHasCodeChanges(false);
-      }
-    }, [
-      msg.role,
-      isLastMessage,
-      isWorking,
-      activeChatId,
-      assistantMadeCodeChangesUntilLatestUserMessage,
-    ]);
-
     const confirmRestore = useCallback(async () => {
       if (!msg.id || !activeChatId) return;
 
@@ -145,37 +107,11 @@ export const ChatBubble = memo(
 
       setChatInput(textContent);
       try {
-        await undoToolCallsUntilUserMessage(msg.id, activeChatId);
+        await undoEditsUntilUserMessage(msg.id, activeChatId);
       } catch (error) {
         console.warn('Failed to undo tool calls:', error);
       }
-    }, [msg.id, activeChatId, setChatInput, undoToolCallsUntilUserMessage]);
-
-    const confirmUndo = useCallback(async () => {
-      if (!activeChatId) return;
-
-      try {
-        const latestUserMessage =
-          await undoToolCallsUntilLatestUserMessage(activeChatId);
-        if (!latestUserMessage) {
-          console.warn('Could not find latest user message');
-          return;
-        }
-
-        // Extract text content from message parts
-        const textContent = latestUserMessage.parts
-          .filter((part) => part.type === 'text')
-          .map((part) => (part as TextUIPart).text)
-          .join('\n');
-
-        // Populate the input with the text content
-        setChatInput(textContent);
-      } catch (error) {
-        console.warn('Failed to undo tool calls:', error);
-      }
-
-      // TODO: restore selected elements
-    }, [activeChatId, setChatInput, undoToolCallsUntilLatestUserMessage]);
+    }, [msg.id, activeChatId, setChatInput, undoEditsUntilUserMessage]);
 
     const selectedPreviewElements = useMemo(() => {
       return msg.metadata?.selectedPreviewElements ?? [];
@@ -350,32 +286,6 @@ export const ChatBubble = memo(
                 </div>
               )}
             </div>
-            {msg.role === 'assistant' &&
-              isLastMessage &&
-              !isWorking &&
-              hasCodeChanges && (
-                <Popover>
-                  <PopoverTrigger>
-                    <Button variant="secondary" size="xs">
-                      Undo changes
-                      <Undo2 className="size-3" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent>
-                    <PopoverTitle>Undo changes?</PopoverTitle>
-                    <PopoverDescription>
-                      This will undo all changes the assistant made since your
-                      last message.
-                    </PopoverDescription>
-                    <PopoverClose />
-                    <PopoverFooter>
-                      <Button variant="primary" size="sm" onClick={confirmUndo}>
-                        Undo
-                      </Button>
-                    </PopoverFooter>
-                  </PopoverContent>
-                </Popover>
-              )}
           </div>
 
           {msg.role === 'user' && msg.id && !isWorking && (

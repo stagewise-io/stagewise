@@ -34,6 +34,7 @@ export function createAndActivateNewChat(
       createdAt: new Date(),
       messages: [],
       usage: { maxContextWindowSize: 200000, usedContextWindowSize: 0 },
+      pendingEdits: [],
     };
     draft.agentChat.activeChatId = chatId;
   });

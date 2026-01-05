@@ -516,6 +516,7 @@ export function createEmptyChat(): Chat {
       maxContextWindowSize: 200000,
       usedContextWindowSize: 0,
     },
+    pendingEdits: [],
   };
 }
 
@@ -549,6 +550,7 @@ export function createSimpleChat(): Chat {
         },
       ),
     ],
+    pendingEdits: [],
     usage: {
       maxContextWindowSize: 200000,
       usedContextWindowSize: 5420,
@@ -576,6 +578,7 @@ export function createChatWithManyMessages(): Chat {
       maxContextWindowSize: 200000,
       usedContextWindowSize: 45000,
     },
+    pendingEdits: [],
   };
 }
 
@@ -591,6 +594,7 @@ export function createStreamingChat(): Chat {
       maxContextWindowSize: 200000,
       usedContextWindowSize: 1200,
     },
+    pendingEdits: [],
   };
 }
 
@@ -629,6 +633,7 @@ export function createChatWithToolCalls(): Chat {
       maxContextWindowSize: 200000,
       usedContextWindowSize: 8920,
     },
+    pendingEdits: [],
   };
 }
 
@@ -653,6 +658,7 @@ export function createChatWithError(): Chat {
       maxContextWindowSize: 200000,
       usedContextWindowSize: 2100,
     },
+    pendingEdits: [],
   };
 }
 
@@ -678,5 +684,6 @@ export function createChatWithFileAttachments(): Chat {
       maxContextWindowSize: 200000,
       usedContextWindowSize: 3200,
     },
+    pendingEdits: [],
   };
 }

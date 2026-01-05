@@ -325,6 +325,17 @@ const userMessageFormatDescription = xml({
                 },
               ],
             },
+            {
+              type: [
+                {
+                  _attr: {
+                    name: 'rejected-edits',
+                    description:
+                      "A comma-separated list of file paths where [USER] rejected [STAGE]'s previous edits. These files were modified by [STAGE] but [USER] reverted the changes.",
+                  },
+                },
+              ],
+            },
           ],
         },
       ],

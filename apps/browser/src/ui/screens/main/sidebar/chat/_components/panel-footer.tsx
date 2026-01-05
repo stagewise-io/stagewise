@@ -11,7 +11,9 @@ import {
   SquareIcon,
   SquareDashedMousePointerIcon,
   ImageUpIcon,
+  ChevronDownIcon,
 } from 'lucide-react';
+import { FileIcon } from './message-part-ui/tools/shared/file-icon';
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import {
   useKartonState,
@@ -30,6 +32,12 @@ import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
 import { Layout, MainTab } from '@shared/karton-contracts/ui';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { usePostHog } from 'posthog-js/react';
+import { diffLines } from 'diff';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@stagewise/stage-ui/components/collapsible';
 
 const GlassyTextInputClassNames =
   'origin-center rounded-md border border-black/10 ring-1 ring-white/20 transition-all duration-150 ease-out after:absolute after:inset-0 after:size-full after:content-normal after:rounded-[inherit] after:bg-gradient-to-b after:from-white/5 after:to-white/0 after:transition-colors after:duration-150 after:ease-out disabled:pointer-events-none disabled:bg-black/5 disabled:text-foreground/60 disabled:opacity-30';
@@ -493,6 +501,176 @@ export function ChatPanelFooter() {
           </Button>
         </div>
       )}
+      <FileDiffCard />
     </footer>
+  );
+}
+
+function FileDiffCard() {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const activeChatId = useKartonState((s) => s.agentChat.activeChatId);
+  const chats = useKartonState((s) => s.agentChat.chats);
+  const activeChat = useMemo(() => {
+    return activeChatId && chats ? chats[activeChatId] : null;
+  }, [activeChatId, chats]);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const rejectAllPendingEdits = useKartonProcedure(
+    (p) => p.agentChat.rejectAllPendingEdits,
+  );
+  const acceptAllPendingEdits = useKartonProcedure(
+    (p) => p.agentChat.acceptAllPendingEdits,
+  );
+
+  const pendingEdits = useMemo(() => {
+    return activeChat?.pendingEdits ?? [];
+  }, [activeChat]);
+
+  const formattedEdits = useMemo(() => {
+    const edits: {
+      path: string;
+      fileName: string;
+      linesAdded: number;
+      linesRemoved: number;
+    }[] = [];
+    for (const edit of pendingEdits) {
+      const diff = diffLines(edit.before ?? '', edit.after ?? '');
+      const fileName = edit.path.split('/').pop() ?? '';
+      const linesAdded = diff.reduce(
+        (acc, line) => acc + (line.added ? line.count : 0),
+        0,
+      );
+      const linesRemoved = diff.reduce(
+        (acc, line) => acc + (line.removed ? line.count : 0),
+        0,
+      );
+      edits.push({ path: edit.path, fileName, linesAdded, linesRemoved });
+    }
+    return edits;
+  }, [pendingEdits]);
+
+  // Sync card height with CSS variable for ChatHistory padding
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+
+    let previousHeight = 0;
+
+    const updateHeight = () => {
+      const height = pendingEdits.length > 0 ? card.offsetHeight : 0;
+      const delta = height - previousHeight;
+
+      document.documentElement.style.setProperty(
+        '--file-diff-card-height',
+        `${height}px`,
+      );
+
+      // Dispatch event to notify chat history about height change
+      if (delta !== 0) {
+        window.dispatchEvent(
+          new CustomEvent('file-diff-card-height-changed', {
+            detail: { delta, height },
+          }),
+        );
+      }
+
+      previousHeight = height;
+    };
+
+    // Initial measurement
+    updateHeight();
+
+    // Observe size changes
+    const resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(card);
+
+    return () => {
+      resizeObserver.disconnect();
+      document.documentElement.style.setProperty(
+        '--file-diff-card-height',
+        '0px',
+      );
+    };
+  }, [pendingEdits.length]);
+
+  if (pendingEdits.length === 0) return null;
+
+  return (
+    <div
+      ref={cardRef}
+      className="-z-10 absolute right-1 bottom-full left-1 flex flex-col items-center justify-between gap-2 rounded-t-lg border-muted-foreground/20 border-t border-r border-l bg-background/70 p-0.75 backdrop-blur-lg"
+    >
+      <Collapsible className="w-full" open={isOpen} onOpenChange={setIsOpen}>
+        <div className="flex w-full flex-col items-start justify-start gap-2 p-0">
+          <CollapsibleTrigger
+            size="condensed"
+            className={cn(
+              'w-full cursor-pointer p-0 hover:bg-transparent active:bg-transparent',
+            )}
+          >
+            <div className="flex w-full flex-row items-center justify-between gap-2 pl-1.5 text-muted-foreground text-xs">
+              <ChevronDownIcon
+                className={cn(
+                  'size-3 shrink-0 transition-transform duration-150',
+                  isOpen && 'rotate-180',
+                )}
+              />
+              {`${formattedEdits.length} Edit${formattedEdits.length > 1 ? 's' : ''}`}
+              <div className="ml-auto flex flex-row items-center justify-start gap-1">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="cursor-pointer text-muted-foreground text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void rejectAllPendingEdits();
+                  }}
+                >
+                  Reject
+                </Button>
+                <Button
+                  variant="primary"
+                  size="xs"
+                  className="cursor-pointer text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void acceptAllPendingEdits();
+                  }}
+                >
+                  Accept all
+                </Button>
+              </div>
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="w-full">
+            {formattedEdits.map((edit) => (
+              <button
+                type="button"
+                className="flex w-full flex-col items-start justify-start gap-2 rounded px-1 py-0.5 hover:bg-muted/50"
+                key={edit.path}
+              >
+                <span className="flex flex-row items-center justify-start gap-1 truncate text-muted-foreground text-xs">
+                  <FileIcon
+                    filePath={edit.fileName}
+                    className="size-5 shrink-0"
+                  />
+                  <span className="text-xs leading-none">{edit.fileName}</span>
+                  {edit.linesAdded > 0 && (
+                    <span className="text-[10px] text-success leading-none">
+                      +{edit.linesAdded}
+                    </span>
+                  )}
+                  {edit.linesRemoved > 0 && (
+                    <span className="text-[10px] text-error leading-none">
+                      -{edit.linesRemoved}
+                    </span>
+                  )}
+                </span>
+              </button>
+            ))}
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
+    </div>
   );
 }
