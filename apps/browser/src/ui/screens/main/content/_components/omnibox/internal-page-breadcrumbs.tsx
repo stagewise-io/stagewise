@@ -62,7 +62,7 @@ export function InternalPageBreadcrumbs({
   return (
     <div
       onClick={onFocusInput}
-      className="-ml-2 flex h-8 w-full cursor-pointer flex-row items-center gap-1.5"
+      className="-ml-2 flex h-8 w-full cursor-pointer flex-row items-center gap-1.5 overflow-hidden"
     >
       <div className="flex h-6 shrink-0 items-center justify-center gap-1 rounded-full bg-primary/10 px-2 py-0.5">
         <Logo className="size-3 text-primary" color="current" />
@@ -72,13 +72,16 @@ export function InternalPageBreadcrumbs({
         pathnameSegments.map((segment, index) => {
           // Create a unique key using the path prefix up to this segment
           const pathPrefix = pathnameSegments.slice(0, index + 1).join('/');
+          const isLast = index === pathnameSegments.length - 1;
           return (
             <div
               key={pathPrefix}
-              className="flex shrink-0 flex-row items-center gap-1.5"
+              className={`flex min-w-0 flex-row items-center gap-1.5 ${isLast ? '' : 'shrink-0'}`}
             >
               <IconChevronRight className="size-3 shrink-0 text-muted-foreground" />
-              <span className="text-foreground text-sm">
+              <span
+                className={`text-foreground text-sm ${isLast ? 'truncate' : ''}`}
+              >
                 {formatSegmentText(segment)}
               </span>
             </div>
