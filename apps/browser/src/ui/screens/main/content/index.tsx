@@ -1,7 +1,7 @@
 import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
 import { useTabUIState } from '@/hooks/use-tab-ui-state';
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import {
   TabsContainer,
@@ -38,6 +38,11 @@ export function MainSection({
   // Store refs for each tab's PerTabContent
   const tabContentRefs = useRef<Record<string, PerTabContentRef | null>>({});
 
+  // Track pending omnibox focus request for newly created tabs
+  // Stores the activeTabId at the time createTab was called, so we know to focus
+  // when activeTabId changes to a different (new) value
+  const pendingOmniboxFocusFromTabIdRef = useRef<string | null>(null);
+
   const handleDragBorderRadiusChange = useCallback((radius: number | null) => {
     setDragBorderRadius(radius);
   }, []);
@@ -53,22 +58,45 @@ export function MainSection({
     [],
   );
 
-  const handleCreateTab = useCallback(() => {
-    createTab();
-    // Focus URL bar of the new active tab after a short delay to allow it to mount
-    setTimeout(() => {
-      const newActiveTabId = Object.keys(tabs)[Object.keys(tabs).length - 1];
-      if (newActiveTabId) {
-        tabContentRefs.current[newActiveTabId]?.focusOmnibox();
+  // Effect to focus omnibox when a new tab is created and ready
+  useEffect(() => {
+    const pendingFromTabId = pendingOmniboxFocusFromTabIdRef.current;
+    // Only focus if we have a pending request AND activeTabId has changed to a NEW tab
+    if (
+      pendingFromTabId !== null &&
+      activeTabId &&
+      activeTabId !== pendingFromTabId
+    ) {
+      // Try to focus the omnibox - the ref might not be ready yet on the first render
+      const tryFocus = () => {
+        const ref = tabContentRefs.current[activeTabId];
+        if (!ref) return false;
+
+        ref.focusOmnibox();
+        pendingOmniboxFocusFromTabIdRef.current = null;
+        return true;
+      };
+
+      // Try immediately (in case ref is already set)
+      if (!tryFocus()) {
+        // Retry after a short delay to allow the component to mount and set the ref
+        const timeoutId = setTimeout(() => {
+          tryFocus();
+        }, 50);
+        return () => clearTimeout(timeoutId);
       }
-    }, 50);
-  }, [createTab, tabs]);
+    }
+  }, [activeTabId, tabs]);
+
+  const handleCreateTab = useCallback(() => {
+    // Store the current activeTabId - we'll focus when it changes to a new tab
+    pendingOmniboxFocusFromTabIdRef.current = activeTabId;
+    createTab();
+  }, [createTab, activeTabId]);
 
   const handleCleanAllTabs = useCallback(() => {
     Object.values(tabs).forEach((tab) => {
-      if (tab.id !== activeTabId) {
-        closeTab(tab.id);
-      }
+      if (tab.id !== activeTabId) closeTab(tab.id);
     });
   }, [tabs, activeTabId, closeTab]);
 
