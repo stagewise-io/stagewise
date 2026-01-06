@@ -10,7 +10,6 @@ export const updateStagewiseMdTool = (
   onUpdateStagewiseMd: () => Promise<void>,
 ) =>
   tool({
-    name: 'updateStagewiseMdTool',
     description: DESCRIPTION,
     inputSchema: z.object({}),
     execute: async () => {

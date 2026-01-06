@@ -197,7 +197,6 @@ export async function overwriteFileToolExecute(
 
 export const overwriteFileTool = (clientRuntime: ClientRuntime) =>
   tool({
-    name: 'overwriteFileTool',
     description: DESCRIPTION,
     inputSchema: overwriteFileParamsSchema,
     execute: async (args) => {

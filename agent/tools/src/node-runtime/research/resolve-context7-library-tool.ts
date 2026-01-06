@@ -60,7 +60,6 @@ export async function resolveContext7LibraryToolExecute(
 
 export const resolveContext7LibraryTool = (apiClient: TRPCClient<AppRouter>) =>
   tool({
-    name: 'resolveContext7Library',
     description: DESCRIPTION,
     inputSchema: resolveContext7LibraryParamsSchema,
     execute: async (args) => {

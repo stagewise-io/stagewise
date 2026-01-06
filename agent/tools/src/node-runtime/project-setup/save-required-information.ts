@@ -66,7 +66,6 @@ export const saveRequiredInformationTool = (
   onSaveInformation: (params: SaveRequiredInformationParams) => Promise<void>,
 ) =>
   tool({
-    name: 'saveRequiredInformationTool',
     description: DESCRIPTION,
     inputSchema: saveRequiredInformationParamsSchema,
     execute: async (args) => {

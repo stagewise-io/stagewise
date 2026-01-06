@@ -49,7 +49,6 @@ export type AskForAppPathParams = z.infer<typeof askForAppPathParamsSchema>;
 
 export const askForAppPathTool = (_clientRuntime: ClientRuntime) =>
   tool({
-    name: 'askForAppPathTool',
     description: DESCRIPTION,
     inputSchema: askForAppPathParamsSchema,
     outputSchema: askForAppPathOutputSchema,

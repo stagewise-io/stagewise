@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { tool } from 'ai';
 import { rethrowCappedToolOutputError } from '../utils/error';
 import { capToolOutput } from '../utils/tool-output-capper';
 import { TOOL_OUTPUT_LIMITS } from '../constants';
@@ -139,13 +140,12 @@ export const readConsoleLogsParamsSchema = z.object({
 export type ReadConsoleLogsParams = z.infer<typeof readConsoleLogsParamsSchema>;
 
 export const readConsoleLogsTool = (runtime: BrowserRuntime) => {
-  return {
-    name: 'readConsoleLogs',
+  return tool({
     description: DESCRIPTION,
     inputSchema: readConsoleLogsParamsSchema,
     execute: (params: ReadConsoleLogsParams) =>
       readConsoleLogsToolExecute(params, runtime),
-  };
+  });
 };
 
 async function readConsoleLogsToolExecute(

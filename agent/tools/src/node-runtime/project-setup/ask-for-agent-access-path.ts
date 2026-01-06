@@ -45,7 +45,6 @@ export type AskForAgentAccessPathParams = z.infer<
 
 export const askForAgentAccessPathTool = (_clientRuntime: ClientRuntime) =>
   tool({
-    name: 'askForAgentAccessPathTool',
     description: DESCRIPTION,
     inputSchema: askForAgentAccessPathParamsSchema,
     outputSchema: askForAgentAccessPathOutputSchema,

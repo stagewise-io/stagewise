@@ -74,7 +74,6 @@ export async function webSearchToolExecute(
 
 export const webSearchTool = (apiClient: TRPCClient<AppRouter>) =>
   tool({
-    name: 'web_search',
     description: DESCRIPTION,
     inputSchema: webSearchParamsSchema,
     execute: async (args) => {

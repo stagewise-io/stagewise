@@ -202,7 +202,6 @@ export async function multiEditToolExecute(
 
 export const multiEditTool = (clientRuntime: ClientRuntime) =>
   tool({
-    name: 'multiEditTool',
     description: DESCRIPTION,
     inputSchema: multiEditParamsSchema,
     execute: async (args) => {

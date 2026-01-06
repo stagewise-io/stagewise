@@ -147,7 +147,6 @@ export async function readFileToolExecute(
 
 export const readFileTool = (clientRuntime: ClientRuntime) =>
   tool({
-    name: 'readFileTool',
     description: DESCRIPTION,
     inputSchema: readFileParamsSchema,
     execute: async (args) => {

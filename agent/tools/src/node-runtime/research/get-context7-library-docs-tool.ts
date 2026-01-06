@@ -65,7 +65,6 @@ export async function getContext7LibraryDocsToolExecute(
 
 export const getContext7LibraryDocsTool = (apiClient: TRPCClient<AppRouter>) =>
   tool({
-    name: 'getContext7LibraryDocs',
     description: DESCRIPTION,
     inputSchema: getContext7LibraryDocsParamsSchema,
     execute: async (args) => {

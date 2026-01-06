@@ -107,7 +107,6 @@ export async function globToolExecute(
 
 export const globTool = (clientRuntime: ClientRuntime) =>
   tool({
-    name: 'globTool',
     description: DESCRIPTION,
     inputSchema: globParamsSchema,
     execute: async (args) => {

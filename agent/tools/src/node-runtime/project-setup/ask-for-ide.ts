@@ -30,7 +30,6 @@ export type AskForIdeParams = z.infer<typeof askForIdeParamsSchema>;
 
 export const askForIdeTool = (_clientRuntime: ClientRuntime) =>
   tool({
-    name: 'askForIdeTool',
     description: DESCRIPTION,
     inputSchema: askForIdeParamsSchema,
     outputSchema: askForIdeOutputSchema,

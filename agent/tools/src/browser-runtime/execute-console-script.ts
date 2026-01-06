@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { tool } from 'ai';
 import type { BrowserRuntime } from '../index.js';
 import { rethrowCappedToolOutputError } from '../utils/error';
 import { capToolOutput } from '../utils/tool-output-capper';
@@ -55,13 +56,12 @@ export type ExecuteConsoleScriptParams = z.infer<
 >;
 
 export const executeConsoleScriptTool = (runtime: BrowserRuntime) => {
-  return {
-    name: 'executeConsoleScript',
+  return tool({
     description: DESCRIPTION,
     inputSchema: executeConsoleScriptParamsSchema,
     execute: (params: ExecuteConsoleScriptParams) =>
       executeConsoleScriptToolExecute(params, runtime),
-  };
+  });
 };
 
 async function executeConsoleScriptToolExecute(

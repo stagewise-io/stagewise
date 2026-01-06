@@ -174,7 +174,6 @@ export async function listFilesToolExecute(
 
 export const listFilesTool = (clientRuntime: ClientRuntime) =>
   tool({
-    name: 'listFilesTool',
     description: DESCRIPTION,
     inputSchema: listFilesParamsSchema,
     execute: async (args) => {

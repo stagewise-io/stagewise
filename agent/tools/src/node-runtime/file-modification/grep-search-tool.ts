@@ -195,7 +195,6 @@ export async function grepSearchToolExecute(
 
 export const grepSearchTool = (clientRuntime: ClientRuntime) =>
   tool({
-    name: 'grepSearchTool',
     description: DESCRIPTION,
     inputSchema: grepSearchParamsSchema,
     execute: async (args) => {

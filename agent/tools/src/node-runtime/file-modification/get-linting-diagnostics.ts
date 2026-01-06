@@ -124,7 +124,6 @@ export const getLintingDiagnosticsTool = (
   getDiagnostics: GetLintingDiagnosticsCallback,
 ) =>
   tool({
-    name: 'getLintingDiagnosticsTool',
     description: DESCRIPTION,
     inputSchema: getLintingDiagnosticsParamsSchema,
     execute: async (args) => {

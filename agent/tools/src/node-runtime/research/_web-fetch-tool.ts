@@ -61,7 +61,6 @@ export async function webFetchToolExecute(
 
 export const webFetchTool = (apiClient: TRPCClient<AppRouter>) =>
   tool({
-    name: 'web_fetch',
     description: DESCRIPTION,
     inputSchema: webFetchParamsSchema,
     execute: async (args) => {

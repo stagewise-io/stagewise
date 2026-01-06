@@ -112,7 +112,6 @@ export async function deleteFileToolExecute(
 
 export const deleteFileTool = (clientRuntime: ClientRuntime) =>
   tool({
-    name: 'deleteFileTool',
     description: DESCRIPTION,
     inputSchema: deleteFileParamsSchema,
     execute: async (args) => {
