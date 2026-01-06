@@ -7,6 +7,7 @@ on:
     paths:
       - 'apps/browser/**'
       - 'packages/**'
+      - 'agent/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/monorepo-ci.yml'
   pull_request:
@@ -16,6 +17,7 @@ on:
     paths:
       - 'apps/browser/**'
       - 'packages/**'
+      - 'agent/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/monorepo-ci.yml'
 
@@ -25,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Basic checks - runs on all pushes and PRs
+  # Lint - runs in parallel with build
   lint:
     name: Lint (Biome)
     runs-on: ubuntu-latest
@@ -52,32 +54,7 @@ jobs:
       - name: Run Biome Check
         run: pnpm check
 
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    env:
-      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.27.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run Tests
-        run: pnpm test
-
+  # Build - runs in parallel with lint
   build:
     name: Build Packages
     runs-on: ubuntu-latest
@@ -104,12 +81,59 @@ jobs:
       - name: Build All Packages
         run: pnpm build
 
+      - name: Cache Build Artifacts
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            packages/*/dist
+            agent/*/dist
+            apps/browser/dist
+          key: build-${{ github.sha }}
+
+  # Test - runs after build to use cached artifacts
+  test:
+    name: Unit Tests
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore Build Artifacts
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            packages/*/dist
+            agent/*/dist
+            apps/browser/dist
+          key: build-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Run Tests
+        run: pnpm test
+
   # Cross-platform browser builds - only on PRs to main/release-tests
   # Required for merge
   build-browser:
     name: Build Browser (${{ matrix.platform }})
     if: github.event_name == 'pull_request'
-    needs: [lint, test, build]
+    needs: [lint, test]
     environment: Dev
     strategy:
       fail-fast: false
