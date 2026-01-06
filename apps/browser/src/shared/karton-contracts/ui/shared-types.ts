@@ -1,4 +1,64 @@
 import { z } from 'zod';
+import type {
+  AnthropicProvider,
+  AnthropicProviderOptions,
+} from '@ai-sdk/anthropic';
+import type {
+  OpenAIProvider,
+  OpenAIResponsesProviderOptions,
+} from '@ai-sdk/openai';
+import type {
+  GoogleGenerativeAIProvider,
+  GoogleGenerativeAIProviderOptions,
+} from '@ai-sdk/google';
+
+type AllAnthropicModelIds = Parameters<AnthropicProvider['languageModel']>[0];
+type AllOpenAIModelIds = Parameters<OpenAIProvider['languageModel']>[0];
+type AllGoogleModelIds = Parameters<
+  GoogleGenerativeAIProvider['languageModel']
+>[0];
+
+type AnthropicModelIds =
+  | Extract<
+      AllAnthropicModelIds,
+      'claude-haiku-4-5' | 'claude-sonnet-4-5' | 'claude-opus-4-5'
+    >
+  | 'claude-opus-4-5';
+
+type OpenAIModelIds = Extract<
+  AllOpenAIModelIds,
+  'gpt-5.2' | 'gpt-5.1-codex-max'
+>;
+
+type GoogleModelIds = Extract<AllGoogleModelIds, 'gemini-3-pro-preview'>;
+
+type BaseSettings = {
+  modelDisplayName: string;
+  modelDescription: string;
+  modelContext: string;
+  headers?: Record<string, string>;
+  thinkingEnabled?: boolean;
+};
+
+type AnthropicModelSettings = BaseSettings & {
+  modelId: AnthropicModelIds;
+  providerOptions: AnthropicProviderOptions;
+};
+
+type OpenAIModelSettings = BaseSettings & {
+  modelId: OpenAIModelIds;
+  providerOptions: OpenAIResponsesProviderOptions;
+};
+
+type GoogleModelSettings = BaseSettings & {
+  modelId: GoogleModelIds;
+  providerOptions: GoogleGenerativeAIProviderOptions;
+};
+
+export type ModelSettings =
+  | AnthropicModelSettings
+  | OpenAIModelSettings
+  | GoogleModelSettings;
 
 /**
  * GLOBAL CONFIG CAPABILITIES

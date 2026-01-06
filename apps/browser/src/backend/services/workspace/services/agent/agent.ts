@@ -1,4 +1,5 @@
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
+import { getArbitraryModel, getModelOptions } from './utils/get-model-settings';
 import { resolve } from 'node:path';
 import type { GlobalDataPathService } from '../../../global-data-path';
 import { DiffHistoryService } from './diff-history';
@@ -19,10 +20,7 @@ import {
   Layout,
   type MainTab,
 } from '@shared/karton-contracts/ui';
-import {
-  type AnthropicProviderOptions,
-  createAnthropic,
-} from '@ai-sdk/anthropic';
+import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import {
   codingAgentTools,
   setupAgentTools,
@@ -35,7 +33,7 @@ import {
 } from '@stagewise/agent-tools';
 import {
   streamText,
-  // smoothStream, // Disabled due to ai-sdk v6 bug - see usage comment
+  smoothStream, // Disabled due to ai-sdk v6 bug - see usage comment
   generateId,
   readUIMessageStream,
   NoSuchToolError,
@@ -69,6 +67,7 @@ import { isAuthenticationError } from './utils/is-authentication-error';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { LspService } from '../lsp';
 import type { DiagnosticsByFile } from './prompt-builder';
+import { availableModels } from '@shared/available-models';
 
 type ToolCallType = 'dynamic-tool' | `tool-${string}`;
 
@@ -135,7 +134,6 @@ export class AgentService {
   private maxAuthRetries = 2;
   private abortController: AbortController;
   private lastMessageId: string | null = null;
-  private litellm: ReturnType<typeof createAnthropic> | null = null;
   private isWarmedUp = false;
   private onSaveSetupInformation: (params: {
     agentAccessPath: string;
@@ -375,26 +373,6 @@ export class AgentService {
     };
   }
 
-  private async initializeLitellm() {
-    const LLM_PROXY_URL =
-      process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
-
-    const accessToken = this.authService.accessToken;
-    if (!accessToken) {
-      this.logger.debug(
-        '[AgentService] No authentication tokens available. Initializing litellm failed, please sign in before using the agent.',
-      );
-      return;
-    }
-
-    this.apiKey = accessToken;
-
-    this.litellm = createAnthropic({
-      baseURL: `${LLM_PROXY_URL}/v1`,
-      apiKey: accessToken,
-    });
-  }
-
   private async initializeClient() {
     // await this.authService.refreshAuthState();
     const accessToken = this.authService.accessToken;
@@ -405,19 +383,29 @@ export class AgentService {
       return;
     }
 
-    this.client = createAuthenticatedClient(accessToken);
+    this.apiKey = accessToken;
+    this.client = createAuthenticatedClient(this.apiKey);
   }
 
   private async updateStagewiseMd() {
     if (!this.clientRuntime) return;
     if (!this.uiKarton.state.workspace?.paths.data) return;
+    if (!this.apiKey) {
+      this.logger.debug(
+        '[AgentService] No API key available. Initializing client failed, please sign in before using the agent.',
+      );
+      return;
+    }
     await generateStagewiseMd(
-      this.telemetryService.withTracing(this.litellm!('claude-haiku-4-5'), {
-        posthogTraceId: 'update-stagewise-md',
-        posthogProperties: {
-          $ai_span_name: 'update-stagewise-md',
+      this.telemetryService.withTracing(
+        getArbitraryModel('claude-haiku-4-5', this.apiKey),
+        {
+          posthogTraceId: 'update-stagewise-md',
+          posthogProperties: {
+            $ai_span_name: 'update-stagewise-md',
+          },
         },
-      }),
+      ),
       this.clientRuntime!,
       new ClientRuntimeNode({
         workingDirectory: this.uiKarton.state.workspace.paths.data,
@@ -643,10 +631,9 @@ export class AgentService {
   private onAuthStateChange = (async (newAuthState: AuthState) => {
     if (newAuthState.status === 'authenticated') {
       this.logger.debug(
-        '[AgentService] Auth state changed to authenticated, initializing client and litellm...',
+        '[AgentService] Auth state changed to authenticated, initializing client...',
       );
       await this.initializeClient();
-      await this.initializeLitellm();
       if (!this.isWarmedUp) {
         this.isWarmedUp = true;
         void this.warmUpLLMProxyCache();
@@ -657,6 +644,8 @@ export class AgentService {
   public async initialize() {
     this.logger.debug('[AgentService] Initializing...');
 
+    const initialModel = availableModels[0];
+
     this.uiKarton.setState((draft) => {
       if (!draft.agentChat) {
         draft.agentChat = {
@@ -664,6 +653,7 @@ export class AgentService {
           activeChatId: null,
           toolCallApprovalRequests: [],
           isWorking: false,
+          selectedModel: initialModel,
         };
       }
     });
@@ -673,9 +663,8 @@ export class AgentService {
       this.uiKarton,
     );
 
-    // Initialize client and litellm
+    // Initialize client
     await this.initializeClient();
-    await this.initializeLitellm();
 
     this.authService.registerAuthStateChangeCallback(this.onAuthStateChange);
 
@@ -719,6 +708,19 @@ export class AgentService {
         'agentChat.undoEditsUntilUserMessage',
         async (userMessageId: string, chatId: string) => {
           await this.undoEditsUntilUserMessage(userMessageId, chatId);
+        },
+      );
+
+      this.uiKarton.registerServerProcedureHandler(
+        'agentChat.setSelectedModel',
+        async (model: string) => {
+          const modelSettings = availableModels.find(
+            (m) => m.modelId === model,
+          );
+          if (!modelSettings) return;
+          this.uiKarton.setState((draft) => {
+            if (draft.agentChat) draft.agentChat.selectedModel = modelSettings;
+          });
         },
       );
 
@@ -974,6 +976,7 @@ export class AgentService {
     this.uiKarton.removeServerProcedureHandler(
       'agentChat.undoEditsUntilUserMessage',
     );
+    this.uiKarton.removeServerProcedureHandler('agentChat.setSelectedModel');
     this.uiKarton.removeServerProcedureHandler(
       'agentChat.acceptAllPendingEdits',
     );
@@ -1049,8 +1052,6 @@ export class AgentService {
     };
     if (!this.apiKey) return captureAgentError('No API key available');
 
-    if (!this.litellm) return captureAgentError('No litellm available');
-
     const toolsContext = this.getToolsContext();
     if (!toolsContext) {
       // agent without workspace configured won't use any tools
@@ -1102,7 +1103,7 @@ export class AgentService {
         const title = await generateChatTitle(
           history,
           this.telemetryService.withTracing(
-            this.litellm('gemini-2.5-flash-lite'),
+            getArbitraryModel('gemini-3-flash-preview', this.apiKey),
             {
               posthogTraceId: `chat-title-${chatId}`,
               posthogProperties: {
@@ -1130,20 +1131,31 @@ export class AgentService {
       }
 
       const isSetupMode = this.uiKarton.state.workspaceStatus === 'setup';
+      const modelId = this.uiKarton.state.agentChat?.selectedModel?.modelId;
 
-      const model = this.telemetryService.withTracing(
-        isSetupMode
-          ? this.litellm('claude-haiku-4-5')
-          : this.litellm('claude-sonnet-4-5'),
-        {
-          posthogTraceId: chatId,
-          posthogProperties: {
-            $ai_span_name: isSetupMode ? 'agent-setup' : 'agent-chat',
-            developerTag: process.env.DEVELOPER_TAG || undefined,
-            currentTab: this.getCurrentTab(),
-          },
+      const modelOptions =
+        isSetupMode || !modelId
+          ? {
+              model: getArbitraryModel('claude-haiku-4-5', this.apiKey),
+              providerOptions: {
+                anthropic: {
+                  thinking: {
+                    type: 'disabled',
+                  },
+                },
+              },
+            }
+          : getModelOptions(modelId, this.apiKey);
+
+      const model = this.telemetryService.withTracing(modelOptions.model, {
+        posthogTraceId: chatId,
+        posthogProperties: {
+          $ai_span_name: isSetupMode ? 'agent-setup' : 'agent-chat',
+          developerTag: process.env.DEVELOPER_TAG || undefined,
+          currentTab: this.getCurrentTab(),
+          modelId,
         },
-      );
+      });
 
       // Get the tools based on the agent mode
       const tools = toolsContext
@@ -1174,18 +1186,9 @@ export class AgentService {
         abortSignal: signalBeforeAsyncOps,
         maxOutputTokens: 10000,
         maxRetries: 0,
-        providerOptions: {
-          anthropic: {
-            thinking: this.thinkingEnabled
-              ? { type: 'enabled', budgetTokens: 10000 }
-              : { type: 'disabled' },
-          } satisfies AnthropicProviderOptions,
-          openai: {},
-        },
-        headers: {
-          'anthropic-beta':
-            'fine-grained-tool-streaming-2025-05-14, interleaved-thinking-2025-05-14',
-        },
+        providerOptions:
+          'providerOptions' in modelOptions ? modelOptions.providerOptions : {},
+        headers: 'headers' in modelOptions ? modelOptions.headers : {},
         messages,
         onError: async (error) => {
           await this.handleStreamingError(error, chatId);
@@ -1195,13 +1198,10 @@ export class AgentService {
           this.authRetryCount = 0;
           this.cleanupPendingOperations('Agent call aborted');
         },
-        // NOTE: smoothStream disabled due to ai-sdk v6 bug where subsequent streams
-        // don't emit chunks properly (likely due to teeStream() state reuse issues).
-        // See: https://github.com/vercel/ai/issues/9021
-        // experimental_transform: smoothStream({
-        //   delayInMs: 10,
-        //   chunking: 'word',
-        // }),
+        experimental_transform: smoothStream({
+          delayInMs: 10,
+          chunking: 'word',
+        }),
         experimental_repairToolCall: async (r) => {
           // Haiku often returns the tool input as string instead of object - we try to parse it as object
           // If the parsing fails, we simply return an invalid tool call
@@ -1525,9 +1525,9 @@ export class AgentService {
       return;
     }
 
-    if (!this.litellm) {
+    if (!this.apiKey) {
       this.logger.debug(
-        '[AgentService] Cannot compact chat history: litellm not initialized',
+        '[AgentService] Cannot compact chat history: no API key available',
       );
       return;
     }
@@ -1591,13 +1591,16 @@ export class AgentService {
     try {
       const summary = await summarizeChatHistory(
         messagesForSummary,
-        this.telemetryService.withTracing(this.litellm('gemini-2.5-flash'), {
-          // TODO: update to use 3-flash when the backend supports it
-          posthogTraceId: `compact-chat-${chatId}`,
-          posthogProperties: {
-            $ai_span_name: 'compact-chat-history',
+        this.telemetryService.withTracing(
+          getArbitraryModel('gemini-2.5-flash', this.apiKey),
+          {
+            // TODO: update to use 3-flash when the backend supports it
+            posthogTraceId: `compact-chat-${chatId}`,
+            posthogProperties: {
+              $ai_span_name: 'compact-chat-history',
+            },
           },
-        }),
+        ),
       );
 
       // Attach summary to last user message's metadata
@@ -1771,15 +1774,15 @@ export class AgentService {
    * @returns The response from the warm-up request.
    */
   private async warmUpLLMProxyCache() {
-    if (!this.litellm) {
+    if (!this.apiKey) {
       this.logger.debug(
-        '[AgentService] No litellm available. Warm up request failed, please initialize litellm before using the agent.',
+        '[AgentService] No API key available. Warm up request failed, please sign in before using the agent.',
       );
       return;
     }
     return generateText({
       model: this.telemetryService.withTracing(
-        this.litellm('claude-haiku-4-5'),
+        getArbitraryModel('claude-haiku-4-5', this.apiKey),
         {
           posthogTraceId: 'warm-up-request',
           posthogProperties: {
@@ -1851,9 +1854,8 @@ export class AgentService {
       this.authRetryCount++;
 
       // Auth service will handle token refresh internally
-      // We just need to reinitialize our client and litellm
+      // We just need to reinitialize our client
       await this.initializeClient();
-      await this.initializeLitellm();
 
       const messages = this.uiKarton.state.agentChat?.chats[chatId]?.messages;
       await this.callAgent({

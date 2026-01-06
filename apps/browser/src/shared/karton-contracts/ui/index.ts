@@ -19,6 +19,7 @@ import type {
   WorkspaceConfig,
   FilePickerRequest,
   GlobalConfig,
+  ModelSettings,
 } from './shared-types';
 import type { PageTransition, DownloadState } from '../pages-api/types';
 
@@ -244,6 +245,7 @@ export type AppState = {
     };
   };
   agentChat: {
+    selectedModel: ModelSettings;
     activeChatId: ChatId | null;
     chats: Record<ChatId, Chat>;
     toolCallApprovalRequests: string[];
@@ -428,6 +430,7 @@ export type KartonContract = {
         chatId: string,
         shouldUndoUserMessage?: boolean,
       ) => Promise<void>;
+      setSelectedModel: (model: string) => Promise<void>;
     };
     userAccount: {
       refreshStatus: () => Promise<void>;

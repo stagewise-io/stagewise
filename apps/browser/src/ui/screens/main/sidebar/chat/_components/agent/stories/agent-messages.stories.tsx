@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { availableModels } from '@shared/available-models';
 import { ChatHistory } from '../../chat-history';
 import { withFileEditScenario } from '@sb/decorators/scenarios';
 import { withMockKarton } from '@sb/decorators/with-mock-karton';
@@ -55,6 +56,7 @@ const baseState: Partial<AppState> = {
     activeChatId: 'chat-1',
     toolCallApprovalRequests: [],
     isWorking: false,
+    selectedModel: availableModels[0],
   },
   userExperience: {
     activeLayout: Layout.MAIN,

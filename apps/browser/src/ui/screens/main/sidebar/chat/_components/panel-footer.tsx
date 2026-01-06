@@ -1,5 +1,6 @@
 import { FileAttachmentChips } from '@/components/file-attachment-chips';
 import { IconXmark } from 'nucleo-micro-bold';
+import { ModelSelect } from './model-select';
 import { ContextUsageRing } from './context-usage-ring';
 import { SelectedElementsChipsFlexible } from '@/components/selected-elements-chips-flexible';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -325,23 +326,24 @@ export function ChatPanelFooter() {
               disabled={!enableInputField}
               className={cn(
                 GlassyTextInputClassNames,
-                'scrollbar-subtle relative z-10 h-full w-full resize-none border-none bg-transparent px-2 py-1 text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out focus:outline-none disabled:bg-transparent',
+                'scrollbar-subtle relative z-10 mt-0 h-full w-full resize-none overflow-visible rounded-none border-none text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out placeholder:text-muted-foreground/70 focus:outline-none disabled:bg-transparent',
               )}
+              placeholder={`Ask anything about this page ${focusChatHotkeyText}`}
             />
-            {chatState.chatInput.length === 0 && (
-              <div className="pointer-events-none absolute inset-0 z-20 size-full px-[9px] py-[2px]">
-                <span className="text-muted-foreground text-sm">
-                  Ask anything about this page{' '}
-                </span>
-                <span className="text-muted-foreground/60 text-sm">
-                  {focusChatHotkeyText}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* Other attachments area */}
           <div className="flex shrink-0 flex-row flex-wrap items-center justify-start gap-1 *:shrink-0">
+            <ModelSelect
+              onModelChange={() => {
+                // Defer focus until after popover closes using double rAF
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    inputRef.current?.focus();
+                  });
+                });
+              }}
+            />
             {activeChat && (isVerboseMode || contextUsed > 80) && (
               <ContextUsageRing
                 percentage={contextUsed}

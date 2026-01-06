@@ -12,6 +12,7 @@ import {
   withComplexRefactoringScenario,
 } from '@sb/decorators/scenarios';
 import { createEmptyChat } from '@sb/mocks/chat-data';
+import { availableModels } from '@shared/available-models';
 
 const meta: Meta<typeof ChatHistory> = {
   title: 'Chat/Agent/Scenarios/Agent Lifecycle',
@@ -51,6 +52,7 @@ const baseState: Partial<AppState> = {
     activeChatId: 'streaming-chat',
     toolCallApprovalRequests: [],
     isWorking: false,
+    selectedModel: availableModels[0],
   },
   userExperience: {
     activeLayout: Layout.MAIN,
