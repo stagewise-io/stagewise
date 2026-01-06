@@ -32,9 +32,9 @@
     "electron-unhandled": "^5.0.0"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "3.0.4",
-    "@ai-sdk/google": "3.0.2",
-    "@ai-sdk/openai": "3.0.2",
+    "@ai-sdk/anthropic": "3.0.7",
+    "@ai-sdk/google": "3.0.4",
+    "@ai-sdk/openai": "3.0.5",
     "@ai-sdk/provider": "3.0.1",
     "@electron-forge/cli": "^7.10.2",
     "@electron-forge/maker-deb": "^7.10.2",

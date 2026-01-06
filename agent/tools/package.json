@@ -25,7 +25,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "3.0.4",
+    "@ai-sdk/anthropic": "3.0.7",
     "@ai-sdk/provider": "3.0.1",
     "@stagewise/api-client": "2.1.0",
     "ai": "6.0.11"
