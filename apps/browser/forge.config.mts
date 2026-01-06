@@ -7,6 +7,8 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
+import path from 'node:path';
+import fs from 'node:fs';
 
 /**
  * Release channel for the build.
@@ -64,10 +66,42 @@ const dmgVolumeName = (() => {
   }
 })();
 
+// For now, we maintain a manually updated list of dependencies and sub-dependencies that need to be copied over in order to get a working deployed app.
+// Ugly but works.
+const nativeDependencies = [
+  '@libsql',
+  'libsql',
+  '@neon-rs',
+  'promise-limit',
+  'js-base64',
+  'ws',
+];
+
+const copyNativeDependencies = (
+  buildPath: string,
+  _electronVersion: string,
+  _platform: string,
+  _arch: string,
+  callback: (error?: Error) => void,
+) => {
+  for (const dependency of nativeDependencies) {
+    const src = path.resolve(__dirname, `../../node_modules/${dependency}`);
+    const dest = path.join(buildPath, 'node_modules', dependency);
+    if (fs.existsSync(src)) {
+      fs.cpSync(src, dest, { recursive: true });
+    } else {
+      throw new Error(`Missing native dependency ${dependency}`);
+    }
+  }
+  callback();
+};
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     extraResource: ['./bundled'],
+    prune: false,
+    afterCopy: [copyNativeDependencies],
     icon: `./assets/icons/${releaseChannel}/icon`,
     appCopyright: `Copyright © ${new Date().getFullYear()} stagewise GmbH`,
     win32metadata: {
@@ -128,6 +162,7 @@ const config: ForgeConfig = {
     }),
   ],
   plugins: [
+    new AutoUnpackNativesPlugin({}),
     new VitePlugin({
       // `build` can specify multiple entry builds, which can be Main process, Preload scripts, Worker process, etc.
       // If you are familiar with Vite configuration, it will look really familiar.
@@ -160,7 +195,7 @@ const config: ForgeConfig = {
         },
       ],
     }),
-    new AutoUnpackNativesPlugin({}),
+    // new AutoUnpackNativesPlugin({}),
     // Fuses are used to enable/disable various Electron functionality
     // at package time, before code signing the application
     new FusesPlugin({

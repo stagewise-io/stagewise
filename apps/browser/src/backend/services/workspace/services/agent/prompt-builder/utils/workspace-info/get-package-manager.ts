@@ -30,10 +30,10 @@ export interface PackageManagerInfo {
  *
  * @example
  * ```typescript
- * // When package.json has "packageManager": "pnpm@10.10.0"
+ * // When package.json has "packageManager": "pnpm@10.27.0"
  * const manager = await getPackageManager(clientRuntime);
  * console.log(manager);
- * // { name: 'pnpm', version: '10.10.0' }
+ * // { name: 'pnpm', version: '10.27.0' }
  * ```
  *
  * @example
@@ -71,7 +71,7 @@ export async function getPackageManager(
         const packageJson = JSON.parse(result.content);
 
         if (packageJson.packageManager) {
-          // packageManager field format: "pnpm@10.10.0" or just "pnpm"
+          // packageManager field format: "pnpm@10.27.0" or just "pnpm"
           const [name, version] = packageJson.packageManager.split('@');
 
           // Validate that it's a known package manager

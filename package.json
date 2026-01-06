@@ -46,28 +46,42 @@
     "turbo": "^2.5.4",
     "typescript": "^5.8.3"
   },
-  "packageManager": "pnpm@10.10.0",
+  "packageManager": "pnpm@10.27.0",
   "engines": {
     "node": ">=18"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@libsql/darwin-arm64",
+      "@libsql/darwin-x64",
+      "@libsql/linux-arm64-gnu",
+      "@libsql/linux-arm64-musl",
+      "@libsql/linux-x64-gnu",
+      "@libsql/linux-x64-musl",
+      "@libsql/win32-x64-msvc",
+      "@parcel/watcher",
+      "@swc/core",
+      "bufferutil",
+      "core-js",
+      "core-js-pure",
       "electron",
       "electron-winstaller",
       "esbuild",
       "fs-xattr",
+      "lefthook",
+      "libsql",
       "macos-alias",
+      "nucleo-core-fill-24",
+      "nucleo-core-outline-24",
       "nucleo-micro-bold",
       "nucleo-ui-fill-18",
       "nucleo-ui-fill-duo-18",
       "nucleo-ui-outline-18",
-      "nucleo-ui-outline-duo-18"
-    ],
-    "ignoredBuiltDependencies": [
-      "keytar"
+      "nucleo-ui-outline-duo-18",
+      "sharp",
+      "utf-8-validate"
     ],
     "overrides": {
-      "stagewise": "link:apps/cli",
       "lucide-react": "0.554.0",
       "@types/react": "19.2.7",
       "@types/react-dom": "19.2.3",
@@ -76,7 +90,6 @@
     }
   },
   "dependencies": {
-    "stagewise": "link:apps/cli",
     "tsx": "^4.20.3"
   },
   "config": {
