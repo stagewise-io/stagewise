@@ -80,7 +80,7 @@
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^4.6.0",
     "@vueless/storybook-dark-mode": "^10.0.3",
-    "ai": "6.0.9",
+    "ai": "6.0.11",
     "bowser": "^2.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
