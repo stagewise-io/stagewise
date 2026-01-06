@@ -211,6 +211,7 @@ export const ChatBubble = memo(
                   }
                   switch (part.type) {
                     case 'text':
+                      if ((part as TextUIPart).text.trim() === '') return null; // Skip empty text parts (can occur with interleaved-thinking in ai-sdk v6)
                       return (
                         <TextPart
                           key={stableKey}

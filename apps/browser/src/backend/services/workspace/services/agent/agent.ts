@@ -35,7 +35,7 @@ import {
 } from '@stagewise/agent-tools';
 import {
   streamText,
-  smoothStream,
+  // smoothStream, // Disabled due to ai-sdk v6 bug - see usage comment
   generateId,
   readUIMessageStream,
   NoSuchToolError,
@@ -1172,7 +1172,6 @@ export class AgentService {
         // Use the captured signal instead of this.abortController.signal
         // This ensures abort is respected even if called during async operations above
         abortSignal: signalBeforeAsyncOps,
-        temperature: 0.7,
         maxOutputTokens: 10000,
         maxRetries: 0,
         providerOptions: {
@@ -1196,10 +1195,13 @@ export class AgentService {
           this.authRetryCount = 0;
           this.cleanupPendingOperations('Agent call aborted');
         },
-        experimental_transform: smoothStream({
-          delayInMs: 10,
-          chunking: 'word',
-        }),
+        // NOTE: smoothStream disabled due to ai-sdk v6 bug where subsequent streams
+        // don't emit chunks properly (likely due to teeStream() state reuse issues).
+        // See: https://github.com/vercel/ai/issues/9021
+        // experimental_transform: smoothStream({
+        //   delayInMs: 10,
+        //   chunking: 'word',
+        // }),
         experimental_repairToolCall: async (r) => {
           // Haiku often returns the tool input as string instead of object - we try to parse it as object
           // If the parsing fails, we simply return an invalid tool call
