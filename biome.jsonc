@@ -16,6 +16,7 @@
       "!**/.svelte-kit/**",
       "!**/.output/**",
       "!**/.source/**",
+      "!**/routeTree.gen.ts",
       "!**/tests/**/*",
       "!**/test/**/*",
       "!**/__tests__/**/*"
