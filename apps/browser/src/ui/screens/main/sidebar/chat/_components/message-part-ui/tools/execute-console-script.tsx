@@ -1,6 +1,6 @@
 import type { ToolPart } from '@shared/karton-contracts/ui';
 import { ChevronDownIcon, Loader2Icon, XIcon } from 'lucide-react';
-import { useMemo, useState, useEffect, useId, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { IconWindowPointerOutline18 } from 'nucleo-ui-outline-18';
 import {
   Tooltip,
@@ -14,23 +14,21 @@ import {
 import { ToolPartUI } from './shared/tool-part-ui';
 import { CodeBlock } from '@/components/ui/code-block';
 import { cn } from '@/utils';
-import { useExploringContentContext } from './exploring';
+import { useToolAutoExpand } from './shared/use-tool-auto-expand';
 
 export const ExecuteConsoleScriptToolPart = ({
   part,
   showBorder = true,
   disableShimmer = false,
+  isLastPart = false,
 }: {
   part: Extract<ToolPart, { type: 'tool-executeConsoleScriptTool' }>;
   showBorder?: boolean;
   disableShimmer?: boolean;
+  isLastPart?: boolean;
 }) => {
-  const [expanded, setExpanded] = useState(false);
-  const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const [resultExpanded, setResultExpanded] = useState(true);
-  const exploringContext = useExploringContentContext();
-  const id = useId();
 
   const streaming = useMemo(() => {
     return part.state === 'input-streaming' || part.state === 'input-available';
@@ -41,6 +39,12 @@ export const ExecuteConsoleScriptToolPart = ({
     if (part.state === 'output-error') return 'error';
     return 'success';
   }, [part.state, streaming]);
+
+  // Use the unified auto-expand hook
+  const { expanded, handleUserSetExpanded } = useToolAutoExpand({
+    isStreaming: streaming,
+    isLastPart,
+  });
 
   // Format the result as pretty-printed JSON if possible
   const formattedResult = useMemo(() => {
@@ -54,30 +58,6 @@ export const ExecuteConsoleScriptToolPart = ({
       return result;
     }
   }, [part.output?.result?.result]);
-
-  // Sync expanded state with streaming state (expand while streaming, collapse when done)
-  // This is auto-expansion, not user-initiated
-  useEffect(() => {
-    setExpanded(streaming);
-    setIsManuallyExpanded(false);
-  }, [streaming]);
-
-  // Handle user-initiated expansion toggle
-  const handleUserSetExpanded = useCallback((newExpanded: boolean) => {
-    setExpanded(newExpanded);
-    setIsManuallyExpanded(newExpanded);
-  }, []);
-
-  // Report expansion state to parent exploring context (only for manual expansion)
-  useEffect(() => {
-    if (!exploringContext) return;
-    if (isManuallyExpanded && expanded) exploringContext.registerExpanded(id);
-    else exploringContext.unregisterExpanded(id);
-
-    return () => {
-      exploringContext.unregisterExpanded(id);
-    };
-  }, [expanded, isManuallyExpanded, exploringContext, id]);
 
   if (state === 'error') {
     return (

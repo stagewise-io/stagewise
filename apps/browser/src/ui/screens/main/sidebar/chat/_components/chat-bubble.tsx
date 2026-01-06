@@ -180,22 +180,24 @@ export const ChatBubble = memo(
                 );
 
                 const typeCounters: Record<string, number> = {};
+                let exploringGroupIndex = 0;
 
                 return parts.map((part, index) => {
-                  if (Array.isArray(part))
+                  const isLastPart = index === parts.length - 1;
+                  if (Array.isArray(part)) {
+                    const stableKey = `${msg.id}:exploring:${exploringGroupIndex}`;
+                    exploringGroupIndex++;
                     return (
                       // Handles glob, grep, listFiles, readFile tools
                       <ExploringToolParts
+                        key={stableKey}
                         parts={part}
                         thinkingDurations={msg.metadata?.thinkingDurations}
-                        isAutoExpanded={index === parts.length - 1}
-                        isShimmering={
-                          isWorking &&
-                          index === parts.length - 1 &&
-                          isLastMessage
-                        }
+                        isAutoExpanded={isLastPart}
+                        isShimmering={isWorking && isLastPart && isLastMessage}
                       />
                     );
+                  }
 
                   const currentTypeIndex = typeCounters[part.type] ?? 0;
                   typeCounters[part.type] = currentTypeIndex + 1;
@@ -228,11 +230,11 @@ export const ChatBubble = memo(
                             msg.metadata?.thinkingDurations?.[currentTypeIndex]
                           }
                           part={part as ReasoningUIPart}
-                          isAutoExpanded={index === parts.length - 1}
+                          isLastPart={isLastPart}
                           isShimmering={
                             isWorking &&
                             part.state === 'streaming' &&
-                            index === parts.length - 1 &&
+                            isLastPart &&
                             isLastMessage
                           }
                         />
@@ -250,11 +252,16 @@ export const ChatBubble = memo(
                         <ExecuteConsoleScriptToolPart
                           key={stableKey}
                           part={part}
+                          isLastPart={isLastPart}
                         />
                       );
                     case 'tool-readConsoleLogsTool':
                       return (
-                        <ReadConsoleLogsToolPart key={stableKey} part={part} />
+                        <ReadConsoleLogsToolPart
+                          key={stableKey}
+                          part={part}
+                          isLastPart={isLastPart}
+                        />
                       );
                     case 'tool-overwriteFileTool':
                       return (

@@ -1,57 +1,38 @@
 import { cn } from '@/utils';
 import type { ReasoningUIPart } from '@shared/karton-contracts/ui';
-import { useState, useEffect, useMemo, useId, useCallback } from 'react';
+import { useMemo } from 'react';
 import { BrainIcon } from 'lucide-react';
 import { Streamdown } from '@/components/streamdown';
 import { useTypeWriterText } from '@/hooks/use-type-writer-text';
 import { ToolPartUI } from './tools/shared/tool-part-ui';
-import { useExploringContentContext } from './tools/exploring';
+import { useToolAutoExpand } from './tools/shared/use-tool-auto-expand';
 
 export const ThinkingPart = ({
   part,
-  isAutoExpanded,
   isShimmering,
   thinkingDuration,
   showBorder = true,
+  isLastPart = false,
 }: {
   part: ReasoningUIPart;
-  isAutoExpanded: boolean;
   isShimmering: boolean;
   thinkingDuration?: number;
   showBorder?: boolean;
+  isLastPart?: boolean;
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
-  const exploringContext = useExploringContentContext();
-  const id = useId();
+  const isStreaming = part.state === 'streaming';
+
+  // Use the unified auto-expand hook
+  const { expanded, handleUserSetExpanded } = useToolAutoExpand({
+    isStreaming,
+    isLastPart,
+  });
+
   const formattedThinkingDuration = useMemo(() => {
     if (!thinkingDuration) return null;
     // thinkingDuration is ms, convert to s without decimals
     return `${Math.round(thinkingDuration / 1000)}s`;
   }, [thinkingDuration]);
-
-  // Handle auto-expansion (not user-initiated)
-  useEffect(() => {
-    setIsExpanded(isAutoExpanded);
-    setIsManuallyExpanded(false);
-  }, [isAutoExpanded]);
-
-  // Handle user-initiated expansion toggle
-  const handleUserSetExpanded = useCallback((expanded: boolean) => {
-    setIsExpanded(expanded);
-    setIsManuallyExpanded(expanded);
-  }, []);
-
-  // Report expansion state to parent exploring context (only for manual expansion)
-  useEffect(() => {
-    if (!exploringContext) return;
-    if (isManuallyExpanded && isExpanded) exploringContext.registerExpanded(id);
-    else exploringContext.unregisterExpanded(id);
-
-    return () => {
-      exploringContext.unregisterExpanded(id);
-    };
-  }, [isExpanded, isManuallyExpanded, exploringContext, id]);
 
   const displayedText = useTypeWriterText(part.text, {
     charsPerInterval: 2,
@@ -62,7 +43,7 @@ export const ThinkingPart = ({
   return (
     <ToolPartUI
       showBorder={showBorder}
-      expanded={isExpanded}
+      expanded={expanded}
       setExpanded={handleUserSetExpanded}
       contentClassName="max-h-24"
       trigger={

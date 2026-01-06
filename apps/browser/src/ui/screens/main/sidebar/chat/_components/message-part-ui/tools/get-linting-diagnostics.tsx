@@ -3,27 +3,24 @@ import {
   IconTriangleWarningOutline18,
   IconCheck2Outline18,
 } from 'nucleo-ui-outline-18';
-import { useMemo, useState, useEffect, useId, useCallback } from 'react';
+import { useMemo } from 'react';
 import { Loader2Icon, XCircleIcon } from 'lucide-react';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { cn } from '@/utils';
-import { useExploringContentContext } from './exploring';
+import { useToolAutoExpand } from './shared/use-tool-auto-expand';
 import type { LintingDiagnostic } from '@stagewise/agent-tools';
 
 export const GetLintingDiagnosticsToolPart = ({
   part,
   disableShimmer = false,
   showBorder = true,
+  isLastPart = false,
 }: {
   part: Extract<ToolPart, { type: 'tool-getLintingDiagnosticsTool' }>;
   disableShimmer?: boolean;
   showBorder?: boolean;
+  isLastPart?: boolean;
 }) => {
-  const [expanded, setExpanded] = useState(false);
-  const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
-  const exploringContext = useExploringContentContext();
-  const id = useId();
-
   const streaming = useMemo(() => {
     return part.state === 'input-streaming' || part.state === 'input-available';
   }, [part.state]);
@@ -33,6 +30,12 @@ export const GetLintingDiagnosticsToolPart = ({
     if (part.state === 'output-error') return 'error';
     return 'success';
   }, [part.state, streaming]);
+
+  // Use the unified auto-expand hook
+  const { expanded, handleUserSetExpanded } = useToolAutoExpand({
+    isStreaming: streaming,
+    isLastPart,
+  });
 
   const summary = part.output?.summary;
   const errors = summary?.errors ?? 0;
@@ -47,29 +50,6 @@ export const GetLintingDiagnosticsToolPart = ({
   const files = useMemo(() => {
     return part.output?.files ?? [];
   }, [part.output?.files]);
-
-  // Sync expanded state with streaming state
-  useEffect(() => {
-    setExpanded(streaming);
-    setIsManuallyExpanded(false);
-  }, [streaming]);
-
-  // Handle user-initiated expansion toggle
-  const handleUserSetExpanded = useCallback((newExpanded: boolean) => {
-    setExpanded(newExpanded);
-    setIsManuallyExpanded(newExpanded);
-  }, []);
-
-  // Report expansion state to parent exploring context
-  useEffect(() => {
-    if (!exploringContext) return;
-    if (isManuallyExpanded && expanded) exploringContext.registerExpanded(id);
-    else exploringContext.unregisterExpanded(id);
-
-    return () => {
-      exploringContext.unregisterExpanded(id);
-    };
-  }, [expanded, isManuallyExpanded, exploringContext, id]);
 
   // Error state display
   if (state === 'error') {

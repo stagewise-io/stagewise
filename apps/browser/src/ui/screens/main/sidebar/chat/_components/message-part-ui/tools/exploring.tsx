@@ -75,21 +75,23 @@ const PartContent = ({
   minimal = false,
   disableShimmer = false,
   thinkingDuration,
+  isLastPart = false,
 }: {
   part: ReadOnlyToolPart;
   minimal?: boolean;
   disableShimmer?: boolean;
   thinkingDuration?: number;
+  isLastPart?: boolean;
 }) => {
   switch (part.type) {
     case 'reasoning':
       return (
         <ThinkingPart
           part={part}
-          isAutoExpanded={part.state === 'streaming'}
           isShimmering={false}
           thinkingDuration={thinkingDuration}
           showBorder={!minimal}
+          isLastPart={isLastPart}
         />
       );
     case 'tool-globTool':
@@ -153,6 +155,7 @@ const PartContent = ({
           showBorder={!minimal}
           part={part}
           disableShimmer={disableShimmer}
+          isLastPart={isLastPart}
         />
       );
     case 'tool-readConsoleLogsTool':
@@ -162,6 +165,7 @@ const PartContent = ({
           showBorder={!minimal}
           part={part}
           disableShimmer={disableShimmer}
+          isLastPart={isLastPart}
         />
       );
     case 'tool-getLintingDiagnosticsTool':
@@ -171,6 +175,7 @@ const PartContent = ({
           showBorder={!minimal}
           part={part}
           disableShimmer={disableShimmer}
+          isLastPart={isLastPart}
         />
       );
     default:
@@ -220,19 +225,21 @@ export const ExploringToolParts = ({
 
   const partContents = useMemo(() => {
     let reasoningIndex = -1;
-    return parts.map((part) => {
+    return parts.map((part, index) => {
       if (part.type === 'reasoning') reasoningIndex++;
       // Use a stable key for reasoning parts (index-based) instead of part.text which changes during streaming
       const stableKey =
         part.type === 'reasoning'
           ? `reasoning-${reasoningIndex}`
           : part.toolCallId;
+      const isLastPart = index === parts.length - 1;
       return (
         <PartContent
           key={stableKey}
           part={part}
           minimal={true}
           disableShimmer
+          isLastPart={isLastPart}
           thinkingDuration={
             part.type === 'reasoning'
               ? thinkingDurations?.[reasoningIndex]
@@ -415,6 +422,7 @@ export const ExploringToolParts = ({
         minimal={false}
         disableShimmer={!isShimmering}
         thinkingDuration={thinkingDurations?.[0]}
+        isLastPart={isAutoExpanded}
       />
     );
 
