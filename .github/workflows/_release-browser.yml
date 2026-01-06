@@ -27,6 +27,10 @@ on:
         required: false
       APPLE_TEAM_ID:
         required: false
+      MACOS_CERT_P12_BASE64:
+        required: false
+      MACOS_CERT_P12_PASSWORD:
+        required: false
 
 jobs:
   pre-check:
@@ -124,22 +128,19 @@ jobs:
           echo "There are no commits with the correct scope to release."
           exit 1
 
-  version-bump:
+  # Prepare version but DON'T commit/tag yet - only after builds succeed
+  prepare-version:
     needs: pre-check
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
       tag_name: ${{ steps.version.outputs.tag_name }}
-      release_notes: ${{ steps.notes.outputs.release_notes }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -155,7 +156,7 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Bump Version and Generate Changelog
+      - name: Calculate Version and Generate Changelog
         id: version
         run: |
           ARGS="--package browser --channel ${{ inputs.channel }}"
@@ -169,41 +170,24 @@ jobs:
           echo "new_version=$(cat .release-version)" >> $GITHUB_OUTPUT
           echo "tag_name=$(cat .release-tag)" >> $GITHUB_OUTPUT
 
-      - name: Read Release Notes
-        id: notes
-        run: |
-          NOTES=$(cat .release-notes.md)
-          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Commit Version Bump
-        run: |
-          git add .
-          git commit -m "chore(browser): release ${{ steps.version.outputs.new_version }} [skip ci]"
-          git push
-
-      - name: Create and Push Tag
-        run: |
-          git tag ${{ steps.version.outputs.tag_name }}
-          git push origin ${{ steps.version.outputs.tag_name }}
-
-      - name: Upload Release Notes Artifact
+      - name: Upload Version Metadata
         uses: actions/upload-artifact@v4
         with:
-          name: release-notes
-          path: .release-notes.md
+          name: version-metadata
+          path: |
+            .release-version
+            .release-tag
+            .release-notes.md
+            apps/browser/package.json
+            CHANGELOG.md
+          retention-days: 1
 
+  # Build all platforms - version/tag only created if ALL builds succeed
   build:
-    needs: version-bump
+    needs: prepare-version
     environment: Release
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - os: macos-26
@@ -220,8 +204,6 @@ jobs:
             artifact-name: browser-windows-x64
 
     runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write
 
     env:
       NODE_OPTIONS: "--max-old-space-size=8192"
@@ -239,7 +221,18 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.version-bump.outputs.tag_name }}
+          fetch-depth: 0
+
+      - name: Download Version Metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: version-metadata
+
+      - name: Apply Version Changes
+        run: |
+          # Copy the updated package.json to the correct location
+          cp package.json apps/browser/package.json 2>/dev/null || true
+        shell: bash
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -255,6 +248,13 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Import macOS signing certs
+        if: runner.os == 'macOS'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          p12-password: ${{ secrets.MACOS_CERT_P12_PASSWORD }}
+
       - name: Build All Packages
         run: pnpm build
         env:
@@ -266,6 +266,9 @@ jobs:
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           BUILD_MODE: production
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           RELEASE_CHANNEL: ${{ inputs.channel == 'release' && 'release' || 'prerelease' }}
 
       - name: Upload Build Artifacts
@@ -278,29 +281,83 @@ jobs:
             apps/browser/out/make/**/*.exe
             apps/browser/out/make/**/*.deb
             apps/browser/out/make/**/*.rpm
-          if-no-files-found: warn
+          if-no-files-found: error
 
-  release:
-    needs: [version-bump, build]
+  # Only runs after ALL builds succeed - commits version, creates tag, publishes release
+  finalize-release:
+    needs: [prepare-version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Download All Artifacts
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Version Metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: version-metadata
+
+      - name: Download All Build Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: browser-*
 
-      - name: List Artifacts
-        run: find artifacts -type f | head -50
+      - name: List Build Artifacts
+        run: |
+          echo "Build artifacts:"
+          find artifacts -type f | head -50
+
+      - name: Apply Version Changes
+        run: |
+          # Version metadata artifact preserves directory structure
+          echo "Version: $(cat .release-version)"
+          echo "Tag: $(cat .release-tag)"
+          echo "Files changed:"
+          ls -la apps/browser/package.json CHANGELOG.md 2>/dev/null || true
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit Version Bump
+        run: |
+          git add .
+          git commit -m "chore(browser): release ${{ needs.prepare-version.outputs.new_version }} [skip ci]"
+
+          # Handle potential race condition if someone pushed while builds were running
+          git pull --rebase origin ${{ github.ref_name }} || {
+            echo "::error::Failed to rebase. Someone may have pushed conflicting changes during the build."
+            echo "Please resolve conflicts and re-run the release workflow."
+            exit 1
+          }
+          git push
+
+      - name: Create and Push Tag
+        run: |
+          git tag ${{ needs.prepare-version.outputs.tag_name }}
+          git push origin ${{ needs.prepare-version.outputs.tag_name }}
+
+      - name: Read Release Notes
+        id: notes
+        run: |
+          NOTES=$(cat .release-notes.md)
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.version-bump.outputs.tag_name }}
-          name: "Browser ${{ needs.version-bump.outputs.new_version }}"
-          body: ${{ needs.version-bump.outputs.release_notes }}
+          tag_name: ${{ needs.prepare-version.outputs.tag_name }}
+          name: "Browser ${{ needs.prepare-version.outputs.new_version }}"
+          body: ${{ steps.notes.outputs.release_notes }}
           prerelease: ${{ inputs.channel != 'release' }}
           draft: false
           files: |
@@ -317,14 +374,14 @@ jobs:
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Package:** browser" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** ${{ needs.version-bump.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.prepare-version.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Channel:** ${{ inputs.channel }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag:** ${{ needs.version-bump.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** ${{ needs.prepare-version.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
           if [ "${{ inputs.new-cycle }}" == "true" ]; then
             echo "- **New Cycle:** Yes" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
-          find artifacts -type f -name "*.dmg" -o -name "*.exe" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" | while read f; do
+          find artifacts -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" \) | while read f; do
             echo "- $(basename $f)" >> $GITHUB_STEP_SUMMARY
           done

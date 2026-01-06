@@ -9,7 +9,9 @@ on:
       - 'packages/**'
       - 'agent/**'
       - 'pnpm-lock.yaml'
-      - '.github/workflows/monorepo-ci.yml'
+      - '.github/workflows/**'
+      - 'turbo.json'
+      - 'biome.json'
   pull_request:
     branches:
       - main
@@ -19,7 +21,9 @@ on:
       - 'packages/**'
       - 'agent/**'
       - 'pnpm-lock.yaml'
-      - '.github/workflows/monorepo-ci.yml'
+      - '.github/workflows/**'
+      - 'turbo.json'
+      - 'biome.json'
 
 # Cancel in-progress runs for the same branch
 concurrency:
