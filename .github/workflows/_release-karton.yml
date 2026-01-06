@@ -1,15 +1,10 @@
-# Reusable workflow for package releases
-# Called by the individual release workflows
+# Reusable workflow for karton releases
 
-name: _Release Package (Reusable)
+name: _Release Karton (Reusable)
 
 on:
   workflow_call:
     inputs:
-      package:
-        description: 'Package to release (browser or karton)'
-        required: true
-        type: string
       channel:
         description: 'Release channel (alpha, beta, or release)'
         required: true
@@ -21,22 +16,15 @@ on:
         default: false
     secrets:
       NPM_PUBLISH_ACCESS_TOKEN:
-        required: false
+        required: true
       NUCLEO_LICENSE_KEY:
         required: false
       POSTHOG_API_KEY:
         required: false
       VITE_POSTHOG_API_KEY:
         required: false
-      APPLE_ID:
-        required: false
-      APPLE_PASSWORD:
-        required: false
-      APPLE_TEAM_ID:
-        required: false
 
 jobs:
-  # Pre-check: Verify CI passed and there are changes to release
   pre-check:
     runs-on: ubuntu-latest
     outputs:
@@ -56,16 +44,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Checking CI status for the latest commit on main..."
+          # Get current branch name from ref
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          echo "Checking CI status for the latest commit on $BRANCH_NAME..."
 
-          # Get the latest CI workflow run for the current commit
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "Current commit: $COMMIT_SHA"
 
-          # Check if CI workflow succeeded for this commit
           CI_STATUS=$(gh run list \
             --workflow=monorepo-ci.yml \
-            --branch=main \
+            --branch="$BRANCH_NAME" \
             --limit=5 \
             --json headSha,conclusion \
             --jq ".[] | select(.headSha == \"$COMMIT_SHA\") | .conclusion" | head -1)
@@ -74,7 +62,7 @@ jobs:
 
           if [ "$CI_STATUS" == "success" ]; then
             echo "passed=true" >> $GITHUB_OUTPUT
-            echo "✅ CI passed for current commit"
+            echo "CI passed for current commit"
           else
             echo "passed=false" >> $GITHUB_OUTPUT
             echo "::error::CI has not passed for the current commit. Please wait for CI to complete successfully."
@@ -84,41 +72,27 @@ jobs:
       - name: Check for Changes Since Last Release
         id: changes-check
         run: |
-          PACKAGE="${{ inputs.package }}"
+          TAG_PREFIX="@stagewise/karton@"
 
-          # Determine tag prefix and scope based on package
-          if [ "$PACKAGE" == "browser" ]; then
-            TAG_PREFIX="browser@"
-            SCOPE="browser"
-          elif [ "$PACKAGE" == "karton" ]; then
-            TAG_PREFIX="@stagewise/karton@"
-            SCOPE="karton"
-          else
-            echo "::error::Unknown package: $PACKAGE"
-            exit 1
-          fi
-
-          # Find the last tag for this package
           LAST_TAG=$(git tag --list "${TAG_PREFIX}*" --sort=-version:refname | head -n 1)
           echo "last_tag=${LAST_TAG:-none}" >> $GITHUB_OUTPUT
           echo "Last tag: ${LAST_TAG:-none}"
 
-          # Count commits with matching scope since last tag
           if [ -n "$LAST_TAG" ]; then
-            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --grep="(${SCOPE})" | wc -l | tr -d ' ')
+            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --grep="(karton)" | wc -l | tr -d ' ')
           else
-            COMMITS=$(git log --oneline --grep="(${SCOPE})" | wc -l | tr -d ' ')
+            COMMITS=$(git log --oneline --grep="(karton)" | wc -l | tr -d ' ')
           fi
 
           echo "commit_count=$COMMITS" >> $GITHUB_OUTPUT
-          echo "Commits with scope '${SCOPE}' since last release: $COMMITS"
+          echo "Commits with scope 'karton' since last release: $COMMITS"
 
           if [ "$COMMITS" -gt 0 ]; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "✅ Found $COMMITS commits to release"
+            echo "Found $COMMITS commits to release"
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "::warning::No commits with scope '${SCOPE}' found since last release"
+            echo "::warning::No commits with scope 'karton' found since last release"
           fi
 
       - name: Pre-check Summary
@@ -146,7 +120,6 @@ jobs:
           echo "There are no commits with the correct scope to release."
           exit 1
 
-  # Step 1: Bump version and create tag (runs once)
   version-bump:
     needs: pre-check
     runs-on: ubuntu-latest
@@ -181,7 +154,7 @@ jobs:
       - name: Bump Version and Generate Changelog
         id: version
         run: |
-          ARGS="--package ${{ inputs.package }} --channel ${{ inputs.channel }}"
+          ARGS="--package karton --channel ${{ inputs.channel }}"
 
           if [ "${{ inputs.new-cycle }}" == "true" ]; then
             ARGS="$ARGS --new-cycle"
@@ -189,14 +162,12 @@ jobs:
 
           pnpm tsx scripts/release/index.ts $ARGS
 
-          # Read outputs from release artifacts
           echo "new_version=$(cat .release-version)" >> $GITHUB_OUTPUT
           echo "tag_name=$(cat .release-tag)" >> $GITHUB_OUTPUT
 
       - name: Read Release Notes
         id: notes
         run: |
-          # Store release notes in output (escape newlines for GitHub Actions)
           NOTES=$(cat .release-notes.md)
           echo "release_notes<<EOF" >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
@@ -210,7 +181,7 @@ jobs:
       - name: Commit Version Bump
         run: |
           git add .
-          git commit -m "chore(${{ inputs.package }}): release ${{ steps.version.outputs.new_version }} [skip ci]"
+          git commit -m "chore(karton): release ${{ steps.version.outputs.new_version }} [skip ci]"
           git push
 
       - name: Create and Push Tag
@@ -224,152 +195,7 @@ jobs:
           name: release-notes
           path: .release-notes.md
 
-  # Step 2: Build browser on multiple platforms (only for browser package)
-  build-browser:
-    if: inputs.package == 'browser'
-    needs: version-bump
-    environment: Release
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-26
-            platform: darwin-arm64
-            arch: arm64
-            artifact-name: browser-macos-arm64
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-            artifact-name: browser-linux-x64
-          - os: windows-latest
-            platform: win32
-            arch: x64
-            artifact-name: browser-windows-x64
-
-    runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write
-
-    env:
-      # Increase Node.js memory limit for large builds
-      NODE_OPTIONS: "--max-old-space-size=8192"
-      # From GitHub secrets
-      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
-      # From GitHub environment secrets
-      POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
-      VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
-      # From GitHub environment variables
-      API_URL: ${{ vars.API_URL }}
-      VITE_API_URL: ${{ vars.VITE_API_URL }}
-      STAGEWISE_CONSOLE_URL: ${{ vars.STAGEWISE_CONSOLE_URL }}
-      VITE_STAGEWISE_CONSOLE_URL: ${{ vars.VITE_STAGEWISE_CONSOLE_URL }}
-      LLM_PROXY_URL: ${{ vars.LLM_PROXY_URL }}
-      VITE_DISABLE_TELEMETRY: ${{ vars.VITE_DISABLE_TELEMETRY }}
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.version-bump.outputs.tag_name }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.27.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build All Packages
-        run: pnpm build
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-
-      - name: Build Electron App
-        working-directory: apps/browser
-        run: pnpm make --arch=${{ matrix.arch }}
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-          BUILD_MODE: production
-          # Set release channel: alpha/beta → prerelease, release → release
-          RELEASE_CHANNEL: ${{ inputs.channel == 'release' && 'release' || 'prerelease' }}
-          # macOS signing (uncomment when ready)
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact-name }}
-          path: |
-            apps/browser/out/make/**/*.dmg
-            apps/browser/out/make/**/*.zip
-            apps/browser/out/make/**/*.exe
-            apps/browser/out/make/**/*.deb
-            apps/browser/out/make/**/*.rpm
-          if-no-files-found: warn
-
-  # Step 3: Create GitHub Release with all artifacts (browser)
-  release-browser:
-    if: inputs.package == 'browser'
-    needs: [version-bump, build-browser]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: List Artifacts
-        run: find artifacts -type f | head -50
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.version-bump.outputs.tag_name }}
-          name: "Browser ${{ needs.version-bump.outputs.new_version }}"
-          body: ${{ needs.version-bump.outputs.release_notes }}
-          prerelease: ${{ inputs.channel != 'release' }}
-          draft: false
-          files: |
-            artifacts/**/*.dmg
-            artifacts/**/*.zip
-            artifacts/**/*.exe
-            artifacts/**/*.deb
-            artifacts/**/*.rpm
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Summary
-        run: |
-          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Package:** browser" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** ${{ needs.version-bump.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Channel:** ${{ inputs.channel }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag:** ${{ needs.version-bump.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ inputs.new-cycle }}" == "true" ]; then
-            echo "- **New Cycle:** Yes" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
-          find artifacts -type f -name "*.dmg" -o -name "*.exe" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" | while read f; do
-            echo "- $(basename $f)" >> $GITHUB_STEP_SUMMARY
-          done
-
-  # Step 4: Publish karton to npm (only for karton package)
-  release-karton:
-    if: inputs.package == 'karton'
+  release:
     needs: version-bump
     environment: Release
     runs-on: ubuntu-latest
@@ -377,12 +203,9 @@ jobs:
       contents: write
 
     env:
-      # From GitHub secrets
       NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
-      # From GitHub environment secrets
       POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
       VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
-      # From GitHub environment variables
       API_URL: ${{ vars.API_URL }}
       VITE_API_URL: ${{ vars.VITE_API_URL }}
       STAGEWISE_CONSOLE_URL: ${{ vars.STAGEWISE_CONSOLE_URL }}

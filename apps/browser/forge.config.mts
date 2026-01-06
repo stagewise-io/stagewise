@@ -100,7 +100,7 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     extraResource: ['./bundled'],
-    prune: false,
+    prune: true,
     afterCopy: [copyNativeDependencies],
     icon: `./assets/icons/${releaseChannel}/icon`,
     appCopyright: `Copyright © ${new Date().getFullYear()} stagewise GmbH`,
