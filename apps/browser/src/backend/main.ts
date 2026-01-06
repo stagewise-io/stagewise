@@ -29,13 +29,8 @@ import {
   DownloadState,
   type DownloadSpeedDataPoint,
 } from '@shared/karton-contracts/pages-api/types';
-import type {
-  DownloadSummary,
-  StoredExperienceData,
-} from '@shared/karton-contracts/ui';
-import { storedExperienceDataSchema } from '@shared/karton-contracts/ui';
+import type { DownloadSummary } from '@shared/karton-contracts/ui';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
-import fs from 'node:fs/promises';
 import { shell } from 'electron';
 import { getRepoRootForPath } from './utils/git-tools';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
@@ -77,7 +72,10 @@ export async function main({
   );
 
   // Create DownloadsService to track active downloads for pause/resume/cancel
-  const downloadsService = DownloadsService.create(logger, historyService);
+  const downloadsService = await DownloadsService.create(
+    logger,
+    historyService,
+  );
 
   // Create PagesService early so it can be passed to WindowLayoutService
   const pagesService = await PagesService.create(
@@ -99,61 +97,11 @@ export async function main({
   // Set up downloads UI state updates
   // This callback updates the UI karton with running + recent finished downloads
   const MAX_DOWNLOADS_TO_SHOW = 5;
-  const storedExperienceDataPath = path.join(
-    globalDataPathService.globalDataPath,
-    'stored-experience-data.json',
-  );
-
-  // Cache for lastSeenAt to avoid disk reads on every state update
-  let cachedLastSeenAt: Date | null = null;
-  let lastSeenAtInitialized = false;
 
   // Cache for finished downloads to avoid database queries on every progress update
   let cachedFinishedDownloads: DownloadSummary[] = [];
   let finishedDownloadsDirty = true; // Start dirty to fetch on first call
   let previousActiveCount = 0;
-
-  // Helper to read lastSeenAt from stored experience data (only on startup)
-  const initializeLastSeenAt = async (): Promise<void> => {
-    if (lastSeenAtInitialized) return;
-    try {
-      const content = await fs.readFile(storedExperienceDataPath, 'utf-8');
-      const data = storedExperienceDataSchema.parse(JSON.parse(content));
-      cachedLastSeenAt = data.downloadsLastSeenAt
-        ? new Date(data.downloadsLastSeenAt)
-        : null;
-    } catch {
-      cachedLastSeenAt = null;
-    }
-    lastSeenAtInitialized = true;
-  };
-
-  // Helper to save lastSeenAt to stored experience data (updates cache and persists to disk)
-  const setDownloadsLastSeenAt = async (date: Date): Promise<void> => {
-    // Update cache immediately
-    cachedLastSeenAt = date;
-
-    try {
-      let data: StoredExperienceData;
-      try {
-        const content = await fs.readFile(storedExperienceDataPath, 'utf-8');
-        data = storedExperienceDataSchema.parse(JSON.parse(content));
-      } catch {
-        data = { recentlyOpenedWorkspaces: [], hasSeenOnboardingFlow: false };
-      }
-      data.downloadsLastSeenAt = date.toISOString();
-      await fs.writeFile(
-        storedExperienceDataPath,
-        JSON.stringify(data, null, 2),
-        'utf-8',
-      );
-    } catch (err) {
-      logger.warn('[Main] Failed to save downloads lastSeenAt', err);
-    }
-  };
-
-  // Initialize lastSeenAt from disk on startup
-  await initializeLastSeenAt();
 
   // Helper to mark finished downloads cache as dirty (needs refetch)
   const invalidateFinishedDownloadsCache = () => {
@@ -175,8 +123,8 @@ export async function main({
   ) => {
     const activeCount = activeDownloads.length;
     const finishedToFetch = Math.max(0, MAX_DOWNLOADS_TO_SHOW - activeCount);
-    // Use cached lastSeenAt instead of reading from disk
-    const lastSeenAt = cachedLastSeenAt;
+    // Get lastSeenAt from DownloadsService (cached in the service)
+    const lastSeenAt = downloadsService.getDownloadsLastSeenAt();
 
     // Build items from active downloads
     const items: DownloadSummary[] = activeDownloads.map((d) => ({
@@ -298,7 +246,7 @@ export async function main({
   // Shared handler for marking downloads as seen (used by both UI and pages-api contracts)
   const markDownloadsSeen = async () => {
     const now = new Date();
-    await setDownloadsLastSeenAt(now);
+    await downloadsService.setDownloadsLastSeenAt(now);
     // Trigger state refresh to update hasUnseenDownloads
     await updateUIDownloadsState(mapActiveDownloadsToUIFormat()).catch(
       (err) => {

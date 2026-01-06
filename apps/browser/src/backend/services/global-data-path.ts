@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import type { Logger } from './logger';
 import { app } from 'electron';
 import { DisposableService } from './disposable';
+import { getGlobalDataPath } from '../utils/paths';
 
 /**
  * This service provides the paths to a variety of global data directories that this app can use to store data and configurations etc.
@@ -28,11 +29,11 @@ export class GlobalDataPathService extends DisposableService {
   }
 
   get configFilePath(): string {
-    return path.join(app.getPath('userData'), 'config.json');
+    return path.join(getGlobalDataPath(), 'config.json');
   }
 
   get identifierFilePath(): string {
-    return path.join(app.getPath('userData'), 'identifier.json');
+    return path.join(getGlobalDataPath(), 'identifier.json');
   }
 
   /**
@@ -45,7 +46,7 @@ export class GlobalDataPathService extends DisposableService {
    * @warning If you store workspace related data, use the getWorkspaceDataPath method instead.
    */
   get globalDataPath(): string {
-    return app.getPath('userData');
+    return getGlobalDataPath();
   }
 
   /**

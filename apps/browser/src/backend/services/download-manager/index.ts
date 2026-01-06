@@ -7,7 +7,12 @@ import {
   DownloadState,
   type ActiveDownloadInfo,
 } from '@shared/karton-contracts/pages-api/types';
+import { downloadsStateSchema } from '@shared/karton-contracts/ui';
 import { DisposableService } from '../disposable';
+import {
+  readPersistedData,
+  writePersistedData,
+} from '../../utils/persisted-data';
 
 /**
  * Simple throttle implementation for state change notifications.
@@ -112,6 +117,8 @@ export class DownloadsService extends DisposableService {
     new Set();
   // Throttled state change notification (100ms = max 10 updates/sec)
   private throttledNotifyStateChange: (() => void) & { cancel: () => void };
+  // Cached value for downloads lastSeenAt (for "unseen" badge)
+  private downloadsLastSeenAt: Date | null = null;
 
   private constructor(logger: Logger, historyService: HistoryService) {
     super();
@@ -203,17 +210,20 @@ export class DownloadsService extends DisposableService {
     }
   }
 
-  public static create(
+  public static async create(
     logger: Logger,
     historyService: HistoryService,
-  ): DownloadsService {
+  ): Promise<DownloadsService> {
     const instance = new DownloadsService(logger, historyService);
-    instance.initialize();
+    await instance.initialize();
     logger.debug('[DownloadsService] Created service');
     return instance;
   }
 
-  private initialize(): void {
+  private async initialize(): Promise<void> {
+    // Load persisted downloads lastSeenAt
+    await this.initializeDownloadsLastSeenAt();
+
     // Get the browser content session
     const ses = session.fromPartition('persist:browser-content');
 
@@ -225,6 +235,38 @@ export class DownloadsService extends DisposableService {
     this.logger.debug(
       '[DownloadsService] Initialized and listening for downloads',
     );
+  }
+
+  /**
+   * Initialize the downloads lastSeenAt value from persisted data.
+   */
+  private async initializeDownloadsLastSeenAt(): Promise<void> {
+    const data = await readPersistedData(
+      'downloads-state',
+      downloadsStateSchema,
+      { lastSeenAt: null },
+    );
+    this.downloadsLastSeenAt = data.lastSeenAt
+      ? new Date(data.lastSeenAt)
+      : null;
+  }
+
+  /**
+   * Get the cached downloads lastSeenAt value.
+   * Used to determine if there are unseen completed downloads.
+   */
+  public getDownloadsLastSeenAt(): Date | null {
+    return this.downloadsLastSeenAt;
+  }
+
+  /**
+   * Set the downloads lastSeenAt value (updates cache and persists to disk).
+   */
+  public async setDownloadsLastSeenAt(date: Date): Promise<void> {
+    this.downloadsLastSeenAt = date;
+    await writePersistedData('downloads-state', downloadsStateSchema, {
+      lastSeenAt: date.toISOString(),
+    });
   }
 
   private handleNewDownload(item: DownloadItem): void {

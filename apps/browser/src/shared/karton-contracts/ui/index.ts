@@ -146,11 +146,32 @@ export const recentlyOpenedWorkspacesArraySchema = z.array(
   recentlyOpenedWorkspaceSchema,
 );
 
+/** Schema for onboarding state persisted data */
+export const onboardingStateSchema = z.object({
+  hasSeenOnboardingFlow: z.boolean(),
+});
+
+export type OnboardingState = z.infer<typeof onboardingStateSchema>;
+
+/** Schema for downloads state persisted data */
+export const downloadsStateSchema = z.object({
+  /** ISO timestamp when downloads were last marked as seen */
+  lastSeenAt: z.string().nullable(),
+});
+
+export type DownloadsState = z.infer<typeof downloadsStateSchema>;
+
+/** Schema for agent preferences persisted data */
+export const agentPreferencesSchema = z.object({
+  /** The model ID that was last selected by the user */
+  selectedModelId: z.string().optional(),
+});
+
+export type AgentPreferences = z.infer<typeof agentPreferencesSchema>;
+
 export const storedExperienceDataSchema = z.object({
   recentlyOpenedWorkspaces: recentlyOpenedWorkspacesArraySchema,
   hasSeenOnboardingFlow: z.boolean(),
-  /** ISO timestamp when downloads were last marked as seen */
-  downloadsLastSeenAt: z.string().nullable().optional(),
 });
 
 export type StoredExperienceData = z.infer<typeof storedExperienceDataSchema>;

@@ -19,7 +19,12 @@ import {
   AgentErrorType,
   Layout,
   type MainTab,
+  agentPreferencesSchema,
 } from '@shared/karton-contracts/ui';
+import {
+  readPersistedData,
+  writePersistedData,
+} from '../../../../utils/persisted-data';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import {
   codingAgentTools,
@@ -200,6 +205,27 @@ export class AgentService {
       },
       { once: true },
     );
+  }
+
+  private async readStoredSelectedModelId(): Promise<string | undefined> {
+    const data = await readPersistedData(
+      'agent-preferences',
+      agentPreferencesSchema,
+      {},
+    );
+    return data.selectedModelId;
+  }
+
+  private async writeSelectedModelId(modelId: string): Promise<void> {
+    try {
+      await writePersistedData('agent-preferences', agentPreferencesSchema, {
+        selectedModelId: modelId,
+      });
+    } catch (error) {
+      this.logger.debug('[AgentService] Failed to save selected model ID', {
+        cause: error,
+      });
+    }
   }
 
   private getToolsContext(): AgentToolsContext | null {
@@ -644,7 +670,12 @@ export class AgentService {
   public async initialize() {
     this.logger.debug('[AgentService] Initializing...');
 
-    const initialModel = availableModels[0];
+    // Read persisted model ID and find matching model settings
+    const storedModelId = await this.readStoredSelectedModelId();
+    const initialModel = storedModelId
+      ? (availableModels.find((m) => m.modelId === storedModelId) ??
+        availableModels[0])
+      : availableModels[0];
 
     this.uiKarton.setState((draft) => {
       if (!draft.agentChat) {
@@ -721,6 +752,8 @@ export class AgentService {
           this.uiKarton.setState((draft) => {
             if (draft.agentChat) draft.agentChat.selectedModel = modelSettings;
           });
+          // Persist the selection for next app launch
+          await this.writeSelectedModelId(model);
         },
       );
 

@@ -6,16 +6,17 @@
  * @warning The state of worksapce-specific experiences is to be managed by the workspace manager etc.
  */
 
-import { Layout, MainTab } from '@shared/karton-contracts/ui';
+import {
+  Layout,
+  MainTab,
+  recentlyOpenedWorkspacesArraySchema,
+  onboardingStateSchema,
+  type StoredExperienceData,
+  type RecentlyOpenedWorkspace,
+} from '@shared/karton-contracts/ui';
 import type { KartonService } from './karton';
 import type { Logger } from './logger';
 import type { GlobalDataPathService } from './global-data-path';
-import path from 'node:path';
-import fs from 'node:fs/promises';
-import {
-  storedExperienceDataSchema,
-  type StoredExperienceData,
-} from '@shared/karton-contracts/ui';
 import {
   type AppRouter,
   createNodeApiClient,
@@ -23,6 +24,7 @@ import {
 } from '@stagewise/api-client';
 import { API_URL } from './auth/server-interop';
 import { DisposableService } from './disposable';
+import { readPersistedData, writePersistedData } from '../utils/persisted-data';
 
 export class UserExperienceService extends DisposableService {
   private readonly logger: Logger;
@@ -279,29 +281,53 @@ export class UserExperienceService extends DisposableService {
     }
   }
 
-  private getStoredExperienceDataFilePath(): string {
-    return path.join(
-      this.globalDataPathService.globalDataPath,
-      'stored-experience-data.json',
+  /**
+   * Read the recently opened workspaces from persisted data.
+   */
+  private async readRecentlyOpenedWorkspaces(): Promise<
+    RecentlyOpenedWorkspace[]
+  > {
+    return readPersistedData(
+      'recently-opened-workspaces',
+      recentlyOpenedWorkspacesArraySchema,
+      [],
     );
   }
 
-  private async readStoredExperienceData(): Promise<StoredExperienceData> {
-    const filePath = this.getStoredExperienceDataFilePath();
-    const fileContent = await fs.readFile(filePath, 'utf-8');
-    const parsedJson = JSON.parse(fileContent);
-    return storedExperienceDataSchema.parse(parsedJson);
+  /**
+   * Write the recently opened workspaces to persisted data.
+   */
+  private async writeRecentlyOpenedWorkspaces(
+    workspaces: RecentlyOpenedWorkspace[],
+  ): Promise<void> {
+    await writePersistedData(
+      'recently-opened-workspaces',
+      recentlyOpenedWorkspacesArraySchema,
+      workspaces,
+    );
   }
 
-  private async writeStoredExperienceData(
-    storedExperienceData: StoredExperienceData,
-  ) {
-    const filePath = this.getStoredExperienceDataFilePath();
-    await fs.writeFile(
-      filePath,
-      JSON.stringify(storedExperienceData, null, 2),
-      'utf-8',
+  /**
+   * Read the onboarding state from persisted data.
+   */
+  private async readOnboardingState(): Promise<boolean> {
+    const data = await readPersistedData(
+      'onboarding-state',
+      onboardingStateSchema,
+      { hasSeenOnboardingFlow: false },
     );
+    return data.hasSeenOnboardingFlow;
+  }
+
+  /**
+   * Write the onboarding state to persisted data.
+   */
+  private async writeOnboardingState(
+    hasSeenOnboardingFlow: boolean,
+  ): Promise<void> {
+    await writePersistedData('onboarding-state', onboardingStateSchema, {
+      hasSeenOnboardingFlow,
+    });
   }
 
   public async saveRecentlyOpenedWorkspace({
@@ -313,15 +339,15 @@ export class UserExperienceService extends DisposableService {
     name: string;
     openedAt: number;
   }) {
-    // Load existing stored experience data (or defaults)
-    const storedData = await this.getStoredExperienceData();
+    // Load existing workspaces
+    const workspaces = await this.readRecentlyOpenedWorkspaces();
 
     // Check if workspace with this path already exists
-    const existingIndex = storedData.recentlyOpenedWorkspaces.findIndex(
+    const existingIndex = workspaces.findIndex(
       (ws) => ws.path === workspacePath,
     );
 
-    const workspaceEntry = {
+    const workspaceEntry: RecentlyOpenedWorkspace = {
       path: workspacePath,
       name,
       openedAt,
@@ -329,13 +355,15 @@ export class UserExperienceService extends DisposableService {
 
     // Update existing entry or add new one
     if (existingIndex !== -1) {
-      storedData.recentlyOpenedWorkspaces[existingIndex] = workspaceEntry;
+      workspaces[existingIndex] = workspaceEntry;
     } else {
-      storedData.recentlyOpenedWorkspaces.push(workspaceEntry);
+      workspaces.push(workspaceEntry);
     }
 
     try {
-      await this.writeStoredExperienceData(storedData);
+      await this.writeRecentlyOpenedWorkspaces(workspaces);
+      // Update UI state with combined data
+      const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
         draft.userExperience.storedExperienceData = storedData;
       });
@@ -344,31 +372,30 @@ export class UserExperienceService extends DisposableService {
       );
     } catch (error) {
       this.logger.error(
-        `[UserExperienceService] Failed to save stored experience data. Error: ${error}`,
+        `[UserExperienceService] Failed to save recently opened workspace. Error: ${error}`,
       );
     }
   }
 
+  /**
+   * Get combined stored experience data from separate files.
+   * This combines data from recently-opened-workspaces.json and onboarding-state.json.
+   */
   public async getStoredExperienceData(): Promise<StoredExperienceData> {
-    try {
-      return await this.readStoredExperienceData();
-    } catch {
-      this.logger.debug(
-        `[UserExperienceService] No stored experience data found or file read failed, returning defaults`,
-      );
-      return {
-        recentlyOpenedWorkspaces: [],
-        hasSeenOnboardingFlow: false,
-      };
-    }
+    const [recentlyOpenedWorkspaces, hasSeenOnboardingFlow] = await Promise.all(
+      [this.readRecentlyOpenedWorkspaces(), this.readOnboardingState()],
+    );
+    return {
+      recentlyOpenedWorkspaces,
+      hasSeenOnboardingFlow,
+    };
   }
 
   public async setHasSeenOnboardingFlow(value: boolean) {
-    const storedData = await this.getStoredExperienceData();
-    storedData.hasSeenOnboardingFlow = value;
-
     try {
-      await this.writeStoredExperienceData(storedData);
+      await this.writeOnboardingState(value);
+      // Update UI state with combined data
+      const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
         draft.userExperience.storedExperienceData = storedData;
       });
@@ -389,9 +416,9 @@ export class UserExperienceService extends DisposableService {
     maxAmount: number;
     hasBeenOpenedBeforeDate: number;
   }) {
-    const storedData = await this.getStoredExperienceData();
+    const workspaces = await this.readRecentlyOpenedWorkspaces();
 
-    if (storedData.recentlyOpenedWorkspaces.length === 0) {
+    if (workspaces.length === 0) {
       this.logger.debug(
         `[UserExperienceService] No recently opened workspaces to prune`,
       );
@@ -399,7 +426,7 @@ export class UserExperienceService extends DisposableService {
     }
 
     // Filter out workspaces opened before the specified date
-    let filteredWorkspaces = storedData.recentlyOpenedWorkspaces.filter(
+    let filteredWorkspaces = workspaces.filter(
       (ws) => ws.openedAt >= hasBeenOpenedBeforeDate,
     );
 
@@ -410,22 +437,19 @@ export class UserExperienceService extends DisposableService {
       filteredWorkspaces = filteredWorkspaces.slice(0, maxAmount);
     }
 
-    const updatedStoredData: StoredExperienceData = {
-      ...storedData,
-      recentlyOpenedWorkspaces: filteredWorkspaces,
-    };
-
     try {
-      await this.writeStoredExperienceData(updatedStoredData);
+      await this.writeRecentlyOpenedWorkspaces(filteredWorkspaces);
+      // Update UI state with combined data
+      const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
-        draft.userExperience.storedExperienceData = updatedStoredData;
+        draft.userExperience.storedExperienceData = storedData;
       });
       this.logger.debug(
         `[UserExperienceService] Pruned recently opened workspaces. Kept ${filteredWorkspaces.length} entries`,
       );
     } catch (error) {
       this.logger.error(
-        `[UserExperienceService] Failed to write pruned stored experience data. Error: ${error}`,
+        `[UserExperienceService] Failed to write pruned workspaces data. Error: ${error}`,
       );
     }
   }
