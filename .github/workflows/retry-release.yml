@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to retry (e.g., browser@1.0.0-alpha.1)'
+        description: 'Tag to retry (e.g., stagewise@1.0.0-alpha.1)'
         required: true
         type: string
 
@@ -37,15 +37,15 @@ jobs:
           echo "Parsing tag: $TAG"
 
           # Determine package from tag prefix
-          if [[ "$TAG" == browser@* ]]; then
+          if [[ "$TAG" == stagewise@* ]]; then
             PACKAGE="browser"
-            VERSION="${TAG#browser@}"
+            VERSION="${TAG#stagewise@}"
           elif [[ "$TAG" == @stagewise/karton@* ]]; then
             PACKAGE="karton"
             VERSION="${TAG#@stagewise/karton@}"
           else
             echo "::error::Unknown tag format: $TAG"
-            echo "Expected: browser@x.x.x or @stagewise/karton@x.x.x"
+            echo "Expected: stagewise@x.x.x or @stagewise/karton@x.x.x"
             exit 1
           fi
 
@@ -224,7 +224,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
-          name: "Browser ${{ needs.parse-tag.outputs.version }}"
+          name: "Stagewise ${{ needs.parse-tag.outputs.version }}"
           body: ${{ steps.notes.outputs.notes }}
           prerelease: ${{ needs.parse-tag.outputs.channel != 'release' }}
           draft: false

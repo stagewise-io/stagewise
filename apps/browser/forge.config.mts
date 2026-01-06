@@ -29,6 +29,7 @@ console.log(
   `[forge.config] Build mode: ${process.env.BUILD_MODE || 'development'}`,
 );
 
+// App name includes channel suffix for differentiation
 const appName = (() => {
   switch (releaseChannel) {
     case 'release':
@@ -53,18 +54,8 @@ const appBundleId = (() => {
   }
 })();
 
-// DMG volume name must be <= 27 characters
-const dmgVolumeName = (() => {
-  switch (releaseChannel) {
-    case 'release':
-      return 'Install stagewise';
-    case 'prerelease':
-      return 'stagewise Pre-Release';
-    case 'dev':
-    default:
-      return 'stagewise Dev';
-  }
-})();
+// DMG volume name (shown when mounted)
+const dmgVolumeName = 'Install stagewise';
 
 // For now, we maintain a manually updated list of dependencies and sub-dependencies that need to be copied over in order to get a working deployed app.
 // Ugly but works.
@@ -97,6 +88,7 @@ const copyNativeDependencies = (
 };
 
 const config: ForgeConfig = {
+  buildIdentifier: releaseChannel,
   packagerConfig: {
     asar: true,
     extraResource: ['./bundled'],
@@ -142,7 +134,12 @@ const config: ForgeConfig = {
     force: true,
   },
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      authors: 'stagewise GmbH',
+      copyright: `Copyright © ${new Date().getFullYear()} stagewise GmbH`,
+      setupIcon: `./assets/icons/${releaseChannel}/icon.ico`,
+      description: appName,
+    }),
     new MakerRpm({}),
     new MakerDeb({}),
     new MakerDMG({
@@ -157,7 +154,7 @@ const config: ForgeConfig = {
           x: 192,
           y: 200,
           type: 'file',
-          path: `./out/${appName}-darwin-arm64/${appName}.app`,
+          path: `./out/${releaseChannel}/${appName}-darwin-arm64/${appName}.app`,
         },
       ],
     }),

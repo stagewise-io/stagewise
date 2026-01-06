@@ -3,13 +3,121 @@ name: "Release Karton"
 on:
   workflow_dispatch:
 
-run-name: "Release Karton"
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
+  pre-check:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CI Status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMIT=$(git rev-parse HEAD)
+          # If current commit is a release commit (skipped CI), check parent commit instead
+          if git log -1 --format=%s | grep -q "\[skip ci\]"; then
+            COMMIT=$(git rev-parse HEAD~1)
+            echo "Current commit skipped CI, checking parent: $COMMIT"
+          fi
+          CI_STATUS=$(gh run list --workflow=monorepo-ci.yml --branch="${GITHUB_REF#refs/heads/}" --limit=10 \
+            --json headSha,conclusion --jq ".[] | select(.headSha == \"$COMMIT\") | .conclusion" | head -1)
+          if [ "$CI_STATUS" != "success" ]; then
+            echo "::error::CI has not passed. Status: ${CI_STATUS:-not found}"
+            exit 1
+          fi
+
+  version-bump:
+    needs: pre-check
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Bump Version
+        id: bump
+        run: |
+          pnpm tsx scripts/release/index.ts --package karton --channel release
+          echo "version=$(cat .release-version)" >> $GITHUB_OUTPUT
+          echo "tag=$(cat .release-tag)" >> $GITHUB_OUTPUT
+
+      - name: Commit and Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "chore(karton): release ${{ steps.bump.outputs.version }} [skip ci]"
+          git push
+          git tag ${{ steps.bump.outputs.tag }}
+          git push origin ${{ steps.bump.outputs.tag }}
+
+  publish:
+    needs: version-bump
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version-bump.outputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @stagewise/karton build
+
+      - name: Publish to npm
+        working-directory: packages/karton
+        run: npm publish --tag latest --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   release:
-    # Only run on main or release-tests branch
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release-tests'
-    uses: ./.github/workflows/_release-karton.yml
-    with:
-      channel: release
-    secrets: inherit
+    needs: [version-bump, publish]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version-bump.outputs.tag }}
+          name: "Karton ${{ needs.version-bump.outputs.version }}"
+          body: |
+            **@stagewise/karton ${{ needs.version-bump.outputs.version }}**
+
+            ```bash
+            npm install @stagewise/karton@${{ needs.version-bump.outputs.version }}
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

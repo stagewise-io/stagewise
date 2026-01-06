@@ -1,16 +1,12 @@
-# Reusable workflow for browser releases
-
 name: _Release Browser (Reusable)
 
 on:
   workflow_call:
     inputs:
       channel:
-        description: 'Release channel (alpha, beta, or release)'
         required: true
         type: string
       new-cycle:
-        description: 'Start a new version cycle (abandon current prerelease)'
         required: false
         type: boolean
         default: false
@@ -35,175 +31,98 @@ on:
 jobs:
   pre-check:
     runs-on: ubuntu-latest
-    outputs:
-      ci-passed: ${{ steps.ci-check.outputs.passed }}
-      has-changes: ${{ steps.changes-check.outputs.has_changes }}
-      last-tag: ${{ steps.changes-check.outputs.last_tag }}
-      commit-count: ${{ steps.changes-check.outputs.commit_count }}
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Check CI Status
-        id: ci-check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get current branch name from ref
-          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          echo "Checking CI status for the latest commit on $BRANCH_NAME..."
-
-          COMMIT_SHA=$(git rev-parse HEAD)
-          echo "Current commit: $COMMIT_SHA"
-
-          CI_STATUS=$(gh run list \
-            --workflow=monorepo-ci.yml \
-            --branch="$BRANCH_NAME" \
-            --limit=5 \
-            --json headSha,conclusion \
-            --jq ".[] | select(.headSha == \"$COMMIT_SHA\") | .conclusion" | head -1)
-
-          echo "CI status: $CI_STATUS"
-
-          if [ "$CI_STATUS" == "success" ]; then
-            echo "passed=true" >> $GITHUB_OUTPUT
-            echo "CI passed for current commit"
-          else
-            echo "passed=false" >> $GITHUB_OUTPUT
-            echo "::error::CI has not passed for the current commit. Please wait for CI to complete successfully."
-            echo "CI status was: ${CI_STATUS:-not found}"
+          COMMIT=$(git rev-parse HEAD)
+          # If current commit is a release commit (skipped CI), check parent commit instead
+          if git log -1 --format=%s | grep -q "\[skip ci\]"; then
+            COMMIT=$(git rev-parse HEAD~1)
+            echo "Current commit skipped CI, checking parent: $COMMIT"
+          fi
+          CI_STATUS=$(gh run list --workflow=monorepo-ci.yml --branch="${GITHUB_REF#refs/heads/}" --limit=10 \
+            --json headSha,conclusion --jq ".[] | select(.headSha == \"$COMMIT\") | .conclusion" | head -1)
+          if [ "$CI_STATUS" != "success" ]; then
+            echo "::error::CI has not passed. Status: ${CI_STATUS:-not found}"
+            exit 1
           fi
 
-      - name: Check for Changes Since Last Release
-        id: changes-check
-        run: |
-          TAG_PREFIX="browser@"
-
-          LAST_TAG=$(git tag --list "${TAG_PREFIX}*" --sort=-version:refname | head -n 1)
-          echo "last_tag=${LAST_TAG:-none}" >> $GITHUB_OUTPUT
-          echo "Last tag: ${LAST_TAG:-none}"
-
-          if [ -n "$LAST_TAG" ]; then
-            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --grep="(browser)" | wc -l | tr -d ' ')
-          else
-            COMMITS=$(git log --oneline --grep="(browser)" | wc -l | tr -d ' ')
-          fi
-
-          echo "commit_count=$COMMITS" >> $GITHUB_OUTPUT
-          echo "Commits with scope 'browser' since last release: $COMMITS"
-
-          if [ "$COMMITS" -gt 0 ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "Found $COMMITS commits to release"
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "::warning::No commits with scope 'browser' found since last release"
-          fi
-
-      - name: Pre-check Summary
-        run: |
-          echo "## Pre-check Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| CI Passed | ${{ steps.ci-check.outputs.passed == 'true' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Has Changes | ${{ steps.changes-check.outputs.has_changes == 'true' && '✅' || '⚠️' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Last Tag | ${{ steps.changes-check.outputs.last_tag }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Commits to Release | ${{ steps.changes-check.outputs.commit_count }} |" >> $GITHUB_STEP_SUMMARY
-
-      - name: Fail if CI not passed
-        if: steps.ci-check.outputs.passed != 'true'
-        run: |
-          echo "::error::Cannot release: CI has not passed for the current commit."
-          echo "Please ensure the CI workflow completes successfully before releasing."
-          exit 1
-
-      - name: Fail if no changes
-        if: steps.changes-check.outputs.has_changes != 'true'
-        run: |
-          echo "::error::Cannot release: No changes found since last release."
-          echo "There are no commits with the correct scope to release."
-          exit 1
-
-  # Prepare version but DON'T commit/tag yet - only after builds succeed
-  prepare-version:
+  version-bump:
     needs: pre-check
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
-      new_version: ${{ steps.version.outputs.new_version }}
-      tag_name: ${{ steps.version.outputs.tag_name }}
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+      notes: ${{ steps.bump.outputs.notes }}
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 10.27.0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
 
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - name: Calculate Version and Generate Changelog
-        id: version
+      - name: Bump Version
+        id: bump
         run: |
           ARGS="--package browser --channel ${{ inputs.channel }}"
-
-          if [ "${{ inputs.new-cycle }}" == "true" ]; then
-            ARGS="$ARGS --new-cycle"
-          fi
-
+          [ "${{ inputs.new-cycle }}" == "true" ] && ARGS="$ARGS --new-cycle"
           pnpm tsx scripts/release/index.ts $ARGS
+          echo "version=$(cat .release-version)" >> $GITHUB_OUTPUT
+          echo "tag=$(cat .release-tag)" >> $GITHUB_OUTPUT
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat .release-notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-          echo "new_version=$(cat .release-version)" >> $GITHUB_OUTPUT
-          echo "tag_name=$(cat .release-tag)" >> $GITHUB_OUTPUT
+      - name: Commit and Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "chore(browser): release ${{ steps.bump.outputs.version }} [skip ci]"
+          git push
+          git tag ${{ steps.bump.outputs.tag }}
+          git push origin ${{ steps.bump.outputs.tag }}
 
-      - name: Upload Version Metadata
-        uses: actions/upload-artifact@v4
-        with:
-          name: version-metadata
-          path: |
-            .release-version
-            .release-tag
-            .release-notes.md
-            apps/browser/package.json
-            CHANGELOG.md
-          retention-days: 1
-
-  # Build all platforms - version/tag only created if ALL builds succeed
   build:
-    needs: prepare-version
+    needs: version-bump
     environment: Release
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - os: macos-26
-            platform: darwin-arm64
             arch: arm64
-            artifact-name: browser-macos-arm64
+            artifact: browser-macos-arm64
           - os: ubuntu-latest
-            platform: linux
             arch: x64
-            artifact-name: browser-linux-x64
+            artifact: browser-linux-x64
           - os: windows-latest
-            platform: win32
             arch: x64
-            artifact-name: browser-windows-x64
+            artifact: browser-windows-x64
 
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
 
     env:
       NODE_OPTIONS: "--max-old-space-size=8192"
@@ -218,35 +137,20 @@ jobs:
       VITE_DISABLE_TELEMETRY: ${{ vars.VITE_DISABLE_TELEMETRY }}
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: ${{ needs.version-bump.outputs.tag }}
 
-      - name: Download Version Metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: version-metadata
-
-      - name: Apply Version Changes
-        run: |
-          # Copy the updated package.json to the correct location
-          cp package.json apps/browser/package.json 2>/dev/null || true
-        shell: bash
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 10.27.0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
 
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
       - name: Import macOS signing certs
         if: runner.os == 'macOS'
@@ -255,133 +159,64 @@ jobs:
           p12-file-base64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
           p12-password: ${{ secrets.MACOS_CERT_P12_PASSWORD }}
 
-      - name: Build All Packages
-        run: pnpm build
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
+      - run: pnpm build
 
       - name: Build Electron App
         working-directory: apps/browser
         run: pnpm make --arch=${{ matrix.arch }}
         env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
           BUILD_MODE: production
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           RELEASE_CHANNEL: ${{ inputs.channel == 'release' && 'release' || 'prerelease' }}
 
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact-name }}
+          name: ${{ matrix.artifact }}
           path: |
             apps/browser/out/make/**/*.dmg
             apps/browser/out/make/**/*.zip
             apps/browser/out/make/**/*.exe
             apps/browser/out/make/**/*.deb
             apps/browser/out/make/**/*.rpm
-          if-no-files-found: error
+          if-no-files-found: warn
 
-  # Only runs after ALL builds succeed - commits version, creates tag, publishes release
-  finalize-release:
-    needs: [prepare-version, build]
+  release:
+    needs: [version-bump, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download Version Metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: version-metadata
-
-      - name: Download All Build Artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: browser-*
 
-      - name: List Build Artifacts
+      - name: Rename Artifacts
         run: |
-          echo "Build artifacts:"
-          find artifacts -type f | head -50
+          VERSION="${{ needs.version-bump.outputs.version }}"
+          mkdir -p release
 
-      - name: Apply Version Changes
-        run: |
-          # Version metadata artifact preserves directory structure
-          echo "Version: $(cat .release-version)"
-          echo "Tag: $(cat .release-tag)"
-          echo "Files changed:"
-          ls -la apps/browser/package.json CHANGELOG.md 2>/dev/null || true
+          # macOS
+          find artifacts -name "*.dmg" -exec cp {} "release/stagewise-${VERSION}-macos-arm64.dmg" \;
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Windows
+          find artifacts -name "*.exe" -exec cp {} "release/stagewise-${VERSION}-windows-x64.exe" \;
 
-      - name: Commit Version Bump
-        run: |
-          git add .
-          git commit -m "chore(browser): release ${{ needs.prepare-version.outputs.new_version }} [skip ci]"
+          # Linux
+          find artifacts -name "*.deb" -exec cp {} "release/stagewise-${VERSION}-linux-x64.deb" \;
+          find artifacts -name "*.rpm" -exec cp {} "release/stagewise-${VERSION}-linux-x64.rpm" \;
 
-          # Handle potential race condition if someone pushed while builds were running
-          git pull --rebase origin ${{ github.ref_name }} || {
-            echo "::error::Failed to rebase. Someone may have pushed conflicting changes during the build."
-            echo "Please resolve conflicts and re-run the release workflow."
-            exit 1
-          }
-          git push
+          echo "Release artifacts:"
+          ls -la release/
 
-      - name: Create and Push Tag
-        run: |
-          git tag ${{ needs.prepare-version.outputs.tag_name }}
-          git push origin ${{ needs.prepare-version.outputs.tag_name }}
-
-      - name: Read Release Notes
-        id: notes
-        run: |
-          NOTES=$(cat .release-notes.md)
-          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.prepare-version.outputs.tag_name }}
-          name: "Browser ${{ needs.prepare-version.outputs.new_version }}"
-          body: ${{ steps.notes.outputs.release_notes }}
+          tag_name: ${{ needs.version-bump.outputs.tag }}
+          name: "Stagewise ${{ needs.version-bump.outputs.version }}"
+          body: ${{ needs.version-bump.outputs.notes }}
           prerelease: ${{ inputs.channel != 'release' }}
-          draft: false
-          files: |
-            artifacts/**/*.dmg
-            artifacts/**/*.zip
-            artifacts/**/*.exe
-            artifacts/**/*.deb
-            artifacts/**/*.rpm
+          files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Summary
-        run: |
-          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Package:** browser" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** ${{ needs.prepare-version.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Channel:** ${{ inputs.channel }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag:** ${{ needs.prepare-version.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ inputs.new-cycle }}" == "true" ]; then
-            echo "- **New Cycle:** Yes" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
-          find artifacts -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" \) | while read f; do
-            echo "- $(basename $f)" >> $GITHUB_STEP_SUMMARY
-          done
