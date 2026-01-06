@@ -85,25 +85,25 @@ export class PromptBuilder {
     const autoCompactInfo = findLatestAutoCompactMessage(chatMessages);
 
     if (autoCompactInfo) {
-      this.convertWithAutoCompacting(
+      await this.convertWithAutoCompacting(
         chatMessages,
         autoCompactInfo,
         modelMessages,
       );
     } else {
-      this.convertAllMessages(chatMessages, modelMessages);
+      await this.convertAllMessages(chatMessages, modelMessages);
     }
 
     return modelMessages;
   }
 
   /** Converts all messages without compaction. */
-  private convertAllMessages(
+  private async convertAllMessages(
     chatMessages: ChatMessage[],
     modelMessages: ModelMessage[],
-  ): void {
+  ): Promise<void> {
     for (const message of chatMessages)
-      this.convertSingleMessage(message, modelMessages);
+      await this.convertSingleMessage(message, modelMessages);
   }
 
   /** Applies compaction: [first N pairs] + [summary] + [last pair with all following]. */
