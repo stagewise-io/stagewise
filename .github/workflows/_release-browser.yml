@@ -1,0 +1,330 @@
+# Reusable workflow for browser releases
+
+name: _Release Browser (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      channel:
+        description: 'Release channel (alpha, beta, or release)'
+        required: true
+        type: string
+      new-cycle:
+        description: 'Start a new version cycle (abandon current prerelease)'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      NUCLEO_LICENSE_KEY:
+        required: false
+      POSTHOG_API_KEY:
+        required: false
+      VITE_POSTHOG_API_KEY:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_PASSWORD:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+
+jobs:
+  pre-check:
+    runs-on: ubuntu-latest
+    outputs:
+      ci-passed: ${{ steps.ci-check.outputs.passed }}
+      has-changes: ${{ steps.changes-check.outputs.has_changes }}
+      last-tag: ${{ steps.changes-check.outputs.last_tag }}
+      commit-count: ${{ steps.changes-check.outputs.commit_count }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CI Status
+        id: ci-check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get current branch name from ref
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          echo "Checking CI status for the latest commit on $BRANCH_NAME..."
+
+          COMMIT_SHA=$(git rev-parse HEAD)
+          echo "Current commit: $COMMIT_SHA"
+
+          CI_STATUS=$(gh run list \
+            --workflow=monorepo-ci.yml \
+            --branch="$BRANCH_NAME" \
+            --limit=5 \
+            --json headSha,conclusion \
+            --jq ".[] | select(.headSha == \"$COMMIT_SHA\") | .conclusion" | head -1)
+
+          echo "CI status: $CI_STATUS"
+
+          if [ "$CI_STATUS" == "success" ]; then
+            echo "passed=true" >> $GITHUB_OUTPUT
+            echo "CI passed for current commit"
+          else
+            echo "passed=false" >> $GITHUB_OUTPUT
+            echo "::error::CI has not passed for the current commit. Please wait for CI to complete successfully."
+            echo "CI status was: ${CI_STATUS:-not found}"
+          fi
+
+      - name: Check for Changes Since Last Release
+        id: changes-check
+        run: |
+          TAG_PREFIX="browser@"
+
+          LAST_TAG=$(git tag --list "${TAG_PREFIX}*" --sort=-version:refname | head -n 1)
+          echo "last_tag=${LAST_TAG:-none}" >> $GITHUB_OUTPUT
+          echo "Last tag: ${LAST_TAG:-none}"
+
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --grep="(browser)" | wc -l | tr -d ' ')
+          else
+            COMMITS=$(git log --oneline --grep="(browser)" | wc -l | tr -d ' ')
+          fi
+
+          echo "commit_count=$COMMITS" >> $GITHUB_OUTPUT
+          echo "Commits with scope 'browser' since last release: $COMMITS"
+
+          if [ "$COMMITS" -gt 0 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Found $COMMITS commits to release"
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "::warning::No commits with scope 'browser' found since last release"
+          fi
+
+      - name: Pre-check Summary
+        run: |
+          echo "## Pre-check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| CI Passed | ${{ steps.ci-check.outputs.passed == 'true' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Has Changes | ${{ steps.changes-check.outputs.has_changes == 'true' && '✅' || '⚠️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Last Tag | ${{ steps.changes-check.outputs.last_tag }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commits to Release | ${{ steps.changes-check.outputs.commit_count }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if CI not passed
+        if: steps.ci-check.outputs.passed != 'true'
+        run: |
+          echo "::error::Cannot release: CI has not passed for the current commit."
+          echo "Please ensure the CI workflow completes successfully before releasing."
+          exit 1
+
+      - name: Fail if no changes
+        if: steps.changes-check.outputs.has_changes != 'true'
+        run: |
+          echo "::error::Cannot release: No changes found since last release."
+          echo "There are no commits with the correct scope to release."
+          exit 1
+
+  version-bump:
+    needs: pre-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+      release_notes: ${{ steps.notes.outputs.release_notes }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bump Version and Generate Changelog
+        id: version
+        run: |
+          ARGS="--package browser --channel ${{ inputs.channel }}"
+
+          if [ "${{ inputs.new-cycle }}" == "true" ]; then
+            ARGS="$ARGS --new-cycle"
+          fi
+
+          pnpm tsx scripts/release/index.ts $ARGS
+
+          echo "new_version=$(cat .release-version)" >> $GITHUB_OUTPUT
+          echo "tag_name=$(cat .release-tag)" >> $GITHUB_OUTPUT
+
+      - name: Read Release Notes
+        id: notes
+        run: |
+          NOTES=$(cat .release-notes.md)
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit Version Bump
+        run: |
+          git add .
+          git commit -m "chore(browser): release ${{ steps.version.outputs.new_version }} [skip ci]"
+          git push
+
+      - name: Create and Push Tag
+        run: |
+          git tag ${{ steps.version.outputs.tag_name }}
+          git push origin ${{ steps.version.outputs.tag_name }}
+
+      - name: Upload Release Notes Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: .release-notes.md
+
+  build:
+    needs: version-bump
+    environment: Release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-26
+            platform: darwin-arm64
+            arch: arm64
+            artifact-name: browser-macos-arm64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            artifact-name: browser-linux-x64
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            artifact-name: browser-windows-x64
+
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+
+    env:
+      NODE_OPTIONS: "--max-old-space-size=8192"
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
+      POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+      VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
+      API_URL: ${{ vars.API_URL }}
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      STAGEWISE_CONSOLE_URL: ${{ vars.STAGEWISE_CONSOLE_URL }}
+      VITE_STAGEWISE_CONSOLE_URL: ${{ vars.VITE_STAGEWISE_CONSOLE_URL }}
+      LLM_PROXY_URL: ${{ vars.LLM_PROXY_URL }}
+      VITE_DISABLE_TELEMETRY: ${{ vars.VITE_DISABLE_TELEMETRY }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version-bump.outputs.tag_name }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build All Packages
+        run: pnpm build
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+
+      - name: Build Electron App
+        working-directory: apps/browser
+        run: pnpm make --arch=${{ matrix.arch }}
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+          BUILD_MODE: production
+          RELEASE_CHANNEL: ${{ inputs.channel == 'release' && 'release' || 'prerelease' }}
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            apps/browser/out/make/**/*.dmg
+            apps/browser/out/make/**/*.zip
+            apps/browser/out/make/**/*.exe
+            apps/browser/out/make/**/*.deb
+            apps/browser/out/make/**/*.rpm
+          if-no-files-found: warn
+
+  release:
+    needs: [version-bump, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List Artifacts
+        run: find artifacts -type f | head -50
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version-bump.outputs.tag_name }}
+          name: "Browser ${{ needs.version-bump.outputs.new_version }}"
+          body: ${{ needs.version-bump.outputs.release_notes }}
+          prerelease: ${{ inputs.channel != 'release' }}
+          draft: false
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package:** browser" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.version-bump.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Channel:** ${{ inputs.channel }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** ${{ needs.version-bump.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.new-cycle }}" == "true" ]; then
+            echo "- **New Cycle:** Yes" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          find artifacts -type f -name "*.dmg" -o -name "*.exe" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" | while read f; do
+            echo "- $(basename $f)" >> $GITHUB_STEP_SUMMARY
+          done

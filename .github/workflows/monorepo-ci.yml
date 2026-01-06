@@ -1,58 +1,115 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'apps/browser/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/monorepo-ci.yml'
   pull_request:
     branches:
       - main
       - release-tests
-  push:
-    branches:
-      - main
-      - release-tests
+    paths:
+      - 'apps/browser/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/monorepo-ci.yml'
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # Linting - runs on all triggers
-  check:
+  # Basic checks - runs on all pushes and PRs
+  lint:
+    name: Lint (Biome)
     runs-on: ubuntu-latest
     env:
       NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 10.27.0
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Run Biome Check
         run: pnpm check
 
-  # Basic build and test - runs on all triggers
-  build:
+  test:
+    name: Unit Tests
     runs-on: ubuntu-latest
     env:
       NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 10.27.0
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm test
 
-  # Cross-platform browser builds - only on push to main
-  # This validates that release builds will work
-  build-browser-platforms:
-    if: github.event_name == 'push'
-    needs: [check, build]
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Tests
+        run: pnpm test
+
+  build:
+    name: Build Packages
+    runs-on: ubuntu-latest
+    env:
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build All Packages
+        run: pnpm build
+
+  # Cross-platform browser builds - only on PRs to main/release-tests
+  # Required for merge
+  build-browser:
+    name: Build Browser (${{ matrix.platform }})
+    if: github.event_name == 'pull_request'
+    needs: [lint, test, build]
     environment: Dev
     strategy:
       fail-fast: false
@@ -71,14 +128,10 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     env:
-      # Increase Node.js memory limit for large builds
       NODE_OPTIONS: "--max-old-space-size=8192"
-      # From GitHub secrets
       NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
-      # From GitHub environment secrets
       POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
       VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
-      # From GitHub environment variables
       API_URL: ${{ vars.API_URL }}
       VITE_API_URL: ${{ vars.VITE_API_URL }}
       STAGEWISE_CONSOLE_URL: ${{ vars.STAGEWISE_CONSOLE_URL }}
@@ -87,25 +140,29 @@ jobs:
       VITE_DISABLE_TELEMETRY: ${{ vars.VITE_DISABLE_TELEMETRY }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 10.27.0
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build All Packages
         run: pnpm build
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
 
-      - name: Build Browser App (${{ matrix.platform }})
+      - name: Build Browser App
         working-directory: apps/browser
         run: pnpm make --arch=${{ matrix.arch }}
         env:
@@ -126,14 +183,50 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-  # Summary job that other workflows can depend on
-  ci-success:
-    if: github.event_name == 'push'
-    needs: [check, build, build-browser-platforms]
+  # Summary job for branch protection rules
+  ci-basic:
+    name: Basic CI
+    if: always()
+    needs: [lint, test, build]
     runs-on: ubuntu-latest
     steps:
-      - name: CI Success
+      - name: Check Basic CI Status
         run: |
-          echo "## CI Build Successful" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.build.result }}" != "success" ]; then
+            echo "Basic CI failed"
+            exit 1
+          fi
+          echo "Basic CI passed"
+
+  # Summary job for PR merge requirements
+  ci-full:
+    name: Full CI (PR)
+    if: github.event_name == 'pull_request' && always()
+    needs: [lint, test, build, build-browser]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Full CI Status
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.build.result }}" != "success" ] || \
+             [ "${{ needs.build-browser.result }}" != "success" ]; then
+            echo "## CI Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Test | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Build Browser | ${{ needs.build-browser.result }} |" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "## CI Passed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All checks passed. Release workflows are now available." >> $GITHUB_STEP_SUMMARY
+          echo "All checks passed. This PR is ready for merge." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "Browser builds for all platforms completed successfully." >> $GITHUB_STEP_SUMMARY
