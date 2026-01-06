@@ -60,7 +60,9 @@
       "stagewise": "link:apps/cli",
       "lucide-react": "0.554.0",
       "@types/react": "19.2.7",
-      "@types/react-dom": "19.2.3"
+      "@types/react-dom": "19.2.3",
+      "@types/glob": "8.1.0",
+      "@types/minimatch": "5.1.2"
     }
   },
   "dependencies": {
