@@ -7,6 +7,9 @@ on:
 # so we check in the job condition
 run-name: "Release Browser Alpha"
 
+permissions:
+  contents: write
+
 jobs:
   release:
     # Only run on main or release-tests branch
