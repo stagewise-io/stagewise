@@ -15,7 +15,7 @@ export const packages: PackageConfig[] = [
     scope: 'browser',
     publishToNpm: false,
     createGithubRelease: true,
-    tagPrefix: 'browser@',
+    tagPrefix: 'stagewise@',
     prereleaseEnabled: true,
   },
   {
