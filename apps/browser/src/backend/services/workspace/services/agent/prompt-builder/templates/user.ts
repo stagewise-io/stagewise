@@ -8,11 +8,13 @@ import {
   selectedElementToContextSnippet,
 } from '../utils/metadata-converter/html-elements';
 
-export function getUserMessage(userMessage: ChatMessage): UserModelMessage {
+export async function getUserMessage(
+  userMessage: ChatMessage,
+): Promise<UserModelMessage> {
   // convert file parts and text to model messages (without metadata) to ensure correct mapping of ui parts to model content
-  const convertedMessage: UserModelMessage = convertToModelMessages([
-    userMessage,
-  ])[0]! as UserModelMessage;
+  const convertedMessage: UserModelMessage = (
+    await convertToModelMessages([userMessage])
+  )[0]! as UserModelMessage;
 
   // If the content is a string, we convert it to a single text part because we always want a parts array as content.
   if (typeof convertedMessage.content === 'string') {

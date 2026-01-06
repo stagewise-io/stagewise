@@ -1,5 +1,5 @@
 import { PostHog } from 'posthog-node';
-import type { LanguageModelV2 } from '@ai-sdk/provider';
+import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { withTracing } from '@posthog/ai';
 import type { IdentifierService } from './identifier';
 import type { GlobalConfigService } from './global-config';
@@ -194,9 +194,9 @@ export class TelemetryService extends DisposableService {
   }
 
   public withTracing(
-    model: LanguageModelV2,
+    model: LanguageModelV3,
     properties?: Parameters<typeof withTracing>[2],
-  ): LanguageModelV2 {
+  ): LanguageModelV3 {
     const telemetryLevel = this.globalConfigService.get().telemetryLevel;
     if (telemetryLevel !== 'full') return model;
 

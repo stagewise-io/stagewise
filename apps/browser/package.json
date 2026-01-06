@@ -32,10 +32,10 @@
     "electron-unhandled": "^5.0.0"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "2.0.45",
-    "@ai-sdk/google": "3.0.1",
-    "@ai-sdk/openai": "^2.0.23",
-    "@ai-sdk/provider": "^2.0.0",
+    "@ai-sdk/anthropic": "3.0.4",
+    "@ai-sdk/google": "3.0.2",
+    "@ai-sdk/openai": "3.0.2",
+    "@ai-sdk/provider": "3.0.1",
     "@electron-forge/cli": "^7.10.2",
     "@electron-forge/maker-deb": "^7.10.2",
     "@electron-forge/maker-dmg": "^7.10.2",
@@ -47,7 +47,7 @@
     "@electron-forge/plugin-vite": "^7.10.2",
     "@electron/fuses": "^1.8.0",
     "@libsql/client": "^0.15.15",
-    "@posthog/ai": "^6.4.3",
+    "@posthog/ai": "7.3.0",
     "@react-three/fiber": "^9.3.0",
     "@stagewise/agent-runtime-interface": "workspace:*",
     "@stagewise/agent-runtime-node": "workspace:*",
@@ -80,7 +80,7 @@
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^4.6.0",
     "@vueless/storybook-dark-mode": "^10.0.3",
-    "ai": "5.0.101",
+    "ai": "6.0.9",
     "bowser": "^2.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -129,7 +129,7 @@
     "vscode-languageserver-types": "^3.17.5",
     "winston": "^3.17.0",
     "xml": "^1.0.1",
-    "zod": "4.1.12"
+    "zod": "4.3.5"
   },
   "productName": "stagewise"
 }

@@ -107,11 +107,11 @@ export class PromptBuilder {
   }
 
   /** Applies compaction: [first N pairs] + [summary] + [last pair with all following]. */
-  private convertWithAutoCompacting(
+  private async convertWithAutoCompacting(
     chatMessages: ChatMessage[],
     autoCompactInfo: AutoCompactInfo,
     modelMessages: ModelMessage[],
-  ): void {
+  ): Promise<void> {
     const { index: autoCompactIndex, summary } = autoCompactInfo;
 
     // Find where the first N pairs end
@@ -125,24 +125,24 @@ export class PromptBuilder {
 
     // Add first N pairs
     for (let i = 0; i < keptMessagesEndIndex; i++)
-      this.convertSingleMessage(chatMessages[i]!, modelMessages);
+      await this.convertSingleMessage(chatMessages[i]!, modelMessages);
 
     // Add summary (middle messages are skipped)
     modelMessages.push(getSummarizationUserMessage(summary));
 
     // Add last pair and any following messages
     for (let i = autoCompactIndex; i < chatMessages.length; i++)
-      this.convertSingleMessage(chatMessages[i]!, modelMessages);
+      await this.convertSingleMessage(chatMessages[i]!, modelMessages);
   }
 
   /** Converts a single ChatMessage to ModelMessage(s). */
-  private convertSingleMessage(
+  private async convertSingleMessage(
     message: ChatMessage,
     modelMessages: ModelMessage[],
-  ): void {
+  ): Promise<void> {
     switch (message.role) {
       case 'user':
-        modelMessages.push(getUserMessage(message));
+        modelMessages.push(await getUserMessage(message));
         break;
       case 'assistant': {
         // Skip empty reasoning/step-start messages
@@ -181,7 +181,9 @@ export class PromptBuilder {
             return part;
           }),
         };
-        const convertedMessages = convertToModelMessages([cleanedMessage]);
+        const convertedMessages = await convertToModelMessages([
+          cleanedMessage,
+        ]);
         const sanitizedConvertedMessages = convertedMessages.map((msg) =>
           sanitizeModelMessageToolCallInput(msg),
         );
@@ -189,7 +191,7 @@ export class PromptBuilder {
         break;
       }
       default: {
-        const convertedMessages = convertToModelMessages([message]);
+        const convertedMessages = await convertToModelMessages([message]);
         modelMessages.push(...convertedMessages);
         break;
       }

@@ -24,10 +24,10 @@
   "devDependencies": {
     "rimraf": "^5.0.0",
     "typescript": "^5.8.3",
-    "zod": "4.0.17",
+    "zod": "4.3.5",
     "@stagewise/api-client": "2.1.0"
   },
   "dependencies": {
-    "ai": "5.0.101"
+    "ai": "6.0.9"
   }
 }

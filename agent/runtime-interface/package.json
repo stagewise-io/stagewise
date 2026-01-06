@@ -24,6 +24,6 @@
   "devDependencies": {
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0",
-    "zod": "4.0.17"
+    "zod": "4.3.5"
   }
 }

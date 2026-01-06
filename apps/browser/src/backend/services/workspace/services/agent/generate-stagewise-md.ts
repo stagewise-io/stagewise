@@ -5,7 +5,7 @@ import {
 } from './prompt-builder/utils/workspace-info';
 import { stepCountIs, type ToolSet } from 'ai';
 import { generateText, type ModelMessage } from 'ai';
-import type { LanguageModelV2 } from '@ai-sdk/provider';
+import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import path from 'node:path';
 
@@ -221,7 +221,7 @@ After analyzing the codebase, use **saveFileTool** to create the \`${STAGEWISE_M
  * styling configuration, and component patterns.
  */
 export async function generateStagewiseMd(
-  model: LanguageModelV2,
+  model: LanguageModelV3,
   clientRuntime: ClientRuntime,
   overwriteClientRuntime: ClientRuntime,
   appPath: string,

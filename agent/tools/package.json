@@ -25,10 +25,10 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "2.0.45",
-    "@ai-sdk/provider": "^2.0.0",
+    "@ai-sdk/anthropic": "3.0.4",
+    "@ai-sdk/provider": "3.0.1",
     "@stagewise/api-client": "2.1.0",
-    "ai": "5.0.101"
+    "ai": "6.0.9"
   },
   "devDependencies": {
     "@stagewise/agent-runtime-interface": "workspace:*",
@@ -38,6 +38,6 @@
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0",
     "vitest": "^3.2.4",
-    "zod": "4.0.17"
+    "zod": "4.3.5"
   }
 }

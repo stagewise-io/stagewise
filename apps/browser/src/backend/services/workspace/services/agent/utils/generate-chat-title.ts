@@ -40,7 +40,7 @@ export async function generateChatTitle(
           content: generateChatTitleSystemPrompt,
         },
         // We use the ai-sdk given tool to convert mesages to keep it simple for title generation
-        ...convertToModelMessages(history ?? []),
+        ...(await convertToModelMessages(history ?? [])),
       ],
     });
 
