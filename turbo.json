@@ -33,6 +33,7 @@
       "dependsOn": ["^typecheck"]
     },
     "test": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": false
     }
