@@ -349,6 +349,7 @@ export function ChatPanelFooter() {
                 percentage={contextUsed}
                 usedKb={activeChat.usage.usedContextWindowSize / 1000}
                 maxKb={activeChat.usage.maxContextWindowSize / 1000}
+                className="ml-1"
               />
             )}
             <FileAttachmentChips

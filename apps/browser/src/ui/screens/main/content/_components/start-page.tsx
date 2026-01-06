@@ -414,7 +414,7 @@ const ConnectWorkspaceBanner = () => {
           Connect a workspace
           <Tooltip>
             <TooltipTrigger>
-              <IconCircleQuestion className="size-4 self-start text-muted-foreground" />
+              <IconCircleQuestion className="size-4 shrink-0 self-start text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>
               <span>

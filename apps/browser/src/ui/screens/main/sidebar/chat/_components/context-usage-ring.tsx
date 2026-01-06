@@ -4,17 +4,20 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { useMemo } from 'react';
+import { cn } from '@/utils';
 
 interface ContextUsageRingProps {
   percentage: number;
   usedKb: number;
   maxKb: number;
+  className?: string;
 }
 
 export function ContextUsageRing({
   percentage,
   usedKb,
   maxKb,
+  className,
 }: ContextUsageRingProps) {
   const ringColor = useMemo(() => {
     if (percentage >= 90) return 'text-error';
@@ -31,7 +34,12 @@ export function ContextUsageRing({
   return (
     <Tooltip>
       <TooltipTrigger>
-        <div className="relative flex shrink-0 items-center justify-center">
+        <div
+          className={cn(
+            'relative flex shrink-0 items-center justify-center',
+            className,
+          )}
+        >
           <svg
             width={size}
             height={size}
