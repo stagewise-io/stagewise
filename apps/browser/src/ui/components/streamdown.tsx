@@ -102,9 +102,6 @@ export const Streamdown = ({
           h6: MemoH6,
         }}
         rehypePlugins={[defaultRehypePlugins.raw!, defaultRehypePlugins.katex!]}
-        urlTransform={(url) => {
-          return url;
-        }}
       >
         {preprocessMarkdown(children)}
       </StreamdownBase>
