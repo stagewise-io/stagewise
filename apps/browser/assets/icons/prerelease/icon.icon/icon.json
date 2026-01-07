@@ -7,7 +7,7 @@
           "image-name": "inkscape-logoonly.svg",
           "name": "inkscape-logoonly",
           "position": {
-            "scale": 0.18,
+            "scale": 0.2,
             "translation-in-points": [0, 0]
           }
         }
@@ -30,7 +30,7 @@
           "image-name": "inkscape-starsonly.svg",
           "name": "inkscape-starsonly",
           "position": {
-            "scale": 0.18,
+            "scale": 0.19,
             "translation-in-points": [0, 0]
           }
         }
@@ -49,6 +49,16 @@
       "layers": [
         {
           "glass": false,
+          "hidden-specializations": [
+            {
+              "appearance": "light",
+              "value": false
+            },
+            {
+              "appearance": "tinted",
+              "value": true
+            }
+          ],
           "image-name": "inkscape-bgonly.svg",
           "name": "inkscape-bgonly",
           "position": {
