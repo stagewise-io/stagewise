@@ -84,7 +84,7 @@ jobs:
       - name: Bump Version
         id: bump
         run: |
-          ARGS="--package browser --channel ${{ inputs.channel }}"
+          ARGS="--package stagewise --channel ${{ inputs.channel }}"
           [ "${{ inputs.new-cycle }}" == "true" ] && ARGS="$ARGS --new-cycle"
           pnpm tsx scripts/release/index.ts $ARGS
           echo "version=$(cat .release-version)" >> $GITHUB_OUTPUT
@@ -112,13 +112,13 @@ jobs:
         include:
           - os: macos-26
             arch: arm64
-            artifact: browser-macos-arm64
+            artifact: stagewise-macos-arm64
           - os: ubuntu-latest
             arch: x64
-            artifact: browser-linux-x64
+            artifact: stagewise-linux-x64
           - os: windows-latest
             arch: x64
-            artifact: browser-windows-x64
+            artifact: stagewise-windows-x64
 
     runs-on: ${{ matrix.os }}
     permissions:

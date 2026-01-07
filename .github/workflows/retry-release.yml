@@ -38,7 +38,7 @@ jobs:
 
           # Determine package from tag prefix
           if [[ "$TAG" == stagewise@* ]]; then
-            PACKAGE="browser"
+            PACKAGE="stagewise"
             VERSION="${TAG#stagewise@}"
           elif [[ "$TAG" == @stagewise/karton@* ]]; then
             PACKAGE="karton"
@@ -83,9 +83,9 @@ jobs:
           echo "::error::Tag ${{ inputs.tag }} does not exist. Cannot retry."
           exit 1
 
-  # Build browser on multiple platforms
-  build-browser:
-    if: needs.parse-tag.outputs.package == 'browser'
+  # Build stagewise on multiple platforms
+  build-stagewise:
+    if: needs.parse-tag.outputs.package == 'stagewise'
     needs: parse-tag
     environment: Release
     strategy:
@@ -95,15 +95,15 @@ jobs:
           - os: macos-latest
             platform: darwin
             arch: arm64
-            artifact-name: browser-macos-arm64
+            artifact-name: stagewise-macos-arm64
           - os: ubuntu-latest
             platform: linux
             arch: x64
-            artifact-name: browser-linux-x64
+            artifact-name: stagewise-linux-x64
           - os: windows-latest
             platform: win32
             arch: x64
-            artifact-name: browser-windows-x64
+            artifact-name: stagewise-windows-x64
 
     runs-on: ${{ matrix.os }}
 
@@ -164,10 +164,10 @@ jobs:
             apps/browser/out/*/make/**/*.rpm
           if-no-files-found: warn
 
-  # Create/Update GitHub Release with all artifacts (browser)
-  release-browser:
-    if: needs.parse-tag.outputs.package == 'browser'
-    needs: [parse-tag, build-browser]
+  # Create/Update GitHub Release with all artifacts (stagewise)
+  release-stagewise:
+    if: needs.parse-tag.outputs.package == 'stagewise'
+    needs: [parse-tag, build-stagewise]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -241,7 +241,7 @@ jobs:
         run: |
           echo "## Retry Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Package:** browser" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package:** stagewise" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** ${{ needs.parse-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Channel:** ${{ needs.parse-tag.outputs.channel }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Tag:** ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
