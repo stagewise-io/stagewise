@@ -150,6 +150,8 @@ const config: ForgeConfig = {
       name: appBaseName,
       copyright: `Copyright © ${new Date().getFullYear()} stagewise Inc.`,
       setupIcon: `./assets/icons/${releaseChannel}/icon.ico`,
+      loadingGif: `./assets/install/${releaseChannel}/windows-install-image.gif`,
+      title: `Installing ${appName}...`,
       description: appName,
     }),
     new MakerRpm({
