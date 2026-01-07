@@ -10,9 +10,9 @@ import type { PackageConfig } from './types.js';
  */
 export const packages: PackageConfig[] = [
   {
-    name: 'browser',
+    name: 'stagewise',
     path: 'apps/browser/package.json',
-    scope: 'browser',
+    scope: 'stagewise',
     publishToNpm: false,
     createGithubRelease: true,
     tagPrefix: 'stagewise@',

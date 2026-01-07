@@ -17,7 +17,7 @@ export interface PackageConfig {
   publishToNpm: boolean;
   /** Whether to create GitHub release */
   createGithubRelease: boolean;
-  /** Git tag prefix (e.g., "browser@", "@stagewise/karton@") */
+  /** Git tag prefix (e.g., "stagewise@", "@stagewise/karton@") */
   tagPrefix: string;
   /** Whether prerelease channels (alpha/beta) are enabled. Default: true */
   prereleaseEnabled?: boolean;
