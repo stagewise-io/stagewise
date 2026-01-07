@@ -12,6 +12,23 @@ export default async function buildPluginSdk() {
     resolve(process.cwd(), 'tmp/plugin-sdk/unbundled-types'),
   );
 
+  // Move the generated index.d.ts to the root if it was created in a nested directory
+  const nestedIndexPath = resolve(
+    process.cwd(),
+    'tmp/plugin-sdk/unbundled-types/plugin-sdk/index.d.ts',
+  );
+  const rootIndexPath = resolve(
+    process.cwd(),
+    'tmp/plugin-sdk/unbundled-types/index.d.ts',
+  );
+
+  try {
+    await fs.access(nestedIndexPath);
+    await fs.rename(nestedIndexPath, rootIndexPath);
+  } catch {
+    // File is already in the correct location or doesn't exist
+  }
+
   // Copy karton-contract types to plugin-sdk dependencies
 
   const sourceDir = resolve(

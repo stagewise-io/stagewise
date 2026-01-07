@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "clean": "rm -rf .turbo .nuxt .output node_modules",
+    "clean": "rimraf .turbo .nuxt .output node_modules",
     "build": "nuxt build",
     "dev": "nuxt dev --port 3004",
     "generate": "nuxt generate",
@@ -14,5 +14,8 @@
     "nuxt": "3.17.7",
     "vue": "^3.5.18",
     "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.0"
   }
 }

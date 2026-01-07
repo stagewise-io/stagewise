@@ -30,7 +30,9 @@
     "@commitlint/config-conventional": "^19.8.1",
     "@stagewise/typescript-config": "workspace:*",
     "@types/node": "22.15.2",
+    "cross-env": "^7.0.3",
     "lefthook": "^1.12.2",
+    "rimraf": "^6.0.0",
     "ts-node": "10.9.2",
     "turbo": "^2.5.4",
     "typescript": "^5.8.3"

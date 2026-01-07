@@ -42,7 +42,7 @@
   ],
   "license": "AGPL-3.0-only",
   "scripts": {
-    "clean": "rm -rf .turbo node_modules",
+    "clean": "rimraf .turbo node_modules",
     "dev": "tsc -b && tsx build.vite.ts development",
     "dev:examples": "tsc -b && tsx build.vite.ts development",
     "build:toolbar": "tsc -b && tsx build.vite.ts production",
@@ -72,6 +72,7 @@
     "react-dom": "19.1.2",
     "react-markdown": "^10.1.0",
     "react-timeago": "^8.3.0",
+    "rimraf": "^6.0.0",
     "rollup": "^4.44.2",
     "rollup-plugin-dts": "^6.2.1",
     "serialize-javascript": "^6.0.2",

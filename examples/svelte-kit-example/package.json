@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "clean": "rm -rf .turbo .svelte-kit node_modules",
+    "clean": "rimraf .turbo .svelte-kit node_modules",
     "dev": "vite dev --port 3007",
     "build": "vite build",
     "preview": "vite preview",
@@ -17,6 +17,7 @@
     "@sveltejs/vite-plugin-svelte": "5.1.1",
     "svelte": "^5.35.5",
     "svelte-check": "^4.1.7",
+    "rimraf": "^6.0.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
   }
