@@ -127,10 +127,18 @@ export class WindowLayoutService extends DisposableService {
       height: this.lastNonMaximizedBounds.height,
       x: this.lastNonMaximizedBounds.x,
       y: this.lastNonMaximizedBounds.y,
-      title: 'stagewise',
+      title: __APP_NAME__,
       titleBarStyle: 'hidden',
       show: false, // Don't show until UI is ready to prevent visual glitches
       // fullscreenable: false,
+      ...(process.platform === 'linux'
+        ? {
+            icon: path.join(
+              process.resourcesPath,
+              `assets/icons/${__RELEASE_CHANNEL__}/icon.png`,
+            ),
+          }
+        : {}),
       ...(process.platform !== 'darwin'
         ? {
             titleBarOverlay: {

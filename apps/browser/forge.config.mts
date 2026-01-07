@@ -103,18 +103,19 @@ const config: ForgeConfig = {
   buildIdentifier: releaseChannel,
   packagerConfig: {
     asar: true,
-    extraResource: ['./bundled'],
+    extraResource: ['./bundled', `./assets/icons/${releaseChannel}/icon.png`],
     prune: true,
     afterCopy: [copyNativeDependencies],
     icon: `./assets/icons/${releaseChannel}/icon`,
-    appCopyright: `Copyright © ${new Date().getFullYear()} stagewise GmbH`,
+    appCopyright: `Copyright © ${new Date().getFullYear()} stagewise Inc.`,
     win32metadata: {
-      CompanyName: 'stagewise GmbH',
+      CompanyName: 'stagewise Inc.',
       ProductName: appName,
       FileDescription: appName,
       'requested-execution-level': 'asInvoker',
     },
     name: appBaseName,
+    executableName: appBaseName,
     appBundleId: appBundleId,
     appCategoryType: 'public.app-category.developer-tools',
     protocols: [
@@ -147,13 +148,34 @@ const config: ForgeConfig = {
   makers: [
     new MakerSquirrel({
       name: appBaseName,
-      authors: 'stagewise GmbH',
-      copyright: `Copyright © ${new Date().getFullYear()} stagewise GmbH`,
+      copyright: `Copyright © ${new Date().getFullYear()} stagewise Inc.`,
       setupIcon: `./assets/icons/${releaseChannel}/icon.ico`,
       description: appName,
     }),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerRpm({
+      options: {
+        name: appBaseName,
+        bin: appBaseName,
+        productName: appName,
+        genericName: 'Web Browser',
+        icon: `./assets/icons/${releaseChannel}/icon.png`,
+        homepage: 'https://stagewise.io',
+        categories: ['Development', 'Network', 'Utility'],
+      },
+    }),
+    new MakerDeb({
+      options: {
+        name: appBaseName,
+        bin: appBaseName,
+        productName: appName,
+        genericName: 'Web Browser',
+        icon: `./assets/icons/${releaseChannel}/icon.png`,
+        homepage: 'https://stagewise.io',
+        categories: ['Development', 'Network', 'Utility'],
+        section: 'devel',
+        priority: 'standard',
+      },
+    }),
     new MakerDMG({
       format: 'UDZO',
       title: dmgVolumeName,
