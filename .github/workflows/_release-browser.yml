@@ -147,18 +147,13 @@ jobs:
 
       - name: List build output
         working-directory: apps/browser
-        run: find out -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.nupkg" -o -name "*.deb" -o -name "*.rpm" \) 2>/dev/null || true
+        run: find out -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES*" -o -name "*.deb" -o -name "*.rpm" \) 2>/dev/null || true
         shell: bash
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: |
-            apps/browser/out/*/make/**/*.dmg
-            apps/browser/out/*/make/**/*.exe
-            apps/browser/out/*/make/**/*.nupkg
-            apps/browser/out/*/make/**/*.deb
-            apps/browser/out/*/make/**/*.rpm
+          path: apps/browser/out/*/make/
           if-no-files-found: warn
 
   release:
@@ -172,24 +167,15 @@ jobs:
         with:
           path: artifacts
 
-      - name: Rename Artifacts
+      - name: Collect Artifacts
         run: |
-          VERSION="${{ needs.version-bump.outputs.version }}"
           mkdir -p release
 
           echo "Found artifacts:"
           find artifacts -type f
 
-          # macOS
-          find artifacts -name "*.dmg" -exec cp {} "release/stagewise-${VERSION}-macos-arm64.dmg" \;
-
-          # Windows (exe + nupkg for auto-updates)
-          find artifacts -name "*.exe" -exec cp {} "release/stagewise-${VERSION}-windows-x64.exe" \;
-          find artifacts -name "*.nupkg" -exec cp {} "release/stagewise-${VERSION}-windows-x64.nupkg" \;
-
-          # Linux
-          find artifacts -name "*.deb" -exec cp {} "release/stagewise-${VERSION}-linux-x64.deb" \;
-          find artifacts -name "*.rpm" -exec cp {} "release/stagewise-${VERSION}-linux-x64.rpm" \;
+          # Copy all release files to flat directory
+          find artifacts -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES*" -o -name "*.deb" -o -name "*.rpm" \) -exec cp {} release/ \;
 
           echo "Release artifacts:"
           ls -la release/
