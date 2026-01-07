@@ -132,9 +132,9 @@ jobs:
       - name: Run Tests
         run: pnpm test
 
-  # Cross-platform browser builds - only on PRs to main/release-tests
+  # Cross-platform stagewise builds - only on PRs to main/release-tests
   # Required for merge
-  build-browser:
+  build-stagewise:
     name: Build Browser (${{ matrix.platform }})
     if: github.event_name == 'pull_request'
     needs: [lint, test]
@@ -190,7 +190,7 @@ jobs:
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
 
-      - name: Build Browser App
+      - name: Build stagewise App
         working-directory: apps/browser
         run: pnpm make --arch=${{ matrix.arch }}
         env:
@@ -201,7 +201,7 @@ jobs:
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: browser-ci-${{ matrix.platform }}
+          name: stagewise-ci-${{ matrix.platform }}
           path: |
             apps/browser/out/*/make/**/*.dmg
             apps/browser/out/*/make/**/*.zip
@@ -233,7 +233,7 @@ jobs:
   ci-full:
     name: Full CI (PR)
     if: github.event_name == 'pull_request' && always()
-    needs: [lint, test, build, build-browser]
+    needs: [lint, test, build, build-stagewise]
     runs-on: ubuntu-latest
     steps:
       - name: Check Full CI Status
@@ -241,7 +241,7 @@ jobs:
           if [ "${{ needs.lint.result }}" != "success" ] || \
              [ "${{ needs.test.result }}" != "success" ] || \
              [ "${{ needs.build.result }}" != "success" ] || \
-             [ "${{ needs.build-browser.result }}" != "success" ]; then
+             [ "${{ needs.build-stagewise.result }}" != "success" ]; then
             echo "## CI Failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
@@ -249,7 +249,7 @@ jobs:
             echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| Test | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Build Browser | ${{ needs.build-browser.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Build Browser | ${{ needs.build-stagewise.result }} |" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
