@@ -171,6 +171,16 @@ export function useComparingSelector<R>(
   );
 }
 
+// Mock implementation of useChatActions
+// Returns stable setChatInput action (used by components that don't need to react to chatInput changes)
+export function useChatActions() {
+  const setChatInput = useCallback((value: string) => {
+    console.log('[Mock] setChatInput called:', value);
+  }, []);
+
+  return { setChatInput };
+}
+
 // Mock implementation of useChatState
 export interface FileAttachment {
   id: string;

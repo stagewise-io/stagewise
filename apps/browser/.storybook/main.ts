@@ -50,6 +50,8 @@ const config: StorybookConfig = {
             replacement: path.resolve(__dirname, './mocks/mock-hooks.tsx'),
           },
           // Standard @ alias (must come last)
+          // @ui must come before @ since it's more specific
+          { find: '@ui', replacement: path.resolve(__dirname, '../src/ui') },
           { find: '@', replacement: path.resolve(__dirname, '../src/ui') },
           {
             find: '@shared',
