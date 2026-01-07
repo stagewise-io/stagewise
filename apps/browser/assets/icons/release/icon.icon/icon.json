@@ -7,7 +7,7 @@
           "image-name": "inkscape-nobg.svg",
           "name": "inkscape-nobg",
           "position": {
-            "scale": 0.22,
+            "scale": 0.2,
             "translation-in-points": [0, 0]
           }
         }
@@ -28,17 +28,15 @@
         {
           "blend-mode": "normal",
           "glass": false,
-          "hidden-specializations": [
-            {
-              "value": false
-            },
-            {
-              "appearance": "tinted",
-              "value": true
-            }
-          ],
+          "hidden": false,
           "image-name": "inkscape-bgonly.svg",
           "name": "inkscape-bgonly",
+          "opacity-specializations": [
+            {
+              "appearance": "tinted",
+              "value": 0.45
+            }
+          ],
           "position": {
             "scale": 0.2,
             "translation-in-points": [0, 0]
