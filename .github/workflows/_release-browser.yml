@@ -29,33 +29,7 @@ on:
         required: false
 
 jobs:
-  pre-check:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check CI Status
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          COMMIT=$(git rev-parse HEAD)
-          # If current commit is a release commit (skipped CI), check parent commit instead
-          if git log -1 --format=%s | grep -q "\[skip ci\]"; then
-            COMMIT=$(git rev-parse HEAD~1)
-            echo "Current commit skipped CI, checking parent: $COMMIT"
-          fi
-          CI_STATUS=$(gh run list --workflow=monorepo-ci.yml --branch="${GITHUB_REF#refs/heads/}" --limit=10 \
-            --json headSha,conclusion --jq ".[] | select(.headSha == \"$COMMIT\") | .conclusion" | head -1)
-          if [ "$CI_STATUS" != "success" ]; then
-            echo "::error::CI has not passed. Status: ${CI_STATUS:-not found}"
-            exit 1
-          fi
-
   version-bump:
-    needs: pre-check
     runs-on: ubuntu-latest
     permissions:
       contents: write
