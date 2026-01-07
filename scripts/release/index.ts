@@ -3,7 +3,7 @@
  * Release CLI - Version bumping and changelog generation
  *
  * Usage:
- *   pnpm tsx scripts/release/index.ts --package browser --channel beta
+ *   pnpm tsx scripts/release/index.ts --package stagewise --channel beta
  *   pnpm tsx scripts/release/index.ts --package karton --channel release --dry-run
  */
 
@@ -68,15 +68,15 @@ Options:
   -h, --help               Show this help message
 
 Examples:
-  pnpm tsx scripts/release/index.ts --package browser --channel beta
+  pnpm tsx scripts/release/index.ts --package stagewise --channel beta
   pnpm tsx scripts/release/index.ts --package karton --channel release
-  pnpm tsx scripts/release/index.ts --package browser --dry-run
+  pnpm tsx scripts/release/index.ts --package stagewise --dry-run
 
   # First release - only include commits after a specific point
-  pnpm tsx scripts/release/index.ts --package browser --since abc1234
+  pnpm tsx scripts/release/index.ts --package stagewise --since abc1234
 
   # Abandon beta and start fresh alpha for next version
-  pnpm tsx scripts/release/index.ts --package browser --channel alpha --new-cycle
+  pnpm tsx scripts/release/index.ts --package stagewise --channel alpha --new-cycle
 `);
     process.exit(0);
   }
