@@ -34,9 +34,10 @@ export async function getCommitsSince(
 
   try {
     // Get commits with full details
-    // Format: hash|subject|body (using | as delimiter since it's unlikely in commits)
+    // Format: hash|subject|body using null byte as commit separator
+    // (null bytes can't appear in commit messages)
     const { stdout } = await exec(
-      `git log ${range} --format="%H|%s|%b|||" --no-merges`,
+      `git log ${range} --format="%H|%s|%b%x00" --no-merges`,
     );
 
     if (!stdout.trim()) {
@@ -45,8 +46,8 @@ export async function getCommitsSince(
 
     const commits: ConventionalCommit[] = [];
 
-    // Split by ||| delimiter (end of each commit)
-    const rawCommits = stdout.split('|||').filter((c) => c.trim());
+    // Split by null byte delimiter (end of each commit)
+    const rawCommits = stdout.split('\0').filter((c) => c.trim());
 
     for (const rawCommit of rawCommits) {
       const parts = rawCommit.trim().split('|');
