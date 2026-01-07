@@ -171,15 +171,20 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           RELEASE_CHANNEL: ${{ inputs.channel == 'release' && 'release' || 'prerelease' }}
 
+      - name: List build output
+        working-directory: apps/browser
+        run: find out -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.nupkg" -o -name "*.deb" -o -name "*.rpm" \) 2>/dev/null || true
+        shell: bash
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: |
-            apps/browser/out/make/**/*.dmg
-            apps/browser/out/make/**/*.zip
-            apps/browser/out/make/**/*.exe
-            apps/browser/out/make/**/*.deb
-            apps/browser/out/make/**/*.rpm
+            apps/browser/out/*/make/**/*.dmg
+            apps/browser/out/*/make/**/*.exe
+            apps/browser/out/*/make/**/*.nupkg
+            apps/browser/out/*/make/**/*.deb
+            apps/browser/out/*/make/**/*.rpm
           if-no-files-found: warn
 
   release:
@@ -198,11 +203,15 @@ jobs:
           VERSION="${{ needs.version-bump.outputs.version }}"
           mkdir -p release
 
+          echo "Found artifacts:"
+          find artifacts -type f
+
           # macOS
           find artifacts -name "*.dmg" -exec cp {} "release/stagewise-${VERSION}-macos-arm64.dmg" \;
 
-          # Windows
+          # Windows (exe + nupkg for auto-updates)
           find artifacts -name "*.exe" -exec cp {} "release/stagewise-${VERSION}-windows-x64.exe" \;
+          find artifacts -name "*.nupkg" -exec cp {} "release/stagewise-${VERSION}-windows-x64.nupkg" \;
 
           # Linux
           find artifacts -name "*.deb" -exec cp {} "release/stagewise-${VERSION}-linux-x64.deb" \;

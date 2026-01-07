@@ -157,11 +157,11 @@ jobs:
         with:
           name: ${{ matrix.artifact-name }}
           path: |
-            apps/browser/out/make/**/*.dmg
-            apps/browser/out/make/**/*.zip
-            apps/browser/out/make/**/*.exe
-            apps/browser/out/make/**/*.deb
-            apps/browser/out/make/**/*.rpm
+            apps/browser/out/*/make/**/*.dmg
+            apps/browser/out/*/make/**/*.exe
+            apps/browser/out/*/make/**/*.nupkg
+            apps/browser/out/*/make/**/*.deb
+            apps/browser/out/*/make/**/*.rpm
           if-no-files-found: warn
 
   # Create/Update GitHub Release with all artifacts (browser)
