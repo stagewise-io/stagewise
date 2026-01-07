@@ -23,8 +23,8 @@
     "typecheck": "concurrently -n ui,backend,preload,storybook -c blue,green,yellow,magenta \"tsc -p tsconfig.ui.json --noEmit\" \"tsc -p tsconfig.backend.json --noEmit\" \"tsc -p tsconfig.web-content-preload.json --noEmit\" \"tsc -p tsconfig.storybook.json --noEmit\""
   },
   "dependencies": {
-    "chokidar": "^4.0.3",
     "@libsql/client": "^0.15.15",
+    "chokidar": "^4.0.3",
     "electron-squirrel-startup": "^1.0.1",
     "electron-unhandled": "^5.0.0"
   },
@@ -82,6 +82,7 @@
     "@vueless/storybook-dark-mode": "^10.0.3",
     "ai": "6.0.11",
     "bowser": "^2.11.0",
+    "bufferutil": "^4.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "concurrently": "^9.2.1",
