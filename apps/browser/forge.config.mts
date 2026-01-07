@@ -7,6 +7,7 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
+import { SquirrelInstallerNameFixPlugin } from './etc/forge-plugins/squirrel-installer-name-fix';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -22,6 +23,15 @@ type ReleaseChannel = 'dev' | 'prerelease' | 'release';
 
 const releaseChannel: ReleaseChannel =
   (process.env.RELEASE_CHANNEL as ReleaseChannel) || 'dev';
+
+const packageJson = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'),
+);
+const version = packageJson.version;
+
+if (typeof version !== 'string') {
+  throw new Error('Version not found in package.json');
+}
 
 // Log the release channel for debugging
 console.log(`[forge.config] Release channel: ${releaseChannel}`);
@@ -146,14 +156,16 @@ const config: ForgeConfig = {
     force: true,
   },
   makers: [
-    new MakerSquirrel({
+    new MakerSquirrel((arch) => ({
       name: appBaseName,
+      description: appName,
+      version: version,
+      setupExe: `${appBaseName}-${version}-${arch}-setup.exe`,
       copyright: `Copyright © ${new Date().getFullYear()} stagewise Inc.`,
       setupIcon: `./assets/icons/${releaseChannel}/icon.ico`,
       loadingGif: `./assets/install/${releaseChannel}/windows-install-image.gif`,
       title: `Installing ${appName}...`,
-      description: appName,
-    }),
+    })),
     new MakerRpm({
       options: {
         name: appBaseName,
@@ -242,6 +254,7 @@ const config: ForgeConfig = {
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
+    new SquirrelInstallerNameFixPlugin({ appBaseName, version }),
   ],
 };
 
