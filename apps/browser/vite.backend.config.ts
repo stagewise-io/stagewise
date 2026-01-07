@@ -14,6 +14,30 @@ const appVersion = packageJson.version;
 // Release channel: 'dev' | 'prerelease' | 'release'
 const releaseChannel = process.env.RELEASE_CHANNEL || 'dev';
 
+const appBaseName = (() => {
+  switch (releaseChannel) {
+    case 'release':
+      return 'stagewise';
+    case 'prerelease':
+      return 'stagewise-prerelease';
+    case 'dev':
+    default:
+      return 'stagewise-dev';
+  }
+})();
+
+const appName = (() => {
+  switch (releaseChannel) {
+    case 'release':
+      return 'stagewise';
+    case 'prerelease':
+      return 'stagewise (Pre-Release)';
+    case 'dev':
+    default:
+      return 'stagewise (Dev-Build)';
+  }
+})();
+
 // https://vitejs.dev/config
 export default defineConfig({
   build: {
@@ -47,6 +71,8 @@ export default defineConfig({
       API_URL: process.env.API_URL ?? 'https://v1.api.stagewise.io',
       LLM_PROXY_URL: process.env.LLM_PROXY_URL ?? 'https://llm.stagewise.io',
     }),
+    __APP_BASE_NAME__: JSON.stringify(appBaseName),
+    __APP_NAME__: JSON.stringify(appName),
     __APP_VERSION__: JSON.stringify(appVersion),
     __RELEASE_CHANNEL__: JSON.stringify(releaseChannel),
   },

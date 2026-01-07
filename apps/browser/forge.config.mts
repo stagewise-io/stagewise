@@ -29,6 +29,18 @@ console.log(
   `[forge.config] Build mode: ${process.env.BUILD_MODE || 'development'}`,
 );
 
+const appBaseName = (() => {
+  switch (releaseChannel) {
+    case 'release':
+      return 'stagewise';
+    case 'prerelease':
+      return 'stagewise-prerelease';
+    case 'dev':
+    default:
+      return 'stagewise-dev';
+  }
+})();
+
 // App name includes channel suffix for differentiation
 const appName = (() => {
   switch (releaseChannel) {
@@ -102,8 +114,7 @@ const config: ForgeConfig = {
       FileDescription: appName,
       'requested-execution-level': 'asInvoker',
     },
-    name: appName,
-    executableName: 'stagewise',
+    name: appBaseName,
     appBundleId: appBundleId,
     appCategoryType: 'public.app-category.developer-tools',
     protocols: [
@@ -135,6 +146,7 @@ const config: ForgeConfig = {
   },
   makers: [
     new MakerSquirrel({
+      name: appBaseName,
       authors: 'stagewise GmbH',
       copyright: `Copyright © ${new Date().getFullYear()} stagewise GmbH`,
       setupIcon: `./assets/icons/${releaseChannel}/icon.ico`,
