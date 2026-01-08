@@ -34,6 +34,7 @@ export default defineConfig({
         process.env.STAGEWISE_CONSOLE_URL ?? 'https://console.stagewise.io',
       API_URL: process.env.API_URL ?? 'https://v1.api.stagewise.io',
       LLM_PROXY_URL: process.env.LLM_PROXY_URL ?? 'https://llm.stagewise.io',
+      UPDATE_SERVER_ORIGIN: process.env.UPDATE_SERVER_ORIGIN,
     }),
     ...Object.fromEntries(
       Object.entries(buildConstants).map(([key, value]) => [

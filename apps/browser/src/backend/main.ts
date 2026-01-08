@@ -24,6 +24,7 @@ import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
 import { WebDataService } from './services/webdata';
 import { DownloadsService } from './services/download-manager';
+import { AutoUpdateService } from './services/auto-update';
 import {
   DownloadState,
   type DownloadSpeedDataPoint,
@@ -486,6 +487,12 @@ export async function main({
   const notificationService = await NotificationService.create(
     logger,
     uiKarton,
+  );
+
+  // Initialize auto-update service (only runs on macOS and Windows, skipped for dev builds)
+  const _autoUpdateService = await AutoUpdateService.create(
+    logger,
+    notificationService,
   );
 
   // Ensure ripgrep is installed for improved grep/glob performance
