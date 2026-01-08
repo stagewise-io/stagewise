@@ -1,42 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import path, { resolve } from 'node:path';
+import path from 'node:path';
 import { defineConfig } from 'vite';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Read package.json to get version
-const packageJson = JSON.parse(
-  await readFile(resolve(__dirname, 'package.json'), 'utf-8'),
-);
-const appVersion = packageJson.version;
-
-// Release channel: 'dev' | 'prerelease' | 'release'
-const releaseChannel = process.env.RELEASE_CHANNEL || 'dev';
-
-const appBaseName = (() => {
-  switch (releaseChannel) {
-    case 'release':
-      return 'stagewise';
-    case 'prerelease':
-      return 'stagewise-prerelease';
-    case 'dev':
-    default:
-      return 'stagewise-dev';
-  }
-})();
-
-const appName = (() => {
-  switch (releaseChannel) {
-    case 'release':
-      return 'stagewise';
-    case 'prerelease':
-      return 'stagewise (Pre-Release)';
-    case 'dev':
-    default:
-      return 'stagewise (Dev-Build)';
-  }
-})();
+import * as buildConstants from './build-constants';
 
 // https://vitejs.dev/config
 export default defineConfig({
@@ -71,9 +35,11 @@ export default defineConfig({
       API_URL: process.env.API_URL ?? 'https://v1.api.stagewise.io',
       LLM_PROXY_URL: process.env.LLM_PROXY_URL ?? 'https://llm.stagewise.io',
     }),
-    __APP_BASE_NAME__: JSON.stringify(appBaseName),
-    __APP_NAME__: JSON.stringify(appName),
-    __APP_VERSION__: JSON.stringify(appVersion),
-    __RELEASE_CHANNEL__: JSON.stringify(releaseChannel),
+    ...Object.fromEntries(
+      Object.entries(buildConstants).map(([key, value]) => [
+        key,
+        JSON.stringify(value),
+      ]),
+    ),
   },
 });

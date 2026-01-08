@@ -135,7 +135,7 @@ export class WindowLayoutService extends DisposableService {
         ? {
             icon: path.join(
               process.resourcesPath,
-              `assets/icons/${__RELEASE_CHANNEL__}/icon.png`,
+              `assets/icons/${__APP_RELEASE_CHANNEL__}/icon.png`,
             ),
           }
         : {}),

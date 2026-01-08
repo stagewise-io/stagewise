@@ -2,19 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Read version from package.json
-const packageJson = JSON.parse(
-  readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'),
-);
-const appVersion = packageJson.version;
-
-// Release channel: 'dev' | 'prerelease' | 'release'
-const releaseChannel = process.env.RELEASE_CHANNEL || 'dev';
+import * as buildConstants from './build-constants';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -23,9 +11,13 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   define: {
     'process.env': 'import.meta.env',
-    // Inject build-time constants (access via __APP_VERSION__ and __RELEASE_CHANNEL__)
-    __APP_VERSION__: JSON.stringify(appVersion),
-    __RELEASE_CHANNEL__: JSON.stringify(releaseChannel),
+    // Inject build-time constants (access via __APP_VERSION__ and __APP_RELEASE_CHANNEL__)
+    ...Object.fromEntries(
+      Object.entries(buildConstants).map(([key, value]) => [
+        key,
+        JSON.stringify(value),
+      ]),
+    ),
   },
   resolve: {
     alias: {
