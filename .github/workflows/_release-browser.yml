@@ -150,7 +150,7 @@ jobs:
 
       - name: List build output
         working-directory: apps/browser
-        run: find out -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES*" -o -name "*.deb" -o -name "*.rpm" \) 2>/dev/null || true
+        run: find out -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES*" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" \) 2>/dev/null || true
         shell: bash
 
       - uses: actions/upload-artifact@v4
@@ -178,7 +178,7 @@ jobs:
           find artifacts -type f
 
           # Copy all release files to flat directory
-          find artifacts -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES*" -o -name "*.deb" -o -name "*.rpm" \) -exec cp {} release/ \;
+          find artifacts -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES*" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" \) -exec cp {} release/ \;
 
           echo "Release artifacts:"
           ls -la release/
