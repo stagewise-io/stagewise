@@ -144,11 +144,22 @@ jobs:
       - name: Build All Packages
         run: pnpm build
 
+      - name: Import macOS signing certs
+        if: runner.os == 'macOS'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          p12-password: ${{ secrets.MACOS_CERT_P12_PASSWORD }}
+
       - name: Build Electron App
         working-directory: apps/browser
         run: pnpm make
         env:
           BUILD_MODE: production
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           # Set release channel: alpha/beta → prerelease, release → release
           RELEASE_CHANNEL: ${{ needs.parse-tag.outputs.channel == 'release' && 'release' || 'prerelease' }}
 

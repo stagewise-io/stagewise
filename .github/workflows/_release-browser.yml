@@ -23,6 +23,8 @@ on:
         required: false
       APPLE_TEAM_ID:
         required: false
+      APPLE_SIGNING_IDENTITY:
+        required: false
       MACOS_CERT_P12_BASE64:
         required: false
       MACOS_CERT_P12_PASSWORD:
@@ -143,6 +145,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           RELEASE_CHANNEL: ${{ inputs.channel == 'release' && 'release' || 'prerelease' }}
 
       - name: List build output
