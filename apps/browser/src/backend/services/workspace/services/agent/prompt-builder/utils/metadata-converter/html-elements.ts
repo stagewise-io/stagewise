@@ -148,7 +148,7 @@ function serializeSelectedElementPart(
   };
 
   const attributesChildNodes: xml.XmlObject[] = Object.entries(
-    element.attributes,
+    element.attributes ?? {},
   )
     .filter(([key]) => !minimizeContent || importantAttributes.has(key))
     .sort((a, _) => (importantAttributes.has(a[0]) ? -1 : 1)) // We should make sure that important attributes are never cut off
@@ -189,7 +189,7 @@ function serializeSelectedElementPart(
       : {};
 
   const ownPropertiesChildNodes: xml.XmlObject[] = !minimizeContent
-    ? Object.entries(element.ownProperties)
+    ? Object.entries(element.ownProperties ?? {})
         .slice(0, 10)
         .map(([key, value]) => ({
           'own-prop': {

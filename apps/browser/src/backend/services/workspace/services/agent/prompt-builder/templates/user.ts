@@ -12,7 +12,7 @@ export async function getUserMessage(
   userMessage: ChatMessage,
 ): Promise<UserModelMessage> {
   // convert file parts and text to model messages (without metadata) to ensure correct mapping of ui parts to model content
-  const convertedMessage: UserModelMessage = (
+  const convertedMessage = (
     await convertToModelMessages([userMessage])
   )[0]! as UserModelMessage;
 

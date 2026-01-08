@@ -1168,16 +1168,7 @@ export class AgentService {
 
       const modelOptions =
         isSetupMode || !modelId
-          ? {
-              model: getArbitraryModel('claude-haiku-4-5', this.apiKey),
-              providerOptions: {
-                anthropic: {
-                  thinking: {
-                    type: 'disabled',
-                  },
-                },
-              },
-            }
+          ? getModelOptions('claude-haiku-4-5', this.apiKey)
           : getModelOptions(modelId, this.apiKey);
 
       const model = this.telemetryService.withTracing(modelOptions.model, {

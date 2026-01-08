@@ -202,7 +202,7 @@ export class TelemetryService extends DisposableService {
 
     const distinctId = this.getDistinctId();
 
-    return withTracing(model, this.posthogClient, {
+    const wrappedModel = withTracing(model, this.posthogClient, {
       posthogDistinctId: distinctId,
       ...properties,
       posthogProperties: {
@@ -211,6 +211,20 @@ export class TelemetryService extends DisposableService {
         ...properties?.posthogProperties,
       },
     });
+
+    // Fix for AI SDK v6: PostHog's withTracing uses spread which doesn't copy
+    // prototype getters like 'supportedUrls'. This property is required by the
+    // AI SDK to determine which URL schemes the model supports for file uploads.
+    // Without it, Object.entries(undefined) throws during asset download.
+    if ('supportedUrls' in model && !('supportedUrls' in wrappedModel)) {
+      Object.defineProperty(wrappedModel, 'supportedUrls', {
+        get: () => model.supportedUrls,
+        enumerable: true,
+        configurable: true,
+      });
+    }
+
+    return wrappedModel;
   }
 
   public capture<T extends keyof EventProperties>(
