@@ -18,7 +18,7 @@ if (!singleInstanceLock) {
 }
 
 const appBaseName = (() => {
-  switch (__RELEASE_CHANNEL__) {
+  switch (__APP_RELEASE_CHANNEL__) {
     case 'release':
       return 'stagewise';
     case 'prerelease':
@@ -30,7 +30,7 @@ const appBaseName = (() => {
 })();
 
 const appName = (() => {
-  switch (__RELEASE_CHANNEL__) {
+  switch (__APP_RELEASE_CHANNEL__) {
     case 'release':
       return 'stagewise';
     case 'prerelease':

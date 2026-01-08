@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
+import * as buildConstants from './build-constants';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -12,10 +13,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageJson = JSON.parse(
   readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'),
 );
-const appVersion = packageJson.version;
+const _appVersion = packageJson.version;
 
 // Release channel: 'dev' | 'prerelease' | 'release'
-const releaseChannel = process.env.RELEASE_CHANNEL || 'dev';
+const _releaseChannel = process.env.RELEASE_CHANNEL || 'dev';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -34,8 +35,12 @@ export default defineConfig({
   define: {
     'process.env': 'import.meta.env',
     // Inject build-time constants
-    __APP_VERSION__: JSON.stringify(appVersion),
-    __RELEASE_CHANNEL__: JSON.stringify(releaseChannel),
+    ...Object.fromEntries(
+      Object.entries(buildConstants).map(([key, value]) => [
+        key,
+        JSON.stringify(value),
+      ]),
+    ),
   },
   resolve: {
     alias: {

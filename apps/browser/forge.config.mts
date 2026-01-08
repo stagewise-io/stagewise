@@ -11,6 +11,7 @@ import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-nati
 import { SquirrelInstallerNameFixPlugin } from './etc/forge-plugins/squirrel-installer-name-fix';
 import path from 'node:path';
 import fs from 'node:fs';
+import * as buildConstants from './build-constants';
 
 /**
  * Release channel for the build.
@@ -20,63 +21,11 @@ import fs from 'node:fs';
  * - 'prerelease': Alpha or beta releases (alpha.x, beta.x versions)
  * - 'release': Production releases (stable versions without prerelease suffix)
  */
-type ReleaseChannel = 'dev' | 'prerelease' | 'release';
-
-const releaseChannel: ReleaseChannel =
-  (process.env.RELEASE_CHANNEL as ReleaseChannel) || 'dev';
-
-const packageJson = JSON.parse(
-  fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'),
-);
-const version = packageJson.version;
-
-if (typeof version !== 'string') {
-  throw new Error('Version not found in package.json');
-}
 
 // Log the release channel for debugging
-console.log(`[forge.config] Release channel: ${releaseChannel}`);
 console.log(
-  `[forge.config] Build mode: ${process.env.BUILD_MODE || 'development'}`,
+  `[forge.config] Release channel: ${buildConstants.__APP_RELEASE_CHANNEL__}`,
 );
-
-const appBaseName = (() => {
-  switch (releaseChannel) {
-    case 'release':
-      return 'stagewise';
-    case 'prerelease':
-      return 'stagewise-prerelease';
-    case 'dev':
-    default:
-      return 'stagewise-dev';
-  }
-})();
-
-// App name includes channel suffix for differentiation
-const appName = (() => {
-  switch (releaseChannel) {
-    case 'release':
-      return 'stagewise';
-    case 'prerelease':
-      return 'stagewise (Pre-Release)';
-    case 'dev':
-    default:
-      return 'stagewise (Dev-Build)';
-  }
-})();
-
-const appBundleId = (() => {
-  switch (releaseChannel) {
-    case 'release':
-      return 'io.stagewise.app';
-    case 'prerelease':
-      return 'io.stagewise.prerelease';
-    case 'dev':
-    default:
-      return 'io.stagewise.dev';
-  }
-})();
-
 // DMG volume name (shown when mounted)
 const dmgVolumeName = 'Install stagewise';
 
@@ -111,23 +60,26 @@ const copyNativeDependencies = (
 };
 
 const config: ForgeConfig = {
-  buildIdentifier: releaseChannel,
+  buildIdentifier: buildConstants.__APP_RELEASE_CHANNEL__,
   packagerConfig: {
     asar: true,
-    extraResource: ['./bundled', `./assets/icons/${releaseChannel}/icon.png`],
+    extraResource: [
+      './bundled',
+      `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.png`,
+    ],
     prune: true,
     afterCopy: [copyNativeDependencies],
-    icon: `./assets/icons/${releaseChannel}/icon`,
+    icon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon`,
     appCopyright: `Copyright © ${new Date().getFullYear()} stagewise Inc.`,
     win32metadata: {
       CompanyName: 'stagewise Inc.',
-      ProductName: appName,
-      FileDescription: appName,
+      ProductName: buildConstants.__APP_NAME__,
+      FileDescription: buildConstants.__APP_NAME__,
       'requested-execution-level': 'asInvoker',
     },
-    name: appBaseName,
-    executableName: appBaseName,
-    appBundleId: appBundleId,
+    name: buildConstants.__APP_BASE_NAME__,
+    executableName: buildConstants.__APP_BASE_NAME__,
+    appBundleId: buildConstants.__APP_BUNDLE_ID__,
     appCategoryType: 'public.app-category.developer-tools',
     protocols: [
       {
@@ -135,7 +87,7 @@ const config: ForgeConfig = {
         schemes: ['stagewise'],
       },
     ],
-    ...(releaseChannel !== 'dev'
+    ...(buildConstants.__APP_RELEASE_CHANNEL__ !== 'dev'
       ? {
           osxSign: {
             optionsForFile: (_filePath) => {
@@ -158,33 +110,33 @@ const config: ForgeConfig = {
   },
   makers: [
     new MakerSquirrel((arch) => ({
-      name: appBaseName,
-      description: appName,
-      version: version,
-      setupExe: `${appBaseName}-${version}-${arch}-setup.exe`,
+      name: buildConstants.__APP_BASE_NAME__,
+      description: buildConstants.__APP_NAME__,
+      version: buildConstants.__APP_VERSION__,
+      setupExe: `${buildConstants.__APP_BASE_NAME__}-${buildConstants.__APP_VERSION__}-${arch}-setup.exe`,
       copyright: `Copyright © ${new Date().getFullYear()} stagewise Inc.`,
-      setupIcon: `./assets/icons/${releaseChannel}/icon.ico`,
-      loadingGif: `./assets/install/${releaseChannel}/windows-install-image.gif`,
-      title: `Installing ${appName}...`,
+      setupIcon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.ico`,
+      loadingGif: `./assets/install/${buildConstants.__APP_RELEASE_CHANNEL__}/windows-install-image.gif`,
+      title: `Installing ${buildConstants.__APP_NAME__}...`,
     })),
     new MakerRpm({
       options: {
-        name: appBaseName,
-        bin: appBaseName,
-        productName: appName,
+        name: buildConstants.__APP_BASE_NAME__,
+        bin: buildConstants.__APP_BASE_NAME__,
+        productName: buildConstants.__APP_NAME__,
         genericName: 'Web Browser',
-        icon: `./assets/icons/${releaseChannel}/icon.png`,
+        icon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.png`,
         homepage: 'https://stagewise.io',
         categories: ['Development', 'Network', 'Utility'],
       },
     }),
     new MakerDeb({
       options: {
-        name: appBaseName,
-        bin: appBaseName,
-        productName: appName,
+        name: buildConstants.__APP_BASE_NAME__,
+        bin: buildConstants.__APP_BASE_NAME__,
+        productName: buildConstants.__APP_NAME__,
         genericName: 'Web Browser',
-        icon: `./assets/icons/${releaseChannel}/icon.png`,
+        icon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.png`,
         homepage: 'https://stagewise.io',
         categories: ['Development', 'Network', 'Utility'],
         section: 'devel',
@@ -194,7 +146,7 @@ const config: ForgeConfig = {
     new MakerDMG({
       format: 'UDZO',
       title: dmgVolumeName,
-      icon: `./assets/icons/${releaseChannel}/icon.icns`,
+      icon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.icns`,
       additionalDMGOptions: {},
       background: './assets/install/macos-dmg-background.png',
       contents: [
@@ -203,8 +155,8 @@ const config: ForgeConfig = {
           x: 192,
           y: 200,
           type: 'file',
-          path: `./out/${releaseChannel}/${appBaseName}-darwin-arm64/${appBaseName}.app`,
-          name: `${appName}.app`,
+          path: `./out/${buildConstants.__APP_RELEASE_CHANNEL__}/${buildConstants.__APP_BASE_NAME__}-darwin-arm64/${buildConstants.__APP_BASE_NAME__}.app`,
+          name: `${buildConstants.__APP_NAME__}.app`,
         },
       ],
     }),
@@ -256,7 +208,10 @@ const config: ForgeConfig = {
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
-    new SquirrelInstallerNameFixPlugin({ appBaseName, version }),
+    new SquirrelInstallerNameFixPlugin({
+      appBaseName: buildConstants.__APP_BASE_NAME__,
+      version: buildConstants.__APP_VERSION__,
+    }),
   ],
 };
 
