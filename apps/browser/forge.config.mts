@@ -142,7 +142,7 @@ const config: ForgeConfig = {
                 entitlements: 'etc/macos/entitlements.plist',
               };
             },
-            identity: 'Developer ID Application: stagewise GmbH (FJCSRR9S5H)',
+            identity: process.env.APPLE_SIGNING_IDENTITY!,
           },
           osxNotarize: {
             appleId: process.env.APPLE_ID!,
