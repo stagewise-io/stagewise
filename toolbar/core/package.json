@@ -61,7 +61,7 @@
     "@types/react": "^19.1.8",
     "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.4.21",
-    "bowser": "^2.11.0",
+    "bowser": "^2.13.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "diff": "^8.0.2",
