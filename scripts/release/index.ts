@@ -15,6 +15,8 @@ import * as readline from 'node:readline';
 import { getPackageConfig, getAvailablePackageNames } from './config.js';
 import {
   getLastTag,
+  getLastStableTag,
+  getFirstPrereleaseTagForCycle,
   getCommitsSince,
   getRecommendedBump,
   hasUncommittedChanges,
@@ -255,14 +257,22 @@ async function main(): Promise<void> {
   const lastTag = await getLastTag(packageConfig.tagPrefix);
   console.log(`   Last tag: ${lastTag || 'none'}`);
 
+  // Parse current version to detect prerelease state
+  const parsedCurrent = parseVersion(currentVersion);
+  const isCurrentPrerelease = parsedCurrent.prerelease !== null;
+
+  // Get the last stable tag for the package
+  const lastStableTag = await getLastStableTag(packageConfig.tagPrefix);
+  console.log(`   Last stable tag: ${lastStableTag || 'none'}`);
+
   // Determine starting point for commits
-  const sinceRef = options.since || lastTag;
+  let sinceRef = options.since || lastTag;
   if (options.since) {
     console.log(`   Using --since: ${options.since}`);
   }
 
   // Get commits since last tag or specified ref
-  const commits = await getCommitsSince(sinceRef, packageConfig.scope);
+  let commits = await getCommitsSince(sinceRef, packageConfig.scope);
   console.log(`   Commits since last release: ${commits.length}`);
 
   // Check for custom release notes
@@ -272,12 +282,55 @@ async function main(): Promise<void> {
     console.log(`   Custom release notes: ${notesPath}`);
   }
 
+  // Determine if this is a channel promotion (alpha→beta or prerelease→release)
+  // Note: options.channel is always provided in CI, which is the primary use case for promotions
+  const requestedChannel = options.channel;
+  const isChannelPromotion =
+    isCurrentPrerelease &&
+    requestedChannel &&
+    ((parsedCurrent.prerelease === 'alpha' && requestedChannel === 'beta') ||
+      (parsedCurrent.prerelease !== null && requestedChannel === 'release'));
+
   if (commits.length === 0) {
-    console.error(
-      `\nError: No commits with scope "${packageConfig.scope}" found since last release.`,
-    );
-    console.error('Nothing to release.');
-    process.exit(1);
+    if (isChannelPromotion) {
+      // This is a channel promotion without new commits
+      // Get commits from the start of the prerelease cycle instead
+      console.log(
+        `\n   ℹ️  No new commits since last tag, but this is a channel promotion`,
+      );
+      console.log(
+        `      Looking for commits since the start of the prerelease cycle...`,
+      );
+
+      // Find the reference point: either last stable tag or first prerelease of this cycle
+      const cycleStartRef =
+        lastStableTag ||
+        (await getFirstPrereleaseTagForCycle(
+          packageConfig.tagPrefix,
+          parsedCurrent.base,
+        ));
+
+      if (cycleStartRef && cycleStartRef !== lastTag) {
+        sinceRef = cycleStartRef;
+        commits = await getCommitsSince(sinceRef, packageConfig.scope);
+        console.log(
+          `      Found ${commits.length} commits since ${cycleStartRef}`,
+        );
+      }
+
+      // If still no commits, allow the promotion with a generated note
+      if (commits.length === 0) {
+        console.log(
+          `      No commits found in cycle, proceeding with promotion release note`,
+        );
+      }
+    } else {
+      console.error(
+        `\nError: No commits with scope "${packageConfig.scope}" found since last release.`,
+      );
+      console.error('Nothing to release.');
+      process.exit(1);
+    }
   }
 
   // Warn if this is a first release (no previous tag and no --since)
@@ -291,24 +344,32 @@ async function main(): Promise<void> {
   }
 
   // Show commits
-  console.log('\n   Commits to include:');
-  for (const commit of commits.slice(0, 10)) {
-    const breaking = commit.breaking ? ' [BREAKING]' : '';
-    console.log(
-      `   - ${commit.type}(${commit.scope}): ${commit.subject}${breaking}`,
-    );
-  }
-  if (commits.length > 10) {
-    console.log(`   ... and ${commits.length - 10} more`);
+  if (commits.length > 0) {
+    console.log('\n   Commits to include:');
+    for (const commit of commits.slice(0, 10)) {
+      const breaking = commit.breaking ? ' [BREAKING]' : '';
+      console.log(
+        `   - ${commit.type}(${commit.scope}): ${commit.subject}${breaking}`,
+      );
+    }
+    if (commits.length > 10) {
+      console.log(`   ... and ${commits.length - 10} more`);
+    }
+  } else if (isChannelPromotion) {
+    console.log('\n   Commits to include: (channel promotion, no new commits)');
   }
 
   // Get recommended bump
-  const bumpType = getRecommendedBump(commits);
+  // For channel promotions without commits, use 'patch' as fallback (won't affect version calculation for promotions)
+  const bumpType =
+    getRecommendedBump(commits) || (isChannelPromotion ? 'patch' : null);
   if (!bumpType) {
     console.error('\nError: Could not determine version bump type.');
     process.exit(1);
   }
-  console.log(`\n   Recommended bump: ${bumpType}`);
+  console.log(
+    `\n   Recommended bump: ${bumpType}${isChannelPromotion && commits.length === 0 ? ' (fallback for promotion)' : ''}`,
+  );
 
   // Check if prerelease channels are enabled for this package
   const prereleaseEnabled = packageConfig.prereleaseEnabled !== false;
