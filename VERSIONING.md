@@ -72,6 +72,7 @@ Standard semver: `MAJOR.MINOR.PATCH` (e.g., `1.2.3`)
 Format: `MAJOR.MINOR.PATCH-<channel>.<number>`
 
 Examples:
+
 - `1.0.1-alpha.1` - First alpha for upcoming 1.0.1
 - `1.0.1-alpha.2` - Second alpha
 - `1.0.1-beta.1` - First beta (after alpha phase)
@@ -125,23 +126,27 @@ pnpm tsx scripts/release/index.ts --package browser --channel alpha --new-cycle
 Release workflows are available in the Actions tab. Each package has separate workflows for each channel:
 
 **Browser:**
+
 - `Release Browser: Alpha` - Release alpha version
 - `Release Browser: Beta` - Release beta version
 - `Release Browser: Production` - Release stable version
 - `Release Browser: Alpha (New Cycle)` - Abandon prerelease, start new alpha
 
 **Karton:**
+
 - `Release Karton: Alpha` - Release alpha version
 - `Release Karton: Beta` - Release beta version
 - `Release Karton: Production` - Release stable version
 - `Release Karton: Alpha (New Cycle)` - Abandon prerelease, start new alpha
 
 **Prerequisites for release:**
+
 1. Must be on `main` branch
 2. CI must have passed for the current commit
 3. Must have commits with the package scope since last release
 
 **The workflow will:**
+
 1. Verify CI passed for current commit
 2. Check for releasable commits
 3. Bump version in package.json
@@ -155,6 +160,7 @@ Release workflows are available in the Actions tab. Each package has separate wo
 If a release fails after the version bump (e.g., build fails on one platform):
 
 **Option 1: Retry the release** (recommended)
+
 1. Fix the issue in a new commit
 2. Go to **Actions** > **Retry Failed Release**
 3. Enter the tag name (e.g., `browser@1.0.0-alpha.1`)
@@ -163,6 +169,7 @@ If a release fails after the version bump (e.g., build fails on one platform):
 This will rebuild and publish without bumping the version again.
 
 **Option 2: Delete tag and re-release**
+
 ```bash
 # Delete the tag locally and remotely
 git tag -d browser@1.0.0-alpha.1
@@ -199,6 +206,7 @@ Just run another release - it will create the next version (e.g., `alpha.2` inst
 To add a new package to the versioning system:
 
 1. Add package config in `scripts/release/config.ts`:
+
    ```typescript
    {
      name: 'new-package',
@@ -213,6 +221,7 @@ To add a new package to the versioning system:
 2. Create `CHANGELOG.md` in the package directory
 
 3. Create initial git tag:
+
    ```bash
    git tag @stagewise/new-package@0.0.1
    git push --tags
@@ -234,12 +243,14 @@ You can add custom content to a release that won't be derived from commit messag
 ### Usage
 
 1. Create a markdown file in `.release-notes/`:
+
    ```
-   .release-notes/browser.md   # For browser releases
+   .release-notes/stagewise.md   # For browser releases
    .release-notes/karton.md    # For karton releases
    ```
 
 2. Write your custom content:
+
    ```markdown
    This release includes a major redesign of the navigation system.
 
