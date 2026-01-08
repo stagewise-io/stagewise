@@ -20,6 +20,7 @@ import {
   IconBroomFillDuo18,
   IconRobotFillDuo18,
   IconDownloadFillDuo18,
+  IconCircleInfoFillDuo18,
 } from 'nucleo-ui-fill-duo-18';
 import { IconGithub, IconLinkedin, IconDiscord } from 'nucleo-social-media';
 import { SidebarNav } from '@/components/sidebar-nav';
@@ -109,6 +110,13 @@ const RootLayout = () => {
                     Clear data
                   </SidebarNav.Item>
                 </SidebarNav.Group>
+                <hr className="ml-1 border-border/30" />
+                <SidebarNav.Item
+                  to="/about"
+                  icon={<IconCircleInfoFillDuo18 className="size-5" />}
+                >
+                  About
+                </SidebarNav.Item>
               </SidebarNav>
             </div>
             <div className="mb-4 flex w-full flex-row items-center justify-start gap-3">

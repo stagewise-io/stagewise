@@ -84,6 +84,9 @@ export class PagesService extends DisposableService {
       initialState: defaultState,
       transport: this.transport,
     });
+    this.kartonServer.setState((draft) => {
+      draft.appInfo.otherVersions = { ...process.versions, modules: undefined };
+    });
 
     // Set up callback to push active downloads state changes
     if (this.downloadsService) {

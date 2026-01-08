@@ -17,6 +17,21 @@ export type PagesApiState = {
   activeDownloads: Record<number, ActiveDownloadInfo>;
   /** Pending file edits by chat ID, pushed in real-time */
   pendingEditsByChat: Record<string, FileDiffResult[]>;
+  // Current stagewise app runtime information
+  appInfo: {
+    baseName: string; // Base name (e.g., 'stagewise-dev', 'stagewise-prerelease', 'stagewise').
+    name: string; // Display name (e.g., 'stagewise (Dev-Build)', 'stagewise').
+    bundleId: string; // Bundle ID (e.g., 'io.stagewise.dev').
+    version: string; // The version of the app.
+    platform: 'darwin' | 'linux' | 'win32'; // The platform on which the app is running.
+    // Build-time constants
+    releaseChannel: 'dev' | 'prerelease' | 'release'; // The release channel of the app.
+    author: string; // Author name.
+    copyright: string; // Copyright string.
+    homepage: string; // Homepage URL.
+    arch: string; // Architecture (e.g., 'x64', 'arm64').
+    otherVersions: Record<string, string | undefined>; // Other versions of the app.
+  };
 };
 
 export type PagesApiContract = {
@@ -58,4 +73,17 @@ export type PagesApiContract = {
 export const defaultState: PagesApiState = {
   activeDownloads: {},
   pendingEditsByChat: {},
+  appInfo: {
+    baseName: __APP_BASE_NAME__,
+    name: __APP_NAME__,
+    bundleId: __APP_BUNDLE_ID__,
+    version: __APP_VERSION__,
+    platform: __APP_PLATFORM__ as 'darwin' | 'linux' | 'win32',
+    releaseChannel: __APP_RELEASE_CHANNEL__,
+    author: __APP_AUTHOR__,
+    copyright: __APP_COPYRIGHT__,
+    homepage: __APP_HOMEPAGE__,
+    arch: __APP_ARCH__,
+    otherVersions: {},
+  },
 };

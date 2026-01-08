@@ -232,6 +232,7 @@ export class WindowLayoutService extends DisposableService {
         pendingElementScreenshots: [],
       };
       draft.appInfo.isFullScreen = this.baseWindow?.isFullScreen() ?? false;
+      draft.appInfo.otherVersions = { ...process.versions, modules: undefined };
     });
 
     // Initialize ChatStateController

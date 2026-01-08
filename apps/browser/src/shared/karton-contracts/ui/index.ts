@@ -325,12 +325,19 @@ export type AppState = {
   };
   // Current stagewise app runtime information
   appInfo: {
-    envMode: 'development' | 'production'; // The mode in which the app is running.
-    verbose: boolean; // Whether the app is running in verbose mode.
+    baseName: string; // Base name (e.g., 'stagewise-dev', 'stagewise-prerelease', 'stagewise').
+    name: string; // Display name (e.g., 'stagewise (Dev-Build)', 'stagewise').
+    bundleId: string; // Bundle ID (e.g., 'io.stagewise.dev').
     version: string; // The version of the app.
-    startedInPath: string; // Working directory in which the app was started.
     platform: 'darwin' | 'linux' | 'win32'; // The platform on which the app is running.
     isFullScreen: boolean; // Whether the app window is in fullscreen mode.
+    // Build-time constants
+    releaseChannel: 'dev' | 'prerelease' | 'release'; // The release channel of the app.
+    author: string; // Author name.
+    copyright: string; // Copyright string.
+    homepage: string; // Homepage URL.
+    arch: string; // Architecture (e.g., 'x64', 'arm64').
+    otherVersions: Record<string, string | undefined>; // Other versions of the app.
   };
   // The global configuration of the CLI.
   globalConfig: GlobalConfig;
@@ -643,12 +650,18 @@ export const defaultState: KartonContract['state'] = {
     status: 'unauthenticated',
   },
   appInfo: {
-    envMode: 'production',
-    verbose: false,
-    version: 'UNKNOWN',
-    startedInPath: '',
-    platform: 'darwin',
+    baseName: __APP_BASE_NAME__,
+    name: __APP_NAME__,
+    bundleId: __APP_BUNDLE_ID__,
+    version: __APP_VERSION__,
     isFullScreen: false,
+    platform: __APP_PLATFORM__ as 'darwin' | 'linux' | 'win32',
+    releaseChannel: __APP_RELEASE_CHANNEL__,
+    author: __APP_AUTHOR__,
+    copyright: __APP_COPYRIGHT__,
+    homepage: __APP_HOMEPAGE__,
+    arch: __APP_ARCH__,
+    otherVersions: {},
   },
   globalConfig: {
     telemetryLevel: 'full',

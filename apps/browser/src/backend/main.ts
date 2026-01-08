@@ -6,7 +6,6 @@ import { app } from 'electron';
 import { AuthService } from './services/auth';
 import { AgentService } from './services/workspace/services/agent/agent';
 import { UserExperienceService } from './services/experience';
-import { getEnvMode } from './utils/env';
 import { WorkspaceManagerService } from './services/workspace-manager';
 import { FilePickerService } from './services/file-picker';
 import { existsSync, unlinkSync } from 'node:fs';
@@ -695,18 +694,6 @@ export async function main({
   );
 
   logger.debug('[Main] Normal operation services bootstrapped');
-
-  // Set initial app info into the karton service.
-  uiKarton.setState((draft) => {
-    draft.appInfo.version = process.env.CLI_VERSION ?? '0.0.1';
-    draft.appInfo.envMode =
-      getEnvMode() === 'dev' ? 'development' : 'production';
-    draft.appInfo.verbose = verbose ?? false;
-    draft.appInfo.startedInPath = process.cwd();
-    draft.appInfo.platform = process.platform as 'darwin' | 'linux' | 'win32';
-  });
-
-  logger.debug('[Main] App info set into karton service');
 
   // After all services got started, we're now ready to load the initial workspace (which is either the user given path or the cwd).
   // We only load the current workspace as default workspace if the folder contains a stagewise.json file. (We don't verify it tho)
