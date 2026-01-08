@@ -1,0 +1,22 @@
+{
+  "name": "@stagewise/update-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "semver": "^7.7.3"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "22.15.2",
+    "@types/semver": "^7.7.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.3"
+  }
+}
