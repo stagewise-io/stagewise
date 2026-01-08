@@ -98,7 +98,9 @@ export function ChatPanelFooter() {
 
   const [isComposing, setIsComposing] = useState(false);
 
-  const isVerboseMode = useKartonState((s) => s.appInfo.verbose);
+  const isVerboseMode = useKartonState(
+    (s) => s.appInfo.releaseChannel === 'dev',
+  );
 
   const enableInputField = useMemo(() => {
     // Disable input if agent is not connected or reconnecting

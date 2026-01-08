@@ -88,7 +88,7 @@ export const __APP_PLATFORM__ =
   process.env.npm_config_platform || process.platform;
 export const __APP_ARCH__ = process.env.npm_config_arch || process.arch;
 
-export const __APP_COPYRIGHT__ = `Copyright © ${new Date().getFullYear()} ${packageJson.author}`;
+export const __APP_COPYRIGHT__ = `Copyright © ${new Date().getFullYear()} ${__APP_AUTHOR__}`;
 
 export const __APP_HOMEPAGE__ = (() => {
   const homepage = packageJson.homepage;
