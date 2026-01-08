@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-beta.1 (2026-01-08)
+
+### Features
+
+* add about page (f1a835d)
+
 ## 1.0.0-beta.1 (2026-01-06)
 
 ### Features
