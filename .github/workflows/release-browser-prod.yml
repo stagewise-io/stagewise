@@ -5,6 +5,9 @@ on:
 
 run-name: "Release Browser Production"
 
+permissions:
+  contents: write
+
 jobs:
   release:
     # Only run on main or release-tests branch

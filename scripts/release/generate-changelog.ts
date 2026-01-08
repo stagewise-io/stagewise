@@ -81,6 +81,42 @@ function formatCommit(commit: ConventionalCommit): string {
 }
 
 /**
+ * Detect if version is a channel promotion (e.g., alpha→beta or prerelease→release)
+ */
+function detectPromotion(version: string): {
+  isPromotion: boolean;
+  fromChannel: string | null;
+  toChannel: string;
+} {
+  const parsed = parseVersion(version);
+
+  // Determine the target channel from the version
+  let toChannel: string;
+  if (parsed.prerelease === 'alpha') {
+    toChannel = 'alpha';
+  } else if (parsed.prerelease === 'beta') {
+    toChannel = 'beta';
+  } else {
+    toChannel = 'release';
+  }
+
+  // For promotions, the previous channel is indicated by the prereleaseNum being 1
+  // (first of a new channel series)
+  const isFirstOfChannel = parsed.prereleaseNum === 1;
+
+  return {
+    isPromotion: isFirstOfChannel && toChannel !== 'alpha',
+    fromChannel:
+      isFirstOfChannel && toChannel === 'beta'
+        ? 'alpha'
+        : isFirstOfChannel && toChannel === 'release'
+          ? 'prerelease'
+          : null,
+    toChannel,
+  };
+}
+
+/**
  * Generate the changelog markdown for a new version
  */
 export function generateChangelogMarkdown(
@@ -97,6 +133,17 @@ export function generateChangelogMarkdown(
   // Add custom release notes at the top if provided
   if (customNotes) {
     markdown += `${customNotes}\n\n`;
+  }
+
+  // Handle case when there are no commits (channel promotion)
+  if (commits.length === 0) {
+    const promotion = detectPromotion(version);
+    if (promotion.isPromotion && promotion.fromChannel) {
+      markdown += `Promoted from ${promotion.fromChannel} to ${promotion.toChannel}.\n\n`;
+    } else {
+      markdown += `No changes in this release.\n\n`;
+    }
+    return markdown;
   }
 
   // Breaking changes section
