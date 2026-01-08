@@ -62,7 +62,6 @@ export class NotificationService extends DisposableService {
     this.logger.debug('[NotificationService] Teardown complete');
   }
 
-  // TODO Implement this service and it's connection to the UI via Karton.
   public showNotification(notification: Notification): NotificationId {
     this.logger.debug(
       `NotificationService] Showing notification with title "${notification.title}"`,
@@ -71,10 +70,21 @@ export class NotificationService extends DisposableService {
 
     this.storedNotifications[id] = notification;
 
+    // Strip onClick from actions before sending to Karton state
+    // (functions can't be serialized over IPC)
+    const actionsForState = notification.actions.map(({ label, type }) => ({
+      label,
+      type,
+    }));
+
     this.uiKarton.setState((draft) => {
       draft.notifications.push({
         id,
-        ...notification,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type,
+        duration: notification.duration,
+        actions: actionsForState,
       });
     });
 
