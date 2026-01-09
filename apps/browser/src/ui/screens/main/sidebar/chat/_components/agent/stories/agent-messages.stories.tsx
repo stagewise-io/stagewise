@@ -3,8 +3,7 @@ import { availableModels } from '@shared/available-models';
 import { ChatHistory } from '../../chat-history';
 import { withFileEditScenario } from '@sb/decorators/scenarios';
 import { withMockKarton } from '@sb/decorators/with-mock-karton';
-import { type AppState, Layout } from '@shared/karton-contracts/ui';
-import { MainTab } from '@shared/karton-contracts/ui';
+import type { AppState } from '@shared/karton-contracts/ui';
 import {
   createUserMessage,
   createAssistantMessage,
@@ -59,8 +58,6 @@ const baseState: Partial<AppState> = {
     selectedModel: availableModels[0],
   },
   userExperience: {
-    activeLayout: Layout.MAIN,
-    activeMainTab: MainTab.BROWSING,
     inspirationWebsites: {
       websites: [],
       total: 0,
@@ -70,7 +67,11 @@ const baseState: Partial<AppState> = {
       recentlyOpenedWorkspaces: [],
       hasSeenOnboardingFlow: false,
     },
-    devAppPreview: null,
+    devAppPreview: {
+      isFullScreen: false,
+      inShowCodeMode: false,
+      customScreenSize: null,
+    },
   },
 };
 

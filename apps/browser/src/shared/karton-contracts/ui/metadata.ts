@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { MainTab } from './index';
 import { selectedElementSchema } from '../../selected-elements';
 
 export const browserDataSchema = z.object({
@@ -20,7 +19,6 @@ export type BrowserData = z.infer<typeof browserDataSchema>;
 const metadataSchema = z.object({
   createdAt: z.date(),
   selectedPreviewElements: z.array(selectedElementSchema).optional(),
-  currentTab: z.enum(MainTab).optional(), // optional because it is set by the agent -> TODO: find a type-safe way
   browserData: browserDataSchema.optional(),
   thinkingDurations: z.array(z.number()).optional(),
   autoCompactInformation: z

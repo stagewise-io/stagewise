@@ -26,7 +26,7 @@ import { IconGithub, IconLinkedin, IconDiscord } from 'nucleo-social-media';
 import { SidebarNav } from '@/components/sidebar-nav';
 
 // Routes that should be displayed without the sidebar (standalone view)
-const STANDALONE_ROUTES = ['/diff-review'];
+const STANDALONE_ROUTES = ['/diff-review', '/auth'];
 
 const RootLayout = () => {
   const location = useLocation();

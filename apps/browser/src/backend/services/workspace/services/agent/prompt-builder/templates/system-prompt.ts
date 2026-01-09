@@ -1,10 +1,5 @@
 import type { SystemModelMessage } from 'ai';
-import {
-  MainTab,
-  Layout,
-  type KartonContract,
-  type TabState,
-} from '@shared/karton-contracts/ui';
+import type { KartonContract, TabState } from '@shared/karton-contracts/ui';
 import xml from 'xml';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import specialTokens from '../utils/special-tokens.js';
@@ -182,7 +177,7 @@ DOM elements can only be looked up if they belong to the [WORKSPACE] codebase. T
 # UI mode specific behavior
 ${productName} offers different UI modes showing different information and functionality to [USER].
 
-## UI Mode \`${MainTab.BROWSING}\` ("Browsing" mode)
+## UI Mode \`browsing\` ("Browsing" mode)
 - [STAGE] is displayed in a chat window right next to open tabs.
 - Focus on development tasks and questions/ideation on design and functionality of app.
 
@@ -765,9 +760,8 @@ const currentGoal = (
   workspaceSetupMode: 'setup-active' | 'setup-needed' | 'setup-finished',
 ) => {
   const goalContent = () => {
-    if (kartonState.userExperience.activeLayout === Layout.MAIN) {
-      if (workspaceSetupMode === 'setup-finished') {
-        return `
+    if (workspaceSetupMode === 'setup-finished') {
+      return `
 - Assist [USER] with frontend development tasks by implementing code changes as requested by [USER]
 - [STAGE] can be proactive, but only when [USER] asks [STAGE] to initially do something.
 - Initiate tool calls that make changes to codebase only once confident that [USER] wants [STAGE] to do so.
@@ -842,18 +836,18 @@ NEVER leave the codebase in a broken state with unresolved type errors or critic
 - [USER] can browse external websites and ask [STAGE] to copy styles. Use executeConsoleScript to extract styles and implement them in the codebase.
 - [USER] can also ask [STAGE] to debug styling issues on their own app. Use executeConsoleScript to inspect computed styles and identify root causes.
 - See 'copying-styles-workflow' in coding-guidelines for detailed guidance.
-        `.trim();
-      } else if (workspaceSetupMode === 'setup-needed') {
-        return `
+      `.trim();
+    } else if (workspaceSetupMode === 'setup-needed') {
+      return `
 - [USER] has not connected a [WORKSPACE] yet.
 - [STAGE] can still inspect and debug any webpage without a connected [WORKSPACE].
 - A [WORKSPACE] is only required when [USER] wants [STAGE] to make edits to source code. If asked to implement code changes, tell [USER] they need to connect a [WORKSPACE] first.
 
 ## Style inspection (available without a workspace)
 [STAGE] can use executeConsoleScript to inspect styles on any website and provide CSS information or code snippets. To implement styles in [USER]'s codebase, a [WORKSPACE] connection is required.
-        `.trim();
-      } else if (workspaceSetupMode === 'setup-active') {
-        return `
+      `.trim();
+    } else if (workspaceSetupMode === 'setup-active') {
+      return `
 - [USER] is in setup process of [WORKSPACE].
 - [STAGE] MUST gather information about [USER]'s [WORKSPACE] and [USER]'s request to set up ${productName} in project.
 ${kartonState.globalConfig.openFilesInIde === 'other' ? `- [STAGE] MUST use the askForIdeTool tool to ask [USER] for the IDE they want to use to open files in (e.g. "vscode", "cursor", "windsurf", "trae", "other").` : ``}
@@ -871,7 +865,7 @@ ${kartonState.globalConfig.openFilesInIde === 'other' ? `- ide: The IDE that [US
 
 # Tool usage
 - Use file modification tools to get information about [WORKSPACE] and to make changes to [WORKSPACE].
-- Use user interaction tools to ask [USER] for <required_information> and confirm it. 
+- Use user interaction tools to ask [USER] for <required_information> and confirm it.
   - IMPORTANT: Always ask [USER] a question when calling a user interaction tool, e.g. "Which app do you want to use ${productName} for?" or "Do you want to give ${productName} access to this path?" or "What port is your app running on?" or "Do you want to integrate ${productName} into dev script of your app?"
   - IMPORTANT: When [USER] cancels a user interaction tool, [STAGE] must ask a follow-up question to clarify [USER]'s intent and choice about <required_information>.
 - When determining agent_access_path using askForAgentAccessPathTool:
@@ -881,7 +875,6 @@ ${kartonState.globalConfig.openFilesInIde === 'other' ? `- ide: The IDE that [US
   4. DO NOT ask the user to choose between path options before calling the tool—the tool presents a single path for YES/NO confirmation only.
   5. Ask a simple YES/NO question alongside the tool call (e.g. "Is this the path ${productName} should have access to?").
 `.trim();
-      }
     }
 
     return 'No goal defined. Be nice to [USER] and help them with their request.';

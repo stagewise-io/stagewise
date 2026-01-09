@@ -7,8 +7,6 @@
  */
 
 import {
-  Layout,
-  MainTab,
   recentlyOpenedWorkspacesArraySchema,
   onboardingStateSchema,
   type StoredExperienceData,
@@ -77,12 +75,6 @@ export class UserExperienceService extends DisposableService {
     this.uiKarton.registerStateChangeCallback(
       this.boundHandleServiceStateChange,
     );
-    this.uiKarton.registerServerProcedureHandler(
-      'userExperience.mainLayout.changeTab',
-      async (_callingClientId: string, tab: MainTab) => {
-        this.changeMainTab(tab);
-      },
-    );
 
     this.uiKarton.registerServerProcedureHandler(
       'userExperience.storedExperienceData.setHasSeenOnboardingFlow',
@@ -119,7 +111,7 @@ export class UserExperienceService extends DisposableService {
     });
 
     this.uiKarton.registerServerProcedureHandler(
-      'userExperience.mainLayout.mainLayout.devAppPreview.changeScreenSize',
+      'userExperience.devAppPreview.changeScreenSize',
       async (
         _callingClientId: string,
         size: {
@@ -129,18 +121,13 @@ export class UserExperienceService extends DisposableService {
         } | null,
       ) => {
         this.uiKarton.setState((draft) => {
-          if (
-            draft.userExperience.activeLayout === Layout.MAIN &&
-            draft.userExperience.activeMainTab === MainTab.BROWSING
-          ) {
-            draft.userExperience.devAppPreview.customScreenSize = size
-              ? {
-                  width: size.width,
-                  height: size.height,
-                  presetName: size.presetName,
-                }
-              : null;
-          }
+          draft.userExperience.devAppPreview.customScreenSize = size
+            ? {
+                width: size.width,
+                height: size.height,
+                presetName: size.presetName,
+              }
+            : null;
         });
       },
     );
@@ -151,30 +138,20 @@ export class UserExperienceService extends DisposableService {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
-      'userExperience.mainLayout.mainLayout.devAppPreview.toggleShowCodeMode',
+      'userExperience.devAppPreview.toggleShowCodeMode',
       async (_callingClientId: string) => {
         this.uiKarton.setState((draft) => {
-          if (
-            draft.userExperience.activeLayout === Layout.MAIN &&
-            draft.userExperience.activeMainTab === MainTab.BROWSING
-          ) {
-            draft.userExperience.devAppPreview.inShowCodeMode =
-              !draft.userExperience.devAppPreview.inShowCodeMode;
-          }
+          draft.userExperience.devAppPreview.inShowCodeMode =
+            !draft.userExperience.devAppPreview.inShowCodeMode;
         });
       },
     );
     this.uiKarton.registerServerProcedureHandler(
-      'userExperience.mainLayout.mainLayout.devAppPreview.toggleFullScreen',
+      'userExperience.devAppPreview.toggleFullScreen',
       async (_callingClientId: string) => {
         this.uiKarton.setState((draft) => {
-          if (
-            draft.userExperience.activeLayout === Layout.MAIN &&
-            draft.userExperience.activeMainTab === MainTab.BROWSING
-          ) {
-            draft.userExperience.devAppPreview.isFullScreen =
-              !draft.userExperience.devAppPreview.isFullScreen;
-          }
+          draft.userExperience.devAppPreview.isFullScreen =
+            !draft.userExperience.devAppPreview.isFullScreen;
         });
       },
     );
@@ -185,73 +162,37 @@ export class UserExperienceService extends DisposableService {
       this.boundHandleServiceStateChange,
     );
     this.uiKarton.removeServerProcedureHandler(
-      'userExperience.mainLayout.changeTab',
-    );
-    this.uiKarton.removeServerProcedureHandler(
       'userExperience.storedExperienceData.setHasSeenOnboardingFlow',
     );
     this.uiKarton.removeServerProcedureHandler(
-      'userExperience.mainLayout.mainLayout.devAppPreview.changeScreenSize',
+      'userExperience.devAppPreview.changeScreenSize',
     );
     this.uiKarton.removeServerProcedureHandler(
       'userExperience.inspiration.loadMore',
     );
     this.uiKarton.removeServerProcedureHandler(
-      'userExperience.mainLayout.mainLayout.devAppPreview.toggleShowCodeMode',
+      'userExperience.devAppPreview.toggleShowCodeMode',
     );
     this.uiKarton.removeServerProcedureHandler(
-      'userExperience.mainLayout.mainLayout.devAppPreview.toggleFullScreen',
+      'userExperience.devAppPreview.toggleFullScreen',
     );
     this.logger.debug('[UserExperienceService] Teardown complete');
   }
 
   private handleServiceStateChange() {
-    // Check if we need to load stored experience data
+    // Load stored experience data if needed
     const state = this.uiKarton.state;
     const needsInitialization =
-      this.activeScreen === Layout.MAIN &&
+      state.userAccount?.status === 'authenticated' &&
       !state.workspace?.setupActive &&
-      state.userExperience.activeLayout === Layout.MAIN &&
-      !(state.userExperience as { activeMainTab?: MainTab }).activeMainTab;
+      !state.userExperience.storedExperienceData.hasSeenOnboardingFlow;
 
     if (needsInitialization) {
       // Load data asynchronously first
       void this.getStoredExperienceData().then((storedExperienceData) => {
         this.uiKarton.setState((draft) => {
-          draft.userExperience.activeLayout = this.activeScreen;
-
-          if (draft.userExperience.activeLayout === Layout.MAIN) {
-            const mainExperience = draft.userExperience as {
-              activeMainTab?: MainTab;
-            };
-            if (
-              !draft.workspace?.setupActive &&
-              !mainExperience.activeMainTab
-            ) {
-              this.logger.debug(
-                '[ExperienceService] Showing dev app preview tab',
-              );
-              draft.userExperience = {
-                storedExperienceData,
-                activeLayout: Layout.MAIN,
-                activeMainTab: MainTab.BROWSING,
-                devAppPreview: {
-                  isFullScreen: false,
-                  inShowCodeMode: false,
-                  customScreenSize: null,
-                },
-                inspirationWebsites: {
-                  ...draft.userExperience.inspirationWebsites,
-                },
-              };
-            }
-          }
+          draft.userExperience.storedExperienceData = storedExperienceData;
         });
-      });
-    } else {
-      // No async data needed, update synchronously
-      this.uiKarton.setState((draft) => {
-        draft.userExperience.activeLayout = this.activeScreen;
       });
     }
   }
@@ -453,40 +394,5 @@ export class UserExperienceService extends DisposableService {
         `[UserExperienceService] Failed to write pruned workspaces data. Error: ${error}`,
       );
     }
-  }
-
-  public changeMainTab(tab: MainTab) {
-    this.uiKarton.setState((draft) => {
-      if (
-        tab ===
-        (draft.userExperience as { activeMainTab: MainTab }).activeMainTab
-      ) {
-        return;
-      }
-
-      if (draft.userExperience.activeLayout === Layout.MAIN) {
-        draft.userExperience.activeMainTab = tab;
-        if (draft.userExperience.activeMainTab === MainTab.BROWSING) {
-          // TODO We can make this nicer by persisting the config in between sessions.
-          draft.userExperience.devAppPreview = {
-            isFullScreen: false,
-            inShowCodeMode: false,
-            customScreenSize: null,
-          };
-        }
-      } else {
-        throw new Error('Cannot change Tab when not in main layout');
-      }
-    });
-  }
-
-  public get activeScreen(): Layout {
-    this.assertNotDisposed();
-    // Depending on the state of auth and workspace servcie, we render different screens.
-    if (this.uiKarton.state.userAccount?.status === 'unauthenticated') {
-      return Layout.SIGNIN;
-    }
-
-    return Layout.MAIN;
   }
 }

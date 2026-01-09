@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ChatHistory } from '../../chat-history';
-import { type AppState, Layout, MainTab } from '@shared/karton-contracts/ui';
+import type { AppState } from '@shared/karton-contracts/ui';
 import {
   withSimpleResponseScenario,
   withFileReadingScenario,
@@ -55,8 +55,6 @@ const baseState: Partial<AppState> = {
     selectedModel: availableModels[0],
   },
   userExperience: {
-    activeLayout: Layout.MAIN,
-    activeMainTab: MainTab.BROWSING,
     inspirationWebsites: {
       websites: [],
       total: 0,
@@ -66,7 +64,11 @@ const baseState: Partial<AppState> = {
       recentlyOpenedWorkspaces: [],
       hasSeenOnboardingFlow: false,
     },
-    devAppPreview: null,
+    devAppPreview: {
+      isFullScreen: false,
+      inShowCodeMode: false,
+      customScreenSize: null,
+    },
   },
 };
 

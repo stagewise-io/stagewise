@@ -89,6 +89,11 @@ export type PagesApiContract = {
     ) => Promise<AddSearchEngineResult>;
     /** Remove a custom search engine by ID */
     removeSearchEngine: (id: number) => Promise<RemoveSearchEngineResult>;
+    /** Handle auth callback from internal auth page */
+    handleAuthCallback: (
+      authCode: string | undefined,
+      error: string | undefined,
+    ) => Promise<void>;
   };
 };
 

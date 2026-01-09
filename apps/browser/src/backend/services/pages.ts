@@ -75,6 +75,10 @@ export class PagesService extends DisposableService {
   ) => Promise<void>;
   private getPreferencesHandler?: () => UserPreferences;
   private updatePreferencesHandler?: (patches: Patch[]) => Promise<void>;
+  private authCallbackHandler?: (
+    authCode: string | undefined,
+    error: string | undefined,
+  ) => Promise<void>;
 
   private constructor(
     logger: Logger,
@@ -1016,6 +1020,35 @@ export class PagesService extends DisposableService {
   }
 
   /**
+   * Set the handler for auth callbacks from the internal auth page.
+   * This should be called by main.ts to wire up to AuthService.
+   */
+  public setAuthCallbackHandler(
+    handler: (
+      authCode: string | undefined,
+      error: string | undefined,
+    ) => Promise<void>,
+  ): void {
+    this.authCallbackHandler = handler;
+
+    this.kartonServer.registerServerProcedureHandler(
+      'handleAuthCallback',
+      async (
+        _callingClientId: string,
+        authCode: string | undefined,
+        error: string | undefined,
+      ) => {
+        if (!this.authCallbackHandler) {
+          throw new Error('Auth callback handler not registered');
+        }
+        await this.authCallbackHandler(authCode, error);
+      },
+    );
+
+    this.logger.debug('[PagesService] Auth callback handler registered');
+  }
+
+  /**
    * Sync preferences state to the Pages API Karton state.
    * Called by PreferencesService when preferences change.
    */
@@ -1125,6 +1158,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('getSearchEngines');
     this.kartonServer.removeServerProcedureHandler('addSearchEngine');
     this.kartonServer.removeServerProcedureHandler('removeSearchEngine');
+    this.kartonServer.removeServerProcedureHandler('handleAuthCallback');
 
     // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');
@@ -1137,6 +1171,7 @@ export class PagesService extends DisposableService {
     this.portCloseListeners.clear();
     this.currentPort = undefined;
     this.openTabHandler = undefined;
+    this.authCallbackHandler = undefined;
 
     await this.transport.close();
     this.logger.debug('[PagesService] Teardown complete');

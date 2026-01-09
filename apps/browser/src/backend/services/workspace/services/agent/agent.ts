@@ -17,8 +17,6 @@ import {
   type History,
   type ChatMessage,
   AgentErrorType,
-  Layout,
-  type MainTab,
   agentPreferencesSchema,
 } from '@shared/karton-contracts/ui';
 import {
@@ -492,18 +490,13 @@ export class AgentService {
       durations: [],
       currentStartTime: null,
     });
-    // Set thinking 'enabled' in main layout. IMPORTANT: Thinking mode must not be switched immediately after tool-responses!
-    const layout = this.uiKarton.state.userExperience.activeLayout;
+    // Set thinking 'enabled' based on workspace status. IMPORTANT: Thinking mode must not be switched immediately after tool-responses!
     if (
-      layout === Layout.MAIN &&
       this.uiKarton.state.workspaceStatus === 'open' &&
       this.thinkingEnabled === false
     )
       this.thinkingEnabled = true;
-    else if (
-      layout === Layout.MAIN &&
-      this.uiKarton.state.workspaceStatus === 'setup'
-    )
+    else if (this.uiKarton.state.workspaceStatus === 'setup')
       this.thinkingEnabled = false;
 
     const pendingToolCalls = findPendingToolCalls(
@@ -538,7 +531,6 @@ export class AgentService {
           ...message,
           metadata: {
             ...message.metadata,
-            currentTab: this.getCurrentTab() ?? undefined,
             rejectedEdits: Array.from(
               this.rejectedEditsPerChat.get(activeChatId) ?? [],
             ),
@@ -1069,15 +1061,6 @@ export class AgentService {
     }
   }
 
-  private getCurrentTab(): MainTab | null {
-    if (this.uiKarton.state.userExperience.activeLayout !== Layout.MAIN)
-      return null;
-
-    if (!this.uiKarton.state.userExperience.activeMainTab) return null;
-
-    return this.uiKarton.state.userExperience.activeMainTab;
-  }
-
   private async callAgent({
     chatId,
     history,
@@ -1189,7 +1172,6 @@ export class AgentService {
         posthogProperties: {
           $ai_span_name: isSetupMode ? 'agent-setup' : 'agent-chat',
           developerTag: process.env.DEVELOPER_TAG || undefined,
-          currentTab: this.getCurrentTab(),
           modelId,
         },
       });

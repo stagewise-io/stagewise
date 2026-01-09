@@ -30,7 +30,6 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { HotkeyComboText } from '@/components/hotkey-combo-text';
 import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
-import { Layout, MainTab } from '@shared/karton-contracts/ui';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { usePostHog } from 'posthog-js/react';
 import { diffLines } from 'diff';
@@ -45,11 +44,6 @@ const GlassyTextInputClassNames =
 
 export function ChatPanelFooter() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const openTab = useKartonState((s) =>
-    s.userExperience.activeLayout === Layout.MAIN
-      ? s.userExperience.activeMainTab
-      : null,
-  );
   const chatState = useChatState();
   const { isWorking, activeChatId, chats } = useKartonState(
     useComparingSelector((s) => ({
@@ -398,42 +392,40 @@ export function ChatPanelFooter() {
           )}
           {!canStop && (
             <>
-              {openTab === MainTab.BROWSING && (
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      disabled={hasOpenedStartPage}
-                      className="text-muted-foreground data-[element-selector-active=true]:bg-primary/5 data-[element-selector-active=true]:text-primary data-[element-selector-active=true]:hover:bg-primary/10"
-                      data-element-selector-active={elementSelectionActive}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (elementSelectionActive) {
-                          setElementSelectionActive(false);
-                        } else {
-                          setChatInputActive(true);
-                          setElementSelectionActive(true);
-                        }
-                      }}
-                      aria-label="Select context elements"
-                    >
-                      <SquareDashedMousePointerIcon className="size-3.5 stroke-[2.5px]" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {elementSelectionActive ? (
-                      'Stop selecting elements (Esc)'
-                    ) : (
-                      <>
-                        Add reference elements (
-                        <HotkeyComboText action={HotkeyActions.CTRL_I} />)
-                      </>
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              )}
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    disabled={hasOpenedStartPage}
+                    className="text-muted-foreground data-[element-selector-active=true]:bg-primary/5 data-[element-selector-active=true]:text-primary data-[element-selector-active=true]:hover:bg-primary/10"
+                    data-element-selector-active={elementSelectionActive}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (elementSelectionActive) {
+                        setElementSelectionActive(false);
+                      } else {
+                        setChatInputActive(true);
+                        setElementSelectionActive(true);
+                      }
+                    }}
+                    aria-label="Select context elements"
+                  >
+                    <SquareDashedMousePointerIcon className="size-3.5 stroke-[2.5px]" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {elementSelectionActive ? (
+                    'Stop selecting elements (Esc)'
+                  ) : (
+                    <>
+                      Add reference elements (
+                      <HotkeyComboText action={HotkeyActions.CTRL_I} />)
+                    </>
+                  )}
+                </TooltipContent>
+              </Tooltip>
               <input
                 type="file"
                 multiple

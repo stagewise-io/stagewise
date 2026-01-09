@@ -568,16 +568,24 @@ export async function main({
 
   // Start remaining services that are irrelevant to non-regular operation of the app.
   const filePickerService = await FilePickerService.create(logger, uiKarton);
-  const uriHandlerService = await URIHandlerService.create(logger);
+
+  // URIHandlerService registers the app as the default protocol client for stagewise://
+  // URL handling is done in main.ts via setupUrlHandlers() and handleCommandLineUrls()
+  await URIHandlerService.create(logger);
 
   const authService = await AuthService.create(
     globalDataPathService,
     identifierService,
     uiKarton,
     notificationService,
-    uriHandlerService,
+    windowLayoutService,
     logger,
   );
+
+  // Wire up auth callback handler from PagesService to AuthService
+  pagesService.setAuthCallbackHandler(async (authCode, error) => {
+    await authService.handleAuthCodeExchange(authCode, error);
+  });
 
   const workspaceManagerService = await WorkspaceManagerService.create(
     logger,
@@ -766,28 +774,32 @@ export async function main({
 }
 
 /**
- * Checks if a string is a valid URL (http/https)
+ * Checks if a string is a valid URL that the browser can open
  */
-function isValidUrl(url: string): boolean {
+function isOpenableUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    return (
+      parsed.protocol === 'http:' ||
+      parsed.protocol === 'https:' ||
+      parsed.protocol === 'stagewise:'
+    );
   } catch {
     return false;
   }
 }
 
 /**
- * Extracts URLs from command line arguments
+ * Extracts URLs from command line arguments (http, https, or stagewise://)
  */
 function extractUrlsFromArgs(argv: string[]): string[] {
   const urls: string[] = [];
   for (const arg of argv) {
-    // Skip non-URL arguments
-    if (arg.startsWith('-') || arg.includes('stagewise:/')) {
+    // Skip non-URL arguments (flags starting with -)
+    if (arg.startsWith('-')) {
       continue;
     }
-    if (isValidUrl(arg)) {
+    if (isOpenableUrl(arg)) {
       urls.push(arg);
     }
   }
@@ -795,27 +807,40 @@ function extractUrlsFromArgs(argv: string[]): string[] {
 }
 
 /**
- * Sets up event handlers for opening URLs
+ * Opens a URL in a new browser tab (handles both http/https and stagewise:// URLs)
+ */
+function openIncomingUrl(
+  url: string,
+  windowLayoutService: WindowLayoutService,
+  logger: Logger,
+): void {
+  logger.debug(`[Main] Opening incoming URL: ${url}`);
+  void windowLayoutService.openUrlInNewTab(url);
+}
+
+/**
+ * Sets up event handlers for opening URLs from OS events
  */
 function setupUrlHandlers(
   windowLayoutService: WindowLayoutService,
   logger: Logger,
 ): void {
-  // Handle 'open-url' event (macOS)
+  // Handle 'open-url' event (macOS) - for both http/https and stagewise:// URLs
   app.on('open-url', (ev: Electron.Event, url: string) => {
     ev.preventDefault();
     logger.debug(`[Main] open-url event received: ${url}`);
-    if (isValidUrl(url)) {
-      void windowLayoutService.openUrl(url);
+    if (isOpenableUrl(url)) {
+      openIncomingUrl(url, windowLayoutService, logger);
     }
   });
 
   // Handle 'second-instance' event (when app is already running)
+  // This fires when user opens another URL while the app is running
   app.on('second-instance', (_ev: Electron.Event, argv: string[]) => {
     logger.debug(`[Main] second-instance event received with argv: ${argv}`);
     const urls = extractUrlsFromArgs(argv);
     for (const url of urls) {
-      void windowLayoutService.openUrl(url);
+      openIncomingUrl(url, windowLayoutService, logger);
     }
   });
 }
@@ -833,11 +858,11 @@ function handleCommandLineUrls(
   if (urls.length > 0) {
     logger.debug(`[Main] Found URLs in command line arguments: ${urls}`);
     // Open the first URL immediately, others will be queued
-    void windowLayoutService.openUrl(urls[0]);
+    openIncomingUrl(urls[0], windowLayoutService, logger);
     // Open remaining URLs after a short delay to ensure the first one is processed
     for (let i = 1; i < urls.length; i++) {
       setTimeout(() => {
-        void windowLayoutService.openUrl(urls[i]);
+        openIncomingUrl(urls[i], windowLayoutService, logger);
       }, i * 100);
     }
   }

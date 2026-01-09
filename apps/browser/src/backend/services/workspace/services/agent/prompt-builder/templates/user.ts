@@ -35,12 +35,6 @@ export async function getUserMessage(
 
   const systemAttachmentTextPart: string[] = [];
 
-  if (userMessage.metadata?.currentTab) {
-    systemAttachmentTextPart.push(
-      `<${specialTokens.userMsgAttachmentXmlTag} type="displayed-ui" value="${userMessage.metadata?.currentTab}"/>`,
-    );
-  }
-
   if (
     userMessage.metadata?.rejectedEdits &&
     userMessage.metadata.rejectedEdits.length > 0

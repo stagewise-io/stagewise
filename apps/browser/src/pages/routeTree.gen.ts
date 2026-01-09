@@ -18,6 +18,7 @@ import { Route as AccountRouteImport } from './routes/account'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DiffReviewChatIdRouteImport } from './routes/diff-review.$chatId'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
@@ -64,6 +65,11 @@ const DiffReviewChatIdRoute = DiffReviewChatIdRouteImport.update({
   path: '/diff-review/$chatId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/clear-data': typeof ClearDataRoute
   '/downloads': typeof DownloadsRoute
   '/history': typeof HistoryRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
 }
 export interface FileRoutesByTo {
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/clear-data': typeof ClearDataRoute
   '/downloads': typeof DownloadsRoute
   '/history': typeof HistoryRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
 }
 export interface FileRoutesById {
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/clear-data': typeof ClearDataRoute
   '/downloads': typeof DownloadsRoute
   '/history': typeof HistoryRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
 }
 export interface FileRouteTypes {
@@ -110,6 +119,7 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
+    | '/auth/callback'
     | '/diff-review/$chatId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
+    | '/auth/callback'
     | '/diff-review/$chatId'
   id:
     | '__root__'
@@ -132,6 +143,7 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
+    | '/auth/callback'
     | '/diff-review/$chatId'
   fileRoutesById: FileRoutesById
 }
@@ -144,6 +156,7 @@ export interface RootRouteChildren {
   ClearDataRoute: typeof ClearDataRoute
   DownloadsRoute: typeof DownloadsRoute
   HistoryRoute: typeof HistoryRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   DiffReviewChatIdRoute: typeof DiffReviewChatIdRoute
 }
 
@@ -212,6 +225,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DiffReviewChatIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -224,6 +244,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClearDataRoute: ClearDataRoute,
   DownloadsRoute: DownloadsRoute,
   HistoryRoute: HistoryRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   DiffReviewChatIdRoute: DiffReviewChatIdRoute,
 }
 export const routeTree = rootRouteImport

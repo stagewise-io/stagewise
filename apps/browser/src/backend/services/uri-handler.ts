@@ -4,17 +4,14 @@ import path from 'node:path';
 import { DisposableService } from './disposable';
 
 /**
- * This service provides the paths to a variety of global data directories that this app can use to store data and configurations etc.
+ * Service responsible for registering the app as the default protocol client for stagewise:// URLs.
+ * This enables the OS to route stagewise:// URLs to this app.
+ *
+ * Note: URL handling is done in main.ts via setupUrlHandlers() and handleCommandLineUrls().
+ * This service only sets up the protocol registration.
  */
 export class URIHandlerService extends DisposableService {
   private readonly logger: Logger;
-  private _handlers: Record<
-    string, // ID of the handler. Is used to delete the handler later.
-    {
-      pathPrefix: string; // The path prefix that the handler is interested in. If the incoming uri starts with this prefix, the handler is called.
-      handler: (uri: string) => void | Promise<void>;
-    }
-  > = {};
 
   private constructor(logger: Logger) {
     super();
@@ -29,7 +26,10 @@ export class URIHandlerService extends DisposableService {
   }
 
   private async initialize(): Promise<void> {
+    // Register as default protocol client for stagewise:// URLs
     app.setAsDefaultProtocolClient('stagewise');
+
+    // In development mode, we need to pass the script path for the protocol to work
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
         app.setAsDefaultProtocolClient('stagewise', process.execPath, [
@@ -42,74 +42,9 @@ export class URIHandlerService extends DisposableService {
     this.logger.debug(
       `[URIHandlerService] Is default protocol client: ${app.isDefaultProtocolClient('stagewise') ? 'yes' : 'no'}`,
     );
-
-    app.on('second-instance', this.handleSecondInstance);
-    app.on('open-url', this.handleOpenURL);
   }
 
   protected onTeardown(): void {
-    this._handlers = {};
-    app.off('second-instance', this.handleSecondInstance);
-    app.off('open-url', this.handleOpenURL);
     this.logger.debug('[URIHandlerService] Teardown complete');
-  }
-
-  private handleSecondInstance = ((_ev: Electron.Event, argv: string[]) => {
-    const uri = argv.find((arg) => arg.startsWith('stagewise://'));
-    if (uri) {
-      this.handleURI(uri);
-    }
-  }).bind(this);
-
-  private handleOpenURL = ((ev: Electron.Event, uri: string) => {
-    ev.preventDefault();
-    this.handleURI(uri);
-  }).bind(this);
-
-  private async handleURI(uri: string): Promise<void> {
-    this.logger.debug(`[URIHandlerService] Handling URI: ${uri}`);
-
-    const extractedPath = uri.trim().replace('stagewise://', '');
-    for (const handler of Object.values(this._handlers)) {
-      if (extractedPath.startsWith(handler.pathPrefix)) {
-        this.logger.debug(
-          `[URIHandlerService] Handler found for URI: ${extractedPath}`,
-        );
-        try {
-          void handler.handler(extractedPath);
-        } catch (err) {
-          this.logger.error(`[URIHandlerService] Error handling URI: ${err}`);
-        }
-      }
-    }
-  }
-
-  /**
-   * Register a handler for a specific uri pattern. If the pattern matches, the handler is called with the uri.
-   *
-   * Info: The uri will only be sent to the first matching handler. If no handler matches, the uri is ignored.
-   *
-   * @param pathPrefix The path prefix that the handler is interested in. If the incoming uri starts with this prefix, the handler is called.
-   * @param handler A function that is called when the uri matches the matcher
-   * @returns The ID of the registered handler
-   */
-  public registerHandler(
-    pathPrefix: string,
-    handler: (uri: string) => void | Promise<void>,
-  ): string {
-    this.logger.debug(
-      `[URIHandlerService] Registering handler for path prefix: ${pathPrefix}`,
-    );
-    const id = crypto.randomUUID();
-    this._handlers[id] = { pathPrefix, handler };
-    return id;
-  }
-
-  /**
-   * Unregister a handler by its ID.
-   * @param id The ID of the handler to unregister
-   */
-  public unregisterHandler(id: string): void {
-    delete this._handlers[id];
   }
 }

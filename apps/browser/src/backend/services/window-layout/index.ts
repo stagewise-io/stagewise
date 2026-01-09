@@ -304,6 +304,25 @@ export class WindowLayoutService extends DisposableService {
   }
 
   /**
+   * Opens a URL in a new tab, always creating a new tab regardless of existing tabs.
+   * Returns the tab ID for tracking purposes (e.g., to close the tab later).
+   */
+  public async openUrlInNewTab(url: string): Promise<string> {
+    this.logger.debug(
+      `[WindowLayoutService] openUrlInNewTab called with url: ${url}`,
+    );
+    return await this.createTab(url, true);
+  }
+
+  /**
+   * Closes a tab by its ID.
+   */
+  public closeTab(tabId: string): void {
+    this.logger.debug(`[WindowLayoutService] closeTab called for: ${tabId}`);
+    void this.handleCloseTab(tabId);
+  }
+
+  /**
    * Opens a URL in a new tab, or navigates the active tab if it's a new/default tab.
    * A tab is considered "new" if it's the only tab and is on the default URL (ui-main).
    */
@@ -501,7 +520,7 @@ export class WindowLayoutService extends DisposableService {
     url: string | undefined,
     setActive: boolean,
     sourceTabId?: string,
-  ) {
+  ): Promise<string> {
     const id = randomUUID();
     const tab = new TabController(
       id,
@@ -631,6 +650,8 @@ export class WindowLayoutService extends DisposableService {
     const shouldActivate =
       setActive && (!sourceTabId || sourceTabId === this.activeTabId);
     if (shouldActivate) await this.handleSwitchTab(id);
+
+    return id;
   }
 
   private handleCloseTab = async (tabId: string) => {

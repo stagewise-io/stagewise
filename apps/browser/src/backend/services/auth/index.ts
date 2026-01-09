@@ -6,8 +6,7 @@ import { AuthServerInterop, consoleUrl } from './server-interop';
 import { AuthTokenStore } from './token-store';
 import type { NotificationService } from '../notification';
 import type { IdentifierService } from '../identifier';
-import type { URIHandlerService } from '../uri-handler';
-import { shell } from 'electron';
+import type { WindowLayoutService } from '../window-layout';
 import { DisposableService } from '../disposable';
 
 export type AuthState = KartonContract['state']['userAccount'];
@@ -20,7 +19,7 @@ export class AuthService extends DisposableService {
   private readonly identifierService: IdentifierService;
   private readonly uiKarton: KartonService;
   private readonly notificationService: NotificationService;
-  private readonly uriHandlerService: URIHandlerService;
+  private readonly windowLayoutService: WindowLayoutService;
   private readonly logger: Logger;
 
   // Owned child services (created in initialize)
@@ -29,17 +28,14 @@ export class AuthService extends DisposableService {
 
   private _authStateCheckInterval: NodeJS.Timeout | null = null;
   private authChangeCallbacks: ((newAuthState: AuthState) => void)[] = [];
-  private authenticationConfirmationCallback: (() => Promise<void>) | null =
-    null;
-
-  private _uriHandlerId: string | null = null;
+  private _authTabId: string | null = null;
 
   private constructor(
     globalDataPathService: GlobalDataPathService,
     identifierService: IdentifierService,
     uiKarton: KartonService,
     notificationService: NotificationService,
-    uriHandlerService: URIHandlerService,
+    windowLayoutService: WindowLayoutService,
     logger: Logger,
   ) {
     super();
@@ -47,7 +43,7 @@ export class AuthService extends DisposableService {
     this.identifierService = identifierService;
     this.uiKarton = uiKarton;
     this.notificationService = notificationService;
-    this.uriHandlerService = uriHandlerService;
+    this.windowLayoutService = windowLayoutService;
     this.logger = logger;
     this.serverInterop = new AuthServerInterop(logger);
   }
@@ -93,25 +89,6 @@ export class AuthService extends DisposableService {
       },
     );
 
-    this.uiKarton.registerServerProcedureHandler(
-      'userAccount.confirmAuthenticationConfirmation',
-      async (_callingClientId: string) => {
-        await this.confirmAuthenticationConfirmation();
-      },
-    );
-
-    this.uiKarton.registerServerProcedureHandler(
-      'userAccount.cancelAuthenticationConfirmation',
-      async (_callingClientId: string) => {
-        await this.cancelAuthenticationConfirmation();
-      },
-    );
-
-    this._uriHandlerId = this.uriHandlerService.registerHandler(
-      'auth',
-      this.handleAuthURI,
-    );
-
     // Check if we have any tokens stored in
     this.logger.debug('[AuthService] Initialized');
   }
@@ -121,7 +98,7 @@ export class AuthService extends DisposableService {
     identifierService: IdentifierService,
     uiKarton: KartonService,
     notificationService: NotificationService,
-    uriHandlerService: URIHandlerService,
+    windowLayoutService: WindowLayoutService,
     logger: Logger,
   ): Promise<AuthService> {
     const authService = new AuthService(
@@ -129,7 +106,7 @@ export class AuthService extends DisposableService {
       identifierService,
       uiKarton,
       notificationService,
-      uriHandlerService,
+      windowLayoutService,
       logger,
     );
     await authService.initialize();
@@ -142,37 +119,10 @@ export class AuthService extends DisposableService {
     this.uiKarton.removeServerProcedureHandler('userAccount.logout');
     this.uiKarton.removeServerProcedureHandler('userAccount.startLogin');
     this.uiKarton.removeServerProcedureHandler('userAccount.refreshStatus');
-    this.uiKarton.removeServerProcedureHandler(
-      'userAccount.confirmAuthenticationConfirmation',
-    );
-    this.uiKarton.removeServerProcedureHandler(
-      'userAccount.cancelAuthenticationConfirmation',
-    );
     this.authChangeCallbacks = [];
-
-    if (this._uriHandlerId) {
-      this.uriHandlerService.unregisterHandler(this._uriHandlerId);
-    }
 
     this.logger.debug('[AuthService] Teardown complete');
   }
-
-  private handleAuthURI: (uri: string) => Promise<void> = (async (
-    uri: string,
-  ) => {
-    const path = uri.split('?')[0];
-    const searchParams = new URLSearchParams(uri.split('?')[1]);
-
-    if (path === 'auth/callback') {
-      const authCode = searchParams.get('authCode');
-      const error = searchParams.get('error');
-
-      void this.handleAuthCodeExchange(
-        authCode ?? undefined,
-        error ?? undefined,
-      );
-    }
-  }).bind(this);
 
   // Regularly callable function that checks, if auth if configured and valid.
   // Will be called every 10 minutes by default, but this function can also be call as soon as we think there may be some issue with auth.
@@ -341,7 +291,7 @@ export class AuthService extends DisposableService {
     }
 
     const authUrl = this.getAuthUrl();
-    shell.openExternal(authUrl);
+    this._authTabId = await this.windowLayoutService.openUrlInNewTab(authUrl);
 
     this.updateAuthState((draft) => {
       draft.userAccount = {
@@ -351,31 +301,24 @@ export class AuthService extends DisposableService {
     });
   }
 
-  // This function should only be called by the web server that the CLI hosts and that receives the auth code from the user.
+  // This function is called when the auth callback URL is received with an auth code.
+  // It immediately exchanges the code for tokens without requiring user confirmation.
   public async handleAuthCodeExchange(
     authCode: string | undefined,
     error: string | undefined,
   ): Promise<void> {
-    this.updateAuthState((draft) => {
-      draft.userAccount = {
-        ...draft.userAccount,
-      };
-    });
     if (error) {
       this.logger.error(`[AuthService] Failed to exchange token: ${error}`);
+      this.closeAuthTab();
+      return;
     }
     if (!authCode) {
       this.logger.error(`[AuthService] No auth code provided`);
+      this.closeAuthTab();
       return;
     }
-    this.updateAuthState((draft) => {
-      draft.userAccount = {
-        ...draft.userAccount,
-        pendingAuthenticationConfirmation: true,
-      };
-    });
-    // This function is executed if the user approves the sign in.
-    this.authenticationConfirmationCallback = async () => {
+
+    try {
       const tokenData = await this.serverInterop.exchangeToken(authCode);
       this.tokenStore.tokenData = {
         accessToken: tokenData.accessToken,
@@ -383,37 +326,34 @@ export class AuthService extends DisposableService {
         expiresAt: new Date(tokenData.expiresAt),
         refreshExpiresAt: new Date(tokenData.refreshExpiresAt),
       };
-    };
-  }
-
-  private async confirmAuthenticationConfirmation(): Promise<void> {
-    this.logger.debug('[AuthService] User confirmed authentication');
-    try {
-      await this.authenticationConfirmationCallback?.();
       await this.checkAuthState();
+
+      this.notificationService.showNotification({
+        title: 'Signed in',
+        message: 'You have successfully signed in to stagewise.',
+        type: 'info',
+        duration: 3000,
+        actions: [],
+      });
     } catch (err) {
       this.logger.error(`[AuthService] Failed to exchange token: ${err}`);
-      void this.logout();
-    } finally {
-      this.updateAuthState((draft) => {
-        draft.userAccount = {
-          ...draft.userAccount,
-          pendingAuthenticationConfirmation: false,
-        };
+      this.notificationService.showNotification({
+        title: 'Sign in failed',
+        message: 'Failed to complete authentication. Please try again.',
+        type: 'error',
+        duration: 5000,
+        actions: [],
       });
-      this.authenticationConfirmationCallback = null;
+    } finally {
+      this.closeAuthTab();
     }
   }
 
-  private async cancelAuthenticationConfirmation(): Promise<void> {
-    this.logger.debug('[AuthService] User cancelled authentication');
-    this.authenticationConfirmationCallback = null;
-    this.updateAuthState((draft) => {
-      draft.userAccount = {
-        ...draft.userAccount,
-        pendingAuthenticationConfirmation: false,
-      };
-    });
+  private closeAuthTab(): void {
+    if (this._authTabId) {
+      this.windowLayoutService.closeTab(this._authTabId);
+      this._authTabId = null;
+    }
   }
 
   public get authState(): AuthState {
@@ -433,7 +373,7 @@ export class AuthService extends DisposableService {
   }
 
   private getAuthUrl(): string {
-    const callbackUrl = `stagewise://auth/callback`;
+    const callbackUrl = `stagewise://internal/auth/callback`;
 
     return `${consoleUrl}/authenticate-ide?ide=cli&redirect_uri=${encodeURIComponent(callbackUrl)}&no-cookie-banner=true`;
   }

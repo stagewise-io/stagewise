@@ -184,15 +184,6 @@ export type RecentlyOpenedWorkspace = z.infer<
   typeof recentlyOpenedWorkspaceSchema
 >;
 
-export enum Layout {
-  SIGNIN = 'signin',
-  MAIN = 'main',
-}
-
-export enum MainTab {
-  BROWSING = 'browsing',
-}
-
 export type AgentError =
   | {
       type: AgentErrorType.INSUFFICIENT_CREDITS;
@@ -314,7 +305,6 @@ export type AppState = {
   userAccount: {
     status: AuthStatus;
     machineId?: string;
-    pendingAuthenticationConfirmation?: boolean;
     user?: {
       id: string;
       email: string;
@@ -349,24 +339,16 @@ export type AppState = {
   userExperience: {
     storedExperienceData: StoredExperienceData;
     inspirationWebsites: InspirationWebsite;
-  } & (
-    | {
-        activeLayout: Layout.SIGNIN;
-      }
-    | {
-        activeLayout: Layout.MAIN;
-        activeMainTab: MainTab.BROWSING;
-        devAppPreview: {
-          isFullScreen: boolean;
-          inShowCodeMode: boolean;
-          customScreenSize: {
-            width: number;
-            height: number;
-            presetName: string; // Preset can be a name like "mobile" or "iPhone 13" or whatever
-          } | null;
-        };
-      }
-  );
+    devAppPreview: {
+      isFullScreen: boolean;
+      inShowCodeMode: boolean;
+      customScreenSize: {
+        width: number;
+        height: number;
+        presetName: string; // Preset can be a name like "mobile" or "iPhone 13" or whatever
+      } | null;
+    };
+  };
   // State of the notification service.
   notifications: {
     id: string;
@@ -475,8 +457,6 @@ export type KartonContract = {
       refreshSubscription: () => Promise<void>;
       logout: () => Promise<void>;
       startLogin: () => Promise<void>;
-      confirmAuthenticationConfirmation: () => Promise<void>;
-      cancelAuthenticationConfirmation: () => Promise<void>;
     };
     workspace: {
       open: (path?: string) => Promise<void>;
@@ -500,21 +480,16 @@ export type KartonContract = {
       };
     };
     userExperience: {
-      mainLayout: {
-        changeTab: (tab: MainTab) => Promise<void>;
-        mainLayout: {
-          devAppPreview: {
-            toggleFullScreen: () => Promise<void>;
-            toggleShowCodeMode: () => Promise<void>;
-            changeScreenSize: (
-              size: {
-                width: number;
-                height: number;
-                presetName: string;
-              } | null,
-            ) => Promise<void>;
-          };
-        };
+      devAppPreview: {
+        toggleFullScreen: () => Promise<void>;
+        toggleShowCodeMode: () => Promise<void>;
+        changeScreenSize: (
+          size: {
+            width: number;
+            height: number;
+            presetName: string;
+          } | null,
+        ) => Promise<void>;
       };
       inspiration: {
         loadMore: () => Promise<void>;
@@ -686,11 +661,15 @@ export const defaultState: KartonContract['state'] = {
       recentlyOpenedWorkspaces: [],
       hasSeenOnboardingFlow: false,
     },
-    activeLayout: Layout.SIGNIN,
     inspirationWebsites: {
       websites: [],
       total: 0,
       seed: '',
+    },
+    devAppPreview: {
+      isFullScreen: false,
+      inShowCodeMode: false,
+      customScreenSize: null,
     },
   },
   notifications: [],

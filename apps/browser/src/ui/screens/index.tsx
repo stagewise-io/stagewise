@@ -1,13 +1,8 @@
 import {
   useKartonConnected,
   useKartonReconnectState,
-  useKartonState,
 } from '@/hooks/use-karton';
-import { SignInScreen } from './signin';
 import { DefaultLayout } from './main';
-import Iridescence from '@/components/ui/iridescence';
-import { cn } from '@/utils';
-import { Layout } from '@shared/karton-contracts/ui';
 import { Logo } from '@/components/ui/logo';
 import { WebContentsBoundsSyncer } from '@/components/web-contents-bounds-syncer';
 
@@ -16,20 +11,8 @@ export function ScreenRouter() {
   const connected = useKartonConnected();
   const reconnectState = useKartonReconnectState();
 
-  const displayedLayout = useKartonState((s) => s.userExperience.activeLayout);
-
   return (
     <div className="fixed inset-0">
-      {connected && displayedLayout !== Layout.MAIN && (
-        <Iridescence
-          className={cn(
-            '-z-10 app-drag pointer-events-none absolute inset-0 opacity-100 duration-1000 ease-out',
-          )}
-          color={[0.7, 0.9, 1]}
-          speed={0.1}
-        />
-      )}
-
       {!connected && (
         <div className="absolute inset-0 flex size-full flex-col items-center justify-center gap-4">
           <Logo
@@ -58,9 +41,7 @@ export function ScreenRouter() {
         </div>
       )}
 
-      <SignInScreen show={connected && displayedLayout === Layout.SIGNIN} />
-
-      <DefaultLayout show={connected && displayedLayout === Layout.MAIN} />
+      <DefaultLayout show />
 
       <WebContentsBoundsSyncer />
     </div>
