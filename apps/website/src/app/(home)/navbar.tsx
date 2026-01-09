@@ -28,6 +28,7 @@ function NavbarButton({
       href={href}
       className={cn(
         buttonVariants({ variant: 'ghost', size: 'md' }),
+        'pointer-events-auto',
         isActive && 'font-semibold text-foreground',
       )}
     >
@@ -70,7 +71,7 @@ export function Navbar() {
   }, []);
 
   return (
-    <div className="fixed top-0 left-0 z-50 flex w-full justify-center bg-zinc-50 dark:bg-zinc-950">
+    <div className="fixed top-0 left-0 z-50 flex w-full justify-center bg-background/80 backdrop-blur-lg">
       <div
         className={cn(
           'z-50 flex h-14 w-full max-w-6xl flex-col items-start justify-between gap-2 overflow-hidden px-4 py-3 transition-all duration-150 ease-out sm:h-14 sm:flex-row sm:items-center sm:py-0',
@@ -83,9 +84,9 @@ export function Navbar() {
             href="/"
             className="relative size-10 scale-100 cursor-pointer overflow-hidden rounded-full shadow-md ring-1 ring-black/20 ring-inset"
           >
-            <AnimatedGradientBackground className="absolute inset-0 size-full" />
+            <AnimatedGradientBackground className="pointer-events-none absolute inset-0 size-full" />
             <Logo
-              className="absolute top-[24%] left-[24%] z-10 size-1/2 drop-shadow-xs"
+              className="pointer-events-none absolute top-[24%] left-[24%] z-10 size-1/2 drop-shadow-xs"
               color="white"
             />
           </Link>
@@ -102,10 +103,11 @@ export function Navbar() {
             )}
           </Button>
         </div>
-        <div className="flex flex-1 flex-col items-start justify-start sm:flex-row sm:items-center sm:justify-center">
+        <div className="flex flex-col items-start justify-start sm:pointer-events-none sm:absolute sm:inset-x-0 sm:flex-row sm:items-center sm:justify-center">
           <NavbarButton href="/pricing">Pricing</NavbarButton>
           <NavbarButton href="/docs">Docs</NavbarButton>
           <NavbarButton href="/news">News</NavbarButton>
+          <NavbarButton href="/team">Team</NavbarButton>
         </div>
         <div className="flex flex-row items-center justify-end gap-2">
           <Link

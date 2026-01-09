@@ -96,16 +96,16 @@ export async function generateMetadata(props: {
   if (!page) notFound();
 
   const metadata: Metadata = {
-    title: `${page.data.title} | stagewise Newsroom`,
+    title: `${page.data.title} · stagewise Newsroom`,
     description: page.data.description,
     openGraph: {
-      title: `${page.data.title} | stagewise Newsroom`,
+      title: `${page.data.title} · stagewise Newsroom`,
       description: page.data.description,
       locale: 'en_US',
       images: page.data.ogImage ? [page.data.ogImage] : undefined,
     },
     twitter: {
-      title: `${page.data.title} | stagewise Newsroom`,
+      title: `${page.data.title} · stagewise Newsroom`,
       description: page.data.description,
       creator: '@stagewise_io',
     },

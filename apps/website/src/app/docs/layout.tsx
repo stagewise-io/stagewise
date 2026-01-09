@@ -5,7 +5,7 @@ import { source } from '@/lib/source';
 
 export const metadata = {
   title: {
-    template: '%s | stagewise Docs',
+    template: '%s · stagewise Docs',
     default: 'stagewiseDocs', // a default is required when creating a template
   },
   description: {

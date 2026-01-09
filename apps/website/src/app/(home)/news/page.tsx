@@ -4,17 +4,17 @@ import Link from 'next/link';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 
 export const metadata: Metadata = {
-  title: 'Newsroom | stagewise',
+  title: 'Newsroom · stagewise',
   description:
     "Find out what we're up to, what we're thinking, and what we're doing at stagewise",
   openGraph: {
-    title: 'Newsroom | stagewise',
+    title: 'Newsroom · stagewise',
     description:
       "Find out what we're up to, what we're thinking, and what we're doing at stagewise",
     type: 'website',
   },
   twitter: {
-    title: 'Newsroom | stagewise',
+    title: 'Newsroom · stagewise',
     description:
       "Find out what we're up to, what we're thinking, and what we're doing at stagewise",
     creator: '@stagewise_io',
