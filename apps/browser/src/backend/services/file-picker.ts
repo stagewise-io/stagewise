@@ -33,7 +33,8 @@ export class FilePickerService extends DisposableService {
   private async initialize() {
     this.uiKarton.registerServerProcedureHandler(
       'filePicker.createRequest',
-      async (request: FilePickerRequest) => this.createRequest(request),
+      async (_callingClientId: string, request: FilePickerRequest) =>
+        this.createRequest(request),
     );
   }
 

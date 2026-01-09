@@ -193,7 +193,7 @@ export type ExtractProcedures<T> = T extends undefined
   : T;
 
 export type AddClientIdToFunction<T> = T extends (...args: infer P) => infer R
-  ? (...args: [...P, callingClientId: string]) => R
+  ? (callingClientId: string, ...args: P) => R
   : never;
 
 export type AddClientIdToImplementations<T> = T extends AsyncFunction

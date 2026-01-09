@@ -103,7 +103,7 @@ export class WorkspaceService extends DisposableService {
 
     this.uiKarton.registerServerProcedureHandler(
       'workspace.getGitRepoRoot',
-      async () => {
+      async (_callingClientId: string) => {
         return getRepoRootForPath(this.workspacePath);
       },
     );

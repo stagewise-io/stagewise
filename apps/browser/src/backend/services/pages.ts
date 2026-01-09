@@ -225,7 +225,10 @@ export class PagesService extends DisposableService {
   private registerProcedureHandlers(): void {
     this.kartonServer.registerServerProcedureHandler(
       'getHistory',
-      async (filter: HistoryFilter): Promise<HistoryResult[]> => {
+      async (
+        _callingClientId: string,
+        filter: HistoryFilter,
+      ): Promise<HistoryResult[]> => {
         const historyResults = await this.historyService.queryHistory(filter);
 
         // Get favicon URLs for all history entries efficiently
@@ -243,7 +246,10 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'getDownloads',
-      async (filter: DownloadsFilter): Promise<DownloadResult[]> => {
+      async (
+        _callingClientId: string,
+        filter: DownloadsFilter,
+      ): Promise<DownloadResult[]> => {
         const downloadResults =
           await this.historyService.queryDownloads(filter);
 
@@ -298,7 +304,7 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'getActiveDownloads',
-      async (): Promise<ActiveDownloadInfo[]> => {
+      async (_callingClientId: string): Promise<ActiveDownloadInfo[]> => {
         if (!this.downloadsService) {
           return [];
         }
@@ -327,7 +333,10 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'deleteDownload',
-      async (downloadId: number): Promise<DownloadControlResult> => {
+      async (
+        _callingClientId: string,
+        downloadId: number,
+      ): Promise<DownloadControlResult> => {
         try {
           // Cancel active download if in progress
           if (this.downloadsService) {
@@ -404,7 +413,10 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'openDownloadFile',
-      async (filePath: string): Promise<DownloadControlResult> => {
+      async (
+        _callingClientId: string,
+        filePath: string,
+      ): Promise<DownloadControlResult> => {
         try {
           if (!filePath) {
             return { success: false, error: 'No file path provided' };
@@ -439,7 +451,10 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'showDownloadInFolder',
-      async (filePath: string): Promise<DownloadControlResult> => {
+      async (
+        _callingClientId: string,
+        filePath: string,
+      ): Promise<DownloadControlResult> => {
         try {
           if (!filePath) {
             return { success: false, error: 'No file path provided' };
@@ -472,7 +487,10 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'pauseDownload',
-      async (downloadId: number): Promise<DownloadControlResult> => {
+      async (
+        _callingClientId: string,
+        downloadId: number,
+      ): Promise<DownloadControlResult> => {
         if (!this.downloadsService) {
           return {
             success: false,
@@ -493,7 +511,10 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'resumeDownload',
-      async (downloadId: number): Promise<DownloadControlResult> => {
+      async (
+        _callingClientId: string,
+        downloadId: number,
+      ): Promise<DownloadControlResult> => {
         if (!this.downloadsService) {
           return {
             success: false,
@@ -514,7 +535,10 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'cancelDownload',
-      async (downloadId: number): Promise<DownloadControlResult> => {
+      async (
+        _callingClientId: string,
+        downloadId: number,
+      ): Promise<DownloadControlResult> => {
         if (!this.downloadsService) {
           return {
             success: false,
@@ -533,7 +557,7 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'markDownloadsSeen',
-      async (): Promise<void> => {
+      async (_callingClientId: string): Promise<void> => {
         if (!this.markDownloadsSeenHandler) {
           this.logger.warn(
             '[PagesService] markDownloadsSeen called but no handler is set',
@@ -547,6 +571,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.registerServerProcedureHandler(
       'getFaviconBitmaps',
       async (
+        _callingClientId: string,
         faviconUrls: string[],
       ): Promise<Record<string, FaviconBitmapResult>> => {
         const bitmapMap =
@@ -562,7 +587,11 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'openTab',
-      async (url: string, setActive?: boolean): Promise<void> => {
+      async (
+        _callingClientId: string,
+        url: string,
+        setActive?: boolean,
+      ): Promise<void> => {
         if (!this.openTabHandler) {
           this.logger.warn(
             '[PagesService] openTab called but no handler is set',
@@ -576,6 +605,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.registerServerProcedureHandler(
       'clearBrowsingData',
       async (
+        _callingClientId: string,
         options: ClearBrowsingDataOptions,
       ): Promise<ClearBrowsingDataResult> => {
         this.logger.info('[PagesService] Clear browsing data requested', {
@@ -716,7 +746,10 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'getPendingEdits',
-      async (chatId: string): Promise<PendingEditsResult> => {
+      async (
+        _callingClientId: string,
+        chatId: string,
+      ): Promise<PendingEditsResult> => {
         if (!this.getPendingEditsHandler) {
           this.logger.warn(
             '[PagesService] getPendingEdits called but no handler is set',
@@ -729,7 +762,7 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'acceptAllPendingEdits',
-      async (chatId: string): Promise<void> => {
+      async (_callingClientId: string, chatId: string): Promise<void> => {
         if (!this.acceptAllPendingEditsHandler) {
           this.logger.warn(
             '[PagesService] acceptAllPendingEdits called but no handler is set',
@@ -742,7 +775,7 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'rejectAllPendingEdits',
-      async (chatId: string): Promise<void> => {
+      async (_callingClientId: string, chatId: string): Promise<void> => {
         if (!this.rejectAllPendingEditsHandler) {
           this.logger.warn(
             '[PagesService] rejectAllPendingEdits called but no handler is set',
@@ -755,7 +788,11 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'acceptPendingEdit',
-      async (chatId: string, filePath: string): Promise<void> => {
+      async (
+        _callingClientId: string,
+        chatId: string,
+        filePath: string,
+      ): Promise<void> => {
         if (!this.acceptPendingEditHandler) {
           this.logger.warn(
             '[PagesService] acceptPendingEdit called but no handler is set',
@@ -768,7 +805,11 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'rejectPendingEdit',
-      async (chatId: string, filePath: string): Promise<void> => {
+      async (
+        _callingClientId: string,
+        chatId: string,
+        filePath: string,
+      ): Promise<void> => {
         if (!this.rejectPendingEditHandler) {
           this.logger.warn(
             '[PagesService] rejectPendingEdit called but no handler is set',
@@ -782,7 +823,7 @@ export class PagesService extends DisposableService {
     // Search engine procedures
     this.kartonServer.registerServerProcedureHandler(
       'getSearchEngines',
-      async () => {
+      async (_callingClientId: string) => {
         if (!this.webDataService) {
           this.logger.warn(
             '[PagesService] getSearchEngines called but webDataService is not available',
@@ -795,7 +836,7 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'addSearchEngine',
-      async (input: AddSearchEngineInput) => {
+      async (_callingClientId: string, input: AddSearchEngineInput) => {
         if (!this.webDataService) {
           return {
             success: false as const,
@@ -834,7 +875,7 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'removeSearchEngine',
-      async (id: number) => {
+      async (_callingClientId: string, id: number) => {
         if (!this.webDataService) {
           return {
             success: false,
@@ -953,7 +994,7 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'getPreferences',
-      async () => {
+      async (_callingClientId: string) => {
         if (!this.getPreferencesHandler) {
           throw new Error('Preferences handler not registered');
         }
@@ -963,7 +1004,7 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'updatePreferences',
-      async (patches: Patch[]) => {
+      async (_callingClientId: string, patches: Patch[]) => {
         if (!this.updatePreferencesHandler) {
           throw new Error('Preferences handler not registered');
         }

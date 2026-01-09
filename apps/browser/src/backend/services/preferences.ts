@@ -125,7 +125,7 @@ export class PreferencesService extends DisposableService {
     // UI procedure for updating preferences
     this.uiKarton.registerServerProcedureHandler(
       'preferences.update',
-      async (patches: Patch[]) => {
+      async (_callingClientId: string, patches: Patch[]) => {
         await this.update(patches);
       },
     );

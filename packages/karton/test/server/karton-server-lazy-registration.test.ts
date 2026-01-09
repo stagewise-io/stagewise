@@ -41,7 +41,7 @@ describe('KartonServer Lazy Registration', () => {
       client.cleanup?.();
     }
     if (server) {
-      await server.wss.close();
+      await server.wss?.close();
     }
     if (httpServer) {
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
@@ -59,7 +59,7 @@ describe('KartonServer Lazy Registration', () => {
       });
 
       // Register handler lazily
-      const handler = vi.fn(async (amount: number, clientId: string) => {
+      const handler = vi.fn(async (clientId: string, amount: number) => {
         return server.state.counter + amount;
       });
 
@@ -104,7 +104,7 @@ describe('KartonServer Lazy Registration', () => {
       });
 
       const getDataHandler = vi.fn(async (clientId: string) => 'test data');
-      const processHandler = vi.fn(async (input: string, clientId: string) => ({
+      const processHandler = vi.fn(async (clientId: string, input: string) => ({
         result: `processed: ${input}`,
       }));
 
@@ -174,7 +174,7 @@ describe('KartonServer Lazy Registration', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Register handler after clients are connected
-      const handler = vi.fn(async (amount: number, clientId: string) => amount * 2);
+      const handler = vi.fn(async (clientId: string, amount: number) => amount * 2);
       server.registerServerProcedureHandler('increment', handler);
 
       // Both clients should be able to call the procedure
@@ -200,8 +200,8 @@ describe('KartonServer Lazy Registration', () => {
         },
       });
 
-      const handler1 = async (amount: number, clientId: string) => amount;
-      const handler2 = async (amount: number, clientId: string) => amount * 2;
+      const handler1 = async (clientId: string, amount: number) => amount;
+      const handler2 = async (clientId: string, amount: number) => amount * 2;
 
       server.registerServerProcedureHandler('increment', handler1);
 
@@ -225,14 +225,14 @@ describe('KartonServer Lazy Registration', () => {
         },
       });
 
-      const handler = vi.fn(async (amount: number, clientId: string) => amount);
+      const handler = vi.fn(async (clientId: string, amount: number) => amount);
       server.registerServerProcedureHandler('increment', handler);
 
       // Remove the handler
       server.removeServerProcedureHandler('increment');
 
       // Should be able to register new handler now
-      const newHandler = vi.fn(async (amount: number, clientId: string) => amount * 3);
+      const newHandler = vi.fn(async (clientId: string, amount: number) => amount * 3);
       server.registerServerProcedureHandler('increment', newHandler);
 
       // Create HTTP server and attach WebSocket server
@@ -286,7 +286,7 @@ describe('KartonServer Lazy Registration', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const handler = async (amount: number, clientId: string) => amount * 2;
+      const handler = async (clientId: string, amount: number) => amount * 2;
       server.registerServerProcedureHandler('increment', handler);
 
       // Verify handler works
@@ -389,7 +389,7 @@ describe('KartonServer Lazy Registration', () => {
       });
 
       // Register additional handler lazily
-      const lazyHandler = vi.fn(async (amount: number, clientId: string) => amount * 2);
+      const lazyHandler = vi.fn(async (clientId: string, amount: number) => amount * 2);
       server.registerServerProcedureHandler('increment', lazyHandler);
 
       // Create HTTP server and attach WebSocket server
@@ -421,7 +421,7 @@ describe('KartonServer Lazy Registration', () => {
     });
 
     it('should allow overriding initial procedures after removal', async () => {
-      const initialHandler = vi.fn(async (amount: number, clientId: string) => amount);
+      const initialHandler = vi.fn(async (clientId: string, amount: number) => amount);
 
       server = await createKartonServer<TestAppType>({
         initialState: {
@@ -457,7 +457,7 @@ describe('KartonServer Lazy Registration', () => {
 
       // Remove and replace
       server.removeServerProcedureHandler('increment');
-      const newHandler = vi.fn(async (amount: number, clientId: string) => amount * 10);
+      const newHandler = vi.fn(async (clientId: string, amount: number) => amount * 10);
       server.registerServerProcedureHandler('increment', newHandler);
 
       // New handler should be used

@@ -224,12 +224,12 @@ const kartonServer = await createKartonServer({
 });
 
 // Register handlers lazily - type-safe with dot-notation paths
-kartonServer.registerServerProcedureHandler('increment', async (amount: number, callingClientId: string) => {
+kartonServer.registerServerProcedureHandler('increment', async (callingClientId: string, amount: number) => {
   return kartonServer.state.counter + amount;
 });
 
 // Register nested procedures
-kartonServer.registerServerProcedureHandler('math.add', async (a: number, b: number, callingClientId: string) => {
+kartonServer.registerServerProcedureHandler('math.add', async (callingClientId: string, a: number, b: number) => {
   return a + b;
 });
 
@@ -237,12 +237,13 @@ kartonServer.registerServerProcedureHandler('math.add', async (a: number, b: num
 kartonServer.removeServerProcedureHandler(['increment']);
 
 // Register a new handler for the same procedure
-kartonServer.registerServerProcedureHandler('increment', async (amount: number, callingClientId: string) => {
+kartonServer.registerServerProcedureHandler('increment', async (callingClientId: string, amount: number) => {
   return amount * 2;
 });
 ```
 
 **Important notes about lazy registration:**
+
 - Attempting to register a handler for an already registered procedure will throw a `KartonProcedureError`
 - You must first remove the existing handler before registering a new one
 - Handlers are immediately available to all connected clients
@@ -339,6 +340,7 @@ When the user selected the `isConnected` entry, it should only re-render when th
 ### KartonProcedureError
 
 The `KartonProcedureError` is thrown for procedure-related errors:
+
 - When attempting to call a server procedure that has no registered handler
 - When attempting to register a handler for a procedure that already has a handler
 

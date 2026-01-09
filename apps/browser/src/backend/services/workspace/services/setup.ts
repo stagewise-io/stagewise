@@ -76,15 +76,27 @@ export class WorkspaceSetupService extends DisposableService {
     // Register karton procedure handlers
     this.uiKarton.registerServerProcedureHandler(
       'workspace.setup.checkForActiveAppOnPort',
-      this.handleCheckForActiveAppOnPort.bind(this),
+      async (_callingClientId: string, port: number) => {
+        return this.handleCheckForActiveAppOnPort(port);
+      },
     );
     this.uiKarton.registerServerProcedureHandler(
       'workspace.setup.submit',
-      this.handleSetupSubmission.bind(this),
+      async (
+        _callingClientId: string,
+        config: WorkspaceConfig,
+        newWorkspacePath?: string,
+      ) => {
+        return this.handleSetupSubmission(config, newWorkspacePath);
+      },
     );
     this.uiKarton.registerServerProcedureHandler(
       'workspace.setup.resolveRelativePathToAbsolutePath',
-      async (relativePath: string, basePath?: string) => {
+      async (
+        _callingClientId: string,
+        relativePath: string,
+        basePath?: string,
+      ) => {
         return await this.handleResolveRelativePathToAbsolutePath(
           relativePath,
           basePath,

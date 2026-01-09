@@ -61,7 +61,8 @@ export class GlobalConfigService extends DisposableService {
     });
     this.uiKarton.registerServerProcedureHandler(
       'config.set',
-      async (config: GlobalConfig) => this.set(config),
+      async (_callingClientId: string, config: GlobalConfig) =>
+        this.set(config),
     );
 
     // We also store the config once it's validated. We do that to make sure that the stored config is always aligned with the schema.

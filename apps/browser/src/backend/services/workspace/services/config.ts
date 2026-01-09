@@ -104,7 +104,8 @@ export class WorkspaceConfigService extends DisposableService {
 
     this.uiKarton.registerServerProcedureHandler(
       'workspace.config.set',
-      async (config: WorkspaceConfig) => this.set(config),
+      async (_callingClientId: string, config: WorkspaceConfig) =>
+        this.set(config),
     );
 
     this.logger.debug('[WorkspaceConfigService] Initialized');

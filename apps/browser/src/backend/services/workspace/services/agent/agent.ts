@@ -737,14 +737,18 @@ export class AgentService {
     try {
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.undoEditsUntilUserMessage',
-        async (userMessageId: string, chatId: string) => {
+        async (
+          _callingClientId: string,
+          userMessageId: string,
+          chatId: string,
+        ) => {
           await this.undoEditsUntilUserMessage(userMessageId, chatId);
         },
       );
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.setSelectedModel',
-        async (model: string) => {
+        async (_callingClientId: string, model: string) => {
           const modelSettings = availableModels.find(
             (m) => m.modelId === model,
           );
@@ -759,14 +763,14 @@ export class AgentService {
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.acceptAllPendingEdits',
-        async () => {
+        async (_callingClientId: string) => {
           this.diffHistoryService?.acceptPendingChanges();
         },
       );
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.rejectAllPendingEdits',
-        async () => {
+        async (_callingClientId: string) => {
           const rejected = this.diffHistoryService?.rejectPendingChanges();
           const chatId = this.uiKarton.state.agentChat?.activeChatId;
           if (!rejected || !chatId) return;
@@ -785,7 +789,7 @@ export class AgentService {
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.acceptPendingEdit',
-        async (filePath: string) => {
+        async (_callingClientId: string, filePath: string) => {
           // Use partialAccept to accept only this specific file
           this.diffHistoryService?.partialAccept([filePath]);
         },
@@ -793,7 +797,7 @@ export class AgentService {
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.rejectPendingEdit',
-        async (filePath: string) => {
+        async (_callingClientId: string, filePath: string) => {
           const rejected = this.diffHistoryService?.partialReject([filePath]);
           const chatId = this.uiKarton.state.agentChat?.activeChatId;
           if (!rejected || !chatId) return;
@@ -813,7 +817,7 @@ export class AgentService {
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.retrySendingUserMessage',
-        async () => {
+        async (_callingClientId: string) => {
           this.setAgentWorking(true);
           const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
           if (!activeChatId) return;
@@ -838,28 +842,28 @@ export class AgentService {
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.abortAgentCall',
-        async () => {
+        async (_callingClientId: string) => {
           this.abortAgentCall();
         },
       );
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.approveToolCall',
-        async (_toolCallId: string, _callingClientId: string) => {
+        async (_callingClientId: string, _toolCallId: string) => {
           // Implementation TBD
         },
       );
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.rejectToolCall',
-        async (_toolCallId: string, _callingClientId: string) => {
+        async (_callingClientId: string, _toolCallId: string) => {
           // Implementation TBD
         },
       );
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.create',
-        async () => {
+        async (_callingClientId: string) => {
           return createAndActivateNewChat(
             this.uiKarton as KartonStateProvider<KartonContract['state']>,
           );
@@ -868,7 +872,7 @@ export class AgentService {
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.switch',
-        async (chatId: string, _callingClientId: string) => {
+        async (_callingClientId: string, chatId: string) => {
           this.uiKarton.setState((draft) => {
             if (draft.agentChat) draft.agentChat.activeChatId = chatId;
           });
@@ -889,7 +893,7 @@ export class AgentService {
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.delete',
-        async (chatId: string, _callingClientId: string) => {
+        async (_callingClientId: string, chatId: string) => {
           const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
           if (!activeChatId) return;
           if (this.isWorking) this.abortAgentCall();
@@ -924,14 +928,14 @@ export class AgentService {
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.sendUserMessage',
-        async (message: ChatMessage, _callingClientId: string) => {
+        async (_callingClientId: string, message: ChatMessage) => {
           await this.sendUserMessage(message);
         },
       );
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.submitUserInteractionToolInput',
-        async (toolCallId, input) => {
+        async (_callingClientId: string, toolCallId, input) => {
           const { type: _, ...cleanInput } = input;
           // Find tool call with state 'input-available' and the toolCallId and attach the output
           attachToolOutputToMessage(
@@ -964,7 +968,7 @@ export class AgentService {
 
       this.uiKarton.registerServerProcedureHandler(
         'agentChat.cancelUserInteractionToolInput',
-        async (toolCallId: string) => {
+        async (_callingClientId: string, toolCallId: string) => {
           attachToolOutputToMessage(
             this.uiKarton as KartonStateProvider<KartonContract['state']>,
             [
@@ -991,7 +995,7 @@ export class AgentService {
 
       this.uiKarton.registerServerProcedureHandler(
         'userAccount.refreshSubscription',
-        async () => {
+        async (_callingClientId: string) => {
           await this.fetchSubscription();
         },
       );

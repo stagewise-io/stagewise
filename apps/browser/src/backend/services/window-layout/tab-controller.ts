@@ -967,21 +967,24 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private registerKartonProcedureHandlers() {
     this.kartonServer.registerServerProcedureHandler(
       'movePanelToForeground',
-      async (panel: 'stagewise-ui' | 'tab-content') => {
+      async (
+        _callingClientId: string,
+        panel: 'stagewise-ui' | 'tab-content',
+      ) => {
         this.emit('movePanelToForeground', panel);
       },
     );
 
     this.kartonServer.registerServerProcedureHandler(
       'handleKeyDown',
-      async (key) => {
+      async (_callingClientId: string, key) => {
         this.emit('handleKeyDown', key);
       },
     );
 
     this.kartonServer.registerServerProcedureHandler(
       'handleWheelZoom',
-      async (wheelEvent) => {
+      async (_callingClientId: string, wheelEvent) => {
         // Handle wheel zoom: deltaY > 0 means scroll down (zoom out), deltaY < 0 means scroll up (zoom in)
         const currentZoom = this.getZoomPercentage();
         let newZoom = currentZoom;

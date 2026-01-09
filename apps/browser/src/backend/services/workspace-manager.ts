@@ -58,14 +58,14 @@ export class WorkspaceManagerService extends DisposableService {
 
     this.uiKarton.registerServerProcedureHandler(
       'workspace.open',
-      async (workspacePath) => {
+      async (_callingClientId: string, workspacePath) => {
         await this.loadWorkspace(workspacePath);
       },
     );
 
     this.uiKarton.registerServerProcedureHandler(
       'workspace.close',
-      async () => {
+      async (_callingClientId: string) => {
         await this.unloadWorkspace();
       },
     );

@@ -74,35 +74,35 @@ export class AuthService extends DisposableService {
     // Register all procedure handlers for the user account
     this.uiKarton.registerServerProcedureHandler(
       'userAccount.logout',
-      async () => {
+      async (_callingClientId: string) => {
         await this.logout();
       },
     );
 
     this.uiKarton.registerServerProcedureHandler(
       'userAccount.startLogin',
-      async () => {
+      async (_callingClientId: string) => {
         await this.startLogin();
       },
     );
 
     this.uiKarton.registerServerProcedureHandler(
       'userAccount.refreshStatus',
-      async () => {
+      async (_callingClientId: string) => {
         await this.checkAuthState();
       },
     );
 
     this.uiKarton.registerServerProcedureHandler(
       'userAccount.confirmAuthenticationConfirmation',
-      async () => {
+      async (_callingClientId: string) => {
         await this.confirmAuthenticationConfirmation();
       },
     );
 
     this.uiKarton.registerServerProcedureHandler(
       'userAccount.cancelAuthenticationConfirmation',
-      async () => {
+      async (_callingClientId: string) => {
         await this.cancelAuthenticationConfirmation();
       },
     );

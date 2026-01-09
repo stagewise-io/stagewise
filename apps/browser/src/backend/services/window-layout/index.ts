@@ -459,7 +459,7 @@ export class WindowLayoutService extends DisposableService {
       }
     }
 
-    await this.createTab(url, setActive ?? true, sourceTabId);
+    await this.createTab(url ?? 'ui-main', setActive ?? true, sourceTabId);
   };
 
   private async createTab(

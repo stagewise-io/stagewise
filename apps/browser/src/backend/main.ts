@@ -285,13 +285,13 @@ export async function main({
   // Register the markSeen procedure handler for UI contract
   uiKarton.registerServerProcedureHandler(
     'downloads.markSeen',
-    markDownloadsSeen,
+    async (_callingClientId: string) => markDownloadsSeen(),
   );
 
   // Register download control procedure handlers for UI contract
   uiKarton.registerServerProcedureHandler(
     'downloads.pause',
-    async (downloadId: number) => {
+    async (_callingClientId: string, downloadId: number) => {
       const paused = downloadsService.pauseDownload(downloadId);
       if (paused) {
         return { success: true };
@@ -305,7 +305,7 @@ export async function main({
 
   uiKarton.registerServerProcedureHandler(
     'downloads.resume',
-    async (downloadId: number) => {
+    async (_callingClientId: string, downloadId: number) => {
       const resumed = downloadsService.resumeDownload(downloadId);
       if (resumed) {
         return { success: true };
@@ -319,7 +319,7 @@ export async function main({
 
   uiKarton.registerServerProcedureHandler(
     'downloads.cancel',
-    async (downloadId: number) => {
+    async (_callingClientId: string, downloadId: number) => {
       const cancelled = await downloadsService.cancelDownload(downloadId);
       if (cancelled) {
         return { success: true };
@@ -341,7 +341,7 @@ export async function main({
 
   uiKarton.registerServerProcedureHandler(
     'downloads.openFile',
-    async (filePath: string) => {
+    async (_callingClientId: string, filePath: string) => {
       try {
         if (!filePath) {
           return { success: false, error: 'No file path provided' };
@@ -373,7 +373,7 @@ export async function main({
 
   uiKarton.registerServerProcedureHandler(
     'downloads.showInFolder',
-    async (filePath: string) => {
+    async (_callingClientId: string, filePath: string) => {
       try {
         if (!filePath) {
           return { success: false, error: 'No file path provided' };
@@ -402,7 +402,7 @@ export async function main({
 
   uiKarton.registerServerProcedureHandler(
     'downloads.delete',
-    async (downloadId: number) => {
+    async (_callingClientId: string, downloadId: number) => {
       try {
         // Cancel active download if in progress
         const activeDownload = downloadsService.getActiveDownload(downloadId);

@@ -79,14 +79,14 @@ export class UserExperienceService extends DisposableService {
     );
     this.uiKarton.registerServerProcedureHandler(
       'userExperience.mainLayout.changeTab',
-      async (tab: MainTab) => {
+      async (_callingClientId: string, tab: MainTab) => {
         this.changeMainTab(tab);
       },
     );
 
     this.uiKarton.registerServerProcedureHandler(
       'userExperience.storedExperienceData.setHasSeenOnboardingFlow',
-      async (value: boolean) => {
+      async (_callingClientId: string, value: boolean) => {
         void this.setHasSeenOnboardingFlow(value);
       },
     );
@@ -121,6 +121,7 @@ export class UserExperienceService extends DisposableService {
     this.uiKarton.registerServerProcedureHandler(
       'userExperience.mainLayout.mainLayout.devAppPreview.changeScreenSize',
       async (
+        _callingClientId: string,
         size: {
           width: number;
           height: number;
@@ -145,13 +146,13 @@ export class UserExperienceService extends DisposableService {
     );
     this.uiKarton.registerServerProcedureHandler(
       'userExperience.inspiration.loadMore',
-      async () => {
+      async (_callingClientId: string) => {
         return this.loadMoreInspirationWebsites();
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'userExperience.mainLayout.mainLayout.devAppPreview.toggleShowCodeMode',
-      async () => {
+      async (_callingClientId: string) => {
         this.uiKarton.setState((draft) => {
           if (
             draft.userExperience.activeLayout === Layout.MAIN &&
@@ -165,7 +166,7 @@ export class UserExperienceService extends DisposableService {
     );
     this.uiKarton.registerServerProcedureHandler(
       'userExperience.mainLayout.mainLayout.devAppPreview.toggleFullScreen',
-      async () => {
+      async (_callingClientId: string) => {
         this.uiKarton.setState((draft) => {
           if (
             draft.userExperience.activeLayout === Layout.MAIN &&

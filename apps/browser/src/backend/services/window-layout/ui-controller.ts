@@ -167,31 +167,32 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
   private registerKartonProcedures() {
     this.uiKarton.registerServerProcedureHandler(
       'browser.createTab',
-      async (url?: string, setActive?: boolean) => {
+      async (_callingClientId: string, url?: string, setActive?: boolean) => {
         this.emit('createTab', url, setActive);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.closeTab',
-      async (tabId: string) => {
+      async (_callingClientId: string, tabId: string) => {
         this.emit('closeTab', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.switchTab',
-      async (tabId: string) => {
+      async (_callingClientId: string, tabId: string) => {
         this.emit('switchTab', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.reorderTabs',
-      async (tabIds: string[]) => {
+      async (_callingClientId: string, tabIds: string[]) => {
         this.emit('reorderTabs', tabIds);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.layout.update',
       async (
+        _callingClientId: string,
         bounds: { x: number; y: number; width: number; height: number } | null,
       ) => {
         this.emit('layoutUpdate', bounds);
@@ -199,154 +200,175 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.layout.movePanelToForeground',
-      async (panel: 'stagewise-ui' | 'tab-content') => {
+      async (
+        _callingClientId: string,
+        panel: 'stagewise-ui' | 'tab-content',
+      ) => {
         this.emit('movePanelToForeground', panel);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.layout.togglePanelKeyboardFocus',
-      async (panel: 'stagewise-ui' | 'tab-content') => {
+      async (
+        _callingClientId: string,
+        panel: 'stagewise-ui' | 'tab-content',
+      ) => {
         this.emit('togglePanelKeyboardFocus', panel);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.stop',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('stop', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.reload',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('reload', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.goto',
-      async (url: string, tabId?: string, transition?: PageTransition) => {
+      async (
+        _callingClientId: string,
+        url: string,
+        tabId?: string,
+        transition?: PageTransition,
+      ) => {
         this.emit('goto', url, tabId, transition);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.goBack',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('goBack', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.goForward',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('goForward', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.toggleDevTools',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('toggleDevTools', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.openDevTools',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('openDevTools', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.closeDevTools',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('closeDevTools', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.setAudioMuted',
-      async (muted: boolean, tabId?: string) => {
+      async (_callingClientId: string, muted: boolean, tabId?: string) => {
         this.emit('setAudioMuted', muted, tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.toggleAudioMuted',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('toggleAudioMuted', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.setColorScheme',
-      async (scheme: ColorScheme, tabId?: string) => {
+      async (_callingClientId: string, scheme: ColorScheme, tabId?: string) => {
         this.emit('setColorScheme', scheme, tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.cycleColorScheme',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('cycleColorScheme', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.setZoomPercentage',
-      async (percentage: number, tabId?: string) => {
+      async (_callingClientId: string, percentage: number, tabId?: string) => {
         this.emit('setZoomPercentage', percentage, tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.setActive',
-      async (active: boolean) => {
+      async (_callingClientId: string, active: boolean) => {
         this.emit('setContextSelectionMode', active);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.setMouseCoordinates',
-      async (x: number, y: number) => {
+      async (_callingClientId: string, x: number, y: number) => {
         this.emit('setContextSelectionMouseCoordinates', x, y);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.clearMouseCoordinates',
-      async () => {
+      async (_callingClientId: string) => {
         this.emit('clearContextSelectionMouseCoordinates');
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.passthroughWheelEvent',
-      async (event) => {
+      async (_callingClientId: string, event) => {
         this.emit('passthroughWheelEvent', event);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.selectHoveredElement',
-      async () => {
+      async (_callingClientId: string) => {
         // TODO: Implement by adding the element to the chat state controller.
         this.emit('selectHoveredElement');
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.removeElement',
-      async (elementId: string) => {
+      async (_callingClientId: string, elementId: string) => {
         // TODO: Implement by removing the element from the chat state controller.
         this.emit('removeElement', elementId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.clearElements',
-      async () => {
+      async (_callingClientId: string) => {
         // TODO: Implement by clearing all stored elements in the chat state controller.
         this.emit('clearElements');
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.clearPendingScreenshots',
-      async () => {
+      async (_callingClientId: string) => {
         this.emit('clearPendingScreenshots');
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.scrollToElement',
-      async (tabId: string, backendNodeId: number, frameId: string) => {
+      async (
+        _callingClientId: string,
+        tabId: string,
+        backendNodeId: number,
+        frameId: string,
+      ) => {
         this.emit('scrollToElement', tabId, backendNodeId, frameId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.checkFrameValidity',
-      async (tabId: string, frameId: string, expectedFrameLocation: string) => {
+      async (
+        _callingClientId: string,
+        tabId: string,
+        frameId: string,
+        expectedFrameLocation: string,
+      ) => {
         if (this.checkFrameValidityHandler) {
           return await this.checkFrameValidityHandler(
             tabId,
@@ -359,7 +381,12 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.checkElementExists',
-      async (tabId: string, backendNodeId: number, frameId: string) => {
+      async (
+        _callingClientId: string,
+        tabId: string,
+        backendNodeId: number,
+        frameId: string,
+      ) => {
         if (this.checkElementExistsHandler) {
           return await this.checkElementExistsHandler(
             tabId,
@@ -372,43 +399,43 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.searchInPage.start',
-      async (searchText: string, tabId?: string) => {
+      async (_callingClientId: string, searchText: string, tabId?: string) => {
         this.emit('startSearchInPage', searchText, tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.searchInPage.updateText',
-      async (searchText: string, tabId?: string) => {
+      async (_callingClientId: string, searchText: string, tabId?: string) => {
         this.emit('updateSearchInPageText', searchText, tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.searchInPage.next',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('nextSearchResult', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.searchInPage.previous',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('previousSearchResult', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.searchInPage.stop',
-      async (tabId?: string) => {
+      async (_callingClientId: string, tabId?: string) => {
         this.emit('stopSearchInPage', tabId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.searchBar.activate',
-      async () => {
+      async (_callingClientId: string) => {
         this.emit('activateSearchBar');
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.searchBar.deactivate',
-      async () => {
+      async (_callingClientId: string) => {
         this.emit('deactivateSearchBar');
       },
     );

@@ -109,8 +109,8 @@ class KartonServerImpl<T> implements KartonServer<T> {
     // Register server procedures with clientId injection
     for (const [path, handler] of this.serverProcedures) {
       rpcManager.registerProcedure(path, async (...args: any[]) => {
-        // Add clientId as last argument
-        return handler(...args, clientId);
+        // Add clientId as first argument to avoid issues with optional trailing parameters
+        return handler(clientId, ...args);
       });
     }
 
@@ -199,8 +199,8 @@ class KartonServerImpl<T> implements KartonServer<T> {
     // Register with all existing client connections
     for (const client of this.clients.values()) {
       client.rpcManager.registerProcedure(path, async (...args: any[]) => {
-        // Add clientId as last argument
-        return handler(...args, client.id);
+        // Add clientId as first argument to avoid issues with optional trailing parameters
+        return handler(client.id, ...args);
       });
     }
   }

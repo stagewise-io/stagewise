@@ -37,13 +37,13 @@ export class NotificationService extends DisposableService {
   private initialize() {
     this.uiKarton.registerServerProcedureHandler(
       'notifications.dismiss',
-      async (id) => {
+      async (_callingClientId: string, id: string) => {
         this.dismissNotification(id);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'notifications.triggerAction',
-      async (id, actionIndex) => {
+      async (_callingClientId: string, id: string, actionIndex: number) => {
         this.handleActionTrigger(id, actionIndex);
       },
     );
