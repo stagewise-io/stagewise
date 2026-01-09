@@ -17,6 +17,7 @@ import { GlobalDataPathService } from './services/global-data-path';
 import { Logger } from './services/logger';
 import { TelemetryService } from './services/telemetry';
 import { GlobalConfigService } from './services/global-config';
+import { PreferencesService } from './services/preferences';
 import { NotificationService } from './services/notification';
 import { PagesService } from './services/pages';
 import { WindowLayoutService } from './services/window-layout';
@@ -93,6 +94,13 @@ export async function main({
     pagesService,
   );
   const uiKarton = windowLayoutService.uiKarton;
+
+  // Create PreferencesService to manage user preferences
+  const preferencesService = await PreferencesService.create(
+    logger,
+    uiKarton,
+    pagesService,
+  );
 
   // Set up downloads UI state updates
   // This callback updates the UI karton with running + recent finished downloads
@@ -509,7 +517,7 @@ export async function main({
 
   const telemetryService = new TelemetryService(
     identifierService,
-    globalConfigService,
+    preferencesService,
     logger,
   );
 

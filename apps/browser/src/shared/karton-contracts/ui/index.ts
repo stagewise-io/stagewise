@@ -20,7 +20,10 @@ import type {
   FilePickerRequest,
   GlobalConfig,
   ModelSettings,
+  UserPreferences,
+  Patch,
 } from './shared-types';
+import { defaultUserPreferences } from './shared-types';
 import type { PageTransition, DownloadState } from '../pages-api/types';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
@@ -411,6 +414,9 @@ export type AppState = {
     /** Timestamp when downloads were last marked as seen (null if never) */
     lastSeenAt: Date | null;
   };
+
+  // User preferences (synced from PreferencesService)
+  preferences: UserPreferences;
 };
 
 export type AuthStatus =
@@ -633,6 +639,10 @@ export type KartonContract = {
         downloadId: number,
       ) => Promise<{ success: boolean; error?: string }>;
     };
+    preferences: {
+      /** Update user preferences by applying Immer patches */
+      update: (patches: Patch[]) => Promise<void>;
+    };
   };
 };
 
@@ -696,4 +706,5 @@ export const defaultState: KartonContract['state'] = {
     hasUnseenDownloads: false,
     lastSeenAt: null,
   },
+  preferences: defaultUserPreferences,
 };

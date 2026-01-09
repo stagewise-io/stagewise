@@ -14,6 +14,10 @@ import {
   defaultState,
 } from '@shared/karton-contracts/pages-api';
 import type { FileDiffResult } from '@shared/karton-contracts/pages-api/types';
+import type {
+  UserPreferences,
+  Patch,
+} from '@shared/karton-contracts/ui/shared-types';
 import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
 import type { DownloadsService } from './download-manager';
@@ -65,6 +69,8 @@ export class PagesService extends DisposableService {
     chatId: string,
     path: string,
   ) => Promise<void>;
+  private getPreferencesHandler?: () => UserPreferences;
+  private updatePreferencesHandler?: (patches: Patch[]) => Promise<void>;
 
   private constructor(
     logger: Logger,
@@ -828,6 +834,50 @@ export class PagesService extends DisposableService {
   }
 
   /**
+   * Register handlers for preferences operations.
+   * Called by PreferencesService during initialization.
+   */
+  public registerPreferencesHandlers(
+    getHandler: () => UserPreferences,
+    updateHandler: (patches: Patch[]) => Promise<void>,
+  ): void {
+    this.getPreferencesHandler = getHandler;
+    this.updatePreferencesHandler = updateHandler;
+
+    this.kartonServer.registerServerProcedureHandler(
+      'getPreferences',
+      async () => {
+        if (!this.getPreferencesHandler) {
+          throw new Error('Preferences handler not registered');
+        }
+        return this.getPreferencesHandler();
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'updatePreferences',
+      async (patches: Patch[]) => {
+        if (!this.updatePreferencesHandler) {
+          throw new Error('Preferences handler not registered');
+        }
+        await this.updatePreferencesHandler(patches);
+      },
+    );
+
+    this.logger.debug('[PagesService] Preferences handlers registered');
+  }
+
+  /**
+   * Sync preferences state to the Pages API Karton state.
+   * Called by PreferencesService when preferences change.
+   */
+  public syncPreferencesState(preferences: UserPreferences): void {
+    this.kartonServer.setState((draft) => {
+      draft.preferences = preferences;
+    });
+  }
+
+  /**
    * Update the pending edits state for a specific chat. Called when edits change.
    */
   public updatePendingEditsState(
@@ -894,6 +944,8 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('rejectAllPendingEdits');
     this.kartonServer.removeServerProcedureHandler('acceptPendingEdit');
     this.kartonServer.removeServerProcedureHandler('rejectPendingEdit');
+    this.kartonServer.removeServerProcedureHandler('getPreferences');
+    this.kartonServer.removeServerProcedureHandler('updatePreferences');
 
     // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');

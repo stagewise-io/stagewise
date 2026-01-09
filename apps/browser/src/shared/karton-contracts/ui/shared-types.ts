@@ -86,6 +86,30 @@ export const globalConfigSchema = z
 export type GlobalConfig = z.infer<typeof globalConfigSchema>;
 
 /**
+ * USER PREFERENCES (stored in Preferences.json)
+ */
+
+export const userPreferencesSchema = z.object({
+  privacy: z
+    .object({
+      telemetryLevel: z.enum(['off', 'anonymous', 'full']).default('anonymous'),
+    })
+    .default({ telemetryLevel: 'anonymous' }),
+});
+
+export type UserPreferences = z.infer<typeof userPreferencesSchema>;
+export type TelemetryLevel = UserPreferences['privacy']['telemetryLevel'];
+
+export const defaultUserPreferences: UserPreferences = {
+  privacy: {
+    telemetryLevel: 'anonymous',
+  },
+};
+
+// Re-export Patch type from immer for use in Karton contracts
+export type { Patch } from 'immer';
+
+/**
  * WORKSPACE CONFIG CAPABILITIES
  */
 

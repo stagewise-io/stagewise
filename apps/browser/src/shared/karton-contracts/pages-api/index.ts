@@ -11,12 +11,16 @@ import type {
   PendingEditsResult,
   FileDiffResult,
 } from './types';
+import type { UserPreferences, Patch } from '../ui/shared-types';
+import { defaultUserPreferences } from '../ui/shared-types';
 
 export type PagesApiState = {
   /** Active downloads currently in progress, keyed by download ID */
   activeDownloads: Record<number, ActiveDownloadInfo>;
   /** Pending file edits by chat ID, pushed in real-time */
   pendingEditsByChat: Record<string, FileDiffResult[]>;
+  /** User preferences (read-only sync) */
+  preferences: UserPreferences;
   // Current stagewise app runtime information
   appInfo: {
     baseName: string; // Base name (e.g., 'stagewise-dev', 'stagewise-prerelease', 'stagewise').
@@ -67,12 +71,17 @@ export type PagesApiContract = {
     acceptPendingEdit: (chatId: string, path: string) => Promise<void>;
     /** Reject a single pending edit by file path */
     rejectPendingEdit: (chatId: string, path: string) => Promise<void>;
+    /** Get current user preferences */
+    getPreferences: () => Promise<UserPreferences>;
+    /** Update user preferences by applying Immer patches */
+    updatePreferences: (patches: Patch[]) => Promise<void>;
   };
 };
 
 export const defaultState: PagesApiState = {
   activeDownloads: {},
   pendingEditsByChat: {},
+  preferences: defaultUserPreferences,
   appInfo: {
     baseName: __APP_BASE_NAME__,
     name: __APP_NAME__,

@@ -26,7 +26,8 @@
     "@libsql/client": "^0.15.15",
     "chokidar": "^4.0.3",
     "electron-squirrel-startup": "^1.0.1",
-    "electron-unhandled": "^5.0.0"
+    "electron-unhandled": "^5.0.0",
+    "immer": "^10.2.0"
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "3.0.7",

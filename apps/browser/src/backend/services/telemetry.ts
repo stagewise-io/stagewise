@@ -2,9 +2,9 @@ import { PostHog } from 'posthog-node';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { withTracing } from '@posthog/ai';
 import type { IdentifierService } from './identifier';
-import type { GlobalConfigService } from './global-config';
+import type { PreferencesService } from './preferences';
 import type {
-  GlobalConfig,
+  TelemetryLevel,
   OpenFilesInIde,
 } from '@shared/karton-contracts/ui/shared-types';
 import type { Logger } from './logger';
@@ -123,19 +123,19 @@ export interface UserProperties {
 
 export class TelemetryService extends DisposableService {
   private readonly identifierService: IdentifierService;
-  private readonly globalConfigService: GlobalConfigService;
+  private readonly preferencesService: PreferencesService;
   private readonly logger: Logger;
   private userProperties: UserProperties = {};
   public posthogClient: PostHog;
 
   public constructor(
     identifierService: IdentifierService,
-    globalConfigService: GlobalConfigService,
+    preferencesService: PreferencesService,
     logger: Logger,
   ) {
     super();
     this.identifierService = identifierService;
-    this.globalConfigService = globalConfigService;
+    this.preferencesService = preferencesService;
     this.logger = logger;
     const apiKey = process.env.POSTHOG_API_KEY ?? '';
     this.posthogClient = new PostHog(apiKey, {
@@ -143,19 +143,31 @@ export class TelemetryService extends DisposableService {
       flushAt: 1,
       flushInterval: 0,
       disabled:
-        this.globalConfigService.get().telemetryLevel === 'off' ||
+        this.getTelemetryLevel() === 'off' ||
         process.env.POSTHOG_API_KEY === undefined,
     });
 
     this.identifyUser();
 
-    this.globalConfigService.addConfigUpdatedListener(
-      (newConfig, oldConfig) => {
-        this.onConfigUpdate(newConfig, oldConfig);
-      },
-    );
+    this.preferencesService.addListener((newPrefs, oldPrefs) => {
+      if (newPrefs.privacy.telemetryLevel !== oldPrefs.privacy.telemetryLevel) {
+        this.logger.debug(
+          `[TelemetryService] Detected change to telemetry level.`,
+        );
+        this.capture('cli-telemetry-config-set', {
+          configured_level: newPrefs.privacy.telemetryLevel,
+        });
+      }
+    });
 
     logger.debug('[TelemetryService] Telemetry initialized');
+  }
+
+  /**
+   * Get the current telemetry level from preferences.
+   */
+  private getTelemetryLevel(): TelemetryLevel {
+    return this.preferencesService.get().privacy.telemetryLevel;
   }
 
   setUserProperties(properties: UserProperties): void {
@@ -163,8 +175,7 @@ export class TelemetryService extends DisposableService {
   }
 
   private getDistinctId(): string {
-    return this.globalConfigService.get().telemetryLevel === 'full' &&
-      this.userProperties.user_id
+    return this.getTelemetryLevel() === 'full' && this.userProperties.user_id
       ? this.userProperties.user_id
       : this.identifierService.getMachineId();
   }
@@ -173,7 +184,7 @@ export class TelemetryService extends DisposableService {
     if (
       this.userProperties.user_id &&
       this.userProperties.user_email &&
-      this.globalConfigService.get().telemetryLevel === 'full'
+      this.getTelemetryLevel() === 'full'
     ) {
       this.logger.debug('[TelemetryService] Identifying user...');
       this.posthogClient.identify({
@@ -197,7 +208,7 @@ export class TelemetryService extends DisposableService {
     model: LanguageModelV3,
     properties?: Parameters<typeof withTracing>[2],
   ): LanguageModelV3 {
-    const telemetryLevel = this.globalConfigService.get().telemetryLevel;
+    const telemetryLevel = this.getTelemetryLevel();
     if (telemetryLevel !== 'full') return model;
 
     const distinctId = this.getDistinctId();
@@ -235,7 +246,7 @@ export class TelemetryService extends DisposableService {
       this.logger.debug(
         `[TelemetryService] Capturing event: ${eventName} with properties: ${JSON.stringify(properties)}`,
       );
-      const telemetryLevel = this.globalConfigService.get().telemetryLevel;
+      const telemetryLevel = this.getTelemetryLevel();
 
       // Special case: always send telemetry config events even when turning off
       const isLevelConfigEvent = eventName === 'cli-telemetry-config-set';
@@ -272,7 +283,7 @@ export class TelemetryService extends DisposableService {
     error: Error,
     properties?: Record<string, any>,
   ): void {
-    const telemetryLevel = this.globalConfigService.get().telemetryLevel;
+    const telemetryLevel = this.getTelemetryLevel();
     if (telemetryLevel === 'off') return;
     const distinctId = this.getDistinctId();
 
@@ -293,20 +304,5 @@ export class TelemetryService extends DisposableService {
       }
     }
     this.logger.debug('[TelemetryService] Teardown complete');
-  }
-
-  async onConfigUpdate(
-    newConfig: GlobalConfig,
-    oldConfig: GlobalConfig | null,
-  ) {
-    // If the new telemetry level is different from the current one, capture an event.
-    if (newConfig.telemetryLevel !== oldConfig?.telemetryLevel) {
-      this.logger.debug(
-        `[TelemetryService] Detected change to telemetry level.`,
-      );
-      this.capture('cli-telemetry-config-set', {
-        configured_level: newConfig.telemetryLevel,
-      });
-    }
   }
 }
