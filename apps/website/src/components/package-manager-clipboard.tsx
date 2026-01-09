@@ -50,7 +50,7 @@ export function PackageManagerClipboard() {
   };
 
   return (
-    <div className="glass-body relative flex w-fit items-center gap-2 rounded-full bg-white/60 p-2 transition-all duration-200 dark:bg-zinc-900/60">
+    <div className="relative flex w-fit items-center gap-2 rounded-lg bg-zinc-100 p-2 transition-all duration-200 dark:bg-zinc-800">
       {/* Dropdown for package manager selection */}
       <div className="relative">
         <Menu>
@@ -79,10 +79,10 @@ export function PackageManagerClipboard() {
         </Menu>
       </div>
 
-      {/* Code sample in inner glass-inset box */}
+      {/* Code sample */}
       <button
         type="button"
-        className="glass-inset glass-body-motion glass-body-motion-interactive !shadow-none flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-4 py-2 transition-all duration-200"
+        className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md bg-white px-4 py-2 transition-all duration-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800"
         onClick={handleCopy}
         aria-label="Copy to clipboard"
       >

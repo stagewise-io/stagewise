@@ -3,18 +3,16 @@
 import { AnimatedGradientBackground } from '@/components/landing/animated-gradient-background';
 import { Logo } from '@/components/landing/logo';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
-import {
-  Menu,
-  MenuTrigger,
-  MenuContent,
-  MenuItem,
-} from '@stagewise/stage-ui/components/menu';
+
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { MenuIcon, XIcon, Share2, UserCog } from 'lucide-react';
+import { MenuIcon, XIcon } from 'lucide-react';
+import {
+  IconUserSettingsFillDuo18,
+  IconDownload4FillDuo18,
+} from 'nucleo-ui-fill-duo-18';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
-import { SiDiscord, SiX, SiGithub } from 'react-icons/si';
+import { useState, useEffect } from 'react';
 
 function NavbarButton({
   children,
@@ -29,8 +27,7 @@ function NavbarButton({
     <Link
       href={href}
       className={cn(
-        buttonVariants({ variant: 'ghost', size: 'lg' }),
-        'rounded-full px-5 font-normal text-muted-foreground hover:bg-zinc-500/5',
+        buttonVariants({ variant: 'ghost', size: 'md' }),
         isActive && 'font-semibold text-foreground',
       )}
     >
@@ -41,19 +38,50 @@ function NavbarButton({
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string>('#');
+  const [isMobile, setIsMobile] = useState(false);
+  const [isOsSupported, setIsOsSupported] = useState(true);
+
+  // Detect user OS and set download URL
+  useEffect(() => {
+    const platform = navigator.platform.toLowerCase();
+    const userAgent = navigator.userAgent.toLowerCase();
+
+    // Detect mobile devices
+    const mobileCheck =
+      /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
+        userAgent,
+      );
+    setIsMobile(mobileCheck);
+
+    if (platform.includes('mac') || userAgent.includes('mac')) {
+      setDownloadUrl(
+        'https://dl.stagewise.io/download/stagewise/beta/macos/arm64',
+      );
+    } else if (platform.includes('win') || userAgent.includes('win')) {
+      setDownloadUrl('https://dl.stagewise.io/download/stagewise/beta/win/x64');
+    } else if (platform.includes('linux') || userAgent.includes('linux')) {
+      setDownloadUrl(
+        'https://dl.stagewise.io/download/stagewise/beta/linux/deb/x86_64',
+      );
+    } else {
+      setIsOsSupported(false);
+    }
+  }, []);
 
   return (
-    <div className="-translate-x-1/2 fixed top-4 left-1/2 z-50 w-full px-4 sm:w-fit">
+    <div className="fixed top-0 left-0 z-50 flex w-full justify-center bg-zinc-50 dark:bg-zinc-950">
       <div
         className={cn(
-          'glass-body z-50 flex h-14 w-full max-w-2xl flex-col items-start justify-between gap-2 overflow-hidden rounded-3xl bg-white/60 p-2 shadow-black/5 shadow-xl backdrop-blur-md transition-all duration-150 ease-out sm:h-14 sm:w-fit sm:flex-row sm:items-center sm:rounded-full dark:bg-zinc-900/60 dark:shadow-white/5',
-          isOpen && 'h-[calc-size(auto,size)] h-auto',
+          'z-50 flex h-14 w-full max-w-6xl flex-col items-start justify-between gap-2 overflow-hidden px-4 py-3 transition-all duration-150 ease-out sm:h-14 sm:flex-row sm:items-center sm:py-0',
+          isOpen &&
+            'h-[calc-size(auto,size)] h-auto border-zinc-200 border-b shadow-sm dark:border-zinc-800',
         )}
       >
         <div className="flex w-full items-center justify-between sm:w-24">
           <Link
             href="/"
-            className="relative size-10 scale-100 cursor-pointer overflow-hidden rounded-full shadow-lg ring-1 ring-black/20 ring-inset"
+            className="relative size-10 scale-100 cursor-pointer overflow-hidden rounded-full shadow-md ring-1 ring-black/20 ring-inset"
           >
             <AnimatedGradientBackground className="absolute inset-0 size-full" />
             <Logo
@@ -74,71 +102,33 @@ export function Navbar() {
             )}
           </Button>
         </div>
-        <div className="flex flex-1 flex-col items-start justify-start sm:flex-row sm:items-center">
-          <NavbarButton href="/">Home</NavbarButton>
-          <NavbarButton href="/pricing">
-            <span>Pricing</span>
-            <span className="ml-1 rounded-full bg-primary px-2 py-0.5 font-medium text-primary-foreground text-xs">
-              New
-            </span>
-          </NavbarButton>
+        <div className="flex flex-1 flex-col items-start justify-start sm:flex-row sm:items-center sm:justify-center">
+          <NavbarButton href="/pricing">Pricing</NavbarButton>
           <NavbarButton href="/docs">Docs</NavbarButton>
           <NavbarButton href="/news">News</NavbarButton>
         </div>
         <div className="flex flex-row items-center justify-end gap-2">
-          <Menu>
-            <MenuTrigger>
-              <Button size="icon-md" variant="secondary">
-                <Share2 className="size-4" />
-              </Button>
-            </MenuTrigger>
-            <MenuContent side="bottom" align="end">
-              <Link
-                href="https://x.com/stagewise_io"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full"
-              >
-                <MenuItem>
-                  <SiX className="size-4" />
-                  Follow on X
-                </MenuItem>
-              </Link>
-
-              <Link
-                href="https://discord.gg/gkdGsDYaKA"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full"
-              >
-                <MenuItem>
-                  <SiDiscord className="size-4" />
-                  Join Discord
-                </MenuItem>
-              </Link>
-
-              <Link
-                href="https://github.com/stagewise-io/stagewise"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full"
-              >
-                <MenuItem>
-                  <SiGithub className="size-4" />
-                  View on GitHub
-                </MenuItem>
-              </Link>
-            </MenuContent>
-          </Menu>
           <Link
             href="https://console.stagewise.io"
             className={buttonVariants({
-              size: 'icon-md',
-              variant: 'primary',
+              size: 'sm',
+              variant: 'secondary',
             })}
           >
-            <UserCog className="size-4" />
+            Account
+            <IconUserSettingsFillDuo18 className="size-4" />
           </Link>
+          {!isMobile && isOsSupported && (
+            <Link
+              href={downloadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonVariants({ size: 'sm', variant: 'primary' })}
+            >
+              Download
+              <IconDownload4FillDuo18 className="size-4" />
+            </Link>
+          )}
         </div>
       </div>
     </div>

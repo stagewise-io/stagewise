@@ -32,7 +32,7 @@ export function Clipboard({
     <button
       type="button"
       className={cn(
-        'glass-body glass-body-interactive glass-body-motion glass-body-motion-interactive mb-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-white/60 p-4 pr-6 transition-all duration-200 active:scale-95 sm:w-auto dark:bg-zinc-900/60',
+        'mb-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-zinc-100 p-4 pr-6 transition-all duration-200 hover:bg-zinc-200 active:scale-95 sm:w-auto dark:bg-zinc-800 dark:hover:bg-zinc-700',
         className,
       )}
       onClick={handleCopy}
