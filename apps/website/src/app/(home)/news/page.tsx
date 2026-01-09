@@ -26,11 +26,13 @@ export default function BlogPage() {
   const posts = news.getPages();
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-12 px-4">
+    <div className="relative mx-auto w-full max-w-6xl px-4">
       <ScrollReveal>
-        <div className="flex flex-col items-center gap-4 text-center">
-          <h1 className="bg-gradient-to-tr from-zinc-900 via-zinc-700 to-black bg-clip-text font-bold text-3xl text-transparent tracking-tight md:text-5xl dark:from-zinc-100 dark:via-zinc-300 dark:to-white">
-            Newsroom
+        <div className="mb-12 flex flex-col items-start gap-4 text-left">
+          <h1 className="font-medium text-3xl tracking-tight md:text-5xl">
+            <span className="bg-gradient-to-br from-zinc-800 via-zinc-900 to-black bg-clip-text text-transparent dark:from-zinc-100 dark:via-zinc-300 dark:to-white">
+              Newsroom
+            </span>
           </h1>
           <p className="text-lg text-zinc-600 dark:text-zinc-400">
             Find out what we're up to, what we're thinking, and what we're doing
@@ -42,7 +44,7 @@ export default function BlogPage() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Y Combinator page of stagewise"
-              className="glass-body glass-body-motion glass-body-interactive glass-body-motion-interactive flex size-6 items-center justify-center rounded-sm bg-[#F26625] text-sm text-white"
+              className="flex size-6 items-center justify-center rounded-sm bg-[#F26625] text-sm text-white transition-opacity hover:opacity-80"
             >
               Y
             </Link>
@@ -51,7 +53,7 @@ export default function BlogPage() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="LinkedIn page of stagewise"
-              className="glass-body glass-body-motion glass-body-interactive glass-body-motion-interactive flex size-6 items-center justify-center rounded-sm bg-[#0b66c2] font-bold text-sm text-white"
+              className="flex size-6 items-center justify-center rounded-sm bg-[#0b66c2] font-bold text-sm text-white transition-opacity hover:opacity-80"
             >
               in
             </Link>
@@ -60,14 +62,14 @@ export default function BlogPage() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="X page of stagewise"
-              className="glass-body glass-body-motion glass-body-interactive glass-body-motion-interactive flex size-6 items-center justify-center rounded-sm bg-black text-sm text-white dark:bg-zinc-800"
+              className="flex size-6 items-center justify-center rounded-sm bg-black text-sm text-white transition-opacity hover:opacity-80 dark:bg-zinc-800"
             >
               𝕏
             </Link>
           </div>
         </div>
       </ScrollReveal>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 md:ml-24">
         {posts
           .sort(
             (a, b) =>
@@ -76,7 +78,7 @@ export default function BlogPage() {
           .map((post, index) => (
             <ScrollReveal key={post.path} delay={200 + index * 100}>
               <Link href={post.url}>
-                <div className="glass-body glass-body-motion glass-body-interactive glass-body-motion-interactive flex w-full flex-col items-start justify-center gap-1 rounded-xl bg-white/80 p-4 dark:bg-zinc-900/80">
+                <div className="flex w-full flex-col items-start justify-center gap-1 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800">
                   <p className="font-semibold text-xl text-zinc-900 tracking-tight dark:text-white">
                     {post.data.title}
                   </p>

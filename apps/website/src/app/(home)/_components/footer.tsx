@@ -1,33 +1,35 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+
 import { ExternalLink } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
-import StagewiseLogo from '../../logo.svg';
-import StagewiseLogoWhite from '../../logo-white.svg';
 
 export function Footer() {
   const posthog = usePostHog();
   return (
-    <footer className="container relative z-10 mx-auto border-zinc-200 border-t px-4 py-12 dark:border-zinc-800">
+    <footer className="relative z-10 mx-auto w-full max-w-6xl px-4 py-12">
       <div className="flex flex-col items-center justify-between md:flex-row">
         <div className="mb-4 flex items-center gap-2 md:mb-0">
-          <Image
-            src={StagewiseLogo}
-            alt="stagewise Logo"
-            height={32}
-            className="dark:hidden"
-          />
-          <Image
-            src={StagewiseLogoWhite}
-            alt="stagewise Logo"
-            height={32}
-            className="hidden dark:block"
-          />
-          <span className="ml-8 text-sm text-zinc-600 dark:text-zinc-500">
-            © 2025 stagewise GmbH
+          <span className="text-sm text-zinc-600 dark:text-zinc-500">
+            © {new Date().getFullYear()} stagewise GmbH
           </span>
+          <span className="text-zinc-400 dark:text-zinc-600">·</span>
+          <a
+            href="https://www.ycombinator.com/companies/stagewise"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center text-sm text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-300"
+            onClick={() =>
+              posthog?.capture('footer_link_click', { destination: 'yc' })
+            }
+          >
+            Backed by{' '}
+            <span className="mx-1 inline-flex size-4 items-center justify-center bg-[#f26622] font-normal text-white text-xs">
+              Y
+            </span>
+            <span className="font-normal text-[#f26622]">Combinator</span>
+          </a>
         </div>
         <div className="flex gap-8">
           <Link
@@ -79,7 +81,7 @@ export function Footer() {
           <br />
           Unauthorized use is prohibited.
         </p>
-        <div className="mt-4 flex gap-4 md:mt-0">
+        <div className="mt-4 flex flex-col items-end gap-2 md:mt-0">
           <Link
             href="/terms"
             className="text-xs text-zinc-500 hover:underline dark:text-zinc-400"
