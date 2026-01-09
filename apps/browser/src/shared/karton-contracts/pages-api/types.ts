@@ -283,6 +283,14 @@ export type {
   AddSearchEngineInput,
 } from '../ui/shared-types';
 
+// Re-export home page types from UI contract
+export type {
+  InspirationWebsite,
+  RecentlyOpenedWorkspace,
+  StoredExperienceData,
+  WorkspaceStatus,
+} from '../ui';
+
 /** Result of adding a search engine */
 export type AddSearchEngineResult =
   | { success: true; id: number }

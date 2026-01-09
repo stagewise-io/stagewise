@@ -646,6 +646,21 @@ export async function main({
     globalDataPathService,
   );
 
+  // Wire up home page services - bidirectional connection between services
+  _userExperienceService.setPagesService(pagesService);
+  pagesService.setUserExperienceService(_userExperienceService);
+  pagesService.setOpenWorkspaceHandler(async (path?: string) => {
+    try {
+      // Unload current workspace first if one is loaded
+      if (workspaceManagerService.workspace) {
+        await workspaceManagerService.unloadWorkspace();
+      }
+      await workspaceManagerService.loadWorkspace(path);
+    } catch (error) {
+      logger.error(`[Main] Failed to open workspace: ${error}`);
+    }
+  });
+
   const agentService = await AgentService.create(
     logger,
     telemetryService,

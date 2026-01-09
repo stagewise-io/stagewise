@@ -112,7 +112,8 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
 
     // Update local URL when tab URL changes
     useEffect(() => {
-      if (tab?.url === 'ui-main') {
+      // Show empty URL bar for the home page
+      if (tab?.url === 'stagewise://internal/home') {
         setLocalUrl('');
         setUrlBeforeEdit('');
       } else {
@@ -123,10 +124,14 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
       setIsUrlInputFocused(false);
     }, [tab?.url]);
 
-    // Check if URL is a stagewise://internal/ URL
-    const isStagewiseInternalUrl = useMemo(() => {
+    // Check if URL is a stagewise://internal/ URL (but not the home page)
+    const showBreadcrumbs = useMemo(() => {
       const url = tab?.url ?? '';
-      return url.startsWith('stagewise://internal/');
+      // Show breadcrumbs for internal pages except the home page
+      return (
+        url.startsWith('stagewise://internal/') &&
+        url !== 'stagewise://internal/home'
+      );
     }, [tab?.url]);
 
     const handleBreadcrumbClick = useCallback(() => {
@@ -175,7 +180,7 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
 
     return (
       <div className="relative flex flex-1 items-center rounded-full bg-zinc-500/5 pr-5 pl-3 focus-within:bg-zinc-500/10">
-        {!isUrlInputFocused && isStagewiseInternalUrl && tab?.url ? (
+        {!isUrlInputFocused && showBreadcrumbs && tab?.url ? (
           <InternalPageBreadcrumbs
             url={tab.url}
             onFocusInput={handleBreadcrumbClick}

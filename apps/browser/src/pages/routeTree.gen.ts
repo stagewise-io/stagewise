@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as HomeRouteImport } from './routes/home'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as DownloadsRouteImport } from './routes/downloads'
 import { Route as ClearDataRouteImport } from './routes/clear-data'
@@ -20,6 +21,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DiffReviewChatIdRouteImport } from './routes/diff-review.$chatId'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
+const HomeRoute = HomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/clear-data': typeof ClearDataRoute
   '/downloads': typeof DownloadsRoute
   '/history': typeof HistoryRoute
+  '/home': typeof HomeRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
 }
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/clear-data': typeof ClearDataRoute
   '/downloads': typeof DownloadsRoute
   '/history': typeof HistoryRoute
+  '/home': typeof HomeRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
 }
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/clear-data': typeof ClearDataRoute
   '/downloads': typeof DownloadsRoute
   '/history': typeof HistoryRoute
+  '/home': typeof HomeRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
 }
@@ -119,6 +128,7 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
+    | '/home'
     | '/auth/callback'
     | '/diff-review/$chatId'
   fileRoutesByTo: FileRoutesByTo
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
+    | '/home'
     | '/auth/callback'
     | '/diff-review/$chatId'
   id:
@@ -143,6 +154,7 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
+    | '/home'
     | '/auth/callback'
     | '/diff-review/$chatId'
   fileRoutesById: FileRoutesById
@@ -156,12 +168,20 @@ export interface RootRouteChildren {
   ClearDataRoute: typeof ClearDataRoute
   DownloadsRoute: typeof DownloadsRoute
   HistoryRoute: typeof HistoryRoute
+  HomeRoute: typeof HomeRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   DiffReviewChatIdRoute: typeof DiffReviewChatIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/home': {
+      id: '/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof HomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/history': {
       id: '/history'
       path: '/history'
@@ -244,6 +264,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClearDataRoute: ClearDataRoute,
   DownloadsRoute: DownloadsRoute,
   HistoryRoute: HistoryRoute,
+  HomeRoute: HomeRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   DiffReviewChatIdRoute: DiffReviewChatIdRoute,
 }

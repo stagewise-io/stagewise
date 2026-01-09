@@ -178,8 +178,9 @@ function TabContent({
 
   const shouldHideCloseButton = useMemo(() => {
     const isOnlyTab = Object.keys(tabs).length === 1;
-    const isNewTabPage = tabState.url === 'ui-main';
-    return isOnlyTab && isNewTabPage;
+    const isInternalPage =
+      tabState.url?.startsWith('stagewise://internal/') ?? false;
+    return isOnlyTab && isInternalPage;
   }, [tabs, tabState.url]);
   const content = (
     <>

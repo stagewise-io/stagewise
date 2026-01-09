@@ -170,7 +170,7 @@ export function CoreHotkeyBindings({
     const homeUrl =
       newTabPagePreference.type === 'custom' && newTabPagePreference.customUrl
         ? newTabPagePreference.customUrl
-        : 'ui-main';
+        : 'stagewise://internal/home';
     goto(homeUrl, activeTabId);
   }, HotkeyActions.CMD_SHIFT_H);
 

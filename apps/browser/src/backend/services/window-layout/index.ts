@@ -253,7 +253,7 @@ export class WindowLayoutService extends DisposableService {
     const initialUrl =
       startupPage.type === 'custom' && startupPage.customUrl
         ? startupPage.customUrl
-        : 'ui-main';
+        : 'stagewise://internal/home';
 
     // Create initial tab with the appropriate URL
     this.createTab(initialUrl, true);
@@ -333,7 +333,7 @@ export class WindowLayoutService extends DisposableService {
     const shouldReuseActiveTab =
       this.activeTab &&
       Object.keys(this.tabs).length === 1 &&
-      this.activeTab.getState().url === 'ui-main' &&
+      this.activeTab.getState().url === 'stagewise://internal/home' &&
       !this.activeTab.getState().navigationHistory.canGoBack;
 
     if (shouldReuseActiveTab) {
@@ -351,6 +351,7 @@ export class WindowLayoutService extends DisposableService {
 
   private setupKartonConnectionListener() {
     this.kartonConnectListener = (event, connectionId) => {
+      // 'ui-main' is the Karton client ID for the main UI renderer (different from the tab URL)
       if (connectionId === 'ui-main') {
         this.uiKarton.setTransportPort(event.ports[0]);
       } else if (connectionId === 'tab') {
@@ -490,11 +491,11 @@ export class WindowLayoutService extends DisposableService {
           targetUrl = customUrl;
         } else {
           // Custom type but no URL configured - fall back to home
-          targetUrl = 'ui-main';
+          targetUrl = 'stagewise://internal/home';
         }
       } else {
         // Type is 'home' - use the start page
-        targetUrl = 'ui-main';
+        targetUrl = 'stagewise://internal/home';
       }
     }
 
@@ -697,7 +698,7 @@ export class WindowLayoutService extends DisposableService {
           const initialUrl =
             newTabPage.type === 'custom' && newTabPage.customUrl
               ? newTabPage.customUrl
-              : 'ui-main';
+              : 'stagewise://internal/home';
           await this.createTab(initialUrl, true);
         }
       }

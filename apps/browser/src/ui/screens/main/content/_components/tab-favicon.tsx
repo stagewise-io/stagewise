@@ -6,9 +6,7 @@ import { Loader2Icon } from 'lucide-react';
 
 export function TabFavicon({ tabState }: { tabState: TabState }) {
   const isStagewisePage = useMemo(
-    () =>
-      tabState?.url === 'ui-main' ||
-      tabState?.url.startsWith('stagewise://internal/'),
+    () => tabState?.url?.startsWith('stagewise://internal/') ?? false,
     [tabState?.url],
   );
 

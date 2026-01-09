@@ -55,11 +55,6 @@ const baseState: Partial<AppState> = {
     selectedModel: availableModels[0],
   },
   userExperience: {
-    inspirationWebsites: {
-      websites: [],
-      total: 0,
-      seed: '',
-    },
     storedExperienceData: {
       recentlyOpenedWorkspaces: [],
       hasSeenOnboardingFlow: false,

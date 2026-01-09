@@ -1,62 +1,179 @@
+import { createFileRoute } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useKartonProcedure,
+  useKartonState,
+  useKartonConnected,
+} from '@/hooks/use-karton';
 import type {
   InspirationWebsite,
   RecentlyOpenedWorkspace,
-} from '@shared/karton-contracts/ui';
-import { LogoWithText } from '@/components/ui/logo-with-text';
-import { cn } from '@/utils';
-import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
-import { useIsContainerScrollable } from '@/hooks/use-is-container-scrollable';
-import { IconDocFolder, IconCircleQuestion } from 'nucleo-glass';
-import { IconPlusFill18 } from 'nucleo-ui-fill-18';
+} from '@shared/karton-contracts/pages-api/types';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
-import { TextSlideshow } from '@/components/ui/text-slideshow';
-
-import TimeAgo from 'react-timeago';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { IconChevronDown } from 'nucleo-micro-bold';
+import { IconDocFolder, IconCircleQuestion } from 'nucleo-glass';
+import { IconPlusFill18 } from 'nucleo-ui-fill-18';
+import TimeAgo from 'react-timeago';
+import { cn } from '@/utils';
+import { Logo } from '@ui/components/ui/logo';
+import { AnimatedGradientBackground } from '@ui/components/ui/animated-gradient-background';
 
-interface StartPageProps {
-  tabId: string;
+export const Route = createFileRoute('/home')({
+  component: HomePage,
+  head: () => ({
+    meta: [
+      {
+        title: 'Home',
+      },
+    ],
+  }),
+});
+
+// Text slideshow component for the inspiration section
+function TextSlideshow({
+  texts,
+  className,
+}: {
+  texts: string[];
+  className?: string;
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % texts.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [texts.length]);
+
+  return <span className={className}>{texts[currentIndex]}</span>;
 }
 
-export function StartPage({ tabId }: StartPageProps) {
-  const hasSeenOnboardingFlow = useKartonState(
-    (s) => s.userExperience.storedExperienceData.hasSeenOnboardingFlow,
+// Logo with text component
+function LogoWithText({ className }: { className?: string }) {
+  return (
+    <div className={cn('flex items-center gap-2', className)}>
+      <div className="glass-body -ml-0.5 flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full">
+        <AnimatedGradientBackground className="absolute inset-0 z-0 size-full" />
+        <Logo color="white" className="z-10 mr-px mb-px size-1/2 shadow-2xs" />
+      </div>
+      <span className="font-semibold text-foreground text-xl">stagewise</span>
+    </div>
   );
+}
+
+function HomePage() {
+  const isConnected = useKartonConnected();
+  const hasSeenOnboardingFlow = useKartonState(
+    (s) => s.homePage.storedExperienceData.hasSeenOnboardingFlow,
+  );
+
+  if (!isConnected) {
+    return (
+      <div className="flex size-full items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <LogoWithText />
+          <span className="text-muted-foreground text-sm">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex size-full flex-col items-center justify-center overflow-hidden bg-background">
       {!hasSeenOnboardingFlow ? (
         <OnboardingStartPage />
       ) : (
-        <StartPageWithConnectedWorkspace tabId={tabId} />
+        <StartPageWithConnectedWorkspace />
       )}
     </div>
   );
 }
 
-const StartPageWithConnectedWorkspace = ({ tabId }: { tabId: string }) => {
-  const inspirationWebsites = useKartonState(
-    (s) => s.userExperience.inspirationWebsites,
-  );
-  const goto = useKartonProcedure((p) => p.browser.goto);
-  const createTab = useKartonProcedure((p) => p.browser.createTab);
-  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
-  const loadMoreWebsites = useKartonProcedure(
-    (p) => p.userExperience.inspiration.loadMore,
+function StartPageWithConnectedWorkspace() {
+  const openTab = useKartonProcedure((p) => p.openTab);
+  const workspaceStatus = useKartonState((s) => s.homePage.workspaceStatus);
+  const getInspirationWebsites = useKartonProcedure(
+    (p) => p.getInspirationWebsites,
   );
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { canScrollLeft, canScrollRight } =
-    useIsContainerScrollable(scrollContainerRef);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const [leftFadeDistance, setLeftFadeDistance] = useState(0);
   const [rightFadeDistance, setRightFadeDistance] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Local state for inspiration websites (fetched on demand)
+  const [inspirationWebsites, setInspirationWebsites] =
+    useState<InspirationWebsite>({
+      websites: [],
+      total: 0,
+      seed: '',
+    });
+
+  // Initial fetch of inspiration websites
+  useEffect(() => {
+    let cancelled = false;
+    getInspirationWebsites({ offset: 0, limit: 10 }).then((result) => {
+      if (!cancelled) {
+        setInspirationWebsites(result);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [getInspirationWebsites]);
+
+  // Load more websites
+  const loadMoreWebsites = useCallback(async () => {
+    if (isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const result = await getInspirationWebsites({
+        offset: inspirationWebsites.websites.length,
+        limit: 10,
+      });
+      setInspirationWebsites((prev) => ({
+        websites: [...prev.websites, ...result.websites],
+        total: result.total,
+        seed: result.seed,
+      }));
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [
+    getInspirationWebsites,
+    inspirationWebsites.websites.length,
+    isLoadingMore,
+  ]);
+
+  // Check scroll state
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const updateScrollState = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = container;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 1);
+    };
+
+    updateScrollState();
+    container.addEventListener('scroll', updateScrollState);
+    const resizeObserver = new ResizeObserver(updateScrollState);
+    resizeObserver.observe(container);
+
+    return () => {
+      container.removeEventListener('scroll', updateScrollState);
+      resizeObserver.disconnect();
+    };
+  }, [inspirationWebsites.websites.length]);
 
   useEffect(() => {
     setLeftFadeDistance(canScrollLeft ? 32 : 0);
@@ -74,10 +191,7 @@ const StartPageWithConnectedWorkspace = ({ tabId }: { tabId: string }) => {
       const isNearEnd = scrollLeft + clientWidth >= scrollWidth - 400;
 
       if (isNearEnd && !isLoadingMore && hasMoreWebsites) {
-        setIsLoadingMore(true);
-        loadMoreWebsites().finally(() => {
-          setIsLoadingMore(false);
-        });
+        loadMoreWebsites();
       }
     };
 
@@ -110,21 +224,16 @@ const StartPageWithConnectedWorkspace = ({ tabId }: { tabId: string }) => {
     (url: string, event?: React.MouseEvent) => {
       // Check if CMD (Mac) or CTRL (Windows/Linux) is pressed
       const isModifierPressed = event?.metaKey || event?.ctrlKey;
-
-      if (isModifierPressed) {
-        // Open in new background tab
-        createTab(url, false);
-      } else {
-        // Navigate current tab
-        goto(url, tabId);
-      }
+      // Open in new tab (background if modifier pressed)
+      openTab(url, !isModifierPressed);
     },
-    [tabId, goto, createTab],
+    [openTab],
   );
+
   return (
     <div className="flex w-full max-w-6xl flex-col items-start gap-8 px-20">
       <div className="flex items-center gap-2">
-        <LogoWithText className="h-10 text-foreground" />
+        <LogoWithText />
         <div className="glass-body ml-1 @[350px]:inline-flex hidden h-fit shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
           Alpha
         </div>
@@ -180,22 +289,22 @@ const StartPageWithConnectedWorkspace = ({ tabId }: { tabId: string }) => {
       )}
     </div>
   );
-};
+}
 
-const OnboardingStartPage = () => {
-  const openWorkspace = useKartonProcedure((p) => p.workspace.open);
+function OnboardingStartPage() {
+  const openWorkspace = useKartonProcedure((p) => p.openWorkspace);
   const setHasSeenOnboardingFlow = useKartonProcedure(
-    (p) => p.userExperience.storedExperienceData.setHasSeenOnboardingFlow,
+    (p) => p.setHasSeenOnboardingFlow,
   );
+
   const selectAndOpenWorkspace = useCallback(async () => {
     await openWorkspace(undefined);
-    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
   }, [openWorkspace]);
 
   return (
     <div className="flex w-full max-w-2xl flex-col items-start gap-4 px-10">
       <div className="flex items-center gap-2">
-        <LogoWithText className="h-10 text-foreground" />
+        <LogoWithText />
         <div className="glass-body ml-1 @[350px]:inline-flex hidden h-fit shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
           Alpha
         </div>
@@ -243,15 +352,15 @@ const OnboardingStartPage = () => {
       </div>
     </div>
   );
-};
+}
 
-const RecentlyOpenedWorkspaceItem = ({
+function RecentlyOpenedWorkspaceItem({
   workspace,
   onClick,
 }: {
   workspace: RecentlyOpenedWorkspace;
   onClick?: () => void;
-}) => {
+}) {
   return (
     <div
       className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg p-2 pt-1 hover:bg-muted-foreground/5"
@@ -276,9 +385,9 @@ const RecentlyOpenedWorkspaceItem = ({
       </div>
     </div>
   );
-};
+}
 
-const DesignInspirationSkeletonCard = () => {
+function DesignInspirationSkeletonCard() {
   return (
     <div className="flex w-64 shrink-0 flex-col items-center overflow-hidden rounded-lg border border-border bg-card shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)]">
       <Skeleton className="h-40 w-full rounded-none" />
@@ -287,15 +396,15 @@ const DesignInspirationSkeletonCard = () => {
       </div>
     </div>
   );
-};
+}
 
-const DesignInspirationCard = ({
+function DesignInspirationCard({
   website,
   onClick,
 }: {
   website: InspirationWebsite['websites'][number];
   onClick: (event: React.MouseEvent) => void;
-}) => {
+}) {
   const [isHovered, setIsHovered] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
@@ -342,7 +451,7 @@ const DesignInspirationCard = ({
       <div className="relative h-40 w-full">
         {!isImageLoaded && <Skeleton className="h-40 w-full rounded-none" />}
         <img
-          src={website.screenshot_url}
+          src={website.screenshot_url ?? undefined}
           alt={websiteName}
           onLoad={() => setIsImageLoaded(true)}
           className={cn(
@@ -384,16 +493,15 @@ const DesignInspirationCard = ({
       </div>
     </div>
   );
-};
+}
 
-const ConnectWorkspaceBanner = () => {
-  const openWorkspace = useKartonProcedure((p) => p.workspace.open);
+function ConnectWorkspaceBanner() {
+  const openWorkspace = useKartonProcedure((p) => p.openWorkspace);
   const selectAndOpenWorkspace = useCallback(async () => {
     await openWorkspace(undefined);
-    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
   }, [openWorkspace]);
   const recentlyOpenedWorkspaces = useKartonState(
-    (s) => s.userExperience.storedExperienceData.recentlyOpenedWorkspaces,
+    (s) => s.homePage.storedExperienceData.recentlyOpenedWorkspaces,
   );
 
   const [showAllRecentlyOpenedWorkspaces, setShowAllRecentlyOpenedWorkspaces] =
@@ -498,4 +606,4 @@ const ConnectWorkspaceBanner = () => {
       </Button>
     </div>
   );
-};
+}

@@ -19,7 +19,7 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
   const reload = useKartonProcedure((p) => p.browser.reload);
   const stop = useKartonProcedure((p) => p.browser.stop);
 
-  const isStartPage = tab?.url === 'ui-main';
+  const isInternalPage = tab?.url?.startsWith('stagewise://internal/') ?? false;
   const isLoading = tab?.isLoading ?? false;
 
   return (
@@ -27,25 +27,25 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
       <Button
         variant="ghost"
         size="icon-sm"
-        disabled={isStartPage || !tab?.navigationHistory.canGoBack}
+        disabled={isInternalPage || !tab?.navigationHistory.canGoBack}
         onClick={() => {
           goBack(tabId);
         }}
       >
         <IconArrowLeft
-          className={`size-4 ${!isStartPage && tab?.navigationHistory.canGoBack ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+          className={`size-4 ${!isInternalPage && tab?.navigationHistory.canGoBack ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
         />
       </Button>
       <Button
         variant="ghost"
         size="icon-sm"
-        disabled={isStartPage || !tab?.navigationHistory.canGoForward}
+        disabled={isInternalPage || !tab?.navigationHistory.canGoForward}
         onClick={() => {
           goForward(tabId);
         }}
       >
         <IconArrowRight
-          className={`size-4 ${!isStartPage && tab?.navigationHistory.canGoForward ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+          className={`size-4 ${!isInternalPage && tab?.navigationHistory.canGoForward ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
         />
       </Button>
       {isLoading ? (
@@ -62,13 +62,13 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
         <Button
           variant="ghost"
           size="icon-sm"
-          disabled={isStartPage}
+          disabled={isInternalPage}
           onClick={() => {
             reload(tabId);
           }}
         >
           <IconArrowRotateAnticlockwise
-            className={`size-4 ${!isStartPage ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+            className={`size-4 ${!isInternalPage ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
           />
         </Button>
       )}

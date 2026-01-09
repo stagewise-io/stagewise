@@ -108,8 +108,8 @@ export function ChatPanelFooter() {
     return enableInputField && chatState.chatInput.trim().length > 2;
   }, [enableInputField, chatState]);
 
-  const hasOpenedStartPage = useMemo(() => {
-    return activeTab?.url === 'ui-main';
+  const hasOpenedInternalPage = useMemo(() => {
+    return activeTab?.url?.startsWith('stagewise://internal/') ?? false;
   }, [activeTab?.url]);
 
   const createChat = useKartonProcedure((p) => p.agentChat.create);
@@ -245,7 +245,7 @@ export function ChatPanelFooter() {
       } else if (
         !elementSelectionActive &&
         !isWorking &&
-        activeTab.url !== 'ui-main'
+        !activeTab?.url?.startsWith('stagewise://internal/')
       ) {
         // State 2: Sidebar open, element selection OFF, agent not working and *not* on the start page (start page doesn't allow element selection) → activate element selection
         setElementSelectionActive(true);
@@ -397,7 +397,7 @@ export function ChatPanelFooter() {
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    disabled={hasOpenedStartPage}
+                    disabled={hasOpenedInternalPage}
                     className="text-muted-foreground data-[element-selector-active=true]:bg-primary/5 data-[element-selector-active=true]:text-primary data-[element-selector-active=true]:hover:bg-primary/10"
                     data-element-selector-active={elementSelectionActive}
                     onClick={(e) => {

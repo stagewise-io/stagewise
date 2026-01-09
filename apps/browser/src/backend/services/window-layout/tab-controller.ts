@@ -725,12 +725,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   ): Promise<string | null> {
     const wc = this.webContentsView.webContents;
 
-    // Don't capture if webContents is unavailable
+    // Don't capture if webContents is unavailable or showing internal pages
     if (
       wc.isDestroyed() ||
       wc.isLoading() ||
       this.currentState.error !== null ||
-      this.currentState.url === 'ui-main'
+      this.currentState.url.startsWith('stagewise://internal/')
     ) {
       return null;
     }
@@ -1356,12 +1356,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private async captureScreenshot(): Promise<void> {
     const wc = this.webContentsView.webContents;
 
-    // Don't capture if webContents is destroyed, loading, or showing an error
+    // Don't capture if webContents is destroyed, loading, showing an error, or internal page
     if (
       wc.isDestroyed() ||
       wc.isLoading() ||
       this.currentState.error !== null ||
-      this.currentState.url === 'ui-main'
+      this.currentState.url.startsWith('stagewise://internal/')
     ) {
       return;
     }

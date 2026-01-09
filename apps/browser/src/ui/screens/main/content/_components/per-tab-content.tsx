@@ -22,7 +22,6 @@ import { Omnibox, type OmniboxRef } from './omnibox';
 import { ZoomBar } from './zoom-bar';
 import { SearchBar } from './search-bar';
 import { DownloadsControlButton } from './control-buttons/downloads';
-import { StartPage } from './start-page';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
 
 const ColorSchemeIcon = ({
@@ -82,8 +81,8 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
     const omniboxRef = useRef<OmniboxRef>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    const isStartPage = useMemo(() => {
-      return tab?.url === 'ui-main';
+    const isInternalPage = useMemo(() => {
+      return tab?.url?.startsWith('stagewise://internal/') ?? false;
     }, [tab?.url]);
 
     const colorScheme = tab?.colorScheme ?? 'system';
@@ -125,14 +124,16 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
               <Button
                 variant="ghost"
                 size="icon-sm"
-                disabled={isStartPage}
+                disabled={isInternalPage}
                 onClick={() => {
                   cycleColorScheme(tabId);
                 }}
               >
                 <ColorSchemeIcon
                   colorScheme={colorScheme}
-                  className={cn(isStartPage ? 'text-muted-foreground/40' : '')}
+                  className={cn(
+                    isInternalPage ? 'text-muted-foreground/40' : '',
+                  )}
                 />
               </Button>
             </TooltipTrigger>
@@ -143,7 +144,7 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
               <Button
                 variant="ghost"
                 size="icon-sm"
-                disabled={isStartPage}
+                disabled={isInternalPage}
                 onClick={() => {
                   toggleDevTools(tabId);
                 }}
@@ -154,7 +155,7 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
                     tab?.devToolsOpen
                       ? 'text-primary'
                       : 'text-muted-foreground',
-                    isStartPage ? 'text-muted-foreground/40' : '',
+                    isInternalPage ? 'text-muted-foreground/40' : '',
                   )}
                 />
               </Button>
@@ -180,16 +181,14 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
         {/* Content Area */}
         <div className="flex size-full flex-col gap-4 rounded-lg p-2">
           <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-sm shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] ring-1 ring-foreground/10">
-            {tab?.url === 'ui-main' ? (
-              isActive && <StartPage tabId={tabId} />
-            ) : tab?.error ? (
+            {tab?.error ? (
               <div>Error: {tab?.error?.message}</div>
             ) : (
               <div
                 id={`dev-app-preview-container-${tabId}`}
                 className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
               >
-                {isActive && <DOMContextSelector />}
+                {isActive && !isInternalPage && <DOMContextSelector />}
               </div>
             )}
           </div>

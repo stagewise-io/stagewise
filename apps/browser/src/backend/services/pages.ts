@@ -22,6 +22,7 @@ import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
 import type { DownloadsService } from './download-manager';
 import type { WebDataService } from './webdata';
+import type { UserExperienceService } from './experience';
 import type {
   HistoryFilter,
   HistoryResult,
@@ -34,6 +35,7 @@ import type {
   DownloadControlResult,
   PendingEditsResult,
   AddSearchEngineInput,
+  InspirationWebsite,
 } from '@shared/karton-contracts/pages-api/types';
 import { DisposableService } from './disposable';
 
@@ -79,6 +81,9 @@ export class PagesService extends DisposableService {
     authCode: string | undefined,
     error: string | undefined,
   ) => Promise<void>;
+  // Home page service dependencies
+  private userExperienceService?: UserExperienceService;
+  private openWorkspaceHandler?: (path?: string) => Promise<void>;
 
   private constructor(
     logger: Logger,
@@ -914,6 +919,49 @@ export class PagesService extends DisposableService {
         }
       },
     );
+
+    // Home page procedure handlers
+    this.kartonServer.registerServerProcedureHandler(
+      'getInspirationWebsites',
+      async (
+        _callingClientId: string,
+        params: { offset: number; limit: number },
+      ): Promise<InspirationWebsite> => {
+        if (!this.userExperienceService) {
+          this.logger.warn(
+            '[PagesService] getInspirationWebsites called but UserExperienceService not set',
+          );
+          return { websites: [], total: 0, seed: '' };
+        }
+        return this.userExperienceService.getInspirationWebsites(params);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'setHasSeenOnboardingFlow',
+      async (_callingClientId: string, value: boolean): Promise<void> => {
+        if (!this.userExperienceService) {
+          this.logger.warn(
+            '[PagesService] setHasSeenOnboardingFlow called but UserExperienceService not set',
+          );
+          return;
+        }
+        await this.userExperienceService.setHasSeenOnboardingFlow(value);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'openWorkspace',
+      async (_callingClientId: string, path?: string): Promise<void> => {
+        if (!this.openWorkspaceHandler) {
+          this.logger.warn(
+            '[PagesService] openWorkspace called but no handler is set',
+          );
+          return;
+        }
+        await this.openWorkspaceHandler(path);
+      },
+    );
   }
 
   /**
@@ -1049,6 +1097,24 @@ export class PagesService extends DisposableService {
   }
 
   /**
+   * Set the UserExperienceService for home page functionality.
+   * This should be called by main.ts after UserExperienceService is created.
+   */
+  public setUserExperienceService(service: UserExperienceService): void {
+    this.userExperienceService = service;
+  }
+
+  /**
+   * Set the handler for opening a workspace.
+   * This should be called by main.ts to wire up to WorkspaceManager.
+   */
+  public setOpenWorkspaceHandler(
+    handler: (path?: string) => Promise<void>,
+  ): void {
+    this.openWorkspaceHandler = handler;
+  }
+
+  /**
    * Sync preferences state to the Pages API Karton state.
    * Called by PreferencesService when preferences change.
    */
@@ -1095,6 +1161,24 @@ export class PagesService extends DisposableService {
   ): void {
     this.kartonServer.setState((draft) => {
       draft.pendingEditsByChat[chatId] = edits;
+    });
+  }
+
+  /**
+   * Sync home page state to the Pages API Karton state.
+   * Called by UserExperienceService when home page data changes.
+   */
+  public syncHomePageState(state: {
+    storedExperienceData?: PagesApiContract['state']['homePage']['storedExperienceData'];
+    workspaceStatus?: PagesApiContract['state']['homePage']['workspaceStatus'];
+  }): void {
+    this.kartonServer.setState((draft) => {
+      if (state.storedExperienceData !== undefined) {
+        draft.homePage.storedExperienceData = state.storedExperienceData;
+      }
+      if (state.workspaceStatus !== undefined) {
+        draft.homePage.workspaceStatus = state.workspaceStatus;
+      }
     });
   }
 
@@ -1159,6 +1243,9 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('addSearchEngine');
     this.kartonServer.removeServerProcedureHandler('removeSearchEngine');
     this.kartonServer.removeServerProcedureHandler('handleAuthCallback');
+    this.kartonServer.removeServerProcedureHandler('getInspirationWebsites');
+    this.kartonServer.removeServerProcedureHandler('setHasSeenOnboardingFlow');
+    this.kartonServer.removeServerProcedureHandler('openWorkspace');
 
     // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');
@@ -1172,6 +1259,8 @@ export class PagesService extends DisposableService {
     this.currentPort = undefined;
     this.openTabHandler = undefined;
     this.authCallbackHandler = undefined;
+    this.userExperienceService = undefined;
+    this.openWorkspaceHandler = undefined;
 
     await this.transport.close();
     this.logger.debug('[PagesService] Teardown complete');

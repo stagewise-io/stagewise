@@ -34,7 +34,7 @@ export function WithTabPreviewCard({
       <PreviewCardTrigger delay={10} closeDelay={10}>
         {children}
       </PreviewCardTrigger>
-      {tabState.url !== 'ui-main' && (
+      {!tabState.url?.startsWith('stagewise://internal/') && (
         <PreviewCardContent
           className="flex w-64 flex-col items-stretch gap-2"
           sideOffset={isActive ? 0 : 2}

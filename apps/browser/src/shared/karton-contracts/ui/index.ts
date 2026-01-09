@@ -338,7 +338,6 @@ export type AppState = {
   // State of the current user experience (getting started etc.)
   userExperience: {
     storedExperienceData: StoredExperienceData;
-    inspirationWebsites: InspirationWebsite;
     devAppPreview: {
       isFullScreen: boolean;
       inShowCodeMode: boolean;
@@ -490,12 +489,6 @@ export type KartonContract = {
             presetName: string;
           } | null,
         ) => Promise<void>;
-      };
-      inspiration: {
-        loadMore: () => Promise<void>;
-      };
-      storedExperienceData: {
-        setHasSeenOnboardingFlow: (value: boolean) => Promise<void>;
       };
     };
     filePicker: {
@@ -660,11 +653,6 @@ export const defaultState: KartonContract['state'] = {
     storedExperienceData: {
       recentlyOpenedWorkspaces: [],
       hasSeenOnboardingFlow: false,
-    },
-    inspirationWebsites: {
-      websites: [],
-      total: 0,
-      seed: '',
     },
     devAppPreview: {
       isFullScreen: false,

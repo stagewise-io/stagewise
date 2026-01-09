@@ -11,10 +11,12 @@ import {
   onboardingStateSchema,
   type StoredExperienceData,
   type RecentlyOpenedWorkspace,
+  type InspirationWebsite,
 } from '@shared/karton-contracts/ui';
 import type { KartonService } from './karton';
 import type { Logger } from './logger';
 import type { GlobalDataPathService } from './global-data-path';
+import type { PagesService } from './pages';
 import {
   type AppRouter,
   createNodeApiClient,
@@ -28,8 +30,14 @@ export class UserExperienceService extends DisposableService {
   private readonly logger: Logger;
   private readonly uiKarton: KartonService;
   private readonly globalDataPathService: GlobalDataPathService;
-  private inspirationWebsiteListOffset = 0;
-  private inspirationWebsiteListSeed = crypto.randomUUID();
+  private pagesService?: PagesService;
+  private inspirationSeed = crypto.randomUUID();
+  private cachedInspirationWebsites: InspirationWebsite = {
+    websites: [],
+    total: 0,
+    seed: '',
+  };
+  private inspirationFetchInProgress: Promise<InspirationWebsite> | null = null;
 
   private unAuthenticatedApiClient: TRPCClient<AppRouter> = createNodeApiClient(
     {
@@ -76,35 +84,6 @@ export class UserExperienceService extends DisposableService {
       this.boundHandleServiceStateChange,
     );
 
-    this.uiKarton.registerServerProcedureHandler(
-      'userExperience.storedExperienceData.setHasSeenOnboardingFlow',
-      async (_callingClientId: string, value: boolean) => {
-        void this.setHasSeenOnboardingFlow(value);
-      },
-    );
-
-    this.logger.debug(`[UserExperienceService] Loading inspiration websites`);
-    this.unAuthenticatedApiClient.inspiration.list
-      .query({
-        offset: this.inspirationWebsiteListOffset,
-        limit: 5,
-        seed: this.inspirationWebsiteListSeed,
-      })
-      .then((response) => {
-        this.logger.debug(
-          `[UserExperienceService] Loaded inspiration websites. Response: ${JSON.stringify(response)}`,
-        );
-        this.inspirationWebsiteListOffset += response.websites.length;
-        this.uiKarton.setState((draft) => {
-          draft.userExperience.inspirationWebsites = response;
-        });
-      })
-      .catch((error) => {
-        this.logger.error(
-          `[UserExperienceService] Failed to load inspiration websites. Error: ${error}`,
-        );
-      });
-
     void this.pruneRecentlyOpenedWorkspaces({
       maxAmount: 10,
       hasBeenOpenedBeforeDate: Date.now() - 1000 * 60 * 60 * 24 * 30, // 30 days ago
@@ -132,12 +111,6 @@ export class UserExperienceService extends DisposableService {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
-      'userExperience.inspiration.loadMore',
-      async (_callingClientId: string) => {
-        return this.loadMoreInspirationWebsites();
-      },
-    );
-    this.uiKarton.registerServerProcedureHandler(
       'userExperience.devAppPreview.toggleShowCodeMode',
       async (_callingClientId: string) => {
         this.uiKarton.setState((draft) => {
@@ -162,13 +135,7 @@ export class UserExperienceService extends DisposableService {
       this.boundHandleServiceStateChange,
     );
     this.uiKarton.removeServerProcedureHandler(
-      'userExperience.storedExperienceData.setHasSeenOnboardingFlow',
-    );
-    this.uiKarton.removeServerProcedureHandler(
       'userExperience.devAppPreview.changeScreenSize',
-    );
-    this.uiKarton.removeServerProcedureHandler(
-      'userExperience.inspiration.loadMore',
     );
     this.uiKarton.removeServerProcedureHandler(
       'userExperience.devAppPreview.toggleShowCodeMode',
@@ -193,33 +160,105 @@ export class UserExperienceService extends DisposableService {
         this.uiKarton.setState((draft) => {
           draft.userExperience.storedExperienceData = storedExperienceData;
         });
+        // Sync to pages API
+        this.syncHomePageStateToPagesService();
       });
     }
+
+    // Always sync workspace status changes to pages API
+    this.syncHomePageStateToPagesService();
   }
 
-  private async loadMoreInspirationWebsites() {
+  /**
+   * Get inspiration websites with pagination.
+   * Results are cached - will only fetch from API if we don't have enough cached data.
+   */
+  public async getInspirationWebsites(params: {
+    offset: number;
+    limit: number;
+  }): Promise<InspirationWebsite> {
+    const { offset, limit } = params;
+    const requestedEnd = offset + limit;
+    const cachedCount = this.cachedInspirationWebsites.websites.length;
+
+    // Check if we have enough cached data
+    if (
+      cachedCount >= requestedEnd ||
+      cachedCount >= this.cachedInspirationWebsites.total
+    ) {
+      // Return slice from cache
+      return {
+        websites: this.cachedInspirationWebsites.websites.slice(
+          offset,
+          requestedEnd,
+        ),
+        total: this.cachedInspirationWebsites.total,
+        seed: this.inspirationSeed,
+      };
+    }
+
+    // Need to fetch more - deduplicate concurrent requests
+    if (this.inspirationFetchInProgress) {
+      await this.inspirationFetchInProgress;
+      // After waiting, check cache again
+      return this.getInspirationWebsites(params);
+    }
+
+    // Fetch more websites from API
+    this.inspirationFetchInProgress = this.fetchMoreInspirationWebsites(
+      requestedEnd - cachedCount,
+    );
+    try {
+      await this.inspirationFetchInProgress;
+    } finally {
+      this.inspirationFetchInProgress = null;
+    }
+
+    // Return slice from updated cache
+    return {
+      websites: this.cachedInspirationWebsites.websites.slice(
+        offset,
+        requestedEnd,
+      ),
+      total: this.cachedInspirationWebsites.total,
+      seed: this.inspirationSeed,
+    };
+  }
+
+  /**
+   * Internal method to fetch more inspiration websites from API.
+   */
+  private async fetchMoreInspirationWebsites(
+    minCount: number,
+  ): Promise<InspirationWebsite> {
     try {
       const response =
         await this.unAuthenticatedApiClient.inspiration.list.query({
-          offset: this.inspirationWebsiteListOffset,
-          limit: 5,
-          seed: this.inspirationWebsiteListSeed,
+          offset: this.cachedInspirationWebsites.websites.length,
+          limit: Math.max(minCount, 10), // Fetch at least 10 at a time
+          seed: this.inspirationSeed,
         });
-      this.inspirationWebsiteListOffset += response.websites.length;
-      this.uiKarton.setState((draft) => {
-        draft.userExperience.inspirationWebsites = {
-          websites: [
-            ...draft.userExperience.inspirationWebsites.websites,
-            ...response.websites,
-          ],
-          total: response.total,
-          seed: this.inspirationWebsiteListSeed,
-        };
-      });
+
+      this.cachedInspirationWebsites = {
+        websites: [
+          ...this.cachedInspirationWebsites.websites,
+          ...response.websites,
+        ],
+        total: response.total,
+        seed: this.inspirationSeed,
+      };
+
+      this.logger.debug(
+        `[UserExperienceService] Fetched ${response.websites.length} inspiration websites, total cached: ${this.cachedInspirationWebsites.websites.length}`,
+      );
+
+      return this.cachedInspirationWebsites;
     } catch (error) {
       this.logger.error(
-        `[UserExperienceService] Failed to load more inspiration websites. Error: ${error}`,
+        `[UserExperienceService] Failed to fetch inspiration websites: ${error}`,
       );
+      // Return current cache even on error
+      return this.cachedInspirationWebsites;
     }
   }
 
@@ -309,6 +348,8 @@ export class UserExperienceService extends DisposableService {
       this.uiKarton.setState((draft) => {
         draft.userExperience.storedExperienceData = storedData;
       });
+      // Sync to pages API
+      this.syncHomePageStateToPagesService();
       this.logger.debug(
         `[UserExperienceService] Saved recently opened workspace: ${workspacePath}`,
       );
@@ -341,6 +382,8 @@ export class UserExperienceService extends DisposableService {
       this.uiKarton.setState((draft) => {
         draft.userExperience.storedExperienceData = storedData;
       });
+      // Sync to pages API
+      this.syncHomePageStateToPagesService();
       this.logger.debug(
         `[UserExperienceService] Set hasSeenOnboardingFlow to: ${value}`,
       );
@@ -349,6 +392,31 @@ export class UserExperienceService extends DisposableService {
         `[UserExperienceService] Failed to save hasSeenOnboardingFlow. Error: ${error}`,
       );
     }
+  }
+
+  /**
+   * Set the PagesService instance for syncing home page state.
+   * This should be called by main.ts after services are created.
+   */
+  public setPagesService(pagesService: PagesService): void {
+    this.pagesService = pagesService;
+    // Sync initial state
+    this.syncHomePageStateToPagesService();
+  }
+
+  /**
+   * Sync current home page state to PagesService.
+   * Called when stored experience data or workspace status changes.
+   */
+  private syncHomePageStateToPagesService(): void {
+    if (!this.pagesService) {
+      return;
+    }
+    const state = this.uiKarton.state;
+    this.pagesService.syncHomePageState({
+      storedExperienceData: state.userExperience.storedExperienceData,
+      workspaceStatus: state.workspaceStatus,
+    });
   }
 
   private async pruneRecentlyOpenedWorkspaces({

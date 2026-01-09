@@ -14,6 +14,9 @@ import type {
   AddSearchEngineInput,
   AddSearchEngineResult,
   RemoveSearchEngineResult,
+  InspirationWebsite,
+  StoredExperienceData,
+  WorkspaceStatus,
 } from './types';
 import type { UserPreferences, Patch } from '../ui/shared-types';
 import { defaultUserPreferences } from '../ui/shared-types';
@@ -27,6 +30,11 @@ export type PagesApiState = {
   preferences: UserPreferences;
   /** Available search engines from Web Data database */
   searchEngines: SearchEngine[];
+  /** Home page state (for stagewise://internal/home) */
+  homePage: {
+    storedExperienceData: StoredExperienceData;
+    workspaceStatus: WorkspaceStatus;
+  };
   // Current stagewise app runtime information
   appInfo: {
     baseName: string; // Base name (e.g., 'stagewise-dev', 'stagewise-prerelease', 'stagewise').
@@ -94,6 +102,15 @@ export type PagesApiContract = {
       authCode: string | undefined,
       error: string | undefined,
     ) => Promise<void>;
+    /** Fetch inspiration websites with pagination (results are cached) */
+    getInspirationWebsites: (params: {
+      offset: number;
+      limit: number;
+    }) => Promise<InspirationWebsite>;
+    /** Set whether user has seen the onboarding flow */
+    setHasSeenOnboardingFlow: (value: boolean) => Promise<void>;
+    /** Open a workspace (shows file picker if no path provided) */
+    openWorkspace: (path?: string) => Promise<void>;
   };
 };
 
@@ -102,6 +119,13 @@ export const defaultState: PagesApiState = {
   pendingEditsByChat: {},
   preferences: defaultUserPreferences,
   searchEngines: [],
+  homePage: {
+    storedExperienceData: {
+      recentlyOpenedWorkspaces: [],
+      hasSeenOnboardingFlow: false,
+    },
+    workspaceStatus: 'closed',
+  },
   appInfo: {
     baseName: __APP_BASE_NAME__,
     name: __APP_NAME__,
