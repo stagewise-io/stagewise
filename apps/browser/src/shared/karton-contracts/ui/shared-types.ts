@@ -95,6 +95,12 @@ export const userPreferencesSchema = z.object({
       telemetryLevel: z.enum(['off', 'anonymous', 'full']).default('anonymous'),
     })
     .default({ telemetryLevel: 'anonymous' }),
+  search: z
+    .object({
+      /** ID of the default search engine (references keywords.id in Web Data DB) */
+      defaultEngineId: z.number().default(1), // Google
+    })
+    .default({ defaultEngineId: 1 }),
 });
 
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
@@ -104,7 +110,40 @@ export const defaultUserPreferences: UserPreferences = {
   privacy: {
     telemetryLevel: 'anonymous',
   },
+  search: {
+    defaultEngineId: 1,
+  },
 };
+
+/**
+ * SEARCH ENGINE TYPES
+ */
+
+/** Search engine entry from Web Data database */
+export const searchEngineSchema = z.object({
+  id: z.number(),
+  shortName: z.string(),
+  keyword: z.string(),
+  url: z.string(), // Internal format with {searchTerms}
+  faviconUrl: z.string(),
+  isBuiltIn: z.boolean(), // true for prepopulate_id > 0
+});
+
+export type SearchEngine = z.infer<typeof searchEngineSchema>;
+
+/** Input for adding a new search engine (UI format with %s) */
+export const addSearchEngineInputSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  url: z
+    .string()
+    .min(1, 'URL is required')
+    .refine((url) => url.includes('%s'), {
+      message: 'URL must contain %s placeholder for search terms',
+    }),
+  keyword: z.string().min(1, 'Keyword is required'),
+});
+
+export type AddSearchEngineInput = z.infer<typeof addSearchEngineInputSchema>;
 
 // Re-export Patch type from immer for use in Karton contracts
 export type { Patch } from 'immer';

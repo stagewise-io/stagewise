@@ -21,6 +21,7 @@ import type {
 import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
 import type { DownloadsService } from './download-manager';
+import type { WebDataService } from './webdata';
 import type {
   HistoryFilter,
   HistoryResult,
@@ -32,6 +33,7 @@ import type {
   ActiveDownloadInfo,
   DownloadControlResult,
   PendingEditsResult,
+  AddSearchEngineInput,
 } from '@shared/karton-contracts/pages-api/types';
 import { DisposableService } from './disposable';
 
@@ -50,12 +52,14 @@ export class PagesService extends DisposableService {
   private readonly historyService: HistoryService;
   private readonly faviconService: FaviconService;
   private readonly downloadsService?: DownloadsService;
+  private readonly webDataService?: WebDataService;
   private kartonServer: KartonServer<PagesApiContract>;
   private transport: ElectronServerTransport;
   private currentPort?: MessagePortMain;
   private portCloseListeners = new Map<MessagePortMain, () => void>();
   private openTabHandler?: (url: string, setActive?: boolean) => Promise<void>;
   private markDownloadsSeenHandler?: () => Promise<void>;
+  private onSearchEnginesChangeHandler?: () => Promise<void>;
   private getPendingEditsHandler?: (
     chatId: string,
   ) => Promise<PendingEditsResult>;
@@ -77,12 +81,14 @@ export class PagesService extends DisposableService {
     historyService: HistoryService,
     faviconService: FaviconService,
     downloadsService?: DownloadsService,
+    webDataService?: WebDataService,
   ) {
     super();
     this.logger = logger;
     this.historyService = historyService;
     this.faviconService = faviconService;
     this.downloadsService = downloadsService;
+    this.webDataService = webDataService;
 
     this.transport = new ElectronServerTransport();
 
@@ -118,12 +124,14 @@ export class PagesService extends DisposableService {
     historyService: HistoryService,
     faviconService: FaviconService,
     downloadsService?: DownloadsService,
+    webDataService?: WebDataService,
   ): Promise<PagesService> {
     const instance = new PagesService(
       logger,
       historyService,
       faviconService,
       downloadsService,
+      webDataService,
     );
     await instance.initialize();
     logger.debug('[PagesService] Created service');
@@ -770,6 +778,97 @@ export class PagesService extends DisposableService {
         await this.rejectPendingEditHandler(chatId, filePath);
       },
     );
+
+    // Search engine procedures
+    this.kartonServer.registerServerProcedureHandler(
+      'getSearchEngines',
+      async () => {
+        if (!this.webDataService) {
+          this.logger.warn(
+            '[PagesService] getSearchEngines called but webDataService is not available',
+          );
+          return [];
+        }
+        return this.webDataService.getSearchEngines();
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'addSearchEngine',
+      async (input: AddSearchEngineInput) => {
+        if (!this.webDataService) {
+          return {
+            success: false as const,
+            error: 'Search engine service not available',
+          };
+        }
+        try {
+          // Convert %s to {searchTerms} for internal storage
+          const internalUrl = input.url.replace(/%s/g, '{searchTerms}');
+
+          const id = await this.webDataService.addSearchEngine({
+            name: input.name,
+            url: internalUrl,
+            keyword: input.keyword,
+          });
+
+          // Sync updated list to state
+          await this.syncSearchEnginesState();
+
+          return { success: true as const, id };
+        } catch (error) {
+          this.logger.error(
+            '[PagesService] Failed to add search engine',
+            error,
+          );
+          return {
+            success: false as const,
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Failed to add search engine',
+          };
+        }
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'removeSearchEngine',
+      async (id: number) => {
+        if (!this.webDataService) {
+          return {
+            success: false,
+            error: 'Search engine service not available',
+          };
+        }
+        try {
+          const removed = await this.webDataService.removeSearchEngine(id);
+          if (!removed) {
+            return {
+              success: false,
+              error: 'Search engine not found',
+            };
+          }
+
+          // Sync updated list to state
+          await this.syncSearchEnginesState();
+
+          return { success: true };
+        } catch (error) {
+          this.logger.error(
+            '[PagesService] Failed to remove search engine',
+            error,
+          );
+          return {
+            success: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Failed to remove search engine',
+          };
+        }
+      },
+    );
   }
 
   /**
@@ -786,6 +885,14 @@ export class PagesService extends DisposableService {
    */
   public setMarkDownloadsSeenHandler(handler: () => Promise<void>): void {
     this.markDownloadsSeenHandler = handler;
+  }
+
+  /**
+   * Set the handler called when search engines change.
+   * This allows main.ts to sync search engines to the UI Karton.
+   */
+  public setOnSearchEnginesChangeHandler(handler: () => Promise<void>): void {
+    this.onSearchEnginesChangeHandler = handler;
   }
 
   /**
@@ -878,6 +985,34 @@ export class PagesService extends DisposableService {
   }
 
   /**
+   * Sync search engines state to the Pages API Karton state.
+   * Called after search engines are added/removed or during initialization.
+   * Also notifies the onSearchEnginesChangeHandler to sync to UI Karton.
+   */
+  public async syncSearchEnginesState(): Promise<void> {
+    if (!this.webDataService) {
+      this.logger.warn(
+        '[PagesService] Cannot sync search engines - webDataService not available',
+      );
+      return;
+    }
+
+    const engines = await this.webDataService.getSearchEngines();
+    this.kartonServer.setState((draft) => {
+      draft.searchEngines = engines;
+    });
+
+    // Notify main.ts to sync to UI Karton as well
+    if (this.onSearchEnginesChangeHandler) {
+      await this.onSearchEnginesChangeHandler();
+    }
+
+    this.logger.debug(
+      `[PagesService] Synced ${engines.length} search engines to state`,
+    );
+  }
+
+  /**
    * Update the pending edits state for a specific chat. Called when edits change.
    */
   public updatePendingEditsState(
@@ -946,6 +1081,9 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('rejectPendingEdit');
     this.kartonServer.removeServerProcedureHandler('getPreferences');
     this.kartonServer.removeServerProcedureHandler('updatePreferences');
+    this.kartonServer.removeServerProcedureHandler('getSearchEngines');
+    this.kartonServer.removeServerProcedureHandler('addSearchEngine');
+    this.kartonServer.removeServerProcedureHandler('removeSearchEngine');
 
     // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');

@@ -10,6 +10,10 @@ import type {
   DownloadControlResult,
   PendingEditsResult,
   FileDiffResult,
+  SearchEngine,
+  AddSearchEngineInput,
+  AddSearchEngineResult,
+  RemoveSearchEngineResult,
 } from './types';
 import type { UserPreferences, Patch } from '../ui/shared-types';
 import { defaultUserPreferences } from '../ui/shared-types';
@@ -21,6 +25,8 @@ export type PagesApiState = {
   pendingEditsByChat: Record<string, FileDiffResult[]>;
   /** User preferences (read-only sync) */
   preferences: UserPreferences;
+  /** Available search engines from Web Data database */
+  searchEngines: SearchEngine[];
   // Current stagewise app runtime information
   appInfo: {
     baseName: string; // Base name (e.g., 'stagewise-dev', 'stagewise-prerelease', 'stagewise').
@@ -75,6 +81,14 @@ export type PagesApiContract = {
     getPreferences: () => Promise<UserPreferences>;
     /** Update user preferences by applying Immer patches */
     updatePreferences: (patches: Patch[]) => Promise<void>;
+    /** Get all available search engines */
+    getSearchEngines: () => Promise<SearchEngine[]>;
+    /** Add a new custom search engine (URL should use %s placeholder) */
+    addSearchEngine: (
+      input: AddSearchEngineInput,
+    ) => Promise<AddSearchEngineResult>;
+    /** Remove a custom search engine by ID */
+    removeSearchEngine: (id: number) => Promise<RemoveSearchEngineResult>;
   };
 };
 
@@ -82,6 +96,7 @@ export const defaultState: PagesApiState = {
   activeDownloads: {},
   pendingEditsByChat: {},
   preferences: defaultUserPreferences,
+  searchEngines: [],
   appInfo: {
     baseName: __APP_BASE_NAME__,
     name: __APP_NAME__,

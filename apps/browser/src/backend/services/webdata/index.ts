@@ -1,11 +1,12 @@
 import type { Logger } from '../logger';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import * as schema from './schema';
 import { drizzle } from 'drizzle-orm/libsql';
 import type { GlobalDataPathService } from '../global-data-path';
 import path from 'node:path';
 import { createClient } from '@libsql/client';
 import startScript from './start-script.sql?raw';
+import type { SearchEngine } from '@shared/karton-contracts/ui/shared-types';
 
 /**
  * Result of extracting a search term from a URL.
@@ -177,6 +178,12 @@ export class WebDataService {
 
   /** Maximum length for stored search terms (prevents DB bloat from malformed URLs) */
   private static readonly MAX_SEARCH_TERM_LENGTH = 1000;
+
+  /**
+   * Minimum ID for user-added search engines.
+   * Using a high value to avoid conflicts with future built-in engines.
+   */
+  private static readonly CUSTOM_ENGINE_ID_START = 10000;
 
   /**
    * Extracts the query parameter name from a URL template.
@@ -356,5 +363,130 @@ export class WebDataService {
     }
 
     return null;
+  }
+
+  // =================================================================
+  //  SEARCH ENGINE CRUD (for settings UI)
+  // =================================================================
+
+  /**
+   * Get all search engines formatted for UI display.
+   * Built-in engines are identified by prepopulate_id > 0.
+   */
+  async getSearchEngines(): Promise<SearchEngine[]> {
+    const results = await this.db
+      .select({
+        id: schema.keywords.id,
+        shortName: schema.keywords.shortName,
+        keyword: schema.keywords.keyword,
+        url: schema.keywords.url,
+        faviconUrl: schema.keywords.faviconUrl,
+        prepopulateId: schema.keywords.prepopulateId,
+      })
+      .from(schema.keywords);
+
+    return results.map((r) => ({
+      id: Number(r.id),
+      shortName: r.shortName,
+      keyword: r.keyword,
+      url: r.url,
+      faviconUrl: r.faviconUrl,
+      isBuiltIn: (r.prepopulateId ?? 0) > 0,
+    }));
+  }
+
+  /**
+   * Add a new custom search engine.
+   * @param input The search engine details (URL should use {searchTerms} placeholder internally)
+   * @returns The ID of the newly created search engine
+   */
+  async addSearchEngine(input: {
+    name: string;
+    url: string; // Expected to be in {searchTerms} format
+    keyword: string;
+  }): Promise<number> {
+    // Find the maximum ID and ensure we use at least CUSTOM_ENGINE_ID_START
+    // Note: Database uses intMode: 'bigint', so we need to convert to number
+    const maxIdResult = await this.db
+      .select({ maxId: sql<bigint>`MAX(id)` })
+      .from(schema.keywords)
+      .get();
+
+    const currentMaxId = maxIdResult?.maxId ? Number(maxIdResult.maxId) : 0;
+    const newId = Math.max(
+      currentMaxId + 1,
+      WebDataService.CUSTOM_ENGINE_ID_START,
+    );
+
+    // Extract favicon URL from the search engine URL
+    let faviconUrl = '';
+    try {
+      const parsedUrl = new URL(input.url.replace('{searchTerms}', 'test'));
+      faviconUrl = `${parsedUrl.origin}/favicon.ico`;
+    } catch {
+      // If URL parsing fails, leave faviconUrl empty
+    }
+
+    await this.db.insert(schema.keywords).values({
+      id: newId,
+      shortName: input.name,
+      keyword: input.keyword,
+      url: input.url,
+      faviconUrl,
+      safeForAutoreplace: 0,
+      inputEncodings: 'UTF-8',
+      prepopulateId: 0, // Custom engine, not built-in
+      dateCreated: Math.floor(Date.now() / 1000),
+      syncGuid: '',
+      alternateUrls: '[]',
+    });
+
+    // Invalidate cache so the new engine appears in getAllKeywords
+    this.invalidateKeywordsCache();
+
+    this.logger.info(`[WebDataService] Added search engine: ${input.name}`, {
+      id: newId,
+      keyword: input.keyword,
+    });
+
+    return newId;
+  }
+
+  /**
+   * Remove a search engine by ID.
+   * @throws Error if the engine is a built-in engine (prepopulate_id > 0)
+   * @returns true if removed, false if not found
+   */
+  async removeSearchEngine(id: number): Promise<boolean> {
+    // First check if the engine exists and whether it's built-in
+    const engine = await this.db
+      .select({
+        prepopulateId: schema.keywords.prepopulateId,
+        shortName: schema.keywords.shortName,
+      })
+      .from(schema.keywords)
+      .where(eq(schema.keywords.id, id))
+      .get();
+
+    if (!engine) {
+      return false;
+    }
+
+    // Prevent deletion of built-in engines
+    if ((engine.prepopulateId ?? 0) > 0) {
+      throw new Error('Cannot delete built-in search engines');
+    }
+
+    await this.db.delete(schema.keywords).where(eq(schema.keywords.id, id));
+
+    // Invalidate cache
+    this.invalidateKeywordsCache();
+
+    this.logger.info(
+      `[WebDataService] Removed search engine: ${engine.shortName}`,
+      { id },
+    );
+
+    return true;
   }
 }

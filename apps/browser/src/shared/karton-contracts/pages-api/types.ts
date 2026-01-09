@@ -276,3 +276,20 @@ export interface PendingEditsResult {
   /** Pending file diffs */
   edits: FileDiffResult[];
 }
+
+// Re-export search engine types from shared-types
+export type {
+  SearchEngine,
+  AddSearchEngineInput,
+} from '../ui/shared-types';
+
+/** Result of adding a search engine */
+export type AddSearchEngineResult =
+  | { success: true; id: number }
+  | { success: false; error: string };
+
+/** Result of removing a search engine */
+export interface RemoveSearchEngineResult {
+  success: boolean;
+  error?: string;
+}

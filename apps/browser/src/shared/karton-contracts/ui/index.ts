@@ -22,6 +22,7 @@ import type {
   ModelSettings,
   UserPreferences,
   Patch,
+  SearchEngine,
 } from './shared-types';
 import { defaultUserPreferences } from './shared-types';
 import type { PageTransition, DownloadState } from '../pages-api/types';
@@ -417,6 +418,9 @@ export type AppState = {
 
   // User preferences (synced from PreferencesService)
   preferences: UserPreferences;
+
+  // Available search engines (synced from WebDataService via PreferencesService)
+  searchEngines: SearchEngine[];
 };
 
 export type AuthStatus =
@@ -707,4 +711,5 @@ export const defaultState: KartonContract['state'] = {
     lastSeenAt: null,
   },
   preferences: defaultUserPreferences,
+  searchEngines: [],
 };

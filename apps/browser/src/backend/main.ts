@@ -84,7 +84,11 @@ export async function main({
     historyService,
     faviconService,
     downloadsService,
+    webDataService,
   );
+
+  // Initialize search engines state
+  await pagesService.syncSearchEnginesState();
 
   const windowLayoutService = await WindowLayoutService.create(
     logger,
@@ -101,6 +105,18 @@ export async function main({
     uiKarton,
     pagesService,
   );
+
+  // Sync search engines to UI Karton state (for omnibox to access)
+  const syncSearchEnginesToUiKarton = async () => {
+    const engines = await webDataService.getSearchEngines();
+    uiKarton.setState((draft) => {
+      draft.searchEngines = engines;
+    });
+  };
+  await syncSearchEnginesToUiKarton();
+
+  // Set up handler to sync search engines to UI Karton when they change
+  pagesService.setOnSearchEnginesChangeHandler(syncSearchEnginesToUiKarton);
 
   // Set up downloads UI state updates
   // This callback updates the UI karton with running + recent finished downloads

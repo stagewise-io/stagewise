@@ -12,7 +12,8 @@ import type { TabState } from '@shared/karton-contracts/ui';
 import { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { InternalPageBreadcrumbs } from './internal-page-breadcrumbs';
-import { useKartonProcedure } from '@/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
+import type { SearchEngine } from '@shared/karton-contracts/ui/shared-types';
 
 export interface OmniboxRef {
   focus: () => void;
@@ -28,6 +29,7 @@ function goToUrl(
   url: string,
   tabId?: string,
   transition?: PageTransition,
+  getSearchUrl?: (searchTerm: string) => string,
 ) {
   const trimmed = url.trim();
   // Check if it starts with stagewise:/ - always treat as URL, never search
@@ -42,22 +44,56 @@ function goToUrl(
   // Check if it looks like a domain (no spaces, has a dot)
   if (!trimmed.includes(' ') && trimmed.includes('.'))
     return goto(`https://${trimmed}`, tabId, transition);
-  // Treat as search query
-  goto(
-    `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`,
-    tabId,
-    transition,
-  );
+  // Treat as search query - use dynamic search URL
+  const searchUrl = getSearchUrl
+    ? getSearchUrl(trimmed)
+    : `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
+  goto(searchUrl, tabId, transition);
+}
+
+/**
+ * Build a search URL from a search engine and search term.
+ */
+function buildSearchUrl(
+  searchEngines: SearchEngine[],
+  defaultEngineId: number,
+  searchTerm: string,
+): string {
+  const defaultEngine = searchEngines.find((e) => e.id === defaultEngineId);
+
+  if (defaultEngine) {
+    // Replace {searchTerms} placeholder with encoded search term
+    return defaultEngine.url.replace(
+      '{searchTerms}',
+      encodeURIComponent(searchTerm),
+    );
+  }
+
+  // Fallback to Google if no default engine found
+  return `https://www.google.com/search?q=${encodeURIComponent(searchTerm)}`;
 }
 
 export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
   ({ tabId, tab }, ref) => {
     const goto = useKartonProcedure((p) => p.browser.goto);
+    const preferences = useKartonState((s) => s.preferences);
+    const searchEngines = useKartonState((s) => s.searchEngines);
 
     const [localUrl, setLocalUrl] = useState(tab?.url ?? '');
     const [urlBeforeEdit, setUrlBeforeEdit] = useState(tab?.url ?? '');
     const [isUrlInputFocused, setIsUrlInputFocused] = useState(false);
     const urlInputRef = useRef<HTMLInputElement>(null);
+
+    // Create a memoized search URL builder
+    const getSearchUrl = useCallback(
+      (searchTerm: string) =>
+        buildSearchUrl(
+          searchEngines,
+          preferences.search.defaultEngineId,
+          searchTerm,
+        ),
+      [searchEngines, preferences.search.defaultEngineId],
+    );
 
     // Expose focus method via ref
     useImperativeHandle(
@@ -116,12 +152,12 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
       (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
           // When user types in omnibox and presses Enter, mark as TYPED transition
-          goToUrl(goto, localUrl, tabId, PageTransition.TYPED);
+          goToUrl(goto, localUrl, tabId, PageTransition.TYPED, getSearchUrl);
           setUrlBeforeEdit(localUrl);
           urlInputRef.current?.blur();
         }
       },
-      [goto, localUrl, tabId],
+      [goto, localUrl, tabId, getSearchUrl],
     );
 
     // Handle Escape key to cancel editing
