@@ -9,28 +9,28 @@ import { SystemThemeProvider } from '@/components/theme-switcher';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://stagewise.io'),
-  title: 'stagewise | The frontend coding agent for production codebases',
+  title: 'stagewise',
   description:
-    'Visually build your apps frontend right inside your browser on localhost. Compatible with any frontend framework.',
+    'A purpose-built browser for web development. Build, preview, and iterate on your frontend with an AI agent built right in.',
   openGraph: {
-    title: 'stagewise | The frontend coding agent for production codebases',
+    title: 'stagewise · The browser for web developers',
     description:
-      'Visually build your apps frontend right inside your browser on localhost. Compatible with any frontend framework.',
+      'A purpose-built browser for web development. Build, preview, and iterate on your frontend with an AI agent built right in.',
     type: 'website',
     images: [
       {
         url: '/agent-thumbnail.png',
         width: 1200,
         height: 630,
-        alt: 'stagewise: The frontend coding agent for production codebases',
+        alt: 'stagewise: The browser for web developers',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'stagewise | The frontend coding agent for production codebases',
+    title: 'stagewise · The browser for web developers',
     description:
-      'Visually build your apps frontend right inside your browser on localhost. Compatible with any frontend framework.',
+      'A purpose-built browser for web development. Build, preview, and iterate on your frontend with an AI agent built right in.',
     images: ['/agent-thumbnail.png'],
   },
 };

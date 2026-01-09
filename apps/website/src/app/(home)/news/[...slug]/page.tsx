@@ -34,19 +34,17 @@ export default async function PostPage(props: {
   return (
     <div className="flex w-full max-w-2xl flex-col gap-12 p-4">
       <div className="flex flex-col items-center gap-4 text-center">
-        <span className="text-base text-zinc-600 dark:text-zinc-400">
+        <span className="text-base text-muted-foreground">
           {date.toLocaleString('en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
           })}
         </span>
-        <h1 className="bg-gradient-to-tr from-zinc-900 via-zinc-700 to-black bg-clip-text font-bold text-3xl text-transparent tracking-tight md:text-5xl dark:from-zinc-100 dark:via-zinc-300 dark:to-white">
+        <h1 className="font-bold text-3xl text-foreground tracking-tight md:text-5xl">
           {title}
         </h1>
-        <p className="text-lg text-zinc-600 dark:text-zinc-400">
-          {description}
-        </p>
+        <p className="text-lg text-muted-foreground">{description}</p>
         <div className="flex flex-row gap-4">
           <Link
             href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
@@ -55,7 +53,7 @@ export default async function PostPage(props: {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Share this post on LinkedIn"
-            className="glass-body glass-body-motion glass-body-interactive glass-body-motion-interactive flex h-8 items-center justify-center rounded-sm bg-[#0b66c2] px-4 text-sm text-white"
+            className="flex h-8 items-center justify-center rounded-sm bg-[#0b66c2] px-4 text-sm text-white"
           >
             Share on <span className="ml-2 font-bold">in</span>
           </Link>
@@ -66,7 +64,7 @@ export default async function PostPage(props: {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Share this post on X"
-            className="glass-body glass-body-motion glass-body-interactive glass-body-motion-interactive flex h-8 items-center justify-center rounded-sm bg-black px-4 text-sm text-white dark:bg-zinc-800"
+            className="flex h-8 items-center justify-center rounded-sm bg-black px-4 text-sm text-white dark:bg-white dark:text-black"
           >
             Share on <span className="ml-2 font-bold">𝕏</span>
           </Link>
@@ -96,16 +94,16 @@ export async function generateMetadata(props: {
   if (!page) notFound();
 
   const metadata: Metadata = {
-    title: `${page.data.title} | stagewise Newsroom`,
+    title: `${page.data.title} · stagewise Newsroom`,
     description: page.data.description,
     openGraph: {
-      title: `${page.data.title} | stagewise Newsroom`,
+      title: `${page.data.title} · stagewise Newsroom`,
       description: page.data.description,
       locale: 'en_US',
       images: page.data.ogImage ? [page.data.ogImage] : undefined,
     },
     twitter: {
-      title: `${page.data.title} | stagewise Newsroom`,
+      title: `${page.data.title} · stagewise Newsroom`,
       description: page.data.description,
       creator: '@stagewise_io',
     },

@@ -9,7 +9,7 @@ export default async function TermsPage() {
   const MDXContent = page.data.body;
 
   return (
-    <main className="prose mx-auto min-h-screen max-w-2xl bg-surface-1 p-4 md:p-10">
+    <main className="prose mx-auto min-h-screen max-w-2xl p-4 md:p-10">
       <MDXContent components={getMDXComponents({})} />
     </main>
   );

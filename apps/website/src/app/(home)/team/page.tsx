@@ -4,22 +4,19 @@ import Image from 'next/image';
 
 export default function TeamPage() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-zinc-50 text-zinc-900 dark:bg-black dark:text-white">
-      {/* Hero Section */}
-      <section className="container relative z-10 mx-auto px-4 pt-40 pb-12 sm:pt-28 md:pb-16">
-        <div className="mx-auto max-w-2xl">
-          <ScrollReveal>
-            <div className="mb-12 text-center">
-              <h1 className="mb-6 font-bold text-3xl tracking-tight md:text-5xl">
-                <span className="bg-gradient-to-tr from-gray-900 via-gray-700 to-black bg-clip-text text-transparent dark:from-gray-100 dark:via-gray-300 dark:to-white">
-                  About our team
-                </span>
-              </h1>
-            </div>
-          </ScrollReveal>
+    <div className="relative mx-auto w-full max-w-6xl px-4 pb-16">
+      <ScrollReveal>
+        <div className="flex flex-col items-start gap-4 text-left">
+          <h1 className="font-medium text-3xl text-foreground tracking-tight md:text-5xl">
+            About our team
+          </h1>
+        </div>
+      </ScrollReveal>
 
+      <section className="mt-12">
+        <div className="flex flex-col gap-8 md:flex-row md:gap-12">
           <ScrollReveal delay={300}>
-            <div className="mx-auto mt-8 max-w-xl scale-[1.02] transform overflow-hidden rounded-xl border border-gray-900/50 shadow-[0_0_40px_rgba(0,0,0,0.25)] transition-transform duration-500 dark:border-gray-100/50 dark:shadow-[0_0_40px_rgba(255,255,255,0.1)]">
+            <div className="w-full shrink-0 scale-[1.02] transform overflow-hidden rounded-xl border border-zinc-900/50 shadow-[0_0_20px_rgba(0,0,0,0.15)] transition-transform duration-500 md:w-80 dark:border-zinc-100/50 dark:shadow-[0_0_20px_rgba(255,255,255,0.05)]">
               <Image
                 src={TeamPic}
                 alt="A picture of the two stagewise founders"
@@ -30,7 +27,7 @@ export default function TeamPage() {
           </ScrollReveal>
 
           <ScrollReveal delay={300}>
-            <div className="prose mx-auto mt-8 max-w-xl">
+            <div className="dark:prose-invert prose max-w-none">
               <p>
                 At its core, stagewise is the result of developers that are
                 driven by a single goal: to build tools we love to use.
@@ -40,17 +37,17 @@ export default function TeamPage() {
                 <a
                   target="_blank"
                   rel="noopener noreferrer"
-                  href="https://www.linkedin.com/in/glenntws/"
+                  href="https://www.linkedin.com/in/juliangoetze/"
                 >
-                  Glenn
-                </a>{' '}
+                  Julian
+                </a>
                 and{' '}
                 <a
                   target="_blank"
                   rel="noopener noreferrer"
-                  href="https://www.linkedin.com/in/juliangoetze/"
+                  href="https://www.linkedin.com/in/glenntws/"
                 >
-                  Julian
+                  Glenn
                 </a>
                 , and we’ve built our team on a foundation of shared passion,
                 complementary interests, and a relentless focus on solving

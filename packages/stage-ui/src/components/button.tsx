@@ -7,7 +7,7 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          'border border-derived-subtle bg-linear-to-tr bg-primary-solid font-normal text-solid-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
+          'border border-derived-subtle bg-primary-solid font-normal text-solid-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
         secondary:
           'border border-derived-subtle bg-surface-1 font-normal text-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
         destructive:

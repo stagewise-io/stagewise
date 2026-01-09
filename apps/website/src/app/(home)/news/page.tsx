@@ -4,17 +4,17 @@ import Link from 'next/link';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 
 export const metadata: Metadata = {
-  title: 'Newsroom | stagewise',
+  title: 'Newsroom · stagewise',
   description:
     "Find out what we're up to, what we're thinking, and what we're doing at stagewise",
   openGraph: {
-    title: 'Newsroom | stagewise',
+    title: 'Newsroom · stagewise',
     description:
       "Find out what we're up to, what we're thinking, and what we're doing at stagewise",
     type: 'website',
   },
   twitter: {
-    title: 'Newsroom | stagewise',
+    title: 'Newsroom · stagewise',
     description:
       "Find out what we're up to, what we're thinking, and what we're doing at stagewise",
     creator: '@stagewise_io',
@@ -26,15 +26,13 @@ export default function BlogPage() {
   const posts = news.getPages();
 
   return (
-    <div className="relative mx-auto w-full max-w-6xl px-4">
+    <div className="relative mx-auto w-full max-w-6xl px-4 ">
       <ScrollReveal>
         <div className="mb-12 flex flex-col items-start gap-4 text-left">
           <h1 className="font-medium text-3xl tracking-tight md:text-5xl">
-            <span className="bg-gradient-to-br from-zinc-800 via-zinc-900 to-black bg-clip-text text-transparent dark:from-zinc-100 dark:via-zinc-300 dark:to-white">
-              Newsroom
-            </span>
+            <span className="text-foreground">Newsroom</span>
           </h1>
-          <p className="text-lg text-zinc-600 dark:text-zinc-400">
+          <p className="text-lg text-muted-foreground">
             Find out what we're up to, what we're thinking, and what we're doing
             at stagewise.
           </p>
@@ -62,7 +60,7 @@ export default function BlogPage() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="X page of stagewise"
-              className="flex size-6 items-center justify-center rounded-sm bg-black text-sm text-white transition-opacity hover:opacity-80 dark:bg-zinc-800"
+              className="flex size-6 items-center justify-center rounded-sm bg-black text-sm text-white transition-opacity hover:opacity-80 dark:bg-white dark:text-black"
             >
               𝕏
             </Link>
@@ -78,15 +76,15 @@ export default function BlogPage() {
           .map((post, index) => (
             <ScrollReveal key={post.path} delay={200 + index * 100}>
               <Link href={post.url}>
-                <div className="flex w-full flex-col items-start justify-center gap-1 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800">
-                  <p className="font-semibold text-xl text-zinc-900 tracking-tight dark:text-white">
+                <div className="flex w-full flex-col items-start justify-center gap-1 rounded-xl border border-derived-subtle bg-surface-1 p-4 transition-colors">
+                  <p className="font-semibold text-foreground text-xl tracking-tight">
                     {post.data.title}
                   </p>
-                  <span className="text-base text-zinc-600 dark:text-zinc-400">
+                  <span className="text-base text-muted-foreground">
                     {post.data.description}
                   </span>
                   <div className="mt-1 flex w-full flex-row items-end justify-end gap-6">
-                    <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                    <span className="text-muted-foreground text-sm">
                       {post.data.date.toLocaleString('en-US', {
                         year: 'numeric',
                         month: 'short',
