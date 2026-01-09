@@ -89,6 +89,15 @@ export type GlobalConfig = z.infer<typeof globalConfigSchema>;
  * USER PREFERENCES (stored in Preferences.json)
  */
 
+/** Page setting that can be either stagewise home or a custom URL */
+export const pageSettingSchema = z.object({
+  type: z.enum(['home', 'custom']).default('home'),
+  /** Custom URL (only used when type is 'custom') */
+  customUrl: z.string().optional(),
+});
+
+export type PageSetting = z.infer<typeof pageSettingSchema>;
+
 export const userPreferencesSchema = z.object({
   privacy: z
     .object({
@@ -101,6 +110,17 @@ export const userPreferencesSchema = z.object({
       defaultEngineId: z.number().default(1), // Google
     })
     .default({ defaultEngineId: 1 }),
+  general: z
+    .object({
+      /** Default page opened when creating a new tab */
+      newTabPage: pageSettingSchema.default({ type: 'home' }),
+      /** Default page opened when the browser starts */
+      startupPage: pageSettingSchema.default({ type: 'home' }),
+    })
+    .default({
+      newTabPage: { type: 'home' },
+      startupPage: { type: 'home' },
+    }),
 });
 
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
@@ -112,6 +132,10 @@ export const defaultUserPreferences: UserPreferences = {
   },
   search: {
     defaultEngineId: 1,
+  },
+  general: {
+    newTabPage: { type: 'home' },
+    startupPage: { type: 'home' },
   },
 };
 

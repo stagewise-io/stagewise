@@ -48,6 +48,9 @@ export function CoreHotkeyBindings({
   const currentZoomPercentage = useKartonState(
     (s) => s.browser.tabs[activeTabId]?.zoomPercentage,
   );
+  const newTabPagePreference = useKartonState(
+    (s) => s.preferences.general.newTabPage,
+  );
 
   const handleSwitchTab = useCallback(
     async (tabId: string) => {
@@ -164,7 +167,11 @@ export function CoreHotkeyBindings({
   // Home page
   useHotKeyListener(() => {
     if (!activeTabId) return;
-    goto('ui-main', activeTabId);
+    const homeUrl =
+      newTabPagePreference.type === 'custom' && newTabPagePreference.customUrl
+        ? newTabPagePreference.customUrl
+        : 'ui-main';
+    goto(homeUrl, activeTabId);
   }, HotkeyActions.CMD_SHIFT_H);
 
   // URL BAR

@@ -78,6 +78,10 @@ export async function main({
     historyService,
   );
 
+  // Create PreferencesService early so it can be passed to WindowLayoutService
+  // This loads preferences from disk; Karton sync is connected later
+  const preferencesService = await PreferencesService.create(logger);
+
   // Create PagesService early so it can be passed to WindowLayoutService
   const pagesService = await PagesService.create(
     logger,
@@ -90,21 +94,20 @@ export async function main({
   // Initialize search engines state
   await pagesService.syncSearchEnginesState();
 
+  // Create WindowLayoutService with all dependencies including PreferencesService
+  // This also applies the startup page preference during initialization
   const windowLayoutService = await WindowLayoutService.create(
     logger,
     globalDataPathService,
     historyService,
     faviconService,
     pagesService,
+    preferencesService,
   );
   const uiKarton = windowLayoutService.uiKarton;
 
-  // Create PreferencesService to manage user preferences
-  const preferencesService = await PreferencesService.create(
-    logger,
-    uiKarton,
-    pagesService,
-  );
+  // Connect PreferencesService to Karton for reactive sync
+  preferencesService.connectKarton(uiKarton, pagesService);
 
   // Sync search engines to UI Karton state (for omnibox to access)
   const syncSearchEnginesToUiKarton = async () => {

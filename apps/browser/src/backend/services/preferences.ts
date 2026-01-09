@@ -68,32 +68,24 @@ type PreferencesListener = (
  */
 export class PreferencesService extends DisposableService {
   private readonly logger: Logger;
-  private readonly uiKarton: KartonService;
-  private readonly pagesService: PagesService;
+  private uiKarton: KartonService | null = null;
+  private pagesService: PagesService | null = null;
 
   private preferences: UserPreferences = defaultUserPreferences;
   private listeners: PreferencesListener[] = [];
 
-  private constructor(
-    logger: Logger,
-    uiKarton: KartonService,
-    pagesService: PagesService,
-  ) {
+  private constructor(logger: Logger) {
     super();
     this.logger = logger;
-    this.uiKarton = uiKarton;
-    this.pagesService = pagesService;
   }
 
   /**
    * Create and initialize a new PreferencesService instance.
+   * This only loads preferences from disk. Call connectKarton() to enable
+   * reactive sync with UI and Pages Karton.
    */
-  public static async create(
-    logger: Logger,
-    uiKarton: KartonService,
-    pagesService: PagesService,
-  ): Promise<PreferencesService> {
-    const instance = new PreferencesService(logger, uiKarton, pagesService);
+  public static async create(logger: Logger): Promise<PreferencesService> {
+    const instance = new PreferencesService(logger);
     await instance.initialize();
     return instance;
   }
@@ -112,16 +104,36 @@ export class PreferencesService extends DisposableService {
       telemetryLevel: this.preferences.privacy.telemetryLevel,
     });
 
-    // Sync to Karton state
+    this.logger.debug('[PreferencesService] Initialized');
+  }
+
+  /**
+   * Connect to Karton services for reactive sync.
+   * Should be called after WindowLayoutService and PagesService are created.
+   */
+  public connectKarton(
+    uiKarton: KartonService,
+    pagesService: PagesService,
+  ): void {
+    this.logger.debug('[PreferencesService] Connecting to Karton...');
+
+    this.uiKarton = uiKarton;
+    this.pagesService = pagesService;
+
+    // Sync current preferences to Karton state
     this.syncToKarton();
 
     // Register procedure handlers
     this.registerProcedures();
 
-    this.logger.debug('[PreferencesService] Initialized');
+    this.logger.debug('[PreferencesService] Connected to Karton');
   }
 
   private registerProcedures(): void {
+    if (!this.uiKarton || !this.pagesService) {
+      throw new Error('Karton not connected');
+    }
+
     // UI procedure for updating preferences
     this.uiKarton.registerServerProcedureHandler(
       'preferences.update',
@@ -138,6 +150,11 @@ export class PreferencesService extends DisposableService {
   }
 
   private syncToKarton(): void {
+    if (!this.uiKarton || !this.pagesService) {
+      // Not connected yet, skip sync
+      return;
+    }
+
     const prefs = structuredClone(this.preferences);
 
     // Sync to UI Karton state
@@ -228,7 +245,9 @@ export class PreferencesService extends DisposableService {
 
   protected async onTeardown(): Promise<void> {
     this.logger.debug('[PreferencesService] Tearing down...');
-    this.uiKarton.removeServerProcedureHandler('preferences.update');
+    if (this.uiKarton) {
+      this.uiKarton.removeServerProcedureHandler('preferences.update');
+    }
     this.listeners = [];
     this.logger.debug('[PreferencesService] Teardown complete');
   }

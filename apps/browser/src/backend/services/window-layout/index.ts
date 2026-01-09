@@ -9,6 +9,7 @@ import type { GlobalDataPathService } from '../global-data-path';
 import type { HistoryService } from '../history';
 import type { FaviconService } from '../favicon';
 import type { PagesService } from '../pages';
+import type { PreferencesService } from '../preferences';
 import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import { UIController } from './ui-controller';
 import {
@@ -36,6 +37,7 @@ export class WindowLayoutService extends DisposableService {
   private readonly historyService: HistoryService;
   private readonly faviconService: FaviconService;
   private readonly pagesService: PagesService;
+  private readonly preferencesService: PreferencesService;
 
   private baseWindow: BaseWindow | null = null;
   private uiController: UIController | null = null;
@@ -69,6 +71,7 @@ export class WindowLayoutService extends DisposableService {
     historyService: HistoryService,
     faviconService: FaviconService,
     pagesService: PagesService,
+    preferencesService: PreferencesService,
   ) {
     super();
     this.logger = logger;
@@ -76,6 +79,7 @@ export class WindowLayoutService extends DisposableService {
     this.historyService = historyService;
     this.faviconService = faviconService;
     this.pagesService = pagesService;
+    this.preferencesService = preferencesService;
   }
 
   public static async create(
@@ -84,6 +88,7 @@ export class WindowLayoutService extends DisposableService {
     historyService: HistoryService,
     faviconService: FaviconService,
     pagesService: PagesService,
+    preferencesService: PreferencesService,
   ): Promise<WindowLayoutService> {
     const instance = new WindowLayoutService(
       logger,
@@ -91,6 +96,7 @@ export class WindowLayoutService extends DisposableService {
       historyService,
       faviconService,
       pagesService,
+      preferencesService,
     );
     await instance.initialize();
     return instance;
@@ -241,8 +247,16 @@ export class WindowLayoutService extends DisposableService {
       this.tabs,
     );
 
-    // Create initial tab
-    this.createTab('ui-main', true);
+    // Determine initial tab URL based on startup page preference
+    const preferences = this.preferencesService.get();
+    const startupPage = preferences.general.startupPage;
+    const initialUrl =
+      startupPage.type === 'custom' && startupPage.customUrl
+        ? startupPage.customUrl
+        : 'ui-main';
+
+    // Create initial tab with the appropriate URL
+    this.createTab(initialUrl, true);
 
     this.logger.debug('[WindowLayoutService] Service initialized');
   }
@@ -445,11 +459,32 @@ export class WindowLayoutService extends DisposableService {
     setActive?: boolean,
     sourceTabId?: string,
   ) => {
+    // If no URL is provided, check user's new tab page preference
+    let targetUrl = url;
+
+    if (!targetUrl) {
+      const preferences = this.preferencesService.get();
+      if (preferences.general.newTabPage.type === 'custom') {
+        const customUrl = preferences.general.newTabPage.customUrl;
+        if (customUrl) {
+          // Use the custom URL directly
+          targetUrl = customUrl;
+        } else {
+          // Custom type but no URL configured - fall back to home
+          targetUrl = 'ui-main';
+        }
+      } else {
+        // Type is 'home' - use the start page
+        targetUrl = 'ui-main';
+      }
+    }
+
     // For internal pages, check if a non-active tab with the same URL already exists
     // If the active tab already has this URL, we still create a new tab (user explicitly wants another)
-    if (url?.startsWith('stagewise://')) {
+    if (targetUrl?.startsWith('stagewise://')) {
       const existingTab = Object.entries(this.tabs).find(
-        ([id, tab]) => id !== this.activeTabId && tab.getState().url === url,
+        ([id, tab]) =>
+          id !== this.activeTabId && tab.getState().url === targetUrl,
       );
 
       if (existingTab) {
@@ -459,7 +494,7 @@ export class WindowLayoutService extends DisposableService {
       }
     }
 
-    await this.createTab(url ?? 'ui-main', setActive ?? true, sourceTabId);
+    await this.createTab(targetUrl, setActive ?? true, sourceTabId);
   };
 
   private async createTab(
@@ -474,8 +509,8 @@ export class WindowLayoutService extends DisposableService {
       this.historyService,
       this.faviconService,
       url,
-      (newUrl: string, setActive?: boolean, newSourceTabId?: string) => {
-        void this.handleCreateTab(newUrl, setActive, newSourceTabId);
+      (newUrl: string, setActive?: boolean) => {
+        void this.handleCreateTab(newUrl, setActive, id);
       },
     );
 
@@ -636,7 +671,13 @@ export class WindowLayoutService extends DisposableService {
           await this.handleSwitchTab(nextTabId);
         } else {
           // If no other tabs exist, create a new one
-          await this.createTab('ui-main', true);
+          const preferences = this.preferencesService.get();
+          const newTabPage = preferences.general.newTabPage;
+          const initialUrl =
+            newTabPage.type === 'custom' && newTabPage.customUrl
+              ? newTabPage.customUrl
+              : 'ui-main';
+          await this.createTab(initialUrl, true);
         }
       }
     }

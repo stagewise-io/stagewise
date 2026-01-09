@@ -260,11 +260,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     historyService: HistoryService,
     faviconService: FaviconService,
     initialUrl?: string,
-    onCreateTab?: (
-      url: string,
-      setActive?: boolean,
-      sourceTabId?: string,
-    ) => void,
+    onCreateTab?: (url: string, setActive?: boolean) => void,
   ) {
     super();
     this.id = id;
