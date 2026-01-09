@@ -1,4 +1,4 @@
-import { app, Menu, shell } from 'electron';
+import { app, Menu } from 'electron';
 import path from 'node:path';
 import type { Logger } from './logger';
 import type { WindowLayoutService } from './window-layout';
@@ -62,13 +62,17 @@ export class AppMenuService extends DisposableService {
           {
             label: 'Open our GitHub repository',
             click: () => {
-              shell.openExternal('https://github.com/stagewise-io/stagewise');
+              void this.windowLayoutService.openUrl(
+                'https://github.com/stagewise-io/stagewise',
+              );
             },
           },
           {
             label: 'Open our Discord server',
             click: () => {
-              shell.openExternal('https://stagewise.io/socials/discord');
+              void this.windowLayoutService.openUrl(
+                'https://stagewise.io/socials/discord',
+              );
             },
           },
           { type: 'separator' },
@@ -90,7 +94,9 @@ export class AppMenuService extends DisposableService {
                   id: 'user_menu_open_console',
                   label: 'Open console',
                   click: () => {
-                    shell.openExternal('https://console.stagewise.io');
+                    void this.windowLayoutService.openUrl(
+                      'https://console.stagewise.io',
+                    );
                   },
                 },
                 { type: 'separator', id: 'user_menu_separator', visible: true },
