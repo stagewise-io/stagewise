@@ -1,11 +1,11 @@
 import { knowledgeAgentTools, stripToolMetadata } from '@stagewise/agent-tools';
+import type { getModelOptions } from './utils/get-model-settings';
 import {
   getWorkspaceInfo,
   type WorkspaceInfo,
 } from './prompt-builder/utils/workspace-info';
 import { stepCountIs, type ToolSet } from 'ai';
 import { generateText, type ModelMessage } from 'ai';
-import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type { ClientRuntime } from '@stagewise/agent-runtime-interface';
 import path from 'node:path';
 
@@ -221,7 +221,7 @@ After analyzing the codebase, use **saveFileTool** to create the \`${STAGEWISE_M
  * styling configuration, and component patterns.
  */
 export async function generateStagewiseMd(
-  model: LanguageModelV3,
+  modelOptions: ReturnType<typeof getModelOptions>,
   clientRuntime: ClientRuntime,
   overwriteClientRuntime: ClientRuntime,
   appPath: string,
@@ -254,22 +254,13 @@ Remember: Focus on information that helps with frontend development - styling, c
     } satisfies ModelMessage;
 
     const _r = await generateText({
-      model,
+      model: modelOptions.model,
       messages: [{ role: 'system', content: system }, prompt],
       tools: tools as unknown as ToolSet,
       stopWhen: stepCountIs(75),
       maxRetries: 2,
-      providerOptions: {
-        anthropic: {
-          thinking: {
-            type: 'enabled',
-            budgetTokens: 10000,
-          },
-        },
-      },
-      headers: {
-        'anthropic-beta': 'interleaved-thinking-2025-05-14',
-      },
+      providerOptions: modelOptions.providerOptions,
+      headers: modelOptions.headers,
     });
 
     const outputPath = path.join(appPath, STAGEWISE_MD_FILENAME);

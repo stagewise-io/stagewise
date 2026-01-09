@@ -422,23 +422,32 @@ export class AgentService {
       );
       return;
     }
-    await generateStagewiseMd(
-      this.telemetryService.withTracing(
-        getArbitraryModel('claude-haiku-4-5', this.apiKey),
-        {
-          posthogTraceId: 'update-stagewise-md',
-          posthogProperties: {
-            $ai_span_name: 'update-stagewise-md',
-          },
+    const haikuOptions = getModelOptions('claude-haiku-4-5', this.apiKey);
+    const posthogTraceId = generateId();
+    const optionsWithTracing = {
+      model: this.telemetryService.withTracing(haikuOptions.model, {
+        posthogTraceId,
+        posthogProperties: {
+          $ai_span_name: 'update-stagewise-md',
+          posthogTraceId,
+          modelId: haikuOptions.model.modelId,
         },
-      ),
+      }),
+      providerOptions: haikuOptions.providerOptions,
+      headers: haikuOptions.headers,
+    };
+
+    const stagewiseMdPath = this.uiKarton.state.workspace?.paths.data;
+    if (!stagewiseMdPath) return;
+
+    void generateStagewiseMd(
+      optionsWithTracing,
       this.clientRuntime!,
       new ClientRuntimeNode({
-        workingDirectory: this.uiKarton.state.workspace.paths.data,
+        workingDirectory: stagewiseMdPath,
         rgBinaryBasePath: this.globalDataPathService.globalDataPath,
       }),
-      this.uiKarton.state.workspace?.path ??
-        (this.clientRuntime?.fileSystem.getCurrentWorkingDirectory() || ''),
+      stagewiseMdPath,
     );
   }
 
@@ -1810,7 +1819,7 @@ export class AgentService {
     }
     return generateText({
       model: this.telemetryService.withTracing(
-        getArbitraryModel('claude-haiku-4-5', this.apiKey),
+        getArbitraryModel('gemini-2.5-flash', this.apiKey),
         {
           posthogTraceId: 'warm-up-request',
           posthogProperties: {
