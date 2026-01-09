@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useKartonState } from '@/hooks/use-karton';
 
-export const Route = createFileRoute('/about')({
+export const Route = createFileRoute('/_internal-app/about')({
   component: Page,
   head: () => ({
     meta: [
@@ -26,7 +26,7 @@ function Page() {
 
       {/* Content */}
       <div className="flex w-full flex-1 flex-col items-center overflow-y-auto p-6">
-        <div className="flex w-full max-w-3xl flex-col gap-8">
+        <div className="flex w-full max-w-3xl shrink-0 flex-col gap-8">
           {/* App Name Section */}
           <div className="flex flex-col gap-2">
             <h2 className="font-bold text-3xl text-foreground">

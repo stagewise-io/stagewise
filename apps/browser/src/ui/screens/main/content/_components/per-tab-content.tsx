@@ -168,7 +168,7 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => {
-                  createTab('stagewise://internal/settings', true);
+                  createTab('stagewise://internal/browsing-settings', true);
                 }}
               >
                 <IconGear2Fill18 className="size-4.5 text-muted-foreground" />

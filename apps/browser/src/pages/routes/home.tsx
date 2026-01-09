@@ -76,7 +76,7 @@ function HomePage() {
 
   if (!isConnected) {
     return (
-      <div className="flex size-full items-center justify-center bg-background">
+      <div className="flex size-full min-h-screen min-w-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <LogoWithText />
           <span className="text-muted-foreground text-sm">Loading...</span>
@@ -86,7 +86,7 @@ function HomePage() {
   }
 
   return (
-    <div className="flex size-full flex-col items-center justify-center overflow-hidden bg-background">
+    <div className="flex size-full min-h-screen min-w-screen flex-col items-center justify-center overflow-hidden bg-background">
       {!hasSeenOnboardingFlow ? (
         <OnboardingStartPage />
       ) : (
@@ -106,7 +106,7 @@ function StartPageWithConnectedWorkspace() {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [leftFadeDistance, setLeftFadeDistance] = useState(0);
-  const [rightFadeDistance, setRightFadeDistance] = useState(0);
+  const [_rightFadeDistance, setRightFadeDistance] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Local state for inspiration websites (fetched on demand)
@@ -217,7 +217,7 @@ function StartPageWithConnectedWorkspace() {
   const getMaskStyle = (): React.CSSProperties =>
     ({
       '--left-fade': `${leftFadeDistance}px`,
-      '--right-fade': `${rightFadeDistance}px`,
+      '--right-fade': '${rightFadeDistance}px',
     }) as React.CSSProperties;
 
   const handleWebsiteClick = useCallback(

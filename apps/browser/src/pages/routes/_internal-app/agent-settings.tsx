@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-export const Route = createFileRoute('/agent-settings')({
+export const Route = createFileRoute('/_internal-app/agent-settings')({
   component: Page,
   head: () => ({
     meta: [

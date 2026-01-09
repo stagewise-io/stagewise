@@ -8,7 +8,7 @@ type AuthCallbackSearch = {
   error?: string;
 };
 
-export const Route = createFileRoute('/auth/callback')({
+export const Route = createFileRoute('/_callbacks/auth/callback')({
   component: Page,
   validateSearch: (search: Record<string, unknown>): AuthCallbackSearch => ({
     authCode: search.authCode as string | undefined,

@@ -590,6 +590,19 @@ export class WindowLayoutService extends DisposableService {
       }
     });
 
+    // Listen for webContents destroyed event to handle external tab closure
+    // (e.g., crash, system closing the webContents)
+    const webContents = tab.getViewContainer().webContents;
+    webContents.on('destroyed', () => {
+      this.logger.debug(
+        `[WindowLayoutService] WebContents destroyed for tab ${id}, cleaning up`,
+      );
+      // Only clean up if tab still exists (not already handled by handleCloseTab)
+      if (this.tabs[id]) {
+        void this.handleCloseTab(id);
+      }
+    });
+
     // Insert after source tab when opened from another tab, otherwise append to end
     const shouldInsertAfterSource = !!sourceTabId && !!this.tabs[sourceTabId];
 
@@ -663,7 +676,14 @@ export class WindowLayoutService extends DisposableService {
       const currentIndex = tabIdsBeforeDeletion.indexOf(tabId);
       const isActiveTab = this.activeTabId === tabId;
 
-      this.baseWindow!.contentView.removeChildView(tab.getViewContainer());
+      // Check if webContents is already destroyed (e.g., crash, external closure)
+      const webContents = tab.getViewContainer().webContents;
+      const isAlreadyDestroyed = webContents.isDestroyed();
+
+      // Only try to remove from view if not already destroyed
+      if (!isAlreadyDestroyed) {
+        this.baseWindow!.contentView.removeChildView(tab.getViewContainer());
+      }
       tab.destroy();
       delete this.tabs[tabId];
 

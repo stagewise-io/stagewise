@@ -1,11 +1,11 @@
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider, createRouter } from '@tanstack/react-router';
+import { NotFound } from './not-found';
 import './app.css';
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
-import { NotFound } from './not-found';
 import { Providers } from './providers';
 
 // Create a new router instance

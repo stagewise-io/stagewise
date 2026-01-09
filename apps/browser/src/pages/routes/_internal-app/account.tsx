@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-export const Route = createFileRoute('/account')({
+export const Route = createFileRoute('/_internal-app/account')({
   component: Page,
   head: () => ({
     meta: [

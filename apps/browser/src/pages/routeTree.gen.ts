@@ -10,60 +10,24 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as HomeRouteImport } from './routes/home'
-import { Route as HistoryRouteImport } from './routes/history'
-import { Route as DownloadsRouteImport } from './routes/downloads'
-import { Route as ClearDataRouteImport } from './routes/clear-data'
-import { Route as BrowsingSettingsRouteImport } from './routes/browsing-settings'
-import { Route as AgentSettingsRouteImport } from './routes/agent-settings'
-import { Route as AccountRouteImport } from './routes/account'
-import { Route as AboutRouteImport } from './routes/about'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as DiffReviewChatIdRouteImport } from './routes/diff-review.$chatId'
-import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as InternalAppRouteRouteImport } from './routes/_internal-app/route'
+import { Route as DiffReviewChatIdRouteImport } from './routes/diff-review/$chatId'
+import { Route as InternalAppHistoryRouteImport } from './routes/_internal-app/history'
+import { Route as InternalAppDownloadsRouteImport } from './routes/_internal-app/downloads'
+import { Route as InternalAppClearDataRouteImport } from './routes/_internal-app/clear-data'
+import { Route as InternalAppBrowsingSettingsRouteImport } from './routes/_internal-app/browsing-settings'
+import { Route as InternalAppAgentSettingsRouteImport } from './routes/_internal-app/agent-settings'
+import { Route as InternalAppAccountRouteImport } from './routes/_internal-app/account'
+import { Route as InternalAppAboutRouteImport } from './routes/_internal-app/about'
+import { Route as CallbacksAuthCallbackRouteImport } from './routes/_callbacks/auth.callback'
 
 const HomeRoute = HomeRouteImport.update({
   id: '/home',
   path: '/home',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HistoryRoute = HistoryRouteImport.update({
-  id: '/history',
-  path: '/history',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DownloadsRoute = DownloadsRouteImport.update({
-  id: '/downloads',
-  path: '/downloads',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ClearDataRoute = ClearDataRouteImport.update({
-  id: '/clear-data',
-  path: '/clear-data',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BrowsingSettingsRoute = BrowsingSettingsRouteImport.update({
-  id: '/browsing-settings',
-  path: '/browsing-settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgentSettingsRoute = AgentSettingsRouteImport.update({
-  id: '/agent-settings',
-  path: '/agent-settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountRoute = AccountRouteImport.update({
-  id: '/account',
-  path: '/account',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const InternalAppRouteRoute = InternalAppRouteRouteImport.update({
+  id: '/_internal-app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DiffReviewChatIdRoute = DiffReviewChatIdRouteImport.update({
@@ -71,56 +35,91 @@ const DiffReviewChatIdRoute = DiffReviewChatIdRouteImport.update({
   path: '/diff-review/$chatId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthCallbackRoute = AuthCallbackRouteImport.update({
-  id: '/auth/callback',
+const InternalAppHistoryRoute = InternalAppHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => InternalAppRouteRoute,
+} as any)
+const InternalAppDownloadsRoute = InternalAppDownloadsRouteImport.update({
+  id: '/downloads',
+  path: '/downloads',
+  getParentRoute: () => InternalAppRouteRoute,
+} as any)
+const InternalAppClearDataRoute = InternalAppClearDataRouteImport.update({
+  id: '/clear-data',
+  path: '/clear-data',
+  getParentRoute: () => InternalAppRouteRoute,
+} as any)
+const InternalAppBrowsingSettingsRoute =
+  InternalAppBrowsingSettingsRouteImport.update({
+    id: '/browsing-settings',
+    path: '/browsing-settings',
+    getParentRoute: () => InternalAppRouteRoute,
+  } as any)
+const InternalAppAgentSettingsRoute =
+  InternalAppAgentSettingsRouteImport.update({
+    id: '/agent-settings',
+    path: '/agent-settings',
+    getParentRoute: () => InternalAppRouteRoute,
+  } as any)
+const InternalAppAccountRoute = InternalAppAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => InternalAppRouteRoute,
+} as any)
+const InternalAppAboutRoute = InternalAppAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => InternalAppRouteRoute,
+} as any)
+const CallbacksAuthCallbackRoute = CallbacksAuthCallbackRouteImport.update({
+  id: '/_callbacks/auth/callback',
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/account': typeof AccountRoute
-  '/agent-settings': typeof AgentSettingsRoute
-  '/browsing-settings': typeof BrowsingSettingsRoute
-  '/clear-data': typeof ClearDataRoute
-  '/downloads': typeof DownloadsRoute
-  '/history': typeof HistoryRoute
   '/home': typeof HomeRoute
-  '/auth/callback': typeof AuthCallbackRoute
+  '/about': typeof InternalAppAboutRoute
+  '/account': typeof InternalAppAccountRoute
+  '/agent-settings': typeof InternalAppAgentSettingsRoute
+  '/browsing-settings': typeof InternalAppBrowsingSettingsRoute
+  '/clear-data': typeof InternalAppClearDataRoute
+  '/downloads': typeof InternalAppDownloadsRoute
+  '/history': typeof InternalAppHistoryRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
+  '/auth/callback': typeof CallbacksAuthCallbackRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/account': typeof AccountRoute
-  '/agent-settings': typeof AgentSettingsRoute
-  '/browsing-settings': typeof BrowsingSettingsRoute
-  '/clear-data': typeof ClearDataRoute
-  '/downloads': typeof DownloadsRoute
-  '/history': typeof HistoryRoute
   '/home': typeof HomeRoute
-  '/auth/callback': typeof AuthCallbackRoute
+  '/about': typeof InternalAppAboutRoute
+  '/account': typeof InternalAppAccountRoute
+  '/agent-settings': typeof InternalAppAgentSettingsRoute
+  '/browsing-settings': typeof InternalAppBrowsingSettingsRoute
+  '/clear-data': typeof InternalAppClearDataRoute
+  '/downloads': typeof InternalAppDownloadsRoute
+  '/history': typeof InternalAppHistoryRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
+  '/auth/callback': typeof CallbacksAuthCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/account': typeof AccountRoute
-  '/agent-settings': typeof AgentSettingsRoute
-  '/browsing-settings': typeof BrowsingSettingsRoute
-  '/clear-data': typeof ClearDataRoute
-  '/downloads': typeof DownloadsRoute
-  '/history': typeof HistoryRoute
+  '/_internal-app': typeof InternalAppRouteRouteWithChildren
   '/home': typeof HomeRoute
-  '/auth/callback': typeof AuthCallbackRoute
+  '/_internal-app/about': typeof InternalAppAboutRoute
+  '/_internal-app/account': typeof InternalAppAccountRoute
+  '/_internal-app/agent-settings': typeof InternalAppAgentSettingsRoute
+  '/_internal-app/browsing-settings': typeof InternalAppBrowsingSettingsRoute
+  '/_internal-app/clear-data': typeof InternalAppClearDataRoute
+  '/_internal-app/downloads': typeof InternalAppDownloadsRoute
+  '/_internal-app/history': typeof InternalAppHistoryRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
+  '/_callbacks/auth/callback': typeof CallbacksAuthCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
+    | '/home'
     | '/about'
     | '/account'
     | '/agent-settings'
@@ -128,12 +127,11 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
-    | '/home'
-    | '/auth/callback'
     | '/diff-review/$chatId'
+    | '/auth/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
+    | '/home'
     | '/about'
     | '/account'
     | '/agent-settings'
@@ -141,36 +139,28 @@ export interface FileRouteTypes {
     | '/clear-data'
     | '/downloads'
     | '/history'
-    | '/home'
-    | '/auth/callback'
     | '/diff-review/$chatId'
+    | '/auth/callback'
   id:
     | '__root__'
-    | '/'
-    | '/about'
-    | '/account'
-    | '/agent-settings'
-    | '/browsing-settings'
-    | '/clear-data'
-    | '/downloads'
-    | '/history'
+    | '/_internal-app'
     | '/home'
-    | '/auth/callback'
+    | '/_internal-app/about'
+    | '/_internal-app/account'
+    | '/_internal-app/agent-settings'
+    | '/_internal-app/browsing-settings'
+    | '/_internal-app/clear-data'
+    | '/_internal-app/downloads'
+    | '/_internal-app/history'
     | '/diff-review/$chatId'
+    | '/_callbacks/auth/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AboutRoute: typeof AboutRoute
-  AccountRoute: typeof AccountRoute
-  AgentSettingsRoute: typeof AgentSettingsRoute
-  BrowsingSettingsRoute: typeof BrowsingSettingsRoute
-  ClearDataRoute: typeof ClearDataRoute
-  DownloadsRoute: typeof DownloadsRoute
-  HistoryRoute: typeof HistoryRoute
+  InternalAppRouteRoute: typeof InternalAppRouteRouteWithChildren
   HomeRoute: typeof HomeRoute
-  AuthCallbackRoute: typeof AuthCallbackRoute
   DiffReviewChatIdRoute: typeof DiffReviewChatIdRoute
+  CallbacksAuthCallbackRoute: typeof CallbacksAuthCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -182,60 +172,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HomeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/history': {
-      id: '/history'
-      path: '/history'
-      fullPath: '/history'
-      preLoaderRoute: typeof HistoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/downloads': {
-      id: '/downloads'
-      path: '/downloads'
-      fullPath: '/downloads'
-      preLoaderRoute: typeof DownloadsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/clear-data': {
-      id: '/clear-data'
-      path: '/clear-data'
-      fullPath: '/clear-data'
-      preLoaderRoute: typeof ClearDataRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/browsing-settings': {
-      id: '/browsing-settings'
-      path: '/browsing-settings'
-      fullPath: '/browsing-settings'
-      preLoaderRoute: typeof BrowsingSettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agent-settings': {
-      id: '/agent-settings'
-      path: '/agent-settings'
-      fullPath: '/agent-settings'
-      preLoaderRoute: typeof AgentSettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account': {
-      id: '/account'
-      path: '/account'
-      fullPath: '/account'
-      preLoaderRoute: typeof AccountRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/_internal-app': {
+      id: '/_internal-app'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof InternalAppRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/diff-review/$chatId': {
@@ -245,28 +186,93 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DiffReviewChatIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/callback': {
-      id: '/auth/callback'
+    '/_internal-app/history': {
+      id: '/_internal-app/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof InternalAppHistoryRouteImport
+      parentRoute: typeof InternalAppRouteRoute
+    }
+    '/_internal-app/downloads': {
+      id: '/_internal-app/downloads'
+      path: '/downloads'
+      fullPath: '/downloads'
+      preLoaderRoute: typeof InternalAppDownloadsRouteImport
+      parentRoute: typeof InternalAppRouteRoute
+    }
+    '/_internal-app/clear-data': {
+      id: '/_internal-app/clear-data'
+      path: '/clear-data'
+      fullPath: '/clear-data'
+      preLoaderRoute: typeof InternalAppClearDataRouteImport
+      parentRoute: typeof InternalAppRouteRoute
+    }
+    '/_internal-app/browsing-settings': {
+      id: '/_internal-app/browsing-settings'
+      path: '/browsing-settings'
+      fullPath: '/browsing-settings'
+      preLoaderRoute: typeof InternalAppBrowsingSettingsRouteImport
+      parentRoute: typeof InternalAppRouteRoute
+    }
+    '/_internal-app/agent-settings': {
+      id: '/_internal-app/agent-settings'
+      path: '/agent-settings'
+      fullPath: '/agent-settings'
+      preLoaderRoute: typeof InternalAppAgentSettingsRouteImport
+      parentRoute: typeof InternalAppRouteRoute
+    }
+    '/_internal-app/account': {
+      id: '/_internal-app/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof InternalAppAccountRouteImport
+      parentRoute: typeof InternalAppRouteRoute
+    }
+    '/_internal-app/about': {
+      id: '/_internal-app/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof InternalAppAboutRouteImport
+      parentRoute: typeof InternalAppRouteRoute
+    }
+    '/_callbacks/auth/callback': {
+      id: '/_callbacks/auth/callback'
       path: '/auth/callback'
       fullPath: '/auth/callback'
-      preLoaderRoute: typeof AuthCallbackRouteImport
+      preLoaderRoute: typeof CallbacksAuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
 }
 
+interface InternalAppRouteRouteChildren {
+  InternalAppAboutRoute: typeof InternalAppAboutRoute
+  InternalAppAccountRoute: typeof InternalAppAccountRoute
+  InternalAppAgentSettingsRoute: typeof InternalAppAgentSettingsRoute
+  InternalAppBrowsingSettingsRoute: typeof InternalAppBrowsingSettingsRoute
+  InternalAppClearDataRoute: typeof InternalAppClearDataRoute
+  InternalAppDownloadsRoute: typeof InternalAppDownloadsRoute
+  InternalAppHistoryRoute: typeof InternalAppHistoryRoute
+}
+
+const InternalAppRouteRouteChildren: InternalAppRouteRouteChildren = {
+  InternalAppAboutRoute: InternalAppAboutRoute,
+  InternalAppAccountRoute: InternalAppAccountRoute,
+  InternalAppAgentSettingsRoute: InternalAppAgentSettingsRoute,
+  InternalAppBrowsingSettingsRoute: InternalAppBrowsingSettingsRoute,
+  InternalAppClearDataRoute: InternalAppClearDataRoute,
+  InternalAppDownloadsRoute: InternalAppDownloadsRoute,
+  InternalAppHistoryRoute: InternalAppHistoryRoute,
+}
+
+const InternalAppRouteRouteWithChildren =
+  InternalAppRouteRoute._addFileChildren(InternalAppRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  AboutRoute: AboutRoute,
-  AccountRoute: AccountRoute,
-  AgentSettingsRoute: AgentSettingsRoute,
-  BrowsingSettingsRoute: BrowsingSettingsRoute,
-  ClearDataRoute: ClearDataRoute,
-  DownloadsRoute: DownloadsRoute,
-  HistoryRoute: HistoryRoute,
+  InternalAppRouteRoute: InternalAppRouteRouteWithChildren,
   HomeRoute: HomeRoute,
-  AuthCallbackRoute: AuthCallbackRoute,
   DiffReviewChatIdRoute: DiffReviewChatIdRoute,
+  CallbacksAuthCallbackRoute: CallbacksAuthCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

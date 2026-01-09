@@ -36,7 +36,7 @@ import {
 import { List } from 'react-window';
 import { AreaChart, Area, ResponsiveContainer, XAxis } from 'recharts';
 
-export const Route = createFileRoute('/downloads')({
+export const Route = createFileRoute('/_internal-app/downloads')({
   component: Page,
   head: () => ({
     meta: [
@@ -348,7 +348,6 @@ function RowComponent({
       {row.isActive && (
         <SpeedGraph speedHistory={row.speedHistory} startTime={row.startTime} />
       )}
-
       <div
         className={`group relative z-10 flex h-full cursor-pointer select-none flex-col justify-center gap-2 rounded-lg px-4 ${
           row.fileExists || row.isActive ? 'hover:bg-muted/50' : 'opacity-60'

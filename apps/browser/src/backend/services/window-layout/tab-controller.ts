@@ -1031,11 +1031,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       this.consoleLogCountUpdateTimeout = null;
     }
 
-    this.detachDevToolsDebugger();
-
-    // Explicitly destroy the webContents to stop all processes
-    // In Electron, WebContents must be explicitly destroyed
+    // Only detach debugger if webContents is still alive
     if (!this.webContentsView.webContents.isDestroyed()) {
+      this.detachDevToolsDebugger();
+
+      // Explicitly destroy the webContents to stop all processes
+      // In Electron, WebContents must be explicitly destroyed
       this.webContentsView.webContents.close({ waitForBeforeUnload: false });
     }
 

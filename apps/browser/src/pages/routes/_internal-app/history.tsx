@@ -23,7 +23,7 @@ import type {
 } from '@shared/karton-contracts/pages-api/types';
 import { List } from 'react-window';
 
-export const Route = createFileRoute('/history')({
+export const Route = createFileRoute('/_internal-app/history')({
   component: Page,
   head: () => ({
     meta: [

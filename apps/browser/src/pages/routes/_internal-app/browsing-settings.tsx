@@ -27,7 +27,7 @@ import type {
   PageSetting,
 } from '@shared/karton-contracts/ui/shared-types';
 
-export const Route = createFileRoute('/browsing-settings')({
+export const Route = createFileRoute('/_internal-app/browsing-settings')({
   component: Page,
   head: () => ({
     meta: [
