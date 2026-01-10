@@ -182,9 +182,12 @@ export class UserExperienceService extends DisposableService {
     const cachedCount = this.cachedInspirationWebsites.websites.length;
 
     // Check if we have enough cached data
+    // Note: We only check against total when we've actually fetched before (seed is set).
+    // Otherwise total=0 initial state would incorrectly match cachedCount=0.
+    const hasFetchedBefore = this.cachedInspirationWebsites.seed !== '';
     if (
       cachedCount >= requestedEnd ||
-      cachedCount >= this.cachedInspirationWebsites.total
+      (hasFetchedBefore && cachedCount >= this.cachedInspirationWebsites.total)
     ) {
       // Return slice from cache
       return {

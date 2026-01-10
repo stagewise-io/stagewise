@@ -21,8 +21,7 @@ import { IconDocFolder, IconCircleQuestion } from 'nucleo-glass';
 import { IconPlusFill18 } from 'nucleo-ui-fill-18';
 import TimeAgo from 'react-timeago';
 import { cn } from '@/utils';
-import { Logo } from '@ui/components/ui/logo';
-import { AnimatedGradientBackground } from '@ui/components/ui/animated-gradient-background';
+import { LogoWithText } from '@ui/components/ui/logo-with-text';
 
 export const Route = createFileRoute('/home')({
   component: HomePage,
@@ -53,19 +52,6 @@ function TextSlideshow({
   }, [texts.length]);
 
   return <span className={className}>{texts[currentIndex]}</span>;
-}
-
-// Logo with text component
-function LogoWithText({ className }: { className?: string }) {
-  return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <div className="glass-body -ml-0.5 flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full">
-        <AnimatedGradientBackground className="absolute inset-0 z-0 size-full" />
-        <Logo color="white" className="z-10 mr-px mb-px size-1/2 shadow-2xs" />
-      </div>
-      <span className="font-semibold text-foreground text-xl">stagewise</span>
-    </div>
-  );
 }
 
 function HomePage() {
@@ -121,14 +107,12 @@ function StartPageWithConnectedWorkspace() {
   useEffect(() => {
     let cancelled = false;
     getInspirationWebsites({ offset: 0, limit: 10 }).then((result) => {
-      if (!cancelled) {
-        setInspirationWebsites(result);
-      }
+      if (!cancelled) setInspirationWebsites(result);
     });
     return () => {
       cancelled = true;
     };
-  }, [getInspirationWebsites]);
+  }, []);
 
   // Load more websites
   const loadMoreWebsites = useCallback(async () => {
@@ -224,8 +208,8 @@ function StartPageWithConnectedWorkspace() {
     (url: string, event?: React.MouseEvent) => {
       // Check if CMD (Mac) or CTRL (Windows/Linux) is pressed
       const isModifierPressed = event?.metaKey || event?.ctrlKey;
-      // Open in new tab (background if modifier pressed)
-      openTab(url, !isModifierPressed);
+      if (!isModifierPressed) window.location.href = url;
+      else openTab(url, false);
     },
     [openTab],
   );
