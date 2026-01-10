@@ -14,6 +14,10 @@ const meta = {
   // More on argTypes: https://storybook.js.org/docs/api/argtypes
   argTypes: {
     disabled: { control: 'boolean' },
+    size: {
+      control: 'select',
+      options: ['xs', 'sm', 'md'],
+    },
   },
   // Use `fn` to spy on the onClick arg, which will appear in the actions panel once invoked: https://storybook.js.org/docs/essentials/actions#action-args
   args: { onClick: fn() },
@@ -23,8 +27,29 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // More on writing stories with args: https://storybook.js.org/docs/writing-stories/args
-export const Enabled: Story = {
+export const Default: Story = {
   args: {
+    defaultChecked: true,
+  },
+};
+
+export const ExtraSmall: Story = {
+  args: {
+    size: 'xs',
+    defaultChecked: true,
+  },
+};
+
+export const Small: Story = {
+  args: {
+    size: 'sm',
+    defaultChecked: true,
+  },
+};
+
+export const Medium: Story = {
+  args: {
+    size: 'md',
     defaultChecked: true,
   },
 };

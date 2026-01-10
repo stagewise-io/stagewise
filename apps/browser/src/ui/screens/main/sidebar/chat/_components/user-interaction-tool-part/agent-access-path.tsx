@@ -101,7 +101,7 @@ export const AskForAgentAccessPathToolPartContent = memo(
             {isInputAvailable && (
               <>
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="xs"
                   onClick={onCancel}
                   disabled={isError || isOutputAvailable || isLoadingPath}
@@ -132,12 +132,12 @@ export const AskForAgentAccessPathToolPartContent = memo(
         )}
         {isOutputAvailable && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
-            <CheckIcon className="size-3 text-success" />
+            <CheckIcon className="size-3 text-success-foreground" />
           </div>
         )}
         {isError && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
-            <XIcon className="size-3 text-error" />
+            <XIcon className="size-3 text-error-foreground" />
           </div>
         )}
       </div>

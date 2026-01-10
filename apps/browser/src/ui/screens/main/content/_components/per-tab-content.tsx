@@ -8,10 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import {
-  IconNightShiftFillDuo18,
-  IconSquareCodeFillDuo18,
-} from 'nucleo-ui-fill-duo-18';
+import { IconSquareCodeFillDuo18 } from 'nucleo-ui-fill-duo-18';
 import {
   IconMoonFill18,
   IconBrightnessIncreaseFill18,
@@ -35,21 +32,23 @@ const ColorSchemeIcon = ({
     case 'light':
       return (
         <IconBrightnessIncreaseFill18
-          className={cn('size-4.5 text-primary', className)}
+          className={cn(
+            'size-4.5 text-primary-accent hover:text-primary-400 dark:hover:text-primary-350',
+            className,
+          )}
         />
       );
     case 'dark':
       return (
         <IconMoonFill18
-          className={cn('mb-px ml-px size-4 text-primary', className)}
+          className={cn(
+            'mb-px ml-px size-4 text-primary-accent hover:text-primary-400 dark:hover:text-primary-350',
+            className,
+          )}
         />
       );
     case 'system':
-      return (
-        <IconNightShiftFillDuo18
-          className={cn('size-4.5 text-foreground', className)}
-        />
-      );
+      return <IconMoonFill18 className={cn('mb-px ml-px size-4', className)} />;
   }
 };
 
@@ -131,13 +130,19 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
               >
                 <ColorSchemeIcon
                   colorScheme={colorScheme}
-                  className={cn(
-                    isInternalPage ? 'text-muted-foreground/40' : '',
-                  )}
+                  className={cn(isInternalPage ? 'opacity-50' : '')}
                 />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">Toggle color scheme</TooltipContent>
+            <TooltipContent side="bottom">
+              <div>
+                Toggle color scheme
+                <br />
+                <span className="text-muted-foreground/70">
+                  Current: {colorScheme}
+                </span>
+              </div>
+            </TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger>
@@ -153,9 +158,9 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
                   className={cn(
                     'size-5',
                     tab?.devToolsOpen
-                      ? 'text-primary'
-                      : 'text-muted-foreground',
-                    isInternalPage ? 'text-muted-foreground/40' : '',
+                      ? 'text-primary-accent hover:text-primary-400 dark:hover:text-primary-350'
+                      : '',
+                    isInternalPage ? 'opacity-50' : '',
                   )}
                 />
               </Button>
@@ -171,16 +176,14 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
                   createTab('stagewise://internal/browsing-settings', true);
                 }}
               >
-                <IconGear2Fill18 className="size-4.5 text-muted-foreground" />
+                <IconGear2Fill18 className="size-4.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">Settings</TooltipContent>
           </Tooltip>
         </div>
-
-        {/* Content Area */}
         <div className="flex size-full flex-col gap-4 rounded-lg p-2">
-          <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-sm shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] ring-1 ring-foreground/10">
+          <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-sm shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] ring-1 ring-border-subtle">
             {tab?.error ? (
               <div>Error: {tab?.error?.message}</div>
             ) : (

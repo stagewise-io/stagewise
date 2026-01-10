@@ -25,14 +25,14 @@ export function ProgressTrack({
   return (
     <ProgressBase.Track
       className={cn(
-        'glass-body col-span-2 col-start-1 block overflow-hidden rounded-xl bg-background/50',
+        'col-span-2 col-start-1 block overflow-hidden rounded-full border border-border bg-surface-1',
         slim ? 'h-1.5' : 'h-4',
       )}
     >
       <ProgressBase.Indicator
         className={cn(
-          'glass-body relative h-full overflow-hidden rounded-md data-[indeterminate]:w-full',
-          variant === 'warning' ? 'bg-yellow-500' : 'bg-primary',
+          'relative max-h-full overflow-hidden rounded-full data-indeterminate:w-full',
+          variant === 'warning' ? 'bg-warning' : 'bg-primary',
         )}
       >
         <div

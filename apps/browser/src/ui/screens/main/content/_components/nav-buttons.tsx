@@ -33,7 +33,7 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
         }}
       >
         <IconArrowLeft
-          className={`size-4 ${!isInternalPage && tab?.navigationHistory.canGoBack ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+          className={`size-4 ${(isInternalPage || !tab?.navigationHistory.canGoBack) && 'opacity-50'}`}
         />
       </Button>
       <Button
@@ -45,7 +45,7 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
         }}
       >
         <IconArrowRight
-          className={`size-4 ${!isInternalPage && tab?.navigationHistory.canGoForward ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+          className={`size-4 ${(isInternalPage || !tab?.navigationHistory.canGoForward) && 'opacity-50'}`}
         />
       </Button>
       {isLoading ? (
@@ -56,7 +56,7 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
             stop(tabId);
           }}
         >
-          <IconMediaStopFill18 className="size-3.5 text-muted-foreground" />
+          <IconMediaStopFill18 className="size-3.5" />
         </Button>
       ) : (
         <Button
@@ -68,7 +68,7 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
           }}
         >
           <IconArrowRotateAnticlockwise
-            className={`size-4 ${!isInternalPage ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}
+            className={`size-4 ${(isInternalPage || !tab?.navigationHistory.canGoBack) && 'opacity-50'}`}
           />
         </Button>
       )}

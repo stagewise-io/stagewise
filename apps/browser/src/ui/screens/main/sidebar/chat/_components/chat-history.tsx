@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEventListener } from '@/hooks/use-event-listener';
+import { useScrollbarGutterWidth } from '@/hooks/use-scrollbar-gutter-width';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { ChatBubble } from './chat-bubble';
-import { Loader2Icon } from 'lucide-react';
 import {
   useComparingSelector,
   useKartonState,
@@ -14,10 +14,57 @@ import type { History } from '@shared/karton-contracts/ui';
 import { IconXmark } from 'nucleo-micro-bold';
 
 export const ChatHistory = () => {
+  // Detect scrollbar gutter width for padding adjustment
+  const scrollbarGutterWidth = useScrollbarGutterWidth();
+
   const wasAtBottomRef = useRef(true);
   const isScrollingProgrammaticallyRef = useRef(false);
+  const forceScrollOnNextUpdateRef = useRef(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { activeChatId, isWorking, chats, workspaceStatus } = useKartonState(
+  const [containerHeight, setContainerHeight] = useState(0);
+  const [lastUserMessageHeight, setLastUserMessageHeight] = useState(0);
+  const lastUserMessageRef = useRef<HTMLDivElement | null>(null);
+  const lastUserMessageResizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  // Track section height using ResizeObserver
+  useEffect(() => {
+    const container = ref.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerHeight(entry.contentRect.height);
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Callback ref for the last user message
+  const lastUserMessageMeasureRef = useCallback((el: HTMLDivElement | null) => {
+    // Clean up previous observer
+    if (lastUserMessageResizeObserverRef.current) {
+      lastUserMessageResizeObserverRef.current.disconnect();
+      lastUserMessageResizeObserverRef.current = null;
+    }
+
+    lastUserMessageRef.current = el;
+
+    if (el) {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setLastUserMessageHeight(entry.contentRect.height);
+        }
+      });
+      observer.observe(el);
+      lastUserMessageResizeObserverRef.current = observer;
+    } else {
+      setLastUserMessageHeight(0);
+    }
+  }, []);
+  const { activeChatId, chats, workspaceStatus } = useKartonState(
     useComparingSelector((s) => ({
       activeChatId: s.agentChat?.activeChatId,
       isWorking: s.agentChat?.isWorking,
@@ -99,10 +146,12 @@ export const ChatHistory = () => {
   };
 
   // Auto-scroll to bottom when content changes, but only if user was at bottom
+  // or if a message was just sent (forceScrollOnNextUpdateRef)
   useEffect(() => {
-    if (wasAtBottomRef.current) {
-      // Always scroll to bottom if user was at bottom before the update
+    if (forceScrollOnNextUpdateRef.current || wasAtBottomRef.current) {
       scrollToBottom();
+      wasAtBottomRef.current = true;
+      forceScrollOnNextUpdateRef.current = false;
     }
   }, [activeChat]);
 
@@ -114,8 +163,11 @@ export const ChatHistory = () => {
   }, []);
 
   // Force scroll to bottom when user sends a message
+  // We set a flag here instead of scrolling immediately because the message
+  // hasn't been added to state yet (sendMessage is async). The actual scroll
+  // happens in the useEffect when activeChat updates with the new message.
   const handleMessageSent = useCallback(() => {
-    scrollToBottom();
+    forceScrollOnNextUpdateRef.current = true;
     wasAtBottomRef.current = true;
   }, []);
 
@@ -183,20 +235,40 @@ export const ChatHistory = () => {
       }, []);
   }, [activeChat]);
 
+  // Find the index of the last user message
+  const lastUserMessageIndex = useMemo(() => {
+    for (let i = renderedMessages.length - 1; i >= 0; i--) {
+      if (renderedMessages[i].role === 'user') {
+        return i;
+      }
+    }
+    return -1;
+  }, [renderedMessages]);
+
   /* We're adding a bg color on hover because there's a brower bug
      that prevents auto scroll-capturing if we don't do this.
      The onMouseEnter methods is also in place to help with another heuristic to get the browser to capture scroll in this element on hover. */
+
+  // Calculate right padding to account for scrollbar gutter
+  // When scrollbarGutterWidth > 0 (classic scrollbars), reduce right padding
+  // so that paddingRight + gutterWidth = 16px (same as left padding)
+  const basePadding = 16; // px-4 = 16px
+  const rightPadding = Math.max(0, basePadding - scrollbarGutterWidth);
 
   return (
     <section
       ref={ref}
       aria-label="Agent message display"
       className={cn(
-        'scrollbar-subtle mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_4px,black_100%)] pointer-events-auto block h-full min-h-[inherit] overflow-y-scroll overscroll-contain px-1 pt-4 text-foreground text-sm focus-within:outline-none focus:outline-none',
+        'mask-alpha mask-[linear-gradient(to_bottom,transparent_0px,black_4px,black_100%)] pointer-events-auto block h-full min-h-[inherit] overflow-y-auto overscroll-contain text-foreground text-sm focus-within:outline-none focus:outline-none',
+        'scrollbar-hover-only',
         renderedMessages.length === 0 && 'mb-1 h-max overflow-y-hidden',
       )}
       style={{
+        paddingLeft: basePadding,
+        paddingRight: rightPadding,
         paddingBottom: `calc(1rem + var(--file-diff-card-height, 0px)${workspaceStatus === 'setup' ? ' + 2rem' : ''})`,
+        scrollbarGutter: 'stable',
       }}
       onScroll={handleScroll}
     >
@@ -206,20 +278,17 @@ export const ChatHistory = () => {
             key={message.id ?? `${message.role}-${index}`}
             message={message}
             isLastMessage={index === renderedMessages.length - 1}
+            containerHeightInPx={containerHeight - lastUserMessageHeight}
+            measureRef={
+              index === lastUserMessageIndex
+                ? lastUserMessageMeasureRef
+                : undefined
+            }
           />
         );
       }) ?? []}
 
       {activeChat?.error && <ChatErrorBubble error={activeChat.error} />}
-
-      <div
-        className={cn(
-          'mt-4 flex h-0 w-full flex-row items-center justify-start gap-2 pl-2 text-xs text-zinc-500 opacity-0',
-          isWorking && 'h-auto opacity-100',
-        )}
-      >
-        <Loader2Icon className="size-4 animate-spin stroke-blue-600" />
-      </div>
 
       {renderedMessages.length === 0 && (
         <div className="flex w-full flex-col items-center justify-center gap-1 text-sm">
@@ -291,7 +360,8 @@ const suggestions: ChatSuggestionProps[] = [
       'You are looking at airbnb.com. Please inspect the page to find out how their icons work, and provide a simple explanation. If possible, find and focus on a specific, interesting icon that you could clone and use in my own application.',
     suggestion: (
       <span className="font-normal">
-        How do <span className="font-medium text-primary/60">airbnb.com</span>{' '}
+        How do{' '}
+        <span className="font-medium text-primary-accent">airbnb.com</span>{' '}
         icons work?
       </span>
     ),
@@ -304,7 +374,7 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         Take the glow effect from{' '}
-        <span className="font-medium text-primary/60">reflect.app</span>
+        <span className="font-medium text-primary-accent">reflect.app</span>
       </span>
     ),
     faviconUrl: 'https://reflect.app/favicon.ico',
@@ -316,7 +386,9 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         Copy the glass effect from{' '}
-        <span className="font-medium text-primary/60">react.email</span>{' '}
+        <span className="font-medium text-primary-accent">
+          react.email
+        </span>{' '}
       </span>
     ),
     faviconUrl: 'https://react.email/meta/favicon.ico',
@@ -328,7 +400,7 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         Make our button look like{' '}
-        <span className="font-medium text-primary/60">posthog.com</span>
+        <span className="font-medium text-primary-accent">posthog.com</span>
       </span>
     ),
     faviconUrl: 'https://posthog.com/favicon-32x32.png',
@@ -340,7 +412,7 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         What's the theme of{' '}
-        <span className="font-medium text-primary/60">cursor.com</span>?
+        <span className="font-medium text-primary-accent">cursor.com</span>?
       </span>
     ),
     faviconUrl: 'https://cursor.com/favicon.ico',

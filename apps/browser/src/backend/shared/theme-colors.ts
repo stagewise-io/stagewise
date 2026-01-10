@@ -5,16 +5,16 @@
  */
 export const THEME_COLORS = {
   light: {
-    background: '#e4e4e7',
+    background: '#d3d8e1', // base-200
     titleBarOverlay: {
-      color: '#e4e4e7',
+      color: '#d3d8e1',
       symbolColor: '#3f3f46',
     },
   },
   dark: {
-    background: '#18181b',
+    background: '#0c0d10', // base-950
     titleBarOverlay: {
-      color: '#18181b',
+      color: '#0c0d10',
       symbolColor: '#d4d4d8',
     },
   },

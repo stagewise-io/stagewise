@@ -35,6 +35,7 @@ export function SortableTab({
       <Tab
         tabState={tabState}
         activateBottomLeftCornerRadius={activateBottomLeftCornerRadius}
+        isDragging={isDragging}
       />
     </div>
   );

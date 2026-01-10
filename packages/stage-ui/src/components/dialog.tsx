@@ -20,11 +20,27 @@ export const DialogContent = ({
 }: DialogContentProps) => {
   return (
     <BaseDialog.Portal>
-      <BaseDialog.Backdrop className="fixed inset-0 z-40 size-full bg-black/10 backdrop-blur-xs transition-all duration-150 ease-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:backdrop-blur-none data-[starting-style]:backdrop-blur-none dark:bg-black/50" />
+      <BaseDialog.Backdrop
+        className={cn(
+          'fixed inset-0 z-40 size-full bg-overlay/20 backdrop-blur-xs dark:bg-overlay/50',
+          'transition-all duration-150 ease-out',
+          'data-ending-style:opacity-0 data-starting-style:opacity-0',
+          'data-ending-style:backdrop-blur-none data-starting-style:backdrop-blur-none',
+        )}
+      />
       <BaseDialog.Popup
         {...props}
         className={cn(
-          'app-no-drag -translate-x-1/2 -translate-y-1/2 glass-body glass-body-motion fixed top-1/2 left-1/2 z-40 flex h-full w-full flex-col items-stretch gap-6 bg-background/80 p-5 text-foreground backdrop-blur-lg duration-150 ease-out data-[ending-style]:origin-top data-[starting-style]:origin-bottom data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm sm:h-fit sm:w-fit sm:min-w-lg sm:rounded-3xl',
+          'app-no-drag -translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-40',
+          'flex h-full w-full flex-col items-stretch gap-6 p-5',
+          'bg-background text-foreground backdrop-blur-lg',
+          'border border-border-subtle',
+          'duration-150 ease-out',
+          'data-ending-style:origin-top data-starting-style:origin-bottom',
+          'data-ending-style:scale-90 data-starting-style:scale-90',
+          'data-ending-style:opacity-0 data-starting-style:opacity-0',
+          'data-ending-style:blur-sm data-starting-style:blur-sm',
+          'sm:h-fit sm:w-fit sm:min-w-lg sm:rounded-xl',
           className,
         )}
       >

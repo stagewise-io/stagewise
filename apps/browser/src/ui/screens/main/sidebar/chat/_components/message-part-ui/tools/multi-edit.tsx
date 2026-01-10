@@ -113,6 +113,7 @@ export const MultiEditToolPart = ({
 
   return (
     <ToolPartUI
+      showBorder={true}
       expanded={expanded}
       setExpanded={setExpanded}
       trigger={
@@ -146,7 +147,7 @@ export const MultiEditToolPart = ({
           )}
         </>
       }
-      contentClassName={streaming ? 'max-h-24' : 'max-h-56'}
+      contentClassName={cn(streaming ? 'max-h-24' : 'max-h-56')}
       contentFooter={
         state === 'success' ? (
           <div className="flex w-full flex-row items-center justify-between">
@@ -167,13 +168,9 @@ export const MultiEditToolPart = ({
                   }}
                 >
                   {collapsedDiffView ? (
-                    <ListChevronsUpDownIcon
-                      className={cn('size-3 shrink-0 text-muted-foreground')}
-                    />
+                    <ListChevronsUpDownIcon className={cn('size-3 shrink-0')} />
                   ) : (
-                    <ListChevronsDownUpIcon
-                      className={cn('size-3 shrink-0 text-muted-foreground')}
-                    />
+                    <ListChevronsDownUpIcon className={cn('size-3 shrink-0')} />
                   )}
                 </Button>
               </TooltipTrigger>
@@ -204,10 +201,10 @@ export const MultiEditToolPart = ({
             >
               <Tooltip>
                 <TooltipTrigger>
-                  <div className="flex flex-row items-center justify-center gap-1 text-muted-foreground">
+                  <div className="flex flex-row items-center justify-center gap-1">
                     <IdeLogo
                       ide={openInIdeSelection}
-                      className="size-3 shrink-0 text-muted-foreground"
+                      className="size-3 shrink-0"
                     />
                     <span className="text-xs">Open file</span>
                   </div>
@@ -269,7 +266,7 @@ const SuccessHeader = ({
 }) => {
   return (
     <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
-      <div className="pointer-events-auto flex flex-row items-center justify-start gap-1 text-muted-foreground">
+      <div className="pointer-events-auto flex flex-row items-center justify-start gap-1 text-foreground">
         <FileIcon filePath={relativePath ?? ''} className="size-5 shrink-0" />
         <Tooltip>
           <TooltipTrigger>
@@ -283,10 +280,14 @@ const SuccessHeader = ({
         </Tooltip>
       </div>
       {newLineCount > 0 && (
-        <span className="shrink-0 text-success text-xs">+{newLineCount}</span>
+        <span className="shrink-0 text-success-foreground text-xs">
+          +{newLineCount}
+        </span>
       )}
       {deletedLineCount > 0 && (
-        <span className="shrink-0 text-error text-xs">-{deletedLineCount}</span>
+        <span className="shrink-0 text-error-foreground text-xs">
+          -{deletedLineCount}
+        </span>
       )}
     </div>
   );

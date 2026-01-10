@@ -13,12 +13,12 @@ import type { LintingDiagnostic } from '@stagewise/agent-tools';
 export const GetLintingDiagnosticsToolPart = ({
   part,
   disableShimmer = false,
-  showBorder = true,
+  capMaxHeight = false,
   isLastPart = false,
 }: {
   part: Extract<ToolPart, { type: 'tool-getLintingDiagnosticsTool' }>;
   disableShimmer?: boolean;
-  showBorder?: boolean;
+  capMaxHeight?: boolean;
   isLastPart?: boolean;
 }) => {
   const streaming = useMemo(() => {
@@ -54,12 +54,7 @@ export const GetLintingDiagnosticsToolPart = ({
   // Error state display
   if (state === 'error') {
     return (
-      <div
-        className={cn(
-          'group/exploring-part block min-w-32 rounded-xl',
-          showBorder && '-mx-1 border-border/20 bg-muted-foreground/5',
-        )}
-      >
+      <div className={cn('group/exploring-part block min-w-32 rounded-xl')}>
         <div className="flex h-6 cursor-default items-center gap-1 rounded-xl px-2.5 text-muted-foreground">
           <div className="flex w-full flex-row items-center justify-start gap-1">
             <XCircleIcon className="size-3 shrink-0 text-muted-foreground" />
@@ -74,23 +69,17 @@ export const GetLintingDiagnosticsToolPart = ({
 
   return (
     <ToolPartUI
-      showBorder={showBorder}
       expanded={expanded}
       setExpanded={handleUserSetExpanded}
       trigger={
         <>
           {!streaming &&
             (hasDiagnostics ? (
-              <IconTriangleWarningOutline18 className="size-3 shrink-0 text-muted-foreground" />
+              <IconTriangleWarningOutline18 className="size-3 shrink-0" />
             ) : (
-              <IconCheck2Outline18 className="size-3 shrink-0 text-muted-foreground" />
+              <IconCheck2Outline18 className="size-3 shrink-0" />
             ))}
-          <div
-            className={cn(
-              'flex flex-row items-center justify-start gap-1',
-              showBorder && 'flex-1',
-            )}
-          >
+          <div className={cn('flex flex-row items-center justify-start gap-1')}>
             {streaming ? (
               <LoadingHeader disableShimmer={disableShimmer} />
             ) : (
@@ -99,7 +88,6 @@ export const GetLintingDiagnosticsToolPart = ({
                 warnings={warnings}
                 totalFiles={totalFiles}
                 hasDiagnostics={hasDiagnostics}
-                showBorder={showBorder}
               />
             )}
           </div>
@@ -132,13 +120,13 @@ export const GetLintingDiagnosticsToolPart = ({
             </div>
           )}
           {state === 'success' && !hasDiagnostics && (
-            <div className="py-2 text-muted-foreground/60 text-xs">
+            <div className="pb-1 text-muted-foreground text-xs opacity-75">
               No linting issues found
             </div>
           )}
         </>
       }
-      contentClassName="max-h-48!"
+      contentClassName={capMaxHeight ? 'max-h-48' : undefined}
       contentFooterClassName="px-0"
     />
   );
@@ -150,9 +138,9 @@ const DiagnosticRow = ({ diagnostic }: { diagnostic: LintingDiagnostic }) => {
   return (
     <div className="flex flex-row items-start gap-1.5 text-xs">
       {isError ? (
-        <XCircleIcon className="mt-0.5 size-3 shrink-0 text-error" />
+        <XCircleIcon className="mt-0.5 size-3 shrink-0 text-error-foreground" />
       ) : (
-        <IconTriangleWarningOutline18 className="mt-0.5 size-3 shrink-0 text-warning" />
+        <IconTriangleWarningOutline18 className="mt-0.5 size-3 shrink-0 text-warning-foreground" />
       )}
       <span className="min-w-0 flex-1 truncate text-muted-foreground/75">
         {diagnostic.message}
@@ -169,29 +157,18 @@ const SuccessHeader = ({
   warnings,
   totalFiles,
   hasDiagnostics,
-  showBorder,
 }: {
   errors: number;
   warnings: number;
   totalFiles: number;
   hasDiagnostics: boolean;
-  showBorder?: boolean;
 }) => {
   return (
     <div className="pointer-events-none flex flex-row items-center justify-start gap-1 overflow-hidden">
-      <span
-        className={cn(
-          'shrink-0 text-muted-foreground text-xs',
-          !showBorder && 'font-normal text-muted-foreground/75',
-        )}
-      >
+      <span className={cn('shrink-0 text-xs')}>
         {hasDiagnostics ? (
           <>
-            {showBorder ? (
-              'Found '
-            ) : (
-              <span className="font-medium text-muted-foreground">Found </span>
-            )}
+            <span className="font-medium">Found </span>
             {errors > 0 && (
               <span>
                 {errors} error{errors !== 1 ? 's' : ''}
@@ -223,7 +200,7 @@ const LoadingHeader = ({ disableShimmer }: { disableShimmer?: boolean }) => {
         className={cn(
           'truncate text-xs',
           disableShimmer
-            ? 'text-muted-foreground'
+            ? ''
             : 'shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300',
         )}
       >

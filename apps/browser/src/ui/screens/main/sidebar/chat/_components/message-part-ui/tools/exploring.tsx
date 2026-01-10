@@ -1,3 +1,4 @@
+import { useKartonState } from '@/hooks/use-karton';
 import type { ToolPart } from '@shared/karton-contracts/ui';
 import {
   useMemo,
@@ -76,21 +77,22 @@ const PartContent = ({
   disableShimmer = false,
   thinkingDuration,
   isLastPart = false,
+  capMaxHeight = false,
 }: {
   part: ReadOnlyToolPart;
   minimal?: boolean;
   disableShimmer?: boolean;
   thinkingDuration?: number;
   isLastPart?: boolean;
+  capMaxHeight?: boolean;
 }) => {
   switch (part.type) {
     case 'reasoning':
       return (
         <ThinkingPart
           part={part}
-          isShimmering={false}
+          isShimmering={!disableShimmer}
           thinkingDuration={thinkingDuration}
-          showBorder={!minimal}
           isLastPart={isLastPart}
         />
       );
@@ -156,26 +158,27 @@ const PartContent = ({
           part={part}
           disableShimmer={disableShimmer}
           isLastPart={isLastPart}
+          capMaxHeight={capMaxHeight}
         />
       );
     case 'tool-readConsoleLogsTool':
       return (
         <ReadConsoleLogsToolPart
           key={part.toolCallId}
-          showBorder={!minimal}
           part={part}
           disableShimmer={disableShimmer}
           isLastPart={isLastPart}
+          capMaxHeight={capMaxHeight}
         />
       );
     case 'tool-getLintingDiagnosticsTool':
       return (
         <GetLintingDiagnosticsToolPart
           key={part.toolCallId}
-          showBorder={!minimal}
           part={part}
           disableShimmer={disableShimmer}
           isLastPart={isLastPart}
+          capMaxHeight={capMaxHeight}
         />
       );
     default:
@@ -199,6 +202,7 @@ export const ExploringToolParts = ({
     new Set(),
   );
   const isOnlyOnePart = useMemo(() => parts.length === 1, [parts]);
+  const activeTabs = useKartonState((s) => s.browser.tabs);
 
   useEffect(() => {
     setExpanded(isAutoExpanded);
@@ -401,28 +405,63 @@ export const ExploringToolParts = ({
       case 'tool-grepSearchTool':
       case 'tool-listFilesTool':
         return 'Exploring files...';
-      case 'tool-getContext7LibraryDocsTool':
-      case 'tool-resolveContext7LibraryTool':
-        return 'Exploring documentation...';
-      case 'tool-executeConsoleScriptTool':
-      case 'tool-readConsoleLogsTool':
-        return 'Exploring the browser...';
+      case 'tool-getContext7LibraryDocsTool': {
+        const p = lastNonReasoningPart as Extract<
+          ToolPart,
+          { type: 'tool-getContext7LibraryDocsTool' }
+        >;
+        if (!p.input.libraryId) return 'Exploring documentation...';
+        return `Reading docs for ${p.input.libraryId}...`;
+      }
+      case 'tool-resolveContext7LibraryTool': {
+        const p = lastNonReasoningPart as Extract<
+          ToolPart,
+          { type: 'tool-resolveContext7LibraryTool' }
+        >;
+        if (!p.input?.library) return 'Exploring documentation...';
+        return `Searching docs for ${p.input.library}...`;
+      }
+      case 'tool-executeConsoleScriptTool': {
+        const p = lastNonReasoningPart as Extract<
+          ToolPart,
+          { type: 'tool-executeConsoleScriptTool' }
+        >;
+        const tab = Object.values(activeTabs).find(
+          (tab) => tab.handle === p.input?.id,
+        );
+        if (!tab) return 'Exploring the browser...';
+        const hostname = new URL(tab.url).hostname;
+        return `Running script in ${hostname}...`;
+      }
+      case 'tool-readConsoleLogsTool': {
+        const p = lastNonReasoningPart as Extract<
+          ToolPart,
+          { type: 'tool-readConsoleLogsTool' }
+        >;
+        const tab = Object.values(activeTabs).find(
+          (tab) => tab.handle === p.input?.id,
+        );
+        if (!tab) return 'Exploring the browser...';
+        const hostname = new URL(tab.url).hostname;
+        return `Reading logs from ${hostname}...`;
+      }
       case 'tool-getLintingDiagnosticsTool':
         return 'Checking linting...';
       default:
         return 'Exploring...';
     }
-  }, [parts]);
+  }, [parts, activeTabs]);
 
   // For single part, show it inline in the trigger without expand/collapse
   if (isOnlyOnePart)
     return (
       <PartContent
         part={parts[0]!}
-        minimal={false}
+        minimal={true}
         disableShimmer={!isShimmering}
         thinkingDuration={thinkingDurations?.[0]}
         isLastPart={isAutoExpanded}
+        capMaxHeight={true}
       />
     );
 
@@ -432,11 +471,7 @@ export const ExploringToolParts = ({
       expanded={expanded}
       setExpanded={setExpanded}
       trigger={
-        <div
-          className={cn(
-            `flex w-full flex-row items-center justify-start gap-2`,
-          )}
-        >
+        <div className={cn(`flex flex-row items-center justify-start gap-2`)}>
           <div className="flex flex-1 flex-row items-center justify-start gap-1 text-xs">
             {isShimmering ? (
               <>
@@ -447,10 +482,8 @@ export const ExploringToolParts = ({
               </>
             ) : (
               <>
-                <SearchIcon className="size-3 shrink-0 text-muted-foreground" />
-                <span className="truncate text-muted-foreground">
-                  {explorationFinishedText}
-                </span>
+                <SearchIcon className="size-3 shrink-0" />
+                <span className="truncate">{explorationFinishedText}</span>
               </>
             )}
           </div>
@@ -463,7 +496,7 @@ export const ExploringToolParts = ({
           </div>
         </ExploringContentContext.Provider>
       }
-      contentClassName={hasExpandedChild ? 'max-h-96' : 'max-h-52'}
+      contentClassName={hasExpandedChild ? 'max-h-96!' : 'max-h-52!'}
     />
   );
 };

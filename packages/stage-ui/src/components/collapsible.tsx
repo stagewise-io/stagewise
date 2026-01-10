@@ -17,14 +17,14 @@ export const CollapsibleTrigger = ({
   size,
   ...props
 }: CollapsibleTriggerProps) => {
-  const paddingClass = size === 'default' ? 'p-3' : 'px-1.5 py-1';
+  const paddingClass = size === 'default' ? 'py-3 px-0' : 'px-0 py-1'; // TODO: Decide on a final style here
   const gapClass = size === 'default' ? 'gap-2' : 'gap-1';
 
   return (
     <CollapsibleBase.Trigger
       {...props}
       className={cn(
-        'group flex w-full flex-row items-center justify-between font-medium text-sm transition-all duration-150 ease-out hover:bg-foreground/5 active:bg-foreground/10',
+        'group flex w-full flex-row items-center justify-between rounded-lg font-medium text-muted-foreground text-sm transition-all duration-150 ease-out hover:text-foreground active:text-foreground',
         paddingClass,
         gapClass,
         props.className,
@@ -49,7 +49,7 @@ export const CollapsibleContent = ({
     <CollapsibleBase.Panel
       {...props}
       className={cn(
-        'flex h-(--collapsible-panel-height) flex-col overflow-hidden px-2 text-foreground text-sm transition-[height] duration-100 ease-out data-ending-style:h-0 data-starting-style:h-0',
+        'flex h-(--collapsible-panel-height) flex-col overflow-hidden px-2 text-foreground text-sm transition-[height] duration-100 data-ending-style:h-0 data-starting-style:h-0',
         props.className,
       )}
     >

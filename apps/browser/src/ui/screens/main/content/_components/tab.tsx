@@ -29,6 +29,7 @@ export function Tab({
   className = '',
   activateBottomLeftCornerRadius = true,
   tabState,
+  isDragging = false,
 }: {
   borderRadius?: number;
   /** Optional override for just the bottom-left S-curve radius (used during drag interpolation) */
@@ -36,6 +37,8 @@ export function Tab({
   className?: string;
   activateBottomLeftCornerRadius?: boolean;
   tabState: TabState;
+  /** Whether this tab is currently being dragged */
+  isDragging?: boolean;
 }) {
   // Use the override if provided, otherwise use the general borderRadius
   const effectiveBottomLeftRadius = bottomLeftBorderRadius ?? borderRadius;
@@ -101,9 +104,10 @@ export function Tab({
           isActive
             ? 'relative h-8'
             : cn(
-                'mb-0.75 flex h-7.25 items-center gap-2 self-start rounded-[8.5px] py-1 transition-colors hover:bg-muted-foreground/5 has-[+[data-state="active"]]:rounded-br-md [[data-state="active"]+&]:rounded-bl-md',
+                'mb-0.75 flex h-7.25 items-center gap-2 self-start rounded-[8.5px] py-1 transition-colors hover:bg-surface-2 has-[+[data-state="active"]]:rounded-br-md dark:hover:bg-base-850 [[data-state="active"]+&]:rounded-bl-md',
+                isDragging && 'bg-surface-2 dark:bg-base-850',
                 shouldShowRightSeparator &&
-                  'after:-right-[2px] after:absolute after:h-4 after:border-muted-foreground/20 after:border-r after:content-[""]',
+                  'after:-right-[2px] after:absolute after:h-4 after:border-surface-2 after:border-r after:content-[""]',
               ),
         )}
         onClick={isActive ? undefined : handleClick}
@@ -203,7 +207,7 @@ function TabContent({
           className={cn(
             'shrink-0',
             tabState.isMuted
-              ? 'text-rose-500 hover:text-rose-800'
+              ? 'text-error hover:text-error-foreground'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
@@ -213,7 +217,7 @@ function TabContent({
             />
           ) : (
             <IconVolumeXmarkFill18
-              className={cn('size-3', !isActive && 'text-rose-600')}
+              className={cn('size-3', !isActive && 'text-error-foreground')}
             />
           )}
         </Button>

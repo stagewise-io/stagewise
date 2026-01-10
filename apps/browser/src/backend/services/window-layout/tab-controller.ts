@@ -594,7 +594,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   }
 
   public async cycleColorScheme() {
-    const schemes: ColorScheme[] = ['system', 'light', 'dark'];
+    const schemes: ColorScheme[] = ['system', 'dark', 'light'];
     const currentIndex = schemes.indexOf(this.currentState.colorScheme);
     const nextScheme = schemes[(currentIndex + 1) % schemes.length];
     await this.setColorScheme(nextScheme);

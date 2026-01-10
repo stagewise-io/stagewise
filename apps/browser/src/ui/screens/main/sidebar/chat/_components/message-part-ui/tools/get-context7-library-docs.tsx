@@ -19,9 +19,11 @@ export const GetContext7LibraryDocsToolPart = ({
     part.state === 'output-available' ? (
       <span className="flex min-w-0 gap-1">
         <span className="shrink-0 truncate font-medium">Read latest docs</span>
-        <span className="truncate font-normal text-muted-foreground/75">
-          for {part.input?.libraryId ?? 'unknown library'}
-        </span>
+        {part.input?.libraryId && (
+          <span className="truncate font-normal text-muted-foreground/75">
+            for {part.input.libraryId}
+          </span>
+        )}
       </span>
     ) : undefined;
 

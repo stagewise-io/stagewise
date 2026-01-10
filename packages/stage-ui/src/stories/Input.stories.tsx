@@ -12,6 +12,10 @@ const meta = {
     disabled: { control: 'boolean' },
     required: { control: 'boolean' },
     debounce: { control: 'number' },
+    size: {
+      control: 'select',
+      options: ['xs', 'sm', 'md'],
+    },
   },
   args: { onValueChange: fn() },
 } satisfies Meta<typeof Input>;
@@ -22,6 +26,27 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     placeholder: 'Enter text...',
+  },
+};
+
+export const ExtraSmall: Story = {
+  args: {
+    placeholder: 'Extra small input',
+    size: 'xs',
+  },
+};
+
+export const Small: Story = {
+  args: {
+    placeholder: 'Small input',
+    size: 'sm',
+  },
+};
+
+export const Medium: Story = {
+  args: {
+    placeholder: 'Medium input',
+    size: 'md',
   },
 };
 

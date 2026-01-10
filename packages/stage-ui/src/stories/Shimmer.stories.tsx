@@ -229,7 +229,7 @@ const ShimmerShowcase = () => {
           </div>
         </section>
 
-        <section className="rounded-lg bg-muted p-6">
+        <section className="rounded-lg bg-surface-1 p-6">
           <h3 className="mb-4 font-semibold text-foreground text-xl">
             Usage Example
           </h3>

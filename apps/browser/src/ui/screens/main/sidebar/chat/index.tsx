@@ -10,12 +10,10 @@ export function SidebarChatSection() {
   return (
     <div
       className={cn(
-        'size-full rounded-lg bg-[#fcfcfc] p-2 group-data-[collapsed=true]:hidden dark:bg-background',
+        'size-full rounded-lg bg-background py-2 group-data-[collapsed=true]:hidden',
       )}
     >
-      <div className="size-full group-data-[collapsed=true]:hidden">
-        {signedIn ? <ChatPanel /> : <NotSignedIn />}
-      </div>
+      {signedIn ? <ChatPanel /> : <NotSignedIn />}
     </div>
   );
 }

@@ -3,6 +3,9 @@ import { CheckIcon, ChevronDownIcon } from 'lucide-react';
 import { useMemo, type ComponentProps } from 'react';
 import { cn } from '../lib/utils';
 
+export type SelectSize = 'xs' | 'sm' | 'md';
+export type SelectTriggerVariant = 'ghost' | 'secondary';
+
 export type SelectProps = Omit<
   ComponentProps<typeof SelectBase.Root>,
   'children' | 'items'
@@ -13,21 +16,66 @@ export type SelectProps = Omit<
     icon?: React.ReactNode;
   }[];
   triggerClassName?: string;
+  size?: SelectSize;
+  triggerVariant?: SelectTriggerVariant;
 };
 
-export const Select = ({ items, triggerClassName, ...props }: SelectProps) => {
+const sizes = {
+  trigger: {
+    xs: 'h-6 gap-1 text-xs',
+    sm: 'h-8 gap-1.5 text-sm',
+    md: 'h-10 gap-2 text-sm',
+  } satisfies Record<SelectSize, string>,
+  popup: {
+    xs: 'text-xs',
+    sm: 'text-sm',
+    md: 'text-sm',
+  } satisfies Record<SelectSize, string>,
+  item: {
+    xs: 'px-2 py-1',
+    sm: 'px-2 py-1.5',
+    md: 'px-2.5 py-2',
+  } satisfies Record<SelectSize, string>,
+  icon: {
+    xs: 'size-3.5',
+    sm: 'size-4',
+    md: 'size-4',
+  } satisfies Record<SelectSize, string>,
+};
+
+const triggerVariants = {
+  ghost:
+    'bg-transparent text-muted-foreground hover:text-foreground data-popup-open:text-foreground',
+  secondary:
+    'border border-border bg-surface-1 text-foreground hover:bg-surface-2 active:bg-surface-3 data-popup-open:bg-surface-2',
+} satisfies Record<SelectTriggerVariant, string>;
+
+export const Select = ({
+  items,
+  triggerClassName,
+  size = 'sm',
+  triggerVariant = 'ghost',
+  ...props
+}: SelectProps) => {
   // convert items with icons to proper items that can be rendered everywhere
   const convertedItems = useMemo(() => {
     return items.map((item) => ({
       value: item.value as string,
       label: (
-        <div className="flex flex-row items-center justify-between gap-4 text-sm">
-          {item.icon && <div className="size-4 shrink-0">{item.icon}</div>}
-          <span className="truncate last:pr-4">{item.label}</span>
+        <div
+          className={cn(
+            'flex flex-row items-center gap-2',
+            size === 'xs' ? 'text-xs' : 'text-sm',
+          )}
+        >
+          {item.icon && (
+            <div className={cn('shrink-0', sizes.icon[size])}>{item.icon}</div>
+          )}
+          <span className="truncate">{item.label}</span>
         </div>
       ),
     })) as { value: string; label: React.ReactNode }[];
-  }, [items]);
+  }, [items, size]);
 
   return (
     <SelectBase.Root
@@ -38,30 +86,49 @@ export const Select = ({ items, triggerClassName, ...props }: SelectProps) => {
     >
       <SelectBase.Trigger
         className={cn(
-          'glass-body flex h-8 min-w-32 max-w-lg flex-row items-center justify-between gap-4 rounded-lg pr-1.5 pl-2 text-foreground has-disabled:before:bg-transparent has-disabled:before:opacity-50',
+          'focus-visible:-outline-offset-2 inline-flex min-w-32 max-w-lg cursor-pointer items-center justify-between rounded-lg pr-1.5 pl-2 shadow-none transition-colors focus-visible:outline-1 focus-visible:outline-muted-foreground/35 has-disabled:pointer-events-none has-disabled:opacity-50',
+          triggerVariants[triggerVariant],
+          sizes.trigger[size],
           triggerClassName,
         )}
       >
-        <SelectBase.Value />
+        <SelectBase.Value className="truncate" />
         <SelectBase.Icon className="shrink-0">
-          <ChevronDownIcon className="size-4" />
+          <ChevronDownIcon className={sizes.icon[size]} />
         </SelectBase.Icon>
       </SelectBase.Trigger>
       <SelectBase.Portal>
         <SelectBase.Positioner>
-          <SelectBase.Popup className="glass-body glass-body-motion flex origin-[var(--transform-origin)] flex-col items-stretch gap-0.5 rounded-lg bg-background/80 p-1 backdrop-blur-sm transition-[transform,scale,opacity] duration-150 ease-out data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0">
+          <SelectBase.Popup
+            className={cn(
+              'flex origin-(--transform-origin) flex-col items-stretch gap-0.5',
+              'rounded-lg border border-border-subtle bg-background p-1',
+              'shadow-lg',
+              'transition-[transform,scale,opacity] duration-150 ease-out',
+              'data-ending-style:scale-90 data-starting-style:scale-90',
+              'data-ending-style:opacity-0 data-starting-style:opacity-0',
+              sizes.popup[size],
+            )}
+          >
             <SelectBase.ScrollUpArrow />
             {convertedItems.map((item) => (
               <SelectBase.Item
                 key={item.value}
                 value={item.value}
-                className="grid w-full min-w-24 min-w-[var(--anchor-width)] cursor-default grid-cols-[0.75rem_1fr] flex-row items-center justify-start gap-2 rounded-md px-2 py-1.5 text-foreground text-sm transition-all duration-150 ease-out hover:bg-foreground/5 hover:pr-1.75 hover:pl-2.25 group-data-[side=none]:min-w-[calc(var(--anchor-width)+1rem)] group-data-[side=none]:pr-12 group-data-[side=none]:text-base group-data-[side=none]:leading-4"
+                className={cn(
+                  'grid w-full min-w-(--anchor-width) cursor-default grid-cols-[0.75rem_1fr] items-center gap-2',
+                  'rounded-md text-foreground outline-none',
+                  'transition-colors duration-150 ease-out',
+                  'hover:bg-surface-1 data-highlighted:bg-surface-1',
+                  'group-data-[side=none]:min-w-[calc(var(--anchor-width)+1rem)] group-data-[side=none]:pr-12 group-data-[side=none]:text-base group-data-[side=none]:leading-4',
+                  sizes.item[size],
+                )}
               >
                 <SelectBase.ItemIndicator className="col-start-1 shrink-0">
-                  <CheckIcon className="w-full text-muted-foreground" />
+                  <CheckIcon className="size-full text-muted-foreground" />
                 </SelectBase.ItemIndicator>
 
-                <SelectBase.ItemText className="col-start-2 flex flex-row items-center justify-between gap-4">
+                <SelectBase.ItemText className="col-start-2 flex flex-row items-center gap-2">
                   {item.label}
                 </SelectBase.ItemText>
               </SelectBase.Item>

@@ -165,7 +165,11 @@ class HighlighterManager {
 
     const addCodeScroll = (html: string) => {
       // Add overflow-x: auto and scrollbar-subtle to code element so it scrolls instead of the container
+      // Also add min-width: 0 and flex: 1 to allow proper shrinking in flex container
+      // Explicitly set overflow-y: visible to prevent vertical scrollbar (scrollbar-subtle sets overflow: auto)
       return html.replace(/<code([^>]*)>/, (_match, attrs) => {
+        const flexStyles =
+          'overflow-x: auto; overflow-y: visible; min-width: 0; flex: 1;';
         // Check if there's already a class attribute
         if (attrs.includes('class=')) {
           // Add to existing class
@@ -173,10 +177,10 @@ class HighlighterManager {
             /class="([^"]*)"/,
             'class="$1 scrollbar-subtle"',
           );
-          return `<code${withClass} style="overflow-x: auto;">`;
+          return `<code${withClass} style="${flexStyles}">`;
         } else {
           // Add new class attribute
-          return `<code${attrs} class="scrollbar-subtle" style="overflow-x: auto;">`;
+          return `<code${attrs} class="scrollbar-subtle" style="${flexStyles}">`;
         }
       });
     };
@@ -200,7 +204,7 @@ export const CodeBlock = memo(
     code,
     language,
     className,
-    preClassName = 'flex flex-row gap-2 font-mono text-xs',
+    preClassName = 'flex flex-row gap-2 font-mono text-xs w-full',
     hideActionButtons,
     compactDiff,
     ...rest

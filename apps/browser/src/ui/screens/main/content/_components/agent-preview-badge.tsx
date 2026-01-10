@@ -30,9 +30,7 @@ export function AgentPreviewBadge({ onClick }: AgentPreviewBadgeProps) {
             <IconMessagesFillDuo18
               className={cn(
                 'size-4',
-                isWorking
-                  ? 'animate-agent-working-pulse text-primary'
-                  : 'text-foreground/80',
+                isWorking ? 'animate-agent-working-pulse text-primary' : '',
               )}
             />
           </Button>

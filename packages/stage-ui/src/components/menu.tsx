@@ -3,6 +3,21 @@ import type { ComponentProps, ReactElement } from 'react';
 import { cn } from '../lib/utils';
 import { ChevronRightIcon } from 'lucide-react';
 
+export type MenuSize = 'xs' | 'sm' | 'md';
+
+const menuSizes = {
+  popup: {
+    xs: 'text-xs',
+    sm: 'text-sm',
+    md: 'text-sm',
+  } satisfies Record<MenuSize, string>,
+  item: {
+    xs: 'px-2 py-1 text-xs',
+    sm: 'px-2 py-1.5 text-sm',
+    md: 'px-2.5 py-2 text-sm',
+  } satisfies Record<MenuSize, string>,
+};
+
 export const Menu = MenuBase.Root;
 
 export type MenuTriggerProps = Omit<
@@ -27,6 +42,7 @@ export type MenuContentProps = Omit<
   'render'
 > & {
   children: React.ReactNode;
+  size?: MenuSize;
 };
 export function MenuContent({
   align = 'center',
@@ -36,6 +52,7 @@ export function MenuContent({
   sticky,
   className,
   children,
+  size = 'sm',
   ...props
 }: MenuContentProps) {
   return (
@@ -51,7 +68,13 @@ export function MenuContent({
         <MenuBase.Popup
           {...props}
           className={cn(
-            'flex origin-[var(--transform-origin)] flex-col items-stretch gap-0.5 rounded-lg bg-background/90 p-1 ring-1 ring-muted-foreground/30 backdrop-blur-sm transition-[transform,scale,opacity] duration-150 ease-out data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0',
+            'flex origin-(--transform-origin) flex-col items-stretch gap-0.5',
+            'rounded-lg border border-border-subtle bg-background p-1',
+            'shadow-lg',
+            'transition-[transform,scale,opacity] duration-150 ease-out',
+            'data-ending-style:scale-90 data-starting-style:scale-90',
+            'data-ending-style:opacity-0 data-starting-style:opacity-0',
+            menuSizes.popup[size],
             className,
           )}
         >
@@ -62,13 +85,24 @@ export function MenuContent({
   );
 }
 
-export type MenuItemProps = ComponentProps<typeof MenuBase.Item>;
-export function MenuItem({ children, className, ...props }: MenuItemProps) {
+export type MenuItemProps = ComponentProps<typeof MenuBase.Item> & {
+  size?: MenuSize;
+};
+export function MenuItem({
+  children,
+  className,
+  size = 'sm',
+  ...props
+}: MenuItemProps) {
   return (
     <MenuBase.Item
       {...props}
       className={cn(
-        'flex w-full min-w-24 cursor-default flex-row items-center justify-start gap-2 rounded-md px-2 py-1.5 text-foreground text-sm transition-all duration-150 ease-out hover:bg-foreground/5 hover:pr-1.75 hover:pl-2.25',
+        'flex w-full min-w-24 cursor-default flex-row items-center justify-start gap-2',
+        'rounded-md text-foreground outline-none',
+        'transition-colors duration-150 ease-out',
+        'hover:bg-surface-1 data-highlighted:bg-surface-1',
+        menuSizes.item[size],
         className,
       )}
     >
@@ -85,9 +119,9 @@ export const MenuSeparator = ({
     {...props}
     className={(state) =>
       cn(
-        'my-0.5 bg-muted-foreground/10',
-        className,
+        'my-0.5 bg-border-subtle',
         state.orientation === 'horizontal' ? 'h-px w-full' : 'h-full w-px',
+        className,
       )
     }
   />
@@ -102,22 +136,29 @@ export const MenuSubmenu = MenuBase.SubmenuRoot;
 
 export type MenuSubmenuTriggerProps = ComponentProps<
   typeof MenuBase.SubmenuTrigger
->;
+> & {
+  size?: MenuSize;
+};
 export function MenuSubmenuTrigger({
   children,
   className,
+  size = 'sm',
   ...props
 }: MenuSubmenuTriggerProps) {
   return (
     <MenuBase.SubmenuTrigger
       {...props}
       className={cn(
-        'group flex w-full min-w-24 cursor-default flex-row items-center justify-start gap-2 rounded-md px-2 py-1.5 text-foreground text-sm transition-all duration-150 ease-out hover:bg-black/5 hover:pr-1.75 hover:pl-2.25 dark:hover:bg-white/5',
+        'group flex w-full min-w-24 cursor-default flex-row items-center justify-between gap-2',
+        'rounded-md text-foreground outline-none',
+        'transition-colors duration-150 ease-out',
+        'hover:bg-surface-1 data-highlighted:bg-surface-1',
+        menuSizes.item[size],
         className,
       )}
     >
-      {children}
-      <ChevronRightIcon className="ml-2 size-3 opacity-50 group-hover:opacity-100" />
+      <span className="flex flex-row items-center gap-2">{children}</span>
+      <ChevronRightIcon className="size-3 shrink-0 text-muted-foreground" />
     </MenuBase.SubmenuTrigger>
   );
 }
@@ -131,6 +172,7 @@ export function MenuSubmenuContent({
   sticky,
   className,
   children,
+  size = 'sm',
   ...props
 }: MenuSubmenuContentProps) {
   return (
@@ -141,6 +183,7 @@ export function MenuSubmenuContent({
       side={side}
       sideOffset={sideOffset}
       sticky={sticky}
+      size={size}
       className={className}
     >
       {children}

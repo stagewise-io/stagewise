@@ -19,7 +19,7 @@ export const UnknownToolPart = ({
       part={part}
       icon={<CircleQuestionMarkIcon className="size-3 shrink-0" />}
       disableShimmer={!shimmer}
-      minimal={false}
+      minimal={true}
       streamingText={streamingText}
       finishedText={finishedText}
     />

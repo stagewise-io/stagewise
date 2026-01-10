@@ -2,7 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/utils';
 
 export const skeletonVariants = cva(
-  'relative overflow-hidden bg-muted-foreground/10 dark:bg-muted-foreground/10',
+  'relative overflow-hidden border border-border bg-surface-1 dark:border-border',
   {
     variants: {
       variant: {
@@ -19,7 +19,7 @@ export const skeletonVariants = cva(
         full: 'h-full',
       },
       animate: {
-        true: 'after:absolute after:inset-0 after:animate-skeleton-shimmer after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent dark:after:via-white/10',
+        true: 'after:absolute after:inset-0 after:animate-skeleton-shimmer after:bg-gradient-to-r after:from-transparent after:via-base-50/50 after:to-transparent dark:after:via-base-650',
         false: '',
       },
     },

@@ -203,14 +203,14 @@ function Page() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <div className="flex items-center border-border/30 border-b px-6 py-4">
+      <div className="flex items-center border-border-subtle border-b px-6 py-4">
         <div className="mx-auto w-full max-w-3xl">
           <h1 className="font-semibold text-foreground text-xl">Clear Data</h1>
         </div>
       </div>
 
       {/* Content */}
-      <div className="scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent hover:scrollbar-thumb-zinc-400 dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500 flex-1 overflow-y-auto p-6">
+      <div className="scrollbar-subtle flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-3xl space-y-8">
           {/* Data Selection Section */}
           <section className="space-y-4">
@@ -224,7 +224,7 @@ function Page() {
               {dataOptions.map((option) => (
                 <label
                   key={option.id}
-                  className="flex cursor-pointer select-none items-start gap-3 rounded-lg border border-zinc-500/20 p-2.5 transition-colors hover:bg-muted/30"
+                  className="flex cursor-pointer select-none items-start gap-3 rounded-lg border border-border-subtle p-2.5 transition-colors hover:bg-surface-1"
                   htmlFor={option.id}
                 >
                   <Checkbox
@@ -253,7 +253,7 @@ function Page() {
                 onClick={() => handleClearData('last24h')}
                 disabled={isClearing || selectedTypes.size === 0}
                 variant="secondary"
-                size="md"
+                size="sm"
               >
                 {isClearing ? (
                   <>
@@ -269,7 +269,7 @@ function Page() {
                 onClick={() => handleClearData('allTime')}
                 disabled={isClearing || selectedTypes.size === 0}
                 variant="primary"
-                size="md"
+                size="sm"
               >
                 {isClearing ? (
                   <>
@@ -288,8 +288,8 @@ function Page() {
             <div
               className={`rounded-lg border p-4 ${
                 result.success
-                  ? 'border-green-500/20 bg-green-500/10 text-green-600 dark:text-green-400'
-                  : 'border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400'
+                  ? 'border border-success-foreground bg-success/10 text-success-foreground'
+                  : 'border border-error-foreground bg-error/10 text-error-foreground'
               }`}
             >
               <p className="text-sm">{result.message}</p>

@@ -98,7 +98,7 @@ export type FormFieldErrorProps = React.ComponentProps<typeof FieldBase.Error>;
 export function FormFieldError({ className, ...props }: FormFieldErrorProps) {
   return (
     <FieldBase.Error
-      className={cn('text-error text-sm', className)}
+      className={cn('text-error-foreground text-sm', className)}
       {...props}
     />
   );
@@ -112,7 +112,7 @@ export function FormFieldSeparator({
   return (
     <hr
       className={cn(
-        'block max-h-full max-w-full border-none bg-border/20',
+        'block max-h-full max-w-full border-none bg-border-subtle',
         orientation === 'horizontal' ? 'h-px w-full' : 'h-full w-px',
       )}
     />

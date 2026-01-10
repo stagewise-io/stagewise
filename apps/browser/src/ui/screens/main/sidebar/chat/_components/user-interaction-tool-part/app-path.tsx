@@ -55,7 +55,7 @@ export const AskForAppPathToolPartContent = memo(
           toolPart.state === 'output-error') && (
           <div className="ml-auto flex flex-row items-center gap-2">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="xs"
               onClick={onCancel}
               disabled={isDisabled}
@@ -79,12 +79,12 @@ export const AskForAppPathToolPartContent = memo(
         )}
         {toolPart.state === 'output-error' && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
-            <XIcon className="size-3 text-error" />
+            <XIcon className="size-3 text-error-foreground" />
           </div>
         )}
         {toolPart.state === 'output-available' && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
-            <CheckIcon className="size-3 text-success" />
+            <CheckIcon className="size-3 text-success-foreground" />
           </div>
         )}
       </div>

@@ -141,7 +141,7 @@ function DownloadItemRow({
   return (
     <div
       className={`group -mx-1.5 relative flex cursor-pointer select-none flex-col gap-1 overflow-hidden rounded-lg px-1.5 py-1.5 ${
-        download.isActive || isComplete ? 'hover:bg-muted/50' : 'opacity-60'
+        download.isActive || isComplete ? 'hover:bg-surface-1' : 'opacity-60'
       }`}
       onClick={handleRowClick}
     >

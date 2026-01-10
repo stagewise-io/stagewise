@@ -15,8 +15,18 @@ import {
 import { cn } from '../lib/utils';
 
 type SearchableSelectSize = 'xs' | 'sm' | 'md';
+export type SearchableSelectTriggerVariant = 'ghost' | 'secondary';
 
-type SearchableSelectItem = {
+export type SearchableSelectItemAction = {
+  /** Icon to display for the action button */
+  icon: ReactNode;
+  /** Called when the action button is clicked */
+  onClick: (value: string, event: React.MouseEvent) => void;
+  /** If true, the action button is only visible on hover. @default false */
+  showOnHover?: boolean;
+};
+
+export type SearchableSelectItem = {
   value: string | null;
   label: string | ReactNode;
   /**
@@ -44,6 +54,15 @@ type SearchableSelectItem = {
    * is used; otherwise it falls back to `value`.
    */
   searchText?: string;
+  /**
+   * Optional group/section this item belongs to. Items with the same group
+   * will be rendered together under a section header.
+   */
+  group?: string;
+  /**
+   * Optional action button rendered at the end of the item row.
+   */
+  action?: SearchableSelectItemAction;
 };
 
 export type SearchableSelectProps = Omit<
@@ -54,6 +73,11 @@ export type SearchableSelectProps = Omit<
   triggerClassName?: string;
   size?: SearchableSelectSize;
   /**
+   * Visual variant for the trigger button.
+   * @default 'ghost'
+   */
+  triggerVariant?: SearchableSelectTriggerVariant;
+  /**
    * Which side of the trigger the popup should appear on.
    * @default 'top'
    */
@@ -63,14 +87,40 @@ export type SearchableSelectProps = Omit<
    * @default 4
    */
   sideOffset?: number;
+  /**
+   * Custom trigger render function. If provided, replaces the default trigger
+   * (which shows selected value + chevron). Receives trigger props that must be
+   * spread onto the clickable element for the select to work properly.
+   *
+   * @example
+   * ```tsx
+   * customTrigger={(triggerProps) => (
+   *   <Button {...triggerProps}>
+   *     <IconHistory />
+   *   </Button>
+   * )}
+   * ```
+   */
+  customTrigger?: (
+    triggerProps: React.ComponentPropsWithoutRef<'button'>,
+  ) => ReactElement;
 };
+
+const triggerVariants = {
+  ghost:
+    'bg-transparent text-muted-foreground hover:text-foreground data-popup-open:text-foreground',
+  secondary:
+    'border border-border bg-surface-1 text-foreground hover:bg-surface-2 active:bg-surface-3 data-popup-open:bg-surface-2',
+} satisfies Record<SearchableSelectTriggerVariant, string>;
 
 export const SearchableSelect = ({
   items,
   triggerClassName,
   size = 'xs',
+  triggerVariant = 'ghost',
   side = 'top',
   sideOffset = 4,
+  customTrigger,
   ...props
 }: SearchableSelectProps) => {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -112,6 +162,34 @@ export const SearchableSelect = ({
 
     return filtered;
   }, [items, itemSearchText, query, props.value]);
+
+  // Group filtered items by their `group` property
+  const groupedFilteredItems = useMemo(() => {
+    const groups: {
+      group: string | undefined;
+      items: SearchableSelectItem[];
+    }[] = [];
+    let currentGroup: string | undefined;
+    let currentItems: SearchableSelectItem[] = [];
+
+    for (const item of filteredItems) {
+      if (item.group !== currentGroup) {
+        if (currentItems.length > 0) {
+          groups.push({ group: currentGroup, items: currentItems });
+        }
+        currentGroup = item.group;
+        currentItems = [item];
+      } else {
+        currentItems.push(item);
+      }
+    }
+
+    if (currentItems.length > 0) {
+      groups.push({ group: currentGroup, items: currentItems });
+    }
+
+    return groups;
+  }, [filteredItems]);
 
   // All items for Base UI's value management (ensures selection isn't lost during search)
   const allConvertedItems = useMemo(() => {
@@ -222,20 +300,29 @@ export const SearchableSelect = ({
       defaultValue={props.defaultValue as string | string[] | undefined}
       items={allConvertedItems}
     >
-      <SelectBase.Trigger
-        className={cn(
-          'focus-visible:-outline-offset-2 inline-flex max-w-full cursor-default items-center justify-between bg-transparent p-0 text-muted-foreground shadow-none transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-muted-foreground/35 has-[*:disabled]:pointer-events-none has-[*:disabled]:opacity-50 data-[popup-open]:text-foreground',
-          sizes.trigger[size],
-          triggerClassName,
-        )}
-      >
-        <SelectBase.Value className="truncate">
-          {(value: string) => selectedValueToTriggerLabel.get(String(value))}
-        </SelectBase.Value>
-        <SelectBase.Icon className="shrink-0">
-          <ChevronDownIcon className={sizes.icon[size]} />
-        </SelectBase.Icon>
-      </SelectBase.Trigger>
+      {customTrigger ? (
+        <SelectBase.Trigger
+          render={(props) =>
+            customTrigger(props as React.ComponentPropsWithoutRef<'button'>)
+          }
+        />
+      ) : (
+        <SelectBase.Trigger
+          className={cn(
+            'focus-visible:-outline-offset-2 inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0 shadow-none transition-colors focus-visible:outline-1 focus-visible:outline-muted-foreground/35 has-disabled:pointer-events-none has-disabled:opacity-50',
+            triggerVariants[triggerVariant],
+            sizes.trigger[size],
+            triggerClassName,
+          )}
+        >
+          <SelectBase.Value className="truncate">
+            {(value: string) => selectedValueToTriggerLabel.get(String(value))}
+          </SelectBase.Value>
+          <SelectBase.Icon className="shrink-0">
+            <ChevronDownIcon className={sizes.icon[size]} />
+          </SelectBase.Icon>
+        </SelectBase.Trigger>
+      )}
       <SelectBase.Portal>
         <SelectBase.Positioner
           side={side}
@@ -250,7 +337,7 @@ export const SearchableSelect = ({
           >
             <SelectBase.Popup
               className={cn(
-                'glass-body glass-body-motion flex origin-(--transform-origin) flex-col items-stretch gap-0.5 rounded-lg bg-background/80 p-1 backdrop-blur-sm transition-[transform,scale,opacity] duration-150 ease-out data-[ending-style]:scale-90 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0',
+                'flex origin-(--transform-origin) flex-col items-stretch gap-0.5 rounded-lg border border-border-subtle bg-background p-1 shadow-lg transition-[transform,scale,opacity] duration-150 ease-out data-ending-style:scale-90 data-starting-style:scale-90 data-ending-style:opacity-0 data-starting-style:opacity-0',
                 sizes.popup[size],
               )}
             >
@@ -261,7 +348,7 @@ export const SearchableSelect = ({
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search…"
                   className={cn(
-                    'w-full rounded-md bg-transparent text-foreground placeholder:text-muted-foreground/70 focus:outline-none',
+                    'w-full rounded-md bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none',
                     sizes.item[size],
                     size === 'xs' ? 'text-xs' : 'text-sm',
                   )}
@@ -277,60 +364,98 @@ export const SearchableSelect = ({
                   No results
                 </div>
               )}
-              {filteredItems.map((item) => {
-                const hasTooltip = !!(
-                  item.tooltipContent || item.tooltipComponent
-                );
-                const Row = (
-                  <SelectBase.Item
-                    key={String(item.value)}
-                    value={String(item.value)}
-                    className={cn(
-                      'grid w-full min-w-24 cursor-default grid-cols-[0.75rem_1fr] items-center gap-2 rounded-md text-foreground outline-none transition-colors duration-150 ease-out',
-                      'data-highlighted:bg-foreground/5',
-                      'hover:bg-foreground/5',
-                      sizes.item[size],
-                    )}
-                    onMouseEnter={
-                      hasTooltip ? (e) => handleItemHover(item, e) : undefined
-                    }
-                    // Prevent Base UI from stealing focus from search input
-                    onFocus={() => searchInputRef.current?.focus()}
-                  >
-                    <SelectBase.ItemIndicator className="col-start-1 shrink-0">
-                      <CheckIcon className="size-full text-muted-foreground" />
-                    </SelectBase.ItemIndicator>
+              <div className="scrollbar-hover-only flex max-h-48 flex-col gap-0.5 overflow-y-auto">
+                {groupedFilteredItems.map(
+                  ({ group, items: groupItems }, groupIndex) => (
+                    <div key={group ?? `ungrouped-${groupIndex}`}>
+                      {group && (
+                        <div className="shrink-0 px-2 py-1 font-normal text-muted-foreground/60 text-xs">
+                          {group}
+                        </div>
+                      )}
+                      {groupItems.map((item) => {
+                        const hasTooltip = !!(
+                          item.tooltipContent || item.tooltipComponent
+                        );
+                        const Row = (
+                          <SelectBase.Item
+                            key={String(item.value)}
+                            value={String(item.value)}
+                            className={cn(
+                              'group/item grid w-full min-w-24 cursor-default items-center gap-2 rounded-md text-foreground outline-none transition-colors duration-150 ease-out',
+                              'data-highlighted:bg-surface-1',
+                              'hover:bg-surface-1',
+                              item.action
+                                ? 'grid-cols-[0.75rem_1fr_auto]'
+                                : 'grid-cols-[0.75rem_1fr]',
+                              sizes.item[size],
+                            )}
+                            onMouseEnter={
+                              hasTooltip
+                                ? (e) => handleItemHover(item, e)
+                                : undefined
+                            }
+                            // Prevent Base UI from stealing focus from search input
+                            onFocus={() => searchInputRef.current?.focus()}
+                          >
+                            <SelectBase.ItemIndicator className="col-start-1 shrink-0">
+                              <CheckIcon className="size-full text-muted-foreground" />
+                            </SelectBase.ItemIndicator>
 
-                    <SelectBase.ItemText className="col-start-2 flex flex-row items-center justify-between gap-4">
-                      <div
-                        className={cn(
-                          'flex min-w-0 flex-row items-center gap-2',
-                          size === 'xs' ? 'text-xs' : 'text-sm',
-                        )}
-                      >
-                        <span className="truncate">{item.label}</span>
-                        {item.icon && (
-                          <div className="flex size-4 shrink-0 items-center justify-center">
-                            {item.icon}
-                          </div>
-                        )}
-                      </div>
-                    </SelectBase.ItemText>
-                  </SelectBase.Item>
-                );
+                            <SelectBase.ItemText className="col-start-2 flex flex-row items-center justify-between gap-4">
+                              <div
+                                className={cn(
+                                  'flex min-w-0 flex-row items-center gap-2',
+                                  size === 'xs' ? 'text-xs' : 'text-sm',
+                                )}
+                              >
+                                <span className="truncate">{item.label}</span>
+                                {item.icon && (
+                                  <div className="flex size-4 shrink-0 items-center justify-center">
+                                    {item.icon}
+                                  </div>
+                                )}
+                              </div>
+                            </SelectBase.ItemText>
 
-                // For custom tooltip components, wrap with a div for hover tracking
-                if (item.tooltipComponent) {
-                  const TooltipComponent = item.tooltipComponent;
-                  return (
-                    <TooltipComponent key={String(item.value)} item={item}>
-                      {Row}
-                    </TooltipComponent>
-                  );
-                }
+                            {item.action && (
+                              <button
+                                type="button"
+                                className={cn(
+                                  'col-start-3 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-surface-1 hover:text-foreground',
+                                  item.action.showOnHover &&
+                                    'opacity-0 group-hover/item:opacity-100',
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  item.action?.onClick(String(item.value), e);
+                                }}
+                              >
+                                {item.action.icon}
+                              </button>
+                            )}
+                          </SelectBase.Item>
+                        );
 
-                return Row;
-              })}
+                        // For custom tooltip components, wrap with a div for hover tracking
+                        if (item.tooltipComponent) {
+                          const TooltipComponent = item.tooltipComponent;
+                          return (
+                            <TooltipComponent
+                              key={String(item.value)}
+                              item={item}
+                            >
+                              {Row}
+                            </TooltipComponent>
+                          );
+                        }
+
+                        return Row;
+                      })}
+                    </div>
+                  ),
+                )}
+              </div>
               <SelectBase.ScrollDownArrow />
             </SelectBase.Popup>
 
@@ -339,7 +464,7 @@ export const SearchableSelect = ({
               <div
                 ref={sidePanelRef}
                 className={cn(
-                  'glass-body absolute left-full ml-1 flex max-w-64 flex-col gap-1 rounded-lg bg-background/80 p-2.5 text-foreground shadow-lg backdrop-blur-sm transition-[top] duration-100 ease-out',
+                  'absolute left-full ml-1 flex max-w-64 flex-col gap-1 rounded-lg border border-border-subtle bg-background p-2.5 text-foreground shadow-lg transition-[top] duration-100 ease-out',
                   'fade-in-0 slide-in-from-left-1 animate-in duration-150',
                   sizes.popup[size],
                 )}

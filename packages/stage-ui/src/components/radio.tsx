@@ -25,11 +25,11 @@ export const Radio = ({ className, ...props }: RadioProps) => {
     <RadioBase.Root
       {...props}
       className={cn(
-        'glass-inset flex size-5 shrink-0 items-center justify-center rounded-full bg-white/20 p-1.5 transition-colors duration-100 ease-out ease-out disabled:opacity-50 data-[checked]:bg-primary',
+        'flex size-5 shrink-0 not-data-checked:not-disabled:cursor-pointer items-center justify-center rounded-full border border-border bg-surface-1 p-1.5 transition-colors duration-100 ease-out disabled:opacity-50 data-checked:bg-primary-accent',
         className,
       )}
     >
-      <RadioBase.Indicator className="glass-body size-full rounded-full bg-white/90 transition-colors duration-100 ease-out" />
+      <RadioBase.Indicator className="size-full rounded-full bg-primary-foreground transition-colors duration-100 ease-out" />
     </RadioBase.Root>
   );
 };
@@ -43,7 +43,7 @@ export const RadioLabel = ({ className, children }: RadioLabelProps) => {
     // biome-ignore lint/a11y/noLabelWithoutControl: This is a reusable component
     <label
       className={cn(
-        'block flex flex-row items-center gap-2 text-foreground text-sm',
+        'flex flex-row items-center gap-2 text-foreground text-sm',
         className,
       )}
     >

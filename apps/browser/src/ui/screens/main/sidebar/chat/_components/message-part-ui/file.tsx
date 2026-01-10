@@ -7,12 +7,12 @@ export const FilePart = ({ part }: { part: FileUIPart }) => {
   const isImage = part.mediaType.startsWith('image/');
 
   return (
-    <div className="-mx-1 rounded-xl bg-muted-foreground/5">
+    <div className="-mx-1 rounded-xl">
       <Button
         variant="ghost"
         size="xs"
         data-image={isImage}
-        className="group/file-part flex w-full flex-col items-center gap-1 rounded-xl data-[image=false]:h-6 data-[image=true]:h-fit"
+        className="group/file-part flex h-auto w-full flex-col items-center gap-1 rounded-xl text-foreground"
         onClick={() => {
           void openFileUrl(part.url, part.filename);
         }}
@@ -26,7 +26,7 @@ export const FilePart = ({ part }: { part: FileUIPart }) => {
           <span className="flex-1 text-start text-xs">
             {part.filename ?? 'Generated file'}
           </span>
-          <ExternalLinkIcon className="size-3 text-muted-foreground group-hover/file-part:text-foreground" />
+          <ExternalLinkIcon className="size-3 group-hover/file-part:text-foreground" />
         </div>
         {isImage && (
           <img

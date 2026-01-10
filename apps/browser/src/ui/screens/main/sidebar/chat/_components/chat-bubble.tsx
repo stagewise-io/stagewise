@@ -1,5 +1,6 @@
 import { cn } from '@/utils';
 import { IconMagicWandSparkle } from 'nucleo-glass';
+import { PulsatingCircle } from './circle';
 import type {
   ToolPart,
   ChatMessage,
@@ -64,9 +65,13 @@ export const ChatBubble = memo(
   function ChatBubble({
     message: msg,
     isLastMessage,
+    containerHeightInPx,
+    measureRef,
   }: {
     message: ChatMessage;
     isLastMessage: boolean;
+    containerHeightInPx?: number;
+    measureRef?: (el: HTMLDivElement | null) => void;
   }) {
     const undoEditsUntilUserMessage = useKartonProcedure(
       (p) => p.agentChat.undoEditsUntilUserMessage,
@@ -120,26 +125,30 @@ export const ChatBubble = memo(
       return msg.parts.filter((part) => part.type === 'file') as FileUIPart[];
     }, [msg.parts]);
 
-    if (isEmptyMessage) return null; // Message parts start long before the message is sent - bubble should only show after the first chunk is received
+    if (isEmptyMessage && !isLastMessage) return null;
 
     return (
-      <div className="flex flex-col gap-1">
-        <div
-          className={cn(
-            'group/chat-bubble mt-2 flex w-full shrink-0 items-center justify-start gap-2',
-            msg.role === 'assistant' ? 'flex-row' : 'flex-row-reverse',
-          )}
-        >
-          <div className="flex max-w-full flex-col items-start gap-2">
+      <div
+        className={cn('flex w-full flex-col gap-1')}
+        style={{
+          minHeight: isLastMessage ? `${containerHeightInPx ?? 0}px` : 0,
+        }}
+      >
+        {/* measureRef wraps just the content, NOT the min-h element, to avoid circular measurement */}
+        <div ref={measureRef} className="w-full">
+          <div
+            className={cn(
+              'group/chat-bubble mt-2 flex w-full shrink-0 items-center justify-start gap-2',
+              msg.role === 'assistant' ? 'flex-row' : 'flex-row-reverse',
+              isEmptyMessage ? 'hidden' : '',
+            )}
+          >
             <div
               className={cn(
-                'group wrap-break-word relative min-h-8 max-w-full animate-chat-bubble-appear select-text space-y-3 rounded-xl px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
+                'group wrap-break-word relative min-h-8 max-w-xl select-text space-y-2 py-1.5 font-normal text-sm last:mb-0.5',
                 msg.role === 'assistant'
-                  ? 'min-w-1/3 origin-bottom-left rounded-bl-sm border border-muted-foreground/10 bg-zinc-100/60 text-foreground dark:bg-zinc-700/50'
-                  : 'origin-bottom-right rounded-br-sm border border-muted-foreground/10 bg-blue-600/90 text-white',
-                msg.parts.length > 1 && 'w-full',
-                msg.role === 'user' &&
-                  '[--color-background:var(--color-blue-600)] [--color-busy:var(--color-blue-200)] [--color-error:var(--color-rose-200)] [--color-foreground:var(--color-white)] [--color-muted-background:var(--color-blue-500)] [--color-muted-foreground:var(--color-blue-200)] [--color-primary:var(--color-blue-200)] [--color-success:var(--color-green-200)]',
+                  ? 'w-full min-w-1/3 origin-bottom-left rounded-bl-sm text-foreground'
+                  : 'origin-bottom-right rounded-lg rounded-br-sm border border-border-tinted bg-surface-tinted px-2.5 text-foreground',
                 msg.role === 'user'
                   ? 'group/chat-bubble-user'
                   : 'group/chat-bubble-assistant',
@@ -294,46 +303,55 @@ export const ChatBubble = memo(
                 </div>
               )}
             </div>
-          </div>
 
-          {msg.role === 'user' && msg.id && !isWorking && (
-            <Popover>
-              <PopoverTrigger>
-                <Button
-                  aria-label="Restore checkpoint"
-                  variant="secondary"
-                  size="icon-sm"
-                  className="shrink-0 opacity-0 blur-xs transition-all group-hover/chat-bubble:scale-100 group-hover/chat-bubble:opacity-100 group-hover/chat-bubble:blur-none"
-                >
-                  <Undo2 className="size-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent>
-                <PopoverTitle>Restore checkpoint?</PopoverTitle>
-                <PopoverDescription>
-                  This will clear the chat history and undo file changes after
-                  this point.
-                </PopoverDescription>
-                <PopoverClose />
-                <PopoverFooter>
+            {msg.role === 'user' && msg.id && !isWorking && (
+              <Popover>
+                <PopoverTrigger>
                   <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      confirmRestore();
-                    }}
+                    aria-label="Restore checkpoint"
+                    variant="secondary"
+                    size="icon-sm"
+                    className="shrink-0 opacity-0 blur-xs transition-all group-hover/chat-bubble:scale-100 group-hover/chat-bubble:opacity-100 group-hover/chat-bubble:blur-none"
                   >
-                    Restore
+                    <Undo2 className="size-4" />
                   </Button>
-                </PopoverFooter>
-              </PopoverContent>
-            </Popover>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <PopoverTitle>Restore checkpoint?</PopoverTitle>
+                  <PopoverDescription>
+                    This will clear the chat history and undo file changes after
+                    this point.
+                  </PopoverDescription>
+                  <PopoverClose />
+                  <PopoverFooter>
+                    <Button
+                      variant="primary"
+                      size="xs"
+                      onClick={() => {
+                        confirmRestore();
+                      }}
+                    >
+                      Restore
+                    </Button>
+                  </PopoverFooter>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+          {((isLastMessage && isWorking && msg.role === 'user') ||
+            (isLastMessage &&
+              isWorking &&
+              isEmptyMessage &&
+              msg.role === 'assistant')) && (
+            <div className="mt-2 flex flex-row items-center gap-2">
+              <PulsatingCircle size="sm" />
+            </div>
           )}
         </div>
         {msg.metadata?.autoCompactInformation?.isAutoCompacted && (
           <div
             key={`compact-${msg.id}`}
-            className="flex w-full flex-row items-center gap-2 text-xs"
+            className="mt-2 flex w-full flex-row items-center gap-2 text-xs"
           >
             <IconMagicWandSparkle className="size-3 text-muted-foreground" />
             <span className="shimmer-duration-1500 shimmer-from-muted-foreground shimmer-text-once shimmer-to-foreground font-normal">
@@ -349,6 +367,10 @@ export const ChatBubble = memo(
     if (prevProps.message.id !== nextProps.message.id) return false;
     if (prevProps.message.role !== nextProps.message.role) return false;
     if (prevProps.isLastMessage !== nextProps.isLastMessage) return false;
+    if (prevProps.containerHeightInPx !== nextProps.containerHeightInPx)
+      return false;
+    // Check if measureRef presence changed (for height tracking)
+    if (!!prevProps.measureRef !== !!nextProps.measureRef) return false;
     if (prevProps.message.parts.length !== nextProps.message.parts.length)
       return false;
 

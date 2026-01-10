@@ -109,7 +109,7 @@ function SelectedElementChip({
     const tagName = (
       selectedElement.nodeType || selectedElement.tagName
     ).toLowerCase();
-    const id = selectedElement.attributes.id
+    const id = selectedElement.attributes?.id
       ? `#${selectedElement.attributes.id}`
       : '';
     return `${tagName}${id}`;
@@ -208,11 +208,7 @@ function SelectedElementChip({
   return (
     <Popover>
       <PopoverTrigger>
-        <Button
-          size="xs"
-          variant="secondary"
-          className="bg-muted/10 text-foreground"
-        >
+        <Button size="xs" variant="secondary" className="text-foreground">
           <SquareDashedMousePointer className="size-3" />
           <span className="max-w-24 truncate font-medium">{chipLabel}</span>
           {onDelete && (

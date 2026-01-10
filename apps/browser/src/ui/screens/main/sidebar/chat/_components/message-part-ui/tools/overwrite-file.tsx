@@ -119,7 +119,7 @@ export const OverwriteFileToolPart = ({
       );
     else if (streaming && part.input?.content && !diff)
       return (
-        <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground/75 text-xs">
+        <pre className="overflow-x-hidden whitespace-pre font-mono text-xs">
           {part.input?.content}
         </pre>
       );
@@ -147,13 +147,9 @@ export const OverwriteFileToolPart = ({
                 }}
               >
                 {codeDiffCollapsed ? (
-                  <ListChevronsUpDownIcon
-                    className={cn('size-3 shrink-0 text-muted-foreground')}
-                  />
+                  <ListChevronsUpDownIcon className={cn('size-3 shrink-0')} />
                 ) : (
-                  <ListChevronsDownUpIcon
-                    className={cn('size-3 shrink-0 text-muted-foreground')}
-                  />
+                  <ListChevronsDownUpIcon className={cn('size-3 shrink-0')} />
                 )}
               </Button>
             </TooltipTrigger>
@@ -179,11 +175,8 @@ export const OverwriteFileToolPart = ({
               'shrink-0',
             )}
           >
-            <div className="flex flex-row items-center justify-center gap-1 text-muted-foreground">
-              <IdeLogo
-                ide={openInIdeSelection}
-                className="size-3 shrink-0 text-muted-foreground"
-              />
+            <div className="flex flex-row items-center justify-center gap-1">
+              <IdeLogo ide={openInIdeSelection} className="size-3 shrink-0" />
               <span className="text-xs">Open file</span>
             </div>
           </a>
@@ -194,11 +187,12 @@ export const OverwriteFileToolPart = ({
 
   return (
     <ToolPartUI
+      showBorder={true}
       expanded={expanded}
       setExpanded={setExpanded}
       trigger={trigger}
       content={content}
-      contentClassName={streaming ? 'max-h-24' : 'max-h-56'}
+      contentClassName={cn(streaming ? 'max-h-24' : 'max-h-56')}
       contentFooter={contentFooter}
       contentFooterClassName="px-0"
     />
@@ -220,10 +214,10 @@ const ErrorHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <XIcon className="size-3 shrink-0 text-muted-foreground" />
+      <XIcon className="size-3 shrink-0" />
       <Tooltip>
         <TooltipTrigger>
-          <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
+          <span className="min-w-0 flex-1 truncate text-xs">
             {errorTextContent}
           </span>
         </TooltipTrigger>
@@ -247,8 +241,8 @@ const SuccessHeader = ({
   fileWasCreated: boolean;
 }) => {
   return (
-    <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
-      <div className="pointer-events-auto flex flex-row items-center justify-start gap-1 text-muted-foreground">
+    <div className="pointer-events-none flex flex-row items-center justify-start gap-1 text-foreground">
+      <div className="pointer-events-auto flex flex-row items-center justify-start gap-1">
         <FileIcon filePath={relativePath ?? ''} className="size-5 shrink-0" />
         <Tooltip>
           <TooltipTrigger>
@@ -262,11 +256,15 @@ const SuccessHeader = ({
         </Tooltip>
       </div>
       {fileWasCreated && (
-        <span className="shrink-0 text-success text-xs">(new)</span>
+        <span className="shrink-0 text-success-foreground text-xs">(new)</span>
       )}
-      <span className="shrink-0 text-success text-xs">+{newLineCount}</span>
+      <span className="shrink-0 text-success-foreground text-xs">
+        +{newLineCount}
+      </span>
       {!fileWasCreated && (
-        <span className="shrink-0 text-error text-xs">-{deletedLineCount}</span>
+        <span className="shrink-0 text-error-foreground text-xs">
+          -{deletedLineCount}
+        </span>
       )}
     </div>
   );

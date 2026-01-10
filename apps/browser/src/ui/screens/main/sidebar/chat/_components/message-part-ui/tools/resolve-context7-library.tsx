@@ -20,7 +20,7 @@ export const ResolveContext7LibraryToolPart = ({
       <span className="flex min-w-0 gap-1">
         <span className="shrink-0 truncate font-semibold">Found</span>
         <span className="truncate font-normal">
-          {part.output?.results.length ?? 0} results for {part.input?.library}
+          {part.output?.results.length ?? 0} docs for {part.input?.library}
         </span>
       </span>
     ) : undefined;

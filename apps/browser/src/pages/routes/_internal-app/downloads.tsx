@@ -350,7 +350,7 @@ function RowComponent({
       )}
       <div
         className={`group relative z-10 flex h-full cursor-pointer select-none flex-col justify-center gap-2 rounded-lg px-4 ${
-          row.fileExists || row.isActive ? 'hover:bg-muted/50' : 'opacity-60'
+          row.fileExists || row.isActive ? 'hover:bg-surface-1' : 'opacity-60'
         }`}
         onClick={() => {
           if (row.fileExists && isComplete) {
@@ -999,18 +999,17 @@ function Page() {
         }
       `}</style>
       {/* Header */}
-      <div className="flex items-center border-border/30 border-b px-6 py-4">
+      <div className="flex items-center border-border-subtle border-b px-6 py-4">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-24">
           <h1 className="font-semibold text-foreground text-xl">Downloads</h1>
-          <div className="relative flex-1 rounded-full bg-zinc-500/5 focus-within:bg-zinc-500/10">
+          <div className="relative flex-1 rounded-full bg-surface-1 focus-within:bg-surface-2">
             <IconMagnifierFill18 className="-translate-y-1/2 absolute top-1/2 left-3.5 z-10 size-4 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Search downloads"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="w-full rounded-full pl-10 before:hidden"
-              inputClassName="rounded-full pl-4 focus:outline-none focus:ring-0 bg-transparent"
+              className="rounded-full border-none bg-transparent pl-10 before:hidden focus:border-none focus:outline-none focus:ring-0"
             />
           </div>
         </div>
@@ -1037,7 +1036,7 @@ function Page() {
                     <summary className="cursor-pointer text-muted-foreground text-xs">
                       Technical details (dev mode)
                     </summary>
-                    <pre className="mt-2 max-h-48 overflow-auto rounded bg-muted p-2 text-muted-foreground text-xs">
+                    <pre className="mt-2 max-h-48 overflow-auto rounded bg-surface-1 p-2 text-muted-foreground text-xs">
                       {error.stack}
                     </pre>
                   </details>
@@ -1075,7 +1074,7 @@ function Page() {
                 rowProps={rowProps}
                 onRowsRendered={handleRowsRendered}
                 overscanCount={5}
-                className="scrollbar-thin scrollbar-thumb-zinc-300 hover:scrollbar-thumb-zinc-400 scrollbar-track-transparent dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500"
+                className="scrollbar-subtle"
                 style={{
                   height: containerSize.height,
                   width: containerSize.width,

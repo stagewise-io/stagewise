@@ -168,18 +168,8 @@ body {
   "Menlo", "Monaco", "Inconsolata", "Fira Mono", "Droid Sans Mono",
   "Consolas", "Roboto Mono", "Oxygen Mono", "Ubuntu Mono", "Liberation Mono",
   "DejaVu Sans Mono", "Courier New", monospace;
-  --color-background: var(--color-white);
-  --color-foreground: var(--color-zinc-800);
-  --color-muted: var(--color-zinc-50);
-  --color-muted-foreground: var(--color-zinc-500);
-  --color-border: var(--color-zinc-300);
   
   --text-2xs: 0.625rem;
-
-  --color-success: var(--color-emerald-500);
-  --color-error: var(--color-red-500);
-  --color-warning: var(--color-amber-500);
-  --color-busy: var(--color-blue-600);
   
   --shadow-glass: var(--shadow-lg), 0px -48px 48px -48px rgba(0, 0, 0, 0.05) inset, 0 5px 42px -5px rgba(255, 255, 255, 0.25) inset;
   --ease-spring: linear(0.00, -0.00946, 0.0219, 0.0793, 0.152, 0.237, 0.326, 0.419, 0.509, 0.597, 0.680, 0.755, 0.823, 0.882, 0.933, 0.976, 1.01, 1.04, 1.06, 1.07, 1.08, 1.09, 1.09, 1.09, 1.09, 1.08, 1.07, 1.07, 1.06, 1.05, 1.04, 1.03, 1.03, 1.02, 1.01, 1.01, 1.00, 1.00, 0.998, 0.996, 0.994, 0.993, 0.992, 0.992, 0.992, 0.992, 0.992, 0.993, 0.994, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 0.999, 0.999, 1.00);
@@ -237,11 +227,11 @@ body {
 }
 
 @utility code-block-diff-add {
-  @apply bg-green-600/10 dark:bg-green-400/10 -m-px p-px;
+  @apply bg-success-foreground-dark/23 dark:bg-success-foreground/30;
 }
 
 @utility code-block-diff-remove {
-  @apply bg-rose-600/10 dark:bg-rose-400/10 -m-px p-px;
+  @apply bg-error-foreground-dark/23 dark:bg-error-foreground/30;
 }
 
 /* Edge-top collapsed lines (before first diff) - hidden */
@@ -367,13 +357,23 @@ body {
 
 /* Scrollbar utilities */
 @utility scrollbar-subtle {
-  @apply scrollbar-thin scrollbar-thumb-foreground/15 scrollbar-track-transparent;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-2) transparent;
 }
 
 @utility scrollbar-hover-only {
-  @apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-transparent hover:scrollbar-thumb-foreground/15;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  &:hover {
+    scrollbar-color: var(--color-surface-2) transparent;
+  }
 }
 
 @utility scrollbar-visible {
   @apply scrollbar-thin scrollbar-thumb-foreground/20 scrollbar-track-muted-foreground/10;
+}
+
+/* Streamdown table wrapper - subtle scrollbar for markdown tables */
+[data-streamdown="table-wrapper"] {
+  @apply scrollbar-thin scrollbar-thumb-foreground/15 scrollbar-track-transparent;
 }

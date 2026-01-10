@@ -13,10 +13,20 @@ const meta = {
   tags: ['autodocs'],
   // More on argTypes: https://storybook.js.org/docs/api/argtypes
   argTypes: {
-    variant: { control: 'select', options: ['primary', 'secondary', 'ghost'] },
+    variant: {
+      control: 'select',
+      options: [
+        'primary',
+        'secondary',
+        'destructive',
+        'warning',
+        'success',
+        'ghost',
+      ],
+    },
     size: {
       control: 'select',
-      options: ['sm', 'md', 'lg', 'xl', 'icon-sm', 'icon-md'],
+      options: ['xs', 'sm', 'md', 'lg', 'xl', 'icon-xs', 'icon-sm', 'icon-md'],
     },
     disabled: { control: 'boolean' },
     children: { control: 'text' },
@@ -33,7 +43,6 @@ export const Primary: Story = {
   args: {
     variant: 'primary',
     size: 'md',
-    shape: 'default',
     children: 'Test button',
   },
 };

@@ -62,22 +62,21 @@ export function WorkspaceInfoBadge() {
         <PopoverTitle>Workspace Info</PopoverTitle>
 
         <div className="flex flex-col gap-0">
-          <h3 className="font-medium text-sm">Path</h3>
+          <h3 className="font-medium text-xs">Path</h3>
           <p
-            className="min-w-0 select-text truncate text-foreground/70 text-sm"
+            className="min-w-0 select-text truncate text-foreground/70 text-xs"
             dir="rtl"
           >
             <span dir="ltr">{workspace?.path}</span>
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-row items-center justify-end gap-2">
           <Tooltip>
             <TooltipTrigger>
               <Button
                 variant="secondary"
-                size="sm"
-                className="w-full"
+                size="xs"
                 onClick={disconnectWorkspace}
               >
                 Disconnect
@@ -89,8 +88,7 @@ export function WorkspaceInfoBadge() {
             <TooltipTrigger>
               <Button
                 variant="primary"
-                size="sm"
-                className="w-full"
+                size="xs"
                 onClick={selectAndOpenWorkspace}
               >
                 <span className="shrink-0">Change workspace</span>

@@ -57,7 +57,7 @@ const FileDiffItem: FC<{
   return (
     <div
       id={edit.elementId}
-      className="overflow-hidden rounded-lg border border-muted-foreground/20 bg-muted-foreground/5"
+      className="overflow-hidden rounded-lg border border-border-subtle bg-background shadow-xs dark:border-border dark:bg-surface-1"
     >
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
         <CollapsibleTrigger
@@ -66,14 +66,16 @@ const FileDiffItem: FC<{
         >
           {/* File header */}
           <div
-            className={`flex w-full items-center gap-1.5 bg-linear-to-tr from-muted-foreground/8 to-muted-foreground/3 p-2 ${
-              isOpen ? 'border-muted-foreground/20 border-b' : ''
+            className={`flex h-6 w-full items-center gap-1 bg-background px-2.5 dark:bg-surface-1 ${
+              isOpen
+                ? 'border-border-subtle/50 border-b dark:border-border/70'
+                : ''
             }`}
           >
-            <FileIcon filePath={edit.fileName} className="size-4 shrink-0" />
+            <FileIcon filePath={edit.fileName} className="size-5 shrink-0" />
             <Tooltip>
               <TooltipTrigger>
-                <span className="truncate font-mono text-foreground text-xs">
+                <span className="min-w-0 truncate text-foreground text-xs">
                   {edit.fileName}
                 </span>
               </TooltipTrigger>
@@ -81,27 +83,29 @@ const FileDiffItem: FC<{
                 <div className="max-w-md">{edit.path}</div>
               </TooltipContent>
             </Tooltip>
-            <div className="flex shrink-0 items-center gap-1.5 text-xs">
-              {edit.linesAdded > 0 && (
-                <span className="text-success text-xs">+{edit.linesAdded}</span>
-              )}
-              {edit.linesRemoved > 0 && (
-                <span className="text-error text-xs">-{edit.linesRemoved}</span>
-              )}
-            </div>
+            {edit.linesAdded > 0 && (
+              <span className="shrink-0 text-success-foreground text-xs">
+                +{edit.linesAdded}
+              </span>
+            )}
+            {edit.linesRemoved > 0 && (
+              <span className="shrink-0 text-error-foreground text-xs">
+                -{edit.linesRemoved}
+              </span>
+            )}
             <div className="ml-auto flex items-center gap-1">
               <Tooltip>
                 <TooltipTrigger>
                   <Button
                     variant="ghost"
                     size="xs"
-                    className="size-6 cursor-pointer p-0 text-muted-foreground"
+                    className="size-6 cursor-pointer p-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       onReject(edit.path);
                     }}
                   >
-                    <XIcon className="size-3.5" />
+                    <XIcon className="size-3" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Reject this file</TooltipContent>
@@ -111,20 +115,20 @@ const FileDiffItem: FC<{
                   <Button
                     variant="ghost"
                     size="xs"
-                    className="size-6 cursor-pointer p-0 text-muted-foreground"
+                    className="size-6 cursor-pointer p-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       onAccept(edit.path);
                     }}
                   >
-                    <CheckIcon className="size-3.5" />
+                    <CheckIcon className="size-3" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Accept this file</TooltipContent>
               </Tooltip>
               <div className="flex size-6 items-center justify-center">
                 <ChevronDownIcon
-                  className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
+                  className={`size-3 shrink-0 transition-transform ${
                     isOpen ? 'rotate-180' : ''
                   }`}
                 />
@@ -372,7 +376,7 @@ function Page() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <div className="flex items-center border-muted-foreground/20 border-b px-6 py-4">
+      <div className="flex items-center border-border-subtle border-b px-6 py-4">
         <div className="mx-auto flex w-full max-w-4xl items-center gap-3">
           <h1 className="font-semibold text-foreground text-lg leading-none">
             Diff Preview
@@ -382,12 +386,7 @@ function Page() {
             changed
           </p>
           <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={handleRejectAll}
-            >
+            <Button variant="ghost" size="sm" onClick={handleRejectAll}>
               Reject all
             </Button>
             <Button variant="primary" size="sm" onClick={handleAcceptAll}>
@@ -400,7 +399,7 @@ function Page() {
       {/* Content - File diffs */}
       <div
         ref={scrollContainerRef}
-        className="scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent hover:scrollbar-thumb-zinc-400 dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500 flex-1 overflow-y-auto p-6"
+        className="scrollbar-subtle flex-1 overflow-y-auto p-6"
       >
         <div className="mx-auto max-w-4xl space-y-6">
           {formattedEdits.map((edit) => (

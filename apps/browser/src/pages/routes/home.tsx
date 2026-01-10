@@ -106,7 +106,7 @@ function StartPageWithConnectedWorkspace() {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [leftFadeDistance, setLeftFadeDistance] = useState(0);
-  const [_rightFadeDistance, setRightFadeDistance] = useState(0);
+  const [rightFadeDistance, setRightFadeDistance] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Local state for inspiration websites (fetched on demand)
@@ -217,7 +217,7 @@ function StartPageWithConnectedWorkspace() {
   const getMaskStyle = (): React.CSSProperties =>
     ({
       '--left-fade': `${leftFadeDistance}px`,
-      '--right-fade': '${rightFadeDistance}px',
+      '--right-fade': `${rightFadeDistance}px`,
     }) as React.CSSProperties;
 
   const handleWebsiteClick = useCallback(
@@ -233,8 +233,8 @@ function StartPageWithConnectedWorkspace() {
   return (
     <div className="flex w-full max-w-6xl flex-col items-start gap-8 px-20">
       <div className="flex items-center gap-2">
-        <LogoWithText />
-        <div className="glass-body ml-1 @[350px]:inline-flex hidden h-fit shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
+        <LogoWithText className="h-10 text-foreground" />
+        <div className="ml-1 inline-flex shrink-0 items-center font-normal text-primary-accent text-xs">
           Alpha
         </div>
       </div>
@@ -304,14 +304,14 @@ function OnboardingStartPage() {
   return (
     <div className="flex w-full max-w-2xl flex-col items-start gap-4 px-10">
       <div className="flex items-center gap-2">
-        <LogoWithText />
-        <div className="glass-body ml-1 @[350px]:inline-flex hidden h-fit shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-primary text-xs">
+        <LogoWithText className="h-10 text-foreground" />
+        <div className="ml-1 inline-flex shrink-0 items-center font-normal text-primary-accent text-xs">
           Alpha
         </div>
       </div>
       <div
         className={cn(
-          'group/start-page-workspaces mt-2 flex w-full flex-col items-start justify-start gap-4 rounded-lg border border-muted-foreground/5 bg-linear-to-tr from-muted-foreground/8 to-muted-foreground/3 p-4',
+          'group/start-page-workspaces mt-2 flex w-full flex-col items-start justify-start gap-4 rounded-lg border border-border-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-4 dark:border-border dark:from-base-750 dark:to-surface-1',
         )}
       >
         <div className="flex justify-between gap-20 ">
@@ -363,14 +363,14 @@ function RecentlyOpenedWorkspaceItem({
 }) {
   return (
     <div
-      className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg p-2 pt-1 hover:bg-muted-foreground/5"
+      className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg from-base-700 to-base-650 p-2 pt-1 hover:bg-surface-1 dark:hover:bg-linear-to-tr"
       onClick={onClick}
     >
       <IconDocFolder className="size-4 shrink-0 text-muted-foreground" />
       <div className="flex w-full flex-col items-start justify-start gap-0">
         <div className="flex w-full items-baseline justify-start gap-3 text-foreground text-sm">
           <span className="truncate font-medium">{workspace.name}</span>
-          <span className="hidden shrink-0 font-normal text-muted-foreground/50 text-xs sm:inline">
+          <span className="hidden shrink-0 font-normal text-muted-foreground/40 text-xs sm:inline">
             <TimeAgo date={workspace.openedAt} live={false} />
           </span>
         </div>
@@ -389,9 +389,9 @@ function RecentlyOpenedWorkspaceItem({
 
 function DesignInspirationSkeletonCard() {
   return (
-    <div className="flex w-64 shrink-0 flex-col items-center overflow-hidden rounded-lg border border-border bg-card shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)]">
-      <Skeleton className="h-40 w-full rounded-none" />
-      <div className="flex w-full items-center justify-between gap-2 p-2">
+    <div className="flex w-64 shrink-0 flex-col items-center overflow-hidden rounded-lg border border-border bg-background shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] dark:bg-surface-1">
+      <Skeleton className="h-40 w-full rounded-none border-none" />
+      <div className="flex w-full items-center justify-between gap-2 p-2 dark:border-border dark:border-t">
         <Skeleton className="h-4 w-32" />
       </div>
     </div>
@@ -446,7 +446,7 @@ function DesignInspirationCard({
       onClick={(e) => onClick(e)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="flex w-64 shrink-0 cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-muted-foreground/20 bg-background text-foreground shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] transition-shadow duration-300 hover:shadow-[0_0_12px_0_rgba(0,0,0,0.12),0_-8px_56px_-24px_rgba(0,0,0,0.2)]"
+      className="flex w-64 shrink-0 cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-border bg-background text-foreground shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] transition-shadow duration-300 hover:shadow-[0_0_12px_0_rgba(0,0,0,0.12),0_-8px_56px_-24px_rgba(0,0,0,0.2)] dark:bg-surface-1"
     >
       <div className="relative h-40 w-full">
         {!isImageLoaded && <Skeleton className="h-40 w-full rounded-none" />}
@@ -484,7 +484,7 @@ function DesignInspirationCard({
               {websiteName}
             </span>
             {websiteFirstRoute && (
-              <span className="truncate rounded-md bg-primary/5 px-1.5 py-0.5 font-normal text-primary/70 text-xs">
+              <span className="truncate rounded-md bg-primary-accent/10 px-1.5 py-0.5 font-normal text-primary-accent text-xs dark:bg-primary-200/10 dark:text-primary-400">
                 {websiteFirstRoute}
               </span>
             )}
@@ -532,7 +532,7 @@ function ConnectWorkspaceBanner() {
             </TooltipContent>
           </Tooltip>
         </h1>
-        <div className="group/recent-workspaces flex w-full flex-col items-start justify-start gap-1 rounded-lg border border-muted-foreground/5 bg-linear-to-tr from-muted-foreground/8 to-muted-foreground/3 p-3">
+        <div className="group/recent-workspaces flex w-full flex-col items-start justify-start gap-1 rounded-lg border border-border-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-3 dark:border-border dark:from-base-750 dark:to-surface-1">
           <div className="flex w-full flex-row items-start justify-between gap-14">
             <div className="flex w-full flex-col items-start gap-2">
               <div className="flex w-full flex-row items-start justify-between gap-1">
@@ -588,7 +588,7 @@ function ConnectWorkspaceBanner() {
   }
 
   return (
-    <div className="flex w-full items-center justify-between gap-4 rounded-lg border border-muted-foreground/5 bg-linear-to-tr from-muted-foreground/8 to-muted-foreground/3 p-4">
+    <div className="flex w-full items-center justify-between gap-4 rounded-lg border border-border-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-4 dark:border-border dark:from-base-750 dark:to-surface-1">
       <div className="flex items-center gap-3">
         <IconDocFolder className="size-6 shrink-0 text-muted-foreground" />
         <span className="font-medium text-foreground text-sm">

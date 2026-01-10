@@ -8,6 +8,7 @@ import {
   MenuSubmenu,
   MenuSubmenuTrigger,
   MenuSubmenuContent,
+  type MenuSize,
 } from '../components/menu';
 import { Button } from '../components/button';
 import {
@@ -18,74 +19,107 @@ import {
   TrashIcon,
 } from 'lucide-react';
 
+const MenuDemo = ({ size }: { size?: MenuSize }) => (
+  <Menu>
+    <MenuTrigger>
+      <Button variant="secondary" size="sm">
+        Open Menu
+      </Button>
+    </MenuTrigger>
+    <MenuContent size={size}>
+      <MenuItem size={size}>
+        <FileIcon className="size-4" />
+        New File
+      </MenuItem>
+      <MenuItem size={size}>
+        <FolderIcon className="size-4" />
+        New Folder
+      </MenuItem>
+      <MenuSeparator />
+      <MenuItem size={size}>
+        <SaveIcon className="size-4" />
+        Save
+      </MenuItem>
+      <MenuSeparator />
+      <MenuItem size={size}>
+        <TrashIcon className="size-4" />
+        Delete
+      </MenuItem>
+    </MenuContent>
+  </Menu>
+);
+
 const meta = {
   title: 'Example/Menu',
-  component: Menu,
+  component: MenuDemo,
   parameters: {},
   tags: ['autodocs'],
-  render: () => (
-    <Menu>
-      <MenuTrigger>
-        <Button variant="secondary">Open Menu</Button>
-      </MenuTrigger>
-      <MenuContent>
-        <MenuItem>
-          <FileIcon className="size-4" />
-          New File
-        </MenuItem>
-        <MenuItem>
-          <FolderIcon className="size-4" />
-          New Folder
-        </MenuItem>
-        <MenuSeparator />
-        <MenuItem>
-          <SaveIcon className="size-4" />
-          Save
-        </MenuItem>
-        <MenuSeparator />
-        <MenuItem>
-          <TrashIcon className="size-4" />
-          Delete
-        </MenuItem>
-      </MenuContent>
-    </Menu>
-  ),
-} satisfies Meta<typeof Menu>;
+  argTypes: {
+    size: {
+      control: 'select',
+      options: ['xs', 'sm', 'md'],
+      description: 'Size of the menu items',
+    },
+  },
+  args: {
+    size: 'sm',
+  },
+} satisfies Meta<typeof MenuDemo>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const ExtraSmall: Story = {
+  args: {
+    size: 'xs',
+  },
+};
+
+export const Small: Story = {
+  args: {
+    size: 'sm',
+  },
+};
+
+export const Medium: Story = {
+  args: {
+    size: 'md',
+  },
+};
+
 export const WithSubmenu: Story = {
-  render: () => (
+  render: (args) => (
     <Menu>
       <MenuTrigger>
-        <Button variant="secondary">Open Menu</Button>
+        <Button variant="secondary" size="sm">
+          Open Menu
+        </Button>
       </MenuTrigger>
-      <MenuContent>
-        <MenuItem>
+      <MenuContent size={args.size}>
+        <MenuItem size={args.size}>
           <FileIcon className="size-4" />
           New File
         </MenuItem>
         <MenuSubmenu>
-          <MenuSubmenuTrigger>
+          <MenuSubmenuTrigger size={args.size}>
             <FolderIcon className="size-4" />
             More Options
           </MenuSubmenuTrigger>
-          <MenuSubmenuContent side="right">
-            <MenuItem>
+          <MenuSubmenuContent side="right" size={args.size}>
+            <MenuItem size={args.size}>
               <SettingsIcon className="size-4" />
               Settings
             </MenuItem>
-            <MenuItem>
+            <MenuItem size={args.size}>
               <SaveIcon className="size-4" />
               Save As...
             </MenuItem>
           </MenuSubmenuContent>
         </MenuSubmenu>
         <MenuSeparator />
-        <MenuItem>
+        <MenuItem size={args.size}>
           <TrashIcon className="size-4" />
           Delete
         </MenuItem>

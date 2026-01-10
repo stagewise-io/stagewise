@@ -1,0 +1,78 @@
+@theme default {
+  --H: 265;
+
+ /* Primary (accent + UI fill) */
+  --color-primary-50: oklch(0.93 0.033 var(--H));
+  --color-primary-100: oklch(0.86 0.07 var(--H));
+  --color-primary-150: oklch(0.82 0.095 var(--H));
+  --color-primary-200: oklch(0.78 0.12 var(--H));
+  --color-primary-250: oklch(0.74 0.15 var(--H));
+  --color-primary-300: oklch(0.70 0.18 var(--H));
+  --color-primary-350: oklch(0.66 0.205 var(--H));
+  --color-primary-400: oklch(0.62 0.23 var(--H));
+  --color-primary-450: oklch(0.583 0.24 var(--H));
+  --color-primary-500: oklch(0.5455 0.25 var(--H)); /* peak chroma */
+  --color-primary-550: oklch(0.521 0.235 var(--H));
+  --color-primary-600: oklch(0.49 0.22 var(--H));
+  --color-primary-650: oklch(0.46 0.20 var(--H));
+  --color-primary-700: oklch(0.43 0.18 var(--H));
+  --color-primary-750: oklch(0.40 0.16 var(--H));
+  --color-primary-800: oklch(0.37 0.14 var(--H));
+  --color-primary-850: oklch(0.34 0.125 var(--H));
+  --color-primary-900: oklch(0.31 0.11 var(--H));
+  --color-primary-950: oklch(0.26 0.082 var(--H));
+
+  /* Neutrals (tinted, low chroma) - more nuance in dark range for elevation */
+  --color-base-50:  oklch(0.992 0.006 var(--H));
+  --color-base-100: oklch(0.96 0.008 var(--H));
+  --color-base-150: oklch(0.92 0.011 var(--H));
+  --color-base-200: oklch(0.88 0.014 var(--H)); /* current light mode bg #d3d8e1 */
+  --color-base-250: oklch(0.81 0.016 var(--H)); /* #bcc1cc */
+  --color-base-300: oklch(0.74 0.018 var(--H));
+  --color-base-350: oklch(0.665 0.0205 var(--H));
+  --color-base-400: oklch(0.59 0.023 var(--H));
+  --color-base-450: oklch(0.525 0.0255 var(--H));
+  --color-base-500: oklch(0.46 0.028 var(--H));
+  --color-base-550: oklch(0.40 0.0265 var(--H));
+  --color-base-600: oklch(0.34 0.025 var(--H));
+  --color-base-650: oklch(0.3175 0.0215 var(--H));
+  --color-base-700: oklch(0.295 0.018 var(--H));
+  --color-base-750: oklch(0.2645 0.0155 var(--H));
+  --color-base-800: oklch(0.234 0.013 var(--H));
+  --color-base-850: oklch(0.216 0.011 var(--H));
+  --color-base-900: oklch(0.198 0.009 var(--H));
+  --color-base-950: oklch(0.161 0.005 var(--H));
+
+  /* SUCCESS */
+  --color-success-foreground-light: oklch(0.52 0.160 152);
+  --color-success-foreground-dark:  oklch(0.70 0.160 152);
+  --color-success:    oklch(0.47 0.170 152); /* solid bg */
+  --color-success-hover:  oklch(0.42 0.165 152);
+  --color-success-active: oklch(0.36 0.150 152);
+
+  /* ERROR */
+  --color-error-foreground-light: oklch(0.50 0.155 28);
+  --color-error-foreground-dark:  oklch(0.70 0.155 28);
+  --color-error:    oklch(0.47 0.165 28);    /* solid bg */
+  --color-error-hover:  oklch(0.44 0.160 28);
+  --color-error-active: oklch(0.42 0.145 28);
+
+  /* WARNING */
+  --color-warning-foreground-light: oklch(0.58 0.120 85);
+  --color-warning-foreground-dark:  oklch(0.80 0.130 85);
+  --color-warning:    oklch(0.41 0.135 85);  /* solid bg */
+  --color-warning-hover:  oklch(0.38 0.135 85);
+  --color-warning-active: oklch(0.36 0.125 85);
+
+  /* INFO  */
+  --color-info-foreground-light: oklch(0.49 0.160 220);
+  --color-info-foreground-dark:  oklch(0.70 0.175 220);
+  --color-info:    oklch(0.47 0.18 220);    /* solid bg */
+  --color-info-hover:  oklch(0.43 0.175 220);
+  --color-info-active: oklch(0.40 0.170 220);
+
+
+  /* Code highlighting */ 
+  --color-comment-light: oklch(0.0 0.0 0); /* TODO */
+  --color-comment-dark: oklch(0.0 0.0 0); /* TODO */
+}

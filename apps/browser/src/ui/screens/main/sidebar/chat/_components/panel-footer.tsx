@@ -39,9 +39,6 @@ import {
   CollapsibleTrigger,
 } from '@stagewise/stage-ui/components/collapsible';
 
-const GlassyTextInputClassNames =
-  'origin-center rounded-md border border-black/10 ring-1 ring-white/20 transition-all duration-150 ease-out after:absolute after:inset-0 after:size-full after:content-normal after:rounded-[inherit] after:bg-gradient-to-b after:from-white/5 after:to-white/0 after:transition-colors after:duration-150 after:ease-out disabled:pointer-events-none disabled:bg-black/5 disabled:text-foreground/60 disabled:opacity-30';
-
 export function ChatPanelFooter() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatState = useChatState();
@@ -298,9 +295,9 @@ export function ChatPanelFooter() {
   });
 
   return (
-    <footer className="relative z-20 flex flex-col items-stretch gap-1 p-0">
+    <footer className="z-20 flex flex-col items-stretch gap-1 px-2">
       <div
-        className="flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.04)] ring-1 ring-muted-foreground/15 before:absolute before:inset-0 before:rounded-lg data-[chat-active=true]:bg-primary/1 data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/10"
+        className="relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.04)] ring-1 ring-border before:absolute before:inset-0 before:rounded-lg data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/3 dark:bg-surface-1"
         id="chat-input-container-box"
         data-chat-active={chatInputActive}
       >
@@ -321,7 +318,6 @@ export function ChatPanelFooter() {
               onBlur={onInputBlur}
               disabled={!enableInputField}
               className={cn(
-                GlassyTextInputClassNames,
                 'scrollbar-subtle relative z-10 mt-0 h-full w-full resize-none overflow-visible rounded-none border-none text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out placeholder:text-muted-foreground/70 focus:outline-none disabled:bg-transparent',
               )}
               placeholder={`Ask anything about this page ${focusChatHotkeyText}`}
@@ -345,7 +341,6 @@ export function ChatPanelFooter() {
                 percentage={contextUsed}
                 usedKb={activeChat.usage.usedContextWindowSize / 1000}
                 maxKb={activeChat.usage.maxContextWindowSize / 1000}
-                className="ml-1"
               />
             )}
             <FileAttachmentChips
@@ -362,7 +357,6 @@ export function ChatPanelFooter() {
               <Button
                 size="xs"
                 variant="ghost"
-                className="text-muted-foreground"
                 onClick={() => {
                   chatState.clearFileAttachments();
                   clearSelectedElements();
@@ -398,7 +392,7 @@ export function ChatPanelFooter() {
                     size="icon-sm"
                     variant="ghost"
                     disabled={hasOpenedInternalPage}
-                    className="text-muted-foreground data-[element-selector-active=true]:bg-primary/5 data-[element-selector-active=true]:text-primary data-[element-selector-active=true]:hover:bg-primary/10"
+                    className="data-[element-selector-active=true]:bg-primary-accent/5 data-[element-selector-active=true]:text-primary-accent"
                     data-element-selector-active={elementSelectionActive}
                     onClick={(e) => {
                       e.preventDefault();
@@ -439,7 +433,7 @@ export function ChatPanelFooter() {
                     size="icon-sm"
                     variant="ghost"
                     aria-label="Upload image"
-                    className="mb-1 text-muted-foreground"
+                    className="mb-1"
                     onClick={() => {
                       const input = document.getElementById(
                         'chat-file-attachment-input-file',
@@ -481,24 +475,24 @@ export function ChatPanelFooter() {
             <TooltipContent>Send message</TooltipContent>
           </Tooltip>
         </div>
+        {workspaceStatus === 'setup' && (
+          <div className="-z-10 absolute right-2 bottom-full left-2 flex flex-row items-center justify-between gap-2 rounded-t-lg border-border-subtle border-t border-r border-l bg-background p-0.75 pl-2.5 backdrop-blur-lg">
+            <span className="truncate text-primary-accent text-xs">
+              You are in workspace setup-mode.
+            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="shrink-0"
+              onClick={() => closeWorkspaceSetupAndCreateNewChat(activeChatId)}
+            >
+              <IconXmark className="size-3" />
+              Cancel setup
+            </Button>
+          </div>
+        )}
+        <FileDiffCard />
       </div>
-      {workspaceStatus === 'setup' && (
-        <div className="-z-10 absolute right-1 bottom-full left-1 flex flex-row items-center justify-between gap-2 rounded-t-lg border-primary/20 border-t border-r border-l bg-blue-100/10 p-0.75 pl-2.5 backdrop-blur-lg">
-          <span className="truncate text-primary/80 text-xs dark:text-blue-400">
-            You are in workspace setup-mode.
-          </span>
-          <Button
-            variant="ghost"
-            size="xs"
-            className="shrink-0 text-muted-foreground"
-            onClick={() => closeWorkspaceSetupAndCreateNewChat(activeChatId)}
-          >
-            <IconXmark className="size-3" />
-            Cancel setup
-          </Button>
-        </div>
-      )}
-      <FileDiffCard />
     </footer>
   );
 }
@@ -609,7 +603,7 @@ function FileDiffCard() {
   return (
     <div
       ref={cardRef}
-      className="-z-10 absolute right-1 bottom-full left-1 flex flex-col items-center justify-between gap-2 rounded-t-lg border-muted-foreground/20 border-t border-r border-l bg-background/70 p-0.75 backdrop-blur-lg"
+      className="-z-10 absolute right-2 bottom-full left-2 flex flex-col items-center justify-between gap-1 rounded-t-lg border-border-subtle border-t border-r border-l bg-background p-0.75 backdrop-blur-lg"
     >
       <Collapsible className="w-full" open={isOpen} onOpenChange={setIsOpen}>
         <div className="flex w-full flex-col items-start justify-start gap-2 p-0">
@@ -619,7 +613,7 @@ function FileDiffCard() {
               'w-full cursor-pointer p-0 hover:bg-transparent active:bg-transparent',
             )}
           >
-            <div className="flex w-full flex-row items-center justify-between gap-2 pl-1.5 text-muted-foreground text-xs">
+            <div className="flex w-full flex-row items-center justify-between gap-2 pl-1.5 text-xs">
               <ChevronDownIcon
                 className={cn(
                   'size-3 shrink-0 transition-transform duration-150',
@@ -631,7 +625,7 @@ function FileDiffCard() {
                 <Button
                   variant="ghost"
                   size="xs"
-                  className="cursor-pointer text-muted-foreground text-xs"
+                  className="cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     void rejectAllPendingEdits();
@@ -642,7 +636,7 @@ function FileDiffCard() {
                 <Button
                   variant="primary"
                   size="xs"
-                  className="cursor-pointer text-xs"
+                  className="cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     void acceptAllPendingEdits();
@@ -653,27 +647,27 @@ function FileDiffCard() {
               </div>
             </div>
           </CollapsibleTrigger>
-          <CollapsibleContent className="w-full">
+          <CollapsibleContent className="w-full pb-1">
             {formattedEdits.map((edit) => (
               <button
                 type="button"
-                className="flex w-full cursor-pointer flex-col items-start justify-start gap-2 rounded px-1 py-0.5 hover:bg-muted/50"
+                className="flex w-full cursor-pointer flex-col items-start justify-start gap-2 rounded px-1 py-0.5 text-muted-foreground hover:bg-surface-1 hover:text-foreground"
                 key={edit.path}
                 onClick={() => openDiffReviewPage(edit.path)}
               >
-                <span className="flex flex-row items-center justify-start gap-1 truncate text-muted-foreground text-xs">
+                <span className="flex flex-row items-center justify-start gap-1 truncate text-xs">
                   <FileIcon
                     filePath={edit.fileName}
                     className="size-5 shrink-0"
                   />
                   <span className="text-xs leading-none">{edit.fileName}</span>
                   {edit.linesAdded > 0 && (
-                    <span className="text-[10px] text-success leading-none">
+                    <span className="text-[10px] text-success-foreground leading-none">
                       +{edit.linesAdded}
                     </span>
                   )}
                   {edit.linesRemoved > 0 && (
-                    <span className="text-[10px] text-error leading-none">
+                    <span className="text-[10px] text-error-foreground leading-none">
                       -{edit.linesRemoved}
                     </span>
                   )}

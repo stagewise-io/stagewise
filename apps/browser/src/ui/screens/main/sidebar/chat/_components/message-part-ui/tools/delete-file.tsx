@@ -84,6 +84,7 @@ export const DeleteFileToolPart = ({
 
   return (
     <ToolPartUI
+      showBorder={true}
       expanded={expanded}
       setExpanded={setExpanded}
       trigger={trigger}

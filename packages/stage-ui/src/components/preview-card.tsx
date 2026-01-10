@@ -49,7 +49,13 @@ export const PreviewCardContent = ({
         <PreviewCardBase.Popup
           {...props}
           className={cn(
-            'flex max-w-80 flex-col gap-4 rounded-xl bg-background/80 p-3 text-foreground shadow-xl ring-1 ring-muted-foreground/30 backdrop-blur-sm transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm',
+            'flex max-w-80 flex-col gap-4 p-3',
+            'rounded-lg border border-border-subtle bg-background',
+            'text-foreground shadow-lg',
+            'transition-[transform,scale,opacity] duration-150 ease-out',
+            'origin-(--transform-origin)',
+            'data-ending-style:scale-90 data-starting-style:scale-90',
+            'data-ending-style:opacity-0 data-starting-style:opacity-0',
             className,
           )}
         >

@@ -36,7 +36,7 @@ export const PopoverContent = ({
 }: PopoverContentProps) => {
   return (
     <PopoverBase.Portal>
-      <PopoverBase.Backdrop className="fixed inset-0 z-40 h-screen w-screen" />
+      <PopoverBase.Backdrop className="fixed inset-0 z-40 size-full" />
       <PopoverBase.Positioner
         sideOffset={sideOffset ?? 4}
         side={side}
@@ -48,7 +48,13 @@ export const PopoverContent = ({
         <PopoverBase.Popup
           {...props}
           className={cn(
-            'flex max-w-80 flex-col gap-4 rounded-3xl bg-background/80 p-3 text-foreground shadow-xl ring-1 ring-muted-foreground/30 backdrop-blur-sm transition-all duration-150 ease-out data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[ending-style]:scale-75 data-[starting-style]:scale-75 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm',
+            'flex max-w-80 flex-col gap-3 p-2',
+            'rounded-lg border border-border-subtle bg-background',
+            'text-foreground shadow-lg',
+            'transition-[transform,scale,opacity] duration-150 ease-out',
+            'origin-(--transform-origin)',
+            'data-ending-style:scale-90 data-starting-style:scale-90',
+            'data-ending-style:opacity-0 data-starting-style:opacity-0',
             className,
           )}
         >
@@ -68,12 +74,16 @@ export const PopoverTitle = ({
   return (
     <PopoverBase.Title
       {...props}
-      className={cn('mr-8 font-semibold text-base text-foreground', className)}
+      className={cn(
+        'mr-8 font-semibold text-foreground text-sm leading-none',
+        className,
+      )}
     >
       {children}
     </PopoverBase.Title>
   );
 };
+
 export type PopoverDescriptionProps = React.ComponentProps<
   typeof PopoverBase.Description
 >;
@@ -85,10 +95,7 @@ export const PopoverDescription = ({
   return (
     <PopoverBase.Description
       {...props}
-      className={cn(
-        '-mt-3 text-muted-foreground text-sm first:mt-0',
-        className,
-      )}
+      className={cn('text-muted-foreground text-xs', className)}
     >
       {children}
     </PopoverBase.Description>
@@ -105,9 +112,9 @@ export const PopoverClose = ({ className, ...props }: PopoverCloseProps) => {
       render={
         <Button
           variant="ghost"
-          size="icon-xs"
+          size="icon-2xs"
           {...props}
-          className={cn('absolute top-2.5 right-2.5', className)}
+          className={cn('absolute top-1.5 right-1.5', className)}
         >
           <XIcon className="size-4" />
         </Button>
@@ -123,7 +130,8 @@ export const PopoverFooter = ({
   return (
     <div
       className={cn(
-        'mt-1 flex h-fit w-full flex-row-reverse items-center justify-start gap-2 text-foreground',
+        'mt-0.5 flex h-fit w-full flex-row-reverse items-center justify-start gap-2',
+        'text-foreground',
         className,
       )}
       {...props}

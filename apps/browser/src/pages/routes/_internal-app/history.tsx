@@ -189,7 +189,7 @@ function RowComponent({
   return (
     <div style={style}>
       <div
-        className="group flex h-full cursor-pointer select-none items-center gap-4 rounded-lg px-4 hover:bg-muted/50"
+        className="group flex h-full cursor-pointer select-none items-center gap-4 rounded-lg px-4 hover:bg-surface-1"
         onClick={() => onOpenUrl(row.url)}
       >
         <span className="min-w-[60px] text-muted-foreground text-sm">
@@ -210,7 +210,7 @@ function RowComponent({
               className="opacity-0 group-hover:opacity-100"
               onClick={handleCopyUrl}
             >
-              <LinkIcon className="size-4 text-muted-foreground" />
+              <LinkIcon className="size-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{copyTooltipText}</TooltipContent>
@@ -455,18 +455,17 @@ function Page() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <div className="flex items-center border-border/30 border-b px-6 py-4">
+      <div className="flex items-center border-border-subtle border-b px-6 py-4">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-24">
           <h1 className="font-semibold text-foreground text-xl">History</h1>
-          <div className="relative flex-1 rounded-full bg-zinc-500/5 focus-within:bg-zinc-500/10">
+          <div className="relative flex-1 rounded-full bg-surface-1 focus-within:bg-surface-2">
             <IconMagnifierFill18 className="-translate-y-1/2 absolute top-1/2 left-3.5 z-10 size-4 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Search history"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="w-full rounded-full pl-10 before:hidden"
-              inputClassName="rounded-full pl-4 focus:outline-none focus:ring-0 bg-transparent"
+              className="rounded-full border-none bg-transparent pl-10 before:hidden focus:border-none focus:outline-none focus:ring-0"
             />
           </div>
         </div>
@@ -493,7 +492,7 @@ function Page() {
                     <summary className="cursor-pointer text-muted-foreground text-xs">
                       Technical details (dev mode)
                     </summary>
-                    <pre className="mt-2 max-h-48 overflow-auto rounded bg-muted p-2 text-muted-foreground text-xs">
+                    <pre className="mt-2 max-h-48 overflow-auto rounded bg-surface-1 p-2 text-muted-foreground text-xs">
                       {error.stack}
                     </pre>
                   </details>
@@ -554,7 +553,7 @@ function Page() {
                 rowProps={rowProps}
                 onRowsRendered={handleRowsRendered}
                 overscanCount={5}
-                className="scrollbar-thin scrollbar-thumb-zinc-300 hover:scrollbar-thumb-zinc-400 scrollbar-track-transparent dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500"
+                className="scrollbar-subtle"
                 style={{
                   height: containerSize.height,
                   width: containerSize.width,

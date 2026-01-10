@@ -37,8 +37,36 @@ import {
 } from '@dnd-kit/modifiers';
 import { SortableTab } from './sortable-tab';
 import { Tab } from './tab';
+import type { TabState } from '@shared/karton-contracts/ui';
 
 const DEFAULT_BORDER_RADIUS = 8;
+
+function DragOverlayContent({
+  activeTab,
+  dragBorderRadius,
+  activateBottomLeftCornerRadius,
+}: {
+  activeTab: TabState;
+  dragBorderRadius: number | null;
+  activateBottomLeftCornerRadius: boolean;
+}) {
+  return (
+    <div style={{ width: '13rem' }}>
+      <Tab
+        tabState={activeTab}
+        activateBottomLeftCornerRadius={
+          dragBorderRadius !== null
+            ? dragBorderRadius > 0
+            : activateBottomLeftCornerRadius
+        }
+        bottomLeftBorderRadius={
+          dragBorderRadius !== null ? dragBorderRadius : undefined
+        }
+        isDragging={true}
+      />
+    </div>
+  );
+}
 
 // Default dnd-kit drop animation duration in ms
 // See: @dnd-kit/core defaultDropAnimationConfiguration
@@ -339,12 +367,12 @@ export function TabsContainer({
         <Button
           variant="ghost"
           size="xs"
-          className="-ml-1.25 h-7.25 shrink-0 self-start rounded-[8.5px] rounded-bl-md text-muted opacity-80 transition-all duration-150 ease-out hover:text-muted-foreground hover:opacity-100"
+          className="group -ml-1.25 h-7.25 shrink-0 self-start rounded-[8.5px] rounded-bl-md text-muted-foreground transition-all duration-150 ease-out hover:bg-surface-2 dark:hover:bg-base-850"
           onClick={onAddTab}
         >
-          <IconPlus className="size-3 text-muted-foreground" />
-          <div className="pointer-events-none flex flex-row items-center gap-1">
-            <span className="ml-1 text-xs">⌘ T</span>
+          <IconPlus className="size-3" />
+          <div className="pointer-events-none flex flex-row items-center gap-1 opacity-0 group-hover:opacity-100">
+            <span className="ml-1 text-muted-foreground text-xs">⌘ T</span>
           </div>
         </Button>
         <div className="app-drag h-full min-w-2! grow" />
@@ -355,13 +383,16 @@ export function TabsContainer({
                 variant="ghost"
                 size="xs"
                 className={cn(
-                  'h-7.25 shrink-0 self-start rounded-[8.5px] text-muted opacity-80 transition-all duration-150 ease-out hover:text-muted-foreground hover:opacity-100',
+                  'group h-7.25 shrink-0 self-start rounded-[8.5px] text-muted-foreground transition-all duration-150 ease-out',
                   platform !== 'darwin' ? 'mr-32' : 'mr-0',
+                  'hover:bg-surface-2 dark:hover:bg-base-850',
                 )}
                 onClick={onCleanAllTabs}
               >
-                <span className="mr-1 text-xs">⌘ ↑ W</span>
-                <IconBrush2Fill18 className="size-3.5 text-muted-foreground" />
+                <span className="mr-1 text-muted-foreground text-xs opacity-0 group-hover:opacity-100">
+                  ⌘ ↑ W
+                </span>
+                <IconBrush2Fill18 className="size-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -372,19 +403,11 @@ export function TabsContainer({
       </div>
       <DragOverlay dropAnimation={disableDropAnimation ? null : undefined}>
         {activeTab ? (
-          <div style={{ width: '13rem' }}>
-            <Tab
-              tabState={activeTab}
-              activateBottomLeftCornerRadius={
-                dragBorderRadius !== null
-                  ? dragBorderRadius > 0 // During drag, show curve only if radius > 0
-                  : activateBottomLeftCornerRadius
-              }
-              bottomLeftBorderRadius={
-                dragBorderRadius !== null ? dragBorderRadius : undefined
-              }
-            />
-          </div>
+          <DragOverlayContent
+            activeTab={activeTab}
+            dragBorderRadius={dragBorderRadius}
+            activateBottomLeftCornerRadius={activateBottomLeftCornerRadius}
+          />
         ) : null}
       </DragOverlay>
     </DndContext>

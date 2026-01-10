@@ -1,168 +1,185 @@
+import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-const ColorSwatch = ({
-  bgClass,
-  textClass,
-  mutedTextClass,
-  label,
+/**
+ * Tailwind Safelist for palette.css colors
+ * These classes ensure Tailwind generates all color utilities from palette.css
+ *
+ * bg-primary-50 bg-primary-100 bg-primary-150 bg-primary-200 bg-primary-250 bg-primary-300 bg-primary-350 bg-primary-400 bg-primary-450 bg-primary-500 bg-primary-550 bg-primary-600 bg-primary-650 bg-primary-700 bg-primary-750 bg-primary-800 bg-primary-850 bg-primary-900 bg-primary-950
+ * text-primary-50 text-primary-100 text-primary-150 text-primary-200 text-primary-250 text-primary-300 text-primary-350 text-primary-400 text-primary-450 text-primary-500 text-primary-550 text-primary-600 text-primary-650 text-primary-700 text-primary-750 text-primary-800 text-primary-850 text-primary-900 text-primary-950
+ * border-primary-50 border-primary-100 border-primary-150 border-primary-200 border-primary-250 border-primary-300 border-primary-350 border-primary-400 border-primary-450 border-primary-500 border-primary-550 border-primary-600 border-primary-650 border-primary-700 border-primary-750 border-primary-800 border-primary-850 border-primary-900 border-primary-950
+ * bg-base-50 bg-base-100 bg-base-150 bg-base-200 bg-base-250 bg-base-300 bg-base-350 bg-base-400 bg-base-450 bg-base-500 bg-base-550 bg-base-600 bg-base-650 bg-base-700 bg-base-750 bg-base-800 bg-base-850 bg-base-900 bg-base-950
+ * text-base-50 text-base-100 text-base-150 text-base-200 text-base-250 text-base-300 text-base-350 text-base-400 text-base-450 text-base-500 text-base-550 text-base-600 text-base-650 text-base-700 text-base-750 text-base-800 text-base-850 text-base-900 text-base-950
+ * border-base-50 border-base-100 border-base-150 border-base-200 border-base-250 border-base-300 border-base-350 border-base-400 border-base-450 border-base-500 border-base-550 border-base-600 border-base-650 border-base-700 border-base-750 border-base-800 border-base-850 border-base-900 border-base-950
+ * bg-success bg-success-hover bg-success-active text-success text-success-hover text-success-active border-success border-success-hover border-success-active text-success-foreground-light text-success-foreground-dark
+ * bg-error bg-error-hover bg-error-active text-error text-error-hover text-error-active border-error border-error-hover border-error-active text-error-foreground-light text-error-foreground-dark
+ * bg-warning bg-warning-hover bg-warning-active text-warning text-warning-hover text-warning-active border-warning border-warning-hover border-warning-active text-warning-foreground-light text-warning-foreground-dark
+ * bg-info bg-info-hover bg-info-active text-info text-info-hover text-info-active border-info border-info-hover border-info-active text-info-foreground-light text-info-foreground-dark
+ */
+
+const allShades = [
+  50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800,
+  850, 900, 950,
+];
+
+const ColorRamp = ({
+  title,
+  colorVar,
+  isDark,
 }: {
-  bgClass: string;
-  textClass: string;
-  mutedTextClass: string;
-  label: string;
+  title: string;
+  colorVar: 'primary' | 'base';
+  isDark: boolean;
 }) => {
   return (
-    <div className={`${bgClass} rounded-lg border border-border p-6`}>
-      <div className="space-y-2">
-        <div className={`${textClass} font-semibold text-sm`}>{label}</div>
-        <div className={`${textClass} text-base`}>Regular text</div>
-        <div className={`${mutedTextClass} text-sm`}>Muted text</div>
+    <div className="flex flex-col gap-2">
+      <h3
+        className="font-semibold text-sm"
+        style={{ color: isDark ? 'white' : 'black' }}
+      >
+        {title}
+      </h3>
+      <div className="flex flex-row flex-wrap items-start justify-start">
+        {allShades.map((shade) => (
+          <div
+            key={shade}
+            className="flex size-11 items-end justify-start p-1"
+            style={{ backgroundColor: `var(--color-${colorVar}-${shade})` }}
+          >
+            <span
+              className="font-mono text-[10px]"
+              style={{
+                color:
+                  shade < 500
+                    ? 'var(--color-base-900)'
+                    : 'var(--color-base-100)',
+              }}
+            >
+              {shade}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const SemanticColorCard = ({
+  title,
+  colorName,
+}: {
+  title: string;
+  colorName: 'success' | 'warning' | 'error' | 'info';
+}) => {
+  return (
+    <div className="flex flex-col items-start justify-center gap-2">
+      <div
+        className="size-12 rounded transition-colors"
+        style={{ backgroundColor: `var(--color-${colorName})` }}
+      />
+      <div
+        className="size-12 rounded transition-colors"
+        style={{ backgroundColor: `var(--color-${colorName}-hover)` }}
+      />
+      <div
+        className="size-12 rounded transition-colors"
+        style={{ backgroundColor: `var(--color-${colorName}-active)` }}
+      />
+      <div className="mt-1 flex flex-col gap-1">
+        <span
+          className="text-xs"
+          style={{ color: `var(--color-${colorName}-foreground-light)` }}
+        >
+          {title} Light
+        </span>
+        <span
+          className="text-xs"
+          style={{ color: `var(--color-${colorName}-foreground-dark)` }}
+        >
+          {title} Dark
+        </span>
       </div>
     </div>
   );
 };
 
 const ColorShowcase = () => {
+  const [isDark, setIsDark] = useState(true);
+
   return (
-    <div className="space-y-8 p-8">
-      <div>
-        <h2 className="mb-4 font-bold text-2xl text-foreground">
-          Color Combinations
-        </h2>
-        <p className="mb-6 text-muted-foreground">
-          Showcasing the different background and text color combinations from
-          our design system.
-        </p>
+    <div
+      className="flex min-h-screen flex-col gap-8 p-8"
+      style={{ backgroundColor: isDark ? 'black' : 'white' }}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <h2
+            className="mb-2 font-bold text-2xl"
+            style={{ color: isDark ? 'white' : 'black' }}
+          >
+            Color Palette
+          </h2>
+          <p
+            className="text-sm"
+            style={{
+              color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
+            }}
+          >
+            Complete color ramps with all 50s steps for primary, base, and
+            semantic colors.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsDark(!isDark)}
+          className="flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-sm transition-colors"
+          style={{
+            backgroundColor: isDark
+              ? 'rgba(255,255,255,0.1)'
+              : 'rgba(0,0,0,0.1)',
+            color: isDark ? 'white' : 'black',
+          }}
+        >
+          <span
+            className="size-4 rounded-full border-2"
+            style={{
+              backgroundColor: isDark ? 'black' : 'white',
+              borderColor: isDark ? 'white' : 'black',
+            }}
+          />
+          {isDark ? 'Dark' : 'Light'}
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <ColorSwatch
-          bgClass="bg-background"
-          textClass="text-foreground"
-          mutedTextClass="text-muted-foreground"
-          label="Background"
-        />
+      {/* Primary Ramp */}
+      <ColorRamp title="Primary" colorVar="primary" isDark={isDark} />
 
-        <ColorSwatch
-          bgClass="bg-muted"
-          textClass="text-foreground"
-          mutedTextClass="text-muted-foreground"
-          label="Muted"
-        />
+      {/* Base Ramp */}
+      <ColorRamp title="Base (Neutrals)" colorVar="base" isDark={isDark} />
 
-        <ColorSwatch
-          bgClass="bg-primary"
-          textClass="text-primary-foreground"
-          mutedTextClass="text-primary-foreground/70"
-          label="Primary"
-        />
-
-        <ColorSwatch
-          bgClass="bg-foreground"
-          textClass="text-background"
-          mutedTextClass="text-background/70"
-          label="Foreground (Inverted)"
-        />
-
-        <ColorSwatch
-          bgClass="bg-zinc-950 dark:bg-zinc-50"
-          textClass="text-zinc-50 dark:text-zinc-950"
-          mutedTextClass="text-zinc-400 dark:text-zinc-600"
-          label="High Contrast"
-        />
-
-        <ColorSwatch
-          bgClass="bg-success/10"
-          textClass="text-success"
-          mutedTextClass="text-success/70"
-          label="Success Tint"
-        />
-
-        <ColorSwatch
-          bgClass="bg-error/10"
-          textClass="text-error"
-          mutedTextClass="text-error/70"
-          label="Error Tint"
-        />
-
-        <ColorSwatch
-          bgClass="bg-busy/10"
-          textClass="text-busy"
-          mutedTextClass="text-busy/70"
-          label="Busy Tint"
-        />
-      </div>
-
-      <div className="mt-12">
-        <h3 className="mb-4 font-bold text-foreground text-xl">
+      {/* Semantic Colors */}
+      <div className="flex flex-col gap-2">
+        <h3
+          className="font-semibold text-sm"
+          style={{ color: isDark ? 'white' : 'black' }}
+        >
           Semantic Colors
         </h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-lg bg-success p-6 text-white">
-            <div className="font-semibold text-sm">Success</div>
-            <div className="text-base">Operation completed</div>
-            <div className="text-sm opacity-70">Secondary message</div>
-          </div>
-
-          <div className="rounded-lg bg-error p-6 text-white">
-            <div className="font-semibold text-sm">Error</div>
-            <div className="text-base">Something went wrong</div>
-            <div className="text-sm opacity-70">Secondary message</div>
-          </div>
-
-          <div className="rounded-lg bg-busy p-6 text-white">
-            <div className="font-semibold text-sm">Busy</div>
-            <div className="text-base">Loading state</div>
-            <div className="text-sm opacity-70">Secondary message</div>
-          </div>
+        <div className="flex flex-row items-start gap-6">
+          <SemanticColorCard title="Success" colorName="success" />
+          <SemanticColorCard title="Warning" colorName="warning" />
+          <SemanticColorCard title="Error" colorName="error" />
+          <SemanticColorCard title="Info" colorName="info" />
         </div>
-      </div>
-
-      <div className="mt-12">
-        <h3 className="mb-4 font-bold text-foreground text-xl">
-          CSS Variable Reference
-        </h3>
-        <div className="space-y-2 rounded-lg bg-muted p-6 font-mono text-sm">
-          <div className="text-foreground">
-            <span className="text-muted-foreground">--color-background:</span>{' '}
-            Background color
-          </div>
-          <div className="text-foreground">
-            <span className="text-muted-foreground">--color-foreground:</span>{' '}
-            Primary text color
-          </div>
-          <div className="text-foreground">
-            <span className="text-muted-foreground">--color-muted:</span> Muted
-            background
-          </div>
-          <div className="text-foreground">
-            <span className="text-muted-foreground">
-              --color-muted-foreground:
-            </span>{' '}
-            Muted text
-          </div>
-          <div className="text-foreground">
-            <span className="text-muted-foreground">--color-primary:</span>{' '}
-            Primary brand color
-          </div>
-          <div className="text-foreground">
-            <span className="text-muted-foreground">
-              --color-primary-foreground:
-            </span>{' '}
-            Text on primary
-          </div>
-          <div className="text-foreground">
-            <span className="text-muted-foreground">--color-success:</span>{' '}
-            Success state
-          </div>
-          <div className="text-foreground">
-            <span className="text-muted-foreground">--color-error:</span> Error
-            state
-          </div>
-          <div className="text-foreground">
-            <span className="text-muted-foreground">--color-busy:</span>{' '}
-            Busy/loading state
-          </div>
+        <div
+          className="mt-2 flex flex-row gap-4 text-xs"
+          style={{
+            color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
+          }}
+        >
+          <span>Top: default</span>
+          <span>Middle: hover</span>
+          <span>Bottom: active</span>
         </div>
       </div>
     </div>

@@ -28,7 +28,7 @@ function RouteComponent() {
     <div className="flex h-screen w-screen items-center justify-center bg-muted/50 p-3">
       <div className="flex h-full w-full flex-row items-start justify-start gap-6">
         <Sidebar />
-        <div className="scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent hover:scrollbar-thumb-zinc-400 dark:scrollbar-thumb-zinc-600 dark:hover:scrollbar-thumb-zinc-500 h-full flex-1 overflow-y-auto rounded-lg bg-background ring-1 ring-muted-foreground/20">
+        <div className="scrollbar-subtle h-full flex-1 overflow-y-auto rounded-lg bg-background ring-1 ring-border-subtle">
           <Outlet />
         </div>
       </div>

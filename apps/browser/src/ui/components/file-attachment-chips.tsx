@@ -7,7 +7,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
-import { buttonVariants } from '@stagewise/stage-ui/components/button';
+import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 
 interface FileAttachmentChipsProps {
   fileAttachments: FileAttachment[];
@@ -85,16 +85,17 @@ function FileAttachmentChip({ attachment, onDelete }: FileAttachmentChipProps) {
       <span className="max-w-24 truncate font-medium text-foreground/80 text-xs">
         {fileName}
       </span>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        className="size-3"
         onClick={(e) => {
           e.stopPropagation();
           onDelete();
         }}
-        className="text-muted-foreground transition-colors hover:text-error"
       >
         <XIcon className="size-3" />
-      </button>
+      </Button>
     </div>
   );
 

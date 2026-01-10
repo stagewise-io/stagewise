@@ -63,6 +63,17 @@ const config: StorybookConfig = {
       define: {
         'process.env.POSTHOG_API_KEY': JSON.stringify(undefined),
         'process.env.POSTHOG_HOST': JSON.stringify('https://eu.i.posthog.com'),
+        // Mock build constants for Storybook (normally injected from build-constants.ts)
+        __APP_RELEASE_CHANNEL__: JSON.stringify('dev'),
+        __APP_BASE_NAME__: JSON.stringify('stagewise-dev'),
+        __APP_NAME__: JSON.stringify('stagewise (Storybook)'),
+        __APP_BUNDLE_ID__: JSON.stringify('io.stagewise.dev'),
+        __APP_VERSION__: JSON.stringify('0.0.0-storybook'),
+        __APP_AUTHOR__: JSON.stringify('stagewise Inc.'),
+        __APP_PLATFORM__: JSON.stringify('darwin'),
+        __APP_ARCH__: JSON.stringify('x64'),
+        __APP_COPYRIGHT__: JSON.stringify('Copyright © 2025 stagewise Inc.'),
+        __APP_HOMEPAGE__: JSON.stringify('https://stagewise.io'),
       },
     });
   },

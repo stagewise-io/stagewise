@@ -11,7 +11,7 @@ export const IdeLogo = ({
   className?: string;
 }) => {
   return ide === 'other' ? (
-    <FileIcon className={cn('size-3 shrink-0 text-foreground', className)} />
+    <FileIcon className={cn('size-3 shrink-0', className)} />
   ) : (
     <img
       src={IDE_LOGOS[ide]}

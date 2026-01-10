@@ -155,14 +155,14 @@ const CodeComponent = ({
   return (
     <div
       className={cn(
-        'group glass-inset-chat-bubble relative my-4 flex h-auto flex-col gap-1 rounded-2xl p-2',
+        'group relative my-2 flex h-auto flex-col gap-1 rounded-lg border border-border-subtle px-2 pt-0.5 pb-2',
         language === 'mermaid' ? 'max-h-96' : 'max-h-64',
         className,
       )}
       data-streamdown={language === 'mermaid' ? 'mermaid-block' : 'code-block'}
     >
       <div className="flex shrink-0 flex-row items-center justify-between">
-        <span className="ml-1.5 font-medium font-mono text-muted-foreground text-sm lowercase">
+        <span className="ml-1.5 font-mono font-normal text-muted-foreground text-xs lowercase">
           {language}
         </span>
         {!isStreaming && (
@@ -172,7 +172,7 @@ const CodeComponent = ({
         )}
       </div>
       {language === 'mermaid' ? (
-        <div className="scrollbar-hover-only max-h-96 overflow-auto overscroll-contain rounded-lg border border-foreground/5 bg-background/10 p-2">
+        <div className="scrollbar-hover-only max-h-96 overflow-auto overscroll-contain p-2">
           <Mermaid
             chart={code}
             config={{
@@ -185,7 +185,7 @@ const CodeComponent = ({
         <div
           data-code-block-container
           data-language={language}
-          className="scrollbar-hover-only w-full overflow-auto overscroll-contain rounded-lg border border-foreground/5 bg-background/10"
+          className="scrollbar-hover-only w-full overflow-y-auto overflow-x-hidden overscroll-contain"
         >
           <CodeBlock
             code={code}
@@ -254,12 +254,7 @@ const CodeBlockCopyButton = ({ code }: { code: string }) => {
   };
 
   return (
-    <Button
-      variant="secondary"
-      size="icon-xs"
-      className="bg-background/60"
-      onClick={copyToClipboard}
-    >
+    <Button variant="ghost" size="icon-xs" onClick={copyToClipboard}>
       {hasCopied ? (
         <CopyCheckIcon className="size-3" />
       ) : (
@@ -296,7 +291,7 @@ const FileLink = ({
           }
           className={cn(
             'inline-flex items-center gap-0.5',
-            'font-medium text-primary text-sm',
+            'font-medium text-primary-accent text-sm',
             'hover:opacity-80',
             'transition-opacity duration-200',
             'break-all',
@@ -411,7 +406,7 @@ const AnchorComponent = ({
           target="_blank"
           rel="noopener noreferrer"
           className={cn(
-            'inline-flex items-baseline justify-start gap-0.5 break-all font-medium text-primary hover:opacity-80',
+            'inline-flex items-baseline justify-start gap-0.5 break-all font-medium text-primary-accent hover:opacity-80',
             className,
           )}
           {...props}

@@ -6,6 +6,7 @@ import {
 } from '@stagewise/stage-ui/components/collapsible';
 import { cn } from '@/utils';
 import { ChevronDownIcon } from 'lucide-react';
+import { useIsContainerScrollable } from '@/hooks/use-is-container-scrollable';
 
 export const ToolPartUI = ({
   trigger,
@@ -15,7 +16,7 @@ export const ToolPartUI = ({
   contentFooterClassName,
   expanded: controlledExpanded,
   setExpanded: controlledSetExpanded,
-  showBorder = true,
+  showBorder = false,
 }: {
   trigger?: React.ReactNode;
   content?: React.ReactNode;
@@ -34,37 +35,20 @@ export const ToolPartUI = ({
     controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
   const setExpanded = controlledSetExpanded ?? setInternalExpanded;
 
-  const [containerReady, setContainerReady] = useState(false);
-  const scrollContainerRef = useRef<HTMLElement>(null);
-  const isUserScrolledRef = useRef(false);
-  const [topFadeDistance, setTopFadeDistance] = useState(0);
-  const [bottomFadeDistance, setBottomFadeDistance] = useState(0);
-  const [hasVerticalScrollbar, setHasVerticalScrollbar] = useState(false);
-  const [hasHorizontalScrollbar, setHasHorizontalScrollbar] = useState(false);
   const contentScrollRef = useRef<HTMLDivElement>(null);
-
-  // Find the scrollable container element (the CollapsibleContent with overflow-y-auto)
-  const findScrollContainer = (
-    element: HTMLElement | null,
-  ): HTMLElement | null => {
-    if (!element) return null;
-    const style = window.getComputedStyle(element);
-    if (style.overflowY === 'auto' || style.overflowY === 'scroll')
-      return element;
-
-    return findScrollContainer(element.parentElement);
-  };
-
-  // Callback ref to find scroll container when wrapper mounts
   const contentWrapperRef = useRef<HTMLDivElement>(null);
-  const setContentWrapperRef = (element: HTMLDivElement | null) => {
-    contentWrapperRef.current = element;
-    const container = findScrollContainer(element);
-    if (element && container) {
-      scrollContainerRef.current = container;
-      setContainerReady(true);
-    } else setContainerReady(false);
-  };
+  const isUserScrolledRef = useRef(false);
+
+  // Use the hook for scroll state detection
+  const { canScrollUp, canScrollDown, canScrollLeft, canScrollRight } =
+    useIsContainerScrollable(contentScrollRef);
+
+  // Binary fade distances based on scroll state
+  const FADE_DISTANCE = 16;
+  const topFade = canScrollUp ? FADE_DISTANCE : 0;
+  const bottomFade = canScrollDown ? FADE_DISTANCE : 0;
+  const leftFade = canScrollLeft ? FADE_DISTANCE : 0;
+  const rightFade = canScrollRight ? FADE_DISTANCE : 0;
 
   // Check if user is at bottom of scroll container
   const isAtBottom = (element: HTMLElement): boolean => {
@@ -77,8 +61,8 @@ export const ToolPartUI = ({
 
   // Track user scroll position and scroll to bottom on initial expansion
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || !expanded || !containerReady) return;
+    const container = contentScrollRef.current;
+    if (!container || !expanded) return;
 
     // Only scroll to bottom on initial expansion
     requestAnimationFrame(() => {
@@ -96,14 +80,14 @@ export const ToolPartUI = ({
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [expanded, containerReady]);
+  }, [expanded]);
 
   // Auto-scroll to bottom when content changes (if user hasn't scrolled away)
   useEffect(() => {
-    const container = scrollContainerRef.current;
+    const container = contentScrollRef.current;
     const contentWrapper = contentWrapperRef.current;
 
-    if (!container || !contentWrapper || !expanded || !containerReady) return;
+    if (!container || !contentWrapper || !expanded) return;
 
     const shouldAutoScroll = () => !isUserScrolledRef.current;
 
@@ -135,102 +119,23 @@ export const ToolPartUI = ({
     return () => {
       observer.disconnect();
     };
-  }, [expanded, containerReady]);
-
-  // Track scroll position of content to smoothly adjust fade effects
-  useEffect(() => {
-    const contentDiv = contentScrollRef.current;
-    if (!contentDiv || !expanded) return;
-
-    let rafId: number | null = null;
-
-    const updateScrollPosition = () => {
-      const minFade = 6; // Subtle fade at edges
-      const maxFade = 16; // Normal fade when scrolling
-      const transitionDistance = 24; // Distance over which to transition
-
-      // Check if content is actually scrollable
-      const isScrollable = contentDiv.scrollHeight > contentDiv.clientHeight;
-
-      // If not scrollable, no fade should be shown
-      if (!isScrollable) {
-        setTopFadeDistance(0);
-        setBottomFadeDistance(0);
-        setHasVerticalScrollbar(false);
-        setHasHorizontalScrollbar(
-          contentDiv.scrollWidth > contentDiv.clientWidth,
-        );
-        return;
-      }
-
-      // Calculate distance from top
-      const distanceFromTop = contentDiv.scrollTop;
-      const topFadeAmount = Math.min(
-        maxFade,
-        minFade + (distanceFromTop / transitionDistance) * (maxFade - minFade),
-      );
-
-      // Calculate distance from bottom
-      const distanceFromBottom =
-        contentDiv.scrollHeight -
-        contentDiv.scrollTop -
-        contentDiv.clientHeight;
-      const bottomFadeAmount = Math.min(
-        maxFade,
-        minFade +
-          (distanceFromBottom / transitionDistance) * (maxFade - minFade),
-      );
-
-      setTopFadeDistance(topFadeAmount);
-      setBottomFadeDistance(bottomFadeAmount);
-
-      // Check for scrollbar visibility
-      setHasVerticalScrollbar(true);
-      setHasHorizontalScrollbar(
-        contentDiv.scrollWidth > contentDiv.clientWidth,
-      );
-    };
-
-    const handleScroll = () => {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        updateScrollPosition();
-        rafId = null;
-      });
-    };
-
-    // Initial check
-    updateScrollPosition();
-
-    contentDiv.addEventListener('scroll', handleScroll);
-
-    // ResizeObserver to detect size changes after CSS animation completes
-    const resizeObserver = new ResizeObserver(() => {
-      updateScrollPosition();
-    });
-    resizeObserver.observe(contentDiv);
-
-    return () => {
-      contentDiv.removeEventListener('scroll', handleScroll);
-      resizeObserver.disconnect();
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-  }, [expanded, content]);
+  }, [expanded]);
 
   // Generate inline style for mask with CSS custom properties
   const getMaskStyle = (): React.CSSProperties =>
     ({
-      '--top-fade': `${topFadeDistance}px`,
-      '--bottom-fade': `${bottomFadeDistance}px`,
+      '--top-fade': `${topFade}px`,
+      '--bottom-fade': `${bottomFade}px`,
+      '--left-fade': `${leftFade}px`,
+      '--right-fade': `${rightFade}px`,
     }) as React.CSSProperties;
 
   if (content === undefined) {
     return (
       <div
         className={cn(
-          '-mx-1 flex h-6 items-center gap-1 truncate rounded-xl px-2.5 font-normal text-muted-foreground',
-          showBorder &&
-            'border-muted-foreground/10 bg-muted/30 dark:border-muted-foreground/5',
+          '-mx-1 flex h-6 w-full items-center gap-1 truncate px-2.5 font-normal text-muted-foreground',
+          showBorder && 'rounded-lg border border-border bg-surface-1',
         )}
       >
         {trigger}
@@ -241,25 +146,35 @@ export const ToolPartUI = ({
   return (
     <div
       className={cn(
-        // '-mx-1 block overflow-hidden rounded-xl border-border/20 bg-muted-foreground/5', // Current state of the product
-        'block overflow-hidden rounded-xl', // Very heavy inset glass
+        'block w-full overflow-hidden',
         showBorder &&
-          '-mx-1 border border-muted-foreground/10 dark:border-muted-foreground/5',
-        // '-mx-1 glass-inset-chat-bubble block overflow-hidden rounded-xl border-border/20',
+          'rounded-lg border border-border-subtle bg-background dark:border-border dark:bg-surface-1',
+        showBorder && 'shadow-xs',
       )}
     >
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         <CollapsibleTrigger
           size="condensed"
           className={cn(
-            `group/trigger gap-1 rounded-t-xl px-0 font-normal text-muted-foreground`,
+            `group/trigger gap-1 px-0 font-normal text-muted-foreground`,
             content !== undefined
               ? 'cursor-pointer'
               : 'cursor-default hover:bg-transparent active:bg-transparent',
-            showBorder && 'h-6 bg-muted/30 px-2',
+            showBorder &&
+              'h-6 rounded-t-lg rounded-b-none border-b bg-background px-2.5 dark:bg-surface-1',
+            // Always have border-b, toggle color to avoid transition-all animating border
+            showBorder &&
+              (expanded
+                ? 'border-border-subtle/50 dark:border-border/70'
+                : 'border-transparent'),
             !showBorder &&
               'justify-start py-0 hover:bg-transparent active:bg-transparent',
           )}
+          style={
+            showBorder
+              ? { transitionProperty: 'color, background-color' }
+              : undefined
+          }
         >
           {trigger}
           <ChevronDownIcon
@@ -281,8 +196,8 @@ export const ToolPartUI = ({
             <div
               ref={contentScrollRef}
               className={cn(
-                'mask-alpha scrollbar-hover-only block max-h-32 overscroll-contain py-0.5 transition-[max-height] duration-300 ease-[var(--ease-spring-soft)]',
-                !showBorder && 'max-h-none',
+                'mask-alpha scrollbar-hover-only block overscroll-contain py-0.5 transition-[max-height] duration-300 ease-spring-soft',
+                showBorder ? 'max-h-32' : 'max-h-none',
                 contentClassName,
               )}
               style={
@@ -291,24 +206,24 @@ export const ToolPartUI = ({
                   overflowY: 'auto',
                   overflowX: 'auto',
                   maskImage: `
-                  linear-gradient(to right, black calc(100% - ${hasVerticalScrollbar ? '10px' : '0px'}), transparent 100%),
-                  linear-gradient(to bottom, transparent 0px, black var(--top-fade), black calc(100% - var(--bottom-fade) - ${hasHorizontalScrollbar ? '10px' : '0px'}), transparent 100%)
-                `,
+                    linear-gradient(to right, transparent 0px, black var(--left-fade), black calc(100% - var(--right-fade)), transparent 100%),
+                    linear-gradient(to bottom, transparent 0px, black var(--top-fade), black calc(100% - var(--bottom-fade)), transparent 100%)
+                  `,
                   WebkitMaskImage: `
-                  linear-gradient(to right, black calc(100% - ${hasVerticalScrollbar ? '10px' : '0px'}), transparent 100%),
-                  linear-gradient(to bottom, transparent 0px, black var(--top-fade), black calc(100% - var(--bottom-fade) - ${hasHorizontalScrollbar ? '10px' : '0px'}), transparent 100%)
-                `,
+                    linear-gradient(to right, transparent 0px, black var(--left-fade), black calc(100% - var(--right-fade)), transparent 100%),
+                    linear-gradient(to bottom, transparent 0px, black var(--top-fade), black calc(100% - var(--bottom-fade)), transparent 100%)
+                  `,
                   maskComposite: 'intersect',
                   WebkitMaskComposite: 'source-in',
                 } as React.CSSProperties
               }
             >
-              <div ref={setContentWrapperRef}>{content}</div>
+              <div ref={contentWrapperRef}>{content}</div>
             </div>
             {contentFooter && (
               <div
                 className={cn(
-                  '-ml-2 -mr-2 flex h-6 shrink-0 flex-row items-center justify-start gap-1 rounded-b-xl px-2 py-1 text-muted-foreground transition-all duration-150 ease-out',
+                  '-ml-2 -mr-2 flex h-6 shrink-0 flex-row items-center justify-start gap-1 rounded-b-lg border-border-subtle/50 border-t px-2 py-1 text-muted-foreground transition-all duration-150 ease-out dark:border-border/70',
                   contentFooterClassName,
                 )}
               >

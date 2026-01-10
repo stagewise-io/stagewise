@@ -37,13 +37,16 @@ export function useIsContainerScrollable(
       clientHeight,
     } = el;
 
+    // Small threshold to handle subpixel rendering precision issues
+    const threshold = 1;
+
     // Horizontal scroll
-    setCanScrollLeft(scrollLeft > 0);
-    setCanScrollRight(scrollLeft + clientWidth < scrollWidth);
+    setCanScrollLeft(scrollLeft > threshold);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - threshold);
 
     // Vertical scroll
-    setCanScrollUp(scrollTop > 0);
-    setCanScrollDown(scrollTop + clientHeight < scrollHeight);
+    setCanScrollUp(scrollTop > threshold);
+    setCanScrollDown(scrollTop + clientHeight < scrollHeight - threshold);
   }, [element]);
 
   useEffect(() => {

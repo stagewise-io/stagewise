@@ -11,13 +11,11 @@ export const ThinkingPart = ({
   part,
   isShimmering,
   thinkingDuration,
-  showBorder = true,
   isLastPart = false,
 }: {
   part: ReasoningUIPart;
   isShimmering: boolean;
   thinkingDuration?: number;
-  showBorder?: boolean;
   isLastPart?: boolean;
 }) => {
   const isStreaming = part.state === 'streaming';
@@ -42,17 +40,15 @@ export const ThinkingPart = ({
   });
   return (
     <ToolPartUI
-      showBorder={showBorder}
       expanded={expanded}
       setExpanded={handleUserSetExpanded}
-      contentClassName="max-h-24"
       trigger={
         <>
           <BrainIcon
             className={cn(
-              'size-3 text-muted-foreground',
+              'size-3',
               isShimmering
-                ? 'animate-thinking-part-brain-pulse text-primary'
+                ? 'animate-thinking-part-brain-pulse text-primary-accent'
                 : '',
             )}
           />
@@ -60,37 +56,22 @@ export const ThinkingPart = ({
             className={cn(
               'truncate text-start text-xs',
               isShimmering
-                ? 'shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300'
-                : 'text-muted-foreground',
-              showBorder && 'flex-1',
+                ? 'shimmer-text shimmer-duration-1500 shimmer-from-primary-accent shimmer-to-primary-200'
+                : '',
             )}
           >
             {part.state === 'streaming' && 'Thinking...'}
             {part.state === 'done' && formattedThinkingDuration && (
-              <span
-                className={
-                  !showBorder ? 'font-normal text-muted-foreground/75' : ''
-                }
-              >
-                {!showBorder ? (
-                  <span className="shrink-0 truncate font-medium text-muted-foreground">
-                    Thought{' '}
-                  </span>
-                ) : (
-                  'Thought '
-                )}
-                for {formattedThinkingDuration}
-              </span>
+              <>
+                <span className="shrink-0 truncate font-medium">Thought </span>
+                <span className={'font-normal opacity-75'}>
+                  for {formattedThinkingDuration}
+                </span>
+              </>
             )}
             {part.state === 'done' && !formattedThinkingDuration && (
               <span>
-                {!showBorder ? (
-                  <span className="shrink-0 truncate font-medium">
-                    Thought{' '}
-                  </span>
-                ) : (
-                  'Thought '
-                )}
+                <span className="shrink-0 truncate font-medium">Thought </span>
               </span>
             )}
           </span>

@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { cn } from '@/utils.js';
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import type { PickToolPart } from './index.js';
 import { CheckIcon, XIcon, ChevronDownIcon } from 'lucide-react';
@@ -56,20 +57,24 @@ const IdeOptionButton = memo(
     onSelect: (ide: OpenFilesInIde) => void;
   }) => {
     return (
-      <button
-        key={option.value}
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={() => onSelect(option.value)}
         disabled={isDisabled}
-        className={`glass-body flex shrink-0 flex-row items-center gap-3 rounded-md p-2 transition-all ${
+        className={cn(
+          'flex shrink-0 flex-row items-center justify-start gap-3 rounded-md p-2 transition-all',
           isSelected
-            ? 'border-primary bg-primary/10'
-            : 'hover:border-primary/50'
-        } ${isDisabled ? 'opacity-50' : 'glass-body-motion glass-body-motion-interactive cursor-pointer'}`}
+            ? 'border-primary-150 bg-primary-50 hover:bg-primary-50! dark:border-primary-500/70 dark:bg-primary-500/35 dark:hover:bg-primary-500/35!'
+            : '',
+          isDisabled ? 'opacity-50' : '',
+        )}
       >
         {option.logo && option.logo}
-        <span className="font-medium text-sm">{option.label}</span>
-      </button>
+        <span className="font-normal text-foreground text-sm">
+          {option.label}
+        </span>
+      </Button>
     );
   },
 );
@@ -110,7 +115,7 @@ export const AskForIdeToolPartContent = memo(
     return (
       <div className="flex w-full flex-col gap-2">
         {/* Primary IDE Options (Cursor & VS Code) */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
           {optionsToShow.map((option) => (
             <IdeOptionButton
               key={option.value}
@@ -124,15 +129,16 @@ export const AskForIdeToolPartContent = memo(
 
         {/* Show More Options Toggle */}
         {!showAllOptions && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => setShowAllOptions(true)}
             disabled={isError || isOutputAvailable}
-            className={`flex flex-row items-center justify-center gap-2 pb-2 text-muted-foreground text-xs transition-colors ${isError || isOutputAvailable ? 'opacity-50' : 'hover:text-foreground'}`}
+            className="mb-2"
           >
             <span>Show more options</span>
             <ChevronDownIcon className="size-4" />
-          </button>
+          </Button>
         )}
 
         {/* Action Buttons */}
@@ -141,7 +147,7 @@ export const AskForIdeToolPartContent = memo(
             {isInputAvailable && (
               <>
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="xs"
                   onClick={onCancel}
                   disabled={isError || isOutputAvailable}
@@ -169,12 +175,12 @@ export const AskForIdeToolPartContent = memo(
         )}
         {isOutputAvailable && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
-            <CheckIcon className="size-3 text-success" />
+            <CheckIcon className="size-3 text-success-foreground" />
           </div>
         )}
         {isError && (
           <div className="flex w-full flex-row items-center justify-end gap-2">
-            <XIcon className="size-3 text-error" />
+            <XIcon className="size-3 text-error-foreground" />
           </div>
         )}
       </div>

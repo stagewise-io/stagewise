@@ -19,7 +19,7 @@ export const TabsList = ({ className, children, ...props }: TabsListProps) => {
     <TabsBase.List
       {...props}
       className={cn(
-        '-ml-0.5 glass-inset flex w-auto shrink-0 flex-row items-center justify-between gap-2 overflow-hidden rounded-full p-1',
+        '-ml-0.5 flex w-auto shrink-0 flex-row items-center justify-between gap-2 overflow-hidden rounded-full p-1',
         className,
       )}
     >
@@ -49,10 +49,10 @@ export const TabsTrigger = ({
           className={(state) =>
             cn(
               buttonVariants({
-                variant: state.selected ? 'primary' : 'ghost',
-                size: state.selected ? 'md' : 'icon-md',
+                variant: state.active ? 'primary' : 'ghost',
+                size: state.active ? 'md' : 'icon-md',
               }),
-              'group/tabstab w-[calc-size(auto,size)] min-w-10 rounded-full transition-all duration-200 ease-out',
+              'group/tabstab w-[calc-size(auto,size)] min-w-10 rounded-full transition-[width,color,padding] duration-200 ease-out',
               className,
             )
           }
@@ -61,7 +61,7 @@ export const TabsTrigger = ({
           {title && (
             <span
               className={cn(
-                'hidden w-0 overflow-hidden whitespace-nowrap group-data-selected/tabstab:w-auto md:block',
+                'hidden w-0 overflow-hidden whitespace-nowrap group-aria-selected/tabstab:w-auto md:block',
               )}
             >
               {title}
@@ -80,7 +80,7 @@ export const TabsContent = ({ className, ...props }: TabsContentProps) => {
     <TabsBase.Panel
       {...props}
       className={cn(
-        'data-hidden:data-[activation-direction=right]:-translate-x-10 data-[starting-style]:data-[activation-direction=left]:-translate-x-4 data-[ending-style]:data-[activation-direction=right]:-translate-x-4 transition-all duration-300 ease-out data-[ending-style]:data-[activation-direction=left]:translate-x-4 data-[starting-style]:data-[activation-direction=right]:translate-x-4 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[ending-style]:blur-sm data-[starting-style]:blur-sm',
+        'data-hidden:data-[activation-direction=right]:-translate-x-10 data-starting-style:data-[activation-direction=left]:-translate-x-4 data-ending-style:data-[activation-direction=right]:-translate-x-4 transition-all duration-300 ease-out data-[starting-style]:data-activation-direction=right:translate-x-4 data-ending-style:data-[activation-direction=left]:translate-x-4 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:blur-sm data-starting-style:blur-sm',
         className,
       )}
     />

@@ -9,26 +9,31 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import {
   Collapsible,
+  CollapsibleTrigger,
   CollapsibleContent,
 } from '@stagewise/stage-ui/components/collapsible';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { CodeBlock } from '@/components/ui/code-block';
 import { cn } from '@/utils';
 import { useToolAutoExpand } from './shared/use-tool-auto-expand';
+import { useKartonState } from '@/hooks/use-karton';
 
 export const ExecuteConsoleScriptToolPart = ({
   part,
-  showBorder = true,
+  capMaxHeight = false,
+  showBorder = false,
   disableShimmer = false,
   isLastPart = false,
 }: {
   part: Extract<ToolPart, { type: 'tool-executeConsoleScriptTool' }>;
+  capMaxHeight?: boolean;
   showBorder?: boolean;
   disableShimmer?: boolean;
   isLastPart?: boolean;
 }) => {
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const [resultExpanded, setResultExpanded] = useState(true);
+  const activeTabs = useKartonState((s) => s.browser.tabs);
 
   const streaming = useMemo(() => {
     return part.state === 'input-streaming' || part.state === 'input-available';
@@ -46,6 +51,16 @@ export const ExecuteConsoleScriptToolPart = ({
     isLastPart,
   });
 
+  const tab = useMemo(() => {
+    return Object.values(activeTabs).find(
+      (tab) => tab.handle === part.input?.id,
+    );
+  }, [part.input?.id, activeTabs]);
+
+  const hostname = useMemo(() => {
+    return tab ? new URL(tab.url).hostname : undefined;
+  }, [tab]);
+
   // Format the result as pretty-printed JSON if possible
   const formattedResult = useMemo(() => {
     const result = part.output?.result?.result;
@@ -61,13 +76,8 @@ export const ExecuteConsoleScriptToolPart = ({
 
   if (state === 'error') {
     return (
-      <div
-        className={cn(
-          'group/exploring-part block min-w-32 rounded-xl',
-          showBorder && '-mx-1 border-border/20 bg-muted-foreground/5',
-        )}
-      >
-        <div className="flex h-6 cursor-default items-center gap-1 rounded-xl px-2.5 text-muted-foreground">
+      <div className={cn('group/exploring-part block min-w-32 rounded-xl')}>
+        <div className="flex h-6 cursor-default items-center gap-1 rounded-xl px-2.5">
           <div className="flex w-full flex-row items-center justify-start gap-1">
             <ErrorHeader errorText={part.errorText ?? undefined} />
           </div>
@@ -84,7 +94,7 @@ export const ExecuteConsoleScriptToolPart = ({
       trigger={
         <>
           {!streaming && (
-            <IconWindowPointerOutline18 className="size-3 shrink-0 text-muted-foreground" />
+            <IconWindowPointerOutline18 className="size-3 shrink-0" />
           )}
           <div
             className={cn(
@@ -93,9 +103,12 @@ export const ExecuteConsoleScriptToolPart = ({
             )}
           >
             {streaming ? (
-              <LoadingHeader disableShimmer={disableShimmer} />
+              <LoadingHeader
+                disableShimmer={disableShimmer}
+                hostname={hostname}
+              />
             ) : (
-              <SuccessHeader showBorder={showBorder} />
+              <SuccessHeader capMaxHeight={capMaxHeight} hostname={hostname} />
             )}
           </div>
         </>
@@ -108,29 +121,31 @@ export const ExecuteConsoleScriptToolPart = ({
             </pre>
           )}
           {state === 'success' && part.input?.script && (
-            <div className="flex flex-col gap-2 pt-1">
+            <div className="flex flex-col">
               <Collapsible
                 open={scriptExpanded}
                 onOpenChange={setScriptExpanded}
               >
-                <button
-                  type="button"
-                  onClick={() => setScriptExpanded(!scriptExpanded)}
-                  className="mb-1 flex cursor-pointer items-center gap-1 text-[10px] text-muted-foreground/60 uppercase tracking-wider hover:text-muted-foreground"
-                >
-                  <ChevronDownIcon
-                    className={cn(
-                      'size-3 transition-transform duration-150',
-                      !scriptExpanded && '-rotate-90',
-                    )}
-                  />
-                  Script
-                </button>
+                <CollapsibleTrigger size="condensed" className="">
+                  <button
+                    type="button"
+                    onClick={() => setScriptExpanded(!scriptExpanded)}
+                    className="mb-1 flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider"
+                  >
+                    <ChevronDownIcon
+                      className={cn(
+                        'size-3 transition-transform duration-150',
+                        !scriptExpanded && '-rotate-90',
+                      )}
+                    />
+                    Script
+                  </button>
+                </CollapsibleTrigger>
                 <CollapsibleContent>
                   <div
                     className={cn(
-                      'scrollbar-hover-only rounded border border-border/10',
-                      showBorder
+                      'scrollbar-hover-only',
+                      capMaxHeight
                         ? 'max-h-28 overflow-auto'
                         : 'overflow-y-hidden',
                     )}
@@ -148,24 +163,26 @@ export const ExecuteConsoleScriptToolPart = ({
                   open={resultExpanded}
                   onOpenChange={setResultExpanded}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setResultExpanded(!resultExpanded)}
-                    className="mb-1 flex cursor-pointer items-center gap-1 text-[10px] text-muted-foreground/60 uppercase tracking-wider hover:text-muted-foreground"
-                  >
-                    <ChevronDownIcon
-                      className={cn(
-                        'size-3 transition-transform duration-150',
-                        !resultExpanded && '-rotate-90',
-                      )}
-                    />
-                    Result
-                  </button>
+                  <CollapsibleTrigger size="condensed" className="">
+                    <button
+                      type="button"
+                      onClick={() => setResultExpanded(!resultExpanded)}
+                      className="mb-1 flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider"
+                    >
+                      <ChevronDownIcon
+                        className={cn(
+                          'size-3 transition-transform duration-150',
+                          !resultExpanded && '-rotate-90',
+                        )}
+                      />
+                      Result
+                    </button>
+                  </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div
                       className={cn(
-                        'scrollbar-hover-only rounded border border-border/10',
-                        showBorder
+                        'scrollbar-hover-only',
+                        capMaxHeight
                           ? 'max-h-28 overflow-auto'
                           : 'overflow-y-hidden',
                       )}
@@ -184,7 +201,7 @@ export const ExecuteConsoleScriptToolPart = ({
         </>
       }
       contentClassName={
-        showBorder ? (streaming ? 'max-h-32' : 'max-h-80') : undefined
+        capMaxHeight ? (streaming ? 'max-h-32!' : 'max-h-80!') : undefined
       }
       contentFooterClassName="px-0"
     />
@@ -206,10 +223,10 @@ const ErrorHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <XIcon className="size-3 shrink-0 text-muted-foreground" />
+      <XIcon className="size-3 shrink-0" />
       <Tooltip>
         <TooltipTrigger>
-          <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
+          <span className="min-w-0 flex-1 truncate text-xs">
             {errorTextContent}
           </span>
         </TooltipTrigger>
@@ -221,29 +238,43 @@ const ErrorHeader = ({
   );
 };
 
-const SuccessHeader = ({ showBorder }: { showBorder?: boolean }) => {
+const SuccessHeader = ({
+  capMaxHeight,
+  hostname,
+}: {
+  capMaxHeight?: boolean;
+  hostname?: string;
+}) => {
   return (
     <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
-      <div className="pointer-events-auto flex flex-row items-center justify-start gap-1 text-muted-foreground">
+      <div className="pointer-events-auto flex flex-row items-center justify-start gap-1">
         <span
-          className={cn(
-            'shrink-0 text-muted-foreground text-xs',
-            !showBorder && 'font-normal text-muted-foreground/75',
-          )}
+          className={cn('shrink-0 text-xs', !capMaxHeight && 'font-normal')}
         >
-          {showBorder ? (
-            'Executed '
+          {capMaxHeight ? (
+            'Ran script'
           ) : (
-            <span className="font-medium text-muted-foreground">Executed </span>
+            <span className="font-medium">Ran script</span>
           )}
-          console script
+          <span className="font-normal opacity-75">
+            {hostname ? ` in ${hostname}` : ''}
+          </span>
         </span>
       </div>
     </div>
   );
 };
 
-const LoadingHeader = ({ disableShimmer }: { disableShimmer?: boolean }) => {
+const LoadingHeader = ({
+  disableShimmer,
+  hostname,
+}: {
+  disableShimmer?: boolean;
+  hostname?: string;
+}) => {
+  const text = hostname
+    ? `Running script in ${hostname}...`
+    : 'Running console script...';
   return (
     <div className="flex flex-row items-center justify-start gap-1">
       <Loader2Icon className="size-3 shrink-0 animate-spin text-primary" />
@@ -252,11 +283,11 @@ const LoadingHeader = ({ disableShimmer }: { disableShimmer?: boolean }) => {
         className={cn(
           'text-xs',
           disableShimmer
-            ? 'text-muted-foreground'
+            ? ''
             : 'shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300',
         )}
       >
-        Executing console script...
+        {text}
       </span>
     </div>
   );

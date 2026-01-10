@@ -49,7 +49,7 @@ export function WithTabPreviewCard({
                 onError={() => setImageLoaded(false)}
               />
               {imageLoaded && (
-                <div className="flex min-h-24 w-full items-center justify-center overflow-hidden rounded-sm bg-muted ring-1 ring-muted-foreground/20">
+                <div className="flex min-h-24 w-full items-center justify-center overflow-hidden rounded-sm bg-background ring-1 ring-border-subtle">
                   <img
                     src={tabState.screenshot}
                     className="max-h-36 max-w-full object-contain"

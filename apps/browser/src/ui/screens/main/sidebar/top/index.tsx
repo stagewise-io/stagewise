@@ -1,14 +1,6 @@
 import { WorkspaceInfoBadge } from './_components/workspace-info';
 import { cn } from '@/utils';
 import { IconHistoryFill18, IconPlusFill18 } from 'nucleo-ui-fill-18';
-import { IconMessagesOutline18 } from 'nucleo-ui-outline-18';
-import {
-  Menu,
-  MenuContent,
-  MenuItem,
-  MenuSeparator,
-  MenuTrigger,
-} from '@stagewise/stage-ui/components/menu';
 import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
 import {
   Tooltip,
@@ -16,6 +8,10 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { Button } from '@stagewise/stage-ui/components/button';
+import {
+  SearchableSelect,
+  type SearchableSelectItem,
+} from '@stagewise/stage-ui/components/searchable-select';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import TimeAgo from 'react-timeago';
 import buildFormatter from 'react-timeago/lib/formatters/buildFormatter';
@@ -46,6 +42,68 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
 
   const groupedChats = useMemo(() => groupChatsByTime(chats), [chats]);
 
+  const minimalFormatter = useMemo(
+    () =>
+      buildFormatter({
+        prefixAgo: '',
+        prefixFromNow: '',
+        suffixAgo: '',
+        suffixFromNow: '',
+        second: '1s',
+        seconds: (value) => `${value}s`,
+        minute: '1m',
+        minutes: (value) => `${value}m`,
+        hour: '1h',
+        hours: (value) => `${value}h`,
+        day: '1d',
+        days: (value) => `${value}d`,
+        week: '1w',
+        weeks: (value) => `${value}w`,
+        month: '1M',
+        months: (value) => `${value}M`,
+        year: '1y',
+        years: (value) => `${value}y`,
+        wordSeparator: '',
+        numbers: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+      }),
+    [],
+  );
+
+  // Convert grouped chats to flat items with group property for SearchableSelect
+  const chatSelectItems = useMemo((): SearchableSelectItem[] => {
+    const items: SearchableSelectItem[] = [];
+    for (const [label, groupChats] of Object.entries(groupedChats)) {
+      for (const [chatId, chat] of Object.entries(groupChats)) {
+        items.push({
+          value: chatId,
+          label: (
+            <span className="flex w-full items-center gap-2">
+              <span className="truncate">{chat.title}</span>
+              <span className="shrink-0 text-muted-foreground/60">
+                <TimeAgo
+                  date={chat.createdAt}
+                  formatter={minimalFormatter}
+                  live={false}
+                />
+              </span>
+            </span>
+          ),
+          searchText: chat.title,
+          group: label,
+          action: {
+            icon: <IconTrash2Outline24 className="size-3" />,
+            onClick: (value, e) => {
+              e.stopPropagation();
+              if (!isWorking) void deleteChat(value);
+            },
+            showOnHover: true,
+          },
+        });
+      }
+    }
+    return items;
+  }, [groupedChats, deleteChat, isWorking, minimalFormatter]);
+
   // Helper to create a new chat and focus the input
   const createChatAndFocus = useCallback(async () => {
     await createChat();
@@ -57,38 +115,24 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
     if (showNewChatButton && !isWorking) void createChatAndFocus();
   }, HotkeyActions.CTRL_N);
 
-  const minimalFormatter = buildFormatter({
-    prefixAgo: '',
-    prefixFromNow: '',
-    suffixAgo: '',
-    suffixFromNow: '',
-    second: '1s',
-    seconds: (value) => `${value}s`,
-    minute: '1m',
-    minutes: (value) => `${value}m`,
-    hour: '1h',
-    hours: (value) => `${value}h`,
-    day: '1d',
-    days: (value) => `${value}d`,
-    week: '1w',
-    weeks: (value) => `${value}w`,
-    month: '1M',
-    months: (value) => `${value}M`,
-    year: '1y',
-    years: (value) => `${value}y`,
-    wordSeparator: '',
-    numbers: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
-  });
+  const handleChatSelect = useCallback(
+    (value: string | null) => {
+      if (value && value !== activeChatId && !isWorking) {
+        void switchChat(value);
+      }
+    },
+    [activeChatId, isWorking, switchChat],
+  );
 
   return (
     <div
       className={cn(
-        'app-drag flex h-8 max-h-8 min-h-8 flex-row items-center justify-start gap-2 pr-2 group-data-[collapsed=true]:hidden',
+        'app-drag flex h-8 max-h-8 min-h-8 flex-row items-center justify-start gap-2 group-data-[collapsed=true]:hidden',
         platform === 'darwin' && !isFullScreen ? 'ml-18' : 'ml-0',
       )}
     >
       {!isCollapsed && <WorkspaceInfoBadge />}
-      <div className="app-no-drag glass-body ml-1 @[350px]:inline-flex hidden shrink-0 items-center rounded-full px-2 py-0.5 font-medium text-[10px] text-primary">
+      <div className="app-no-drag ml-1 inline-flex shrink-0 items-center font-normal text-primary-accent text-xs">
         Alpha
       </div>
       <div className="flex-1 group-data-[collapsed=true]:hidden" />
@@ -104,7 +148,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
                   disabled={isWorking}
                   onClick={() => void createChatAndFocus()}
                 >
-                  <IconPlusFill18 className="size-4 text-foreground" />
+                  <IconPlusFill18 className="size-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -116,81 +160,33 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
             </Tooltip>
           )}
           {showChatListButton && (
-            <Menu>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <MenuTrigger>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="app-no-drag shrink-0"
-                        disabled={isWorking}
-                      >
-                        <IconHistoryFill18 className="size-4 text-foreground" />
-                      </Button>
-                    </MenuTrigger>
-                  }
-                />
-                <TooltipContent>
-                  <span>Show chat history</span>
-                </TooltipContent>
-              </Tooltip>
-              <MenuContent>
-                <div className="scrollbar-hover-only flex max-h-48 flex-col gap-1 overflow-y-auto">
-                  {Object.entries(groupedChats).map(([label, chats], index) => (
-                    <>
-                      <span className="shrink-0 px-2 py-1 font-normal text-muted-foreground/60 text-xs">
-                        {label}
-                      </span>
-                      {Object.entries(chats).map(([chatId, chat]) => {
-                        return (
-                          <MenuItem
-                            key={chatId}
-                            className="shrink-0"
-                            disabled={isWorking}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!isWorking) void switchChat(chatId);
-                            }}
-                          >
-                            <div className="group flex w-64 flex-row items-center justify-start gap-2">
-                              <IconMessagesOutline18 className="size-4 shrink-0 text-muted-foreground" />
-                              <span className="truncate font-medium text-sm">
-                                {chat.title}
-                              </span>
-                              <span className="shrink-0 font-normal text-muted-foreground/60 text-xs">
-                                <TimeAgo
-                                  date={chat.createdAt}
-                                  formatter={minimalFormatter}
-                                  live={false}
-                                />
-                              </span>
-
-                              <Button
-                                variant="ghost"
-                                size="icon-xs"
-                                className="ml-auto shrink-0 opacity-0 group-hover:opacity-100"
-                                disabled={isWorking}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (!isWorking) void deleteChat(chatId);
-                                }}
-                              >
-                                <IconTrash2Outline24 className="size-3 text-muted-foreground" />
-                              </Button>
-                            </div>
-                          </MenuItem>
-                        );
-                      })}
-                      {index < Object.entries(groupedChats).length - 1 && (
-                        <MenuSeparator />
-                      )}
-                    </>
-                  ))}
-                </div>
-              </MenuContent>
-            </Menu>
+            <SearchableSelect
+              items={chatSelectItems}
+              value={activeChatId}
+              onValueChange={handleChatSelect}
+              disabled={isWorking}
+              side="bottom"
+              sideOffset={8}
+              size="xs"
+              customTrigger={(triggerProps) => (
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Button
+                      {...triggerProps}
+                      variant="ghost"
+                      size="icon-sm"
+                      className="app-no-drag shrink-0"
+                      disabled={isWorking}
+                    >
+                      <IconHistoryFill18 className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <span>Show chat history</span>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            />
           )}
         </div>
       )}

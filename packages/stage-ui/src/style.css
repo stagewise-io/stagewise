@@ -1,53 +1,17 @@
 @import "tailwindcss";
-
-:root {
-  --color-background: var(--color-white);
-  --color-foreground: var(--color-zinc-700);
-  --color-muted: var(--color-zinc-200);
-  --color-muted-foreground: var(--color-zinc-500);
-
-  --color-primary: var(--color-blue-600);
-  --color-primary-foreground: var(--color-blue-50);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: var(--color-zinc-800);
-    --color-foreground: var(--color-zinc-50);
-    --color-muted: var(--color-zinc-900);
-    --color-muted-foreground: var(--color-zinc-400);
-
-    --color-primary: var(--color-blue-500);
-    --color-primary-foreground: var(--color-blue-50);
-  }
-}
+@import "./palette.css";
+@import "./theme.css";
+@import "./legacy.css";
 
 @theme default {
-  --color-background: var(--color-background);
-  --color-foreground: var(--color-foreground);
-  --color-muted: var(--color-muted);
-  --color-muted-foreground: var(--color-muted-foreground);
+  /* Light mode elevation shadows (very subtle) */
+  --shadow-elev-1:
+    0 1px 2px color-mix(in oklch, var(--color-base-950) 8%, transparent),
+    0 1px 1px color-mix(in oklch, var(--color-base-950) 6%, transparent);
 
-  --color-primary: var(--color-primary);
-  --color-primary-foreground: var(--color-primary-foreground);
-
-  --color-glass-overlay-top: var(--color-white);
-  --color-glass-overlay-bottom: var(--color-zinc-50);
-  --color-glass-overlay-border-start: var(--color-zinc-100);
-  --color-glass-overlay-border-middle: var(--color-zinc-500);
-  --color-glass-overlay-border-end: var(--color-zinc-100);
-  --shadow-glass-overlay: var(--shadow-lg);
-  --shadow-glass-overlay-hover: var(--shadow-xl);
-  --shadow-glass-overlay-pressed: var(--shadow-md);
-
-  --color-glass-inset-top: var(--color-zinc-100);
-  --color-glass-inset-bottom: var(--color-zinc-50);
-  --color-glass-inset-border-start: var(--color-zinc-300);
-  --color-glass-inset-border-middle: var(--color-zinc-500);
-  --color-glass-inset-border-end: var(--color-zinc-50);
-  --shadow-glass-inset: var(--shadow-inner);
-  --shadow-glass-inset-hover: var(--shadow-xl);
-  --shadow-glass-inset-pressed: var(--shadow-md);
+  --shadow-elev-2:
+    0 8px 24px color-mix(in oklch, var(--color-base-950) 14%, transparent),
+    0 2px 6px color-mix(in oklch, var(--color-base-950) 10%, transparent);
 
   --animate-progress-bar-indicator: progress-bar-indicator 500ms linear infinite;
   @keyframes progress-bar-indicator {
@@ -70,130 +34,40 @@
   }
 }
 
-:root {
-  /* Glass border shadows - light and dark edges with subtle border */
-  --glass-border-shadow:
-    inset 2px 3px 1px -3px rgba(255, 255, 255, 0.8),
-    inset 2px 3px 3px -2.5px rgba(255, 255, 255, 0.3),
-    inset -2px -3px 1px -3px rgba(255, 255, 255, 0.8),
-    inset -2px -3px 3px -2.5px rgba(255, 255, 255, 0.3),
-    inset 0 0 1px 1px rgba(50, 50, 50, 0.15);
-
-  /* Glass body shadows - base state with top highlight and bottom shade */
-  --glass-body-shadow:
-    inset 0 0 0 rgba(0, 0, 0, 0), inset 0 4px 8px 4px rgba(255, 255, 255, 0.1),
-    inset 0 -16px 32px -24px rgba(0, 0, 0, 0.1);
-
-  /* Glass body shadows - hover state with enhanced highlights */
-  --glass-body-shadow-hover:
-    inset 0 0 0 rgba(0, 0, 0, 0), inset 0 4px 16px 4px rgba(255, 255, 255, 0.15),
-    inset 0 -16px 32px -24px rgba(0, 0, 0, 0.1);
-
-  /* Glass body shadows - pressed state with reduced highlights */
-  --glass-body-shadow-pressed:
-    inset 0 0 0 rgba(0, 0, 0, 0), inset 0 2px 4px 3px rgba(255, 255, 255, 0.1),
-    inset 0 -8px 16px -16px rgba(0, 0, 0, 0.3);
-
-  /* Glass inset effects - border and depth shadows */
-  --glass-inset-border-shadow: inset 0 0 1px 0px rgba(0, 0, 0, 0.2);
-  --glass-inset-shadow:
-    inset -1px 2px 1px -1px rgba(0, 0, 0, 0.05),
-    inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5),
-    /* inset 0 2px 6px 2px rgba(0, 0, 0, 0.05), */
-    /* inset 0 2px 10px 6px rgba(0, 0, 0, 0.05), */
-    0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
-  --glass-inset-shadow-chat-bubble:
-    inset -1px 2px 1px -1px rgba(0, 0, 0, 0.05),
-    inset -1px -4px 5px -5px rgba(255, 255, 255, 0.5),
-    0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
-  --glass-inset-background: rgba(148, 163, 184, 0.09);
-  --glass-inset-background-chat-bubble: rgba(255, 255, 255, 0.2);
-}
-
+/* Dark mode elevation shadows (create depth) */
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Glass border shadows - reduced opacity for dark mode */
-    --glass-border-shadow:
-      inset 2px 3px 1px -3px rgba(255, 255, 255, 0.3),
-      inset 2px 3px 2px -2.5px rgba(255, 255, 255, 0.05),
-      inset -2px -3px 1px -3px rgba(255, 255, 255, 0.3),
-      inset -2px -3px 2px -2.5px rgba(255, 255, 255, 0.05),
-      inset 0 0 1px 1px rgba(50, 50, 50, 0.05);
+     --shadow-elev-1:
+      inset 0 1px 0 color-mix(in oklch, var(--color-base-100) 7%, transparent),
+      0 1px 2px color-mix(in oklch, var(--color-base-950) 40%, transparent),
+      0 10px 28px color-mix(in oklch, var(--color-base-950) 32%, transparent);
+    
 
-    /* Glass body shadows - dark mode base state */
-    --glass-body-shadow:
-      inset 0 0 0 rgba(0, 0, 0, 0), inset 0 2px 4px 2px
-      rgba(255, 255, 255, 0.05), inset 0 -16px 32px -24px rgba(0, 0, 0, 0.05);
-
-    /* Glass body shadows - dark mode hover state */
-    --glass-body-shadow-hover:
-      inset 0 0 0 rgba(0, 0, 0, 0), inset 0 2px 16px 4px
-      rgba(255, 255, 255, 0.07), inset 0 -16px 32px -24px rgba(0, 0, 0, 0.05);
-
-    /* Glass body shadows - dark mode pressed state */
-    --glass-body-shadow-pressed:
-      inset 0 0 0 rgba(0, 0, 0, 0), inset 0 2px 4px 2px
-      rgba(255, 255, 255, 0.05), inset 0 -8px 16px -16px rgba(0, 0, 0, 0.2);
-
-    /* Glass inset effects - dark mode */
-    --glass-inset-border-shadow: inset 0 0 1px 0px rgba(0, 0, 0, 0.2);
-    --glass-inset-shadow:
-      inset 0 2px 3px 1px rgba(0, 0, 0, 0.05),
-      inset -3px -4px 2px -5px rgba(255, 255, 255, 0.5),
-      inset 0 4px 24px 12px rgba(0, 0, 0, 0.05),
-      0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
-    --glass-inset-shadow-chat-bubble:
-      inset 0 2px 3px 1px rgba(0, 0, 0, 0.05),
-      inset -3px -4px 2px -5px rgba(255, 255, 255, 0.5),
-      inset 0 4px 24px 12px rgba(0, 0, 0, 0.05),
-      0.3px 0.7px 1px 0px rgba(255, 255, 255, 0.2);
-    /* Slightly lighter overlay similar to bg-muted-foreground/5 */
-    --glass-inset-background: rgba(148, 163, 184, 0.15);
-    --glass-inset-background-chat-bubble: rgba(148, 163, 184, 0.06);
+    --shadow-elev-2:
+      inset 0 1px 0 color-mix(in oklch, var(--color-base-100) 9%, transparent),
+      inset 0 0 0 1px color-mix(in oklch, var(--color-base-100) 7%, transparent),
+      0 2px 0 color-mix(in oklch, var(--color-base-950) 60%, transparent),
+      0 22px 60px color-mix(in oklch, var(--color-base-950) 45%, transparent);
   }
-}
-
-@utility glass-body {
-  @apply relative
-    after:absolute after:inset-0 after:block after:size-full
-    after:pointer-events-none after:rounded-[inherit]
-    after:transition-all after:duration-150
-    after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow)];
-}
-
-@utility glass-body-interactive {
-  @apply active:after:bg-black/2.5
-    enabled:hover:after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow-hover)]
-    enabled:active:after:shadow-[var(--glass-border-shadow),var(--glass-body-shadow-pressed)];
-}
-
-@utility glass-body-motion {
-  @apply transition-transform duration-300 ease-out
-    shadow-black/5 shadow-lg;
-}
-
-@utility glass-body-motion-interactive {
-  @apply hover:scale-[101%] hover:shadow-xl
-    active:scale-[98%] active:shadow-md;
-}
-
-@utility glass-inset {
-  @apply relative
-    before:absolute before:inset-0 before:block before:size-full
-    before:pointer-events-none before:rounded-[inherit]
-    before:bg-[var(--glass-inset-background)]
-    before:shadow-[var(--glass-inset-border-shadow),var(--glass-inset-shadow)];
-}
-
-@utility glass-inset-chat-bubble {
-  @apply relative
-    before:absolute before:inset-0 before:block before:size-full
-    before:pointer-events-none before:rounded-[inherit]
-    before:bg-[var(--glass-inset-background-chat-bubble)]
-    before:shadow-[var(--glass-inset-border-shadow),var(--glass-inset-shadow-chat-bubble)];
 }
 
 /* Make all shapes inside a .seti-icon SVG use the parent text color */
 .seti-icon svg * {
   fill: currentColor;
+}
+
+@utility shadow-elevation-1 {
+  @apply shadow-(--shadow-elev-1);
+}
+
+@utility shadow-elevation-2 {
+  @apply shadow-(--shadow-elev-2);
+}
+
+@utility surface-sheen {
+  @apply relative
+    before:absolute before:inset-0 before:block before:size-full
+    before:pointer-events-none before:rounded-[inherit]
+    before:bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--color-base-100)_4%,transparent),transparent_35%,color-mix(in_oklch,var(--color-base-950)_3%,transparent))]
+    before:mix-blend-normal;
 }

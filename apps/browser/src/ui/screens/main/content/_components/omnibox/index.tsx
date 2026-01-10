@@ -179,7 +179,7 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
     );
 
     return (
-      <div className="relative flex flex-1 items-center rounded-full bg-zinc-500/5 pr-5 pl-3 focus-within:bg-zinc-500/10">
+      <div className="relative flex h-8 flex-1 items-center rounded-full bg-surface-1 pr-5 pl-3">
         {!isUrlInputFocused && showBreadcrumbs && tab?.url ? (
           <InternalPageBreadcrumbs
             url={tab.url}
@@ -194,13 +194,13 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
             onChange={(e) => setLocalUrl(e.target.value)}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
-            className="h-8 w-full truncate rounded-full px-2 text-foreground text-sm outline-none"
+            className="w-full truncate rounded-full px-2 text-foreground text-sm outline-none placeholder:font-normal"
             onKeyDown={handleKeyDown}
           />
         )}
-        <div className="pointer-events-none flex shrink-0 flex-row items-center gap-1 opacity-40">
-          <IconCommand className="size-3 text-muted-foreground" />
-          <span className="font-mono text-muted-foreground text-xs">L</span>
+        <div className="pointer-events-none flex shrink-0 flex-row items-center gap-1 text-muted-foreground">
+          <IconCommand className="size-3" />
+          <span className="font-mono text-xs">L</span>
         </div>
       </div>
     );
