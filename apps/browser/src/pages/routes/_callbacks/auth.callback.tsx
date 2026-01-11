@@ -54,7 +54,7 @@ function Page() {
   }, [authCode, error, handleAuthCallback]);
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-6">
+    <div className="flex h-full min-h-screen w-full min-w-screen flex-col items-center justify-center gap-4 p-6">
       {status === 'processing' && (
         <>
           <Loader2Icon className="size-8 animate-spin text-muted-foreground" />
