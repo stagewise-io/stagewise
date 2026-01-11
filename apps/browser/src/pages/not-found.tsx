@@ -1,5 +1,6 @@
 import { IconGearsFill18 } from 'nucleo-ui-fill-18';
 import { ErrorDisplay } from './components/error-display';
+import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
 
 export function NotFound() {
   return (
@@ -15,7 +16,7 @@ export function NotFound() {
                 <IconGearsFill18 className="size-4" />
               </>
             ),
-            href: 'stagewise://internal/browsing-settings',
+            href: SETTINGS_PAGE_URL,
           },
           {
             label: 'Close tab',

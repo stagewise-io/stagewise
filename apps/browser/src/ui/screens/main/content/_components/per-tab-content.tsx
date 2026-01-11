@@ -15,6 +15,7 @@ import {
   IconGear2Fill18,
 } from 'nucleo-ui-fill-18';
 import { NavButtons } from './nav-buttons';
+import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
 import { Omnibox, type OmniboxRef } from './omnibox';
 import { ZoomBar } from './zoom-bar';
 import { SearchBar } from './search-bar';
@@ -173,7 +174,7 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => {
-                  createTab('stagewise://internal/browsing-settings', true);
+                  createTab(SETTINGS_PAGE_URL, true);
                 }}
               >
                 <IconGear2Fill18 className="size-4.5" />

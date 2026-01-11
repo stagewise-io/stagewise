@@ -3,6 +3,7 @@ import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonState, useKartonProcedure } from '@/hooks/use-karton';
 import { useCallback, useMemo } from 'react';
 import { useTabUIState } from '@/hooks/use-tab-ui-state';
+import { HOME_PAGE_URL } from '@shared/internal-urls';
 
 export function CoreHotkeyBindings({
   onCreateTab,
@@ -170,7 +171,7 @@ export function CoreHotkeyBindings({
     const homeUrl =
       newTabPagePreference.type === 'custom' && newTabPagePreference.customUrl
         ? newTabPagePreference.customUrl
-        : 'stagewise://internal/home';
+        : HOME_PAGE_URL;
     goto(homeUrl, activeTabId);
   }, HotkeyActions.CMD_SHIFT_H);
 

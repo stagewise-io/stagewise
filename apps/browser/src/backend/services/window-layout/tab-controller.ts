@@ -7,8 +7,7 @@ import {
 } from 'electron';
 import type { Protocol } from 'devtools-protocol';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
-import type { Input } from 'electron';
-import contextMenu from 'electron-context-menu';
+import type { BaseWindow, Input } from 'electron';
 import type { Logger } from '../logger';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
@@ -36,6 +35,12 @@ import {
 import type { HistoryService } from '../history';
 import type { FaviconService } from '../favicon';
 import { canBrowserHandleUrl } from './protocol-utils';
+import { ContextMenuWebContent } from './utils/context-menu-web-content';
+import {
+  type NavigationTarget,
+  type SearchUtilsConfig,
+  createSearchUtils,
+} from './utils/search-utils';
 
 export interface TabState {
   title: string;
@@ -134,6 +139,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   public readonly id: string;
   public readonly handle: string;
+  private readonly parentWindow: BaseWindow;
   private webContentsView: WebContentsView;
   private logger: Logger;
   private historyService: HistoryService;
@@ -141,6 +147,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private kartonServer: KartonServer<TabKartonContract>;
   private kartonTransport: ElectronServerTransport;
   private selectedElementTracker: SelectedElementTracker;
+  // Context menu instance - stored to keep alive but not accessed directly
+  private _contextMenuWebContent: ContextMenuWebContent;
 
   // Current state cache
   private currentState: TabState;
@@ -189,13 +197,17 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   // Callback to create new tabs (sourceTabId is passed to enable inserting new tab next to source)
   private onCreateTab?: (
-    url: string,
+    target: NavigationTarget,
     setActive?: boolean,
     sourceTabId?: string,
   ) => void;
 
+  // Search utilities configuration
+  private searchUtilsConfig: SearchUtilsConfig;
+
   // Search state tracking
-  private currentSearchRequestId: number | null = null;
+  // Note: _currentSearchRequestId is tracked but not currently used for validation
+  private _currentSearchRequestId: number | null = null;
   private currentSearchText: string | null = null;
 
   // Console log capturing
@@ -256,18 +268,26 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   constructor(
     id: string,
+    parentWindow: BaseWindow,
     logger: Logger,
     historyService: HistoryService,
     faviconService: FaviconService,
+    searchUtilsConfig: SearchUtilsConfig,
     initialUrl?: string,
-    onCreateTab?: (url: string, setActive?: boolean) => void,
+    onCreateTab?: (
+      target: NavigationTarget,
+      setActive?: boolean,
+      sourceTabId?: string,
+    ) => void,
   ) {
     super();
     this.id = id;
+    this.parentWindow = parentWindow;
     this.handle = TabController.allocateHandle();
     this.logger = logger;
     this.historyService = historyService;
     this.faviconService = faviconService;
+    this.searchUtilsConfig = searchUtilsConfig;
     this.onCreateTab = onCreateTab;
 
     this.webContentsView = new WebContentsView({
@@ -318,6 +338,25 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       this.webContentsView.webContents,
       this.logger,
     );
+    // Create search utils for this tab
+    const searchUtils = createSearchUtils(this.searchUtilsConfig);
+
+    this._contextMenuWebContent = new ContextMenuWebContent(
+      this.webContentsView.webContents,
+      this.parentWindow,
+      {
+        openInNewTab: (url: string) => {
+          this.onCreateTab?.({ type: 'url', url }, true);
+        },
+        searchFor: (query: string, searchEngineId?: number) => {
+          this.onCreateTab?.({ type: 'search', query, searchEngineId }, true);
+        },
+        inspectElement: (x: number, y: number) => {
+          this.webContentsView.webContents.inspectElement(x, y);
+        },
+        searchUtils,
+      },
+    );
 
     // Track pending info collection to avoid duplicate work
     let pendingInfoCollection: NodeJS.Timeout | null = null;
@@ -356,14 +395,8 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       }
     });
 
-    contextMenu({
-      showSaveImageAs: true,
-      showServices: true,
-      window: this.webContentsView.webContents,
-    });
-
     this.webContentsView.webContents.session.setUserAgent(
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 stagewise/1.0.0-alpha',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
     );
 
     this.currentState = {
@@ -1260,7 +1293,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         // disposition can be: 'default', 'foreground-tab', 'background-tab', 'new-window', etc.
         const setActive = details.disposition !== 'background-tab';
         // Pass this tab's ID as source so new tab can be inserted next to it
-        this.onCreateTab(details.url, setActive, this.id);
+        this.onCreateTab({ type: 'url', url: details.url }, setActive, this.id);
       } else {
         // Fallback to external browser if no callback is provided
         shell.openExternal(details.url);
@@ -1792,7 +1825,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
     // Start new search - use findNext: true to initiate search and highlight first result
     const requestId = wc.findInPage(searchText, { findNext: true });
-    this.currentSearchRequestId = requestId;
+    this._currentSearchRequestId = requestId;
 
     // Update state immediately to show search is active
     this.updateState({
@@ -1812,7 +1845,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
     // Update search text - use findNext: true to initiate new search
     const requestId = wc.findInPage(searchText, { findNext: true });
-    this.currentSearchRequestId = requestId;
+    this._currentSearchRequestId = requestId;
 
     this.updateState({
       search: {
@@ -1850,7 +1883,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     if (wc.isDestroyed()) return;
 
     wc.stopFindInPage('clearSelection');
-    this.currentSearchRequestId = null;
+    this._currentSearchRequestId = null;
     this.currentSearchText = null;
 
     this.updateState({ search: null });

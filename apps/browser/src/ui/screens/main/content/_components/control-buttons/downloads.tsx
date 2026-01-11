@@ -28,6 +28,7 @@ import {
   DownloadIcon,
 } from 'lucide-react';
 import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
+import { DOWNLOADS_PAGE_URL } from '@shared/internal-urls';
 import { HotkeyActions } from '@shared/hotkeys';
 import { AreaChart, Area, ResponsiveContainer, XAxis } from 'recharts';
 
@@ -398,7 +399,7 @@ export function DownloadsControlButton() {
             {hasActiveDownloads ? 'Downloads' : 'Recent Downloads'}
           </PopoverTitle>
           <a
-            href="stagewise://internal/downloads"
+            href={DOWNLOADS_PAGE_URL}
             target="_blank"
             className="flex flex-row items-center gap-0.5 p-0.5 font-medium text-primary text-sm hover:opacity-80"
             onClick={() => setIsOpen(false)}

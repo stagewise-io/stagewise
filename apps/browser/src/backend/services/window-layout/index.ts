@@ -21,6 +21,12 @@ import { ChatStateController } from './chat-state-controller';
 import type { ColorScheme } from '@shared/karton-contracts/ui';
 import { THEME_COLORS, getBackgroundColor } from '@/shared/theme-colors';
 import { DisposableService } from '../disposable';
+import {
+  type NavigationTarget,
+  type SearchUtilsConfig,
+  createSearchUtils,
+} from './utils/search-utils';
+import { HOME_PAGE_URL } from '@shared/internal-urls';
 
 interface WindowState {
   width: number;
@@ -253,7 +259,7 @@ export class WindowLayoutService extends DisposableService {
     const initialUrl =
       startupPage.type === 'custom' && startupPage.customUrl
         ? startupPage.customUrl
-        : 'stagewise://internal/home';
+        : HOME_PAGE_URL;
 
     // Create initial tab with the appropriate URL
     this.createTab(initialUrl, true);
@@ -333,7 +339,7 @@ export class WindowLayoutService extends DisposableService {
     const shouldReuseActiveTab =
       this.activeTab &&
       Object.keys(this.tabs).length === 1 &&
-      this.activeTab.getState().url === 'stagewise://internal/home' &&
+      this.activeTab.getState().url === HOME_PAGE_URL &&
       !this.activeTab.getState().navigationHistory.canGoBack;
 
     if (shouldReuseActiveTab) {
@@ -491,11 +497,11 @@ export class WindowLayoutService extends DisposableService {
           targetUrl = customUrl;
         } else {
           // Custom type but no URL configured - fall back to home
-          targetUrl = 'stagewise://internal/home';
+          targetUrl = HOME_PAGE_URL;
         }
       } else {
         // Type is 'home' - use the start page
-        targetUrl = 'stagewise://internal/home';
+        targetUrl = HOME_PAGE_URL;
       }
     }
 
@@ -523,14 +529,29 @@ export class WindowLayoutService extends DisposableService {
     sourceTabId?: string,
   ): Promise<string> {
     const id = randomUUID();
+
+    // Create search utilities config that reads from current Karton state and preferences
+    const searchUtilsConfig: SearchUtilsConfig = {
+      getSearchEngines: () => this.uiKarton.state.searchEngines,
+      getDefaultEngineId: () =>
+        this.preferencesService.get().search.defaultEngineId,
+    };
+
+    // Create search utils instance for resolving navigation targets
+    const searchUtils = createSearchUtils(searchUtilsConfig);
+
     const tab = new TabController(
       id,
+      this.baseWindow!,
       this.logger,
       this.historyService,
       this.faviconService,
+      searchUtilsConfig,
       url,
-      (newUrl: string, setActive?: boolean) => {
-        void this.handleCreateTab(newUrl, setActive, id);
+      (target: NavigationTarget, setActive?: boolean) => {
+        // Resolve the navigation target to a URL
+        const resolvedUrl = searchUtils.resolveNavigationTarget(target);
+        void this.handleCreateTab(resolvedUrl, setActive, id);
       },
     );
 
@@ -718,7 +739,7 @@ export class WindowLayoutService extends DisposableService {
           const initialUrl =
             newTabPage.type === 'custom' && newTabPage.customUrl
               ? newTabPage.customUrl
-              : 'stagewise://internal/home';
+              : HOME_PAGE_URL;
           await this.createTab(initialUrl, true);
         }
       }
