@@ -24,7 +24,7 @@ export const Route = createFileRoute('/_callbacks/auth/callback')({
 });
 
 function Page() {
-  const { authCode, error } = useSearch({ from: '/auth/callback' });
+  const { authCode, error } = useSearch({ from: '/_callbacks/auth/callback' });
   const handleAuthCallback = useKartonProcedure((p) => p.handleAuthCallback);
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>(
     'processing',
