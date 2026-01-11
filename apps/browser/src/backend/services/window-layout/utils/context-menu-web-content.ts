@@ -4,6 +4,7 @@ import {
   type Event,
   Menu,
   clipboard,
+  nativeImage,
   type MenuItem as ElectronMenuItem,
   type MenuItemConstructorOptions as ElectronMenuItemConstructorOptions,
   type BaseWindow,
@@ -56,11 +57,12 @@ export class ContextMenuWebContent {
     // 2D-array of all shown elements.
     const allItems2D: MenuItem[][] = [
       this.buildUrlMenuItems(params),
-      this.buildImageRelatedMenuItems(params),
+      this.buildMediaRelatedMenuItems(params),
       this.buildBasicEditMenuItems(params),
       this.buildSpellcheckMenuItems(params),
       this.buildStagewiseFeaturesMenuItems(params),
       this.buildSystemMenuItems(params),
+      this.buildDevToolsItems(params),
     ];
 
     const allItems: MenuItem[] = allItems2D.reduce((acc, curr) => {
@@ -76,13 +78,13 @@ export class ContextMenuWebContent {
   private buildSpellcheckMenuItems = (
     params: ContextMenuParams,
   ): MenuItem[] => {
-    if (!params.isEditable || !params.spellcheckEnabled) return [];
+    if (!params.isEditable) return [];
 
     const items: MenuItem[] = [
       ...(params.misspelledWord
         ? [
             {
-              label: 'Add to dictionary',
+              label: 'Add to Dictionary',
               click: () => {
                 this.webContents.session.addWordToSpellCheckerDictionary(
                   params.misspelledWord,
@@ -92,20 +94,18 @@ export class ContextMenuWebContent {
           ]
         : []),
       {
-        label: `${params.dictionarySuggestions.length === 0 ? 'No ' : ''}Suggestion${params.dictionarySuggestions.length > 1 ? 's' : ''}`,
         type: 'header',
+        label: `${params.dictionarySuggestions.length === 0 ? 'No ' : ''}Suggestion${params.dictionarySuggestions.length > 1 ? 's' : ''}`,
+        enabled: false,
+        visible: !!params.misspelledWord,
       },
-      ...params.dictionarySuggestions.map((suggestion) => ({
+      ...params.dictionarySuggestions.slice(0, 3).map((suggestion) => ({
         label: suggestion,
         click: () => {
           this.webContents.replaceMisspelling(suggestion);
         },
       })),
     ];
-
-    if (params.dictionarySuggestions.length === 0) return [];
-
-    params.spellcheckEnabled;
 
     return items;
   };
@@ -165,12 +165,63 @@ export class ContextMenuWebContent {
     return items;
   };
 
-  private buildImageRelatedMenuItems = (
-    _params: ContextMenuParams,
+  private buildMediaRelatedMenuItems = (
+    params: ContextMenuParams,
   ): MenuItem[] => {
-    const items: MenuItem[] = [];
+    if (!['image', 'video', 'audio'].includes(params.mediaType)) return [];
 
-    // TODO
+    let label = '';
+    switch (params.mediaType) {
+      case 'image':
+        label = 'image';
+        break;
+      case 'video':
+        label = 'video';
+        break;
+      case 'audio':
+        label = 'audio';
+        break;
+      default:
+        label = 'media';
+        break;
+    }
+    label = label.charAt(0).toUpperCase() + label.slice(1);
+
+    const items: MenuItem[] = [
+      {
+        label: `Open ${label} in New Tab`,
+        click: () => {
+          this.utils.openInNewTab(params.srcURL);
+        },
+      },
+      {
+        label: `Save ${label} as...`,
+        click: () => {
+          this.webContents.downloadURL(params.srcURL);
+        },
+      },
+      {
+        label: `Copy ${label} URL`,
+        click: () => {
+          clipboard.writeText(params.srcURL);
+        },
+      },
+      {
+        label: `Copy ${label} to Clipboard`,
+        click: () => {
+          fetch(params.srcURL)
+            .then((res) => res.arrayBuffer())
+            .then((buffer) => nativeImage.createFromBuffer(Buffer.from(buffer)))
+            .catch(() => null)
+            .then((image) => {
+              if (image) {
+                clipboard.writeImage(image);
+              }
+            });
+        },
+        visible: params.mediaType === 'image',
+      },
+    ];
 
     return items;
   };
@@ -179,12 +230,6 @@ export class ContextMenuWebContent {
     if (params.linkURL.length === 0) return [];
 
     const items: MenuItem[] = [
-      {
-        label: 'Open in this tab',
-        click: () => {
-          this.webContents.loadURL(params.linkURL);
-        },
-      },
       {
         label: 'Open in new tab',
         click: () => {
@@ -205,6 +250,7 @@ export class ContextMenuWebContent {
         click: () => {
           clipboard.writeText(params.selectionText);
         },
+        visible: params.selectionText.length > 0,
       },
     ];
 
@@ -235,7 +281,27 @@ export class ContextMenuWebContent {
   };
 
   private buildSystemMenuItems = (_params: ContextMenuParams): MenuItem[] => {
-    const items: MenuItem[] = [];
+    const items: MenuItem[] = [
+      {
+        label: 'Print/Save page',
+        click: () => {
+          this.webContents.print();
+        },
+      },
+    ];
+
+    return items;
+  };
+
+  private buildDevToolsItems = (params: ContextMenuParams): MenuItem[] => {
+    const items: MenuItem[] = [
+      {
+        label: 'Inspect Element',
+        click: () => {
+          this.utils.inspectElement(params.x, params.y);
+        },
+      },
+    ];
 
     return items;
   };
