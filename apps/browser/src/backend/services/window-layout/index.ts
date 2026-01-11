@@ -615,6 +615,11 @@ export class WindowLayoutService extends DisposableService {
     // (e.g., crash, system closing the webContents)
     const webContents = tab.getViewContainer().webContents;
     webContents.on('destroyed', () => {
+      // Skip cleanup if window is being destroyed (all tabs will be cleaned up together)
+      if (!this.baseWindow || this.baseWindow.isDestroyed()) {
+        return;
+      }
+
       this.logger.debug(
         `[WindowLayoutService] WebContents destroyed for tab ${id}, cleaning up`,
       );
@@ -857,6 +862,15 @@ export class WindowLayoutService extends DisposableService {
   };
 
   private updateZOrder() {
+    // Guard against calls during/after teardown when window is destroyed
+    if (
+      !this.baseWindow ||
+      this.baseWindow.isDestroyed() ||
+      !this.uiController
+    ) {
+      return;
+    }
+
     if (process.platform !== 'win32') {
       // On non-windows platforms, re-adding works fine and keep performance good
       if (this.isWebContentInteractive && this.activeTab) {
