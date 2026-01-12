@@ -19,6 +19,7 @@ import { Route as InternalAppBrowsingSettingsRouteImport } from './routes/_inter
 import { Route as InternalAppAgentSettingsRouteImport } from './routes/_internal-app/agent-settings'
 import { Route as InternalAppAccountRouteImport } from './routes/_internal-app/account'
 import { Route as InternalAppAboutRouteImport } from './routes/_internal-app/about'
+import { Route as ErrorPagesErrorPageLoadFailedRouteImport } from './routes/_error-pages/error.page-load-failed'
 import { Route as CallbacksAuthCallbackRouteImport } from './routes/_callbacks/auth.callback'
 
 const HomeRoute = HomeRouteImport.update({
@@ -72,6 +73,12 @@ const InternalAppAboutRoute = InternalAppAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => InternalAppRouteRoute,
 } as any)
+const ErrorPagesErrorPageLoadFailedRoute =
+  ErrorPagesErrorPageLoadFailedRouteImport.update({
+    id: '/_error-pages/error/page-load-failed',
+    path: '/error/page-load-failed',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const CallbacksAuthCallbackRoute = CallbacksAuthCallbackRouteImport.update({
   id: '/_callbacks/auth/callback',
   path: '/auth/callback',
@@ -89,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/history': typeof InternalAppHistoryRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
   '/auth/callback': typeof CallbacksAuthCallbackRoute
+  '/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
 }
 export interface FileRoutesByTo {
   '/home': typeof HomeRoute
@@ -101,6 +109,7 @@ export interface FileRoutesByTo {
   '/history': typeof InternalAppHistoryRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
   '/auth/callback': typeof CallbacksAuthCallbackRoute
+  '/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -115,6 +124,7 @@ export interface FileRoutesById {
   '/_internal-app/history': typeof InternalAppHistoryRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
   '/_callbacks/auth/callback': typeof CallbacksAuthCallbackRoute
+  '/_error-pages/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/diff-review/$chatId'
     | '/auth/callback'
+    | '/error/page-load-failed'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/home'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/diff-review/$chatId'
     | '/auth/callback'
+    | '/error/page-load-failed'
   id:
     | '__root__'
     | '/_internal-app'
@@ -154,6 +166,7 @@ export interface FileRouteTypes {
     | '/_internal-app/history'
     | '/diff-review/$chatId'
     | '/_callbacks/auth/callback'
+    | '/_error-pages/error/page-load-failed'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -161,6 +174,7 @@ export interface RootRouteChildren {
   HomeRoute: typeof HomeRoute
   DiffReviewChatIdRoute: typeof DiffReviewChatIdRoute
   CallbacksAuthCallbackRoute: typeof CallbacksAuthCallbackRoute
+  ErrorPagesErrorPageLoadFailedRoute: typeof ErrorPagesErrorPageLoadFailedRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -235,6 +249,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InternalAppAboutRouteImport
       parentRoute: typeof InternalAppRouteRoute
     }
+    '/_error-pages/error/page-load-failed': {
+      id: '/_error-pages/error/page-load-failed'
+      path: '/error/page-load-failed'
+      fullPath: '/error/page-load-failed'
+      preLoaderRoute: typeof ErrorPagesErrorPageLoadFailedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_callbacks/auth/callback': {
       id: '/_callbacks/auth/callback'
       path: '/auth/callback'
@@ -273,6 +294,7 @@ const rootRouteChildren: RootRouteChildren = {
   HomeRoute: HomeRoute,
   DiffReviewChatIdRoute: DiffReviewChatIdRoute,
   CallbacksAuthCallbackRoute: CallbacksAuthCallbackRoute,
+  ErrorPagesErrorPageLoadFailedRoute: ErrorPagesErrorPageLoadFailedRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

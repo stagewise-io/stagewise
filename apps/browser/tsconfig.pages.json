@@ -10,7 +10,8 @@
     "paths": {
       "@/*": ["./src/pages/*"],
       "@shared/*": ["./src/shared/*"],
-      "@ui/*": ["./src/ui/*"]
+      "@ui/*": ["./src/ui/*"],
+      "@assets/*": ["./assets/pages/*"]
     },
     "types": ["vite/client"],
     "skipLibCheck": true,

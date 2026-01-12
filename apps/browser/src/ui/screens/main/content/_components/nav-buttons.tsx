@@ -19,34 +19,31 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
   const reload = useKartonProcedure((p) => p.browser.reload);
   const stop = useKartonProcedure((p) => p.browser.stop);
 
-  const isInternalPage = tab?.url?.startsWith('stagewise://internal/') ?? false;
   const isLoading = tab?.isLoading ?? false;
+  const canGoBack = tab?.navigationHistory.canGoBack ?? false;
+  const canGoForward = tab?.navigationHistory.canGoForward ?? false;
 
   return (
     <>
       <Button
         variant="ghost"
         size="icon-sm"
-        disabled={isInternalPage || !tab?.navigationHistory.canGoBack}
+        disabled={!canGoBack}
         onClick={() => {
           goBack(tabId);
         }}
       >
-        <IconArrowLeft
-          className={`size-4 ${(isInternalPage || !tab?.navigationHistory.canGoBack) && 'opacity-50'}`}
-        />
+        <IconArrowLeft className={`size-4 ${!canGoBack && 'opacity-50'}`} />
       </Button>
       <Button
         variant="ghost"
         size="icon-sm"
-        disabled={isInternalPage || !tab?.navigationHistory.canGoForward}
+        disabled={!canGoForward}
         onClick={() => {
           goForward(tabId);
         }}
       >
-        <IconArrowRight
-          className={`size-4 ${(isInternalPage || !tab?.navigationHistory.canGoForward) && 'opacity-50'}`}
-        />
+        <IconArrowRight className={`size-4 ${!canGoForward && 'opacity-50'}`} />
       </Button>
       {isLoading ? (
         <Button
@@ -62,14 +59,11 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
         <Button
           variant="ghost"
           size="icon-sm"
-          disabled={isInternalPage}
           onClick={() => {
             reload(tabId);
           }}
         >
-          <IconArrowRotateAnticlockwise
-            className={`size-4 ${(isInternalPage || !tab?.navigationHistory.canGoBack) && 'opacity-50'}`}
-          />
+          <IconArrowRotateAnticlockwise className="size-4" />
         </Button>
       )}
     </>

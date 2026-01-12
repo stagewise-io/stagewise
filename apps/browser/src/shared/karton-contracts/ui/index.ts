@@ -226,6 +226,10 @@ export type TabState = {
   error: {
     code: number;
     message?: string;
+    /** The original URL that failed to load (for reload behavior) */
+    originalFailedUrl?: string;
+    /** Whether an error page is currently displayed */
+    isErrorPageDisplayed?: boolean;
   } | null;
   navigationHistory: {
     canGoBack: boolean;

@@ -82,8 +82,13 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     const isInternalPage = useMemo(() => {
-      return tab?.url?.startsWith('stagewise://internal/') ?? false;
-    }, [tab?.url]);
+      // Consider a page "internal" if it's a stagewise:// URL or if an error page is displayed
+      // (Error pages show the failed URL but are still internal pages)
+      const isInternalUrl =
+        tab?.url?.startsWith('stagewise://internal/') ?? false;
+      const isErrorPageDisplayed = tab?.error?.isErrorPageDisplayed ?? false;
+      return isInternalUrl || isErrorPageDisplayed;
+    }, [tab?.url, tab?.error?.isErrorPageDisplayed]);
 
     const colorScheme = tab?.colorScheme ?? 'system';
 
@@ -185,16 +190,12 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
         </div>
         <div className="flex size-full flex-col gap-4 rounded-lg p-2">
           <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-sm shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] ring-1 ring-border-subtle">
-            {tab?.error ? (
-              <div>Error: {tab?.error?.message}</div>
-            ) : (
-              <div
-                id={`dev-app-preview-container-${tabId}`}
-                className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
-              >
-                {isActive && !isInternalPage && <DOMContextSelector />}
-              </div>
-            )}
+            <div
+              id={`dev-app-preview-container-${tabId}`}
+              className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
+            >
+              {isActive && !isInternalPage && <DOMContextSelector />}
+            </div>
           </div>
         </div>
       </div>

@@ -41,6 +41,8 @@ import {
   type SearchUtilsConfig,
   createSearchUtils,
 } from './utils/search-utils';
+import { TabErrorHandler, type SubframeError } from './tab-error-handler';
+export type { SubframeError } from './tab-error-handler';
 
 export interface TabState {
   title: string;
@@ -54,7 +56,13 @@ export interface TabState {
   error: {
     code: number;
     message?: string;
+    /** The original URL that failed to load (for reload behavior) */
+    originalFailedUrl?: string;
+    /** Whether an error page is currently displayed */
+    isErrorPageDisplayed?: boolean;
   } | null;
+  /** Subframe errors that occurred on the current page */
+  subframeErrors: SubframeError[];
   navigationHistory: {
     canGoBack: boolean;
     canGoForward: boolean;
@@ -215,6 +223,9 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private readonly MAX_CONSOLE_LOGS = 1000; // Ring buffer max size
   private isConsoleLogListenerSetup = false;
   private isRuntimeEnabled = false;
+
+  // Error handling
+  private errorHandler: TabErrorHandler | null = null;
 
   /**
    * Allocates a handle for a new tab.
@@ -408,6 +419,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       isMuted: this.webContentsView.webContents.audioMuted,
       colorScheme: 'system',
       error: null,
+      subframeErrors: [],
       navigationHistory: {
         canGoBack: false,
         canGoForward: false,
@@ -429,6 +441,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.startScreenshotTracking();
     this.setupScreenshotOnResize();
     this.setupConsoleLogCapture();
+    this.setupErrorHandler();
 
     // Initialize zoom percentage from Electron's current zoom factor
     // This ensures we reflect any persisted zoom from previous sessions
@@ -494,6 +507,40 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   }
 
   public reload() {
+    // If on error page, reload the original failed URL instead
+    const reloadUrl = this.errorHandler?.getReloadUrl();
+    if (reloadUrl) {
+      const navHistory = this.webContentsView.webContents.navigationHistory;
+      const errorPageIndex = navHistory.getActiveIndex();
+
+      this.errorHandler?.resetErrorState();
+      this.loadURL(reloadUrl, PageTransition.RELOAD);
+
+      // Remove the error page entry from history after navigation starts.
+      // We can't remove the active index, so we do it after loadURL() which
+      // starts the navigation and changes the active index.
+      if (errorPageIndex >= 0) {
+        // Use setImmediate to ensure navigation has started and index changed
+        setImmediate(() => {
+          try {
+            // Only remove if the index still exists and is not the current one
+            const currentIndex = navHistory.getActiveIndex();
+            if (
+              errorPageIndex !== currentIndex &&
+              errorPageIndex < navHistory.length()
+            ) {
+              navHistory.removeEntryAtIndex(errorPageIndex);
+            }
+          } catch (err) {
+            this.logger.debug(
+              `[TabController] Could not remove error page from history: ${err}`,
+            );
+          }
+        });
+      }
+      return;
+    }
+
     this.pendingNavigation = {
       transition: PageTransition.RELOAD,
       referrerVisitId: this.lastVisitId || undefined,
@@ -506,7 +553,16 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   }
 
   public goBack() {
-    if (this.webContentsView.webContents.navigationHistory.canGoBack()) {
+    const navHistory = this.webContentsView.webContents.navigationHistory;
+
+    // Check if error handler wants to modify navigation offset (to skip error pages)
+    const offset = this.errorHandler?.getNavigationOffset('back');
+    if (
+      offset !== null &&
+      offset !== undefined &&
+      navHistory.canGoToOffset(offset)
+    ) {
+      this.errorHandler?.resetErrorState();
       this.pendingNavigation = {
         transition: makeQualifiedTransition(
           PageTransition.LINK,
@@ -514,12 +570,34 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         ),
         referrerVisitId: this.lastVisitId || undefined,
       };
-      this.webContentsView.webContents.navigationHistory.goBack();
+      navHistory.goToOffset(offset);
+      return;
+    }
+
+    // Standard back navigation
+    if (navHistory.canGoBack()) {
+      this.pendingNavigation = {
+        transition: makeQualifiedTransition(
+          PageTransition.LINK,
+          PageTransitionQualifier.FORWARD_BACK,
+        ),
+        referrerVisitId: this.lastVisitId || undefined,
+      };
+      navHistory.goBack();
     }
   }
 
   public goForward() {
-    if (this.webContentsView.webContents.navigationHistory.canGoForward()) {
+    const navHistory = this.webContentsView.webContents.navigationHistory;
+
+    // Check if error handler wants to modify navigation offset (to skip error pages)
+    const offset = this.errorHandler?.getNavigationOffset('forward');
+    if (
+      offset !== null &&
+      offset !== undefined &&
+      navHistory.canGoToOffset(offset)
+    ) {
+      this.errorHandler?.resetErrorState();
       this.pendingNavigation = {
         transition: makeQualifiedTransition(
           PageTransition.LINK,
@@ -527,7 +605,20 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         ),
         referrerVisitId: this.lastVisitId || undefined,
       };
-      this.webContentsView.webContents.navigationHistory.goForward();
+      navHistory.goToOffset(offset);
+      return;
+    }
+
+    // Standard forward navigation
+    if (navHistory.canGoForward()) {
+      this.pendingNavigation = {
+        transition: makeQualifiedTransition(
+          PageTransition.LINK,
+          PageTransitionQualifier.FORWARD_BACK,
+        ),
+        referrerVisitId: this.lastVisitId || undefined,
+      };
+      navHistory.goForward();
     }
   }
 
@@ -1064,6 +1155,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       this.consoleLogCountUpdateTimeout = null;
     }
 
+    // Clean up error handler
+    if (this.errorHandler) {
+      this.errorHandler.destroy();
+      this.errorHandler = null;
+    }
+
     // Only detach debugger if webContents is still alive
     if (!this.webContentsView.webContents.isDestroyed()) {
       this.detachDevToolsDebugger();
@@ -1132,30 +1229,48 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
     wc.on('did-navigate', async (_event, url) => {
       this.stopSearch(); // Clear search on navigation
+
+      // Don't update URL in UI if navigating to an error page - keep showing the failed URL
+      const isErrorPage = url.includes('/error/page-load-failed');
+      const displayUrl = isErrorPage
+        ? (this.errorHandler?.getErrorState().originalFailedUrl ?? url)
+        : url;
+
       this.updateState({
-        url,
+        url: displayUrl,
         navigationHistory: {
           canGoBack: wc.navigationHistory.canGoBack(),
           canGoForward: wc.navigationHistory.canGoForward(),
         },
       });
 
-      // Log to history
-      await this.logNavigationToHistory(url);
+      // Log to history (skip error pages)
+      if (!isErrorPage) {
+        await this.logNavigationToHistory(url);
+      }
     });
 
     wc.on('did-navigate-in-page', async (_event, url) => {
       this.stopSearch(); // Clear search on in-page navigation
+
+      // Don't update URL in UI if on an error page - keep showing the failed URL
+      const isErrorPage = url.includes('/error/page-load-failed');
+      const displayUrl = isErrorPage
+        ? (this.errorHandler?.getErrorState().originalFailedUrl ?? url)
+        : url;
+
       this.updateState({
-        url,
+        url: displayUrl,
         navigationHistory: {
           canGoBack: wc.navigationHistory.canGoBack(),
           canGoForward: wc.navigationHistory.canGoForward(),
         },
       });
 
-      // Log to history (in-page navigations like hash changes, pushState)
-      await this.logNavigationToHistory(url);
+      // Log to history (in-page navigations like hash changes, pushState) - skip error pages
+      if (!isErrorPage) {
+        await this.logNavigationToHistory(url);
+      }
     });
 
     wc.on('did-start-loading', () => {
@@ -1190,24 +1305,15 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       this.enableCdpDomainsForConsole();
     });
 
-    wc.on(
-      'did-fail-load',
-      (_event, errorCode, errorDescription, _validatedUrl, isMainFrame) => {
-        // Ignore "abort" errors (like when a user hits the Stop button) and sub-frames
-        if (errorCode !== -3 && isMainFrame) {
-          this.logger.error(`Page failed: ${errorDescription}`);
-          this.updateState({
-            isLoading: false,
-            error: {
-              code: errorCode,
-              message: errorDescription,
-            },
-          });
-        }
-        // Clear pending navigation on failure - don't log failed navigations
+    // Note: Error handling UI is managed by TabErrorHandler (setupErrorHandler)
+    // This handler only clears pending navigation to prevent failed loads from being logged
+    wc.on('did-fail-load', (_event, errorCode) => {
+      // Ignore abort errors (user stopped navigation)
+      if (errorCode !== -3) {
+        // Clear pending navigation on failure - don't log failed navigations to history
         this.pendingNavigation = null;
-      },
-    );
+      }
+    });
 
     wc.on('focus', () => {
       this.updateState({ lastFocusedAt: Date.now() });
@@ -1954,6 +2060,47 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         error: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  // =========================================================================
+  // Error Handling
+  // =========================================================================
+
+  /**
+   * Sets up the TabErrorHandler for handling page load errors and certificate errors.
+   * The handler manages error page navigation, URL display, and navigation interception.
+   */
+  private setupErrorHandler() {
+    this.errorHandler = new TabErrorHandler(
+      this.webContentsView.webContents,
+      this.logger,
+      {
+        onErrorStateUpdate: (errorState) => {
+          if (errorState.errorCode !== null) {
+            this.updateState({
+              error: {
+                code: errorState.errorCode,
+                message: errorState.errorMessage ?? undefined,
+                originalFailedUrl: errorState.originalFailedUrl ?? undefined,
+                isErrorPageDisplayed: errorState.isErrorPageDisplayed,
+              },
+            });
+          } else {
+            this.updateState({ error: null });
+          }
+        },
+        onSubframeErrorsUpdate: (errors) => {
+          this.updateState({ subframeErrors: errors });
+        },
+        onDisplayUrlUpdate: (url) => {
+          // Update the URL shown in UI to the failed URL, not the error page URL
+          this.updateState({ url });
+        },
+        onLoadingStateUpdate: (isLoading) => {
+          this.updateState({ isLoading });
+        },
+      },
+    );
   }
 
   // =========================================================================

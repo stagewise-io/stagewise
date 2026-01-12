@@ -47,6 +47,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src/pages'),
       '@shared': path.resolve(__dirname, './src/shared'),
       '@ui': path.resolve(__dirname, './src/ui'),
+      '@assets': path.resolve(__dirname, './assets/pages'),
       // 'use-sync-external-store/shim/with-selector.js': 'react',
       // 'use-sync-external-store/shim/index.js': 'react',
     },
