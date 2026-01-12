@@ -111,6 +111,12 @@ export type PagesApiContract = {
     setHasSeenOnboardingFlow: (value: boolean) => Promise<void>;
     /** Open a workspace (shows file picker if no path provided) */
     openWorkspace: (path?: string) => Promise<void>;
+    /**
+     * Trust a certificate for a specific origin in a tab and reload.
+     * This adds the origin to a per-tab whitelist that allows certificate errors.
+     * The whitelist is cleared when the tab is closed.
+     */
+    trustCertificateAndReload: (tabId: string, origin: string) => Promise<void>;
   };
 };
 

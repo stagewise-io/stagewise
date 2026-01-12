@@ -84,6 +84,10 @@ export class PagesService extends DisposableService {
   // Home page service dependencies
   private userExperienceService?: UserExperienceService;
   private openWorkspaceHandler?: (path?: string) => Promise<void>;
+  private trustCertificateAndReloadHandler?: (
+    tabId: string,
+    origin: string,
+  ) => Promise<void>;
 
   private constructor(
     logger: Logger,
@@ -962,6 +966,23 @@ export class PagesService extends DisposableService {
         await this.openWorkspaceHandler(path);
       },
     );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'trustCertificateAndReload',
+      async (
+        _callingClientId: string,
+        tabId: string,
+        origin: string,
+      ): Promise<void> => {
+        if (!this.trustCertificateAndReloadHandler) {
+          this.logger.warn(
+            '[PagesService] trustCertificateAndReload called but no handler is set',
+          );
+          return;
+        }
+        await this.trustCertificateAndReloadHandler(tabId, origin);
+      },
+    );
   }
 
   /**
@@ -1115,6 +1136,16 @@ export class PagesService extends DisposableService {
   }
 
   /**
+   * Set the handler for trusting a certificate and reloading the tab.
+   * This should be called by main.ts to wire up to WindowLayoutService.
+   */
+  public setTrustCertificateAndReloadHandler(
+    handler: (tabId: string, origin: string) => Promise<void>,
+  ): void {
+    this.trustCertificateAndReloadHandler = handler;
+  }
+
+  /**
    * Sync preferences state to the Pages API Karton state.
    * Called by PreferencesService when preferences change.
    */
@@ -1246,6 +1277,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('getInspirationWebsites');
     this.kartonServer.removeServerProcedureHandler('setHasSeenOnboardingFlow');
     this.kartonServer.removeServerProcedureHandler('openWorkspace');
+    this.kartonServer.removeServerProcedureHandler('trustCertificateAndReload');
 
     // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');
@@ -1261,6 +1293,7 @@ export class PagesService extends DisposableService {
     this.authCallbackHandler = undefined;
     this.userExperienceService = undefined;
     this.openWorkspaceHandler = undefined;
+    this.trustCertificateAndReloadHandler = undefined;
 
     await this.transport.close();
     this.logger.debug('[PagesService] Teardown complete');

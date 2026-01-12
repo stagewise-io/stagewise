@@ -66,6 +66,7 @@ const ERROR_PAGE_PATH = '/error/page-load-failed';
  * - Provide navigation offsets to skip error pages during back/forward
  */
 export class TabErrorHandler {
+  private readonly tabId: string;
   private readonly webContents: WebContents;
   private readonly logger: Logger;
   private readonly callbacks: TabErrorHandlerCallbacks;
@@ -84,6 +85,13 @@ export class TabErrorHandler {
 
   /** Whether we're in the process of navigating to an error page */
   private isNavigatingToErrorPage = false;
+
+  /**
+   * Origins with temporarily trusted certificates (per-tab whitelist).
+   * Format: "protocol://host:port" (e.g., "https://example.com:443")
+   * Cleared when the tab is closed.
+   */
+  private trustedCertificateOrigins: Set<string> = new Set();
 
   /** Listener references for cleanup */
   private boundHandleDidFailLoad: (
@@ -112,10 +120,12 @@ export class TabErrorHandler {
   ) => void;
 
   constructor(
+    tabId: string,
     webContents: WebContents,
     logger: Logger,
     callbacks: TabErrorHandlerCallbacks,
   ) {
+    this.tabId = tabId;
     this.webContents = webContents;
     this.logger = logger;
     this.callbacks = callbacks;
@@ -204,7 +214,17 @@ export class TabErrorHandler {
     callback: (isTrusted: boolean) => void,
     isMainFrame: boolean,
   ): void {
-    // Always reject untrusted certificates for safety (V1 - no bypass option)
+    // Check if the origin is in the trusted list (user bypassed the warning)
+    const origin = this.getOriginFromUrl(url);
+    if (origin && this.trustedCertificateOrigins.has(origin)) {
+      this.logger.debug(
+        `[TabErrorHandler] certificate-error: origin ${origin} is trusted, allowing`,
+      );
+      callback(true);
+      return;
+    }
+
+    // Reject untrusted certificates
     callback(false);
 
     // Ignore if already navigating to error page
@@ -227,6 +247,18 @@ export class TabErrorHandler {
       // Subframe certificate errors are treated as safety-relevant
       // Navigate full page to error with subresource URL
       this.handleMainFrameError(errorCode, errorMessage, url, url);
+    }
+  }
+
+  /**
+   * Extract origin from URL (protocol://host:port)
+   */
+  private getOriginFromUrl(url: string): string | null {
+    try {
+      const parsed = new URL(url);
+      return parsed.origin;
+    } catch {
+      return null;
     }
   }
 
@@ -423,6 +455,7 @@ export class TabErrorHandler {
     params.set('errorUrl', errorUrl);
     params.set('errorCode', errorCode.toString());
     params.set('errorMessage', errorMessage);
+    params.set('tabId', this.tabId);
 
     if (subresourceUrl) {
       params.set('subresourceUrl', subresourceUrl);
@@ -571,6 +604,27 @@ export class TabErrorHandler {
   }
 
   /**
+   * Add an origin to the trusted certificate whitelist for this tab.
+   * The origin should be in the format "protocol://host:port" (e.g., "https://example.com:443").
+   * This whitelist is cleared when the tab is closed.
+   *
+   * @param origin The origin to trust (e.g., "https://example.com")
+   */
+  public trustCertificateOrigin(origin: string): void {
+    this.trustedCertificateOrigins.add(origin);
+    this.logger.debug(
+      `[TabErrorHandler] Added trusted certificate origin: ${origin}`,
+    );
+  }
+
+  /**
+   * Check if an origin has a trusted certificate for this tab.
+   */
+  public isCertificateOriginTrusted(origin: string): boolean {
+    return this.trustedCertificateOrigins.has(origin);
+  }
+
+  /**
    * Clean up event listeners
    */
   public destroy(): void {
@@ -582,6 +636,9 @@ export class TabErrorHandler {
       wc.off('did-navigate', this.boundHandleDidNavigate);
       wc.off('did-start-navigation', this.boundHandleDidStartNavigation);
     }
+
+    // Clear trusted certificate origins (per-tab whitelist)
+    this.trustedCertificateOrigins.clear();
 
     this.clearErrorState();
     this.subframeErrors = [];

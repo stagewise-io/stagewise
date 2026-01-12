@@ -329,6 +329,17 @@ export class WindowLayoutService extends DisposableService {
   }
 
   /**
+   * Trusts a certificate for a specific origin in a tab and reloads the page.
+   * This is called from the pages API for the "Continue (UNSAFE!)" button on error pages.
+   */
+  public trustCertificateAndReload(tabId: string, origin: string): void {
+    this.logger.debug(
+      `[WindowLayoutService] trustCertificateAndReload called for tab: ${tabId}, origin: ${origin}`,
+    );
+    void this.handleTrustCertificateAndReload(tabId, origin);
+  }
+
+  /**
    * Opens a URL in a new tab, or navigates the active tab if it's a new/default tab.
    * A tab is considered "new" if it's the only tab and is on the default URL (ui-main).
    */
@@ -414,6 +425,10 @@ export class WindowLayoutService extends DisposableService {
     );
     this.uiController.on('stop', this.handleStop);
     this.uiController.on('reload', this.handleReload);
+    this.uiController.on(
+      'trustCertificateAndReload',
+      this.handleTrustCertificateAndReload,
+    );
     this.uiController.on('goto', this.handleGoto);
     this.uiController.on('goBack', this.handleGoBack);
     this.uiController.on('goForward', this.handleGoForward);
@@ -921,6 +936,16 @@ export class WindowLayoutService extends DisposableService {
   private handleReload = async (tabId?: string) => {
     const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.reload();
+  };
+
+  private handleTrustCertificateAndReload = async (
+    tabId: string,
+    origin: string,
+  ) => {
+    const tab = this.tabs[tabId];
+    if (tab) {
+      tab.trustCertificateAndReload(origin);
+    }
   };
 
   private handleGoto = async (

@@ -552,6 +552,46 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.webContentsView.webContents.stop();
   }
 
+  /**
+   * Trust a certificate for a specific origin and reload the page.
+   * This adds the origin to a per-tab whitelist that allows certificate errors
+   * from that origin. The whitelist is cleared when the tab is closed.
+   *
+   * @param origin The origin to trust (e.g., "https://example.com")
+   */
+  public trustCertificateAndReload(origin: string): void {
+    if (!this.errorHandler) {
+      this.logger.warn(
+        '[TabController] Cannot trust certificate: error handler not initialized',
+      );
+      return;
+    }
+
+    // Get the original failed URL before trusting
+    const reloadUrl = this.errorHandler.getReloadUrl();
+    if (!reloadUrl) {
+      this.logger.warn(
+        '[TabController] Cannot trust certificate: no original URL to reload',
+      );
+      return;
+    }
+
+    this.errorHandler.trustCertificateOrigin(origin);
+    this.logger.info(
+      `[TabController] Trusted certificate for origin: ${origin}`,
+    );
+
+    // Reset error state before navigation
+    this.errorHandler.resetErrorState();
+
+    // Use location.replace() to navigate without adding to history.
+    // This replaces the error page in history with the target URL.
+    const escapedUrl = reloadUrl.replace(/'/g, "\\'");
+    this.webContentsView.webContents.executeJavaScript(
+      `location.replace('${escapedUrl}')`,
+    );
+  }
+
   public goBack() {
     const navHistory = this.webContentsView.webContents.navigationHistory;
 
@@ -2072,6 +2112,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
    */
   private setupErrorHandler() {
     this.errorHandler = new TabErrorHandler(
+      this.id,
       this.webContentsView.webContents,
       this.logger,
       {

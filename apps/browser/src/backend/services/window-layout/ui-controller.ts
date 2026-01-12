@@ -28,6 +28,7 @@ export interface UIControllerEventMap {
   togglePanelKeyboardFocus: [panel: 'stagewise-ui' | 'tab-content'];
   stop: [tabId?: string];
   reload: [tabId?: string];
+  trustCertificateAndReload: [tabId: string, origin: string];
   goto: [url: string, tabId?: string, transition?: PageTransition];
   goBack: [tabId?: string];
   goForward: [tabId?: string];
@@ -226,6 +227,12 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       'browser.reload',
       async (_callingClientId: string, tabId?: string) => {
         this.emit('reload', tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.trustCertificateAndReload',
+      async (_callingClientId: string, tabId: string, origin: string) => {
+        this.emit('trustCertificateAndReload', tabId, origin);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -495,6 +502,9 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
     this.uiKarton.removeServerProcedureHandler('browser.stop');
     this.uiKarton.removeServerProcedureHandler('browser.reload');
+    this.uiKarton.removeServerProcedureHandler(
+      'browser.trustCertificateAndReload',
+    );
     this.uiKarton.removeServerProcedureHandler('browser.goto');
     this.uiKarton.removeServerProcedureHandler('browser.goBack');
     this.uiKarton.removeServerProcedureHandler('browser.goForward');

@@ -529,6 +529,15 @@ export type KartonContract = {
       };
       stop: (tabId?: string) => Promise<void>;
       reload: (tabId?: string) => Promise<void>;
+      /**
+       * Trust a certificate for a specific origin in a tab and reload.
+       * This adds the origin to a per-tab whitelist that allows certificate errors.
+       * The whitelist is cleared when the tab is closed.
+       */
+      trustCertificateAndReload: (
+        tabId: string,
+        origin: string,
+      ) => Promise<void>;
       goto: (
         url: string,
         tabId?: string,

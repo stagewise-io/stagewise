@@ -661,6 +661,13 @@ export async function main({
     }
   });
 
+  // Wire up certificate trust handler for error page "Continue (UNSAFE!)" button
+  pagesService.setTrustCertificateAndReloadHandler(
+    async (tabId: string, origin: string) => {
+      windowLayoutService.trustCertificateAndReload(tabId, origin);
+    },
+  );
+
   const agentService = await AgentService.create(
     logger,
     telemetryService,

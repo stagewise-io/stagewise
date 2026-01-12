@@ -7,6 +7,7 @@ import {
   classifyError,
   getErrorName,
 } from '@shared/chromium-errors/error-classification';
+import { useKartonProcedure } from '@/hooks/use-karton';
 
 import StagemanAskingForInput from '@assets/stageman/asking-for-input.png';
 import StagemanCertError from '@assets/stageman/cert-error.png';
@@ -124,12 +125,13 @@ type PageLoadErrorSearch = {
   errorCode: number;
   errorMessage?: string;
   isSubframe?: string;
+  tabId: string;
 };
 
 export const Route = createFileRoute('/_error-pages/error/page-load-failed')({
   component: RouteComponent,
   validateSearch: (search: Record<string, unknown>): PageLoadErrorSearch => {
-    if (!search.errorUrl || !search.errorCode) {
+    if (!search.errorUrl || !search.errorCode || !search.tabId) {
       throw new Error('Invalid search parameters');
     }
 
@@ -143,14 +145,20 @@ export const Route = createFileRoute('/_error-pages/error/page-load-failed')({
       errorCode: Number(search.errorCode),
       errorMessage: search.errorMessage as string | undefined,
       isSubframe: search.isSubframe as string | undefined,
+      tabId: search.tabId as string,
     };
   },
 });
 
 function RouteComponent() {
-  const { errorUrl, errorCode, errorMessage, subresourceUrl } = useSearch({
-    from: '/_error-pages/error/page-load-failed',
-  });
+  const { errorUrl, errorCode, errorMessage, subresourceUrl, tabId } =
+    useSearch({
+      from: '/_error-pages/error/page-load-failed',
+    });
+
+  const trustCertificateAndReload = useKartonProcedure(
+    (p) => p.trustCertificateAndReload,
+  );
 
   const classification = classifyError(errorCode);
   const errorName = getErrorName(errorCode);
@@ -161,7 +169,27 @@ function RouteComponent() {
     ? `${classification.userFriendlyMessage}\n\nFailed resource: ${subresourceUrl}`
     : classification.userFriendlyMessage;
 
-  const buttonActions = getErrorButtonActions(errorUrl);
+  // Extract origin from error URL for certificate bypass
+  const getOriginFromUrl = (url: string): string | null => {
+    try {
+      return new URL(url).origin;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleTrustCertificate = () => {
+    const origin = getOriginFromUrl(errorUrl);
+    if (origin && tabId) {
+      trustCertificateAndReload(tabId, origin);
+    }
+  };
+
+  const buttonActions = getErrorButtonActions(
+    errorUrl,
+    classification.category,
+    handleTrustCertificate,
+  );
   const linkActions = getErrorLinkActions(errorCode);
 
   return (
@@ -190,25 +218,42 @@ function RouteComponent() {
 
 /**
  * Get button actions for the error page.
- * - "Try Again" reloads the original failed URL (via browser reload which TabController intercepts)
- * - "Go Back" navigates to the page before the failed one (TabController handles skip logic)
+ * - For certificate errors: "Continue (UNSAFE!)" as primary, then "Go Back"
+ * - For other errors: "Try Again" then "Go Back"
  */
 const getErrorButtonActions = (
   _errorUrl: string,
+  category: ErrorCategory,
+  onTrustCertificate?: () => void,
 ): Required<ErrorDisplayProps['buttonActions']> => {
+  // Certificate errors: Continue (UNSAFE!) as primary action, no Try Again
+  if (category === 'certificate' && onTrustCertificate) {
+    return [
+      {
+        label: 'Continue (UNSAFE!)',
+        onClick: onTrustCertificate,
+      },
+      {
+        label: 'Go Back',
+        onClick: () => {
+          window.history.back();
+        },
+      },
+    ];
+  }
+
+  // Other errors: Try Again and Go Back
   return [
     {
       label: 'Try Again',
       onClick: () => {
         // Trigger reload - TabController will intercept and reload the original URL
-        // We use location.reload() which Electron maps to the browser's reload action
         window.location.reload();
       },
     },
     {
       label: 'Go Back',
       onClick: () => {
-        // Go back - TabController will handle skipping the error page
         window.history.back();
       },
     },
