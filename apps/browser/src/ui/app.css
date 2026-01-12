@@ -7,6 +7,7 @@
 @source "../../node_modules/streamdown/dist/index.js";
 
 @plugin 'tailwind-scrollbar';
+@plugin '@stagewise/tailwindcss-color-modifiers';
 
 :root {
   background-color: transparent;

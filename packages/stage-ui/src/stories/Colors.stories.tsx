@@ -64,6 +64,146 @@ const ColorRamp = ({
   );
 };
 
+/**
+ * Color Modifier Demo
+ * Demonstrates the @stagewise/tailwindcss-color-modifiers plugin
+ * which allows adjusting OKLCH color channels directly in class names.
+ *
+ * Syntax: color-name/[modifier] where modifier is:
+ * - l+N or l-N: Adjust lightness (scaled: l+10 = +0.1)
+ * - c+N or c-N: Adjust chroma (scaled: c+5 = +0.05)
+ * - h+N or h-N: Adjust hue (degrees)
+ * - a+N or a-N: Adjust alpha
+ */
+const ColorModifierDemo = ({ isDark }: { isDark: boolean }) => {
+  return (
+    <div className="flex flex-col gap-4">
+      <h3
+        className="font-semibold text-sm"
+        style={{ color: isDark ? 'white' : 'black' }}
+      >
+        Color Modifiers (OKLCH adjustments)
+      </h3>
+      <p
+        className="max-w-md text-xs"
+        style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }}
+      >
+        Use <code className="rounded bg-base-700/30 px-1">/[l+N]</code> syntax
+        to adjust lightness, chroma, hue, or alpha directly in class names.
+      </p>
+
+      {/* Lightness adjustments */}
+      <div className="flex flex-col gap-2">
+        <span
+          className="font-medium text-xs"
+          style={{
+            color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)',
+          }}
+        >
+          Lightness (l+/l-)
+        </span>
+        <div className="flex gap-1">
+          <div className="size-10 rounded bg-primary-500/l-20" title="l-20" />
+          <div className="size-10 rounded bg-primary-500/[l-10]" title="l-10" />
+          <div className="size-10 rounded bg-primary-500" title="base" />
+          <div className="size-10 rounded bg-primary-500/[l+10]" title="l+10" />
+          <div className="size-10 rounded bg-primary-500/[l+20]" title="l+20" />
+        </div>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          l-20 → l-10 → base → l+10 → l+20
+        </span>
+      </div>
+
+      {/* Chroma adjustments */}
+      <div className="flex flex-col gap-2">
+        <span
+          className="font-medium text-xs"
+          style={{
+            color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)',
+          }}
+        >
+          Chroma / Saturation (c+/c-)
+        </span>
+        <div className="flex gap-1">
+          <div
+            className="size-10 rounded bg-primary-500/[c-0.15]"
+            title="c-0.15"
+          />
+          <div
+            className="size-10 rounded bg-primary-500/[c-0.08]"
+            title="c-0.08"
+          />
+          <div className="size-10 rounded bg-primary-500" title="base" />
+          <div
+            className="size-10 rounded bg-primary-500/[c+0.05]"
+            title="c+0.05"
+          />
+          <div
+            className="size-10 rounded bg-primary-500/[c+0.10]"
+            title="c+0.10"
+          />
+        </div>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          c-0.15 → c-0.08 → base → c+0.05 → c+0.10
+        </span>
+      </div>
+
+      {/* Hue rotation */}
+      <div className="flex flex-col gap-2">
+        <span
+          className="font-medium text-xs"
+          style={{
+            color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)',
+          }}
+        >
+          Hue Rotation (h+/h-)
+        </span>
+        <div className="flex gap-1">
+          <div className="size-10 rounded bg-primary-500/[h-60]" title="h-60" />
+          <div className="size-10 rounded bg-primary-500/[h-30]" title="h-30" />
+          <div className="size-10 rounded bg-primary-500" title="base" />
+          <div className="size-10 rounded bg-primary-500/[h+30]" title="h+30" />
+          <div className="size-10 rounded bg-primary-500/[h+60]" title="h+60" />
+        </div>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          h-60 → h-30 → base → h+30 → h+60 (degrees)
+        </span>
+      </div>
+
+      {/* Combined modifiers */}
+      <div className="flex flex-col gap-2">
+        <span
+          className="font-medium text-xs"
+          style={{
+            color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)',
+          }}
+        >
+          Combined Modifiers
+        </span>
+        <div className="flex gap-1">
+          <div
+            className="size-10 rounded bg-primary-500/[l+10_c-0.05]"
+            title="l+10 c-0.05"
+          />
+          <div
+            className="size-10 rounded bg-primary-500/[l-10_h+30]"
+            title="l-10 h+30"
+          />
+          <div
+            className="size-10 rounded bg-success/[l+15]"
+            title="success l+15"
+          />
+          <div className="size-10 rounded bg-error/[l+15]" title="error l+15" />
+          <div className="size-10 rounded bg-info/[l+15]" title="info l+15" />
+        </div>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          l+10_c-0.05 | l-10_h+30 | success/l+15 | error/l+15 | info/l+15
+        </span>
+      </div>
+    </div>
+  );
+};
+
 const SemanticColorCard = ({
   title,
   colorName,
@@ -182,6 +322,9 @@ const ColorShowcase = () => {
           <span>Bottom: active</span>
         </div>
       </div>
+
+      {/* Color Modifiers Demo */}
+      <ColorModifierDemo isDark={isDark} />
     </div>
   );
 };

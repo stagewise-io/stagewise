@@ -3,6 +3,10 @@
 @import "./theme.css";
 @import "./legacy.css";
 
+/* Note: Color modifier plugin (@stagewise/tailwindcss-color-modifiers) should be
+   loaded in the app's main CSS file, not here, for proper module resolution.
+   Usage: bg-primary-500/[l+10] (lightness +0.1), text-base-300/[c+0.02] (chroma) */
+
 @theme default {
   /* Light mode elevation shadows (very subtle) */
   --shadow-elev-1:
