@@ -9,6 +9,7 @@ import {
   type ThemeRegistrationAny,
   type ShikiTransformer,
 } from 'shiki';
+import { transformerColorizedBrackets } from '@shikijs/colorized-brackets';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 import { cn } from '@ui/utils';
 import CodeBlockLightTheme from './code-block-light-theme.json';
@@ -17,12 +18,82 @@ import type { Element } from 'hast';
 
 const PRE_TAG_REGEX = /<pre(\s|>)/;
 
+export type CodeBlockTheme = {
+  light: ThemeRegistrationAny;
+  dark: ThemeRegistrationAny;
+};
+
+// =============================================================================
+// Theme Utilities
+// =============================================================================
+
+/**
+ * Extracts the theme name from a theme object
+ */
+function getThemeName(theme: ThemeRegistrationAny): string {
+  // Theme can have name at the top level
+  if (typeof theme === 'object' && theme !== null && 'name' in theme)
+    return String(theme.name);
+
+  return 'unknown-theme';
+}
+
+/**
+ * Extracts bracket highlight colors from a theme's colors object
+ * Returns an array of colors in order (foreground1, foreground2, etc.)
+ * Only includes colors that are defined in the theme
+ */
+function getBracketHighlightColors(theme: ThemeRegistrationAny): string[] {
+  const colors: string[] = [];
+
+  if (typeof theme !== 'object' || theme === null || !('colors' in theme))
+    return colors;
+
+  const themeColors = theme.colors as Record<string, string> | undefined;
+  if (!themeColors) return colors;
+
+  // Extract colors in order, stopping when we hit an undefined one
+  for (let i = 1; i <= 6; i++) {
+    const colorKey = `editorBracketHighlight.foreground${i}`;
+    const color = themeColors[colorKey];
+    if (color) colors.push(color);
+  }
+
+  return colors;
+}
+
+/**
+ * Creates the transformerColorizedBrackets config for a theme
+ * Returns undefined if no bracket colors are defined
+ */
+function createBracketTransformerConfig(
+  theme: ThemeRegistrationAny,
+): Parameters<typeof transformerColorizedBrackets>[0] | undefined {
+  const themeName = getThemeName(theme);
+  const bracketColors = getBracketHighlightColors(theme);
+
+  if (bracketColors.length === 0) return undefined;
+
+  return {
+    themes: {
+      [themeName]: bracketColors,
+    },
+  };
+}
+
 type CodeBlockProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   code: string;
   language: BundledLanguage;
   preClassName?: string;
   hideActionButtons?: boolean;
   compactDiff?: boolean; // Will only show the diff lines and surrounding lines if the diff is larger than 10 lines
+  theme?: CodeBlockTheme;
+};
+
+// Default theme using the generated theme files
+export const defaultCodeBlockTheme: CodeBlockTheme = {
+  light: CodeBlockLightTheme as ThemeRegistrationAny,
+  dark: CodeBlockDarkTheme as ThemeRegistrationAny,
 };
 
 class HighlighterManager {
@@ -34,10 +105,11 @@ class HighlighterManager {
   > | null = null;
   private readonly loadedLanguages: Set<BundledLanguage> = new Set();
   private initializationPromise: Promise<void> | null = null;
-  private themes: [ThemeRegistrationAny, ThemeRegistrationAny] = [
-    CodeBlockLightTheme as ThemeRegistrationAny,
-    CodeBlockDarkTheme as ThemeRegistrationAny,
-  ];
+  private themes: [ThemeRegistrationAny, ThemeRegistrationAny];
+
+  constructor(theme: CodeBlockTheme = defaultCodeBlockTheme) {
+    this.themes = [theme.light, theme.dark];
+  }
   private isLanguageSupported(language: string): language is BundledLanguage {
     return Object.hasOwn(bundledLanguages, language);
   }
@@ -130,30 +202,41 @@ class HighlighterManager {
       ? language
       : this.getFallbackLanguage();
 
-    const light = this.lightHighlighter?.codeToHtml(code, {
-      lang,
-      theme: this.themes[0],
-      transformers: [
+    // Build transformers for each theme
+    const buildTransformers = (
+      theme: ThemeRegistrationAny,
+    ): ShikiTransformer[] => {
+      const transformers: ShikiTransformer[] = [];
+
+      // Add bracket colorization if theme has bracket colors
+      const bracketConfig = createBracketTransformerConfig(theme);
+      if (bracketConfig)
+        transformers.push(transformerColorizedBrackets(bracketConfig));
+      else transformers.push(transformerColorizedBrackets());
+
+      // Add other transformers
+      transformers.push(
         shikiDiffNotation(),
         shikiCodeLineNumbers({}),
         shikiDiffCollapse({
           enabled: compactDiff ?? false,
           includeSurroundingLines: 2,
         }),
-      ],
+      );
+
+      return transformers;
+    };
+
+    const light = this.lightHighlighter?.codeToHtml(code, {
+      lang,
+      theme: this.themes[0],
+      transformers: buildTransformers(this.themes[0]),
     });
 
     const dark = this.darkHighlighter?.codeToHtml(code, {
       lang,
       theme: this.themes[1],
-      transformers: [
-        shikiDiffNotation(),
-        shikiCodeLineNumbers({}),
-        shikiDiffCollapse({
-          enabled: compactDiff ?? false,
-          includeSurroundingLines: 2,
-        }),
-      ],
+      transformers: buildTransformers(this.themes[1]),
     });
 
     const addPreClass = (html: string) => {
@@ -192,8 +275,32 @@ class HighlighterManager {
   }
 }
 
-// Create a singleton instance of the highlighter manager
-const highlighterManager = new HighlighterManager();
+// Cache of highlighter managers keyed by theme identity
+// Using WeakMap would be ideal but themes are plain objects, so we use a Map with a string key
+const highlighterManagerCache = new Map<string, HighlighterManager>();
+
+function getThemeKey(theme: CodeBlockTheme): string {
+  // Create a unique key based on theme names or a hash of the theme
+  const lightName =
+    (theme.light as { name?: string }).name ||
+    JSON.stringify(theme.light).slice(0, 100);
+  const darkName =
+    (theme.dark as { name?: string }).name ||
+    JSON.stringify(theme.dark).slice(0, 100);
+  return `${lightName}::${darkName}`;
+}
+
+function getHighlighterManager(
+  theme: CodeBlockTheme = defaultCodeBlockTheme,
+): HighlighterManager {
+  const key = getThemeKey(theme);
+  let manager = highlighterManagerCache.get(key);
+  if (!manager) {
+    manager = new HighlighterManager(theme);
+    highlighterManagerCache.set(key, manager);
+  }
+  return manager;
+}
 
 // We use custom notation for diff s in the code block to prevent any confusion with the actual code
 export const lineAddedDiffMarker = '/*>> STAGEWISE_ADDED_LINE <<*/';
@@ -204,9 +311,10 @@ export const CodeBlock = memo(
     code,
     language,
     className,
-    preClassName = 'flex flex-row gap-2 font-mono text-xs w-full',
+    preClassName = 'flex flex-row font-mono text-xs w-full',
     hideActionButtons,
     compactDiff,
+    theme = defaultCodeBlockTheme,
     ...rest
   }: CodeBlockProps) => {
     const [html, setHtml] = useState<string>('');
@@ -216,6 +324,7 @@ export const CodeBlock = memo(
     useEffect(() => {
       mounted.current = true;
 
+      const highlighterManager = getHighlighterManager(theme);
       highlighterManager
         .highlightCode(code, language, preClassName, compactDiff)
         .then(([light, dark]) => {
@@ -228,7 +337,7 @@ export const CodeBlock = memo(
       return () => {
         mounted.current = false;
       };
-    }, [code, language, preClassName, compactDiff]);
+    }, [code, language, preClassName, compactDiff, theme]);
 
     return (
       <>
@@ -252,12 +361,13 @@ export const CodeBlock = memo(
       </>
     );
   },
-  // Custom comparison - only re-render if code content or language changes
+  // Custom comparison - only re-render if code content, language, or theme changes
   (prevProps, nextProps) =>
     prevProps.code === nextProps.code &&
     prevProps.language === nextProps.language &&
     prevProps.compactDiff === nextProps.compactDiff &&
-    prevProps.className === nextProps.className,
+    prevProps.className === nextProps.className &&
+    prevProps.theme === nextProps.theme,
 );
 
 function shikiDiffNotation(): ShikiTransformer {

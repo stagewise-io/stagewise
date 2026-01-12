@@ -2,6 +2,8 @@
 @import "./palette.css";
 @import "./theme.css";
 @import "./legacy.css";
+@import "./code-block/syntax.css";
+@import "./code-block/syntax-example-theme.css";
 
 /* Note: Color modifier plugin (@stagewise/tailwindcss-color-modifiers) should be
    loaded in the app's main CSS file, not here, for proper module resolution.

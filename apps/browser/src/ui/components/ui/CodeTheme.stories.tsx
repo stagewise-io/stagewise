@@ -1,10 +1,24 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { useState } from 'react';
 import {
   CodeBlock,
   lineAddedDiffMarker,
   lineRemovedDiffMarker,
+  type CodeBlockTheme,
 } from './code-block';
-import type { BundledLanguage } from 'shiki';
+import type { BundledLanguage, ThemeRegistrationAny } from 'shiki';
+
+// Import example theme JSONs for comparison
+import ExampleThemeDark from '../../../../../../packages/stage-ui/src/code-block/example-theme-dark.json';
+import ExampleThemeLight from '../../../../../../packages/stage-ui/src/code-block/example-theme-light.json';
+
+// Create the example theme (falls back to dark for light if not defined)
+const exampleTheme: CodeBlockTheme = {
+  light: (Object.keys(ExampleThemeLight).length > 0
+    ? ExampleThemeLight
+    : ExampleThemeDark) as ThemeRegistrationAny,
+  dark: ExampleThemeDark as ThemeRegistrationAny,
+};
 
 // =============================================================================
 // Code Snippets
@@ -16,7 +30,7 @@ const typescriptCode = `interface Config<T extends Record<string, unknown>> {
   transform?: (value: T) => T;
 }
 
-type Result<T, E = Error> = 
+type Result<T, E = Error> =
   | { success: true; data: T }
   | { success: false; error: E };
 
@@ -24,7 +38,7 @@ async function fetchData<T>(url: string): Promise<Result<T>> {
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(\`HTTP \${response.status}\`);
+      throw new Error('HTTP error');
     }
     const data: T = await response.json();
     return { success: true, data };
@@ -36,7 +50,8 @@ async function fetchData<T>(url: string): Promise<Result<T>> {
 // Type guard example
 function isString(value: unknown): value is string {
   return typeof value === 'string';
-}`;
+}
+`;
 
 const tsxCode = `import { useState, useCallback, type FC } from 'react';
 
@@ -247,6 +262,7 @@ interface CodeBlockShowcaseProps {
   title: string;
   description?: string;
   compactDiff?: boolean;
+  showComparison?: boolean;
 }
 
 const CodeBlockShowcase = ({
@@ -255,6 +271,7 @@ const CodeBlockShowcase = ({
   title,
   description,
   compactDiff,
+  showComparison = false,
 }: CodeBlockShowcaseProps) => {
   return (
     <div className="flex flex-col gap-2">
@@ -267,25 +284,86 @@ const CodeBlockShowcase = ({
       {description && (
         <p className="text-muted-foreground text-sm">{description}</p>
       )}
-      <div className="overflow-hidden rounded-lg border border-border bg-surface-1">
-        <CodeBlock
-          code={code}
-          language={language}
-          className="p-0"
-          compactDiff={compactDiff}
-        />
+      <div
+        className={`grid gap-4 ${showComparison ? 'grid-cols-2' : 'grid-cols-1'}`}
+      >
+        {/* Our theme */}
+        <div className="flex flex-col gap-1">
+          {showComparison && (
+            <span className="font-medium text-muted-foreground text-xs">
+              Our Theme
+            </span>
+          )}
+          <div className="overflow-hidden rounded-lg border border-border bg-surface-1">
+            <CodeBlock
+              code={code}
+              language={language}
+              className="p-0"
+              compactDiff={compactDiff}
+            />
+          </div>
+        </div>
+
+        {/* Example theme (shown when comparison is enabled) */}
+        {showComparison && (
+          <div className="flex flex-col gap-1">
+            <span className="font-medium text-muted-foreground text-xs">
+              Example Theme (One Dark Pro)
+            </span>
+            <div
+              className="overflow-hidden rounded-lg border border-border"
+              style={{
+                backgroundColor: 'var(--example-syntax-editor-background)',
+              }}
+            >
+              <CodeBlock
+                code={code}
+                language={language}
+                className="p-0"
+                compactDiff={compactDiff}
+                theme={exampleTheme}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
+// Toggle button component
+const ComparisonToggle = ({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+      enabled
+        ? 'border-primary bg-primary/10 text-primary'
+        : 'border-border bg-surface-1 text-muted-foreground hover:bg-surface-2'
+    }`}
+  >
+    <span
+      className={`h-2 w-2 rounded-full ${enabled ? 'bg-primary' : 'bg-muted-foreground'}`}
+    />
+    {enabled ? 'Comparison On' : 'Compare with Example'}
+  </button>
+);
+
 const AllLanguagesShowcase = () => {
+  const [showComparison, setShowComparison] = useState(false);
+
   const examples: Array<{
     code: string;
     language: BundledLanguage;
     title: string;
   }> = [
-    { code: typescriptCode, language: 'typescript', title: 'TypeScript' },
+    { code: typescriptCode, language: 'ts', title: 'TypeScript' },
     { code: tsxCode, language: 'tsx', title: 'TSX / React' },
     { code: javascriptClassCode, language: 'javascript', title: 'JavaScript' },
     { code: cssCode, language: 'css', title: 'CSS' },
@@ -295,14 +373,20 @@ const AllLanguagesShowcase = () => {
 
   return (
     <div className="flex flex-col gap-8 bg-background p-6">
-      <div>
-        <h2 className="mb-2 font-bold text-2xl text-foreground">
-          Code Theme Showcase
-        </h2>
-        <p className="text-muted-foreground">
-          Preview of syntax highlighting across different languages using the
-          code theme.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="mb-2 font-bold text-2xl text-foreground">
+            Code Theme Showcase
+          </h2>
+          <p className="text-muted-foreground">
+            Preview of syntax highlighting across different languages using the
+            code theme.
+          </p>
+        </div>
+        <ComparisonToggle
+          enabled={showComparison}
+          onToggle={() => setShowComparison(!showComparison)}
+        />
       </div>
       <div className="grid gap-8">
         {examples.map(({ code, language, title }) => (
@@ -311,6 +395,7 @@ const AllLanguagesShowcase = () => {
             code={code}
             language={language}
             title={title}
+            showComparison={showComparison}
           />
         ))}
       </div>
@@ -342,19 +427,47 @@ export const AllLanguages: Story = {
   render: () => <AllLanguagesShowcase />,
 };
 
+// Wrapper for individual story pages with comparison toggle
+const SingleLanguageShowcase = ({
+  code,
+  language,
+  title,
+  description,
+  compactDiff,
+}: Omit<CodeBlockShowcaseProps, 'showComparison'>) => {
+  const [showComparison, setShowComparison] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-4 bg-background p-6">
+      <div className="flex justify-end">
+        <ComparisonToggle
+          enabled={showComparison}
+          onToggle={() => setShowComparison(!showComparison)}
+        />
+      </div>
+      <CodeBlockShowcase
+        code={code}
+        language={language}
+        title={title}
+        description={description}
+        compactDiff={compactDiff}
+        showComparison={showComparison}
+      />
+    </div>
+  );
+};
+
 /**
  * TypeScript code with interfaces, generics, type guards, and async functions.
  */
 export const TypeScript: Story = {
   render: () => (
-    <div className="bg-background p-6">
-      <CodeBlockShowcase
-        code={typescriptCode}
-        language="typescript"
-        title="TypeScript"
-        description="Interfaces, generics, type guards, and async/await patterns."
-      />
-    </div>
+    <SingleLanguageShowcase
+      code={typescriptCode}
+      language="typescript"
+      title="TypeScript"
+      description="Interfaces, generics, type guards, and async/await patterns."
+    />
   ),
 };
 
@@ -364,14 +477,12 @@ export const TypeScript: Story = {
 export const TSXReact: Story = {
   name: 'TSX / React',
   render: () => (
-    <div className="bg-background p-6">
-      <CodeBlockShowcase
-        code={tsxCode}
-        language="tsx"
-        title="TSX / React Component"
-        description="Functional component with useState, useCallback, and JSX elements."
-      />
-    </div>
+    <SingleLanguageShowcase
+      code={tsxCode}
+      language="tsx"
+      title="TSX / React Component"
+      description="Functional component with useState, useCallback, and JSX elements."
+    />
   ),
 };
 
@@ -381,14 +492,12 @@ export const TSXReact: Story = {
 export const JavaScriptClasses: Story = {
   name: 'JavaScript Classes',
   render: () => (
-    <div className="bg-background p-6">
-      <CodeBlockShowcase
-        code={javascriptClassCode}
-        language="javascript"
-        title="JavaScript with Classes"
-        description="ES6 classes with constructor, methods, and inheritance."
-      />
-    </div>
+    <SingleLanguageShowcase
+      code={javascriptClassCode}
+      language="javascript"
+      title="JavaScript with Classes"
+      description="ES6 classes with constructor, methods, and inheritance."
+    />
   ),
 };
 
@@ -397,14 +506,12 @@ export const JavaScriptClasses: Story = {
  */
 export const CSS: Story = {
   render: () => (
-    <div className="bg-background p-6">
-      <CodeBlockShowcase
-        code={cssCode}
-        language="css"
-        title="CSS"
-        description="CSS variables, selectors, pseudo-classes, and media queries."
-      />
-    </div>
+    <SingleLanguageShowcase
+      code={cssCode}
+      language="css"
+      title="CSS"
+      description="CSS variables, selectors, pseudo-classes, and media queries."
+    />
   ),
 };
 
@@ -414,14 +521,12 @@ export const CSS: Story = {
 export const JsonConfig: Story = {
   name: 'JSON',
   render: () => (
-    <div className="bg-background p-6">
-      <CodeBlockShowcase
-        code={jsonCode}
-        language="json"
-        title="JSON"
-        description="Package.json style configuration with nested structures."
-      />
-    </div>
+    <SingleLanguageShowcase
+      code={jsonCode}
+      language="json"
+      title="JSON"
+      description="Package.json style configuration with nested structures."
+    />
   ),
 };
 
@@ -430,14 +535,12 @@ export const JsonConfig: Story = {
  */
 export const HTML: Story = {
   render: () => (
-    <div className="bg-background p-6">
-      <CodeBlockShowcase
-        code={htmlCode}
-        language="html"
-        title="HTML"
-        description="Semantic HTML with elements, attributes, and structure."
-      />
-    </div>
+    <SingleLanguageShowcase
+      code={htmlCode}
+      language="html"
+      title="HTML"
+      description="Semantic HTML with elements, attributes, and structure."
+    />
   ),
 };
 
@@ -448,14 +551,12 @@ export const HTML: Story = {
 export const DiffView: Story = {
   name: 'Diff View',
   render: () => (
-    <div className="bg-background p-6">
-      <CodeBlockShowcase
-        code={diffCode}
-        language="typescript"
-        title="Code Diff"
-        description="Shows added (green) and removed (red) lines in a code change."
-      />
-    </div>
+    <SingleLanguageShowcase
+      code={diffCode}
+      language="typescript"
+      title="Code Diff"
+      description="Shows added (green) and removed (red) lines in a code change."
+    />
   ),
 };
 
@@ -466,14 +567,12 @@ export const DiffView: Story = {
 export const DiffViewCompact: Story = {
   name: 'Diff View (Compact)',
   render: () => (
-    <div className="bg-background p-6">
-      <CodeBlockShowcase
-        code={diffCode}
-        language="typescript"
-        title="Compact Diff"
-        description="Collapsed diff view that hides unchanged lines for focus on changes."
-        compactDiff
-      />
-    </div>
+    <SingleLanguageShowcase
+      code={diffCode}
+      language="typescript"
+      title="Compact Diff"
+      description="Collapsed diff view that hides unchanged lines for focus on changes."
+      compactDiff
+    />
   ),
 };

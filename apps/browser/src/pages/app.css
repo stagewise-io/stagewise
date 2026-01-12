@@ -165,8 +165,8 @@ body {
   --font-sans: stagewise-builtin-geist, -apple-system,
   BlinkMacSystemFont, "Segoe UI", Roboto, "SF Compact", "SF Pro",
   "Helvetica Neue", sans-serif;
-  --font-mono: stagewise-builtin-geist-mono, "SF Mono", "SF Pro Mono",
-  "Menlo", "Monaco", "Inconsolata", "Fira Mono", "Droid Sans Mono",
+  --font-mono: "Menlo", stagewise-builtin-geist-mono, "SF Mono", "SF Pro Mono",
+  "Monaco", "Inconsolata", "Fira Mono", "Droid Sans Mono",
   "Consolas", "Roboto Mono", "Oxygen Mono", "Ubuntu Mono", "Liberation Mono",
   "DejaVu Sans Mono", "Courier New", monospace;
   

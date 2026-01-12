@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "pnpm dlx stagewise@beta -- vite",
-    "lint": "biome lint . --max-warnings 0"
+    "dev:themes": "concurrently -n css,json -c blue,magenta \"nodemon --watch src/palette.css --watch src/theme.css --watch src/code-block/syntax.css --ext css --exec 'pnpm generate:themes'\" \"nodemon --watch src/code-block/example-theme-dark.json --watch src/code-block/example-theme-light.json --ext json --exec 'pnpm generate:example-theme'\"",
+    "lint": "biome lint . --max-warnings 0",
+    "generate:themes": "tsx src/code-block/generate-code-block-theme-json.ts",
+    "generate:example-theme": "tsx src/code-block/extract-vars-from-example-theme.ts"
   },
   "peerDependencies": {
     "react": "^19.1.0",
@@ -27,11 +30,15 @@
     "@tailwindcss/postcss": "^4.1.5",
     "@tailwindcss/vite": "^4.1.12",
     "@turbo/gen": "^2.5.3",
+    "@types/culori": "^4.0.1",
     "@types/node": "22.15.2",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
+    "concurrently": "^9.2.1",
+    "culori": "^4.0.2",
     "esbuild": "^0.24.2",
     "glob": "^11.0.0",
+    "nodemon": "^3.1.11",
     "postcss": "^8.5.6",
     "postcss-cli": "^11.0.1",
     "react": "^19.1.0",

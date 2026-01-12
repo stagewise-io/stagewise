@@ -1,0 +1,238 @@
+@import '../palette.css';
+
+/* ==========================================================================
+   Syntax Highlighting Tokens
+   These variables define ALL semantic colors AND font styles for code highlighting.
+   They are consumed by the Shiki theme exporter (OKLCH -> HEX).
+   
+   Font styles use the -style suffix (e.g., --syntax-comment-style: italic)
+   Valid fontStyle values: normal, italic, bold, bold italic, underline, strikethrough
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Light mode
+   -------------------------------------------------------------------------- */
+@theme default {
+  /* Editor-level defaults (fallbacks only) */
+  --syntax-editor-foreground: var(--color-foreground);
+  --syntax-editor-background: transparent;
+
+  /* Base text & structure */
+  --syntax-text: var(--color-foreground);
+  --syntax-punctuation: none;
+  --syntax-operator: var(--color-foreground);
+
+  /* Comments */
+  --syntax-comment: var(--color-muted-foreground);
+  --syntax-comment-style: italic;
+
+  /* Language structure */
+  --syntax-keyword: var(--color-syntax-red-light);
+  --syntax-function: var(--color-syntax-orange-light);
+  --syntax-type: var(--color-syntax-blue-light);
+  --syntax-decorator: var(--color-syntax-green-light);
+
+  /* Namespaces & references */
+  --syntax-namespace: var(--color-syntax-blue-light);
+  --syntax-reference-modifier: var(--color-foreground);
+
+  /* Identifiers & member access */
+  --syntax-property: var(--color-syntax-purple-light);
+  --syntax-language-variable: var(--color-syntax-blue-light);
+  --syntax-language-variable-style: italic;
+
+  /* Literals & data */
+  --syntax-string: var(--color-syntax-purple-light);
+  --syntax-number: var(--color-syntax-pink-light);
+  --syntax-constant: var(--color-syntax-blue-light);
+
+  /* Directives / preprocessor */
+  --syntax-directive: var(--color-syntax-green-light);
+
+  /* Markup / meta */
+  --syntax-tag: var(--color-syntax-green-light);
+  --syntax-tag-punctuation: var(--color-muted-foreground);
+  --syntax-meta: var(--color-syntax-purple-light);
+
+  /* Errors */
+  --syntax-error: var(--color-syntax-red-light);
+
+  /* ==========================================================================
+     Specific Token Overrides (for finer control, web/node focused)
+     ========================================================================== */
+
+  /* Variable specifics */
+  --syntax-variable-readwrite: var(--color-syntax-blue-light);
+  --syntax-variable-parameter: var(--color-foreground);
+  --syntax-variable-parameter-style: italic;
+  --syntax-variable-property: var(--color-syntax-purple-light);
+
+  /* Keyword/Operator specifics */
+  --syntax-keyword-control: var(--color-foreground);
+  --syntax-keyword-operator-expression: var(--color-syntax-blue-light);
+  --syntax-keyword-operator-comparison: var(--color-syntax-red-light);
+  --syntax-keyword-operator-logical: var(--color-syntax-red-light);
+  --syntax-keyword-operator-arithmetic: var(--color-foreground);
+  --syntax-keyword-operator-assignment: var(--color-foreground);
+
+  /* Type specifics */
+  --syntax-type-primitive: var(--color-syntax-red-light);
+  --syntax-type-class: var(--color-syntax-blue-light);
+  --syntax-type-interface: var(--syntax-type);
+
+  /* String/Template specifics */
+  --syntax-string-template-expression: var(--color-syntax-cyan-light);
+  --syntax-string-escape: var(--color-foreground);
+
+  /* Web framework specifics (JS/TS/React/Vue/Angular) */
+  --syntax-jsx-tag: var(--color-syntax-green-light);
+  --syntax-jsx-attribute: var(--syntax-property);
+  --syntax-jsx-attribute-style: italic;
+  --syntax-module: var(--color-syntax-red-light);
+  --syntax-json-property: var(--color-syntax-cyan-light);
+  --syntax-css-property: var(--color-syntax-purple-light);
+  --syntax-css-value: var(--color-syntax-blue-light);
+  --syntax-css-selector: var(--color-syntax-cyan-light);
+  --syntax-css-unit: var(--color-syntax-pink-light);
+
+  /* Regex specifics */
+  --syntax-regexp: var(--color-syntax-blue-light);
+  --syntax-regexp-group: var(--color-syntax-yellow-light);
+
+  /* Additional specific tokens */
+  --syntax-storage: var(--color-syntax-red-light);
+  --syntax-html-tag: var(--color-syntax-blue-light);
+  --syntax-variable-constant: var(--syntax-constant);
+  --syntax-class-inherited: var(--syntax-type);
+  --syntax-css-class: var(--syntax-css-selector);
+  --syntax-embedded-punctuation: var(--syntax-string-template-expression);
+
+  /* Bracket highlight */
+  /* --syntax-bracket-highlight-foreground1: var(--color-syntax-blue-light); */
+  --syntax-bracket-highlight-foreground1: oklch(from var(--color-syntax-blue-light) calc(l * 0.77) calc(c * 0.77) h);
+  /* --syntax-bracket-highlight-foreground2: var(--color-syntax-cyan-light); */
+  --syntax-bracket-highlight-foreground2: oklch(from var(--color-syntax-blue-light) calc(l * 0.88) calc(c * 0.88) h);
+  /* --syntax-bracket-highlight-foreground3: var(--color-syntax-purple-light); */
+  --syntax-bracket-highlight-foreground3: var(--color-syntax-blue-light);
+  /* --syntax-bracket-highlight-foreground4: var(--color-syntax-pink-light); */
+  --syntax-bracket-highlight-foreground4: oklch(from var(--color-syntax-pink-light) calc(l * 0.77) calc(c * 0.77) h);
+  /* --syntax-bracket-highlight-foreground5: var(--color-syntax-orange-light); */
+  --syntax-bracket-highlight-foreground5: oklch(from var(--color-syntax-pink-light) calc(l * 0.88) calc(c * 0.88) h);
+  --syntax-bracket-highlight-foreground6: var(--color-syntax-pink-light);
+}
+
+/* --------------------------------------------------------------------------
+   Dark mode
+   -------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Editor-level defaults (fallbacks only) */
+    --syntax-editor-foreground: var(--color-foreground);
+    --syntax-editor-background: transparent;
+
+    /* Base text & structure */
+    --syntax-text: var(--color-foreground);
+    /* --syntax-punctuation: var(--color-foreground); */
+    --syntax-punctuation: none;
+    --syntax-operator: var(--color-foreground);
+
+    /* Comments (often slightly more transparent / subdued in dark mode) */
+    --syntax-comment: var(--color-muted-foreground);
+    --syntax-comment-style: italic;
+
+    /* Language structure */
+    --syntax-keyword: var(--color-syntax-cyan-dark);
+    --syntax-function: var(--color-syntax-orange-dark);
+    --syntax-type: var(--color-syntax-orange-dark);
+    --syntax-decorator: none;
+    /* --syntax-decorator: var(--color-syntax-green-dark); */
+
+    /* Namespaces & references */
+    --syntax-namespace: var(--color-foreground);
+    --syntax-reference-modifier: var(--color-foreground);
+
+    /* Identifiers & member access */
+    --syntax-property: var(--color-syntax-purple-dark);
+    --syntax-language-variable: var(--color-syntax-red-dark);
+    --syntax-language-variable-style: italic;
+
+    /* Literals & data */
+    --syntax-string: var(--color-syntax-pink-dark);
+    --syntax-number: var(--color-syntax-orange-dark);
+    --syntax-constant: var(--color-syntax-orange-dark);
+
+    /* Directives / preprocessor */
+    --syntax-directive: var(--color-syntax-green-dark);
+
+    /* Markup / meta */
+    --syntax-tag: var(--color-syntax-yellow-dark);
+    --syntax-tag-punctuation: var(--color-muted-foreground);
+    --syntax-meta: var(--color-syntax-purple-dark);
+
+    /* Errors */
+    --syntax-error: var(--color-foreground);
+    /* --syntax-error: var(--color-syntax-red-dark); */
+
+    /* ==========================================================================
+       Specific Token Overrides (for finer control, web/node focused)
+       ========================================================================== */
+
+    /* Variable specifics */
+    --syntax-variable-readwrite: var(--color-syntax-blue-dark);
+    --syntax-variable-parameter: var(--color-foreground);
+    --syntax-variable-parameter-style: italic;
+    --syntax-variable-property: var(--color-syntax-purple-dark);
+
+    /* Keyword/Operator specifics */
+    /* --syntax-keyword-control: var(--color-foreground); */
+    --syntax-keyword-control: none;
+    --syntax-keyword-operator-expression: var(--color-syntax-cyan-dark);
+    --syntax-keyword-operator-comparison: var(--color-foreground);
+    --syntax-keyword-operator-logical: var(--color-foreground);
+    --syntax-keyword-operator-arithmetic: var(--color-foreground);
+    --syntax-keyword-operator-assignment: var(--color-syntax-cyan-dark);
+
+    /* Type specifics */
+    --syntax-type-primitive: var(--color-syntax-cyan-dark);
+    --syntax-type-class: var(--color-syntax-blue-dark);
+    /* --syntax-type-interface: var(--syntax-type); */
+    --syntax-type-interface: none;
+
+    /* String/Template specifics */
+    --syntax-string-template-expression: var(--color-syntax-cyan-dark);
+    --syntax-string-escape: var(--color-foreground);
+
+    /* Web framework specifics (JS/TS/React/Vue/Angular) */
+    /* --syntax-jsx-tag: var(--color-syntax-green-dark); */
+    --syntax-jsx-tag: none;
+    /* --syntax-jsx-attribute: var(--syntax-property); */
+    --syntax-jsx-attribute: none;
+    --syntax-jsx-attribute-style: italic;
+    --syntax-module: var(--color-syntax-orange-dark);
+    --syntax-json-property: var(--color-syntax-cyan-dark);
+    --syntax-css-property: var(--color-syntax-blue-dark);
+    --syntax-css-value: var(--color-syntax-pink-dark);
+    --syntax-css-selector: var(--color-syntax-cyan-dark);
+    --syntax-css-unit: var(--color-syntax-orange-dark);
+
+    /* Regex specifics */
+    --syntax-regexp: var(--color-foreground);
+    --syntax-regexp-group: var(--color-syntax-yellow-dark);
+
+    /* Additional specific tokens */
+    --syntax-storage: var(--syntax-keyword);
+    --syntax-html-tag: var(--color-syntax-blue-dark);
+    --syntax-variable-constant: var(--color-syntax-purple-dark);
+    --syntax-class-inherited: var(--syntax-type);
+    --syntax-css-class: var(--color-syntax-yellow-dark);
+    --syntax-embedded-punctuation: var(--syntax-string-template-expression);
+
+    /* Bracket highlight */
+    --syntax-bracket-highlight-foreground1: var(--color-syntax-yellow-dark);
+    --syntax-bracket-highlight-foreground2: var(--color-syntax-purple-dark);
+    --syntax-bracket-highlight-foreground3: var(--color-syntax-blue-dark);
+    --syntax-bracket-highlight-foreground4: var(--color-syntax-yellow-dark);
+    --syntax-bracket-highlight-foreground5: var(--color-syntax-purple-dark);
+    --syntax-bracket-highlight-foreground6: var(--color-syntax-blue-dark);
+  }
+}

@@ -165,8 +165,8 @@ body {
   --font-sans: stagewise-builtin-geist, -apple-system,
   BlinkMacSystemFont, "Segoe UI", Roboto, "SF Compact", "SF Pro",
   "Helvetica Neue", sans-serif;
-  --font-mono: stagewise-builtin-geist-mono, "SF Mono", "SF Pro Mono",
-  "Menlo", "Monaco", "Inconsolata", "Fira Mono", "Droid Sans Mono",
+  --font-mono: "Menlo", stagewise-builtin-geist-mono, "SF Mono", "SF Pro Mono",
+  "Monaco", "Inconsolata", "Fira Mono", "Droid Sans Mono",
   "Consolas", "Roboto Mono", "Oxygen Mono", "Ubuntu Mono", "Liberation Mono",
   "DejaVu Sans Mono", "Courier New", monospace;
   
@@ -228,11 +228,11 @@ body {
 }
 
 @utility code-block-diff-add {
-  @apply bg-success-foreground-dark/23 dark:bg-success-foreground/30;
+  @apply bg-success-solid/11 dark:bg-success-solid/18;
 }
 
 @utility code-block-diff-remove {
-  @apply bg-error-foreground-dark/23 dark:bg-error-foreground/30;
+  @apply bg-error-solid/11 dark:bg-error-solid/18;
 }
 
 /* Edge-top collapsed lines (before first diff) - hidden */
@@ -257,8 +257,7 @@ body {
 }
 
 @utility line-numbers-container {
-  /* @apply bg-muted-foreground/5 pl-2 pr-1 flex flex-col items-end text-muted-foreground shrink-0; */
-  @apply hidden;
+  @apply pl-0 pr-2 flex flex-col items-end text-muted-foreground/30 text-[10px]/4 shrink-0;
 }
 
 /* Line number variants for collapsed lines */
