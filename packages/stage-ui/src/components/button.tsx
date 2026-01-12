@@ -11,11 +11,9 @@ export const buttonVariants = cva(
         secondary:
           'border border-border bg-surface-1 font-normal text-foreground not-disabled:hover:bg-surface-2 not-disabled:active:bg-surface-3 dark:not-disabled:active:bg-base-600 dark:not-disabled:hover:bg-base-650',
         destructive:
-          'border border-error-foreground-dark bg-error font-normal text-primary-foreground not-disabled:hover:bg-error-hover not-disabled:active:bg-error-active dark:border-error-foreground-light',
-        warning:
-          'border border-warning bg-warning font-normal text-primary-foreground not-disabled:hover:bg-warning-hover not-disabled:active:bg-warning-active',
-        success:
-          'border border-success bg-success font-normal text-primary-foreground not-disabled:hover:bg-success-hover not-disabled:active:bg-success-active',
+          'bg-error-solid font-normal text-primary-foreground dark:border-error-foreground-light',
+        warning: 'bg-warning-solid font-normal text-primary-foreground',
+        success: 'bg-success-solid font-normal text-primary-foreground',
         ghost:
           'bg-transparent font-normal text-foreground-subtle not-disabled:hover:text-foreground not-disabled:active:text-foreground-subtle',
       },

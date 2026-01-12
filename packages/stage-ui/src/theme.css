@@ -24,36 +24,24 @@
   --color-primary-active: var(--color-primary-600);
   --color-primary-accent: var(--color-primary-450);
 
-  /* Semantics: FG for light mode */
-  --color-success-foreground: var(--color-success-foreground-light);
-  --color-error-foreground: var(--color-error-foreground-light);
-  --color-warning-foreground: var(--color-warning-foreground-light);
-  --color-info-foreground: var(--color-info-foreground-light);
-
   --color-surface-tinted: color-mix(in oklch, var(--color-primary-50) 50%, var(--color-base-50)); 
   --color-border-tinted: color-mix(in oklch, var(--color-primary-100) 40%, var(--color-base-100));
 
-  /* Semantics: solid BG (same in both modes) */
-  /* Already defined in palette.css */
-  /* --color-success: var(--color-success);  
-  --color-success-hover: var(--color-success-hover);
-  --color-success-active: var(--color-success-active);
-  */
+  --color-success-background: var(--color-success-background-light);  
+  --color-success-foreground: var(--color-success-foreground-light);  
+  --color-success-solid: var(--color-success-solid-light);  
 
-  /* --color-error: var(--color-error);  
-  --color-error-hover: var(--color-error-hover);
-  --color-error-active: var(--color-error-active);
-  */
+  --color-error-background: var(--color-error-background-light);  
+  --color-error-foreground: var(--color-error-foreground-light);  
+  --color-error-solid: var(--color-error-solid-light);  
 
-  /* --color-warning: var(--color-warning);
-  --color-warning-hover: var(--color-warning-hover);
-  --color-warning-active: var(--color-warning-active);
-  */
+  --color-warning-background: var(--color-warning-background-light);  
+  --color-warning-foreground: var(--color-warning-foreground-light);  
+  --color-warning-solid: var(--color-warning-solid-light);  
 
-  /* --color-info: var(--color-info); 
-  --color-info-hover: var(--color-info-hover);
-  --color-info-active: var(--color-info-active);
-  */
+  --color-info-background: var(--color-info-background-light);  
+  --color-info-foreground: var(--color-info-foreground-light);  
+  --color-info-solid: var(--color-info-solid-light);  
 }
 
 /* ---------
@@ -81,10 +69,20 @@
     --color-border: var(--color-base-600);
     --color-border-subtle: var(--color-base-700);
 
-    /* Semantics: FG for dark mode */
     --color-success-foreground: var(--color-success-foreground-dark);
+    --color-success-background: var(--color-success-background-dark);
+    --color-success-solid: var(--color-success-solid-dark);
+
     --color-error-foreground: var(--color-error-foreground-dark);
+    --color-error-background: var(--color-error-background-dark);
+    --color-error-solid: var(--color-error-solid-dark);
+
     --color-warning-foreground: var(--color-warning-foreground-dark);
+    --color-warning-background: var(--color-warning-background-dark);
+    --color-warning-solid: var(--color-warning-solid-dark);
+
     --color-info-foreground: var(--color-info-foreground-dark);
+    --color-info-background: var(--color-info-background-dark);
+    --color-info-solid: var(--color-info-solid-dark);
     }
 }
