@@ -3,6 +3,7 @@
   /* ---------
      Light theme (default)
      --------- */
+  --color-app-background: var(--color-base-200);
   --color-background: var(--color-base-50);
   --color-foreground: var(--color-base-900);
   --color-muted-foreground: var(--color-base-500);
@@ -50,6 +51,7 @@
    --------- */
 @media (prefers-color-scheme: dark) {
     :root {
+    --color-app-background: var(--color-base-950);
     --color-background: var(--color-base-800);
     --color-foreground: var(--color-base-200);
     --color-foreground-subtle: var(--color-base-300);

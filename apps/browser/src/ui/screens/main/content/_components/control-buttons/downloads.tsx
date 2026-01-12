@@ -141,8 +141,8 @@ function DownloadItemRow({
 
   return (
     <div
-      className={`group -mx-1.5 relative flex cursor-pointer select-none flex-col gap-1 overflow-hidden rounded-lg px-1.5 py-1.5 ${
-        download.isActive || isComplete ? 'hover:bg-surface-1' : 'opacity-60'
+      className={`group relative flex cursor-pointer select-none flex-col gap-1 overflow-hidden rounded-lg bg-background px-1.5 py-1.5 hover:bg-hover-derived ${
+        download.isActive || isComplete ? '' : 'opacity-60'
       }`}
       onClick={handleRowClick}
     >
@@ -278,7 +278,7 @@ function DownloadItemRow({
         <div className="flex items-center gap-2">
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full bg-primary transition-all duration-300"
+              className="h-full bg-primary-accent transition-all duration-300"
               style={{ width: `${download.progress}%` }}
             />
           </div>
@@ -365,19 +365,19 @@ export function DownloadsControlButton() {
   const handleDelete = (id: number) => void deleteDownload(id);
 
   return (
-    <Popover open={isOpen} onOpenChange={handleOpenChange}>
+    <Popover open={true} onOpenChange={handleOpenChange}>
       <Tooltip>
         <TooltipTrigger>
           <PopoverTrigger>
             <Button variant="ghost" size="icon-sm" onClick={() => {}}>
               {hasActiveDownloads && (
                 <div
-                  className="mask-alpha mask-[radial-gradient(closest-side,transparent_calc(100%-3px),white_calc(100%-2.5px))] absolute inset-0.5 rounded-full bg-blue-500"
+                  className="mask-alpha mask-[radial-gradient(closest-side,transparent_calc(100%-3px),white_calc(100%-2.5px))] absolute inset-0.5 rounded-full bg-primary-accent"
                   style={progressRingStyle}
                 />
               )}
               {unseenFinishedCount > 0 && (
-                <div className="absolute top-0 right-0 flex size-3 items-center justify-center rounded-full bg-blue-500 font-bold text-2xs text-white">
+                <div className="absolute top-0 right-0 flex size-3 items-center justify-center rounded-full bg-primary-accent font-bold text-2xs text-primary-foreground">
                   {unseenFinishedCount}
                 </div>
               )}
@@ -401,13 +401,13 @@ export function DownloadsControlButton() {
           <a
             href={DOWNLOADS_PAGE_URL}
             target="_blank"
-            className="flex flex-row items-center gap-0.5 p-0.5 font-medium text-primary text-sm hover:opacity-80"
+            className="flex cursor-pointer flex-row items-center gap-1 font-medium text-primary-accent text-sm leading-none hover:text-hover-derived"
             onClick={() => setIsOpen(false)}
           >
             Show all <IconArrowRight className="size-3" />
           </a>
         </div>
-        <div className="-mx-1 mt-2 max-h-60 overflow-y-auto px-1">
+        <div className="scrollbar-subtle mt-2 max-h-60 overflow-y-auto">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
               <DownloadIcon className="mb-2 size-8 opacity-40" />
@@ -426,7 +426,7 @@ export function DownloadsControlButton() {
                   onDelete={handleDelete}
                 />
                 {index < items.length - 1 && (
-                  <hr className="w-full border-border/30 border-b" />
+                  <hr className="w-full border-derived-subtle border-b bg-background" />
                 )}
               </Fragment>
             ))

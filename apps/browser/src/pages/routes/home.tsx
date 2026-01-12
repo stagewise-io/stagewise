@@ -295,7 +295,7 @@ function OnboardingStartPage() {
       </div>
       <div
         className={cn(
-          'group/start-page-workspaces mt-2 flex w-full flex-col items-start justify-start gap-4 rounded-lg border border-border-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-4 dark:border-border dark:from-base-750 dark:to-surface-1',
+          'group/start-page-workspaces mt-2 flex w-full flex-col items-start justify-start gap-4 rounded-lg border border-derived-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-4 dark:from-base-750 dark:to-surface-1',
         )}
       >
         <div className="flex justify-between gap-20 ">
@@ -373,9 +373,9 @@ function RecentlyOpenedWorkspaceItem({
 
 function DesignInspirationSkeletonCard() {
   return (
-    <div className="flex w-64 shrink-0 flex-col items-center overflow-hidden rounded-lg border border-border bg-background shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] dark:bg-surface-1">
+    <div className="flex w-64 shrink-0 flex-col items-center overflow-hidden rounded-lg border border-derived bg-background shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] dark:bg-surface-1">
       <Skeleton className="h-40 w-full rounded-none border-none" />
-      <div className="flex w-full items-center justify-between gap-2 p-2 dark:border-border dark:border-t">
+      <div className="flex w-full items-center justify-between gap-2 p-2 dark:border-derived dark:border-t">
         <Skeleton className="h-4 w-32" />
       </div>
     </div>
@@ -430,7 +430,7 @@ function DesignInspirationCard({
       onClick={(e) => onClick(e)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="flex w-64 shrink-0 cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-border bg-background text-foreground shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] transition-shadow duration-300 hover:shadow-[0_0_12px_0_rgba(0,0,0,0.12),0_-8px_56px_-24px_rgba(0,0,0,0.2)] dark:bg-surface-1"
+      className="flex w-64 shrink-0 cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-derived bg-background text-foreground shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] transition-shadow duration-300 hover:shadow-[0_0_12px_0_rgba(0,0,0,0.12),0_-8px_56px_-24px_rgba(0,0,0,0.2)] dark:bg-surface-1"
     >
       <div className="relative h-40 w-full">
         {!isImageLoaded && <Skeleton className="h-40 w-full rounded-none" />}
@@ -516,7 +516,7 @@ function ConnectWorkspaceBanner() {
             </TooltipContent>
           </Tooltip>
         </h1>
-        <div className="group/recent-workspaces flex w-full flex-col items-start justify-start gap-1 rounded-lg border border-border-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-3 dark:border-border dark:from-base-750 dark:to-surface-1">
+        <div className="group/recent-workspaces flex w-full flex-col items-start justify-start gap-1 rounded-lg border border-derived-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-3 dark:from-base-750 dark:to-surface-1">
           <div className="flex w-full flex-row items-start justify-between gap-14">
             <div className="flex w-full flex-col items-start gap-2">
               <div className="flex w-full flex-row items-start justify-between gap-1">
@@ -572,7 +572,7 @@ function ConnectWorkspaceBanner() {
   }
 
   return (
-    <div className="flex w-full items-center justify-between gap-4 rounded-lg border border-border-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-4 dark:border-border dark:from-base-750 dark:to-surface-1">
+    <div className="flex w-full items-center justify-between gap-4 rounded-lg border border-derived-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-4 dark:from-base-750 dark:to-surface-1">
       <div className="flex items-center gap-3">
         <IconDocFolder className="size-6 shrink-0 text-muted-foreground" />
         <span className="font-medium text-foreground text-sm">

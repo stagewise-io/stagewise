@@ -110,7 +110,7 @@ const triggerVariants = {
   ghost:
     'bg-transparent text-muted-foreground hover:text-foreground data-popup-open:text-foreground',
   secondary:
-    'border border-border bg-surface-1 text-foreground hover:bg-surface-2 active:bg-surface-3 data-popup-open:bg-surface-2',
+    'border border-derived-subtle bg-surface-1 text-foreground hover:bg-hover-derived active:bg-active-derived data-popup-open:bg-hover-derived',
 } satisfies Record<SearchableSelectTriggerVariant, string>;
 
 export const SearchableSelect = ({
@@ -382,9 +382,9 @@ export const SearchableSelect = ({
                             key={String(item.value)}
                             value={String(item.value)}
                             className={cn(
-                              'group/item grid w-full min-w-24 cursor-default items-center gap-2 rounded-md text-foreground outline-none transition-colors duration-150 ease-out',
-                              'data-highlighted:bg-surface-1',
-                              'hover:bg-surface-1',
+                              'group/item grid w-full min-w-24 cursor-default items-center gap-2 rounded-md bg-background text-foreground outline-none transition-colors duration-150 ease-out',
+                              'data-highlighted:bg-active-derived',
+                              'hover:bg-active-derived',
                               item.action
                                 ? 'grid-cols-[0.75rem_1fr_auto]'
                                 : 'grid-cols-[0.75rem_1fr]',
@@ -422,7 +422,7 @@ export const SearchableSelect = ({
                               <button
                                 type="button"
                                 className={cn(
-                                  'col-start-3 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-surface-1 hover:text-foreground',
+                                  'col-start-3 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground',
                                   item.action.showOnHover &&
                                     'opacity-0 group-hover/item:opacity-100',
                                 )}
@@ -464,7 +464,7 @@ export const SearchableSelect = ({
               <div
                 ref={sidePanelRef}
                 className={cn(
-                  'absolute left-full ml-1 flex max-w-64 flex-col gap-1 rounded-lg border border-border-subtle bg-background p-2.5 text-foreground shadow-lg transition-[top] duration-100 ease-out',
+                  'absolute left-full ml-1 flex max-w-64 flex-col gap-1 rounded-lg border border-derived-subtle bg-background p-2.5 text-foreground shadow-lg transition-[top] duration-100 ease-out',
                   'fade-in-0 slide-in-from-left-1 animate-in duration-150',
                   sizes.popup[size],
                 )}

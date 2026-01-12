@@ -57,7 +57,7 @@
   --color-success-solid-light:    oklch(from var(--color-success-foreground-light) 0.58 calc(c * 1.415) h);
   /* SUCCESS DARK */
   --color-success-background-dark: oklch(0.32 0.060 var(--H-green));
-  --color-success-foreground-dark:  oklch(0.89 0.115 var(--H-green));
+  --color-success-foreground-dark:  oklch(0.82 0.115 var(--H-green));
   --color-success-solid-dark:    oklch(from var(--color-success-foreground-dark) 0.54 calc(c * 1.32) h);
 
   /* ERROR LIGHT */

@@ -349,8 +349,10 @@ function RowComponent({
         <SpeedGraph speedHistory={row.speedHistory} startTime={row.startTime} />
       )}
       <div
-        className={`group relative z-10 flex h-full cursor-pointer select-none flex-col justify-center gap-2 rounded-lg px-4 ${
-          row.fileExists || row.isActive ? 'hover:bg-surface-1' : 'opacity-60'
+        className={`group relative z-10 flex h-full cursor-pointer select-none flex-col justify-center gap-2 rounded-lg bg-background px-4 ${
+          row.fileExists || row.isActive
+            ? 'hover:bg-hover-derived'
+            : 'opacity-60'
         }`}
         onClick={() => {
           if (row.fileExists && isComplete) {
@@ -398,7 +400,9 @@ function RowComponent({
                 // After download: show total size and state
                 <>
                   {row.totalBytes > 0 && (
-                    <span>{formatBytes(row.totalBytes)}</span>
+                    <span className="font-normal">
+                      {formatBytes(row.totalBytes)}
+                    </span>
                   )}
                   <span>•</span>
                   <span>{getDownloadStateLabel(row.state)}</span>
@@ -511,12 +515,12 @@ function RowComponent({
               {row.totalBytes > 0 ? (
                 // Determinate progress bar
                 <div
-                  className="h-full bg-primary transition-all duration-300"
+                  className="h-full bg-primary-accent transition-all duration-300"
                   style={{ width: `${Math.min(row.progress, 100)}%` }}
                 />
               ) : (
                 // Indeterminate progress bar (unknown total size)
-                <div className="h-full w-1/3 animate-[indeterminate_1.5s_ease-in-out_infinite] bg-primary" />
+                <div className="h-full w-1/3 animate-[indeterminate_1.5s_ease-in-out_infinite] bg-primary-accent" />
               )}
             </div>
             <span className="text-muted-foreground text-xs">
@@ -1002,7 +1006,7 @@ function Page() {
       <div className="flex items-center border-border-subtle border-b px-6 py-4">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-24">
           <h1 className="font-semibold text-foreground text-xl">Downloads</h1>
-          <div className="relative flex-1 rounded-full bg-surface-1 focus-within:bg-surface-2">
+          <div className="relative flex-1 rounded-full bg-surface-1 focus-within:bg-hover-derived">
             <IconMagnifierFill18 className="-translate-y-1/2 absolute top-1/2 left-3.5 z-10 size-4 text-muted-foreground" />
             <Input
               type="text"

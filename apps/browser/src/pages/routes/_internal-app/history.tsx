@@ -189,7 +189,7 @@ function RowComponent({
   return (
     <div style={style}>
       <div
-        className="group flex h-full cursor-pointer select-none items-center gap-4 rounded-lg px-4 hover:bg-surface-1"
+        className="group flex h-full cursor-pointer select-none items-center gap-4 rounded-lg bg-background px-4 hover:bg-hover-derived"
         onClick={() => onOpenUrl(row.url)}
       >
         <span className="min-w-[60px] text-muted-foreground text-sm">

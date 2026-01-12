@@ -182,7 +182,7 @@ export const Omnibox = forwardRef<OmniboxRef, OmniboxProps>(
     );
 
     return (
-      <div className="relative flex h-8 flex-1 items-center rounded-full bg-surface-1 pr-5 pl-3">
+      <div className="relative flex h-8 flex-1 items-center rounded-full bg-surface-1 pr-5 pl-3 ring ring-surface-1/l-0.01 ring-inset dark:ring-surface-1/l0.025">
         {!isUrlInputFocused && showBreadcrumbs && tab?.url ? (
           <InternalPageBreadcrumbs
             url={tab.url}

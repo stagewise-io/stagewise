@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { Outlet } from '@tanstack/react-router';
+import { buttonVariants } from '@stagewise/stage-ui/components/button';
 
 export const Route = createFileRoute('/_internal-app')({
   component: RouteComponent,
@@ -25,10 +26,10 @@ export const Route = createFileRoute('/_internal-app')({
 
 function RouteComponent() {
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-muted/50 p-3">
+    <div className="flex h-screen w-screen items-center justify-center bg-app-background p-3">
       <div className="flex h-full w-full flex-row items-start justify-start gap-6">
         <Sidebar />
-        <div className="scrollbar-subtle h-full flex-1 overflow-y-auto rounded-lg bg-background ring-1 ring-border-subtle">
+        <div className="scrollbar-subtle h-full flex-1 overflow-y-auto rounded-lg bg-background ring-1 ring-derived">
           <Outlet />
         </div>
       </div>
@@ -70,7 +71,7 @@ function Sidebar() {
               Account
             </SidebarNav.Item>
           </SidebarNav.Group>
-          <hr className="ml-1 border-border/30" />
+          <hr className="ml-1 border-derived bg-app-background" />
           <SidebarNav.Group label="Browsing data">
             <SidebarNav.Item
               to="/history"
@@ -91,7 +92,7 @@ function Sidebar() {
               Clear data
             </SidebarNav.Item>
           </SidebarNav.Group>
-          <hr className="ml-1 border-border/30" />
+          <hr className="ml-1 border-derived bg-app-background" />
           <SidebarNav.Item
             to="/about"
             icon={<IconCircleInfoFillDuo18 className="size-5" />}
@@ -107,7 +108,11 @@ function Sidebar() {
               href="https://stagewise.io/socials/x"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-lg text-muted-foreground transition-colors hover:text-foreground"
+              className={buttonVariants({
+                variant: 'ghost',
+                size: 'icon-xs',
+                className: 'w-min p-0 text-lg!',
+              })}
               aria-label="X (Twitter)"
             >
               𝕏
@@ -121,7 +126,11 @@ function Sidebar() {
               href="https://stagewise.io/socials/linkedin"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground transition-colors hover:text-foreground"
+              className={buttonVariants({
+                variant: 'ghost',
+                size: 'icon-xs',
+                className: 'w-min p-0 text-lg!',
+              })}
               aria-label="LinkedIn"
             >
               <IconLinkedin className="size-5" />
@@ -135,7 +144,11 @@ function Sidebar() {
               href="https://stagewise.io/socials/discord"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground transition-colors hover:text-foreground"
+              className={buttonVariants({
+                variant: 'ghost',
+                size: 'icon-xs',
+                className: 'w-min p-0 text-lg!',
+              })}
               aria-label="Discord"
             >
               <IconDiscord className="size-5" />
@@ -149,7 +162,11 @@ function Sidebar() {
               href="https://github.com/stagewise-io/stagewise"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground transition-colors hover:text-foreground"
+              className={buttonVariants({
+                variant: 'ghost',
+                size: 'icon-xs',
+                className: 'w-min p-0 text-lg!',
+              })}
               aria-label="GitHub Repository"
             >
               <IconGithub className="size-5" />

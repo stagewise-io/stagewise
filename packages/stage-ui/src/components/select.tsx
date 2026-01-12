@@ -47,7 +47,7 @@ const triggerVariants = {
   ghost:
     'bg-transparent text-muted-foreground hover:text-foreground data-popup-open:text-foreground',
   secondary:
-    'border border-border bg-surface-1 text-foreground hover:bg-surface-2 active:bg-surface-3 data-popup-open:bg-surface-2',
+    'border border-derived-subtle bg-surface-1 text-foreground hover:bg-hover-derived active:bg-active-derived data-popup-open:bg-hover-derived',
 } satisfies Record<SelectTriggerVariant, string>;
 
 export const Select = ({
@@ -102,7 +102,7 @@ export const Select = ({
           <SelectBase.Popup
             className={cn(
               'flex origin-(--transform-origin) flex-col items-stretch gap-0.5',
-              'rounded-lg border border-border-subtle bg-background p-1',
+              'rounded-lg border border-derived-subtle bg-background p-1',
               'shadow-lg',
               'transition-[transform,scale,opacity] duration-150 ease-out',
               'data-ending-style:scale-90 data-starting-style:scale-90',
@@ -119,7 +119,7 @@ export const Select = ({
                   'grid w-full min-w-(--anchor-width) cursor-default grid-cols-[0.75rem_1fr] items-center gap-2',
                   'rounded-md text-foreground outline-none',
                   'transition-colors duration-150 ease-out',
-                  'hover:bg-surface-1 data-highlighted:bg-surface-1',
+                  'hover:bg-active-derived data-highlighted:bg-active-derived',
                   'group-data-[side=none]:min-w-[calc(var(--anchor-width)+1rem)] group-data-[side=none]:pr-12 group-data-[side=none]:text-base group-data-[side=none]:leading-4',
                   sizes.item[size],
                 )}

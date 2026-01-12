@@ -317,9 +317,49 @@ type Rule =
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const colorModifiers: any = plugin.withOptions<ColorModifiersPluginOptions>(
   (options = {}) =>
-    ({ matchUtilities, theme }) => {
+    ({ matchUtilities, theme, addUtilities }) => {
       const warn = makeWarnFn(!!options.warn);
       const colors = flattenColors(theme('colors'));
+      const colorKeys = Object.keys(colors);
+
+      // Build semantic color variable mapping for --cm-bg-color and --cm-text-color
+      // This uses var(--color-{key}) format to preserve theme-aware values
+      const semanticBgColorUtilities: Record<
+        string,
+        Record<string, string>
+      > = {};
+      const semanticTextColorUtilities: Record<
+        string,
+        Record<string, string>
+      > = {};
+
+      // Also build semantic colors for matchUtilities (used with modifiers)
+      // Maps color keys to semantic var(--color-{key}) format
+      const semanticColors: Record<string, string> = {};
+
+      for (const key of colorKeys) {
+        const value = colors[key];
+        const isSemanticVar = value.startsWith('var(--color-');
+
+        // For semantic CSS variables: construct var(--color-{key}) directly from the key
+        // This is robust - we don't parse or manipulate the resolved value at all
+        // For raw colors (hex, oklch, etc.): use as-is
+        const semanticVar = isSemanticVar ? `var(--color-${key})` : value;
+
+        semanticBgColorUtilities[`.bg-${key}`] = {
+          '--cm-bg-color': semanticVar,
+        };
+
+        semanticTextColorUtilities[`.text-${key}`] = {
+          '--cm-text-color': semanticVar,
+        };
+
+        semanticColors[key] = semanticVar;
+      }
+
+      // Add --cm-bg-color and --cm-text-color utilities that use semantic variable names
+      addUtilities(semanticBgColorUtilities);
+      addUtilities(semanticTextColorUtilities);
 
       /**
        * Extract the actual color from a value that may be wrapped in color-mix().
@@ -366,9 +406,7 @@ const colorModifiers: any = plugin.withOptions<ColorModifiersPluginOptions>(
                 }
               }
             }
-            if (colorEnd > 0) {
-              return firstArg.slice(0, colorEnd).trim();
-            }
+            if (colorEnd > 0) return firstArg.slice(0, colorEnd).trim();
           }
 
           // Handle hex colors or simple color names: strip trailing tokens
@@ -408,84 +446,118 @@ const colorModifiers: any = plugin.withOptions<ColorModifiersPluginOptions>(
           }
 
           const adjusted = buildOklchFrom(actualColor, parsed);
+
+          // For backgroundColor, also emit --cm-bg-color for derived utilities
+          if (property === 'backgroundColor')
+            return {
+              '--cm-bg-color': actualColor,
+              [property]: adjusted,
+            };
+
+          // For text color, also emit --cm-text-color for derived utilities
+          if (property === 'color')
+            return {
+              '--cm-text-color': actualColor,
+              [property]: adjusted,
+            };
+
           return { [property]: adjusted };
         };
       }
 
       // Core
       // Note: modifiers: 'any' enables modifier support (e.g., bg-red-500/l+2)
+      // For bg WITHOUT modifier: --cm-bg-color is handled by addUtilities above with semantic vars
+      // For bg WITH modifier: we handle the color transformation here using semantic colors
       matchUtilities(
-        { bg: buildRule('backgroundColor') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        {
+          bg: (value: string, ctx: { modifier: string | null }) => {
+            // Only process if there's a modifier (color transformation)
+            // Without modifier, let Tailwind core handle bg and our addUtilities handle --cm-bg-color
+            if (!ctx.modifier) {
+              return {};
+            }
+            return buildRule('backgroundColor')(value, ctx);
+          },
+        },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
       matchUtilities(
-        { text: buildRule('color') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        {
+          text: (value: string, ctx: { modifier: string | null }) => {
+            // Only process if there's a modifier (color transformation)
+            // Without modifier, let Tailwind core handle text and our addUtilities handle --cm-text-color
+            if (!ctx.modifier) return {};
+
+            return buildRule('color')(value, ctx);
+          },
+        },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
       matchUtilities(
         { border: buildRule('borderColor') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
       matchUtilities(
         { ring: buildRule('--tw-ring-color') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
 
       // Additional common color utilities
       matchUtilities(
         { outline: buildRule('outlineColor') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
       matchUtilities(
         { 'ring-offset': buildRule('--tw-ring-offset-color') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
 
       // Shadow color utility (Tailwind uses a var pipeline; setting --tw-shadow-color is enough)
       matchUtilities(
         { shadow: buildRule('--tw-shadow-color') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
 
       // Text decoration color
       matchUtilities(
         { decoration: buildRule('textDecorationColor') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
 
       // Form/UI related
       matchUtilities(
         { caret: buildRule('caretColor') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
       matchUtilities(
         { accent: buildRule('accentColor') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
 
       // SVG
       matchUtilities(
         { fill: buildRule('fill') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
       matchUtilities(
         { stroke: buildRule('stroke') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
 
       // Gradient stops
       // Tailwind expects these CSS variables for gradient stops; emitting them preserves composition
       matchUtilities(
         { from: buildRule('--tw-gradient-from') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
       matchUtilities(
         { via: buildRule('--tw-gradient-via') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
       matchUtilities(
         { to: buildRule('--tw-gradient-to') },
-        { values: colors, type: ['color'], modifiers: 'any' },
+        { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
     },
 );

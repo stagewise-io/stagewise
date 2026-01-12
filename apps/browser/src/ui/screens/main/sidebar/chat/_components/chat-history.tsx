@@ -331,7 +331,7 @@ const ChatSuggestion: React.FC<
   return (
     <div
       onClick={onClick}
-      className="group/suggestion relative flex w-full cursor-pointer flex-row items-center justify-start gap-3 rounded-lg p-2 text-muted-foreground hover:bg-muted-foreground/5"
+      className="group/suggestion relative flex w-full cursor-pointer flex-row items-center justify-start gap-3 rounded-lg p-2 text-muted-foreground hover:bg-hover-derived hover:text-foreground"
     >
       <span className="flex shrink-0 items-center">
         <img src={faviconUrl} className="size-3 rounded-sm" alt="Favicon" />

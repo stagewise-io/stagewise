@@ -7,15 +7,17 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          'border border-primary-accent bg-linear-to-tr bg-primary font-normal text-primary-foreground not-disabled:hover:bg-primary-hover not-disabled:active:bg-primary-active',
+          'border border-derived-subtle bg-linear-to-tr bg-primary font-normal text-primary-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
         secondary:
-          'border border-border bg-surface-1 font-normal text-foreground not-disabled:hover:bg-surface-2 not-disabled:active:bg-surface-3 dark:not-disabled:active:bg-base-600 dark:not-disabled:hover:bg-base-650',
+          'border border-derived-subtle bg-surface-1 font-normal text-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
         destructive:
-          'bg-error-solid font-normal text-primary-foreground dark:border-error-foreground-light',
-        warning: 'bg-warning-solid font-normal text-primary-foreground',
-        success: 'bg-success-solid font-normal text-primary-foreground',
+          'border border-derived-subtle bg-error-solid font-normal text-primary-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
+        warning:
+          'border border-derived-subtle bg-warning-solid font-normal text-primary-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
+        success:
+          'border border-derived-subtle bg-success-solid font-normal text-primary-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
         ghost:
-          'bg-transparent font-normal text-foreground-subtle not-disabled:hover:text-foreground not-disabled:active:text-foreground-subtle',
+          'bg-transparent font-normal text-foreground-subtle not-disabled:hover:text-foreground not-disabled:active:text-foreground/l-4_c-3',
       },
       size: {
         xs: 'h-6 gap-1 rounded-md px-2.5 py-1 text-xs',

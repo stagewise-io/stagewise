@@ -65,8 +65,10 @@ export function InternalPageBreadcrumbs({
       className="-ml-2 flex h-8 w-full cursor-pointer flex-row items-center gap-1.5 overflow-hidden"
     >
       <div className="flex h-6 shrink-0 items-center justify-center gap-1 rounded-full bg-primary/10 px-2 py-0.5">
-        <Logo className="size-3 text-primary" color="current" />
-        <span className="font-medium text-primary text-xs">stagewise</span>
+        <Logo className="size-3 text-primary-accent" color="current" />
+        <span className="font-medium text-primary-accent text-xs">
+          stagewise
+        </span>
       </div>
       {pathnameSegments.length > 0 ? (
         pathnameSegments.map((segment, index) => {

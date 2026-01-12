@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "pnpm dlx stagewise@beta -- vite",
+    "dev": "vite",
     "dev:themes": "concurrently -n css,json -c blue,magenta \"nodemon --watch src/palette.css --watch src/theme.css --watch src/code-block/syntax.css --ext css --exec 'pnpm generate:themes'\" \"nodemon --watch src/code-block/example-theme-dark.json --watch src/code-block/example-theme-light.json --ext json --exec 'pnpm generate:example-theme'\"",
     "lint": "biome lint . --max-warnings 0",
     "generate:themes": "tsx src/code-block/generate-code-block-theme-json.ts",

@@ -77,3 +77,120 @@
     before:bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--color-base-100)_4%,transparent),transparent_35%,color-mix(in_oklch,var(--color-base-950)_3%,transparent))]
     before:mix-blend-normal;
 }
+
+/* Auto-derived border utilities
+   These derive border colors from the element's background color (--cm-bg-color)
+   which is automatically set by bg-* utilities via the color-modifiers plugin.
+   Falls back to semantic border colors when no background is set. */
+
+:root {
+  --hover-text-derived-l: -0.09;
+  --hover-text-derived-c: -0.01;
+
+  --active-text-derived-l: -0.011;
+  --active-text-derived-c: -0.001;
+
+  --hover-derived-l: -0.01;
+  --hover-derived-c: -0.001;
+
+  --active-derived-l: -0.02;
+  --active-derived-c: -0.002;
+
+  --border-derived-l: -0.098;
+  --border-derived-c: -0.014;
+
+  --border-derived-subtle-l: -0.055;
+  --border-derived-subtle-c: -0.009;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hover-text-derived-l: 0.09;
+    --hover-text-derived-c: 0.01;
+
+    --active-text-derived-l: 0.007;
+    --active-text-derived-c: 0.001;
+
+    --hover-derived-l: 0.017;
+    --hover-derived-c: 0.001;
+
+    --active-derived-l: 0.007;
+    --active-derived-c: 0.001;
+
+    --border-derived-l: 0.07;
+    --border-derived-c: 0.012;
+
+    --border-derived-subtle-l: 0.055;
+    --border-derived-subtle-c: 0.011;
+  }
+}
+
+/* Used for subtle borders via 'border border-derived-subtle' */
+@utility border-derived-subtle {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--border-derived-subtle-l)) calc(c + var(--border-derived-subtle-c)) h);
+}
+
+/* Used for regular borders via 'border border-derived' */
+@utility border-derived {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-l)) calc(c + var(--border-derived-c)) h);
+}
+
+/* Used for subtle rings via 'ring ring-derived-subtle' */
+@utility ring-derived-subtle {
+  --tw-ring-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--border-derived-subtle-l)) calc(c + var(--border-derived-subtle-c)) h);
+}
+
+/* Used for regular rings via 'ring ring-derived' */
+@utility ring-derived {
+  --tw-ring-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-l)) calc(c + var(--border-derived-c)) h);
+}
+
+@utility text-hover-derived {
+  color: oklch(from var(--cm-text-color, var(--color-foreground)) calc(l + var(--hover-text-derived-l)) calc(c + var(--hover-text-derived-c)) h);
+}
+
+@utility text-active-derived {
+  color: oklch(from var(--cm-text-color, var(--color-foreground)) calc(l + var(--active-text-derived-l)) calc(c + var(--active-text-derived-c)) h);
+}
+
+/* Used for hover states via 'hover:bg-hover-derived' */
+@utility bg-hover-derived {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--hover-derived-l)) calc(c + var(--hover-derived-c)) h);
+}
+
+/* Used for active states via 'active:bg-active-derived' */
+@utility bg-active-derived {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--active-derived-l)) calc(c + var(--active-derived-c)) h);
+}
+
+/* Can freely be used to create lighter or darker borders */
+@utility border-derived-lighter-1 {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.06) calc(c + 0.011) h);
+}
+@utility border-derived-lighter-2 {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.09) calc(c + 0.014) h);
+}
+@utility border-derived-darker-1 {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l - 0.06) calc(c - 0.011) h);
+}
+@utility border-derived-darker-2 {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l - 0.09) calc(c - 0.014) h);
+}
+@utility bg-derived-lighter-1 {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.06) calc(c + 0.011) h);
+}
+@utility bg-derived-lighter-2 {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.09) calc(c + 0.014) h);
+}
+@utility bg-derived-lighter-3 {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.12) calc(c + 0.017) h);
+}
+@utility bg-derived-darker-1 {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l - 0.06) calc(c - 0.011) h);
+}
+@utility bg-derived-darker-2 {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l - 0.09) calc(c - 0.014) h);
+}
+@utility bg-derived-darker-3 {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l - 0.12) calc(c - 0.017) h);
+}

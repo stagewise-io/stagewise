@@ -5,6 +5,7 @@
 
 @source "../../node_modules/@stagewise/stage-ui";
 @source "../../node_modules/streamdown/dist/index.js";
+@source "../ui";
 
 @plugin 'tailwind-scrollbar';
 @plugin '@stagewise/tailwindcss-color-modifiers';
@@ -228,11 +229,11 @@ body {
 }
 
 @utility code-block-diff-add {
-  @apply bg-success-solid/11 dark:bg-success-solid/18;
+  @apply bg-success-solid/18 dark:bg-success-solid/31;
 }
 
 @utility code-block-diff-remove {
-  @apply bg-error-solid/11 dark:bg-error-solid/18;
+  @apply bg-error-solid/18 dark:bg-error-solid/31;
 }
 
 /* Edge-top collapsed lines (before first diff) - hidden */

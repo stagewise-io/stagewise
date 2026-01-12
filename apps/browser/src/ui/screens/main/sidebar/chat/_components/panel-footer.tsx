@@ -297,7 +297,7 @@ export function ChatPanelFooter() {
   return (
     <footer className="z-20 flex flex-col items-stretch gap-1 px-2">
       <div
-        className="relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.04)] ring-1 ring-border before:absolute before:inset-0 before:rounded-lg data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/3 dark:bg-surface-1"
+        className="relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.04)] ring-1 ring-derived before:absolute before:inset-0 before:rounded-lg data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/3 dark:bg-surface-1"
         id="chat-input-container-box"
         data-chat-active={chatInputActive}
       >
@@ -476,7 +476,7 @@ export function ChatPanelFooter() {
           </Tooltip>
         </div>
         {workspaceStatus === 'setup' && (
-          <div className="-z-10 absolute right-2 bottom-full left-2 flex flex-row items-center justify-between gap-2 rounded-t-lg border-border-subtle border-t border-r border-l bg-background p-0.75 pl-2.5 backdrop-blur-lg">
+          <div className="-z-10 absolute right-2 bottom-full left-2 flex flex-row items-center justify-between gap-2 rounded-t-lg border-derived-subtle border-t border-r border-l bg-background p-0.75 pl-2.5 backdrop-blur-lg">
             <span className="truncate text-primary-accent text-xs">
               You are in workspace setup-mode.
             </span>
@@ -603,7 +603,7 @@ function FileDiffCard() {
   return (
     <div
       ref={cardRef}
-      className="-z-10 absolute right-2 bottom-full left-2 flex flex-col items-center justify-between gap-1 rounded-t-lg border-border-subtle border-t border-r border-l bg-background p-0.75 backdrop-blur-lg"
+      className="-z-10 absolute right-2 bottom-full left-2 flex flex-col items-center justify-between gap-1 rounded-t-lg border-derived-subtle border-t border-r border-l bg-background p-0.75 backdrop-blur-lg"
     >
       <Collapsible className="w-full" open={isOpen} onOpenChange={setIsOpen}>
         <div className="flex w-full flex-col items-start justify-start gap-2 p-0">
