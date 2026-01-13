@@ -7,6 +7,12 @@ export type ColorModifiersPluginOptions = {
    * Defaults to false (silent).
    */
   warn?: boolean;
+  /**
+   * Extend the plugin to support custom color utilities.
+   * Maps utility prefixes to CSS variable names.
+   * Example: { 'shimmer-from': '--shimmer-color-1', 'shimmer-to': '--shimmer-color-2' }
+   */
+  extend?: Record<string, string>;
 };
 
 type Channel = 'l' | 'c' | 'h' | 'a';
@@ -339,12 +345,16 @@ const colorModifiers: any = plugin.withOptions<ColorModifiersPluginOptions>(
 
       for (const key of colorKeys) {
         const value = colors[key];
-        const isSemanticVar = value.startsWith('var(--color-');
 
-        // For semantic CSS variables: construct var(--color-{key}) directly from the key
-        // This is robust - we don't parse or manipulate the resolved value at all
-        // For raw colors (hex, oklch, etc.): use as-is
-        const semanticVar = isSemanticVar ? `var(--color-${key})` : value;
+        // Use var(--color-{key}) for:
+        // 1. Existing var() references
+        // 2. color-mix() expressions (need runtime evaluation for dark mode)
+        // For everything else (hex, oklch, rgb, etc.), use the value as-is
+        // so Tailwind can process it normally
+        const needsVarReference =
+          value.startsWith('var(') || value.startsWith('color-mix(');
+
+        const semanticVar = needsVarReference ? `var(--color-${key})` : value;
 
         semanticBgColorUtilities[`.bg-${key}`] = {
           '--cm-bg-color': semanticVar,
@@ -559,6 +569,40 @@ const colorModifiers: any = plugin.withOptions<ColorModifiersPluginOptions>(
         { to: buildRule('--tw-gradient-to') },
         { values: semanticColors, type: ['color'], modifiers: 'any' },
       );
+
+      // Process custom utilities from extend option
+      if (options.extend) {
+        for (const [utilityPrefix, cssVariable] of Object.entries(
+          options.extend,
+        )) {
+          matchUtilities(
+            {
+              [utilityPrefix]: (
+                value: string,
+                ctx: { modifier: string | null },
+              ) => {
+                // Only handle modifier case - base utility handled by user's @utility
+                if (!ctx.modifier) return {};
+
+                const parsed = parseModifier(ctx.modifier, warn);
+                if (!parsed) return {};
+
+                const actualColor = extractColorFromValue(value);
+                if (!actualColor) {
+                  warn(
+                    `[tailwindcss-color-modifiers] Could not extract color from value: ${value}`,
+                  );
+                  return {};
+                }
+
+                const adjusted = buildOklchFrom(actualColor, parsed);
+                return { [cssVariable]: adjusted };
+              },
+            },
+            { values: semanticColors, type: ['color'], modifiers: 'any' },
+          );
+        }
+      }
     },
 );
 

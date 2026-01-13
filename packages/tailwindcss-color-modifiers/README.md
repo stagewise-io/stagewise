@@ -220,6 +220,62 @@ Hue (`h`) is always interpreted as degrees and is never scaled for add/subtract.
 | `stroke-*` | `stroke` |
 | `from-*`, `via-*`, `to-*` | gradient stop colors |
 
+## Custom Utilities (Extended Use)
+
+You can extend the plugin to support your own custom color utilities defined with `@utility`.
+
+### Configuration
+
+Pass an `extend` object mapping utility prefixes to CSS variable names:
+
+```ts
+// tailwind.config.js
+import colorModifiers from '@stagewise/tailwindcss-color-modifiers';
+
+export default {
+  plugins: [
+    colorModifiers({
+      extend: {
+        'shimmer-from': '--shimmer-color-1',
+        'shimmer-to': '--shimmer-color-2',
+      }
+    }),
+  ],
+};
+```
+
+### How It Works
+
+The plugin handles **modifier cases only**. Your `@utility` definition handles the base case:
+
+```css
+/* Your @utility definition (handles shimmer-from-red-500) */
+@utility shimmer-from-* {
+  --shimmer-color-1: --value(--color-*);
+}
+
+/* Plugin generates (handles shimmer-from-red-500/l20) */
+.shimmer-from-red-500\/l20 {
+  --shimmer-color-1: oklch(from var(--color-red-500) calc(l + 0.2) c h);
+}
+```
+
+This clean separation means:
+- `shimmer-from-blue-500` → handled by your `@utility`
+- `shimmer-from-blue-500/l20` → handled by the plugin
+
+### Example Usage
+
+```html
+<!-- Base utility: handled by your @utility -->
+<div class="shimmer-from-blue-500 shimmer-to-purple-500">
+
+<!-- With modifiers: handled by the plugin -->
+<div class="shimmer-from-blue-500/l20 shimmer-to-purple-500/c-10">
+```
+
+All modifier operations (add, subtract, multiply, divide) and channel adjustments (l, c, h, a) work with extended utilities just like with built-in ones.
+
 ## Error handling
 
 - Invalid modifiers are ignored silently

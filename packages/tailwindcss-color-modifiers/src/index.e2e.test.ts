@@ -153,3 +153,138 @@ describe('tailwindcss-color-modifiers (e2e)', () => {
     expect(css).toContain('calc(C / 3)');
   });
 });
+
+describe('tailwindcss-color-modifiers extend option (e2e)', () => {
+  async function buildCssWithExtend(
+    rawHtml: string,
+    extend: Record<string, string>,
+  ) {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'tw-color-mods-extend-'));
+
+    // 1) content file
+    const contentPath = path.join(dir, 'content.html');
+    await writeFile(contentPath, rawHtml, 'utf8');
+
+    // 2) Create config with extend option
+    const configPath = path.join(dir, 'tailwind.config.js');
+    const configContent = `
+import colorModifiers from "${pluginPath}";
+
+export default {
+  content: ["./content.html"],
+  theme: {
+    colors: {
+      "primary": "#3b82f6",
+      "red-500": "#ef4444",
+      "blue-500": "#3b82f6",
+    },
+  },
+  plugins: [colorModifiers({ 
+    warn: true,
+    extend: ${JSON.stringify(extend)}
+  })],
+};
+`;
+    await writeFile(configPath, configContent, 'utf8');
+
+    // 3) Tailwind input CSS with custom utility definitions
+    const inputCssPath = path.join(dir, 'input.css');
+    const inputCss = `
+@import "${tailwindCssPath}";
+@config "./tailwind.config.js";
+
+@utility shimmer-from-* {
+  --shimmer-color-1: --value(--color-*);
+}
+
+@utility shimmer-to-* {
+  --shimmer-color-2: --value(--color-*);
+}
+`;
+    await writeFile(inputCssPath, inputCss, 'utf8');
+
+    // 4) Run PostCSS + Tailwind
+    const result = await postcss([tailwind()]).process(inputCss, {
+      from: inputCssPath,
+    });
+
+    return result.css;
+  }
+
+  it('generates custom utility with modifier', async () => {
+    const css = await buildCssWithExtend(
+      `<div class="shimmer-from-primary/l20"></div>`,
+      { 'shimmer-from': '--shimmer-color-1' },
+    );
+
+    // Should generate --shimmer-color-1 with oklch modification
+    expect(css).toContain('--shimmer-color-1:');
+    expect(css).toContain('oklch(from');
+    expect(css).toContain('calc(L + 0.2)');
+  });
+
+  it('handles base custom utility without modifier', async () => {
+    const css = await buildCssWithExtend(
+      `<div class="shimmer-from-primary"></div>`,
+      { 'shimmer-from': '--shimmer-color-1' },
+    );
+
+    // Base utility should be handled by @utility definition
+    // Should contain --shimmer-color-1 (from @utility, may be var() or resolved value)
+    expect(css).toContain('--shimmer-color-1:');
+
+    // Should NOT contain oklch(from for the base utility
+    const shimmerFromPrimaryMatch = css.match(
+      /\.shimmer-from-primary\s*\{[^}]+\}/,
+    );
+    expect(shimmerFromPrimaryMatch).toBeTruthy();
+    if (shimmerFromPrimaryMatch) {
+      expect(shimmerFromPrimaryMatch[0]).not.toContain('oklch(from');
+    }
+  });
+
+  it('supports multiple custom utilities', async () => {
+    const css = await buildCssWithExtend(
+      `<div class="shimmer-from-blue-500/l20 shimmer-to-red-500/l-10"></div>`,
+      {
+        'shimmer-from': '--shimmer-color-1',
+        'shimmer-to': '--shimmer-color-2',
+      },
+    );
+
+    // Should generate both custom variables
+    expect(css).toContain('--shimmer-color-1:');
+    expect(css).toContain('--shimmer-color-2:');
+
+    // Both should use oklch modifications
+    expect(css).toContain('calc(L + 0.2)');
+    expect(css).toContain('calc(L - 0.1)');
+  });
+
+  it('supports complex modifiers on custom utilities', async () => {
+    const css = await buildCssWithExtend(
+      `<div class="shimmer-from-primary/[l20_c-5_h30]"></div>`,
+      { 'shimmer-from': '--shimmer-color-1' },
+    );
+
+    expect(css).toContain('--shimmer-color-1:');
+    expect(css).toContain('calc(L + 0.2)');
+    expect(css).toContain('calc(C - 0.05)');
+    expect(css).toContain('calc(h + 30)');
+  });
+
+  it('works alongside built-in utilities', async () => {
+    const css = await buildCssWithExtend(
+      `<div class="bg-primary/l10 shimmer-from-primary/l20"></div>`,
+      { 'shimmer-from': '--shimmer-color-1' },
+    );
+
+    // Built-in bg utility should still work
+    expect(css).toContain('background-color:');
+    expect(css).toContain('calc(L + 0.1)');
+
+    // Custom utility should also work
+    expect(css).toContain('--shimmer-color-1:');
+    expect(css).toContain('calc(L + 0.2)');
+  });
+});
