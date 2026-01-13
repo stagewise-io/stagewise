@@ -382,9 +382,7 @@ export const SearchableSelect = ({
                             key={String(item.value)}
                             value={String(item.value)}
                             className={cn(
-                              'group/item grid w-full min-w-24 cursor-default items-center gap-2 rounded-md bg-background text-foreground outline-none transition-colors duration-150 ease-out',
-                              'data-highlighted:bg-active-derived',
-                              'hover:bg-active-derived',
+                              'group/item grid w-full min-w-24 cursor-default items-center gap-2 rounded-md bg-background text-foreground outline-none transition-colors duration-150 ease-out hover:bg-hover-derived',
                               item.action
                                 ? 'grid-cols-[0.75rem_1fr_auto]'
                                 : 'grid-cols-[0.75rem_1fr]',

@@ -62,7 +62,7 @@ const FileDiffItem: FC<{
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
         <CollapsibleTrigger
           size="condensed"
-          className="w-full cursor-pointer p-0 hover:bg-transparent active:bg-transparent"
+          className="group w-full cursor-pointer p-0 has-[button:hover]:text-muted-foreground"
         >
           {/* File header */}
           <div
@@ -75,7 +75,7 @@ const FileDiffItem: FC<{
             <FileIcon filePath={edit.fileName} className="size-5 shrink-0" />
             <Tooltip>
               <TooltipTrigger>
-                <span className="min-w-0 truncate text-foreground text-xs">
+                <span className="min-w-0 truncate text-foreground text-xs hover:text-foreground group-hover:text-hover-derived">
                   {edit.fileName}
                 </span>
               </TooltipTrigger>

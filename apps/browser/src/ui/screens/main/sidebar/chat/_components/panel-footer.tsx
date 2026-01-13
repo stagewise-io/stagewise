@@ -613,7 +613,7 @@ function FileDiffCard() {
               'w-full cursor-pointer p-0 hover:bg-transparent active:bg-transparent',
             )}
           >
-            <div className="flex w-full flex-row items-center justify-between gap-2 pl-1.5 text-xs">
+            <div className="flex w-full flex-row items-center justify-between gap-2 pl-1.5 text-muted-foreground text-xs hover:text-foreground has-[button:hover]:text-muted-foreground">
               <ChevronDownIcon
                 className={cn(
                   'size-3 shrink-0 transition-transform duration-150',
@@ -651,7 +651,7 @@ function FileDiffCard() {
             {formattedEdits.map((edit) => (
               <button
                 type="button"
-                className="flex w-full cursor-pointer flex-col items-start justify-start gap-2 rounded px-1 py-0.5 text-muted-foreground hover:bg-surface-1 hover:text-foreground"
+                className="flex w-full cursor-pointer flex-col items-start justify-start gap-2 rounded px-1 py-0.5 text-foreground hover:bg-surface-1 hover:text-hover-derived"
                 key={edit.path}
                 onClick={() => openDiffReviewPage(edit.path)}
               >
@@ -662,12 +662,12 @@ function FileDiffCard() {
                   />
                   <span className="text-xs leading-none">{edit.fileName}</span>
                   {edit.linesAdded > 0 && (
-                    <span className="text-[10px] text-success-foreground leading-none">
+                    <span className="text-[10px] text-success-foreground leading-none hover:text-hover-derived">
                       +{edit.linesAdded}
                     </span>
                   )}
                   {edit.linesRemoved > 0 && (
-                    <span className="text-[10px] text-error-foreground leading-none">
+                    <span className="text-[10px] text-error-foreground leading-none hover:text-hover-derived">
                       -{edit.linesRemoved}
                     </span>
                   )}
