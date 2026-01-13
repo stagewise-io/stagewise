@@ -292,8 +292,7 @@ const FileLink = ({
           className={cn(
             'inline-flex items-center gap-0.5',
             'font-medium text-primary-foreground text-sm',
-            'hover:opacity-80',
-            'transition-opacity duration-200',
+            'hover:text-hover-derived',
             'break-all',
           )}
           target="_blank"
@@ -406,7 +405,7 @@ const AnchorComponent = ({
           target="_blank"
           rel="noopener noreferrer"
           className={cn(
-            'inline-flex items-baseline justify-start gap-0.5 break-all font-medium text-primary-foreground hover:opacity-80',
+            'inline-flex items-baseline justify-start gap-0.5 break-all font-medium text-primary-foreground hover:text-hover-derived',
             className,
           )}
           {...props}

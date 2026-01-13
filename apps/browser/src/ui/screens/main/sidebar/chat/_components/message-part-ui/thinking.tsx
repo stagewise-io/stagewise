@@ -58,25 +58,23 @@ export const ThinkingPart = ({
               isShimmering ? 'shimmer-text-primary' : '',
             )}
           >
-            {part.state === 'streaming' && 'Thinking...'}
-            {part.state === 'done' && formattedThinkingDuration && (
+            {part.state === 'streaming' ? (
+              'Thinking...'
+            ) : part.state === 'done' && formattedThinkingDuration ? (
               <>
                 <span className="shrink-0 truncate font-medium">Thought </span>
                 <span className={'font-normal opacity-75'}>
                   for {formattedThinkingDuration}
                 </span>
               </>
-            )}
-            {part.state === 'done' && !formattedThinkingDuration && (
-              <span>
-                <span className="shrink-0 truncate font-medium">Thought </span>
-              </span>
+            ) : (
+              <span className="shrink-0 truncate font-medium">Thought</span>
             )}
           </span>
         </>
       }
       content={
-        <div className="pb-1 text-muted-foreground opacity-75">
+        <div className="pb-1 opacity-75">
           <Streamdown isAnimating={part.state === 'streaming'}>
             {displayedText}
           </Streamdown>

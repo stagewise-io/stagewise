@@ -20,9 +20,9 @@ export function ContextUsageRing({
   className,
 }: ContextUsageRingProps) {
   const ringColor = useMemo(() => {
-    if (percentage >= 90) return 'text-error';
-    if (percentage >= 70) return 'text-warning';
-    return 'text-primary';
+    if (percentage >= 90) return 'text-error-foreground';
+    if (percentage >= 70) return 'text-warning-foreground';
+    return 'text-primary-foreground';
   }, [percentage]);
 
   const size = 16;
@@ -53,7 +53,7 @@ export function ContextUsageRing({
               fill="none"
               stroke="currentColor"
               strokeWidth={strokeWidth}
-              className="text-muted-foreground/20"
+              className="text-surface-1 dark:text-surface-2"
             />
             {/* Progress circle */}
             <circle

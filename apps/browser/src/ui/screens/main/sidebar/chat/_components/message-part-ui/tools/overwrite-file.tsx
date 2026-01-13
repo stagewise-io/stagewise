@@ -241,13 +241,16 @@ const SuccessHeader = ({
   fileWasCreated: boolean;
 }) => {
   return (
-    <div className="pointer-events-none flex flex-row items-center justify-start gap-1 text-foreground">
+    <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
       <div className="pointer-events-auto flex flex-row items-center justify-start gap-1">
         <FileIcon filePath={relativePath ?? ''} className="size-5 shrink-0" />
         <Tooltip>
           <TooltipTrigger>
             <span className="min-w-0 truncate text-xs" dir="rtl">
-              <span className="items-center gap-0.5 text-xs" dir="ltr">
+              <span
+                className="items-center gap-0.5 text-foreground text-xs group-hover/trigger:text-hover-derived"
+                dir="ltr"
+              >
                 {relativePath}
               </span>
             </span>
@@ -256,13 +259,15 @@ const SuccessHeader = ({
         </Tooltip>
       </div>
       {fileWasCreated && (
-        <span className="shrink-0 text-success-foreground text-xs">(new)</span>
+        <span className="shrink-0 text-success-foreground text-xs group-hover/trigger:text-hover-derived">
+          (new)
+        </span>
       )}
-      <span className="shrink-0 text-success-foreground text-xs">
+      <span className="shrink-0 text-success-foreground text-xs group-hover/trigger:text-hover-derived">
         +{newLineCount}
       </span>
       {!fileWasCreated && (
-        <span className="shrink-0 text-error-foreground text-xs">
+        <span className="shrink-0 text-error-foreground text-xs group-hover/trigger:text-hover-derived">
           -{deletedLineCount}
         </span>
       )}

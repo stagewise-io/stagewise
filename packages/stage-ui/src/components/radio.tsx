@@ -25,7 +25,7 @@ export const Radio = ({ className, ...props }: RadioProps) => {
     <RadioBase.Root
       {...props}
       className={cn(
-        'flex size-5 shrink-0 not-data-checked:not-disabled:cursor-pointer items-center justify-center rounded-full border border-derived-subtle bg-surface-1 p-1.5 transition-colors duration-100 ease-out disabled:opacity-50 data-checked:bg-primary-foreground',
+        'flex size-5 shrink-0 not-data-checked:not-disabled:cursor-pointer items-center justify-center rounded-full border border-derived-subtle bg-surface-1 p-1.5 transition-colors duration-100 ease-out hover:bg-hover-derived active:bg-active-derived disabled:opacity-50 data-checked:bg-primary-foreground',
         className,
       )}
     >
