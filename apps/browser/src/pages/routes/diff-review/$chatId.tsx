@@ -374,7 +374,7 @@ function Page() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="flex h-full w-full flex-col bg-background">
       {/* Header */}
       <div className="flex items-center border-border-subtle border-b px-6 py-4">
         <div className="mx-auto flex w-full max-w-4xl items-center gap-3">

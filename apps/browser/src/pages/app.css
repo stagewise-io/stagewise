@@ -229,11 +229,11 @@ body {
 }
 
 @utility code-block-diff-add {
-  @apply bg-success-solid/18 dark:bg-success-solid/31;
+  @apply bg-success-solid/12 dark:bg-success-solid/31;
 }
 
 @utility code-block-diff-remove {
-  @apply bg-error-solid/18 dark:bg-error-solid/31;
+  @apply bg-error-solid/12 dark:bg-error-solid/31;
 }
 
 /* Edge-top collapsed lines (before first diff) - hidden */

@@ -66,7 +66,7 @@
   --color-error-solid-light:    oklch(from var(--color-error-foreground-light) 0.58 calc(c * 1.415) h);
   /* ERROR DARK */
   --color-error-background-dark: oklch(0.32 0.070 var(--H-red));;
-  --color-error-foreground-dark:  oklch(0.89 0.115 var(--H-red));
+  --color-error-foreground-dark:  oklch(0.8 0.115 var(--H-red));
   --color-error-solid-dark:    oklch(from var(--color-error-foreground-dark) 0.54 calc(c * 1.32) h);
 
   /* WARNING LIGHT */
@@ -75,7 +75,7 @@
   --color-warning-solid-light: oklch(from var(--color-warning-foreground-light) 0.78 calc(c * 1.115) h);
   /* WARNING DARK */
   --color-warning-background-dark: oklch(0.45 0.068 var(--H-yellow));
-  --color-warning-foreground-dark:  oklch(0.89 0.112 var(--H-yellow));
+  --color-warning-foreground-dark:  oklch(0.85 0.112 var(--H-yellow));
   --color-warning-solid-dark: oklch(from var(--color-warning-foreground-dark) 0.54 calc(c * 1.22) h);
 
   /* INFO LIGHT */
@@ -84,7 +84,7 @@
   --color-info-solid-light:    oklch(from var(--color-info-foreground-light) 0.58 calc(c * 1.415) h);
   /* INFO DARK */
   --color-info-background-dark: oklch(0.32 0.060 var(--H-blue));   
-  --color-info-foreground-dark:  oklch(0.89 0.115 var(--H-blue));
+  --color-info-foreground-dark:  oklch(0.82 0.115 var(--H-blue));
   --color-info-solid-dark:    oklch(from var(--color-info-foreground-dark) 0.54 calc(c * 1.32) h);
 
 

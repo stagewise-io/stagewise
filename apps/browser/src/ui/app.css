@@ -229,7 +229,7 @@ body {
 }
 
 @utility code-block-diff-add {
-  @apply bg-success-solid/18 dark:bg-success-solid/31;
+  @apply bg-success-solid/12 dark:bg-success-solid/31;
 }
 
 @utility code-block-diff-remove {
