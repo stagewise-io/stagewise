@@ -23,6 +23,10 @@ import {
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { IdeLogo } from '@/components/ide-logo';
+import {
+  StreamingCodeBlock,
+  getLanguageFromPath,
+} from '@ui/components/ui/streaming-code-block';
 
 export const MultiEditToolPart = ({
   part,
@@ -90,6 +94,10 @@ export const MultiEditToolPart = ({
     return startLine;
   }, [diff]);
 
+  const hasNewContent = useMemo(() => {
+    return part.input?.edits?.some((edit) => edit.new_string?.length > 10);
+  }, [part.input?.edits]);
+
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);
 
   const openInIdeSelection = useKartonState(
@@ -131,12 +139,15 @@ export const MultiEditToolPart = ({
       }
       content={
         <>
-          {part.input?.edits && streaming && !diff && (
-            <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground/75 text-xs">
-              {part.input?.edits
-                ?.map((edit) => edit?.new_string ?? '')
-                .join('\n\n')}
-            </pre>
+          {hasNewContent && streaming && !diff && (
+            <StreamingCodeBlock
+              code={
+                part.input.edits
+                  .map((edit) => edit?.new_string ?? '')
+                  .join('\n\n') ?? ''
+              }
+              language={getLanguageFromPath(part.input?.relative_path)}
+            />
           )}
           {state === 'success' && diff && (
             <DiffPreview

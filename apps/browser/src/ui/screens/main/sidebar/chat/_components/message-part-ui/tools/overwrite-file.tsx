@@ -24,6 +24,10 @@ import { IDE_SELECTION_ITEMS } from '@/utils';
 import { useKartonState } from '@/hooks/use-karton';
 import { usePostHog } from 'posthog-js/react';
 import { IdeLogo } from '@/components/ide-logo';
+import {
+  StreamingCodeBlock,
+  getLanguageFromPath,
+} from '@ui/components/ui/streaming-code-block';
 
 export const OverwriteFileToolPart = ({
   part,
@@ -119,12 +123,13 @@ export const OverwriteFileToolPart = ({
       );
     else if (streaming && part.input?.content && !diff)
       return (
-        <pre className="overflow-x-hidden whitespace-pre font-mono text-xs">
-          {part.input?.content}
-        </pre>
+        <StreamingCodeBlock
+          code={part.input?.content ?? ''}
+          language={getLanguageFromPath(part.input?.relative_path)}
+        />
       );
     else return undefined;
-  }, [state, diff, part.input?.content, streaming]);
+  }, [state, diff, part.input?.content, part.input?.relative_path, streaming]);
 
   const contentFooter = useMemo(() => {
     if (state === 'success' && diff)
