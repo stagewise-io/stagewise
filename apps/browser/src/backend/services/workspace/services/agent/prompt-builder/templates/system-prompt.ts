@@ -557,7 +557,12 @@ Things commonly missed (always check for these):
 - Subtle effects (shadows, gradients, backdrop-filter)
 - Typography details (font stack, letter-spacing, line-height)
 
-When implementing, adapt extracted styles to [USER]'s existing codebase conventions rather than copying raw CSS verbatim.
+CRITICAL - CSS variables and design tokens:
+- NEVER copy CSS variable references (e.g., var(--primary-color), var(--spacing-4)) from the source website into [USER]'s code unless you have VERIFIED these exact variables exist in [USER]'s codebase.
+- External websites use their own design tokens and CSS variables that DO NOT exist in [USER]'s project.
+- Always extract and use the COMPUTED/RESOLVED values (actual hex colors, pixel values, etc.) from the source website, not variable references.
+- Only use [USER]'s own CSS variables if you know they exist (from reading their CSS files or design system).
+- Adapt extracted styles to [USER]'s existing codebase conventions (Tailwind utilities, CSS modules, styled-components, etc.).
         `.trim(),
       },
     },
