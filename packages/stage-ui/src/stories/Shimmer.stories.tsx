@@ -20,38 +20,38 @@ const ShimmerShowcase = () => {
           </h3>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-primary-solid shimmer-to-primary-solid/l30_c0.05 font-semibold text-lg">
                 Processing your request...
               </div>
               <p className="text-muted-foreground text-xs">
-                Primary to Blue 300 (default thinking state)
+                shimmer-from-primary-solid shimmer-to-primary-solid/l30_c0.05
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-blue-600 shimmer-to-blue-300 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-blue-600 shimmer-to-blue-600/l27_c0.03 w-fit font-semibold text-lg">
                 Loading data...
               </div>
               <p className="text-muted-foreground text-xs">
-                Blue 600 to Blue 300
+                shimmer-from-blue-600 shimmer-to-blue-600/l27_c0.03
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-100 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-blue-700 shimmer-to-blue-700/l35_c0.04 font-semibold text-lg">
                 Analyzing code...
               </div>
               <p className="text-muted-foreground text-xs">
-                Primary to Blue 100
+                shimmer-from-blue-700 shimmer-to-blue-700/l35_c0.04
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-blue-600 shimmer-to-blue-50 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-blue-600 shimmer-to-blue-600/l40_c0.05 font-semibold text-lg">
                 Building preview...
               </div>
               <p className="text-muted-foreground text-xs">
-                Blue 600 to Blue 50
+                shimmer-from-blue-600 shimmer-to-blue-600/l40_c0.05
               </p>
             </div>
           </div>
@@ -63,38 +63,39 @@ const ShimmerShowcase = () => {
           </h3>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-muted-foreground shimmer-to-zinc-50 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-muted-foreground shimmer-to-muted-foreground/l15_c0.02 font-semibold text-lg">
                 Reading file contents...
               </div>
               <p className="text-muted-foreground text-xs">
-                Muted foreground to Zinc 50
+                shimmer-from-muted-foreground
+                shimmer-to-muted-foreground/l15_c0.02
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-muted-foreground shimmer-to-slate-400 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-slate-600 shimmer-to-slate-600/l20_c0.015 font-semibold text-lg">
                 Scanning directory...
               </div>
               <p className="text-muted-foreground text-xs">
-                Muted foreground to Slate 400 (low contrast)
+                shimmer-from-slate-600 shimmer-to-slate-600/l20_c0.015
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-slate-900 shimmer-to-slate-400 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-slate-900 shimmer-to-slate-900/l25_c0.02 font-semibold text-lg">
                 Searching patterns...
               </div>
               <p className="text-muted-foreground text-xs">
-                Slate 900 to Slate 400
+                shimmer-from-slate-900 shimmer-to-slate-900/l25_c0.02
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-foreground shimmer-to-muted-foreground font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-foreground shimmer-to-foreground/l18_c0.025 font-semibold text-lg">
                 Processing changes...
               </div>
               <p className="text-muted-foreground text-xs">
-                Foreground to Muted foreground
+                shimmer-from-foreground shimmer-to-foreground/l18_c0.025
               </p>
             </div>
           </div>
@@ -106,38 +107,38 @@ const ShimmerShowcase = () => {
           </h3>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-zinc-500 shimmer-to-zinc-50 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-zinc-500 shimmer-to-zinc-500/l35_c-0.01 font-semibold text-lg">
                 Silver gleam effect
               </div>
               <p className="text-muted-foreground text-xs">
-                Zinc 500 to Zinc 50 (silver shimmer)
+                shimmer-from-zinc-500 shimmer-to-zinc-500/l35_c-0.01
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-slate-900 shimmer-to-slate-50 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-slate-900 shimmer-to-slate-900/l45_c-0.015 font-semibold text-lg">
                 Metallic slate shine
               </div>
               <p className="text-muted-foreground text-xs">
-                Slate 900 to Slate 50 (high contrast)
+                shimmer-from-slate-900 shimmer-to-slate-900/l45_c-0.015
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-zinc-950 shimmer-to-zinc-50 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-zinc-950 shimmer-to-zinc-950/l50_c-0.02 font-semibold text-lg">
                 Chrome-like reflection
               </div>
               <p className="text-muted-foreground text-xs">
-                Zinc 950 to Zinc 50 (maximum contrast)
+                shimmer-from-zinc-950 shimmer-to-zinc-950/l50_c-0.02
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-slate-400 shimmer-to-slate-50 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-slate-400 shimmer-to-slate-400/l30_c-0.01 font-semibold text-lg">
                 Polished steel effect
               </div>
               <p className="text-muted-foreground text-xs">
-                Slate 400 to Slate 50 (soft silver)
+                shimmer-from-slate-400 shimmer-to-slate-400/l30_c-0.01
               </p>
             </div>
           </div>
@@ -149,38 +150,38 @@ const ShimmerShowcase = () => {
           </h3>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-foreground shimmer-to-background font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-foreground shimmer-to-foreground/l50_c-0.03 font-semibold text-lg">
                 High contrast effect
               </div>
               <p className="text-muted-foreground text-xs">
-                Foreground to Background (full inversion)
+                shimmer-from-foreground shimmer-to-foreground/l50_c-0.03
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-primary-foreground font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-primary-solid shimmer-to-primary-solid/l40_c0.04 font-semibold text-lg">
                 Theme color transition
               </div>
               <p className="text-muted-foreground text-xs">
-                Primary to Primary Foreground
+                shimmer-from-primary-solid shimmer-to-primary-solid/l40_c0.04
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-zinc-950 shimmer-to-zinc-500 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-zinc-950 shimmer-to-zinc-950/l35_c0.02 font-semibold text-lg">
                 Dark to medium transition
               </div>
               <p className="text-muted-foreground text-xs">
-                Zinc 950 to Zinc 500
+                shimmer-from-zinc-950 shimmer-to-zinc-950/l35_c0.02
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-blue-600 shimmer-to-zinc-50 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-blue-600 shimmer-to-blue-600/l42_c-0.025 font-semibold text-lg">
                 Cross-hue shimmer
               </div>
               <p className="text-muted-foreground text-xs">
-                Blue 600 to Zinc 50 (cool to neutral)
+                shimmer-from-blue-600 shimmer-to-blue-600/l42_c-0.025
               </p>
             </div>
           </div>
@@ -192,38 +193,42 @@ const ShimmerShowcase = () => {
           </h3>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-800 shimmer-from-primary shimmer-to-blue-300 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-600 shimmer-from-primary-solid shimmer-to-primary-solid/l30_c0.05 font-semibold text-lg">
                 Quick animation
               </div>
               <p className="text-muted-foreground text-xs">
-                Fast shimmer (800ms)
+                shimmer-duration-600 shimmer-from-primary-solid
+                shimmer-to-primary-solid/l30_c0.05
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1000 shimmer-from-primary-solid shimmer-to-primary-solid/l30_c0.05 font-semibold text-lg">
                 Standard animation
               </div>
               <p className="text-muted-foreground text-xs">
-                Default shimmer (1500ms)
+                shimmer-duration-1000 shimmer-from-primary-solid
+                shimmer-to-primary-solid/l30_c0.05
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-2500 shimmer-from-primary shimmer-to-blue-300 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-1800 shimmer-from-primary-solid shimmer-to-primary-solid/l30_c0.05 font-semibold text-lg">
                 Relaxed animation
               </div>
               <p className="text-muted-foreground text-xs">
-                Slow shimmer (2500ms)
+                shimmer-duration-1800 shimmer-from-primary-solid
+                shimmer-to-primary-solid/l30_c0.05
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="shimmer-text shimmer-duration-4000 shimmer-from-primary shimmer-to-blue-300 font-semibold text-lg">
+              <div className="shimmer-text shimmer-duration-3000 shimmer-from-primary-solid shimmer-to-primary-solid/l30_c0.05 font-semibold text-lg">
                 Smooth and calm
               </div>
               <p className="text-muted-foreground text-xs">
-                Very slow shimmer (4000ms)
+                shimmer-duration-3000 shimmer-from-primary-solid
+                shimmer-to-primary-solid/l30_c0.05
               </p>
             </div>
           </div>
@@ -237,13 +242,14 @@ const ShimmerShowcase = () => {
             <div className="text-foreground">
               <span className="text-blue-600">className</span>=
               <span className="text-emerald-600">
-                "shimmer-text shimmer-duration-1500 shimmer-from-primary
-                shimmer-to-blue-300"
+                "shimmer-text shimmer-duration-1000 shimmer-from-blue-600
+                shimmer-to-blue-600/l27_c0.03"
               </span>
             </div>
             <div className="border-border border-l-2 pl-3 text-muted-foreground text-xs">
-              Apply shimmer animation to text with primary color transitioning
-              to blue-300 over 1500ms
+              Apply shimmer animation to text with blue-600 transitioning to a
+              lighter/brighter variant using OKLCH lightness and chroma
+              modifiers
             </div>
           </div>
           <div className="mt-4 space-y-2 text-muted-foreground text-sm">
@@ -253,7 +259,7 @@ const ShimmerShowcase = () => {
             </p>
             <p>
               <strong className="text-foreground">shimmer-duration-*:</strong>{' '}
-              Sets animation duration in milliseconds
+              Sets animation duration in milliseconds (e.g., 600, 1000, 1800)
             </p>
             <p>
               <strong className="text-foreground">shimmer-from-*:</strong> Start
@@ -261,7 +267,8 @@ const ShimmerShowcase = () => {
             </p>
             <p>
               <strong className="text-foreground">shimmer-to-*:</strong> End
-              color (uses Tailwind color tokens)
+              color with optional OKLCH modifiers (e.g., /l27_c0.03 adds 0.27 to
+              lightness and 0.03 to chroma)
             </p>
           </div>
         </section>
@@ -289,7 +296,7 @@ const ShimmerShowcase = () => {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <div className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 font-medium">
+                  <div className="shimmer-text shimmer-duration-1000 shimmer-from-primary-solid shimmer-to-primary-solid/l30_c0.05 font-medium">
                     Stage is thinking...
                   </div>
                   <p className="text-muted-foreground text-xs">
@@ -317,7 +324,7 @@ const ShimmerShowcase = () => {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <div className="shimmer-text shimmer-duration-1500 shimmer-from-muted-foreground shimmer-to-slate-400 font-medium">
+                  <div className="shimmer-text shimmer-duration-1000 shimmer-from-muted-foreground shimmer-to-muted-foreground/l15_c0.02 font-medium">
                     Reading file: components/button.tsx
                   </div>
                   <p className="text-muted-foreground text-xs">
@@ -345,7 +352,7 @@ const ShimmerShowcase = () => {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <div className="shimmer-text shimmer-duration-2000 shimmer-from-blue-600 shimmer-to-blue-100 font-medium">
+                  <div className="shimmer-text shimmer-duration-1500 shimmer-from-blue-600 shimmer-to-blue-600/l25_c0.03 font-medium">
                     Changes applied successfully
                   </div>
                   <p className="text-muted-foreground text-xs">

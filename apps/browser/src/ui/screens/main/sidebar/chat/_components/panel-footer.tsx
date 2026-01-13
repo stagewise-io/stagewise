@@ -297,7 +297,7 @@ export function ChatPanelFooter() {
   return (
     <footer className="z-20 flex flex-col items-stretch gap-1 px-2">
       <div
-        className="relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.04)] ring-1 ring-derived before:absolute before:inset-0 before:rounded-lg data-[chat-active=true]:shadow-lg data-[chat-active=true]:shadow-primary/3 dark:bg-surface-1"
+        className="relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.05),0_-6px_48px_-24px_rgba(0,0,0,0.08)] ring-1 ring-derived before:absolute before:inset-0 before:rounded-lg dark:bg-surface-1"
         id="chat-input-container-box"
         data-chat-active={chatInputActive}
       >
@@ -392,7 +392,7 @@ export function ChatPanelFooter() {
                     size="icon-sm"
                     variant="ghost"
                     disabled={hasOpenedInternalPage}
-                    className="data-[element-selector-active=true]:bg-primary-accent/5 data-[element-selector-active=true]:text-primary-accent"
+                    className="data-[element-selector-active=true]:bg-primary-foreground/5 data-[element-selector-active=true]:text-primary-foreground"
                     data-element-selector-active={elementSelectionActive}
                     onClick={(e) => {
                       e.preventDefault();
@@ -477,7 +477,7 @@ export function ChatPanelFooter() {
         </div>
         {workspaceStatus === 'setup' && (
           <div className="-z-10 absolute right-2 bottom-full left-2 flex flex-row items-center justify-between gap-2 rounded-t-lg border-derived-subtle border-t border-r border-l bg-background p-0.75 pl-2.5 backdrop-blur-lg">
-            <span className="truncate text-primary-accent text-xs">
+            <span className="truncate text-primary-foreground text-xs">
               You are in workspace setup-mode.
             </span>
             <Button

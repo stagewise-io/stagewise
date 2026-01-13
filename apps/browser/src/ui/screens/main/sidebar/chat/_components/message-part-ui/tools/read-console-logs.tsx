@@ -190,14 +190,17 @@ const LoadingHeader = ({
     : 'Reading console logs...';
   return (
     <div className="flex flex-row items-center justify-start gap-1 overflow-hidden">
-      <Loader2Icon className="size-3 shrink-0 animate-spin text-primary" />
+      <Loader2Icon
+        className={cn(
+          'size-3 shrink-0 animate-spin',
+          disableShimmer ? '' : 'text-primary-foreground',
+        )}
+      />
       <span
         dir="ltr"
         className={cn(
           'truncate text-xs',
-          disableShimmer
-            ? ''
-            : 'shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300',
+          disableShimmer ? '' : 'shimmer-text-primary',
         )}
       >
         {text}

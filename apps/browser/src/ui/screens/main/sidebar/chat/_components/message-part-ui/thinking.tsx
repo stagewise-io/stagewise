@@ -48,16 +48,14 @@ export const ThinkingPart = ({
             className={cn(
               'size-3',
               isShimmering
-                ? 'animate-thinking-part-brain-pulse text-primary-accent'
+                ? 'animate-thinking-part-brain-pulse text-primary-foreground'
                 : '',
             )}
           />
           <span
             className={cn(
               'truncate text-start text-xs',
-              isShimmering
-                ? 'shimmer-text shimmer-duration-1500 shimmer-from-primary-accent shimmer-to-primary-200'
-                : '',
+              isShimmering ? 'shimmer-text-primary' : '',
             )}
           >
             {part.state === 'streaming' && 'Thinking...'}

@@ -278,7 +278,7 @@ function DownloadItemRow({
         <div className="flex items-center gap-2">
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full bg-primary-accent transition-all duration-300"
+              className="h-full bg-primary-foreground transition-all duration-300"
               style={{ width: `${download.progress}%` }}
             />
           </div>
@@ -372,12 +372,12 @@ export function DownloadsControlButton() {
             <Button variant="ghost" size="icon-sm" onClick={() => {}}>
               {hasActiveDownloads && (
                 <div
-                  className="mask-alpha mask-[radial-gradient(closest-side,transparent_calc(100%-3px),white_calc(100%-2.5px))] absolute inset-0.5 rounded-full bg-primary-accent"
+                  className="mask-alpha mask-[radial-gradient(closest-side,transparent_calc(100%-3px),white_calc(100%-2.5px))] absolute inset-0.5 rounded-full bg-primary-foreground"
                   style={progressRingStyle}
                 />
               )}
               {unseenFinishedCount > 0 && (
-                <div className="absolute top-0 right-0 flex size-3 items-center justify-center rounded-full bg-primary-accent font-bold text-2xs text-primary-foreground">
+                <div className="absolute top-0 right-0 flex size-3 items-center justify-center rounded-full bg-primary-foreground font-bold text-2xs text-solid-foreground">
                   {unseenFinishedCount}
                 </div>
               )}
@@ -401,7 +401,7 @@ export function DownloadsControlButton() {
           <a
             href={DOWNLOADS_PAGE_URL}
             target="_blank"
-            className="flex cursor-pointer flex-row items-center gap-1 font-medium text-primary-accent text-sm leading-none hover:text-hover-derived"
+            className="flex cursor-pointer flex-row items-center gap-1 font-medium text-primary-foreground text-sm leading-none hover:text-derived-lighter-subtle"
             onClick={() => setIsOpen(false)}
           >
             Show all <IconArrowRight className="size-3" />

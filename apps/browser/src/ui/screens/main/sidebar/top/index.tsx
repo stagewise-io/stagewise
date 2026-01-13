@@ -132,7 +132,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
       )}
     >
       {!isCollapsed && <WorkspaceInfoBadge />}
-      <div className="app-no-drag ml-1 inline-flex shrink-0 items-center font-normal text-primary-accent text-xs">
+      <div className="app-no-drag ml-1 inline-flex shrink-0 items-center font-normal text-primary-foreground text-xs">
         Alpha
       </div>
       <div className="flex-1 group-data-[collapsed=true]:hidden" />

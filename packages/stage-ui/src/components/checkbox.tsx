@@ -10,8 +10,8 @@ export const checkboxVariants = cva(
     'ring-1 ring-border',
     'transition-[background-position,box-shadow,background-color] duration-[20ms] ease-[cubic-bezier(0.26,0.75,0.38,0.45)]',
     'disabled:pointer-events-none disabled:opacity-50',
-    'data-[checked]:bg-primary',
-    'data-[checked]:ring-primary-accent',
+    'data-[checked]:bg-primary-solid',
+    'data-[checked]:ring-derived-lighter-subtle',
     'bg-surface-1',
   ],
   {

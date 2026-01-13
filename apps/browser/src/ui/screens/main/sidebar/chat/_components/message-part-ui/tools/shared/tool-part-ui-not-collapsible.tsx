@@ -60,13 +60,13 @@ export const ToolPartUINotCollapsible = memo(
           >
             {icon && (
               <div
-                className={`size-3 shrink-0 ${disableShimmer ? 'text-muted-foreground' : 'text-primary'}`}
+                className={`size-3 shrink-0 ${disableShimmer ? 'text-muted-foreground' : 'text-primary-foreground'}`}
               >
                 {icon}
               </div>
             )}
             <span
-              className={`truncate ${disableShimmer ? 'text-muted-foreground' : 'shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300'}`}
+              className={`truncate ${disableShimmer ? 'text-muted-foreground' : 'shimmer-text-primary'}`}
             >
               {streamingText}
             </span>

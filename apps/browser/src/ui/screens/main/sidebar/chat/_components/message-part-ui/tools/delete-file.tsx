@@ -165,10 +165,7 @@ const LoadingHeader = ({ relativePath }: { relativePath?: string }) => {
       <TrashIcon className="size-3 shrink-0 text-primary" />
       {relativePath !== null ? (
         <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">
-          <span
-            dir="ltr"
-            className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300"
-          >
+          <span dir="ltr" className="text-muted-foreground">
             {relativePath}
           </span>
         </span>

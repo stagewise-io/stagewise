@@ -7,7 +7,6 @@
   --color-background: var(--color-base-50);
   --color-foreground: var(--color-base-900);
   --color-muted-foreground: var(--color-base-500);
-  --color-foreground-subtle: var(--color-base-500);
 
   --color-surface-1: var(--color-base-100);
   --color-surface-2: var(--color-base-150);
@@ -18,17 +17,16 @@
 
   --color-overlay: var(--color-base-950);
 
+
   /* Primary usage (UI fill) */
-  --color-primary: var(--color-primary-450);
-  --color-primary-foreground: var(--color-base-50);
-  --color-primary-hover: var(--color-primary-550);
-  --color-primary-active: var(--color-primary-600);
-  --color-primary-accent: var(--color-primary-450);
+  --color-primary-foreground: var(--color-primary-450); /* rm */
+  --color-primary-solid: var(--color-primary-500);
+
+  --color-solid-foreground: var(--color-base-50);
 
   --color-surface-tinted: color-mix(in oklch, var(--color-primary-50) 50%, var(--color-base-50)); 
-  --color-border-tinted: color-mix(in oklch, var(--color-primary-100) 40%, var(--color-base-100));
 
-  --color-success-background: var(--color-success-background-light);  
+  --color-success-background: var(--color-success-background-light); 
   --color-success-foreground: var(--color-success-foreground-light);  
   --color-success-solid: var(--color-success-solid-light);  
 
@@ -54,19 +52,18 @@
     --color-app-background: var(--color-base-950);
     --color-background: var(--color-base-800);
     --color-foreground: var(--color-base-200);
-    --color-foreground-subtle: var(--color-base-300);
     --color-muted-foreground: var(--color-base-350);
 
-    --color-primary-foreground: var(--color-base-100);
-    --color-primary-accent: var(--color-primary-400);
-    --color-primary: var(--color-primary-500);
+    --color-primary-foreground: var(--color-primary-400);
+    --color-primary-solid: var(--color-primary-500);
 
     --color-surface-1: var(--color-base-700);
     --color-surface-2: var(--color-base-600);
     --color-surface-3: var(--color-base-550);
 
+    --color-solid-foreground: var(--color-base-50);
+
     --color-surface-tinted: color-mix(in oklch, var(--color-primary-700) 30%, var(--color-base-700));
-    --color-border-tinted: color-mix(in oklch, var(--color-primary-650) 40%, var(--color-base-650));
 
     --color-border: var(--color-base-600);
     --color-border-subtle: var(--color-base-700);

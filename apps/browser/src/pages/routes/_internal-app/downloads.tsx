@@ -515,12 +515,12 @@ function RowComponent({
               {row.totalBytes > 0 ? (
                 // Determinate progress bar
                 <div
-                  className="h-full bg-primary-accent transition-all duration-300"
+                  className="h-full bg-primary-foreground transition-all duration-300"
                   style={{ width: `${Math.min(row.progress, 100)}%` }}
                 />
               ) : (
                 // Indeterminate progress bar (unknown total size)
-                <div className="h-full w-1/3 animate-[indeterminate_1.5s_ease-in-out_infinite] bg-primary-accent" />
+                <div className="h-full w-1/3 animate-[indeterminate_1.5s_ease-in-out_infinite] bg-primary-foreground" />
               )}
             </div>
             <span className="text-muted-foreground text-xs">

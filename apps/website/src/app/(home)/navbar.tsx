@@ -78,7 +78,7 @@ export function Navbar() {
           <NavbarButton href="/">Home</NavbarButton>
           <NavbarButton href="/pricing">
             <span>Pricing</span>
-            <span className="ml-1 rounded-full bg-primary px-2 py-0.5 font-medium text-primary-foreground text-xs">
+            <span className="ml-1 rounded-full bg-primary-solid px-2 py-0.5 font-medium text-solid-foreground text-xs">
               New
             </span>
           </NavbarButton>

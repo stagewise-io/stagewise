@@ -344,12 +344,12 @@ const ComparisonToggle = ({
     onClick={onToggle}
     className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
       enabled
-        ? 'border-primary bg-primary/10 text-primary'
-        : 'border-border bg-surface-1 text-muted-foreground hover:bg-surface-2'
+        ? 'border-derived bg-primary-solid text-solid-foreground'
+        : 'border-derived bg-surface-1 text-muted-foreground hover:bg-hover-derived'
     }`}
   >
     <span
-      className={`h-2 w-2 rounded-full ${enabled ? 'bg-primary' : 'bg-muted-foreground'}`}
+      className={`h-2 w-2 rounded-full ${enabled ? 'bg-primary-solid' : 'bg-muted-foreground'}`}
     />
     {enabled ? 'Comparison On' : 'Compare with Example'}
   </button>

@@ -59,7 +59,7 @@ export function FormFieldLabel({ className, ...props }: FormFieldLabelProps) {
   return (
     <FieldBase.Label
       className={cn(
-        '-mb-1 font-medium text-foreground text-sm has-data-checked:border-primary has-data-checked:bg-primary/5',
+        '-mb-1 font-medium text-foreground text-sm has-data-checked:border-primary-foreground has-data-checked:bg-primary-solid/5',
         className,
       )}
       {...props}

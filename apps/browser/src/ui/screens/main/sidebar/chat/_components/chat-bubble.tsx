@@ -148,7 +148,7 @@ export const ChatBubble = memo(
                 'group wrap-break-word relative min-h-8 max-w-xl select-text space-y-2 py-1.5 font-normal text-sm last:mb-0.5',
                 msg.role === 'assistant'
                   ? 'w-full min-w-1/3 origin-bottom-left rounded-bl-sm text-foreground'
-                  : 'origin-bottom-right rounded-lg rounded-br-sm border border-border-tinted bg-surface-tinted px-2.5 text-foreground',
+                  : 'origin-bottom-right rounded-lg rounded-br-sm border border-derived-subtle bg-surface-tinted px-2.5 text-foreground',
                 msg.role === 'user'
                   ? 'group/chat-bubble-user'
                   : 'group/chat-bubble-assistant',

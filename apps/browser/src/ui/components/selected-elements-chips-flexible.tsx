@@ -302,7 +302,7 @@ function SelectedElementChip({
                         href={selectedElement.attributes[attribute]}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary text-xs hover:text-primary"
+                        className="text-primary-foreground text-xs hover:text-hover-derived"
                       >
                         {selectedElement.attributes[attribute]}{' '}
                         <IconOpenExternalOutline18 className="mb-0.5 ml-0.5 inline size-3.5" />
@@ -331,7 +331,8 @@ function SelectedElementChip({
                         <span
                           className={cn(
                             'font-mono text-foreground text-xs',
-                            index === 0 && 'font-semibold text-primary',
+                            index === 0 &&
+                              'font-semibold text-primary-foreground',
                             index > 1 && 'text-muted-foreground',
                           )}
                         >

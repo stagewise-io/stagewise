@@ -199,9 +199,7 @@ const LoadingHeader = ({ disableShimmer }: { disableShimmer?: boolean }) => {
         dir="ltr"
         className={cn(
           'truncate text-xs',
-          disableShimmer
-            ? ''
-            : 'shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300',
+          disableShimmer ? '' : 'shimmer-text-primary',
         )}
       >
         Checking for issues...

@@ -34,7 +34,7 @@ const ColorSchemeIcon = ({
       return (
         <IconBrightnessIncreaseFill18
           className={cn(
-            'size-4.5 text-primary-accent hover:text-primary-400 dark:hover:text-primary-350',
+            'size-4.5 text-primary-foreground hover:text-derived-lighter-subtle',
             className,
           )}
         />
@@ -43,7 +43,7 @@ const ColorSchemeIcon = ({
       return (
         <IconMoonFill18
           className={cn(
-            'mb-px ml-px size-4 text-primary-accent hover:text-primary-400 dark:hover:text-primary-350',
+            'mb-px ml-px size-4 text-primary-foreground hover:text-derived-lighter-subtle',
             className,
           )}
         />
@@ -164,7 +164,7 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
                   className={cn(
                     'size-5',
                     tab?.devToolsOpen
-                      ? 'text-primary-accent hover:text-primary-400 dark:hover:text-primary-350'
+                      ? 'text-primary-foreground hover:text-derived-lighter-subtle'
                       : '',
                     isInternalPage ? 'opacity-50' : '',
                   )}

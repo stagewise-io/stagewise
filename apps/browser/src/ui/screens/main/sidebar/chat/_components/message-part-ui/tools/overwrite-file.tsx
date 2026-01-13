@@ -273,13 +273,10 @@ const SuccessHeader = ({
 const LoadingHeader = ({ relativePath }: { relativePath?: string }) => {
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <Loader2Icon className="size-3 shrink-0 animate-spin text-primary " />
+      <Loader2Icon className={cn('size-3 shrink-0 animate-spin')} />
       {relativePath !== null ? (
         <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">
-          <span
-            dir="ltr"
-            className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300"
-          >
+          <span dir="ltr" className="shimmer-text-primary">
             {relativePath}
           </span>
         </span>

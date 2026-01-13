@@ -117,7 +117,7 @@ export const MultiEditToolPart = ({
       expanded={expanded}
       setExpanded={setExpanded}
       trigger={
-        <div className="flex w-full flex-row items-center justify-start gap-1">
+        <div className="flex w-full flex-row items-center justify-start gap-1 pl-0">
           {streaming ? (
             <LoadingHeader relativePath={path ?? undefined} />
           ) : (
@@ -299,10 +299,7 @@ const LoadingHeader = ({ relativePath }: { relativePath?: string }) => {
       <Loader2Icon className="size-3 shrink-0 animate-spin text-primary" />
       {relativePath !== null ? (
         <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">
-          <span
-            dir="ltr"
-            className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300"
-          >
+          <span dir="ltr" className="shimmer-text-primary">
             {relativePath}
           </span>
         </span>

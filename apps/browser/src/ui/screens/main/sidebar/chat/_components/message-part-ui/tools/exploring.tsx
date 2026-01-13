@@ -475,8 +475,8 @@ export const ExploringToolParts = ({
           <div className="flex flex-1 flex-row items-center justify-start gap-1 text-xs">
             {isShimmering ? (
               <>
-                <SearchIcon className="size-3 shrink-0 text-primary" />
-                <span className="shimmer-text shimmer-duration-1500 shimmer-from-primary shimmer-to-blue-300 truncate">
+                <SearchIcon className="size-3 shrink-0 text-primary-foreground" />
+                <span className="shimmer-text-primary truncate">
                   {explorationInProgressText}
                 </span>
               </>

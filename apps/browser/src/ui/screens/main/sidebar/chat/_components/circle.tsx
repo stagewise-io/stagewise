@@ -17,7 +17,11 @@ export function PulsatingCircle({
 
   return (
     <div
-      className={cn('rounded-full bg-primary', sizeClasses[size], className)}
+      className={cn(
+        'rounded-full bg-primary-foreground',
+        sizeClasses[size],
+        className,
+      )}
       style={{
         animation: 'pulse-scale 1s ease-in-out infinite',
       }}

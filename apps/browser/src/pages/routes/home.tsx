@@ -218,7 +218,7 @@ function StartPageWithConnectedWorkspace() {
     <div className="flex w-full max-w-6xl flex-col items-start gap-8 px-20">
       <div className="flex items-center gap-2">
         <LogoWithText className="h-10 text-foreground" />
-        <div className="ml-1 inline-flex shrink-0 items-center font-normal text-primary-accent text-xs">
+        <div className="ml-1 inline-flex shrink-0 items-center font-normal text-primary-foreground text-xs">
           Alpha
         </div>
       </div>
@@ -289,7 +289,7 @@ function OnboardingStartPage() {
     <div className="flex w-full max-w-2xl flex-col items-start gap-4 px-10">
       <div className="flex items-center gap-2">
         <LogoWithText className="h-10 text-foreground" />
-        <div className="ml-1 inline-flex shrink-0 items-center font-normal text-primary-accent text-xs">
+        <div className="ml-1 inline-flex shrink-0 items-center font-normal text-primary-foreground text-xs">
           Alpha
         </div>
       </div>
@@ -347,7 +347,7 @@ function RecentlyOpenedWorkspaceItem({
 }) {
   return (
     <div
-      className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg from-base-700 to-base-650 p-2 pt-1 hover:bg-surface-1 dark:hover:bg-linear-to-tr"
+      className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg bg-background from-base-700 to-base-650 p-2 pt-1 hover:bg-hover-derived dark:bg-surface-1 dark:hover:bg-linear-to-tr"
       onClick={onClick}
     >
       <IconDocFolder className="size-4 shrink-0 text-muted-foreground" />
@@ -468,7 +468,7 @@ function DesignInspirationCard({
               {websiteName}
             </span>
             {websiteFirstRoute && (
-              <span className="truncate rounded-md bg-primary-accent/10 px-1.5 py-0.5 font-normal text-primary-accent text-xs dark:bg-primary-200/10 dark:text-primary-400">
+              <span className="truncate rounded-md bg-primary-solid/10 px-1.5 py-0.5 font-normal text-primary-foreground text-xs dark:bg-primary-200/10 dark:text-primary-400">
                 {websiteFirstRoute}
               </span>
             )}
@@ -516,7 +516,7 @@ function ConnectWorkspaceBanner() {
             </TooltipContent>
           </Tooltip>
         </h1>
-        <div className="group/recent-workspaces flex w-full flex-col items-start justify-start gap-1 rounded-lg border border-derived-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-3 dark:from-base-750 dark:to-surface-1">
+        <div className="group/recent-workspaces flex w-full flex-col items-start justify-start gap-1 rounded-lg border border-derived bg-background p-3 shadow-[0_0_6px_0_rgba(0,0,0,0.05),0_-6px_48px_-24px_rgba(0,0,0,0.08)] dark:bg-surface-1">
           <div className="flex w-full flex-row items-start justify-between gap-14">
             <div className="flex w-full flex-col items-start gap-2">
               <div className="flex w-full flex-row items-start justify-between gap-1">

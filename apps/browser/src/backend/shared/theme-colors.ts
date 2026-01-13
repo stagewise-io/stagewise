@@ -6,8 +6,10 @@
 export const THEME_COLORS = {
   light: {
     background: '#d3d8e1', // base-200
+    // background: '#e1e5ec', // base-150
     titleBarOverlay: {
       color: '#d3d8e1',
+      // color: '#e1e5ec',
       symbolColor: '#3f3f46',
     },
   },

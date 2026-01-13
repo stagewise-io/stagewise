@@ -361,7 +361,9 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         How do{' '}
-        <span className="font-medium text-primary-accent">airbnb.com</span>{' '}
+        <span className="font-medium text-primary-foreground hover:text-derived-lighter-subtle">
+          airbnb.com
+        </span>{' '}
         icons work?
       </span>
     ),
@@ -374,7 +376,9 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         Take the glow effect from{' '}
-        <span className="font-medium text-primary-accent">reflect.app</span>
+        <span className="font-medium text-primary-foreground hover:text-derived-lighter-subtle">
+          reflect.app
+        </span>
       </span>
     ),
     faviconUrl: 'https://reflect.app/favicon.ico',
@@ -386,7 +390,7 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         Copy the glass effect from{' '}
-        <span className="font-medium text-primary-accent">
+        <span className="font-medium text-primary-foreground">
           react.email
         </span>{' '}
       </span>
@@ -400,7 +404,9 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         Make our button look like{' '}
-        <span className="font-medium text-primary-accent">posthog.com</span>
+        <span className="font-medium text-primary-foreground hover:text-derived-lighter-subtle">
+          posthog.com
+        </span>
       </span>
     ),
     faviconUrl: 'https://posthog.com/favicon-32x32.png',
@@ -412,7 +418,10 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         What's the theme of{' '}
-        <span className="font-medium text-primary-accent">cursor.com</span>?
+        <span className="font-medium text-primary-foreground hover:text-derived-lighter-subtle">
+          cursor.com
+        </span>
+        ?
       </span>
     ),
     faviconUrl: 'https://cursor.com/favicon.ico',
