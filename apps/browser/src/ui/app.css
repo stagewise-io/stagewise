@@ -311,7 +311,7 @@ body {
 }
 
 @utility shimmer-text-primary{
-  @apply shimmer-text shimmer-duration-2000 shimmer-from-primary-foreground shimmer-to-primary-foreground/l27_c0.02;
+  @apply shimmer-text shimmer-duration-1500 shimmer-from-primary-foreground shimmer-to-primary-foreground/l27_c0.02;
 }
 
 /* One-shot shimmer that settles to normal text color */

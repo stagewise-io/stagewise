@@ -1,6 +1,5 @@
 import { cn } from '@/utils';
 import { IconMagicWandSparkle } from 'nucleo-glass';
-import { PulsatingCircle } from './circle';
 import type {
   ToolPart,
   ChatMessage,
@@ -11,7 +10,7 @@ import type {
   ToolUIPart,
   DynamicToolUIPart,
 } from '@shared/karton-contracts/ui';
-import { Undo2 } from 'lucide-react';
+import { Undo2, BrainIcon } from 'lucide-react';
 import { useMemo, useCallback, memo } from 'react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { useChatActions } from '@/hooks/use-chat-state';
@@ -344,7 +343,17 @@ export const ChatBubble = memo(
               isEmptyMessage &&
               msg.role === 'assistant')) && (
             <div className="mt-2 flex flex-row items-center gap-2">
-              <PulsatingCircle size="sm" />
+              <div className="flex flex-row items-center justify-start gap-1 py-1.5">
+                <BrainIcon
+                  className={cn(
+                    'size-3',
+                    'animate-thinking-part-brain-pulse text-primary-foreground',
+                  )}
+                />
+                <div className="shimmer-text-primary w-fit text-xs">
+                  Working...
+                </div>
+              </div>
             </div>
           )}
         </div>
