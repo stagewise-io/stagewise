@@ -64,12 +64,10 @@ export const ChatBubble = memo(
   function ChatBubble({
     message: msg,
     isLastMessage,
-    containerHeightInPx,
     measureRef,
   }: {
     message: ChatMessage;
     isLastMessage: boolean;
-    containerHeightInPx?: number;
     measureRef?: (el: HTMLDivElement | null) => void;
   }) {
     const undoEditsUntilUserMessage = useKartonProcedure(
@@ -127,12 +125,7 @@ export const ChatBubble = memo(
     if (isEmptyMessage && !isLastMessage) return null;
 
     return (
-      <div
-        className={cn('flex w-full flex-col gap-1')}
-        style={{
-          minHeight: isLastMessage ? `${containerHeightInPx ?? 0}px` : 0,
-        }}
-      >
+      <div className={cn('flex w-full flex-col gap-1')}>
         {/* measureRef wraps just the content, NOT the min-h element, to avoid circular measurement */}
         <div ref={measureRef} className="w-full">
           <div
@@ -376,8 +369,6 @@ export const ChatBubble = memo(
     if (prevProps.message.id !== nextProps.message.id) return false;
     if (prevProps.message.role !== nextProps.message.role) return false;
     if (prevProps.isLastMessage !== nextProps.isLastMessage) return false;
-    if (prevProps.containerHeightInPx !== nextProps.containerHeightInPx)
-      return false;
     // Check if measureRef presence changed (for height tracking)
     if (!!prevProps.measureRef !== !!nextProps.measureRef) return false;
     if (prevProps.message.parts.length !== nextProps.message.parts.length)

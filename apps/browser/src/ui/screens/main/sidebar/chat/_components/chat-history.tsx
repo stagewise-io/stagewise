@@ -273,12 +273,15 @@ export const ChatHistory = () => {
       onScroll={handleScroll}
     >
       {renderedMessages.map((message, index) => {
-        return (
+        const isLastMessage = index === renderedMessages.length - 1;
+        const isLastAssistantMessage =
+          isLastMessage && message.role === 'assistant';
+
+        const bubble = (
           <ChatBubble
             key={message.id ?? `${message.role}-${index}`}
             message={message}
-            isLastMessage={index === renderedMessages.length - 1}
-            containerHeightInPx={containerHeight - lastUserMessageHeight}
+            isLastMessage={isLastMessage}
             measureRef={
               index === lastUserMessageIndex
                 ? lastUserMessageMeasureRef
@@ -286,9 +289,31 @@ export const ChatHistory = () => {
             }
           />
         );
+
+        // Wrap last assistant message + error in a flex container with minHeight
+        if (isLastAssistantMessage)
+          return (
+            <div
+              key={`wrapper-${message.id ?? index}`}
+              className="flex flex-col"
+              style={{
+                minHeight: containerHeight - lastUserMessageHeight,
+              }}
+            >
+              {bubble}
+              {activeChat?.error && (
+                <ChatErrorBubble error={activeChat.error} />
+              )}
+            </div>
+          );
+
+        return bubble;
       }) ?? []}
 
-      {activeChat?.error && <ChatErrorBubble error={activeChat.error} />}
+      {/* Render error after messages only if last message is user (or no messages) */}
+      {(renderedMessages.length === 0 ||
+        renderedMessages[renderedMessages.length - 1]?.role === 'user') &&
+        activeChat?.error && <ChatErrorBubble error={activeChat.error} />}
 
       {renderedMessages.length === 0 && (
         <div className="flex w-full flex-col items-center justify-center gap-1 text-sm">

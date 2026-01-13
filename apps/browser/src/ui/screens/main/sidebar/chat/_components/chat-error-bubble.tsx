@@ -1,10 +1,11 @@
 import { cn } from '@/utils';
+import { useState } from 'react';
 import { IconTriangleWarning } from 'nucleo-micro-bold';
 import { AgentErrorType, type AgentError } from '@shared/karton-contracts/ui';
-import { RefreshCcwIcon } from 'lucide-react';
+import { RefreshCcwIcon, CopyIcon, CopyCheckIcon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
 import { Streamdown } from '@/components/streamdown';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 
 /** Maximum characters to display in error messages (UI-level safety net) */
@@ -109,8 +110,8 @@ export function ChatErrorBubble({ error }: { error: AgentError }) {
       >
         <div
           className={cn(
-            'markdown group wrap-break-word relative min-h-8 animate-chat-bubble-appear space-y-3 rounded-2xl bg-white/5 px-2.5 py-1.5 font-normal text-sm ring-1 ring-inset last:mb-0.5',
-            'min-w-48 origin-bottom-left rounded-bl-xs bg-zinc-100/60 text-zinc-950 ring-zinc-950/5 dark:bg-zinc-800/60 dark:text-zinc-50',
+            'markdown group wrap-break-word relative min-h-8 space-y-3 rounded-lg border border-derived-subtle bg-surface-1 px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
+            'min-w-48 origin-bottom-left',
           )}
         >
           {error.type === AgentErrorType.AGENT_ERROR ? (
@@ -168,6 +169,20 @@ function AgentErrorMessage({
     [error.error.message],
   );
 
+  const copyToClipboard = useCallback(() => {
+    navigator.clipboard.writeText(
+      JSON.stringify(
+        { errorType: error.error.errorType, error: error.error },
+        null,
+        2,
+      ),
+    );
+    setHasCopied(true);
+    setTimeout(() => setHasCopied(false), 2000);
+  }, [displayMessage]);
+
+  const [hasCopied, setHasCopied] = useState(false);
+
   return (
     <div className="flex select-text flex-col gap-1">
       <div className="flex select-text flex-row items-baseline justify-start gap-1">
@@ -175,6 +190,18 @@ function AgentErrorMessage({
         <span className="select-text font-medium text-foreground text-sm">
           {heading}
         </span>
+        <Button
+          variant="ghost"
+          size="icon-2xs"
+          className="ml-auto"
+          onClick={() => void copyToClipboard()}
+        >
+          {hasCopied ? (
+            <CopyCheckIcon className="size-3" />
+          ) : (
+            <CopyIcon className="size-3" />
+          )}
+        </Button>
       </div>
       <span className="select-text text-muted-foreground text-xs">
         <Streamdown isAnimating={false}>{displayMessage}</Streamdown>
