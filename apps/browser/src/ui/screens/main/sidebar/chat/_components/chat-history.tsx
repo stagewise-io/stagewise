@@ -386,7 +386,7 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         How do{' '}
-        <span className="font-medium text-primary-foreground hover:text-derived-lighter-subtle">
+        <span className="font-medium text-primary-foreground group-hover/suggestion:text-hover-derived">
           airbnb.com
         </span>{' '}
         icons work?
@@ -401,7 +401,7 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         Take the glow effect from{' '}
-        <span className="font-medium text-primary-foreground hover:text-derived-lighter-subtle">
+        <span className="font-medium text-primary-foreground group-hover/suggestion:text-hover-derived">
           reflect.app
         </span>
       </span>
@@ -415,7 +415,7 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         Copy the glass effect from{' '}
-        <span className="font-medium text-primary-foreground">
+        <span className="font-medium text-primary-foreground group-hover/suggestion:text-hover-derived">
           react.email
         </span>{' '}
       </span>
@@ -429,7 +429,7 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         Make our button look like{' '}
-        <span className="font-medium text-primary-foreground hover:text-derived-lighter-subtle">
+        <span className="font-medium text-primary-foreground group-hover/suggestion:text-hover-derived">
           posthog.com
         </span>
       </span>
@@ -443,7 +443,7 @@ const suggestions: ChatSuggestionProps[] = [
     suggestion: (
       <span className="font-normal">
         What's the theme of{' '}
-        <span className="font-medium text-primary-foreground hover:text-derived-lighter-subtle">
+        <span className="font-medium text-primary-foreground group-hover/suggestion:text-hover-derived">
           cursor.com
         </span>
         ?
