@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@config "../../tailwind.config.js";
 @import "../../node_modules/@stagewise/stage-ui/src/style.css";
 @import "../../assets/fonts/Geist/geist.css";
 @import "../../assets/fonts/GeistMono/geist-mono.css";
@@ -8,7 +9,6 @@
 @source "../ui";
 
 @plugin 'tailwind-scrollbar';
-@plugin '@stagewise/tailwindcss-color-modifiers';
 
 :root {
   background-color: transparent;
