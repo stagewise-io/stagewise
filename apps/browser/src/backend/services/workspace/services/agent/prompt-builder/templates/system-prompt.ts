@@ -412,6 +412,7 @@ const toolCallGuidelines = xml({
 - If \`<lsp-diagnostics>\` section is present in this system prompt, fix those issues first without calling the tool
 - Otherwise, call \`getLintingDiagnosticsTool\` after completing code modifications
 - Fix any errors or warnings before presenting changes to [USER]
+- IGNORE diagnostics that are purely formatting-related (e.g., Tailwind class sorting, indentation, line length, import ordering) - these will be auto-fixed by formatters
 - This ensures code quality and prevents broken builds
         `.trim(),
       },
@@ -825,6 +826,7 @@ Exceptions where linting issues may be left unfixed:
 - Fixing it would require changes outside the scope of [USER]'s request.
 - The warning is intentional (e.g., unused variable that will be used later).
 - [USER] explicitly asks to skip linting fixes.
+- The diagnostic is purely formatting-related and will be auto-fixed by formatters (e.g., Tailwind class sorting, import ordering, indentation, line length, trailing commas). DO NOT manually fix these - the formatter will handle them.
 
 NEVER leave the codebase in a broken state with unresolved type errors or critical linting issues caused by your changes.
 
