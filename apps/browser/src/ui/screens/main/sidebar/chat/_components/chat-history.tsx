@@ -2,16 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEventListener } from '@/hooks/use-event-listener';
 import { useScrollbarGutterWidth } from '@/hooks/use-scrollbar-gutter-width';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { ChatBubble } from './chat-bubble';
+import { MessageUser } from './message-user';
+import { MessageAssistant } from './message-assistant';
+import { MessageLoading } from './message-loading';
 import {
   useComparingSelector,
   useKartonState,
   useKartonProcedure,
 } from '@/hooks/use-karton';
 import { cn } from '@/utils';
-import { ChatErrorBubble } from './chat-error-bubble';
-import type { History } from '@shared/karton-contracts/ui';
+import { MessageError } from './message-error';
+import type { History, ChatMessage } from '@shared/karton-contracts/ui';
 import { IconXmark } from 'nucleo-micro-bold';
+import { isEmptyAssistantMessage } from './message-utils';
 
 export const ChatHistory = () => {
   // Detect scrollbar gutter width for padding adjustment
@@ -64,10 +67,10 @@ export const ChatHistory = () => {
       setLastUserMessageHeight(0);
     }
   }, []);
-  const { activeChatId, chats } = useKartonState(
+  const { activeChatId, chats, isWorking } = useKartonState(
     useComparingSelector((s) => ({
       activeChatId: s.agentChat?.activeChatId,
-      isWorking: s.agentChat?.isWorking,
+      isWorking: s.agentChat?.isWorking ?? false,
       chats: s.agentChat?.chats,
       workspaceStatus: s.workspaceStatus,
     })),
@@ -245,6 +248,26 @@ export const ChatHistory = () => {
     return -1;
   }, [renderedMessages]);
 
+  // Determine if we should show the "Working..." indicator
+  const showWorkingIndicator = useMemo(() => {
+    if (!isWorking) return false;
+
+    const lastMessage = renderedMessages[renderedMessages.length - 1];
+    if (!lastMessage) return false;
+
+    // Show if last message is from user (agent hasn't responded yet)
+    if (lastMessage.role === 'user') return true;
+
+    // Show if last message is an empty assistant message (agent just started)
+    if (
+      lastMessage.role === 'assistant' &&
+      isEmptyAssistantMessage(lastMessage)
+    )
+      return true;
+
+    return false;
+  }, [isWorking, renderedMessages]);
+
   /* We're adding a bg color on hover because there's a brower bug
      that prevents auto scroll-capturing if we don't do this.
      The onMouseEnter methods is also in place to help with another heuristic to get the browser to capture scroll in this element on hover. */
@@ -277,20 +300,27 @@ export const ChatHistory = () => {
         const isLastAssistantMessage =
           isLastMessage && message.role === 'assistant';
 
-        const bubble = (
-          <ChatBubble
-            key={message.id ?? `${message.role}-${index}`}
-            message={message}
-            isLastMessage={isLastMessage}
-            measureRef={
-              index === lastUserMessageIndex
-                ? lastUserMessageMeasureRef
-                : undefined
-            }
-          />
-        );
+        const messageComponent =
+          message.role === 'user' ? (
+            <MessageUser
+              key={message.id ?? `user-${index}`}
+              message={message as ChatMessage & { role: 'user' }}
+              isLastMessage={isLastMessage}
+              measureRef={
+                index === lastUserMessageIndex
+                  ? lastUserMessageMeasureRef
+                  : undefined
+              }
+            />
+          ) : (
+            <MessageAssistant
+              key={message.id ?? `assistant-${index}`}
+              message={message as ChatMessage & { role: 'assistant' }}
+              isLastMessage={isLastMessage}
+            />
+          );
 
-        // Wrap last assistant message + error in a flex container with minHeight
+        // Wrap last assistant message + error + loading in a flex container with minHeight
         if (isLastAssistantMessage)
           return (
             <div
@@ -300,20 +330,27 @@ export const ChatHistory = () => {
                 minHeight: containerHeight - lastUserMessageHeight,
               }}
             >
-              {bubble}
-              {activeChat?.error && (
-                <ChatErrorBubble error={activeChat.error} />
-              )}
+              {messageComponent}
+              {activeChat?.error && <MessageError error={activeChat.error} />}
+              {/* Working indicator inside wrapper when last message is assistant */}
+              {showWorkingIndicator && <MessageLoading />}
             </div>
           );
 
-        return bubble;
+        return messageComponent;
       }) ?? []}
 
       {/* Render error after messages only if last message is user (or no messages) */}
       {(renderedMessages.length === 0 ||
         renderedMessages[renderedMessages.length - 1]?.role === 'user') &&
-        activeChat?.error && <ChatErrorBubble error={activeChat.error} />}
+        activeChat?.error && <MessageError error={activeChat.error} />}
+
+      {/* Working indicator outside wrapper when last message is user (or no messages) */}
+      {showWorkingIndicator &&
+        (renderedMessages.length === 0 ||
+          renderedMessages[renderedMessages.length - 1]?.role === 'user') && (
+          <MessageLoading />
+        )}
 
       {renderedMessages.length === 0 && (
         <div className="flex w-full flex-col items-center justify-center gap-1 text-sm">

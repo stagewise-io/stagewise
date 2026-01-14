@@ -1,18 +1,8 @@
-import { FileAttachmentChips } from '@/components/file-attachment-chips';
-import { ModelSelect } from './model-select';
-import { ContextUsageRing } from './context-usage-ring';
-import { SelectedElementsChipsFlexible } from '@/components/selected-elements-chips-flexible';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useChatState } from '@/hooks/use-chat-state';
 import { cn } from '@/utils';
 import { HotkeyActions } from '@shared/hotkeys';
-import {
-  ArrowUpIcon,
-  SquareIcon,
-  SquareDashedMousePointerIcon,
-  ImageUpIcon,
-  ChevronDownIcon,
-} from 'lucide-react';
+import { ChevronDownIcon } from 'lucide-react';
 import { FileIcon } from './message-part-ui/tools/shared/file-icon';
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import {
@@ -22,24 +12,22 @@ import {
   useKartonReconnectState,
   useComparingSelector,
 } from '@/hooks/use-karton';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@stagewise/stage-ui/components/tooltip';
-import { HotkeyComboText } from '@/components/hotkey-combo-text';
 import { useHotKeyListener } from '@/hooks/use-hotkey-listener';
 import { useEventListener } from '@/hooks/use-event-listener';
-import { usePostHog } from 'posthog-js/react';
 import { diffLines } from 'diff';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@stagewise/stage-ui/components/collapsible';
+import {
+  ChatInput,
+  ChatInputActions,
+  type ChatInputHandle,
+} from './chat-input';
 
 export function ChatPanelFooter() {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const chatInputRef = useRef<ChatInputHandle>(null);
   const chatState = useChatState();
   const { isWorking, activeChatId, chats } = useKartonState(
     useComparingSelector((s) => ({
@@ -54,8 +42,6 @@ export function ChatPanelFooter() {
   const activeTab = useMemo(() => {
     return tabs[activeTabId];
   }, [tabs, activeTabId]);
-
-  const focusChatHotkeyText = HotkeyComboText({ action: HotkeyActions.CTRL_I });
 
   const elementSelectionActive = useKartonState(
     (s) => s.browser.contextSelectionMode,
@@ -75,7 +61,6 @@ export function ChatPanelFooter() {
   const canStop = isWorking;
   const isConnected = useKartonConnected();
   const reconnectState = useKartonReconnectState();
-  const posthog = usePostHog();
 
   const abortAgent = useCallback(() => {
     stopAgent();
@@ -84,8 +69,6 @@ export function ChatPanelFooter() {
   const activeChat = useMemo(() => {
     return activeChatId && chats ? chats[activeChatId] : null;
   }, [activeChatId, chats]);
-
-  const [isComposing, setIsComposing] = useState(false);
 
   const isVerboseMode = useKartonState(
     (s) => s.appInfo.releaseChannel === 'dev',
@@ -114,58 +97,7 @@ export function ChatPanelFooter() {
       // Dispatch event to force scroll to bottom in chat history
       window.dispatchEvent(new Event('chat-message-sent'));
     }
-  }, [chatState, canSendMessage]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
-        e.preventDefault();
-        handleSubmit();
-      }
-    },
-    [handleSubmit, isComposing],
-  );
-
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      const items = e.clipboardData.items;
-      const files: File[] = [];
-
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item && item.kind === 'file') {
-          const file = item.getAsFile();
-          if (file) {
-            files.push(file);
-          }
-        }
-      }
-
-      if (files.length > 0) {
-        // Prevent default paste for files
-        e.preventDefault();
-        files.forEach((file) => {
-          chatState.addFileAttachment(file);
-          posthog.capture('agent_file_uploaded', {
-            file_type: file.type,
-            method: 'chat_paste',
-          });
-        });
-
-        // Start prompt creation if not already active
-        inputRef.current?.focus();
-      }
-    },
-    [chatState],
-  );
-
-  const handleCompositionStart = useCallback(() => {
-    setIsComposing(true);
-  }, []);
-
-  const handleCompositionEnd = useCallback(() => {
-    setIsComposing(false);
-  }, []);
+  }, [chatState, canSendMessage, setElementSelectionActive]);
 
   const contextUsed = useMemo(() => {
     const used = activeChat?.usage.usedContextWindowSize ?? 0;
@@ -182,24 +114,24 @@ export function ChatPanelFooter() {
     if (chatInputActive) {
       // Wait for the next tick to ensure the input is mounted
       setTimeout(() => {
-        void inputRef.current?.focus();
+        chatInputRef.current?.focus();
       }, 0);
     } else {
       setElementSelectionActive(false);
-      void inputRef.current?.blur();
+      chatInputRef.current?.blur();
     }
-  }, [chatInputActive]);
+  }, [chatInputActive, setElementSelectionActive]);
 
   const onInputFocus = useCallback(() => {
     if (!chatInputActive) setChatInputActive(true);
   }, [chatInputActive]);
 
   const onInputBlur = useCallback(
-    async (ev: React.FocusEvent<HTMLTextAreaElement, Element>) => {
+    (ev: React.FocusEvent<HTMLTextAreaElement, Element>) => {
       // We should only allow chat blur if the user clicked outside the chat box or the context selector element tree. Otherwise, we should keep the input active by refocusing it.
       const target = ev.relatedTarget as HTMLElement;
       if (target?.closest('#chat-file-attachment-menu-content')) {
-        return true;
+        return;
       }
       if (
         !target ||
@@ -208,7 +140,7 @@ export function ChatPanelFooter() {
       ) {
         setChatInputActive(false);
       } else if (chatInputActive) {
-        void inputRef.current?.focus();
+        chatInputRef.current?.focus();
       }
     },
     [chatInputActive],
@@ -246,13 +178,12 @@ export function ChatPanelFooter() {
   useEventListener(
     'keydown',
     (e: KeyboardEvent) => {
-      if (e.code === 'Escape') {
+      if (e.code === 'Escape' && chatInputActive) {
         if (elementSelectionActive) setElementSelectionActive(false);
         else setChatInputActive(false);
       }
     },
     {},
-    inputRef.current,
   );
 
   useEffect(() => {
@@ -276,6 +207,20 @@ export function ChatPanelFooter() {
     if (!isWorking) setElementSelectionActive(true);
   });
 
+  const handleToggleElementSelection = useCallback(() => {
+    if (elementSelectionActive) {
+      setElementSelectionActive(false);
+    } else {
+      setChatInputActive(true);
+      setElementSelectionActive(true);
+    }
+  }, [elementSelectionActive, setElementSelectionActive]);
+
+  const handleClearAll = useCallback(() => {
+    chatState.clearFileAttachments();
+    clearSelectedElements();
+  }, [chatState, clearSelectedElements]);
+
   return (
     <footer className="z-20 flex flex-col items-stretch gap-1 px-2">
       <div
@@ -283,180 +228,46 @@ export function ChatPanelFooter() {
         id="chat-input-container-box"
         data-chat-active={chatInputActive}
       >
-        <div className="flex flex-1 flex-col items-stretch gap-1">
-          {/* Text input area */}
-          <div className="relative flex h-28 pr-1">
-            <textarea
-              ref={inputRef}
-              value={chatState.chatInput}
-              onChange={(e) => {
-                chatState.setChatInput(e.target.value);
-              }}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-              onFocus={onInputFocus}
-              onBlur={onInputBlur}
-              disabled={!enableInputField}
-              className={cn(
-                'scrollbar-subtle relative z-10 mt-0 h-full w-full resize-none overflow-visible rounded-none border-none text-foreground text-sm outline-none ring-0 transition-all duration-300 ease-out placeholder:text-muted-foreground/70 focus:outline-none disabled:bg-transparent',
-              )}
-              placeholder={`Ask anything about this page ${focusChatHotkeyText}`}
-            />
-          </div>
-
-          {/* Other attachments area */}
-          <div className="flex shrink-0 flex-row flex-wrap items-center justify-start gap-1 *:shrink-0">
-            <ModelSelect
-              onModelChange={() => {
-                // Defer focus until after popover closes using double rAF
-                requestAnimationFrame(() => {
-                  requestAnimationFrame(() => {
-                    inputRef.current?.focus();
-                  });
-                });
-              }}
-            />
-            {activeChat && (isVerboseMode || contextUsed > 80) && (
-              <ContextUsageRing
-                percentage={contextUsed}
-                usedKb={activeChat.usage.usedContextWindowSize / 1000}
-                maxKb={activeChat.usage.maxContextWindowSize / 1000}
-              />
-            )}
-            <FileAttachmentChips
-              fileAttachments={chatState.fileAttachments}
-              removeFileAttachment={chatState.removeFileAttachment}
-            />
-            <SelectedElementsChipsFlexible
-              selectedElements={chatState.selectedElements}
-              removeSelectedElementById={chatState.removeSelectedElement}
-            />
-            {chatState.fileAttachments.length +
-              chatState.selectedElements.length >
-              1 && (
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => {
-                  chatState.clearFileAttachments();
-                  clearSelectedElements();
-                }}
-              >
-                Clear all
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex shrink-0 flex-col items-center justify-end gap-1">
-          {canStop && (
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  onClick={abortAgent}
-                  aria-label="Stop agent"
-                  variant={'secondary'}
-                  className="group z-10 size-8 cursor-pointer rounded-full p-1 opacity-100! shadow-md backdrop-blur-lg !disabled:*:opacity-10"
-                >
-                  <SquareIcon className="size-3.5 fill-current" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Stop agent</TooltipContent>
-            </Tooltip>
-          )}
-          {!canStop && (
-            <>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={hasOpenedInternalPage}
-                    className="data-[element-selector-active=true]:bg-primary-foreground/5 data-[element-selector-active=true]:text-primary-foreground"
-                    data-element-selector-active={elementSelectionActive}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (elementSelectionActive) {
-                        setElementSelectionActive(false);
-                      } else {
-                        setChatInputActive(true);
-                        setElementSelectionActive(true);
-                      }
-                    }}
-                    aria-label="Select context elements"
-                  >
-                    <SquareDashedMousePointerIcon className="size-3.5 stroke-[2.5px]" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {elementSelectionActive ? (
-                    'Stop selecting elements (Esc)'
-                  ) : (
-                    <>
-                      Add reference elements (
-                      <HotkeyComboText action={HotkeyActions.CTRL_I} />)
-                    </>
-                  )}
-                </TooltipContent>
-              </Tooltip>
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                accept="image/png, image/jpeg, image/gif, image/webp"
-                id="chat-file-attachment-input-file"
-              />
-              <Tooltip>
-                <TooltipTrigger>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label="Upload image"
-                    className="mb-1"
-                    onClick={() => {
-                      const input = document.getElementById(
-                        'chat-file-attachment-input-file',
-                      ) as HTMLInputElement;
-                      input.value = '';
-                      input.click();
-                      input.onchange = (e) => {
-                        Array.from(
-                          (e.target as HTMLInputElement).files ?? [],
-                        ).forEach((file) => {
-                          chatState.addFileAttachment(file);
-                          posthog.capture('agent_file_uploaded', {
-                            file_type: file.type,
-                            method: 'chat_file_attachment_menu',
-                          });
-                        });
-                      };
-                    }}
-                  >
-                    <ImageUpIcon className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Upload image</TooltipContent>
-              </Tooltip>
-            </>
-          )}
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                disabled={!canSendMessage || !chatInputActive}
-                onClick={handleSubmit}
-                aria-label="Send message"
-                variant={chatInputActive ? 'primary' : 'secondary'}
-                className="z-10 size-8 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg transition-all"
-              >
-                <ArrowUpIcon className="size-4 stroke-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Send message</TooltipContent>
-          </Tooltip>
-        </div>
+        <ChatInput
+          ref={chatInputRef}
+          value={chatState.chatInput}
+          onChange={chatState.setChatInput}
+          onSubmit={handleSubmit}
+          disabled={!enableInputField}
+          fileAttachments={chatState.fileAttachments}
+          onRemoveFileAttachment={chatState.removeFileAttachment}
+          onAddFileAttachment={chatState.addFileAttachment}
+          selectedElements={chatState.selectedElements}
+          onRemoveSelectedElement={chatState.removeSelectedElement}
+          onClearAll={handleClearAll}
+          showModelSelect
+          onModelChange={() => chatInputRef.current?.focus()}
+          showContextUsageRing={
+            !!activeChat && (isVerboseMode || contextUsed > 80)
+          }
+          contextUsedPercentage={contextUsed}
+          contextUsedKb={
+            activeChat ? activeChat.usage.usedContextWindowSize / 1000 : 0
+          }
+          contextMaxKb={
+            activeChat ? activeChat.usage.maxContextWindowSize / 1000 : 0
+          }
+          onFocus={onInputFocus}
+          onBlur={onInputBlur}
+        />
+        <ChatInputActions
+          showStopButton={canStop}
+          onStop={abortAgent}
+          showElementSelectorButton
+          elementSelectionActive={elementSelectionActive}
+          onToggleElementSelection={handleToggleElementSelection}
+          elementSelectorDisabled={hasOpenedInternalPage}
+          showImageUploadButton
+          onAddFileAttachment={chatState.addFileAttachment}
+          canSendMessage={canSendMessage && chatInputActive}
+          onSubmit={handleSubmit}
+          isActive={chatInputActive}
+        />
         <FileDiffCard />
       </div>
     </footer>

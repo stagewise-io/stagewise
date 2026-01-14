@@ -77,7 +77,7 @@ const paidPlanLimitExceededMessage = (minutes?: number) =>
     ? `Wow, looks like you ran out of your daily prompts in your subscription!\n\nYou need to wait ${formatDuration(minutes)} before your next request or [ping the stagewise team on Discord](${discordLink}) 💪`
     : `Wow, looks like you ran out of your daily prompts in your subscription!\n\nYou can wait until the cooldown period ends (max 24 hours) or [ping the stagewise team on Discord](${discordLink}) 💪`;
 
-export function ChatErrorBubble({ error }: { error: AgentError }) {
+export function MessageError({ error }: { error: AgentError }) {
   const retrySendingUserMessage = useKartonProcedure(
     (p) => p.agentChat.retrySendingUserMessage,
   );
@@ -215,11 +215,25 @@ type AgentErrorWithOtherError = Extract<
   { type: AgentErrorType.OTHER }
 >;
 function OtherErrorMessage({ error }: { error: AgentErrorWithOtherError }) {
+  const [hasCopied, setHasCopied] = useState(false);
+
   const displayMessage = useMemo(() => {
     const name = error.error.name || 'Error';
     const message = sanitizeDisplayMessage(error.error.message);
     return `${name} - ${message}`;
   }, [error.error.name, error.error.message]);
+
+  const copyToClipboard = useCallback(() => {
+    navigator.clipboard.writeText(
+      JSON.stringify(
+        { errorType: error.error.name, error: error.error },
+        null,
+        2,
+      ),
+    );
+    setHasCopied(true);
+    setTimeout(() => setHasCopied(false), 2000);
+  }, [error.error]);
 
   return (
     <div className="flex select-text flex-col gap-1">
@@ -228,6 +242,18 @@ function OtherErrorMessage({ error }: { error: AgentErrorWithOtherError }) {
         <span className="select-text font-medium text-foreground text-sm">
           Agent Error
         </span>
+        <Button
+          variant="ghost"
+          size="icon-2xs"
+          className="ml-auto"
+          onClick={() => void copyToClipboard()}
+        >
+          {hasCopied ? (
+            <CopyCheckIcon className="size-3" />
+          ) : (
+            <CopyIcon className="size-3" />
+          )}
+        </Button>
       </div>
       <span className="select-text text-muted-foreground text-xs">
         <Streamdown isAnimating={false}>{displayMessage}</Streamdown>

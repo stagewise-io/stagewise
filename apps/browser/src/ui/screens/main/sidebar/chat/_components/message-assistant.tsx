@@ -1,7 +1,6 @@
 import { cn } from '@/utils';
 import { IconMagicWandSparkle } from 'nucleo-glass';
 import type {
-  ToolPart,
   ChatMessage,
   TextUIPart,
   FileUIPart,
@@ -10,20 +9,8 @@ import type {
   ToolUIPart,
   DynamicToolUIPart,
 } from '@shared/karton-contracts/ui';
-import { Undo2, BrainIcon } from 'lucide-react';
-import { useMemo, useCallback, memo } from 'react';
-import { useKartonProcedure, useKartonState } from '@/hooks/use-karton';
-import { useChatActions } from '@/hooks/use-chat-state';
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  PopoverTitle,
-  PopoverDescription,
-  PopoverFooter,
-  PopoverClose,
-} from '@stagewise/stage-ui/components/popover';
-import { Button } from '@stagewise/stage-ui/components/button';
+import { useMemo, memo } from 'react';
+import { useKartonState } from '@/hooks/use-karton';
 import {
   isInteractionToolPart,
   InteractionToolPartItem,
@@ -35,8 +22,6 @@ import { TextPart } from './message-part-ui/text';
 import { DeleteFileToolPart } from './message-part-ui/tools/delete-file';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
 import { OverwriteFileToolPart } from './message-part-ui/tools/overwrite-file';
-import { SelectedElementsChipsFlexible } from '@/components/selected-elements-chips-flexible';
-import type { SelectedElement } from '@shared/selected-elements';
 import {
   ExploringToolParts,
   isReadOnlyToolPart,
@@ -45,39 +30,20 @@ import {
 import { UnknownToolPart } from './message-part-ui/tools/unknown';
 import { ExecuteConsoleScriptToolPart } from './message-part-ui/tools/execute-console-script';
 import { ReadConsoleLogsToolPart } from './message-part-ui/tools/read-console-logs';
+import { isToolPart, isToolOrReasoningPart } from './message-utils';
 
-function isToolPart(part: UIMessagePart): part is ToolPart {
-  return part.type === 'dynamic-tool' || part.type.startsWith('tool-');
-}
+type AssistantMessage = ChatMessage & { role: 'assistant' };
 
-function isToolOrReasoningPart(
-  part: UIMessagePart,
-): part is ToolPart | ReasoningUIPart {
-  return (
-    part.type === 'dynamic-tool' ||
-    part.type.startsWith('tool-') ||
-    part.type === 'reasoning'
-  );
-}
-
-export const ChatBubble = memo(
-  function ChatBubble({
+export const MessageAssistant = memo(
+  function MessageAssistant({
     message: msg,
     isLastMessage,
-    measureRef,
   }: {
-    message: ChatMessage;
+    message: AssistantMessage;
     isLastMessage: boolean;
-    measureRef?: (el: HTMLDivElement | null) => void;
   }) {
-    const undoEditsUntilUserMessage = useKartonProcedure(
-      (p) => p.agentChat.undoEditsUntilUserMessage,
-    );
-    const activeChatId = useKartonState(
-      (s) => s.agentChat?.activeChatId || null,
-    );
     const isWorking = useKartonState((s) => s.agentChat?.isWorking || false);
-    const { setChatInput } = useChatActions();
+
     const isEmptyMessage = useMemo(() => {
       if (
         msg.parts
@@ -99,51 +65,20 @@ export const ChatBubble = memo(
       );
     }, [msg.parts]);
 
-    const confirmRestore = useCallback(async () => {
-      if (!msg.id || !activeChatId) return;
-
-      const textContent = msg.parts
-        .filter((part) => part.type === 'text')
-        .map((part) => (part as TextUIPart).text)
-        .join('\n');
-
-      setChatInput(textContent);
-      try {
-        await undoEditsUntilUserMessage(msg.id, activeChatId);
-      } catch (error) {
-        console.warn('Failed to undo tool calls:', error);
-      }
-    }, [msg.id, activeChatId, setChatInput, undoEditsUntilUserMessage]);
-
-    const selectedPreviewElements = useMemo(() => {
-      return msg.metadata?.selectedPreviewElements ?? [];
-    }, [msg.metadata?.selectedPreviewElements]);
-    const fileAttachments = useMemo(() => {
-      return msg.parts.filter((part) => part.type === 'file') as FileUIPart[];
-    }, [msg.parts]);
-
     if (isEmptyMessage && !isLastMessage) return null;
 
     return (
       <div className={cn('flex w-full flex-col gap-1')}>
-        {/* measureRef wraps just the content, NOT the min-h element, to avoid circular measurement */}
-        <div ref={measureRef} className="w-full">
+        <div className="w-full">
           <div
             className={cn(
-              'group/chat-bubble mt-2 flex w-full shrink-0 items-center justify-start gap-2',
-              msg.role === 'assistant' ? 'flex-row' : 'flex-row-reverse',
+              'group/chat-bubble mt-2 flex w-full shrink-0 flex-row items-center justify-start gap-2',
               isEmptyMessage ? 'hidden' : '',
             )}
           >
             <div
               className={cn(
-                'group wrap-break-word relative min-h-8 max-w-xl select-text space-y-2 py-1.5 font-normal text-sm last:mb-0.5',
-                msg.role === 'assistant'
-                  ? 'w-full min-w-1/3 origin-bottom-left rounded-bl-sm text-foreground'
-                  : 'origin-bottom-right rounded-lg rounded-br-sm border border-derived-subtle bg-surface-tinted px-2.5 text-foreground',
-                msg.role === 'user'
-                  ? 'group/chat-bubble-user'
-                  : 'group/chat-bubble-assistant',
+                'group group/chat-bubble-assistant wrap-break-word relative min-h-8 w-full min-w-1/3 max-w-xl origin-bottom-left select-text space-y-2 rounded-bl-sm py-1.5 font-normal text-foreground text-sm last:mb-0.5',
               )}
             >
               {(() => {
@@ -214,16 +149,16 @@ export const ChatBubble = memo(
                   }
                   switch (part.type) {
                     case 'text':
-                      if ((part as TextUIPart).text.trim() === '') return null; // Skip empty text parts (can occur with interleaved-thinking in ai-sdk v6)
+                      if ((part as TextUIPart).text.trim() === '') return null;
                       return (
                         <TextPart
                           key={stableKey}
                           part={part as TextUIPart}
-                          role={msg.role}
+                          messageRole="assistant"
                         />
                       );
                     case 'reasoning':
-                      if (part.text.trim() === '') return null; // Sometimes, empty reasoning parts are returned
+                      if (part.text.trim() === '') return null;
                       return (
                         <ThinkingPart
                           key={stableKey}
@@ -283,72 +218,8 @@ export const ChatBubble = memo(
                   }
                 });
               })()}
-
-              {(fileAttachments.length > 0 ||
-                selectedPreviewElements.length > 0) && (
-                <div className="flex flex-row flex-wrap gap-2 pt-2">
-                  <SelectedElementsChipsFlexible
-                    selectedElements={
-                      selectedPreviewElements as SelectedElement[]
-                    }
-                  />
-                </div>
-              )}
             </div>
-
-            {msg.role === 'user' && msg.id && !isWorking && (
-              <Popover>
-                <PopoverTrigger>
-                  <Button
-                    aria-label="Restore checkpoint"
-                    variant="secondary"
-                    size="icon-sm"
-                    className="shrink-0 opacity-0 blur-xs transition-all group-hover/chat-bubble:scale-100 group-hover/chat-bubble:opacity-100 group-hover/chat-bubble:blur-none"
-                  >
-                    <Undo2 className="size-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent>
-                  <PopoverTitle>Restore checkpoint?</PopoverTitle>
-                  <PopoverDescription>
-                    This will clear the chat history and undo file changes after
-                    this point.
-                  </PopoverDescription>
-                  <PopoverClose />
-                  <PopoverFooter>
-                    <Button
-                      variant="primary"
-                      size="xs"
-                      onClick={() => {
-                        confirmRestore();
-                      }}
-                    >
-                      Restore
-                    </Button>
-                  </PopoverFooter>
-                </PopoverContent>
-              </Popover>
-            )}
           </div>
-          {((isLastMessage && isWorking && msg.role === 'user') ||
-            (isLastMessage &&
-              isWorking &&
-              isEmptyMessage &&
-              msg.role === 'assistant')) && (
-            <div className="mt-2 flex flex-row items-center gap-2">
-              <div className="flex flex-row items-center justify-start gap-1 py-1.5">
-                <BrainIcon
-                  className={cn(
-                    'size-3',
-                    'animate-thinking-part-brain-pulse text-primary-foreground',
-                  )}
-                />
-                <div className="shimmer-text-primary w-fit text-xs">
-                  Working...
-                </div>
-              </div>
-            </div>
-          )}
         </div>
         {msg.metadata?.autoCompactInformation?.isAutoCompacted && (
           <div
@@ -367,10 +238,7 @@ export const ChatBubble = memo(
   // Custom comparison to prevent re-renders when message object references change
   (prevProps, nextProps) => {
     if (prevProps.message.id !== nextProps.message.id) return false;
-    if (prevProps.message.role !== nextProps.message.role) return false;
     if (prevProps.isLastMessage !== nextProps.isLastMessage) return false;
-    // Check if measureRef presence changed (for height tracking)
-    if (!!prevProps.measureRef !== !!nextProps.measureRef) return false;
     if (prevProps.message.parts.length !== nextProps.message.parts.length)
       return false;
 
