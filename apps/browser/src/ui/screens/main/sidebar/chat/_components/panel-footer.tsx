@@ -124,6 +124,8 @@ export function ChatPanelFooter() {
   ]);
 
   const [chatInputActive, setChatInputActive] = useState<boolean>(false);
+  // Track if input was focused before app lost focus (for restoring on app regain)
+  const wasActiveBeforeAppBlurRef = useRef(false);
 
   useEffect(() => {
     if (chatInputActive) {
@@ -143,6 +145,8 @@ export function ChatPanelFooter() {
     // Cancel any active message edits when main chat input is focused
     window.dispatchEvent(new Event('cancel-all-message-edits'));
     if (!chatInputActive) setChatInputActive(true);
+    // Clear the app blur flag since we're now focused
+    wasActiveBeforeAppBlurRef.current = false;
   }, [chatInputActive]);
 
   const onInputBlur = useCallback(
@@ -157,12 +161,28 @@ export function ChatPanelFooter() {
         (!target.closest('#chat-input-container-box') &&
           !target.closest('#element-selector-element-canvas'))
       ) {
+        // If relatedTarget is null, the app might be losing focus (e.g., CMD+tab)
+        // Track this so we can restore focus when the app regains focus
+        if (!target && chatInputActive)
+          wasActiveBeforeAppBlurRef.current = true;
+
         setChatInputActive(false);
-      } else if (chatInputActive) {
-        chatInputRef.current?.focus();
-      }
+      } else if (chatInputActive) chatInputRef.current?.focus();
     },
     [chatInputActive],
+  );
+
+  // Restore focus when the app regains focus (e.g., after CMD+tab back)
+  useEventListener(
+    'focus',
+    () => {
+      if (!wasActiveBeforeAppBlurRef.current) return;
+      wasActiveBeforeAppBlurRef.current = false;
+      setChatInputActive(true);
+      chatInputRef.current?.focus();
+    },
+    {},
+    window,
   );
 
   useHotKeyListener(

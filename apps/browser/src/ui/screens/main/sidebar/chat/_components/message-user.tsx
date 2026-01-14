@@ -498,6 +498,46 @@ export const MessageUser = memo(
       }
     }, [isEditing]);
 
+    // Track if input was focused before app lost focus (for restoring on app regain)
+    const wasActiveBeforeAppBlurRef = useRef(false);
+
+    const onEditInputFocus = useCallback(() => {
+      // Clear the app blur flag since we're now focused
+      wasActiveBeforeAppBlurRef.current = false;
+    }, []);
+
+    const onEditInputBlur = useCallback(
+      (ev: React.FocusEvent<HTMLTextAreaElement, Element>) => {
+        // Similar logic to panel-footer: keep focus if clicking within chat box or element selector
+        const target = ev.relatedTarget as HTMLElement;
+        if (target?.closest('#chat-file-attachment-menu-content')) return;
+
+        if (
+          !target ||
+          (!target.closest('.message-user-edit-container') &&
+            !target.closest('#element-selector-element-canvas'))
+        ) {
+          // If relatedTarget is null, the app might be losing focus (e.g., CMD+tab)
+          // Track this so we can restore focus when the app regains focus
+          if (!target && isEditing) wasActiveBeforeAppBlurRef.current = true;
+        } else if (isEditing) chatInputRef.current?.focus();
+      },
+      [isEditing],
+    );
+
+    // Restore focus when the app regains focus (e.g., after CMD+tab back)
+    useEventListener(
+      'focus',
+      () => {
+        if (isEditing && wasActiveBeforeAppBlurRef.current) {
+          wasActiveBeforeAppBlurRef.current = false;
+          chatInputRef.current?.focus();
+        }
+      },
+      {},
+      window,
+    );
+
     // Global escape key handler for edit mode
     useEffect(() => {
       if (!isEditing) return;
@@ -601,7 +641,7 @@ export const MessageUser = memo(
               {/* Edit mode container styled like user message */}
               <div
                 className={cn(
-                  'relative flex w-full flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.05),0_-6px_48px_-24px_rgba(0,0,0,0.08)] ring-1 ring-derived transition-colors before:absolute before:inset-0 before:rounded-lg dark:bg-surface-1',
+                  'message-user-edit-container relative flex w-full flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.05),0_-6px_48px_-24px_rgba(0,0,0,0.08)] ring-1 ring-derived transition-colors before:absolute before:inset-0 before:rounded-lg dark:bg-surface-1',
                   isEditDragOver && 'bg-hover-derived!',
                 )}
               >
@@ -621,6 +661,8 @@ export const MessageUser = memo(
                   selectedElements={combinedSelectedElements}
                   onRemoveSelectedElement={handleRemoveSelectedElement}
                   onClearAll={handleClearAll}
+                  onFocus={onEditInputFocus}
+                  onBlur={onEditInputBlur}
                   className="w-full"
                 />
                 <div className="relative flex shrink-0 flex-col items-center justify-end gap-1">

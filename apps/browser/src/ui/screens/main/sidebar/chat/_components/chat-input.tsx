@@ -115,7 +115,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     });
 
     useImperativeHandle(ref, () => ({
-      focus: () => inputRef.current?.focus(),
+      focus: () => {
+        const textarea = inputRef.current;
+        if (!textarea) return;
+        textarea.focus();
+        // Move cursor to end of text
+        textarea.selectionStart = textarea.value.length;
+        textarea.selectionEnd = textarea.value.length;
+      },
       blur: () => inputRef.current?.blur(),
     }));
 
