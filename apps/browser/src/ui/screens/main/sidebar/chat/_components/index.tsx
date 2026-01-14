@@ -1,4 +1,5 @@
 import { useChatState } from '@/hooks/use-chat-state';
+import { useMessageEditState } from '@/hooks/use-message-edit-state';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ChatHistory } from './chat-history';
 import { ChatPanelFooter } from './panel-footer';
@@ -8,11 +9,12 @@ import {
   useKartonConnected,
   useKartonState,
 } from '@/hooks/use-karton';
+import { cn } from '@/utils';
 
 export function ChatPanel() {
   const posthog = usePostHog();
   const chatState = useChatState();
-  const [_isDragging, setIsDragging] = useState(false);
+  const { addFilesToActiveInput } = useMessageEditState();
   const isWorking = useKartonState(
     useComparingSelector((s) => s.agentChat?.isWorking || false),
   );
@@ -20,9 +22,8 @@ export function ChatPanel() {
 
   const enableInputField = useMemo(() => {
     // Disable input if agent is not connected
-    if (!isConnected) {
-      return false;
-    }
+    if (!isConnected) return false;
+
     return !isWorking;
   }, [isWorking, isConnected]);
 
@@ -36,31 +37,69 @@ export function ChatPanel() {
     }
   }, []);
 
+  // Track drag-over state for visual feedback
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      setIsDragging(false);
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
 
       const files = Array.from(e.dataTransfer.files);
-      files.forEach((file) => {
-        chatState.addFileAttachment(file);
-        posthog.capture('agent_file_uploaded', {
-          file_type: file.type,
-          method: 'chat_drop_zone',
-        });
-      });
 
-      // Focus the input field
-      inputRef.current?.focus();
+      // Route files to active input (editing message or main chat)
+      addFilesToActiveInput(files, (droppedFiles) => {
+        // Fallback: add to main chat input
+        droppedFiles.forEach((file) => {
+          chatState.addFileAttachment(file);
+          posthog.capture('agent_file_uploaded', {
+            file_type: file.type,
+            method: 'chat_drop_zone',
+          });
+        });
+        // Focus the input field
+        inputRef.current?.focus();
+      });
     },
-    [chatState],
+    [chatState, addFilesToActiveInput],
   );
 
   return (
     <div
-      className="relative flex size-full flex-col items-stretch justify-center bg-transparent"
+      className={cn(
+        'relative flex size-full flex-col items-stretch justify-center rounded-lg bg-transparent py-2 transition-colors',
+        isDragOver && 'bg-hover-derived!',
+      )}
       onDrop={handleDrop}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
       role="region"
       aria-label="Chat panel drop zone"
     >

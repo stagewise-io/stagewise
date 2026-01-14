@@ -36,7 +36,10 @@ export const PopoverContent = ({
 }: PopoverContentProps) => {
   return (
     <PopoverBase.Portal>
-      <PopoverBase.Backdrop className="fixed inset-0 z-40 size-full" />
+      <PopoverBase.Backdrop
+        className="fixed inset-0 z-40 size-full"
+        onClick={(e) => e.stopPropagation()}
+      />
       <PopoverBase.Positioner
         sideOffset={sideOffset ?? 4}
         side={side}
@@ -47,6 +50,7 @@ export const PopoverContent = ({
       >
         <PopoverBase.Popup
           {...props}
+          onClick={(e) => e.stopPropagation()}
           className={cn(
             'flex max-w-80 flex-col gap-3 p-2',
             'rounded-lg border border-border-subtle bg-background',

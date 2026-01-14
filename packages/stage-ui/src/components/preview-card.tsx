@@ -37,7 +37,10 @@ export const PreviewCardContent = ({
 }: PreviewCardContentProps) => {
   return (
     <PreviewCardBase.Portal>
-      <PreviewCardBase.Backdrop className="pointer-events-auto fixed inset-0 z-40 h-screen w-screen" />
+      <PreviewCardBase.Backdrop
+        className="pointer-events-auto fixed inset-0 z-40 h-screen w-screen"
+        onClick={(e) => e.stopPropagation()}
+      />
       <PreviewCardBase.Positioner
         sideOffset={sideOffset ?? 4}
         side={side}
@@ -48,6 +51,7 @@ export const PreviewCardContent = ({
       >
         <PreviewCardBase.Popup
           {...props}
+          onClick={(e) => e.stopPropagation()}
           className={cn(
             'flex max-w-80 flex-col gap-4 p-3',
             'rounded-lg border border-border-subtle bg-background',

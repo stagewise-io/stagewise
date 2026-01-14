@@ -1,9 +1,12 @@
-import { FileAttachmentChips } from '@/components/file-attachment-chips';
+import {
+  FileAttachmentChips,
+  type FileAttachmentData,
+} from '@/components/file-attachment-chips';
 import { ModelSelect } from './model-select';
 import { ContextUsageRing } from './context-usage-ring';
-import { SelectedElementsChipsFlexible } from '@/components/selected-elements-chips-flexible';
+import { SelectedElementsChips } from '@/components/selected-elements-chips';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { cn } from '@/utils';
+import { cn, isAnthropicSupportedFile } from '@/utils';
 import { HotkeyActions } from '@shared/hotkeys';
 import {
   ArrowUpIcon,
@@ -60,6 +63,7 @@ export interface ChatInputProps {
   // Focus management
   onFocus?: () => void;
   onBlur?: (event: React.FocusEvent<HTMLTextAreaElement>) => void;
+  onEscape?: () => void;
 
   // Styling
   className?: string;
@@ -96,6 +100,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
       onFocus,
       onBlur,
+      onEscape,
 
       className,
     },
@@ -130,8 +135,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           e.preventDefault();
           handleSubmit();
         }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          onEscape?.();
+        }
       },
-      [handleSubmit, isComposing],
+      [handleSubmit, isComposing, onEscape],
     );
 
     const handlePaste = useCallback(
@@ -173,6 +182,19 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const handleCompositionEnd = useCallback(() => {
       setIsComposing(false);
     }, []);
+
+    // Convert FileAttachment[] to FileAttachmentData[] for the chips component
+    const fileAttachmentData: FileAttachmentData[] = useMemo(
+      () =>
+        fileAttachments.map((attachment) => ({
+          id: attachment.id,
+          url: attachment.url,
+          filename: attachment.file.name,
+          mediaType: attachment.file.type,
+          validation: isAnthropicSupportedFile(attachment.file),
+        })),
+      [fileAttachments],
+    );
 
     const totalAttachments = fileAttachments.length + selectedElements.length;
 
@@ -226,10 +248,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             />
           )}
           <FileAttachmentChips
-            fileAttachments={fileAttachments}
+            fileAttachments={fileAttachmentData}
             removeFileAttachment={onRemoveFileAttachment}
           />
-          <SelectedElementsChipsFlexible
+          <SelectedElementsChips
             selectedElements={selectedElements}
             removeSelectedElementById={onRemoveSelectedElement}
           />

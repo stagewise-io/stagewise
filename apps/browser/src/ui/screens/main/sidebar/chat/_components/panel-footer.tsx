@@ -37,21 +37,36 @@ export function ChatPanelFooter() {
     })),
   );
 
+  // Use 'main' as the message ID for the main chat input
+  const MESSAGE_ID = 'main';
+
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTab = useMemo(() => {
     return tabs[activeTabId];
   }, [tabs, activeTabId]);
 
+  // Check if THIS input's element selection is active (not just global mode)
   const elementSelectionActive = useKartonState(
-    (s) => s.browser.contextSelectionMode,
+    (s) =>
+      s.browser.contextSelectionMode &&
+      s.browser.activeSelectionMessageId === MESSAGE_ID,
   );
-  const setElementSelectionActive = useKartonProcedure(
+  const setElementSelectionActiveProc = useKartonProcedure(
     (p) => p.browser.contextSelection.setActive,
   );
-  const clearSelectedElements = useKartonProcedure(
+  const setElementSelectionActive = useCallback(
+    (active: boolean) => {
+      setElementSelectionActiveProc(active, MESSAGE_ID);
+    },
+    [setElementSelectionActiveProc],
+  );
+  const clearSelectedElementsProc = useKartonProcedure(
     (p) => p.browser.contextSelection.clearElements,
   );
+  const clearSelectedElements = useCallback(() => {
+    clearSelectedElementsProc(MESSAGE_ID);
+  }, [clearSelectedElementsProc]);
 
   const togglePanelKeyboardFocus = useKartonProcedure(
     (p) => p.browser.layout.togglePanelKeyboardFocus,
@@ -117,12 +132,16 @@ export function ChatPanelFooter() {
         chatInputRef.current?.focus();
       }, 0);
     } else {
-      setElementSelectionActive(false);
+      // Don't automatically deactivate element selection here
+      // Element selection can be controlled by other components (inline edit mode)
+      // It will be deactivated explicitly when needed (Escape key, send message, agent working, panel closed)
       chatInputRef.current?.blur();
     }
-  }, [chatInputActive, setElementSelectionActive]);
+  }, [chatInputActive]);
 
   const onInputFocus = useCallback(() => {
+    // Cancel any active message edits when main chat input is focused
+    window.dispatchEvent(new Event('cancel-all-message-edits'));
     if (!chatInputActive) setChatInputActive(true);
   }, [chatInputActive]);
 
@@ -221,12 +240,65 @@ export function ChatPanelFooter() {
     clearSelectedElements();
   }, [chatState, clearSelectedElements]);
 
+  // Track drag-over state for visual feedback
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
+
+      // Process dropped files
+      const files = Array.from(e.dataTransfer.files);
+      files.forEach((file) => {
+        chatState.addFileAttachment(file);
+      });
+
+      // Focus the input
+      chatInputRef.current?.focus();
+    },
+    [chatState],
+  );
+
   return (
     <footer className="z-20 flex flex-col items-stretch gap-1 px-2">
       <div
-        className="relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.05),0_-6px_48px_-24px_rgba(0,0,0,0.08)] ring-1 ring-derived before:absolute before:inset-0 before:rounded-lg dark:bg-surface-1"
+        className={cn(
+          'relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.05),0_-6px_48px_-24px_rgba(0,0,0,0.08)] ring-1 ring-derived transition-colors before:absolute before:inset-0 before:rounded-lg dark:bg-surface-1',
+          isDragOver && 'bg-hover-derived!',
+        )}
         id="chat-input-container-box"
         data-chat-active={chatInputActive}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
       >
         <ChatInput
           ref={chatInputRef}
@@ -348,13 +420,12 @@ function FileDiffCard() {
       );
 
       // Dispatch event to notify chat history about height change
-      if (delta !== 0) {
+      if (delta !== 0)
         window.dispatchEvent(
           new CustomEvent('file-diff-card-height-changed', {
             detail: { delta, height },
           }),
         );
-      }
 
       previousHeight = height;
     };

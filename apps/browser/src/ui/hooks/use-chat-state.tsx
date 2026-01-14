@@ -16,6 +16,14 @@ import { useKartonProcedure, useKartonState } from './use-karton';
 import type { ChatMessage, FileUIPart } from '@shared/karton-contracts/ui';
 import type { SelectedElement } from '@shared/selected-elements';
 
+// Stable empty arrays to avoid creating new instances in selectors
+const EMPTY_SELECTED_ELEMENTS: SelectedElement[] = [];
+const EMPTY_SCREENSHOTS: {
+  id: string;
+  elementId: string;
+  dataUrl: string;
+}[] = [];
+
 /**
  * Convert a data URL to a File object
  */
@@ -97,28 +105,51 @@ interface ChatStateProviderProps {
 export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const [chatInput, setChatInput] = useState<string>('');
 
+  // Use 'main' as the message ID for the main chat input
+  const MESSAGE_ID = 'main';
+
   const _isContextSelectorMode = useKartonState(
     (s) => s.browser.contextSelectionMode,
   );
-  const clearSelectedElements = useKartonProcedure(
+  const clearSelectedElementsProc = useKartonProcedure(
     (p) => p.browser.contextSelection.clearElements,
   );
+  const clearSelectedElements = useCallback(() => {
+    clearSelectedElementsProc(MESSAGE_ID);
+  }, [clearSelectedElementsProc]);
+
   const setContextSelectionActive = useKartonProcedure(
     (p) => p.browser.contextSelection.setActive,
   );
 
-  const selectedElements = useKartonState((s) => s.browser.selectedElements);
-  const removeSelectedElement = useKartonProcedure(
+  // Get selected elements for 'main' message ID
+  const selectedElements = useKartonState(
+    (s) =>
+      s.browser.selectedElementsByMessageId[MESSAGE_ID] ||
+      EMPTY_SELECTED_ELEMENTS,
+  );
+  const removeSelectedElementProc = useKartonProcedure(
     (p) => p.browser.contextSelection.removeElement,
   );
-
-  // Watch for pending element screenshots and auto-add as file attachments
-  const pendingScreenshots = useKartonState(
-    (s) => s.browser.pendingElementScreenshots,
+  const removeSelectedElement = useCallback(
+    (elementId: string) => {
+      removeSelectedElementProc(elementId, MESSAGE_ID);
+    },
+    [removeSelectedElementProc],
   );
-  const clearPendingScreenshots = useKartonProcedure(
+
+  // Watch for pending element screenshots and auto-add as file attachments (for 'main')
+  const pendingScreenshots = useKartonState(
+    (s) =>
+      s.browser.pendingElementScreenshotsByMessageId[MESSAGE_ID] ||
+      EMPTY_SCREENSHOTS,
+  );
+  const clearPendingScreenshotsProc = useKartonProcedure(
     (p) => p.browser.contextSelection.clearPendingScreenshots,
   );
+  const clearPendingScreenshots = useCallback(() => {
+    clearPendingScreenshotsProc(MESSAGE_ID);
+  }, [clearPendingScreenshotsProc]);
 
   // Track which screenshots we've already processed to avoid duplicates
   const processedScreenshotIds = useRef<Set<string>>(new Set());

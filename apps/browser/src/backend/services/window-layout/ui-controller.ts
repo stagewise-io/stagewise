@@ -40,7 +40,7 @@ export interface UIControllerEventMap {
   setColorScheme: [scheme: ColorScheme, tabId?: string];
   cycleColorScheme: [tabId?: string];
   setZoomPercentage: [percentage: number, tabId?: string];
-  setContextSelectionMode: [active: boolean];
+  setContextSelectionMode: [active: boolean, messageId?: string];
   setContextSelectionMouseCoordinates: [x: number, y: number];
   clearContextSelectionMouseCoordinates: [];
   passthroughWheelEvent: [
@@ -53,9 +53,9 @@ export interface UIControllerEventMap {
     },
   ];
   selectHoveredElement: [];
-  removeElement: [elementId: string];
-  clearElements: [];
-  clearPendingScreenshots: [];
+  removeElement: [elementId: string, messageId: string];
+  clearElements: [messageId: string];
+  clearPendingScreenshots: [messageId: string];
   scrollToElement: [tabId: string, backendNodeId: number, frameId: string];
   checkFrameValidity: [
     tabId: string,
@@ -308,8 +308,8 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.setActive',
-      async (_callingClientId: string, active: boolean) => {
-        this.emit('setContextSelectionMode', active);
+      async (_callingClientId: string, active: boolean, messageId?: string) => {
+        this.emit('setContextSelectionMode', active, messageId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -339,22 +339,24 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.removeElement',
-      async (_callingClientId: string, elementId: string) => {
-        // TODO: Implement by removing the element from the chat state controller.
-        this.emit('removeElement', elementId);
+      async (
+        _callingClientId: string,
+        elementId: string,
+        messageId: string,
+      ) => {
+        this.emit('removeElement', elementId, messageId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.clearElements',
-      async (_callingClientId: string) => {
-        // TODO: Implement by clearing all stored elements in the chat state controller.
-        this.emit('clearElements');
+      async (_callingClientId: string, messageId: string) => {
+        this.emit('clearElements', messageId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.contextSelection.clearPendingScreenshots',
-      async (_callingClientId: string) => {
-        this.emit('clearPendingScreenshots');
+      async (_callingClientId: string, messageId: string) => {
+        this.emit('clearPendingScreenshots', messageId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
