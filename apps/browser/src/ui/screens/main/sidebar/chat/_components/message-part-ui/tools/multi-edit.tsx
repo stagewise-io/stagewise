@@ -104,60 +104,65 @@ export const MultiEditToolPart = ({
     (s) => s.globalConfig.openFilesInIde,
   );
 
-  if (state === 'error') {
-    return (
-      <div className="group/exploring-part -mx-1 block min-w-32 rounded-xl border-border/20 bg-muted-foreground/5">
-        <div className="flex h-6 cursor-default items-center gap-1 rounded-xl px-2.5 text-muted-foreground">
-          <div className="flex w-full flex-row items-center justify-start gap-1">
-            <ErrorHeader
-              relativePath={path ?? undefined}
-              errorText={part.errorText ?? undefined}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const trigger = useMemo(() => {
+    if (state === 'error')
+      return (
+        <ErrorHeader
+          relativePath={path ?? undefined}
+          errorText={part.errorText ?? undefined}
+        />
+      );
+    else if (streaming)
+      return <LoadingHeader relativePath={path ?? undefined} />;
+    else
+      return (
+        <SuccessHeader
+          relativePath={path ?? undefined}
+          newLineCount={newLineCount}
+          deletedLineCount={deletedLineCount}
+        />
+      );
+  }, [state, streaming, path, newLineCount, deletedLineCount, part.errorText]);
+
+  const content = useMemo(() => {
+    if (state === 'error') return undefined;
+    else if (state === 'success' && diff)
+      return (
+        <DiffPreview
+          diff={diff}
+          filePath={part.input?.relative_path ?? ''}
+          collapsed={collapsedDiffView}
+        />
+      );
+    else if (hasNewContent && streaming && !diff)
+      return (
+        <StreamingCodeBlock
+          code={
+            part.input.edits
+              .map((edit) => edit?.new_string ?? '')
+              .join('\n\n') ?? ''
+          }
+          language={getLanguageFromPath(part.input?.relative_path)}
+        />
+      );
+    else return undefined;
+  }, [
+    state,
+    diff,
+    part.input?.edits,
+    part.input?.relative_path,
+    streaming,
+    hasNewContent,
+    collapsedDiffView,
+  ]);
 
   return (
     <ToolPartUI
       showBorder={true}
       expanded={expanded}
       setExpanded={setExpanded}
-      trigger={
-        <div className="flex w-full flex-row items-center justify-start gap-1 pl-0">
-          {streaming ? (
-            <LoadingHeader relativePath={path ?? undefined} />
-          ) : (
-            <SuccessHeader
-              relativePath={path ?? undefined}
-              newLineCount={newLineCount}
-              deletedLineCount={deletedLineCount}
-            />
-          )}
-        </div>
-      }
-      content={
-        <>
-          {hasNewContent && streaming && !diff && (
-            <StreamingCodeBlock
-              code={
-                part.input.edits
-                  .map((edit) => edit?.new_string ?? '')
-                  .join('\n\n') ?? ''
-              }
-              language={getLanguageFromPath(part.input?.relative_path)}
-            />
-          )}
-          {state === 'success' && diff && (
-            <DiffPreview
-              diff={diff}
-              filePath={part.input?.relative_path ?? ''}
-              collapsed={collapsedDiffView}
-            />
-          )}
-        </>
-      }
+      trigger={trigger}
+      content={content}
       contentClassName={cn(streaming ? 'max-h-24' : 'max-h-56')}
       contentFooter={
         state === 'success' ? (
@@ -251,10 +256,10 @@ const ErrorHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <XIcon className="size-3 shrink-0 text-muted-foreground" />
+      <XIcon className="size-3 shrink-0" />
       <Tooltip>
         <TooltipTrigger>
-          <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
+          <span className="min-w-0 flex-1 truncate text-xs">
             {errorTextContent}
           </span>
         </TooltipTrigger>
