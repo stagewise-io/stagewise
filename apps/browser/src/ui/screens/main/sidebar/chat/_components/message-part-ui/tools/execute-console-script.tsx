@@ -14,6 +14,7 @@ import {
 } from '@stagewise/stage-ui/components/collapsible';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { CodeBlock } from '@/components/ui/code-block';
+import { StreamingCodeBlock } from '@/components/ui/streaming-code-block';
 import { cn } from '@/utils';
 import { useToolAutoExpand } from './shared/use-tool-auto-expand';
 import { useKartonState } from '@/hooks/use-karton';
@@ -116,9 +117,10 @@ export const ExecuteConsoleScriptToolPart = ({
       content={
         <>
           {part.input?.script && streaming && (
-            <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground/75 text-xs">
-              {part.input?.script}
-            </pre>
+            <StreamingCodeBlock
+              code={part.input.script}
+              language="javascript"
+            />
           )}
           {state === 'success' && part.input?.script && (
             <div className="flex flex-col">
@@ -279,7 +281,7 @@ const LoadingHeader = ({
     <div className="flex flex-row items-center justify-start gap-1">
       <Loader2Icon
         className={cn(
-          'size-3 shrink-0 animate-spin text-primary-foreground',
+          'size-3 shrink-0 animate-spin',
           disableShimmer ? '' : 'text-primary-foreground',
         )}
       />
