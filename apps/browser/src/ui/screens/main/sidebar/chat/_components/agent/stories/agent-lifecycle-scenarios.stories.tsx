@@ -31,9 +31,6 @@ const baseState: Partial<AppState> = {
       data: '/Users/user/projects/my-app/data',
       temp: '/Users/user/projects/my-app/temp',
     },
-    config: null,
-    plugins: null,
-    setupActive: false,
     rag: {
       lastIndexedAt: null,
       indexedFiles: 0,
@@ -79,7 +76,7 @@ export const SimpleResponse: Story = {
     simpleResponseScenario: {
       userMessage: 'What is the difference between Props and State in React?',
       thinkingText:
-        'Let me explain the key differences between Props and State in React components...',
+        "Let me explain the key differences between Props and State in React components. First, I need to read the React documentation to understand the concepts. Then, I can explain the differences.\n\nI think that I already know the answer, but I want to be sure. So, if a prop is passed to a component, it is read-only and cannot be changed by the component. If a state is changed, the component will re-render with the new state.\n\nLet me think through some concrete examples. When a parent component passes a prop to a child, that prop is immutable from the child's perspective. The child can only read it and use it to render or pass it further down the component tree. Any attempt to modify a prop directly would violate React's unidirectional data flow pattern.\n\nState, on the other hand, is managed within a component using hooks like useState. When state changes, React automatically re-renders that component and its children with the new values. This is how components become interactive - users can click buttons, fill forms, and trigger state updates that cause the UI to update.\n\nAnother key difference is the source of truth. Props come from outside the component, so the parent is the source of truth for prop values. State is owned by the component itself, making the component the source of truth for state values. This is important for understanding data flow in React applications.\n\nI should also mention that props are useful for customizing component behavior and appearance, while state is used for tracking user interactions and internal component logic. Props enable component reusability and composition, while state enables component interactivity and responsiveness.",
       responseText:
         'Props are read-only data passed from parent to child components, while State is mutable data managed within a component. Props enable component composition, and State enables component interactivity. Props flow down the component tree, State stays local unless lifted up.',
     },

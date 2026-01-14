@@ -38,9 +38,6 @@ const baseState: Partial<AppState> = {
       data: '/Users/user/projects/my-app/data',
       temp: '/Users/user/projects/my-app/temp',
     },
-    config: null,
-    plugins: null,
-    setupActive: false,
     rag: {
       lastIndexedAt: null,
       indexedFiles: 0,

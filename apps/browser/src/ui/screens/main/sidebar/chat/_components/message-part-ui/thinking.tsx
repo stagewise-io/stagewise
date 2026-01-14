@@ -12,11 +12,13 @@ export const ThinkingPart = ({
   isShimmering,
   thinkingDuration,
   isLastPart = false,
+  capMaxHeight = false,
 }: {
   part: ReasoningUIPart;
   isShimmering: boolean;
   thinkingDuration?: number;
   isLastPart?: boolean;
+  capMaxHeight?: boolean;
 }) => {
   const isStreaming = part.state === 'streaming';
 
@@ -74,7 +76,7 @@ export const ThinkingPart = ({
         </>
       }
       content={
-        <div className="pb-1 opacity-75">
+        <div className={cn('pb-1 opacity-75', capMaxHeight ? 'max-h-24!' : '')}>
           <Streamdown isAnimating={part.state === 'streaming'}>
             {displayedText}
           </Streamdown>

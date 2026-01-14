@@ -9,7 +9,7 @@ import {
   createReasoningPart,
   createTextPart,
   REALISTIC_TIMING,
-  getRandomDuration,
+  splitIntoChunks,
 } from './shared-utilities';
 
 /**
@@ -159,12 +159,12 @@ function buildSimpleResponseTimeline(
   const userMessageId = 'user-msg-1';
   const assistantMessageId = 'assistant-msg-1';
 
-  const thinkingDuration =
+  // Calculate actual streaming duration based on word count and interval
+  // This ensures the timeline events are properly synchronized with the actual streaming time
+  const thinkingChunks = splitIntoChunks(config.thinkingText, 'word');
+  const actualThinkingDuration =
     config.thinkingDuration ||
-    getRandomDuration(
-      REALISTIC_TIMING.thinking.min,
-      REALISTIC_TIMING.thinking.max,
-    );
+    thinkingChunks.length * REALISTIC_TIMING.textStreaming.intervalMs;
 
   const timeline: TimelineEvent[] = [];
   let currentTime = 0;
@@ -203,11 +203,12 @@ function buildSimpleResponseTimeline(
     fullText: config.thinkingText,
     chunkStrategy: 'word',
     intervalMs: REALISTIC_TIMING.textStreaming.intervalMs,
-    duration: thinkingDuration,
+    duration: actualThinkingDuration,
   });
 
   // 5. Mark reasoning as done (update state)
-  currentTime += thinkingDuration;
+  // Wait for the actual streaming to complete before marking as done
+  currentTime += actualThinkingDuration;
   timeline.push({
     type: 'update-message-part',
     timestamp: currentTime,
@@ -230,10 +231,9 @@ function buildSimpleResponseTimeline(
   });
 
   // 7. Stream response text
-  const responseStreamDuration = Math.ceil(
-    config.responseText.split(' ').length *
-      REALISTIC_TIMING.textStreaming.intervalMs,
-  );
+  const responseChunks = splitIntoChunks(config.responseText, 'word');
+  const responseStreamDuration =
+    responseChunks.length * REALISTIC_TIMING.textStreaming.intervalMs;
 
   timeline.push({
     type: 'stream-text-part',

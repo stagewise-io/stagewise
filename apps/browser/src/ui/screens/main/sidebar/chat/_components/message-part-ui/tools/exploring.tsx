@@ -94,6 +94,7 @@ const PartContent = ({
           isShimmering={!disableShimmer}
           thinkingDuration={thinkingDuration}
           isLastPart={isLastPart}
+          capMaxHeight={capMaxHeight}
         />
       );
     case 'tool-globTool':

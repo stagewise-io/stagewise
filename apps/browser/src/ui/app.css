@@ -210,10 +210,10 @@ body {
 
   @keyframes thinking-part-brain-pulse {
     0% {
-      stroke-width: 2.5px;
+      stroke-width: 1.5px;
     }
     100% {
-      stroke-width: 1.5px;
+      stroke-width: 2.5px;
     }
   }
 
