@@ -69,6 +69,15 @@ export interface UIControllerEventMap {
   stopSearchInPage: [tabId?: string];
   activateSearchBar: [];
   deactivateSearchBar: [];
+  // Permission handling events
+  acceptPermission: [requestId: string];
+  rejectPermission: [requestId: string];
+  selectPermissionDevice: [requestId: string, deviceId: string];
+  respondToBluetoothPairing: [
+    requestId: string,
+    confirmed: boolean,
+    pin?: string,
+  ];
 }
 
 export class UIController extends EventEmitter<UIControllerEventMap> {
@@ -446,6 +455,37 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       'browser.searchBar.deactivate',
       async (_callingClientId: string) => {
         this.emit('deactivateSearchBar');
+      },
+    );
+
+    // Permission handling procedures
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.permissions.accept',
+      async (_callingClientId: string, requestId: string) => {
+        this.emit('acceptPermission', requestId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.permissions.reject',
+      async (_callingClientId: string, requestId: string) => {
+        this.emit('rejectPermission', requestId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.permissions.selectDevice',
+      async (_callingClientId: string, requestId: string, deviceId: string) => {
+        this.emit('selectPermissionDevice', requestId, deviceId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.permissions.respondToPairing',
+      async (
+        _callingClientId: string,
+        requestId: string,
+        confirmed: boolean,
+        pin?: string,
+      ) => {
+        this.emit('respondToBluetoothPairing', requestId, confirmed, pin);
       },
     );
   }

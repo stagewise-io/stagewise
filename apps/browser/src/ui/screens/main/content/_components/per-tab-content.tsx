@@ -17,8 +17,9 @@ import {
 import { NavButtons } from './nav-buttons';
 import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
 import { Omnibox, type OmniboxRef } from './omnibox';
-import { ZoomBar } from './zoom-bar';
-import { SearchBar } from './search-bar';
+import { ZoomBar } from './control-buttons/zoom-bar';
+import { SearchBar } from './control-buttons/search-bar';
+import { ResourceRequestsControlButton } from './control-buttons/resource-requests';
 import { DownloadsControlButton } from './control-buttons/downloads';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
 
@@ -123,6 +124,7 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
           <Omnibox ref={omniboxRef} tabId={tabId} tab={tab} />
           <ZoomBar tabId={tabId} />
           <SearchBar tabId={tabId} ref={searchInputRef} />
+          <ResourceRequestsControlButton tabId={tabId} />
           <DownloadsControlButton />
           <Tooltip>
             <TooltipTrigger>

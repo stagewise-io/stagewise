@@ -27,6 +27,7 @@ import {
   createSearchUtils,
 } from './utils/search-utils';
 import { HOME_PAGE_URL } from '@shared/internal-urls';
+import { SessionPermissionRegistry } from './tab-permission-handler/session-registry';
 
 interface WindowState {
   width: number;
@@ -110,6 +111,11 @@ export class WindowLayoutService extends DisposableService {
 
   private async initialize() {
     this.logger.debug('[WindowLayoutService] Initializing service');
+
+    // Initialize session-level permission registry before creating any tabs
+    // This must happen early so tab permission handlers can register with it
+    SessionPermissionRegistry.initialize(this.logger);
+
     this.uiController = new UIController(this.logger);
     this.uiController.setCheckFrameValidityHandler(
       this.handleCheckFrameValidity.bind(this),
@@ -278,6 +284,9 @@ export class WindowLayoutService extends DisposableService {
 
   protected onTeardown() {
     this.logger.debug('[WindowLayoutService] Teardown called');
+
+    // Clean up session-level permission registry
+    SessionPermissionRegistry.getInstance()?.destroy();
 
     // We no longer register procedures directly, UIController does (and should unregister if needed)
     // But UIController doesn't have a clean unregister method that works perfectly yet.
@@ -481,6 +490,18 @@ export class WindowLayoutService extends DisposableService {
     this.uiController.on('stopSearchInPage', this.handleStopSearchInPage);
     this.uiController.on('activateSearchBar', this.handleActivateSearchBar);
     this.uiController.on('deactivateSearchBar', this.handleDeactivateSearchBar);
+
+    // Permission handling
+    this.uiController.on('acceptPermission', this.handleAcceptPermission);
+    this.uiController.on('rejectPermission', this.handleRejectPermission);
+    this.uiController.on(
+      'selectPermissionDevice',
+      this.handleSelectPermissionDevice,
+    );
+    this.uiController.on(
+      'respondToBluetoothPairing',
+      this.handleRespondToBluetoothPairing,
+    );
   }
 
   private setupPagesServiceHandlers() {
@@ -1208,6 +1229,68 @@ export class WindowLayoutService extends DisposableService {
     });
     // Also stop any active search
     this.activeTab?.stopSearch();
+  };
+
+  // Permission Handling
+  // These handlers find the tab that has the permission request and delegate to it
+
+  private handleAcceptPermission = (requestId: string) => {
+    for (const tab of Object.values(this.tabs)) {
+      const state = tab.getState();
+      if (state.permissionRequests.some((r) => r.id === requestId)) {
+        tab.acceptPermission(requestId);
+        return;
+      }
+    }
+    this.logger.warn(
+      `[WindowLayoutService] No tab found for permission request: ${requestId}`,
+    );
+  };
+
+  private handleRejectPermission = (requestId: string) => {
+    for (const tab of Object.values(this.tabs)) {
+      const state = tab.getState();
+      if (state.permissionRequests.some((r) => r.id === requestId)) {
+        tab.rejectPermission(requestId);
+        return;
+      }
+    }
+    this.logger.warn(
+      `[WindowLayoutService] No tab found for permission request: ${requestId}`,
+    );
+  };
+
+  private handleSelectPermissionDevice = (
+    requestId: string,
+    deviceId: string,
+  ) => {
+    for (const tab of Object.values(this.tabs)) {
+      const state = tab.getState();
+      if (state.permissionRequests.some((r) => r.id === requestId)) {
+        tab.selectPermissionDevice(requestId, deviceId);
+        return;
+      }
+    }
+    this.logger.warn(
+      `[WindowLayoutService] No tab found for permission request: ${requestId}`,
+    );
+  };
+
+  private handleRespondToBluetoothPairing = (
+    requestId: string,
+    confirmed: boolean,
+    pin?: string,
+  ) => {
+    for (const tab of Object.values(this.tabs)) {
+      const state = tab.getState();
+      if (state.permissionRequests.some((r) => r.id === requestId)) {
+        tab.respondToBluetoothPairing(requestId, confirmed, pin);
+        return;
+      }
+    }
+    this.logger.warn(
+      `[WindowLayoutService] No tab found for Bluetooth pairing request: ${requestId}`,
+    );
   };
 
   // Window State Management (same as before)

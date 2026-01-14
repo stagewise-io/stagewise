@@ -43,6 +43,9 @@ import {
 } from './utils/search-utils';
 import { TabErrorHandler, type SubframeError } from './tab-error-handler';
 export type { SubframeError } from './tab-error-handler';
+import { TabPermissionHandler } from './tab-permission-handler';
+import { SessionPermissionRegistry } from './tab-permission-handler/session-registry';
+import type { PermissionRequest } from '@shared/karton-contracts/ui';
 
 export interface TabState {
   title: string;
@@ -80,6 +83,7 @@ export interface TabState {
   handle: string; // Human-readable handle for LLM addressing (e.g., t_1, t_2)
   consoleLogCount: number; // Total number of console logs captured since page load
   consoleErrorCount: number; // Number of error-level console logs
+  permissionRequests: PermissionRequest[]; // Pending permission requests for this tab
 }
 
 /**
@@ -226,6 +230,9 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   // Error handling
   private errorHandler: TabErrorHandler | null = null;
+
+  // Permission handling
+  private permissionHandler: TabPermissionHandler | null = null;
 
   /**
    * Allocates a handle for a new tab.
@@ -434,6 +441,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       handle: this.handle,
       consoleLogCount: 0,
       consoleErrorCount: 0,
+      permissionRequests: [],
     };
 
     this.setupEventListeners();
@@ -442,6 +450,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.setupScreenshotOnResize();
     this.setupConsoleLogCapture();
     this.setupErrorHandler();
+    this.setupPermissionHandler();
 
     // Initialize zoom percentage from Electron's current zoom factor
     // This ensures we reflect any persisted zoom from previous sessions
@@ -1199,6 +1208,16 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     if (this.errorHandler) {
       this.errorHandler.destroy();
       this.errorHandler = null;
+    }
+
+    // Clean up permission handler
+    if (this.permissionHandler) {
+      const registry = SessionPermissionRegistry.getInstance();
+      if (registry) {
+        registry.unregisterHandler(this.webContentsView.webContents.id);
+      }
+      this.permissionHandler.destroy();
+      this.permissionHandler = null;
     }
 
     // Only detach debugger if webContents is still alive
@@ -2142,6 +2161,65 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         },
       },
     );
+  }
+
+  // =========================================================================
+  // Permission Handling
+  // =========================================================================
+
+  /**
+   * Sets up the TabPermissionHandler for handling permission requests.
+   * The handler manages media, geolocation, Bluetooth, and other device permissions.
+   */
+  private setupPermissionHandler() {
+    this.permissionHandler = new TabPermissionHandler(
+      this.id,
+      this.webContentsView.webContents,
+      this.logger,
+      {
+        onPermissionRequestsUpdate: (requests) => {
+          this.updateState({ permissionRequests: requests });
+        },
+      },
+    );
+
+    // Register with session registry for session-level handler routing
+    const registry = SessionPermissionRegistry.getInstance();
+    if (registry) {
+      registry.registerHandler(this.permissionHandler);
+    }
+  }
+
+  /**
+   * Accept a permission request.
+   */
+  public acceptPermission(requestId: string): void {
+    this.permissionHandler?.acceptRequest(requestId);
+  }
+
+  /**
+   * Reject a permission request.
+   */
+  public rejectPermission(requestId: string): void {
+    this.permissionHandler?.rejectRequest(requestId);
+  }
+
+  /**
+   * Select a device for a device-selection permission request.
+   */
+  public selectPermissionDevice(requestId: string, deviceId: string): void {
+    this.permissionHandler?.selectDevice(requestId, deviceId);
+  }
+
+  /**
+   * Respond to a Bluetooth pairing request.
+   */
+  public respondToBluetoothPairing(
+    requestId: string,
+    confirmed: boolean,
+    pin?: string,
+  ): void {
+    this.permissionHandler?.respondToPairing(requestId, confirmed, pin);
   }
 
   // =========================================================================

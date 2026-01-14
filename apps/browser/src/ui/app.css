@@ -90,6 +90,21 @@ body {
   }
 }
 
+@utility animate-pulse-full {
+  animation: pulse-full 1s ease-in-out infinite;
+}
+@keyframes pulse-full {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 @layer components {
   /* Chat box loading gradient border */
   .chat-loading-gradient {
