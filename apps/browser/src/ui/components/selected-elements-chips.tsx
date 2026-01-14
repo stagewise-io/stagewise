@@ -238,7 +238,7 @@ function SelectedElementChip({
           )}
         </Button>
       </PreviewCardTrigger>
-      <PreviewCardContent className="p-2.5">
+      <PreviewCardContent className="gap-2.5 p-2.5">
         <Tooltip>
           <TooltipTrigger>
             <Button
@@ -262,16 +262,19 @@ function SelectedElementChip({
                 : 'Checking if element exists...'}
           </TooltipContent>
         </Tooltip>
-        <div className="scrollbar-hover-only flex max-h-[35vh] max-w-72 flex-col gap-5 overflow-y-auto overflow-x-hidden pr-0.5 *:shrink-0">
-          <div className="flex flex-col items-stretch justify-start gap-1.5">
-            <p className="font-medium text-foreground text-sm">XPath</p>
-            <div className="w-full break-all font-mono text-muted-foreground text-xs">
+        <p className="font-medium text-foreground text-sm">
+          Element information
+        </p>
+        <div className="scrollbar-hover-only flex max-h-[35vh] max-w-72 flex-col gap-2.5 overflow-y-auto overflow-x-hidden *:shrink-0">
+          <div className="flex flex-col items-stretch justify-start">
+            <p className="font-medium text-foreground text-xs">XPath</p>
+            <div className="w-full break-all font-mono text-2xs text-muted-foreground">
               {selectedElement.xpath}
             </div>
           </div>
           {selectedElement.frameLocation && (
-            <div className="flex flex-col items-stretch justify-start gap-1.5">
-              <p className="font-medium text-foreground text-sm">
+            <div className="flex flex-col items-stretch justify-start">
+              <p className="font-medium text-foreground text-xs">
                 Frame Location
               </p>
               <div className="w-full break-all font-mono text-muted-foreground text-xs">
@@ -285,55 +288,50 @@ function SelectedElementChip({
             </div>
           )}
           {selectedElement.frameTitle && (
-            <div className="flex flex-col items-stretch justify-start gap-1.5">
-              <p className="font-medium text-foreground text-sm">Frame Title</p>
+            <div className="flex flex-col items-stretch justify-start">
+              <p className="font-medium text-foreground text-xs">Frame Title</p>
               <div className="w-full break-all text-muted-foreground text-xs">
                 {selectedElement.frameTitle}
               </div>
             </div>
           )}
-          <div className="flex flex-col items-stretch justify-start gap-1.5">
-            <p className="font-medium text-foreground text-sm">Attributes</p>
-            <div className="flex w-full flex-col items-stretch gap-0.5">
-              {displayedAttributes
-                .filter(
-                  (attribute) =>
-                    selectedElement.attributes[attribute] !== null &&
-                    selectedElement.attributes[attribute] !== '' &&
-                    selectedElement.attributes[attribute] !== undefined,
-                )
-                .map((attribute) => (
-                  <div
-                    key={attribute}
-                    className="flex flex-row items-start justify-start gap-3"
+          {displayedAttributes
+            .filter(
+              (attribute) =>
+                selectedElement.attributes[attribute] !== null &&
+                selectedElement.attributes[attribute] !== '' &&
+                selectedElement.attributes[attribute] !== undefined,
+            )
+            .map((attribute) => (
+              <div
+                key={attribute}
+                className="flex flex-col items-stretch justify-start"
+              >
+                <p className="font-medium text-foreground text-xs">
+                  {attribute}
+                </p>
+                {isUrl(selectedElement.attributes[attribute]) ? (
+                  <a
+                    href={selectedElement.attributes[attribute]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full break-all text-primary-foreground text-xs hover:text-hover-derived"
                   >
-                    <p className="max-w-1/3 shrink-0 basis-1/3 break-all text-foreground text-sm">
-                      {attribute}
-                    </p>
-                    {isUrl(selectedElement.attributes[attribute]) ? (
-                      <a
-                        href={selectedElement.attributes[attribute]}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-foreground text-xs hover:text-hover-derived"
-                      >
-                        {selectedElement.attributes[attribute]}{' '}
-                        <IconOpenExternalOutline18 className="mb-0.5 ml-0.5 inline size-3.5" />
-                      </a>
-                    ) : (
-                      <p className="mt-0.5 shrink basis-2/3 select-text font-mono text-muted-foreground text-xs">
-                        {selectedElement.attributes[attribute]}
-                      </p>
-                    )}
+                    {selectedElement.attributes[attribute]}{' '}
+                    <IconOpenExternalOutline18 className="mb-0.5 ml-0.5 inline size-3.5" />
+                  </a>
+                ) : (
+                  <div className="w-full select-text break-all font-mono text-2xs text-muted-foreground">
+                    {selectedElement.attributes[attribute]}
                   </div>
-                ))}
-            </div>
-          </div>
+                )}
+              </div>
+            ))}
 
           {selectedElement.frameworkInfo?.react &&
             flattenedReactComponentTree.length > 0 && (
-              <div className="flex flex-col items-stretch justify-start gap-1.5">
-                <p className="font-medium text-foreground text-sm">
+              <div className="flex flex-col items-stretch justify-start gap-0.5">
+                <p className="font-medium text-foreground text-xs">
                   <AtomIcon className="-my-px inline-block size-3 self-end align-baseline" />{' '}
                   React Component Tree
                 </p>
@@ -364,8 +362,8 @@ function SelectedElementChip({
 
           {selectedElement.codeMetadata &&
             selectedElement.codeMetadata.length > 0 && (
-              <div className="flex flex-col items-stretch justify-start gap-1.5">
-                <p className="w-full font-medium text-foreground text-sm">
+              <div className="flex flex-col items-stretch justify-start gap-0.5">
+                <p className="w-full font-medium text-foreground text-xs">
                   Related source files
                 </p>
                 <div className="flex w-full flex-col items-stretch gap-2">
