@@ -47,7 +47,7 @@ export class WorkspacePathsService extends DisposableService {
      * @returns Path to the data folder for the workspace
      */
     try {
-      // Fetch folder form the path and get it's creation time
+      // Fetch folder from the path and get it's creation time
       const workspaceFolder = path.dirname(workspacePath);
       const workspaceFolderCreationTimeSalt = await fs
         .stat(workspaceFolder)

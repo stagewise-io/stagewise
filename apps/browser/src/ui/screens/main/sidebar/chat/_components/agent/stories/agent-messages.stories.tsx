@@ -32,7 +32,6 @@ const baseState: Partial<AppState> = {
     agent: {
       accessPath: '/Users/user/projects/my-app',
     },
-    childWorkspacePaths: [],
     path: '/Users/user/projects/my-app',
     paths: {
       data: '/Users/user/projects/my-app/data',

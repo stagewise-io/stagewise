@@ -222,9 +222,7 @@ function StartPageWithConnectedWorkspace() {
           Alpha
         </div>
       </div>
-      {workspaceStatus !== 'open' && workspaceStatus !== 'setup' && (
-        <ConnectWorkspaceBanner />
-      )}
+      {workspaceStatus !== 'open' && <ConnectWorkspaceBanner />}
       {inspirationWebsitesWithScreenshot.websites.length > 0 && (
         <div className="group/design-inspiration mt-2 flex w-full flex-col items-center justify-start gap-4">
           <div className="flex w-full items-center justify-between">
@@ -295,7 +293,7 @@ function OnboardingStartPage() {
       </div>
       <div
         className={cn(
-          'group/start-page-workspaces mt-2 flex w-full flex-col items-start justify-start gap-4 rounded-lg border border-derived-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-4 dark:from-base-750 dark:to-surface-1',
+          'group/start-page-workspaces mt-2 flex w-full flex-col items-start justify-start gap-4 rounded-lg border border-derived-subtle bg-linear-to-tr from-surface-1/70 to-surface-1/50 p-4 dark:bg-surface-1',
         )}
       >
         <div className="flex justify-between gap-20 ">
@@ -347,7 +345,7 @@ function RecentlyOpenedWorkspaceItem({
 }) {
   return (
     <div
-      className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg bg-background from-base-700 to-base-650 p-2 pt-1 hover:bg-hover-derived dark:bg-surface-1 dark:hover:bg-linear-to-tr"
+      className="flex w-full shrink-0 cursor-pointer items-center gap-4 rounded-lg bg-background p-2 pt-1 hover:bg-hover-derived dark:bg-surface-1"
       onClick={onClick}
     >
       <IconDocFolder className="size-4 shrink-0 text-muted-foreground" />
@@ -524,15 +522,17 @@ function ConnectWorkspaceBanner() {
                   Recent workspaces
                 </div>
                 {recentlyOpenedWorkspaces.length > 3 && (
-                  <div
-                    className="hidden shrink-0 cursor-pointer items-center gap-1 font-medium text-muted-foreground text-xs group-hover/recent-workspaces:flex"
+                  <Button
+                    variant={'ghost'}
+                    size="sm"
+                    className="hidden h-fit shrink-0 cursor-pointer items-center gap-1 p-0 text-xs group-hover/recent-workspaces:flex"
                     onClick={() =>
                       setShowAllRecentlyOpenedWorkspaces(
                         !showAllRecentlyOpenedWorkspaces,
                       )
                     }
                   >
-                    Show all ({sortedRecentlyOpenedWorkspaces.length})
+                    Show all ({recentlyOpenedWorkspaces.length})
                     <IconChevronDown
                       className={cn(
                         'size-3 shrink-0',
@@ -541,7 +541,7 @@ function ConnectWorkspaceBanner() {
                           : '-rotate-90',
                       )}
                     />
-                  </div>
+                  </Button>
                 )}
               </div>
               <div className="scrollbar-subtle flex max-h-60 w-full flex-col items-start gap-2 overflow-y-auto">

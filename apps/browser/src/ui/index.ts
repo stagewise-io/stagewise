@@ -32,7 +32,7 @@ import { App } from '@/app';
 // Initialize the app
 try {
   createRoot(document.body).render(
-    createElement(StrictMode, null, createElement(App, { plugins: [] })),
+    createElement(StrictMode, null, createElement(App)),
   );
 } catch (error) {
   console.error(error);

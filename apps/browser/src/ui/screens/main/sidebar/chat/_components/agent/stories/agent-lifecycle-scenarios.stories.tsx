@@ -37,7 +37,6 @@ const baseState: Partial<AppState> = {
       statusInfo: { isIndexing: false },
     },
     loadedOnStart: true,
-    childWorkspacePaths: [],
     agent: {
       accessPath: '/Users/user/projects/my-app',
     },

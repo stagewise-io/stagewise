@@ -4,12 +4,11 @@
 
 import { app } from 'electron';
 import { AuthService } from './services/auth';
-import { AgentService } from './services/workspace/services/agent/agent';
+import { AgentService } from './services/agent/agent';
 import { UserExperienceService } from './services/experience';
-import { WorkspaceManagerService } from './services/workspace-manager';
+import { WorkspaceService } from './services/workspace';
 import { FilePickerService } from './services/file-picker';
 import { existsSync, unlinkSync } from 'node:fs';
-import path, { resolve } from 'node:path';
 import { AppMenuService } from './services/app-menu';
 import { URIHandlerService } from './services/uri-handler';
 import { IdentifierService } from './services/identifier';
@@ -33,22 +32,15 @@ import {
 import type { DownloadSummary } from '@shared/karton-contracts/ui';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
 import { shell } from 'electron';
-import { getRepoRootForPath } from './utils/git-tools';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
-import { generateId } from 'ai';
 
 export type MainParameters = {
   launchOptions: {
-    workspacePath?: string;
     verbose?: boolean;
-    workspaceOnStart?: boolean;
-    wrappedCommand?: string;
   };
 };
 
-export async function main({
-  launchOptions: { workspacePath, verbose, workspaceOnStart, wrappedCommand },
-}: MainParameters) {
+export async function main({ launchOptions: { verbose } }: MainParameters) {
   // In this file you can include the rest of your app's specific main process
   // code. You can also put them in separate files and import them here.
   const logger = new Logger(verbose ?? false);
@@ -587,49 +579,34 @@ export async function main({
     await authService.handleAuthCodeExchange(authCode, error);
   });
 
-  const workspaceManagerService = await WorkspaceManagerService.create(
+  const workspaceService = await WorkspaceService.create(
     logger,
     filePickerService,
     telemetryService,
     uiKarton,
     globalDataPathService,
     notificationService,
+    authService,
   );
 
-  workspaceManagerService.registerWorkspaceChangeListener((event) => {
+  workspaceService.registerWorkspaceChangeListener((event) => {
     switch (event.type) {
       case 'loaded': {
-        const accessPath = event.accessPath ?? event.selectedPath;
-        const absoluteAccessPath =
-          accessPath === '{GIT_REPO_ROOT}'
-            ? getRepoRootForPath(event.selectedPath)
-            : resolve(event.selectedPath, accessPath);
+        const accessPath = event.selectedPath;
         const clientRuntime = new ClientRuntimeNode({
-          workingDirectory: absoluteAccessPath,
+          workingDirectory: accessPath,
           rgBinaryBasePath: globalDataPathService.globalDataPath,
         });
         agentService.setClientRuntime(clientRuntime);
-        if (uiKarton.state.workspaceStatus === 'setup') {
-          agentService.createAndActivateNewChat();
-          agentService.sendUserMessage({
-            id: generateId(),
-            role: 'user',
-            parts: [
-              { type: 'text', text: 'Help me set up the selected workspace!' },
-            ],
-          });
-        }
+        void _userExperienceService.saveRecentlyOpenedWorkspace({
+          path: event.selectedPath,
+          name: event.name,
+          openedAt: Date.now(),
+        });
         break;
       }
       case 'unloaded':
         agentService.setClientRuntime(null);
-        break;
-      case 'setupCompleted':
-        void _userExperienceService.saveRecentlyOpenedWorkspace({
-          path: event.workspacePath,
-          name: event.name ?? '',
-          openedAt: Date.now(),
-        });
         break;
     }
   });
@@ -652,10 +629,10 @@ export async function main({
   pagesService.setOpenWorkspaceHandler(async (path?: string) => {
     try {
       // Unload current workspace first if one is loaded
-      if (workspaceManagerService.workspace) {
-        await workspaceManagerService.unloadWorkspace();
+      if (workspaceService.isLoaded) {
+        await workspaceService.unloadWorkspace();
       }
-      await workspaceManagerService.loadWorkspace(path);
+      await workspaceService.loadWorkspace(path);
     } catch (error) {
       logger.error(`[Main] Failed to open workspace: ${error}`);
     }
@@ -675,19 +652,6 @@ export async function main({
     globalConfigService,
     authService,
     windowLayoutService,
-    async (params) => {
-      await workspaceManagerService.workspace?.setupService?.handleSetupSubmission(
-        {
-          agentAccessPath: params.agentAccessPath,
-        },
-        params.appPath,
-      );
-      agentService.setCurrentWorkingDirectory(
-        params.agentAccessPath === '{GIT_REPO_ROOT}'
-          ? getRepoRootForPath(params.appPath)
-          : resolve(params.appPath, params.agentAccessPath),
-      );
-    },
     globalDataPathService,
   );
 
@@ -761,23 +725,6 @@ export async function main({
 
   // After all services got started, we're now ready to load the initial workspace (which is either the user given path or the cwd).
   // We only load the current workspace as default workspace if the folder contains a stagewise.json file. (We don't verify it tho)
-  const workspacePathToLoad =
-    workspacePath ??
-    (existsSync(path.resolve(process.cwd(), 'stagewise.json'))
-      ? process.cwd()
-      : undefined);
-
-  if (workspaceOnStart && workspacePathToLoad) {
-    logger.debug('[Main] Loading initial workspace...');
-    await workspaceManagerService.loadWorkspace(
-      workspacePath ?? process.cwd(),
-      true,
-      !!workspacePath,
-      wrappedCommand,
-    );
-    logger.debug('[Main] Initial workspace loaded');
-  }
-
   logger.debug('[Main] Startup complete');
 
   // Handle command line arguments for URLs on initial startup

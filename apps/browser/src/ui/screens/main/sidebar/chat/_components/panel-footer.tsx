@@ -1,5 +1,4 @@
 import { FileAttachmentChips } from '@/components/file-attachment-chips';
-import { IconXmark } from 'nucleo-micro-bold';
 import { ModelSelect } from './model-select';
 import { ContextUsageRing } from './context-usage-ring';
 import { SelectedElementsChipsFlexible } from '@/components/selected-elements-chips-flexible';
@@ -56,8 +55,6 @@ export function ChatPanelFooter() {
     return tabs[activeTabId];
   }, [tabs, activeTabId]);
 
-  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
-
   const focusChatHotkeyText = HotkeyComboText({ action: HotkeyActions.CTRL_I });
 
   const elementSelectionActive = useKartonState(
@@ -108,21 +105,6 @@ export function ChatPanelFooter() {
   const hasOpenedInternalPage = useMemo(() => {
     return activeTab?.url?.startsWith('stagewise://internal/') ?? false;
   }, [activeTab?.url]);
-
-  const createChat = useKartonProcedure((p) => p.agentChat.create);
-  const deleteChat = useKartonProcedure((p) => p.agentChat.delete);
-
-  const closeWorkspace = useKartonProcedure((p) => p.workspace.close);
-
-  const closeWorkspaceSetupAndCreateNewChat = useCallback(
-    async (setupChatId: string) => {
-      await closeWorkspace();
-      await createChat();
-      void deleteChat(setupChatId);
-      window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
-    },
-    [closeWorkspace, createChat, deleteChat],
-  );
 
   const handleSubmit = useCallback(() => {
     if (canSendMessage) {
@@ -475,22 +457,6 @@ export function ChatPanelFooter() {
             <TooltipContent>Send message</TooltipContent>
           </Tooltip>
         </div>
-        {workspaceStatus === 'setup' && (
-          <div className="-z-10 absolute right-2 bottom-full left-2 flex flex-row items-center justify-between gap-2 rounded-t-lg border-derived-subtle border-t border-r border-l bg-background p-0.75 pl-2.5 backdrop-blur-lg">
-            <span className="truncate text-primary-foreground text-xs">
-              You are in workspace setup-mode.
-            </span>
-            <Button
-              variant="ghost"
-              size="xs"
-              className="shrink-0"
-              onClick={() => closeWorkspaceSetupAndCreateNewChat(activeChatId)}
-            >
-              <IconXmark className="size-3" />
-              Cancel setup
-            </Button>
-          </div>
-        )}
         <FileDiffCard />
       </div>
     </footer>

@@ -68,46 +68,6 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
-  agent/knowledge:
-    dependencies:
-      '@ai-sdk/anthropic':
-        specifier: 3.0.7
-        version: 3.0.7(zod@4.3.5)
-      '@ai-sdk/provider':
-        specifier: 3.0.1
-        version: 3.0.1
-      '@stagewise/agent-tools':
-        specifier: workspace:*
-        version: link:../tools
-      ai:
-        specifier: 6.0.11
-        version: 6.0.11(zod@4.3.5)
-      openai:
-        specifier: ^5.20.2
-        version: 5.23.2(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.3.5)
-      zod:
-        specifier: 4.3.5
-        version: 4.3.5
-    devDependencies:
-      '@stagewise/agent-runtime-interface':
-        specifier: workspace:*
-        version: link:../runtime-interface
-      esbuild:
-        specifier: 0.25.9
-        version: 0.25.9
-      rimraf:
-        specifier: ^5.0.0
-        version: 5.0.10
-      tsx:
-        specifier: ^4.7.1
-        version: 4.21.0
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
-
   agent/runtime-interface:
     devDependencies:
       rimraf:
@@ -7903,18 +7863,6 @@ packages:
   open@10.2.0:
     resolution: {integrity: sha512-YgBpdJHPyQ2UE5x+hlSXcnejzAvD0b22U2OuAP+8OnlJT+PjWPxtgmGqKKc+RgTM63U9gN0YzrYc71R2WT/hTA==}
     engines: {node: '>=18'}
-
-  openai@5.23.2:
-    resolution: {integrity: sha512-MQBzmTulj+MM5O8SKEk/gL8a7s5mktS9zUtAkU257WjvobGc9nKcBuVwjyEEcb9SI8a8Y2G/mzn3vm9n1Jlleg==}
-    hasBin: true
-    peerDependencies:
-      ws: ^8.18.0
-      zod: ^3.23.8
-    peerDependenciesMeta:
-      ws:
-        optional: true
-      zod:
-        optional: true
 
   openai@6.15.0:
     resolution: {integrity: sha512-F1Lvs5BoVvmZtzkUEVyh8mDQPPFolq4F+xdsx/DO8Hee8YF3IGAlZqUIsF+DVGhqf4aU0a3bTghsxB6OIsRy1g==}
@@ -18270,11 +18218,6 @@ snapshots:
       define-lazy-prop: 3.0.0
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
-
-  openai@5.23.2(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.3.5):
-    optionalDependencies:
-      ws: 8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      zod: 4.3.5
 
   openai@6.15.0(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.3.5):
     optionalDependencies:

@@ -3,15 +3,14 @@ import './app.css';
 import type { FunctionComponent } from 'react';
 import { ContextProviders } from './components/context-providers';
 import { AppStateProvider } from './hooks/use-app-state';
-import type { InternalToolbarConfig } from './config';
 import { ScreenRouter } from './screens';
 import { NotificationToaster } from './notification-toaster';
 import { TitleManager } from './components/title-manager';
 
-export const App: FunctionComponent<InternalToolbarConfig> = (config) => {
+export const App: FunctionComponent = () => {
   return (
     <AppStateProvider>
-      <ContextProviders config={config}>
+      <ContextProviders>
         <TitleManager />
 
         <ScreenRouter />

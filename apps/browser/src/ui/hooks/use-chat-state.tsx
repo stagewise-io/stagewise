@@ -6,7 +6,6 @@ import {
   useRef,
 } from 'react';
 import { useContext, useState, useCallback } from 'react';
-import { usePlugins } from './use-plugins';
 import {
   generateId,
   collectUserMessageMetadata,
@@ -127,8 +126,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   const [isSending, setIsSending] = useState<boolean>(false);
 
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
-
-  const { plugins } = usePlugins();
 
   const sendChatMessage = useKartonProcedure(
     (p) => p.agentChat.sendUserMessage,
@@ -254,7 +251,6 @@ export const ChatStateProvider = ({ children }: ChatStateProviderProps) => {
   }, [
     chatInput,
     fileAttachments,
-    plugins,
     sendChatMessage,
     clearFileAttachments,
     clearSelectedElements,

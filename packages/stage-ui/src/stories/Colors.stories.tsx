@@ -324,6 +324,7 @@ const specificSyntaxTokens = [
   {
     name: 'string-template-expression',
     label: 'Template Expr',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: Just for demonstration
     description: '${} in templates',
     category: 'Strings',
   },
@@ -429,6 +430,7 @@ const specificSyntaxTokens = [
   {
     name: 'embedded-punctuation',
     label: 'Embedded',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: Just for demonstration
     description: '${} in templates',
     category: 'Additional',
   },

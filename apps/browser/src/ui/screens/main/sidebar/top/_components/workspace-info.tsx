@@ -31,7 +31,6 @@ export function WorkspaceInfoBadge() {
   const openWorkspace = useKartonProcedure((p) => p.workspace.open);
   const closeWorkspace = useKartonProcedure((p) => p.workspace.close);
 
-  const status = useKartonState((s) => s.workspaceStatus);
   const createFilePickerRequest = useKartonProcedure(
     (p) => p.filePicker.createRequest,
   );
@@ -46,7 +45,6 @@ export function WorkspaceInfoBadge() {
   }, [closeWorkspace]);
 
   if (!workspace) return null;
-  if (status === 'setup') return null;
 
   return (
     <Popover>

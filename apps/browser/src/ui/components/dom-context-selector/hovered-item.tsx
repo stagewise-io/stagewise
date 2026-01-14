@@ -1,8 +1,7 @@
 import { useWindowSize } from '@/hooks/use-window-size';
 import { useCyclicUpdate } from '@/hooks/use-cyclic-update';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import type { HTMLAttributes } from 'react';
-import { usePlugins } from '@/hooks/use-plugins';
 import { cn } from '@/utils';
 import { getIFrame } from '@/utils';
 
@@ -16,20 +15,6 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
   const iframeRef = useRef<HTMLIFrameElement>(getIFrame());
 
   const windowSize = useWindowSize();
-
-  const { plugins } = usePlugins();
-
-  const hoveredElementPluginContext = useMemo(() => {
-    if (!refElement) return [];
-    const pluginsWithContextGetters = plugins.filter(
-      (plugin) => plugin.onSelectedElementSelect,
-    );
-
-    return pluginsWithContextGetters.map((plugin) => ({
-      pluginName: plugin.pluginName,
-      context: plugin.onSelectedElementSelect?.(refElement),
-    }));
-  }, [refElement]);
 
   const updateBoxPosition = useCallback(() => {
     if (boxRef.current && refElement) {
@@ -70,22 +55,6 @@ export function HoveredItem({ refElement, ...props }: HoveredItemProps) {
         <div className="flex flex-row items-center justify-center gap-0.5 overflow-hidden rounded-md bg-zinc-700/80 px-1 py-0 font-medium text-white text-xs">
           <span className="truncate">{refElement.tagName.toLowerCase()}</span>
         </div>
-        {hoveredElementPluginContext
-          .filter((plugin) => plugin.context?.annotation)
-          .map((plugin) => (
-            <div
-              key={plugin.pluginName}
-              className="flex flex-row items-center justify-center gap-0.5 overflow-hidden rounded-md bg-zinc-700/80 px-1 py-0 font-medium text-white text-xs"
-            >
-              <span className="size-3 shrink-0 stroke-white text-white *:size-full">
-                {
-                  plugins.find((p) => p.pluginName === plugin.pluginName)
-                    ?.iconSvg
-                }
-              </span>
-              <span className="truncate">{plugin.context?.annotation}</span>
-            </div>
-          ))}
       </div>
     </div>
   );

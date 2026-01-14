@@ -1,4 +1,4 @@
-import { Button } from '@/plugin-sdk';
+import { Button } from '@stagewise/stage-ui/components/button';
 import { IconMessagesFillDuo18 } from 'nucleo-ui-fill-duo-18';
 import {
   Tooltip,

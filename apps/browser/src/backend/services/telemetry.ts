@@ -23,10 +23,6 @@ export interface EventProperties {
   };
   'workspace-opened': {
     initial_setup: boolean; // Whether the workspace was opened for the first time.
-    auto_plugins_enabled: boolean; // Whether the auto plugins feature is enabled.
-    manual_plugins_count: number; // The number of manually added plugins.
-    loaded_plugins: string[]; // The plugins that were loaded.
-    has_wrapped_command: boolean; // Whether the wrapped command feature is enabled.
     codebase_line_count?: number; // The number of lines of code in the workspace.
     dependency_count?: number; // The number of dependencies in the workspace.
     loading_method:

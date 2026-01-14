@@ -64,7 +64,7 @@ export const ChatHistory = () => {
       setLastUserMessageHeight(0);
     }
   }, []);
-  const { activeChatId, chats, workspaceStatus } = useKartonState(
+  const { activeChatId, chats } = useKartonState(
     useComparingSelector((s) => ({
       activeChatId: s.agentChat?.activeChatId,
       isWorking: s.agentChat?.isWorking,
@@ -267,7 +267,7 @@ export const ChatHistory = () => {
       style={{
         paddingLeft: basePadding,
         paddingRight: rightPadding,
-        paddingBottom: `calc(1rem + var(--file-diff-card-height, 0px)${workspaceStatus === 'setup' ? ' + 2rem' : ''})`,
+        paddingBottom: `calc(1rem + var(--file-diff-card-height, 0px))`,
         scrollbarGutter: 'stable',
       }}
       onScroll={handleScroll}

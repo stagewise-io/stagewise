@@ -28,17 +28,16 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   const chats = useKartonState((s) => s.agentChat?.chats) || {};
   const platform = useKartonState((s) => s.appInfo.platform);
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
-  const workspaceStatus = useKartonState((s) => s.workspaceStatus);
   const activeChatId = useKartonState((s) => s.agentChat?.activeChatId || null);
   const isWorking = useKartonState((s) => s.agentChat?.isWorking);
 
   const showChatListButton = useMemo(() => {
-    return Object.keys(chats).length > 1 && workspaceStatus !== 'setup';
-  }, [chats, workspaceStatus]);
+    return Object.keys(chats).length > 1;
+  }, [chats]);
 
   const showNewChatButton = useMemo(() => {
-    return activeChatId && workspaceStatus !== 'setup';
-  }, [activeChatId, workspaceStatus]);
+    return activeChatId;
+  }, [activeChatId]);
 
   const groupedChats = useMemo(() => groupChatsByTime(chats), [chats]);
 
@@ -232,9 +231,8 @@ function groupChatsByTime(
 
     const monthsDiff = (nowYear - chatYear) * 12 + (nowMonth - chatMonth);
 
-    if (monthsDiff < 12) {
+    if (monthsDiff < 12)
       return monthsDiff === 1 ? 'Last month' : `${monthsDiff} months ago`;
-    }
 
     // Yearly grouping (1+ years)
     const yearsDiff = nowYear - chatYear;

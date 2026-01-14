@@ -9,12 +9,10 @@ export function TitleManager() {
     if (authStatus === 'unauthenticated') {
       document.title = 'Sign in | stagewise';
     } else if (workspace === null) {
-      document.title = 'Open Workspace | stagewise';
-    } else if (workspace.setupActive) {
-      document.title = 'Workspace Setup | stagewise';
+      document.title = 'Open Project | stagewise';
     } else {
       const workspaceName =
-        workspace.path.split('/').pop() ?? 'Untitled Workspace';
+        workspace.path.split('/').pop() ?? 'Untitled Project';
       document.title = `${workspaceName} | stagewise`;
     }
   }, [authStatus, workspace]);

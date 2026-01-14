@@ -151,7 +151,6 @@ export class UserExperienceService extends DisposableService {
     const state = this.uiKarton.state;
     const needsInitialization =
       state.userAccount?.status === 'authenticated' &&
-      !state.workspace?.setupActive &&
       !state.userExperience.storedExperienceData.hasSeenOnboardingFlow;
 
     if (needsInitialization) {

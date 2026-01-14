@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import type {
-  AskForAppPathOutput,
-  AskForAgentAccessPathOutput,
-  AskForIdeOutput,
-} from '@stagewise/agent-tools';
+import type { ExampleUserInputOutput } from '@stagewise/agent-tools';
 import type { UserMessageMetadata, BrowserData } from './metadata';
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { AppRouter, TRPCClient } from '@stagewise/api-client';
@@ -16,7 +12,6 @@ import type {
 import type { UITools, ToolPart } from '@stagewise/agent-tools';
 import type { FileDiff } from '@stagewise/agent-types';
 import type {
-  WorkspaceConfig,
   FilePickerRequest,
   GlobalConfig,
   ModelSettings,
@@ -133,12 +128,7 @@ export type StructuredAgentErrorInfo = {
   requestId?: string;
 };
 
-export type WorkspaceStatus =
-  | 'open'
-  | 'closed'
-  | 'loading'
-  | 'closing'
-  | 'setup';
+export type WorkspaceStatus = 'open' | 'closed' | 'loading' | 'closing';
 
 export const recentlyOpenedWorkspaceSchema = z.object({
   path: z.string(),
@@ -280,16 +270,6 @@ export type AppState = {
     agent: {
       accessPath: string;
     } | null;
-    config: WorkspaceConfig | null;
-    plugins:
-      | ({
-          name: string;
-          bundled: boolean;
-          available: boolean;
-          error?: string;
-        } & ({ url: string } | { path: string }))[]
-      | null; // The list of plugins that were loaded in the workspace
-    setupActive: boolean;
     rag: {
       lastIndexedAt: Date | null;
       indexedFiles: number;
@@ -303,7 +283,6 @@ export type AppState = {
         | { isIndexing: false; hasError: true; error: string };
     };
     loadedOnStart: boolean;
-    childWorkspacePaths: string[]; // List of paths that are child paths of the currently opened workspace.
   } | null;
   workspaceStatus: WorkspaceStatus;
   userAccount: {
@@ -433,15 +412,8 @@ export type KartonContract = {
       rejectToolCall: (toolCallId: string) => Promise<void>;
       submitUserInteractionToolInput: (
         toolCallId: string,
-        input:
-          | (AskForAppPathOutput & { type: 'askForAppPathTool' })
-          | (AskForAgentAccessPathOutput & {
-              type: 'askForAgentAccessPathTool';
-            })
-          | (AskForIdeOutput & {
-              type: 'askForIdeTool';
-              ide: AskForIdeOutput['ide'];
-            }),
+        input: ExampleUserInputOutput & { type: 'exampleUserInputTool' },
+        // | (YourNewUserInputOutput & { type: 'yourNewUserInputTool' }),
       ) => Promise<{ success: true } | { success: false; error: string }>; // Returns zod validation success or failure
       cancelUserInteractionToolInput: (toolCallId: string) => Promise<void>; // Cancels the user interaction tool input.
       acceptAllPendingEdits: () => Promise<void>;
@@ -464,23 +436,6 @@ export type KartonContract = {
     workspace: {
       open: (path?: string) => Promise<void>;
       close: () => Promise<void>;
-      getGitRepoRoot: () => Promise<string>;
-      setup: {
-        submit: (config: WorkspaceConfig) => Promise<void>;
-        checkForActiveAppOnPort: (port: number) => Promise<boolean>;
-        resolveRelativePathToAbsolutePath: (
-          relativePath: string,
-          basePath?: string,
-        ) => Promise<string | null>;
-      };
-      config: {
-        set: (config: WorkspaceConfig) => Promise<void>;
-      };
-      devAppState: {
-        start: () => Promise<void>;
-        stop: () => Promise<void>;
-        restart: () => Promise<void>;
-      };
     };
     userExperience: {
       devAppPreview: {
