@@ -40,7 +40,11 @@ import type {
   USBSelectionRequest,
   BluetoothPairingRequest,
 } from '@shared/karton-contracts/ui';
-import { IconCheckFill18, IconXmarkFill18 } from 'nucleo-ui-fill-18';
+import {
+  IconCheckFill18,
+  IconBanFill18,
+  IconXmarkFill18,
+} from 'nucleo-ui-fill-18';
 import { IconBluetoothOutline24 } from 'nucleo-core-outline-24';
 import { IconUsbFill24 } from 'nucleo-core-fill-24';
 import TimeAgo from 'react-timeago';
@@ -233,11 +237,15 @@ function PermissionRequestRow({
   request,
   onAccept,
   onReject,
+  onAlwaysAllow,
+  onAlwaysBlock,
   onSelectDevice,
 }: {
   request: PermissionRequest;
   onAccept: (requestId: string) => void;
   onReject: (requestId: string) => void;
+  onAlwaysAllow: (requestId: string) => void;
+  onAlwaysBlock: (requestId: string) => void;
   onSelectDevice: (requestId: string, deviceId: string) => void;
 }) {
   const icons = getRequestIcons(request);
@@ -277,8 +285,18 @@ function PermissionRequestRow({
     }
   }, [request.id, isSimple, selectedDevice, onAccept, onSelectDevice]);
 
+  const handleAlwaysAllow = useCallback(() => {
+    onAlwaysAllow(request.id);
+  }, [request.id, onAlwaysAllow]);
+
+  const handleAlwaysBlock = useCallback(() => {
+    onAlwaysBlock(request.id);
+  }, [request.id, onAlwaysBlock]);
+
+  const canAct = isSimple || !!selectedDevice;
+
   return (
-    <div className="relative flex shrink-0 flex-col items-stretch gap-1 py-2">
+    <div className="relative flex shrink-0 flex-col items-stretch gap-2 py-2">
       {/* Pulsing bg for new requests */}
       {showPulse && (
         <div className="-mx-1 pointer-events-none absolute inset-0 animate-pulse-full rounded-lg bg-primary/10" />
@@ -303,64 +321,90 @@ function PermissionRequestRow({
         </Button>
       </div>
 
-      {/* Content: description + device select + accept button */}
-      <div className="flex flex-row items-end justify-between gap-4">
-        <div className="flex flex-col items-stretch gap-0.5">
-          <span className="text-foreground text-sm">
-            <strong className="font-semibold">
-              {new URL(request.origin).host}
-            </strong>{' '}
-            {description}
-          </span>
+      {/* Content: description + device select */}
+      <div className="flex flex-col items-stretch gap-1">
+        <span className="text-foreground text-sm">
+          <strong className="font-semibold">
+            {new URL(request.origin).host}
+          </strong>{' '}
+          {description}
+        </span>
 
-          {/* Device selection for device-type requests */}
-          {isDeviceRequest && (
-            <div className="flex flex-col gap-1">
-              {devices.length === 0 ? (
-                <span className="pl-1 text-muted-foreground text-xs">
-                  Searching for devices...
-                </span>
-              ) : (
-                <Select
-                  triggerClassName="mt-1 w-full max-w-full"
-                  popupClassName="max-w-(--anchor-width)"
-                  value={selectedDevice}
-                  onValueChange={setSelectedDevice}
-                  triggerVariant="secondary"
-                  size="md"
-                  placeholder="Select a device…"
-                  items={devices.map((device) => ({
-                    value: device.id,
-                    label: device.name,
-                    description: device.id,
-                  }))}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Bluetooth pairing PIN display */}
-          {pairingRequest?.pairingKind === 'confirmPin' &&
-            pairingRequest.pin && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground text-sm">PIN:</span>
-                <span className="rounded-lg bg-surface-1 px-2 py-0.5 font-medium font-mono text-base tracking-widest">
-                  {pairingRequest.pin}
-                </span>
-              </div>
+        {/* Device selection for device-type requests */}
+        {isDeviceRequest && (
+          <div className="flex flex-col gap-1">
+            {devices.length === 0 ? (
+              <span className="pl-1 text-muted-foreground text-xs">
+                Searching for devices...
+              </span>
+            ) : (
+              <Select
+                triggerClassName="mt-1 w-full max-w-full"
+                popupClassName="max-w-(--anchor-width)"
+                value={selectedDevice}
+                onValueChange={setSelectedDevice}
+                triggerVariant="secondary"
+                size="md"
+                placeholder="Select a device…"
+                items={devices.map((device) => ({
+                  value: device.id,
+                  label: device.name,
+                  description: device.id,
+                }))}
+              />
             )}
-        </div>
+          </div>
+        )}
 
-        <Button
-          variant="primary"
-          size="icon-sm"
-          className="mb-1 shrink-0"
-          disabled={!isSimple && !selectedDevice}
-          onClick={handleAccept}
-        >
-          <IconCheckFill18 className="size-3" />
-        </Button>
+        {/* Bluetooth pairing PIN display */}
+        {pairingRequest?.pairingKind === 'confirmPin' && pairingRequest.pin && (
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground text-sm">PIN:</span>
+            <span className="rounded-lg bg-surface-1 px-2 py-0.5 font-medium font-mono text-base tracking-widest">
+              {pairingRequest.pin}
+            </span>
+          </div>
+        )}
       </div>
+
+      {/* Action buttons: 2-column for device requests, 3-column for simple permissions */}
+      {isDeviceRequest || pairingRequest ? (
+        <div className="grid grid-cols-2 gap-1">
+          <Button
+            variant="primary"
+            size="xs"
+            disabled={!canAct}
+            onClick={handleAccept}
+          >
+            <IconCheckFill18 className="size-3" /> Allow
+          </Button>
+          <Button variant="secondary" size="xs" onClick={handleAlwaysBlock}>
+            <IconBanFill18 className="size-3" /> Block
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-1">
+          <Button
+            variant="primary"
+            size="xs"
+            disabled={!canAct}
+            onClick={handleAccept}
+          >
+            <IconCheckFill18 className="size-3" /> Allow
+          </Button>
+          <Button
+            variant="secondary"
+            size="xs"
+            disabled={!canAct}
+            onClick={handleAlwaysAllow}
+          >
+            <IconCheckFill18 className="size-3" /> Always
+          </Button>
+          <Button variant="secondary" size="xs" onClick={handleAlwaysBlock}>
+            <IconBanFill18 className="size-3" /> Block
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -379,6 +423,12 @@ export function ResourceRequestsControlButton({ tabId }: { tabId: string }) {
   );
   const rejectPermission = useKartonProcedure(
     (p) => p.browser.permissions.reject,
+  );
+  const alwaysAllowPermission = useKartonProcedure(
+    (p) => p.browser.permissions.alwaysAllow,
+  );
+  const alwaysBlockPermission = useKartonProcedure(
+    (p) => p.browser.permissions.alwaysBlock,
   );
   const selectDevice = useKartonProcedure(
     (p) => p.browser.permissions.selectDevice,
@@ -496,6 +546,16 @@ export function ResourceRequestsControlButton({ tabId }: { tabId: string }) {
     [rejectPermission],
   );
 
+  const handleAlwaysAllow = useCallback(
+    (requestId: string) => void alwaysAllowPermission(requestId),
+    [alwaysAllowPermission],
+  );
+
+  const handleAlwaysBlock = useCallback(
+    (requestId: string) => void alwaysBlockPermission(requestId),
+    [alwaysBlockPermission],
+  );
+
   const handleSelectDevice = useCallback(
     (requestId: string, deviceId: string) =>
       void selectDevice(requestId, deviceId),
@@ -578,6 +638,8 @@ export function ResourceRequestsControlButton({ tabId }: { tabId: string }) {
                   request={request}
                   onAccept={handleAccept}
                   onReject={handleReject}
+                  onAlwaysAllow={handleAlwaysAllow}
+                  onAlwaysBlock={handleAlwaysBlock}
                   onSelectDevice={handleSelectDevice}
                 />
               ))

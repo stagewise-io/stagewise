@@ -130,6 +130,8 @@ export interface ClearBrowsingDataOptions {
   serviceWorkers?: boolean;
   /** Clear Cache Storage (Cache API) */
   cacheStorage?: boolean;
+  /** Clear all saved permission exceptions (site-specific Allow/Block settings) */
+  permissionExceptions?: boolean;
 }
 
 // Result of clearing browsing data
@@ -148,6 +150,8 @@ export interface ClearBrowsingDataResult {
   cacheCleared?: boolean;
   /** Whether storage data was cleared */
   storageCleared?: boolean;
+  /** Whether permission exceptions were cleared */
+  permissionExceptionsCleared?: boolean;
   /** Error message if operation failed */
   error?: string;
 }

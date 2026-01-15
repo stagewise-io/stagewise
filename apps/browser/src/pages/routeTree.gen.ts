@@ -19,6 +19,8 @@ import { Route as InternalAppBrowsingSettingsRouteImport } from './routes/_inter
 import { Route as InternalAppAgentSettingsRouteImport } from './routes/_internal-app/agent-settings'
 import { Route as InternalAppAccountRouteImport } from './routes/_internal-app/account'
 import { Route as InternalAppAboutRouteImport } from './routes/_internal-app/about'
+import { Route as InternalAppBrowsingSettingsIndexRouteImport } from './routes/_internal-app/browsing-settings.index'
+import { Route as InternalAppBrowsingSettingsWebsitePermissionsRouteImport } from './routes/_internal-app/browsing-settings.website-permissions'
 import { Route as ErrorPagesErrorPageLoadFailedRouteImport } from './routes/_error-pages/error.page-load-failed'
 import { Route as CallbacksAuthCallbackRouteImport } from './routes/_callbacks/auth.callback'
 
@@ -73,6 +75,18 @@ const InternalAppAboutRoute = InternalAppAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => InternalAppRouteRoute,
 } as any)
+const InternalAppBrowsingSettingsIndexRoute =
+  InternalAppBrowsingSettingsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => InternalAppBrowsingSettingsRoute,
+  } as any)
+const InternalAppBrowsingSettingsWebsitePermissionsRoute =
+  InternalAppBrowsingSettingsWebsitePermissionsRouteImport.update({
+    id: '/website-permissions',
+    path: '/website-permissions',
+    getParentRoute: () => InternalAppBrowsingSettingsRoute,
+  } as any)
 const ErrorPagesErrorPageLoadFailedRoute =
   ErrorPagesErrorPageLoadFailedRouteImport.update({
     id: '/_error-pages/error/page-load-failed',
@@ -90,26 +104,29 @@ export interface FileRoutesByFullPath {
   '/about': typeof InternalAppAboutRoute
   '/account': typeof InternalAppAccountRoute
   '/agent-settings': typeof InternalAppAgentSettingsRoute
-  '/browsing-settings': typeof InternalAppBrowsingSettingsRoute
+  '/browsing-settings': typeof InternalAppBrowsingSettingsRouteWithChildren
   '/clear-data': typeof InternalAppClearDataRoute
   '/downloads': typeof InternalAppDownloadsRoute
   '/history': typeof InternalAppHistoryRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
   '/auth/callback': typeof CallbacksAuthCallbackRoute
   '/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
+  '/browsing-settings/website-permissions': typeof InternalAppBrowsingSettingsWebsitePermissionsRoute
+  '/browsing-settings/': typeof InternalAppBrowsingSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/home': typeof HomeRoute
   '/about': typeof InternalAppAboutRoute
   '/account': typeof InternalAppAccountRoute
   '/agent-settings': typeof InternalAppAgentSettingsRoute
-  '/browsing-settings': typeof InternalAppBrowsingSettingsRoute
   '/clear-data': typeof InternalAppClearDataRoute
   '/downloads': typeof InternalAppDownloadsRoute
   '/history': typeof InternalAppHistoryRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
   '/auth/callback': typeof CallbacksAuthCallbackRoute
   '/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
+  '/browsing-settings/website-permissions': typeof InternalAppBrowsingSettingsWebsitePermissionsRoute
+  '/browsing-settings': typeof InternalAppBrowsingSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -118,13 +135,15 @@ export interface FileRoutesById {
   '/_internal-app/about': typeof InternalAppAboutRoute
   '/_internal-app/account': typeof InternalAppAccountRoute
   '/_internal-app/agent-settings': typeof InternalAppAgentSettingsRoute
-  '/_internal-app/browsing-settings': typeof InternalAppBrowsingSettingsRoute
+  '/_internal-app/browsing-settings': typeof InternalAppBrowsingSettingsRouteWithChildren
   '/_internal-app/clear-data': typeof InternalAppClearDataRoute
   '/_internal-app/downloads': typeof InternalAppDownloadsRoute
   '/_internal-app/history': typeof InternalAppHistoryRoute
   '/diff-review/$chatId': typeof DiffReviewChatIdRoute
   '/_callbacks/auth/callback': typeof CallbacksAuthCallbackRoute
   '/_error-pages/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
+  '/_internal-app/browsing-settings/website-permissions': typeof InternalAppBrowsingSettingsWebsitePermissionsRoute
+  '/_internal-app/browsing-settings/': typeof InternalAppBrowsingSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -140,19 +159,22 @@ export interface FileRouteTypes {
     | '/diff-review/$chatId'
     | '/auth/callback'
     | '/error/page-load-failed'
+    | '/browsing-settings/website-permissions'
+    | '/browsing-settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/home'
     | '/about'
     | '/account'
     | '/agent-settings'
-    | '/browsing-settings'
     | '/clear-data'
     | '/downloads'
     | '/history'
     | '/diff-review/$chatId'
     | '/auth/callback'
     | '/error/page-load-failed'
+    | '/browsing-settings/website-permissions'
+    | '/browsing-settings'
   id:
     | '__root__'
     | '/_internal-app'
@@ -167,6 +189,8 @@ export interface FileRouteTypes {
     | '/diff-review/$chatId'
     | '/_callbacks/auth/callback'
     | '/_error-pages/error/page-load-failed'
+    | '/_internal-app/browsing-settings/website-permissions'
+    | '/_internal-app/browsing-settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -249,6 +273,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InternalAppAboutRouteImport
       parentRoute: typeof InternalAppRouteRoute
     }
+    '/_internal-app/browsing-settings/': {
+      id: '/_internal-app/browsing-settings/'
+      path: '/'
+      fullPath: '/browsing-settings/'
+      preLoaderRoute: typeof InternalAppBrowsingSettingsIndexRouteImport
+      parentRoute: typeof InternalAppBrowsingSettingsRoute
+    }
+    '/_internal-app/browsing-settings/website-permissions': {
+      id: '/_internal-app/browsing-settings/website-permissions'
+      path: '/website-permissions'
+      fullPath: '/browsing-settings/website-permissions'
+      preLoaderRoute: typeof InternalAppBrowsingSettingsWebsitePermissionsRouteImport
+      parentRoute: typeof InternalAppBrowsingSettingsRoute
+    }
     '/_error-pages/error/page-load-failed': {
       id: '/_error-pages/error/page-load-failed'
       path: '/error/page-load-failed'
@@ -266,11 +304,29 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface InternalAppBrowsingSettingsRouteChildren {
+  InternalAppBrowsingSettingsWebsitePermissionsRoute: typeof InternalAppBrowsingSettingsWebsitePermissionsRoute
+  InternalAppBrowsingSettingsIndexRoute: typeof InternalAppBrowsingSettingsIndexRoute
+}
+
+const InternalAppBrowsingSettingsRouteChildren: InternalAppBrowsingSettingsRouteChildren =
+  {
+    InternalAppBrowsingSettingsWebsitePermissionsRoute:
+      InternalAppBrowsingSettingsWebsitePermissionsRoute,
+    InternalAppBrowsingSettingsIndexRoute:
+      InternalAppBrowsingSettingsIndexRoute,
+  }
+
+const InternalAppBrowsingSettingsRouteWithChildren =
+  InternalAppBrowsingSettingsRoute._addFileChildren(
+    InternalAppBrowsingSettingsRouteChildren,
+  )
+
 interface InternalAppRouteRouteChildren {
   InternalAppAboutRoute: typeof InternalAppAboutRoute
   InternalAppAccountRoute: typeof InternalAppAccountRoute
   InternalAppAgentSettingsRoute: typeof InternalAppAgentSettingsRoute
-  InternalAppBrowsingSettingsRoute: typeof InternalAppBrowsingSettingsRoute
+  InternalAppBrowsingSettingsRoute: typeof InternalAppBrowsingSettingsRouteWithChildren
   InternalAppClearDataRoute: typeof InternalAppClearDataRoute
   InternalAppDownloadsRoute: typeof InternalAppDownloadsRoute
   InternalAppHistoryRoute: typeof InternalAppHistoryRoute
@@ -280,7 +336,8 @@ const InternalAppRouteRouteChildren: InternalAppRouteRouteChildren = {
   InternalAppAboutRoute: InternalAppAboutRoute,
   InternalAppAccountRoute: InternalAppAccountRoute,
   InternalAppAgentSettingsRoute: InternalAppAgentSettingsRoute,
-  InternalAppBrowsingSettingsRoute: InternalAppBrowsingSettingsRoute,
+  InternalAppBrowsingSettingsRoute:
+    InternalAppBrowsingSettingsRouteWithChildren,
   InternalAppClearDataRoute: InternalAppClearDataRoute,
   InternalAppDownloadsRoute: InternalAppDownloadsRoute,
   InternalAppHistoryRoute: InternalAppHistoryRoute,

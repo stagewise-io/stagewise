@@ -72,6 +72,8 @@ export interface UIControllerEventMap {
   // Permission handling events
   acceptPermission: [requestId: string];
   rejectPermission: [requestId: string];
+  alwaysAllowPermission: [requestId: string];
+  alwaysBlockPermission: [requestId: string];
   selectPermissionDevice: [requestId: string, deviceId: string];
   respondToBluetoothPairing: [
     requestId: string,
@@ -486,6 +488,20 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
         pin?: string,
       ) => {
         this.emit('respondToBluetoothPairing', requestId, confirmed, pin);
+      },
+    );
+
+    // "Always" permission responses - saves to preferences for future requests
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.permissions.alwaysAllow',
+      async (_callingClientId: string, requestId: string) => {
+        this.emit('alwaysAllowPermission', requestId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.permissions.alwaysBlock',
+      async (_callingClientId: string, requestId: string) => {
+        this.emit('alwaysBlockPermission', requestId);
       },
     );
   }

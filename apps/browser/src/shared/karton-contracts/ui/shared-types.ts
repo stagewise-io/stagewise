@@ -121,10 +121,48 @@ export const userPreferencesSchema = z.object({
       newTabPage: { type: 'home' },
       startupPage: { type: 'home' },
     }),
+  /** Website permission settings (defaults and host-specific overrides) */
+  permissions: z.lazy(() => permissionsPreferencesSchema),
 });
 
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 export type TelemetryLevel = UserPreferences['privacy']['telemetryLevel'];
+
+/** Default permissions preferences - defined inline to avoid circular reference issues */
+const defaultPermissionsForUserPrefs = {
+  defaults: {
+    media: 0 as const, // PermissionSetting.Ask
+    geolocation: 0 as const,
+    notifications: 0 as const,
+    fullscreen: 1 as const, // PermissionSetting.Allow
+    bluetooth: 0 as const,
+    hid: 0 as const,
+    serial: 0 as const,
+    usb: 0 as const,
+    'clipboard-read': 0 as const,
+    'display-capture': 0 as const,
+    midi: 1 as const, // PermissionSetting.Allow
+    'idle-detection': 0 as const,
+    'speaker-selection': 0 as const,
+    'storage-access': 0 as const,
+  },
+  exceptions: {
+    media: {},
+    geolocation: {},
+    notifications: {},
+    fullscreen: {},
+    bluetooth: {},
+    hid: {},
+    serial: {},
+    usb: {},
+    'clipboard-read': {},
+    'display-capture': {},
+    midi: {},
+    'idle-detection': {},
+    'speaker-selection': {},
+    'storage-access': {},
+  },
+};
 
 export const defaultUserPreferences: UserPreferences = {
   privacy: {
@@ -137,6 +175,7 @@ export const defaultUserPreferences: UserPreferences = {
     newTabPage: { type: 'home' },
     startupPage: { type: 'home' },
   },
+  permissions: defaultPermissionsForUserPrefs,
 };
 
 /**
@@ -185,3 +224,192 @@ export type FilePickerRequest = {
   multiple?: boolean;
   allowCreateDirectory?: boolean;
 };
+
+// ============================================================================
+// Permission Settings (Chrome-style model)
+// ============================================================================
+
+/**
+ * Permission setting enum - maps to Chrome's numeric values:
+ * - 0: Ask (default for most permissions - prompt user)
+ * - 1: Allow (auto-grant without prompting)
+ * - 2: Block (auto-deny without prompting)
+ *
+ * Using an enum provides type safety while maintaining Chrome compatibility.
+ */
+export enum PermissionSetting {
+  Ask = 0,
+  Allow = 1,
+  Block = 2,
+}
+
+/**
+ * Permission types that can be configured and persisted.
+ * Excludes 'bluetooth-pairing' as it's a transient request type.
+ */
+export const configurablePermissionTypes = [
+  'media',
+  'geolocation',
+  'notifications',
+  'fullscreen',
+  'bluetooth',
+  'hid',
+  'serial',
+  'usb',
+  'clipboard-read',
+  'display-capture',
+  'midi',
+  'idle-detection',
+  'speaker-selection',
+  'storage-access',
+] as const;
+
+export type ConfigurablePermissionType =
+  (typeof configurablePermissionTypes)[number];
+
+/**
+ * Schema for a single host exception (similar to Chrome's content_settings.exceptions).
+ * Stores the permission setting for a specific origin.
+ */
+export const hostPermissionExceptionSchema = z.object({
+  /** The permission setting for this origin */
+  setting: z.nativeEnum(PermissionSetting),
+  /** Unix timestamp when this exception was last modified */
+  lastModified: z.number().optional(),
+});
+
+export type HostPermissionException = z.infer<
+  typeof hostPermissionExceptionSchema
+>;
+
+/**
+ * Default permission settings - global defaults for each permission type.
+ * These are used when no host-specific exception exists.
+ */
+export const defaultPermissionSettingsSchema = z.object({
+  media: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
+  geolocation: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
+  notifications: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
+  fullscreen: z.nativeEnum(PermissionSetting).default(PermissionSetting.Allow),
+  bluetooth: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
+  hid: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
+  serial: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
+  usb: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
+  'clipboard-read': z
+    .nativeEnum(PermissionSetting)
+    .default(PermissionSetting.Ask),
+  'display-capture': z
+    .nativeEnum(PermissionSetting)
+    .default(PermissionSetting.Ask),
+  midi: z.nativeEnum(PermissionSetting).default(PermissionSetting.Allow),
+  'idle-detection': z
+    .nativeEnum(PermissionSetting)
+    .default(PermissionSetting.Ask),
+  'speaker-selection': z
+    .nativeEnum(PermissionSetting)
+    .default(PermissionSetting.Ask),
+  'storage-access': z
+    .nativeEnum(PermissionSetting)
+    .default(PermissionSetting.Ask),
+});
+
+export type DefaultPermissionSettings = z.infer<
+  typeof defaultPermissionSettingsSchema
+>;
+
+/**
+ * Host-specific permission overrides.
+ * Structure: { [permissionType]: { [origin]: { setting, lastModified? } } }
+ * Similar to Chrome's profile.content_settings.exceptions.<type>
+ */
+export const hostPermissionOverridesSchema = z.object({
+  media: z.record(z.string(), hostPermissionExceptionSchema).default({}),
+  geolocation: z.record(z.string(), hostPermissionExceptionSchema).default({}),
+  notifications: z
+    .record(z.string(), hostPermissionExceptionSchema)
+    .default({}),
+  fullscreen: z.record(z.string(), hostPermissionExceptionSchema).default({}),
+  bluetooth: z.record(z.string(), hostPermissionExceptionSchema).default({}),
+  hid: z.record(z.string(), hostPermissionExceptionSchema).default({}),
+  serial: z.record(z.string(), hostPermissionExceptionSchema).default({}),
+  usb: z.record(z.string(), hostPermissionExceptionSchema).default({}),
+  'clipboard-read': z
+    .record(z.string(), hostPermissionExceptionSchema)
+    .default({}),
+  'display-capture': z
+    .record(z.string(), hostPermissionExceptionSchema)
+    .default({}),
+  midi: z.record(z.string(), hostPermissionExceptionSchema).default({}),
+  'idle-detection': z
+    .record(z.string(), hostPermissionExceptionSchema)
+    .default({}),
+  'speaker-selection': z
+    .record(z.string(), hostPermissionExceptionSchema)
+    .default({}),
+  'storage-access': z
+    .record(z.string(), hostPermissionExceptionSchema)
+    .default({}),
+});
+
+export type HostPermissionOverrides = z.infer<
+  typeof hostPermissionOverridesSchema
+>;
+
+/** Default values for permission settings */
+export const defaultPermissionSettings: DefaultPermissionSettings = {
+  media: PermissionSetting.Ask,
+  geolocation: PermissionSetting.Ask,
+  notifications: PermissionSetting.Ask,
+  fullscreen: PermissionSetting.Allow,
+  bluetooth: PermissionSetting.Ask,
+  hid: PermissionSetting.Ask,
+  serial: PermissionSetting.Ask,
+  usb: PermissionSetting.Ask,
+  'clipboard-read': PermissionSetting.Ask,
+  'display-capture': PermissionSetting.Ask,
+  midi: PermissionSetting.Allow,
+  'idle-detection': PermissionSetting.Ask,
+  'speaker-selection': PermissionSetting.Ask,
+  'storage-access': PermissionSetting.Ask,
+};
+
+/** Default empty host overrides */
+export const defaultHostPermissionOverrides: HostPermissionOverrides = {
+  media: {},
+  geolocation: {},
+  notifications: {},
+  fullscreen: {},
+  bluetooth: {},
+  hid: {},
+  serial: {},
+  usb: {},
+  'clipboard-read': {},
+  'display-capture': {},
+  midi: {},
+  'idle-detection': {},
+  'speaker-selection': {},
+  'storage-access': {},
+};
+
+/**
+ * Complete permissions preferences structure.
+ */
+export const permissionsPreferencesSchema = z
+  .object({
+    /** Global default settings per permission type */
+    defaults: defaultPermissionSettingsSchema.default(
+      defaultPermissionSettings,
+    ),
+    /** Per-origin overrides (exceptions) */
+    exceptions: hostPermissionOverridesSchema.default(
+      defaultHostPermissionOverrides,
+    ),
+  })
+  .default({
+    defaults: defaultPermissionSettings,
+    exceptions: defaultHostPermissionOverrides,
+  });
+
+export type PermissionsPreferences = z.infer<
+  typeof permissionsPreferencesSchema
+>;

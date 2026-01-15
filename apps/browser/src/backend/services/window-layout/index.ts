@@ -18,7 +18,12 @@ import {
   type GetConsoleLogsOptions,
 } from './tab-controller';
 import { ChatStateController } from './chat-state-controller';
-import type { ColorScheme } from '@shared/karton-contracts/ui';
+import {
+  type ColorScheme,
+  type ConfigurablePermissionType,
+  PermissionSetting,
+  configurablePermissionTypes,
+} from '@shared/karton-contracts/ui';
 import { THEME_COLORS, getBackgroundColor } from '@/shared/theme-colors';
 import { DisposableService } from '../disposable';
 import {
@@ -114,7 +119,11 @@ export class WindowLayoutService extends DisposableService {
 
     // Initialize session-level permission registry before creating any tabs
     // This must happen early so tab permission handlers can register with it
-    SessionPermissionRegistry.initialize(this.logger);
+    const permissionRegistry = SessionPermissionRegistry.initialize(
+      this.logger,
+    );
+    // Connect preferences service for checking stored permission settings
+    permissionRegistry.setPreferencesService(this.preferencesService);
 
     this.uiController = new UIController(this.logger);
     this.uiController.setCheckFrameValidityHandler(
@@ -501,6 +510,15 @@ export class WindowLayoutService extends DisposableService {
     this.uiController.on(
       'respondToBluetoothPairing',
       this.handleRespondToBluetoothPairing,
+    );
+    // "Always" permission responses - saves to preferences
+    this.uiController.on(
+      'alwaysAllowPermission',
+      this.handleAlwaysAllowPermission,
+    );
+    this.uiController.on(
+      'alwaysBlockPermission',
+      this.handleAlwaysBlockPermission,
     );
   }
 
@@ -1290,6 +1308,76 @@ export class WindowLayoutService extends DisposableService {
     }
     this.logger.warn(
       `[WindowLayoutService] No tab found for Bluetooth pairing request: ${requestId}`,
+    );
+  };
+
+  /**
+   * Handle "Always Allow" - saves preference and accepts the permission
+   */
+  private handleAlwaysAllowPermission = async (requestId: string) => {
+    for (const tab of Object.values(this.tabs)) {
+      const state = tab.getState();
+      const request = state.permissionRequests.find((r) => r.id === requestId);
+      if (request) {
+        // Check if this permission type is configurable
+        const permissionType = request.type as ConfigurablePermissionType;
+        if (
+          configurablePermissionTypes.includes(
+            permissionType as (typeof configurablePermissionTypes)[number],
+          )
+        ) {
+          // Save the "Always Allow" preference
+          await this.preferencesService.setPermissionException(
+            request.origin,
+            permissionType,
+            PermissionSetting.Allow,
+          );
+          this.logger.debug(
+            `[WindowLayoutService] Saved "Always Allow" for ${permissionType} on ${request.origin}`,
+          );
+        }
+        // Accept the current request
+        tab.acceptPermission(requestId);
+        return;
+      }
+    }
+    this.logger.warn(
+      `[WindowLayoutService] No tab found for permission request: ${requestId}`,
+    );
+  };
+
+  /**
+   * Handle "Always Block" - saves preference and rejects the permission
+   */
+  private handleAlwaysBlockPermission = async (requestId: string) => {
+    for (const tab of Object.values(this.tabs)) {
+      const state = tab.getState();
+      const request = state.permissionRequests.find((r) => r.id === requestId);
+      if (request) {
+        // Check if this permission type is configurable
+        const permissionType = request.type as ConfigurablePermissionType;
+        if (
+          configurablePermissionTypes.includes(
+            permissionType as (typeof configurablePermissionTypes)[number],
+          )
+        ) {
+          // Save the "Always Block" preference
+          await this.preferencesService.setPermissionException(
+            request.origin,
+            permissionType,
+            PermissionSetting.Block,
+          );
+          this.logger.debug(
+            `[WindowLayoutService] Saved "Always Block" for ${permissionType} on ${request.origin}`,
+          );
+        }
+        // Reject the current request
+        tab.rejectPermission(requestId);
+        return;
+      }
+    }
+    this.logger.warn(
+      `[WindowLayoutService] No tab found for permission request: ${requestId}`,
     );
   };
 

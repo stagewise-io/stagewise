@@ -25,7 +25,8 @@ type DataType =
   | 'storage'
   | 'indexedDB'
   | 'serviceWorkers'
-  | 'cacheStorage';
+  | 'cacheStorage'
+  | 'permissionExceptions';
 
 interface DataOption {
   id: DataType;
@@ -78,6 +79,11 @@ const dataOptions: DataOption[] = [
     id: 'favicons',
     label: 'Cached favicons',
     description: 'Site icons and images',
+  },
+  {
+    id: 'permissionExceptions',
+    label: 'Site permission settings',
+    description: 'Saved Allow/Block choices for camera, location, etc.',
   },
 ];
 
@@ -139,6 +145,7 @@ function Page() {
         indexedDB: selectedTypes.has('indexedDB'),
         serviceWorkers: selectedTypes.has('serviceWorkers'),
         cacheStorage: selectedTypes.has('cacheStorage'),
+        permissionExceptions: selectedTypes.has('permissionExceptions'),
         timeRange:
           timeRange === 'last24h'
             ? {
@@ -174,6 +181,9 @@ function Page() {
         }
         if (response.storageCleared) {
           clearedItems.push('storage');
+        }
+        if (response.permissionExceptionsCleared) {
+          clearedItems.push('site permission settings');
         }
 
         setResult({

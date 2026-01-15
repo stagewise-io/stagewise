@@ -18,8 +18,17 @@ import type {
   UserPreferences,
   Patch,
   SearchEngine,
+  ConfigurablePermissionType,
+  PermissionsPreferences,
+  HostPermissionException,
+  DefaultPermissionSettings,
+  HostPermissionOverrides,
 } from './shared-types';
-import { defaultUserPreferences } from './shared-types';
+import {
+  defaultUserPreferences,
+  PermissionSetting,
+  configurablePermissionTypes,
+} from './shared-types';
 import type { PageTransition, DownloadState } from '../pages-api/types';
 
 export type ChatMessage = UIMessage<UserMessageMetadata, UIDataTypes, UITools>;
@@ -78,6 +87,16 @@ export type {
 } from 'ai';
 
 export type { ToolPart };
+
+// Permission settings types (Chrome-style model)
+export type {
+  ConfigurablePermissionType,
+  PermissionsPreferences,
+  HostPermissionException,
+  DefaultPermissionSettings,
+  HostPermissionOverrides,
+};
+export { PermissionSetting, configurablePermissionTypes };
 
 export type History = ChatMessage[];
 
@@ -697,9 +716,9 @@ export type KartonContract = {
         deactivate: () => Promise<void>;
       };
       permissions: {
-        /** Accept a simple permission request (yes/no permissions) */
+        /** Accept a simple permission request (yes/no permissions) - session only */
         accept: (requestId: string) => Promise<void>;
-        /** Reject a permission request */
+        /** Reject a permission request - session only */
         reject: (requestId: string) => Promise<void>;
         /** Select a device for device-selection permission requests (Bluetooth, HID, Serial, USB) */
         selectDevice: (requestId: string, deviceId: string) => Promise<void>;
@@ -709,6 +728,10 @@ export type KartonContract = {
           confirmed: boolean,
           pin?: string,
         ) => Promise<void>;
+        /** Always allow - grants permission AND saves to preferences for future requests from this origin */
+        alwaysAllow: (requestId: string) => Promise<void>;
+        /** Always block - denies permission AND saves to preferences for future requests from this origin */
+        alwaysBlock: (requestId: string) => Promise<void>;
       };
     };
     downloads: {

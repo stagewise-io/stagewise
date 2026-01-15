@@ -6,39 +6,58 @@ import {
 } from 'electron';
 import type { Logger } from '../../logger';
 import type { TabPermissionHandler } from './index';
+import type { PreferencesService } from '../../preferences';
+import {
+  PermissionSetting,
+  type ConfigurablePermissionType,
+} from '@shared/karton-contracts/ui/shared-types';
 
 /**
  * Permissions that are automatically granted without user prompt.
- * These are low-risk permissions that browsers typically auto-grant.
+ * These are non-configurable permissions that browsers typically auto-grant.
  *
- * To modify which permissions are auto-granted, update this set.
- * Any permission not in this set will trigger a user prompt.
- *
- * Reference: https://developer.mozilla.org/en-US/docs/Web/API/Permissions_API
+ * Note: fullscreen and midi were previously here but are now configurable
+ * via user preferences, so they're handled by the preferences check first.
  */
 const AUTO_GRANTED_PERMISSIONS = new Set([
-  // Fullscreen - low risk, user can always exit with Escape
-  'fullscreen',
-
   // Pointer lock - for games/3D apps, user can exit with Escape
+  // Not configurable because it's transient and low-risk
   'pointerLock',
 
-  // Basic MIDI access (without sysex) - low risk
-  'midi',
-
-  // Clipboard write - copy operations are generally safe
-  // Note: 'clipboard-read' is NOT auto-granted (security risk)
-  // 'clipboard-write', // Uncomment if needed
-
-  // Window management - generally safe
+  // Window management - generally safe, not commonly exposed to users
   'window-management',
 ]);
 
 /**
  * Check if a permission should be auto-granted without user prompt.
+ * These are non-configurable permissions.
  */
 function shouldAutoGrant(permission: string): boolean {
   return AUTO_GRANTED_PERMISSIONS.has(permission);
+}
+
+/**
+ * Map Electron permission strings to our ConfigurablePermissionType.
+ * Returns null for permissions that are not configurable.
+ */
+function mapToConfigurablePermission(
+  permission: string,
+): ConfigurablePermissionType | null {
+  const mapping: Record<string, ConfigurablePermissionType> = {
+    media: 'media',
+    geolocation: 'geolocation',
+    notifications: 'notifications',
+    fullscreen: 'fullscreen',
+    'clipboard-read': 'clipboard-read',
+    'display-capture': 'display-capture',
+    midi: 'midi',
+    midiSysex: 'midi', // sysex variant maps to midi
+    'idle-detection': 'idle-detection',
+    'speaker-selection': 'speaker-selection',
+    'storage-access': 'storage-access',
+    'top-level-storage-access': 'storage-access', // variant maps to storage-access
+  };
+  return mapping[permission] ?? null;
 }
 
 /**
@@ -57,6 +76,9 @@ export class SessionPermissionRegistry {
   /** Map of webContents ID to TabPermissionHandler */
   private handlers: Map<number, TabPermissionHandler> = new Map();
 
+  /** PreferencesService for checking stored permission preferences */
+  private preferencesService: PreferencesService | null = null;
+
   private constructor(logger: Logger) {
     this.logger = logger;
     this.browserSession = session.fromPartition('persist:browser-content');
@@ -74,6 +96,17 @@ export class SessionPermissionRegistry {
 
   public static getInstance(): SessionPermissionRegistry | null {
     return SessionPermissionRegistry.instance;
+  }
+
+  /**
+   * Set the PreferencesService for checking stored permission preferences.
+   * This must be called after PreferencesService is created (it's created after this singleton).
+   */
+  public setPreferencesService(preferencesService: PreferencesService): void {
+    this.preferencesService = preferencesService;
+    this.logger.debug(
+      '[SessionPermissionRegistry] PreferencesService connected',
+    );
   }
 
   /**
@@ -100,13 +133,53 @@ export class SessionPermissionRegistry {
     // Permission Request Handler - routes to tab handlers or auto-grants
     this.browserSession.setPermissionRequestHandler(
       (webContents, permission, callback, details) => {
-        // Check if this permission should be auto-granted
+        // Check if this permission should be auto-granted (non-configurable)
         if (shouldAutoGrant(permission)) {
           this.logger.debug(
-            `[SessionPermissionRegistry] Auto-granting permission: ${permission}`,
+            `[SessionPermissionRegistry] Auto-granting non-configurable permission: ${permission}`,
           );
           callback(true);
           return;
+        }
+
+        // Check stored preferences for configurable permissions
+        const configurableType = mapToConfigurablePermission(permission);
+        if (configurableType && this.preferencesService) {
+          // Get the requesting origin
+          const requestingUrl =
+            (details as { requestingUrl?: string }).requestingUrl ?? '';
+          let requestingOrigin: string | null = null;
+          try {
+            requestingOrigin = requestingUrl
+              ? new URL(requestingUrl).origin
+              : null;
+          } catch {
+            // Invalid URL, can't check preferences
+          }
+
+          if (requestingOrigin) {
+            const setting = this.preferencesService.getPermissionSetting(
+              requestingOrigin,
+              configurableType,
+            );
+
+            if (setting === PermissionSetting.Allow) {
+              this.logger.debug(
+                `[SessionPermissionRegistry] Auto-allowing ${permission} for ${requestingOrigin} (stored preference)`,
+              );
+              callback(true);
+              return;
+            }
+
+            if (setting === PermissionSetting.Block) {
+              this.logger.debug(
+                `[SessionPermissionRegistry] Auto-blocking ${permission} for ${requestingOrigin} (stored preference)`,
+              );
+              callback(false);
+              return;
+            }
+            // PermissionSetting.Ask falls through to user prompt
+          }
         }
 
         const handler = webContents ? this.handlers.get(webContents.id) : null;
@@ -131,7 +204,7 @@ export class SessionPermissionRegistry {
 
     // Permission Check Handler (synchronous check before request)
     this.browserSession.setPermissionCheckHandler(
-      (_webContents, permission, _requestingOrigin, details) => {
+      (_webContents, permission, requestingOrigin, details) => {
         // Auto-granted permissions pass the check immediately
         if (shouldAutoGrant(permission)) {
           return true;
@@ -144,8 +217,26 @@ export class SessionPermissionRegistry {
           }
         }
 
+        // Check stored preferences for configurable permissions
+        const configurableType = mapToConfigurablePermission(permission);
+        if (configurableType && this.preferencesService && requestingOrigin) {
+          const setting = this.preferencesService.getPermissionSetting(
+            requestingOrigin,
+            configurableType,
+          );
+
+          // If explicitly blocked, return false to prevent the request
+          if (setting === PermissionSetting.Block) {
+            return false;
+          }
+
+          // If explicitly allowed, return true
+          if (setting === PermissionSetting.Allow) {
+            return true;
+          }
+        }
+
         // For other permissions, allow the check to pass so the request handler gets called
-        // In future versions, we could implement persistent permission storage here
         return true;
       },
     );

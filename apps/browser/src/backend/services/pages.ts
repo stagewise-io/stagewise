@@ -77,6 +77,7 @@ export class PagesService extends DisposableService {
   ) => Promise<void>;
   private getPreferencesHandler?: () => UserPreferences;
   private updatePreferencesHandler?: (patches: Patch[]) => Promise<void>;
+  private clearPermissionExceptionsHandler?: () => Promise<void>;
   private authCallbackHandler?: (
     authCode: string | undefined,
     error: string | undefined,
@@ -631,6 +632,7 @@ export class PagesService extends DisposableService {
           indexedDB: options.indexedDB,
           serviceWorkers: options.serviceWorkers,
           cacheStorage: options.cacheStorage,
+          permissionExceptions: options.permissionExceptions,
           timeRange: options.timeRange,
         });
 
@@ -727,6 +729,19 @@ export class PagesService extends DisposableService {
             this.logger.debug('[PagesService] Session storage data cleared', {
               storageTypes,
             });
+          }
+
+          // Clear permission exceptions if requested
+          if (options.permissionExceptions) {
+            if (this.clearPermissionExceptionsHandler) {
+              await this.clearPermissionExceptionsHandler();
+              result.permissionExceptionsCleared = true;
+              this.logger.debug('[PagesService] Permission exceptions cleared');
+            } else {
+              this.logger.warn(
+                '[PagesService] Permission exceptions clear requested but no handler registered',
+              );
+            }
           }
 
           // Run vacuum if requested (default true)
@@ -1061,9 +1076,11 @@ export class PagesService extends DisposableService {
   public registerPreferencesHandlers(
     getHandler: () => UserPreferences,
     updateHandler: (patches: Patch[]) => Promise<void>,
+    clearPermissionExceptionsHandler: () => Promise<void>,
   ): void {
     this.getPreferencesHandler = getHandler;
     this.updatePreferencesHandler = updateHandler;
+    this.clearPermissionExceptionsHandler = clearPermissionExceptionsHandler;
 
     this.kartonServer.registerServerProcedureHandler(
       'getPreferences',

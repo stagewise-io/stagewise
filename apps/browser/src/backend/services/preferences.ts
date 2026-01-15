@@ -4,8 +4,11 @@ import type { KartonService } from './karton';
 import type { PagesService } from './pages';
 import {
   type UserPreferences,
+  type ConfigurablePermissionType,
   userPreferencesSchema,
   defaultUserPreferences,
+  PermissionSetting,
+  configurablePermissionTypes,
 } from '@shared/karton-contracts/ui/shared-types';
 import { readPersistedData, writePersistedData } from '../utils/persisted-data';
 import { DisposableService } from './disposable';
@@ -146,6 +149,7 @@ export class PreferencesService extends DisposableService {
     this.pagesService.registerPreferencesHandlers(
       () => this.get(),
       (patches) => this.update(patches),
+      () => this.clearAllPermissionExceptionsForAllTypes(),
     );
   }
 
@@ -225,6 +229,150 @@ export class PreferencesService extends DisposableService {
   public removeListener(listener: PreferencesListener): void {
     this.logger.debug('[PreferencesService] Removing preferences listener');
     this.listeners = this.listeners.filter((l) => l !== listener);
+  }
+
+  // ===========================================================================
+  // Permission Helper Methods
+  // ===========================================================================
+
+  /**
+   * Get the effective permission setting for an origin.
+   * Checks host exceptions first, then falls back to the global default.
+   *
+   * @param origin - The origin to check (e.g., "https://example.com")
+   * @param permissionType - The type of permission to check
+   * @returns The effective permission setting (Ask, Allow, or Block)
+   */
+  public getPermissionSetting(
+    origin: string,
+    permissionType: ConfigurablePermissionType,
+  ): PermissionSetting {
+    this.assertNotDisposed();
+
+    // Check for host exception first
+    const exception =
+      this.preferences.permissions?.exceptions?.[permissionType]?.[origin];
+    if (exception) {
+      return exception.setting;
+    }
+
+    // Fall back to global default
+    return (
+      this.preferences.permissions?.defaults?.[permissionType] ??
+      PermissionSetting.Ask
+    );
+  }
+
+  /**
+   * Set a host-specific permission exception.
+   * Used by "Always Allow" and "Always Block" actions.
+   *
+   * @param origin - The origin to set the exception for
+   * @param permissionType - The type of permission
+   * @param setting - The permission setting to apply
+   */
+  public async setPermissionException(
+    origin: string,
+    permissionType: ConfigurablePermissionType,
+    setting: PermissionSetting,
+  ): Promise<void> {
+    this.assertNotDisposed();
+
+    const patches: Patch[] = [
+      {
+        op: 'add',
+        path: ['permissions', 'exceptions', permissionType, origin],
+        value: {
+          setting,
+          lastModified: Date.now(),
+        },
+      },
+    ];
+
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Set permission exception: ${permissionType} for ${origin} = ${PermissionSetting[setting]}`,
+    );
+  }
+
+  /**
+   * Clear a host-specific permission exception.
+   * Reverts the origin to using the global default for this permission type.
+   *
+   * @param origin - The origin to clear the exception for
+   * @param permissionType - The type of permission
+   */
+  public async clearPermissionException(
+    origin: string,
+    permissionType: ConfigurablePermissionType,
+  ): Promise<void> {
+    this.assertNotDisposed();
+
+    // Only clear if it exists
+    if (this.preferences.permissions?.exceptions?.[permissionType]?.[origin]) {
+      const patches: Patch[] = [
+        {
+          op: 'remove',
+          path: ['permissions', 'exceptions', permissionType, origin],
+        },
+      ];
+
+      await this.update(patches);
+      this.logger.debug(
+        `[PreferencesService] Cleared permission exception: ${permissionType} for ${origin}`,
+      );
+    }
+  }
+
+  /**
+   * Clear all exceptions for a specific permission type.
+   *
+   * @param permissionType - The type of permission to clear all exceptions for
+   */
+  public async clearAllPermissionExceptions(
+    permissionType: ConfigurablePermissionType,
+  ): Promise<void> {
+    this.assertNotDisposed();
+
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['permissions', 'exceptions', permissionType],
+        value: {},
+      },
+    ];
+
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Cleared all permission exceptions for: ${permissionType}`,
+    );
+  }
+
+  /**
+   * Clear ALL permission exceptions for ALL permission types.
+   * Used when clearing browsing data.
+   */
+  public async clearAllPermissionExceptionsForAllTypes(): Promise<void> {
+    this.assertNotDisposed();
+
+    // Create empty exceptions object for all permission types
+    const emptyExceptions: Record<string, Record<string, unknown>> = {};
+    for (const permType of configurablePermissionTypes) {
+      emptyExceptions[permType] = {};
+    }
+
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['permissions', 'exceptions'],
+        value: emptyExceptions,
+      },
+    ];
+
+    await this.update(patches);
+    this.logger.debug(
+      '[PreferencesService] Cleared all permission exceptions for all types',
+    );
   }
 
   private notifyListeners(
