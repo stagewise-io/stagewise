@@ -14,6 +14,16 @@ declare global {
   interface Window {
     electron: {
       karton: { portProxy: MessagePortProxy };
+      syncThemeColors: (colors: {
+        isDark: boolean;
+        theme: {
+          background: string;
+          titleBarOverlay: {
+            color: string;
+            symbolColor: string;
+          };
+        };
+      }) => void;
     };
   }
 }

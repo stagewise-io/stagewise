@@ -13,6 +13,9 @@ pre-commit:
     - name: typecheck-browser
       run: pnpm -F stagewise typecheck
       glob: "apps/browser/**/*.{ts,tsx}"
+    - name: generate-theme-colors
+      run: pnpm -F @stagewise/stage-ui generate:theme-colors && git add apps/browser/src/backend/shared/theme-colors.ts
+      glob: "packages/stage-ui/src/{palette,theme}.css"
 
 commit-msg:
   parallel: true

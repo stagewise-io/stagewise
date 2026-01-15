@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "dev:themes": "concurrently -n css,json -c blue,magenta \"nodemon --watch src/palette.css --watch src/theme.css --watch src/code-block/syntax.css --ext css --exec 'pnpm generate:themes'\" \"nodemon --watch src/code-block/example-theme-dark.json --watch src/code-block/example-theme-light.json --ext json --exec 'pnpm generate:example-theme'\"",
+    "dev:themes": "concurrently -n css,json,colors -c blue,magenta,green \"nodemon --watch src/palette.css --watch src/theme.css --watch src/code-block/syntax.css --ext css --exec 'pnpm generate:themes'\" \"nodemon --watch src/code-block/example-theme-dark.json --watch src/code-block/example-theme-light.json --ext json --exec 'pnpm generate:example-theme'\" \"nodemon --watch src/palette.css --watch src/theme.css --ext css --exec 'pnpm generate:theme-colors'\"",
     "lint": "biome lint . --max-warnings 0",
     "generate:themes": "tsx src/code-block/generate-code-block-theme-json.ts",
-    "generate:example-theme": "tsx src/code-block/extract-vars-from-example-theme.ts"
+    "generate:example-theme": "tsx src/code-block/extract-vars-from-example-theme.ts",
+    "generate:theme-colors": "tsx src/generate-theme-colors.ts"
   },
   "peerDependencies": {
     "react": "^19.1.0",

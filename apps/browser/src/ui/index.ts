@@ -29,6 +29,11 @@ import { createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/app.css';
 import { App } from '@/app';
+import { initThemeColorSync } from '@/utils/theme-color-sync';
+
+// Initialize theme color sync for dev mode HMR
+initThemeColorSync();
+
 // Initialize the app
 try {
   createRoot(document.body).render(

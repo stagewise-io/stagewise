@@ -77,6 +77,19 @@ export class WindowLayoutService extends DisposableService {
     | ((event: Electron.IpcMainEvent, connectionId: string) => void)
     | null = null;
 
+  private syncThemeColorsListener:
+    | ((
+        event: Electron.IpcMainEvent,
+        colors: {
+          isDark: boolean;
+          theme: {
+            background: string;
+            titleBarOverlay: { color: string; symbolColor: string };
+          };
+        },
+      ) => void)
+    | null = null;
+
   private constructor(
     logger: Logger,
     globalDataPathService: GlobalDataPathService,
@@ -306,6 +319,11 @@ export class WindowLayoutService extends DisposableService {
       this.kartonConnectListener = null;
     }
 
+    if (this.syncThemeColorsListener) {
+      ipcMain.removeListener('sync-theme-colors', this.syncThemeColorsListener);
+      this.syncThemeColorsListener = null;
+    }
+
     app.applicationMenu = null;
 
     if (this.baseWindow && !this.baseWindow.isDestroyed()) {
@@ -422,6 +440,15 @@ export class WindowLayoutService extends DisposableService {
     ipcMain.on('karton-connect', this.kartonConnectListener);
     this.logger.debug(
       '[WindowLayoutService] Listening for karton connection requests',
+    );
+
+    // Setup theme color sync listener for dev mode HMR
+    this.syncThemeColorsListener = (_event, colors) => {
+      this.applyDynamicThemeColors(colors);
+    };
+    ipcMain.on('sync-theme-colors', this.syncThemeColorsListener);
+    this.logger.debug(
+      '[WindowLayoutService] Listening for theme color sync requests',
     );
   }
 
@@ -1488,6 +1515,43 @@ export class WindowLayoutService extends DisposableService {
 
     this.logger.debug(
       `[WindowLayoutService] Applied ${isDark ? 'dark' : 'light'} theme colors to window`,
+    );
+  }
+
+  /**
+   * Apply theme colors received from the renderer via IPC.
+   * Used during dev mode HMR to keep window background in sync with CSS palette changes.
+   */
+  private applyDynamicThemeColors(colors: {
+    isDark: boolean;
+    theme: {
+      background: string;
+      titleBarOverlay: { color: string; symbolColor: string };
+    };
+  }) {
+    if (!this.baseWindow || this.baseWindow.isDestroyed()) return;
+
+    // Only apply if the theme mode matches current system preference
+    const currentIsDark = nativeTheme.shouldUseDarkColors;
+    if (colors.isDark !== currentIsDark) {
+      this.logger.debug(
+        `[WindowLayoutService] Ignoring theme sync (received ${colors.isDark ? 'dark' : 'light'}, current is ${currentIsDark ? 'dark' : 'light'})`,
+      );
+      return;
+    }
+
+    this.baseWindow.setBackgroundColor(colors.theme.background);
+
+    // titleBarOverlay is only used on non-macOS platforms
+    if (process.platform !== 'darwin') {
+      this.baseWindow.setTitleBarOverlay({
+        color: colors.theme.titleBarOverlay.color,
+        symbolColor: colors.theme.titleBarOverlay.symbolColor,
+      });
+    }
+
+    this.logger.debug(
+      `[WindowLayoutService] Applied dynamic ${colors.isDark ? 'dark' : 'light'} theme colors: bg=${colors.theme.background}`,
     );
   }
 

@@ -176,11 +176,29 @@ ipcRenderer.on('stagewise-tab-focused', (_event, tabId) => {
 });
 
 /**
+ * Theme colors payload for syncing CSS-derived colors to main process
+ */
+interface ThemeColorPayload {
+  background: string;
+  titleBarOverlay: {
+    color: string;
+    symbolColor: string;
+  };
+}
+
+/**
  * Thin bridge API exposed to renderer.
  * The transport layer handles all the complexity.
  */
 contextBridge.exposeInMainWorld('electron', {
   karton: {
     portProxy: messagePortProxy,
+  },
+  /**
+   * Sync theme colors from CSS to main process for window background updates.
+   * Used during dev mode HMR to keep window background in sync with CSS palette changes.
+   */
+  syncThemeColors: (colors: { isDark: boolean; theme: ThemeColorPayload }) => {
+    ipcRenderer.send('sync-theme-colors', colors);
   },
 });
