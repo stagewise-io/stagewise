@@ -349,7 +349,14 @@ export const ChatHistory = () => {
       {showWorkingIndicator &&
         (renderedMessages.length === 0 ||
           renderedMessages[renderedMessages.length - 1]?.role === 'user') && (
-          <MessageLoading />
+          <div
+            className="flex flex-col"
+            style={{
+              minHeight: containerHeight - lastUserMessageHeight,
+            }}
+          >
+            <MessageLoading />
+          </div>
         )}
 
       {renderedMessages.length === 0 && (
