@@ -25,7 +25,6 @@ import type { SelectedElement } from '@shared/selected-elements';
 import { SelectedElementTracker } from './selected-element-tracker';
 import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
 import { fileURLToPath } from 'node:url';
-import { WEB_CONTENT_DEFAULT_BACKGROUND } from '@/shared/theme-colors';
 import {
   PageTransition,
   PageTransitionQualifier,
@@ -318,9 +317,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       },
     });
     this.webContentsView.setBorderRadius(4);
-    // Set background color to white to match real browser behavior
-    // Pages without explicit background will display on a white canvas
-    this.webContentsView.setBackgroundColor(WEB_CONTENT_DEFAULT_BACKGROUND);
+
     this.kartonTransport = new ElectronServerTransport();
 
     // Forward keydown events when dev tools are opened
@@ -488,7 +485,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       this.webContentsView &&
       !this.webContentsView.webContents.isDestroyed()
     ) {
-      this.webContentsView.setBackgroundColor(color);
+      //this.webContentsView.setBackgroundColor(color);
       this.logger.debug(
         `[TabController] Updated background color for tab ${this.id} to ${color}`,
       );
@@ -744,11 +741,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       });
 
       this.updateState({ colorScheme: scheme });
-
-      // Web content background stays white regardless of color scheme
-      // This matches real browser behavior where pages without explicit
-      // background display on a white canvas
-      this.updateBackgroundColor(WEB_CONTENT_DEFAULT_BACKGROUND);
     } catch (err) {
       this.logger.error(`Failed to set color scheme: ${err}`);
     }

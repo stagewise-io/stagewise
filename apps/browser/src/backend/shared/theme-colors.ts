@@ -8,13 +8,6 @@
  * Source: packages/stage-ui/src/palette.css and theme.css
  */
 
-/**
- * Default background color for web content views.
- * This matches real browser behavior (Chrome/Chromium) where pages without
- * an explicit background color display on a white canvas.
- */
-export const WEB_CONTENT_DEFAULT_BACKGROUND = '#ffffff';
-
 export const THEME_COLORS = {
   light: {
     background: '#d3d8e1', // theme.css: --color-app-background → --color-base-200
@@ -31,12 +24,3 @@ export const THEME_COLORS = {
     },
   },
 } as const;
-
-/**
- * Get the background color for the current theme.
- * @param isDark - Whether dark mode is active
- * @returns The background color hex code
- */
-export function getBackgroundColor(isDark: boolean): string {
-  return isDark ? THEME_COLORS.dark.background : THEME_COLORS.light.background;
-}
