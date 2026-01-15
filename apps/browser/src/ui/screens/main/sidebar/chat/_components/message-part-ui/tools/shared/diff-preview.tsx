@@ -33,7 +33,16 @@ export const DiffPreview = memo(
                 : line;
           })
           .join('\n');
-        return `${acc}${modifiedLines}`;
+
+        // Ensure proper line separation between chunks to prevent inline diff merging
+        // If acc doesn't end with newline and this is a diff chunk, add newline separator
+        const needsSeparator =
+          acc.length > 0 &&
+          !acc.endsWith('\n') &&
+          (lines.added || lines.removed);
+        const separator = needsSeparator ? '\n' : '';
+
+        return `${acc}${separator}${modifiedLines}`;
       }, '');
     }, [diff]);
 

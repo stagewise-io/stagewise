@@ -377,24 +377,34 @@ function shikiDiffNotation(): ShikiTransformer {
   return {
     name: 'shiki-diff-notation',
     code(node) {
-      // if (!this.options.meta?.diff) return;
       const lines = node.children.filter((node) => node.type === 'element');
       lines.forEach((line) => {
-        if (lineStartsWith(line, lineAddedDiffMarker)) {
+        // Get line text BEFORE any modifications
+        const lineText = getLineText(line as Element);
+
+        // Determine styling based on FIRST marker
+        const startsWithAdd = lineText.startsWith(lineAddedDiffMarker);
+        const startsWithRemove = lineText.startsWith(lineRemovedDiffMarker);
+
+        // Strip START marker using lineSlice (which handles cross-span slicing)
+        if (startsWithAdd) {
           lineSlice(line, lineAddedDiffMarker.length);
           this.addClassToHast(line, classLineAdd);
-        }
-        if (lineStartsWith(line, lineRemovedDiffMarker)) {
+        } else if (startsWithRemove) {
           lineSlice(line, lineRemovedDiffMarker.length);
           this.addClassToHast(line, classLineRemove);
         }
+
+        // Now strip any REMAINING markers in the middle of the line
+        // These can appear when diff chunks have both removed and added content on same line
+        stripMarkersFromMiddle(line as Element);
       });
     },
   };
 }
 
-const lineStartsWith = (line: Element, marker: string) => {
-  const lineText = line.children.reduce<string>(
+const getLineText = (line: Element): string => {
+  return line.children.reduce<string>(
     (curr, node) =>
       curr +
       (node.type === 'element' && node.children[0]?.type === 'text'
@@ -402,7 +412,50 @@ const lineStartsWith = (line: Element, marker: string) => {
         : ''),
     '',
   );
-  return lineText.startsWith(marker);
+};
+
+/**
+ * Strips markers that appear in the MIDDLE of a line (after the initial lineSlice).
+ * Since Shiki tokenizes code and may split markers across spans, we need to
+ * rebuild the line without markers by working at the full text level.
+ */
+const stripMarkersFromMiddle = (line: Element): void => {
+  // Get current full line text
+  const fullText = getLineText(line);
+
+  // Check if there are any remaining markers
+  if (
+    !fullText.includes(lineAddedDiffMarker) &&
+    !fullText.includes(lineRemovedDiffMarker)
+  ) {
+    return; // No markers to strip
+  }
+
+  // Remove all marker occurrences from the full text
+  const cleanedText = fullText
+    .split(lineAddedDiffMarker)
+    .join('')
+    .split(lineRemovedDiffMarker)
+    .join('');
+
+  // If text changed, we need to rebuild the line
+  if (cleanedText !== fullText) {
+    // Strategy: clear all children and add a single text span
+    // This loses syntax highlighting but ensures markers are removed
+    // Get the style from the first child if available
+    const firstChild = line.children[0];
+    const style =
+      firstChild?.type === 'element' ? firstChild.properties?.style : undefined;
+
+    line.children = [
+      {
+        type: 'element',
+        tagName: 'span',
+        properties: style ? { style } : {},
+        children: [{ type: 'text', value: cleanedText }],
+      },
+    ];
+  }
 };
 
 /** Iterates over the children of the line, performing a "slice" over all text from start to end.
