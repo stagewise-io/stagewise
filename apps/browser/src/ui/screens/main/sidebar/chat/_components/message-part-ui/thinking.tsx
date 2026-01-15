@@ -35,10 +35,9 @@ export const ThinkingPart = ({
   }, [thinkingDuration]);
 
   const displayedText = useTypeWriterText(part.text, {
-    charsPerInterval: 2,
-    framesPerInterval: 1,
     showAllOnFirstRender: true,
     animateOnIncreaseOnly: true,
+    isStreaming: part.state === 'streaming',
   });
   return (
     <ToolPartUI

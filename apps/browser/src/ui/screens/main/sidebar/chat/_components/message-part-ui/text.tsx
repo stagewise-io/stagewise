@@ -11,10 +11,9 @@ interface TextPartProps {
 export const TextPart = memo(
   ({ part, messageRole }: TextPartProps) => {
     const displayedText = useTypeWriterText(part.text, {
-      charsPerInterval: 2,
-      framesPerInterval: 1,
       showAllOnFirstRender: true,
       animateOnIncreaseOnly: true,
+      isStreaming: part.state === 'streaming',
     });
 
     // Only render markdown for assistant messages
