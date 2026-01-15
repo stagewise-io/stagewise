@@ -24,7 +24,7 @@ import {
   PermissionSetting,
   configurablePermissionTypes,
 } from '@shared/karton-contracts/ui';
-import { THEME_COLORS, getBackgroundColor } from '@/shared/theme-colors';
+import { THEME_COLORS } from '@/shared/theme-colors';
 import { DisposableService } from '../disposable';
 import {
   type NavigationTarget,
@@ -1471,7 +1471,6 @@ export class WindowLayoutService extends DisposableService {
 
     const isDark = nativeTheme.shouldUseDarkColors;
     const theme = isDark ? THEME_COLORS.dark : THEME_COLORS.light;
-    const backgroundColor = getBackgroundColor(isDark);
 
     this.baseWindow.setBackgroundColor(theme.background);
 
@@ -1483,17 +1482,12 @@ export class WindowLayoutService extends DisposableService {
       });
     }
 
-    // Update all tab webcontents backgrounds to match the window background
-    // Only update tabs that are in 'system' mode (forced light/dark tabs keep their background)
-    Object.values(this.tabs).forEach((tab) => {
-      const tabState = tab.getState();
-      if (tabState.colorScheme === 'system') {
-        tab.updateBackgroundColor(backgroundColor);
-      }
-    });
+    // Note: Tab webcontents backgrounds stay white regardless of theme
+    // This matches real browser behavior where pages without explicit
+    // background display on a white canvas
 
     this.logger.debug(
-      `[WindowLayoutService] Applied ${isDark ? 'dark' : 'light'} theme colors to window and all tab webcontents`,
+      `[WindowLayoutService] Applied ${isDark ? 'dark' : 'light'} theme colors to window`,
     );
   }
 

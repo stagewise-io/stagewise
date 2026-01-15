@@ -3,7 +3,6 @@ import {
   type NativeImage,
   WebContentsView,
   shell,
-  nativeTheme,
 } from 'electron';
 import type { Protocol } from 'devtools-protocol';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
@@ -26,7 +25,7 @@ import type { SelectedElement } from '@shared/selected-elements';
 import { SelectedElementTracker } from './selected-element-tracker';
 import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
 import { fileURLToPath } from 'node:url';
-import { getBackgroundColor } from '@/shared/theme-colors';
+import { WEB_CONTENT_DEFAULT_BACKGROUND } from '@/shared/theme-colors';
 import {
   PageTransition,
   PageTransitionQualifier,
@@ -319,11 +318,9 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       },
     });
     this.webContentsView.setBorderRadius(4);
-    // Set initial background color based on current system theme
-    const initialBackgroundColor = getBackgroundColor(
-      nativeTheme.shouldUseDarkColors,
-    );
-    this.webContentsView.setBackgroundColor(initialBackgroundColor);
+    // Set background color to white to match real browser behavior
+    // Pages without explicit background will display on a white canvas
+    this.webContentsView.setBackgroundColor(WEB_CONTENT_DEFAULT_BACKGROUND);
     this.kartonTransport = new ElectronServerTransport();
 
     // Forward keydown events when dev tools are opened
@@ -748,19 +745,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
       this.updateState({ colorScheme: scheme });
 
-      // Update webcontents background color based on the selected scheme
-      let backgroundColor: string;
-      if (scheme === 'system') {
-        // In system mode, use the current system theme
-        backgroundColor = getBackgroundColor(nativeTheme.shouldUseDarkColors);
-      } else if (scheme === 'dark') {
-        // Forced dark mode
-        backgroundColor = getBackgroundColor(true);
-      } else {
-        // Forced light mode
-        backgroundColor = getBackgroundColor(false);
-      }
-      this.updateBackgroundColor(backgroundColor);
+      // Web content background stays white regardless of color scheme
+      // This matches real browser behavior where pages without explicit
+      // background display on a white canvas
+      this.updateBackgroundColor(WEB_CONTENT_DEFAULT_BACKGROUND);
     } catch (err) {
       this.logger.error(`Failed to set color scheme: ${err}`);
     }

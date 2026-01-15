@@ -3,6 +3,14 @@
  * These colors are used for window backgrounds and webcontents backgrounds
  * to ensure consistent theming across light and dark modes.
  */
+
+/**
+ * Default background color for web content views.
+ * This matches real browser behavior (Chrome/Chromium) where pages without
+ * an explicit background color display on a white canvas.
+ */
+export const WEB_CONTENT_DEFAULT_BACKGROUND = '#ffffff';
+
 export const THEME_COLORS = {
   light: {
     background: '#d3d8e1', // base-200
