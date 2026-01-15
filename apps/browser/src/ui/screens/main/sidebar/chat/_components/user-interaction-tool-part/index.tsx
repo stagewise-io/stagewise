@@ -17,16 +17,20 @@ import type { ToolPart } from '@shared/karton-contracts/ui';
 // import { ExampleUserInputToolPartContent } from './example-tool';
 import { memo } from 'react';
 import { useKartonProcedure } from '@/hooks/use-karton';
-import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
 
 /**
  * Union type of all user-interaction tool parts.
  * Add new tool types here when creating new user-input tools.
+ *
+ * Note: When no user-input tools are active, this type is `never`.
+ * Uncomment the Extract line when adding user-input tools.
  */
-export type InteractionToolPart = Extract<
-  ToolPart,
-  { type: 'tool-exampleUserInputTool' }
->;
+// When user-input tools are added, use:
+// export type InteractionToolPart = Extract<
+//   ToolPart,
+//   { type: 'tool-exampleUserInputTool' } // | { type: 'tool-yourNewTool' }
+// >;
+export type InteractionToolPart = never;
 
 /**
  * Helper type to pick a specific tool part by type name.
@@ -42,16 +46,23 @@ export type PickToolPart<T extends string> = Extract<
 /**
  * Type guard to check if a tool part is a user-interaction tool.
  * Add new tool type checks here when creating new user-input tools.
+ *
+ * Note: Returns false when no user-input tools are active.
  */
 export function isInteractionToolPart(
-  toolPart: ToolPart,
-): toolPart is InteractionToolPart {
-  return toolPart.type === 'tool-exampleUserInputTool';
+  _toolPart: ToolPart,
+): _toolPart is InteractionToolPart {
+  // When user-input tools are added, check their types:
+  // return toolPart.type === 'tool-exampleUserInputTool';
+  return false;
 }
 
 /**
  * Renders the appropriate UI component for a user-interaction tool.
  * Add new tool component cases here when creating new user-input tools.
+ *
+ * Note: This component is only used when user-input tools are active.
+ * When InteractionToolPart is `never`, this component is never rendered.
  */
 export const InteractionToolPartItem = memo(
   ({ toolPart }: { toolPart: InteractionToolPart }) => {
@@ -63,10 +74,16 @@ export const InteractionToolPartItem = memo(
       (p) => p.agentChat.cancelUserInteractionToolInput,
     );
 
+    // When no user-input tools are defined, toolPart is `never` and this code is unreachable.
+    // TypeScript will error if we try to access properties on `never`.
+    // This cast satisfies the type system while keeping the template code structure.
+    const _unreachable: never = toolPart;
+    void _unreachable;
+
     return (
       <div className="flex w-full flex-row items-center justify-between gap-2 stroke-black/60 pb-1">
         {/* Loading state while tool input is streaming */}
-        {toolPart.state === 'input-streaming' && (
+        {/*toolPart.state === 'input-streaming' && (
           <div className="flex w-full flex-row items-center gap-2 rounded-md border-zinc-200 p-2">
             <Skeleton className="h-4 w-4" variant="circle" />
             <div className="flex w-full flex-1 flex-col gap-2">
@@ -74,10 +91,10 @@ export const InteractionToolPartItem = memo(
               <Skeleton className="h-4 w-3/4" variant="text" />
             </div>
           </div>
-        )}
+        )*/}
 
         {/* Render tool UI when input is ready or completed */}
-        {(toolPart.state === 'input-available' ||
+        {/*(toolPart.state === 'input-available' ||
           toolPart.state === 'output-available' ||
           toolPart.state === 'output-error') && (
           <>
@@ -95,7 +112,7 @@ export const InteractionToolPartItem = memo(
                 }
               />
             )} */}
-            {/* Add new tool UI components here:
+        {/* Add new tool UI components here:
             {toolPart.type === 'tool-yourNewTool' && (
               <YourNewToolPartContent
                 toolPart={toolPart}
@@ -107,9 +124,9 @@ export const InteractionToolPartItem = memo(
                 }
               />
             )}
-            */}
+            }
           </>
-        )}
+        )*/}
       </div>
     );
   },

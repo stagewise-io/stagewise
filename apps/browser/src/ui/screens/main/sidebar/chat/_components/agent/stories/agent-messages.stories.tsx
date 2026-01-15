@@ -1467,7 +1467,7 @@ export const AssistantUnknownTool: Story = {
                       result: {
                         findings: 42,
                       },
-                    },
+                    } as any,
                   },
                 ],
               }),
