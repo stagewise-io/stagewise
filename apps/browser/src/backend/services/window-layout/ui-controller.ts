@@ -80,6 +80,13 @@ export interface UIControllerEventMap {
     confirmed: boolean,
     pin?: string,
   ];
+  // Authentication handling events
+  submitAuthCredentials: [
+    requestId: string,
+    username: string,
+    password: string,
+  ];
+  cancelAuth: [requestId: string];
 }
 
 export class UIController extends EventEmitter<UIControllerEventMap> {
@@ -502,6 +509,25 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       'browser.permissions.alwaysBlock',
       async (_callingClientId: string, requestId: string) => {
         this.emit('alwaysBlockPermission', requestId);
+      },
+    );
+
+    // Authentication handling procedures
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.auth.submit',
+      async (
+        _callingClientId: string,
+        requestId: string,
+        username: string,
+        password: string,
+      ) => {
+        this.emit('submitAuthCredentials', requestId, username, password);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.auth.cancel',
+      async (_callingClientId: string, requestId: string) => {
+        this.emit('cancelAuth', requestId);
       },
     );
   }

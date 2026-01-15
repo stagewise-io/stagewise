@@ -10,7 +10,7 @@ export function Form({ className, ...props }: FormProps) {
   return (
     <FormBase
       {...props}
-      className={cn('flex flex-col items-stretch gap-8', className)}
+      className={cn('flex flex-col items-stretch gap-5', className)}
     />
   );
 }

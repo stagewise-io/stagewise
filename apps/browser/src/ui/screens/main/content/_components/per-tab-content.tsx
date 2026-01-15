@@ -22,6 +22,7 @@ import { SearchBar } from './control-buttons/search-bar';
 import { ResourceRequestsControlButton } from './control-buttons/resource-requests';
 import { DownloadsControlButton } from './control-buttons/downloads';
 import { DOMContextSelector } from '@/components/dom-context-selector/selector-canvas';
+import { BasicAuthDialog } from './basic-auth-dialog';
 
 const ColorSchemeIcon = ({
   colorScheme,
@@ -81,6 +82,8 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
 
     const omniboxRef = useRef<OmniboxRef>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+
+    const devAppPreviewContainerRef = useRef<HTMLDivElement>(null);
 
     const isInternalPage = useMemo(() => {
       // Consider a page "internal" if it's a stagewise:// URL or if an error page is displayed
@@ -193,10 +196,17 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
         <div className="flex size-full flex-col gap-4 rounded-lg p-2">
           <div className="flex size-full flex-col items-center justify-center overflow-hidden rounded-sm shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] ring-1 ring-border-subtle">
             <div
+              ref={devAppPreviewContainerRef}
               id={`dev-app-preview-container-${tabId}`}
-              className="flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
+              className="relative flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
             >
               {isActive && !isInternalPage && <DOMContextSelector />}
+              {isActive && tab?.authenticationRequest && (
+                <BasicAuthDialog
+                  request={tab.authenticationRequest}
+                  container={devAppPreviewContainerRef}
+                />
+              )}
             </div>
           </div>
         </div>

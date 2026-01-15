@@ -357,6 +357,28 @@ export type PermissionRequest =
   | USBSelectionRequest;
 
 // ============================================================================
+// Authentication Requests (HTTP Basic Auth)
+// ============================================================================
+
+/** Request for HTTP Basic Authentication credentials */
+export interface AuthenticationRequest {
+  /** Unique identifier for this request */
+  id: string;
+  /** Timestamp when request was created */
+  timestamp: number;
+  /** The URL that triggered the authentication request */
+  url: string;
+  /** Origin of the URL (protocol + host) */
+  origin: string;
+  /** The realm string from the WWW-Authenticate header */
+  realm?: string;
+  /** The host requesting authentication */
+  host: string;
+  /** Tab ID this request belongs to */
+  tabId: string;
+}
+
+// ============================================================================
 // Tab State
 // ============================================================================
 
@@ -399,6 +421,8 @@ export type TabState = {
   permissionRequests: PermissionRequest[];
   /** Whether the tab's web content is in HTML5 fullscreen mode */
   isContentFullscreen: boolean;
+  /** Pending HTTP Basic Auth request for this tab */
+  authenticationRequest: AuthenticationRequest | null;
 };
 
 export type HistoryEntry = {
@@ -734,6 +758,16 @@ export type KartonContract = {
         alwaysAllow: (requestId: string) => Promise<void>;
         /** Always block - denies permission AND saves to preferences for future requests from this origin */
         alwaysBlock: (requestId: string) => Promise<void>;
+      };
+      auth: {
+        /** Submit credentials for an HTTP Basic Auth request */
+        submit: (
+          requestId: string,
+          username: string,
+          password: string,
+        ) => Promise<void>;
+        /** Cancel an HTTP Basic Auth request */
+        cancel: (requestId: string) => Promise<void>;
       };
     };
     downloads: {

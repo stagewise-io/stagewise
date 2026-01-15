@@ -43,7 +43,11 @@ import { TabErrorHandler, type SubframeError } from './tab-error-handler';
 export type { SubframeError } from './tab-error-handler';
 import { TabPermissionHandler } from './tab-permission-handler';
 import { SessionPermissionRegistry } from './tab-permission-handler/session-registry';
-import type { PermissionRequest } from '@shared/karton-contracts/ui';
+import { TabAuthenticationHandler } from './tab-authentication-handler';
+import type {
+  PermissionRequest,
+  AuthenticationRequest,
+} from '@shared/karton-contracts/ui';
 
 export interface TabState {
   title: string;
@@ -83,6 +87,7 @@ export interface TabState {
   consoleErrorCount: number; // Number of error-level console logs
   permissionRequests: PermissionRequest[]; // Pending permission requests for this tab
   isContentFullscreen: boolean; // Whether the tab's web content is in HTML5 fullscreen mode
+  authenticationRequest: AuthenticationRequest | null; // Pending HTTP Basic Auth request
 }
 
 /**
@@ -233,6 +238,9 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   // Permission handling
   private permissionHandler: TabPermissionHandler | null = null;
+
+  // Authentication handling
+  private authenticationHandler: TabAuthenticationHandler | null = null;
 
   /**
    * Allocates a handle for a new tab.
@@ -439,6 +447,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       consoleErrorCount: 0,
       permissionRequests: [],
       isContentFullscreen: false,
+      authenticationRequest: null,
     };
 
     this.setupEventListeners();
@@ -448,6 +457,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.setupConsoleLogCapture();
     this.setupErrorHandler();
     this.setupPermissionHandler();
+    this.setupAuthenticationHandler();
 
     // Initialize zoom percentage from Electron's current zoom factor
     // This ensures we reflect any persisted zoom from previous sessions
@@ -1225,6 +1235,12 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       }
       this.permissionHandler.destroy();
       this.permissionHandler = null;
+    }
+
+    // Clean up authentication handler
+    if (this.authenticationHandler) {
+      this.authenticationHandler.destroy();
+      this.authenticationHandler = null;
     }
 
     // Only detach debugger if webContents is still alive
@@ -2242,6 +2258,48 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     pin?: string,
   ): void {
     this.permissionHandler?.respondToPairing(requestId, confirmed, pin);
+  }
+
+  // =========================================================================
+  // Authentication Handling (HTTP Basic Auth)
+  // =========================================================================
+
+  /**
+   * Sets up the TabAuthenticationHandler for handling HTTP Basic Auth requests.
+   */
+  private setupAuthenticationHandler() {
+    this.authenticationHandler = new TabAuthenticationHandler(
+      this.id,
+      this.webContentsView.webContents,
+      this.logger,
+      {
+        onAuthRequestUpdate: (request) => {
+          this.updateState({ authenticationRequest: request });
+        },
+      },
+    );
+  }
+
+  /**
+   * Submit credentials for an HTTP Basic Auth request.
+   */
+  public submitAuthCredentials(
+    requestId: string,
+    username: string,
+    password: string,
+  ): void {
+    this.authenticationHandler?.submitCredentials(
+      requestId,
+      username,
+      password,
+    );
+  }
+
+  /**
+   * Cancel an HTTP Basic Auth request.
+   */
+  public cancelAuth(requestId: string): void {
+    this.authenticationHandler?.cancelAuth(requestId);
   }
 
   // =========================================================================

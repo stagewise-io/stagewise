@@ -550,6 +550,13 @@ export class WindowLayoutService extends DisposableService {
       'alwaysBlockPermission',
       this.handleAlwaysBlockPermission,
     );
+
+    // Authentication handling
+    this.uiController.on(
+      'submitAuthCredentials',
+      this.handleSubmitAuthCredentials,
+    );
+    this.uiController.on('cancelAuth', this.handleCancelAuth);
   }
 
   private setupPagesServiceHandlers() {
@@ -1527,6 +1534,38 @@ export class WindowLayoutService extends DisposableService {
     }
     this.logger.warn(
       `[WindowLayoutService] No tab found for permission request: ${requestId}`,
+    );
+  };
+
+  // Authentication Handling
+
+  private handleSubmitAuthCredentials = (
+    requestId: string,
+    username: string,
+    password: string,
+  ) => {
+    for (const tab of Object.values(this.tabs)) {
+      const state = tab.getState();
+      if (state.authenticationRequest?.id === requestId) {
+        tab.submitAuthCredentials(requestId, username, password);
+        return;
+      }
+    }
+    this.logger.warn(
+      `[WindowLayoutService] No tab found for auth request: ${requestId}`,
+    );
+  };
+
+  private handleCancelAuth = (requestId: string) => {
+    for (const tab of Object.values(this.tabs)) {
+      const state = tab.getState();
+      if (state.authenticationRequest?.id === requestId) {
+        tab.cancelAuth(requestId);
+        return;
+      }
+    }
+    this.logger.warn(
+      `[WindowLayoutService] No tab found for auth request: ${requestId}`,
     );
   };
 
