@@ -5,7 +5,6 @@ import type { Logger } from '@/services/logger';
 import type { FileDiff } from '@stagewise/agent-types';
 import fs from 'node:fs/promises';
 import type { KartonService } from '@/services/karton';
-import { join } from 'node:path';
 
 // 1. The File State at a specific moment
 type FileMap = {
@@ -42,6 +41,7 @@ export class DiffHistoryService extends DisposableService {
   private watcher: FSWatcher | null = null;
   private currentIndex = -1;
   private filesLockedByAgent: Set<string> = new Set();
+  private currentlyWatchedFiles: Set<string> = new Set();
 
   private constructor(logger: Logger, uiKarton: KartonService) {
     super();
@@ -97,6 +97,9 @@ export class DiffHistoryService extends DisposableService {
 
         this.pushSnapshot('USER_SAVE', newFiles, []);
         this.logDebug(`File unlinked: ${path}`);
+      })
+      .on('add', (_path) => {
+        // File is now being watched
       });
 
     // TODO: Load from persistent storage
@@ -218,9 +221,10 @@ export class DiffHistoryService extends DisposableService {
 
     // 4. Update Watcher
     this.updateWatcher();
+    const newDiffState = this.getDiffState();
     this.uiKarton.setState((draft) => {
       if (draft.agentChat)
-        draft.agentChat.chats[chatId].pendingEdits = this.getDiffState();
+        draft.agentChat.chats[chatId].pendingEdits = newDiffState;
     });
     this.logDebug(
       `[DiffHistory] Snapshot recorded. Trigger: ${trigger}. ChatId: ${chatId}. History Size: ${this.history.length}`,
@@ -594,24 +598,22 @@ export class DiffHistoryService extends DisposableService {
 
   private updateWatcher(): void {
     const currentPendingChanges = this.getDiffState().map((diff) => diff.path);
-    const currentlyWatchedFiles = Object.entries(
-      this.watcher?.getWatched() ?? {},
-    ).flatMap(([dirPath, fileNames]) =>
-      fileNames.map((fileName) => join(dirPath, fileName)),
-    );
+    const pendingSet = new Set(currentPendingChanges);
 
     const needsToBeWatched = currentPendingChanges.filter(
-      (path) => !currentlyWatchedFiles.includes(path),
+      (path) => !this.currentlyWatchedFiles.has(path),
     );
-    const needsToBeUnwatched = currentlyWatchedFiles.filter(
-      (path: string) => !currentPendingChanges.includes(path),
+    const needsToBeUnwatched = [...this.currentlyWatchedFiles].filter(
+      (path) => !pendingSet.has(path),
     );
 
     needsToBeWatched.forEach((path) => {
       this.watcher?.add(path);
+      this.currentlyWatchedFiles.add(path);
     });
     needsToBeUnwatched.forEach((path) => {
       this.watcher?.unwatch(path);
+      this.currentlyWatchedFiles.delete(path);
     });
   }
 }
