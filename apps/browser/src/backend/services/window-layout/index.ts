@@ -60,6 +60,9 @@ export class WindowLayoutService extends DisposableService {
   private currentWebContentBounds: Electron.Rectangle | null = null;
   private isWebContentInteractive = true;
 
+  // HTML5 content fullscreen tracking
+  private contentFullscreenTabId: string | null = null;
+
   private saveStateTimeout: NodeJS.Timeout | null = null;
   private lastNonMaximizedBounds: {
     width: number;
@@ -701,6 +704,10 @@ export class WindowLayoutService extends DisposableService {
       }
     });
 
+    tab.on('contentFullscreenChanged', (isFullscreen: boolean) => {
+      this.handleContentFullscreenChanged(id, isFullscreen);
+    });
+
     // Listen for webContents destroyed event to handle external tab closure
     // (e.g., crash, system closing the webContents)
     const webContents = tab.getViewContainer().webContents;
@@ -844,22 +851,47 @@ export class WindowLayoutService extends DisposableService {
   private handleSwitchTab = async (tabId: string) => {
     if (!this.tabs[tabId]) return;
 
-    // Hide current
-    if (this.activeTabId && this.tabs[this.activeTabId]) {
-      this.tabs[this.activeTabId]!.setVisible(false);
+    const previousTabId = this.activeTabId;
+
+    // If previous tab was in content fullscreen, exit it
+    if (previousTabId && this.contentFullscreenTabId === previousTabId) {
+      await this.tabs[previousTabId]?.exitContentFullscreen();
+      // The contentFullscreenChanged handler will clean up state
+    }
+
+    // Hide current tab and restore border radius (in case it was in fullscreen)
+    if (previousTabId && this.tabs[previousTabId]) {
+      this.tabs[previousTabId]!.setVisible(false);
+      this.tabs[previousTabId]!.setBorderRadiusForFullscreen(4);
     }
 
     this.activeTabId = tabId;
     const newTab = this.tabs[tabId]!;
 
-    if (this.currentWebContentBounds) {
+    // Check if new tab is in content fullscreen
+    if (newTab.getState().isContentFullscreen) {
+      // Apply fullscreen bounds
+      const windowBounds = this.baseWindow!.getContentBounds();
+      newTab.setBorderRadiusForFullscreen(0);
+      newTab.setBounds({
+        x: 0,
+        y: 0,
+        width: windowBounds.width,
+        height: windowBounds.height,
+      });
+      newTab.setVisible(true);
+      this.isWebContentInteractive = true;
+      this.contentFullscreenTabId = tabId;
+    } else if (this.currentWebContentBounds) {
       newTab.setBounds(this.currentWebContentBounds);
       newTab.setVisible(true);
-      this.updateZOrder();
+      this.isWebContentInteractive = false;
     } else {
       // If no bounds set yet, keep invisible until layout update
       newTab.setVisible(false);
     }
+
+    this.updateZOrder();
 
     // Set viewport size to the new tab's current viewport size
     // Don't set to null and wait for event - the event only fires on size CHANGE
@@ -929,6 +961,14 @@ export class WindowLayoutService extends DisposableService {
   ) => {
     this.currentWebContentBounds = bounds;
 
+    // Don't apply bounds if active tab is in content fullscreen
+    if (this.activeTabId && this.contentFullscreenTabId === this.activeTabId) {
+      this.logger.debug(
+        '[WindowLayoutService] Ignoring layout update during content fullscreen',
+      );
+      return;
+    }
+
     if (bounds && this.activeTab) {
       this.activeTab.setVisible(true);
       this.activeTab.setBounds(bounds);
@@ -942,6 +982,88 @@ export class WindowLayoutService extends DisposableService {
   ) => {
     this.isWebContentInteractive = panel === 'tab-content';
     this.updateZOrder();
+  };
+
+  /**
+   * Handles HTML5 fullscreen state changes from tab content.
+   * Manages bounds override, z-order, and border-radius during fullscreen.
+   *
+   * Note: During fullscreen, handleLayoutUpdate() still updates currentWebContentBounds
+   * to track the UI's current layout (but doesn't apply to the tab). On exit, we use
+   * currentWebContentBounds to restore the tab to the current UI layout, not the layout
+   * from when fullscreen started.
+   */
+  private handleContentFullscreenChanged = (
+    tabId: string,
+    isFullscreen: boolean,
+  ) => {
+    const tab = this.tabs[tabId];
+    if (!tab || !this.baseWindow || this.baseWindow.isDestroyed()) return;
+
+    if (isFullscreen) {
+      this.logger.debug(
+        `[WindowLayoutService] Tab ${tabId} entering content fullscreen`,
+      );
+
+      // Only one tab can be in content fullscreen at a time
+      if (
+        this.contentFullscreenTabId &&
+        this.contentFullscreenTabId !== tabId
+      ) {
+        // Exit fullscreen on the other tab
+        this.tabs[this.contentFullscreenTabId]?.exitContentFullscreen();
+      }
+
+      this.contentFullscreenTabId = tabId;
+
+      // Get full window content bounds
+      const windowBounds = this.baseWindow.getContentBounds();
+      const fullBounds = {
+        x: 0,
+        y: 0,
+        width: windowBounds.width,
+        height: windowBounds.height,
+      };
+
+      // Apply fullscreen styling
+      tab.setBorderRadiusForFullscreen(0);
+      tab.setBounds(fullBounds);
+
+      // Ensure tab is on top (in front of UI)
+      this.isWebContentInteractive = true;
+      this.updateZOrder();
+    } else {
+      this.logger.debug(
+        `[WindowLayoutService] Tab ${tabId} leaving content fullscreen`,
+      );
+
+      // Only restore if this is the tab that was in fullscreen
+      if (this.contentFullscreenTabId === tabId) {
+        this.contentFullscreenTabId = null;
+
+        // Restore border radius
+        tab.setBorderRadiusForFullscreen(4);
+
+        // Restore to current UI bounds (not the bounds from when fullscreen started,
+        // since the UI may have changed during fullscreen, e.g., sidebar toggle)
+        if (this.currentWebContentBounds && this.activeTabId === tabId) {
+          tab.setBounds(this.currentWebContentBounds);
+        }
+
+        // Keep isWebContentInteractive = true (don't change z-order)
+        // The mouse is likely still over the webcontents area, and changing z-order
+        // would require the user to move mouse away and back to trigger mouseEnter.
+        // Normal mouse leave/enter behavior will handle z-order switching.
+        this.updateZOrder();
+      }
+    }
+
+    // Update Karton state for UI
+    this.uiKarton.setState((draft) => {
+      if (draft.browser.tabs[tabId]) {
+        draft.browser.tabs[tabId].isContentFullscreen = isFullscreen;
+      }
+    });
   };
 
   private handleTogglePanelKeyboardFocus = async (
@@ -1491,6 +1613,16 @@ export class WindowLayoutService extends DisposableService {
       width: bounds.width,
       height: bounds.height,
     });
+
+    // If a tab is in content fullscreen, update its bounds to match new window size
+    if (this.contentFullscreenTabId && this.tabs[this.contentFullscreenTabId]) {
+      this.tabs[this.contentFullscreenTabId].setBounds({
+        x: 0,
+        y: 0,
+        width: bounds.width,
+        height: bounds.height,
+      });
+    }
   }
 
   private applyThemeColors() {

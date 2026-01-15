@@ -397,6 +397,8 @@ export type TabState = {
   consoleErrorCount: number; // Number of error-level console logs
   /** Pending permission requests for this tab */
   permissionRequests: PermissionRequest[];
+  /** Whether the tab's web content is in HTML5 fullscreen mode */
+  isContentFullscreen: boolean;
 };
 
 export type HistoryEntry = {

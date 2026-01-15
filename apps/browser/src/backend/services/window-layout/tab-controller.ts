@@ -82,6 +82,7 @@ export interface TabState {
   consoleLogCount: number; // Total number of console logs captured since page load
   consoleErrorCount: number; // Number of error-level console logs
   permissionRequests: PermissionRequest[]; // Pending permission requests for this tab
+  isContentFullscreen: boolean; // Whether the tab's web content is in HTML5 fullscreen mode
 }
 
 /**
@@ -137,6 +138,7 @@ export interface TabControllerEventMap {
       left: number;
     },
   ];
+  contentFullscreenChanged: [isFullscreen: boolean];
 }
 
 export class TabController extends EventEmitter<TabControllerEventMap> {
@@ -436,6 +438,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       consoleLogCount: 0,
       consoleErrorCount: 0,
       permissionRequests: [],
+      isContentFullscreen: false,
     };
 
     this.setupEventListeners();
@@ -472,6 +475,30 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     // Update audio state when tab becomes visible to ensure it's current
     if (visible) {
       this.updateAudioState();
+    }
+  }
+
+  /**
+   * Sets the border radius of this tab's WebContentsView.
+   * Used during fullscreen transitions (0 for fullscreen, 4 for normal).
+   */
+  public setBorderRadiusForFullscreen(radius: number): void {
+    this.webContentsView.setBorderRadius(radius);
+  }
+
+  /**
+   * Exits HTML5 fullscreen mode if active.
+   * Called when switching tabs or when user requests exit.
+   */
+  public async exitContentFullscreen(): Promise<void> {
+    if (this.currentState.isContentFullscreen) {
+      try {
+        await this.webContentsView.webContents.executeJavaScript(
+          'document.exitFullscreen && document.fullscreenElement && document.exitFullscreen()',
+        );
+      } catch (err) {
+        this.logger.debug(`[TabController] Failed to exit fullscreen: ${err}`);
+      }
     }
   }
 
@@ -1420,6 +1447,21 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
     wc.on('found-in-page', (_event, result) => {
       this.handleFoundInPage(result);
+    });
+
+    // HTML5 fullscreen handling (when page content requests fullscreen via element.requestFullscreen())
+    wc.on('enter-html-full-screen', () => {
+      this.logger.debug(
+        `[TabController] Tab ${this.id} entered HTML fullscreen`,
+      );
+      this.updateState({ isContentFullscreen: true });
+      this.emit('contentFullscreenChanged', true);
+    });
+
+    wc.on('leave-html-full-screen', () => {
+      this.logger.debug(`[TabController] Tab ${this.id} left HTML fullscreen`);
+      this.updateState({ isContentFullscreen: false });
+      this.emit('contentFullscreenChanged', false);
     });
 
     wc.setWindowOpenHandler((details) => {
