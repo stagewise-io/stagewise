@@ -271,7 +271,7 @@ const SuccessHeader = ({
       <span className="shrink-0 text-success-foreground text-xs group-hover/trigger:text-hover-derived">
         +{newLineCount}
       </span>
-      {!fileWasCreated && (
+      {!fileWasCreated && deletedLineCount > 0 && (
         <span className="shrink-0 text-error-foreground text-xs group-hover/trigger:text-hover-derived">
           -{deletedLineCount}
         </span>

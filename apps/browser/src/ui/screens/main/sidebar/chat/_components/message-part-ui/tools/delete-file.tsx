@@ -1,9 +1,14 @@
 import type { ToolPart } from '@shared/karton-contracts/ui';
 import { DiffPreview } from './shared/diff-preview';
 import { ToolPartUI } from './shared/tool-part-ui';
-import { TrashIcon, XIcon } from 'lucide-react';
+import {
+  Loader2Icon,
+  XIcon,
+  ListChevronsDownUpIcon,
+  ListChevronsUpDownIcon,
+} from 'lucide-react';
 import { FileIcon } from './shared/file-icon';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
 import {
   Tooltip,
@@ -11,13 +16,18 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import { diffLines } from 'diff';
+import { cn } from '@/utils';
+import { Button } from '@stagewise/stage-ui/components/button';
+import { usePostHog } from 'posthog-js/react';
 
 export const DeleteFileToolPart = ({
   part,
 }: {
   part: Extract<ToolPart, { type: 'tool-deleteFileTool' }>;
 }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+  const [collapsedDiffView, setCollapsedDiffView] = useState(true);
+  const posthog = usePostHog();
 
   const diff = useMemo(
     () =>
@@ -50,6 +60,11 @@ export const DeleteFileToolPart = ({
     return part.input?.relative_path;
   }, [part.input?.relative_path]);
 
+  // Force expanded to false when in error state
+  useEffect(() => {
+    if (state === 'error') setExpanded(false);
+  }, [state]);
+
   const trigger = useMemo(() => {
     if (state === 'error')
       return (
@@ -76,11 +91,46 @@ export const DeleteFileToolPart = ({
         <DiffPreview
           diff={diff}
           filePath={part.input?.relative_path ?? ''}
-          collapsed
+          collapsed={collapsedDiffView}
         />
       );
     else return undefined;
-  }, [state, diff, part.input?.relative_path]);
+  }, [state, diff, part.input?.relative_path, collapsedDiffView]);
+
+  const contentFooter = useMemo(() => {
+    if (state === 'success' && diff)
+      return (
+        <div className="flex w-full flex-row items-center justify-start">
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  posthog.capture(
+                    'agent_code_diff_expanded_via_delete_file_tool',
+                    {
+                      file_path: part.input?.relative_path ?? '',
+                    },
+                  );
+                  setCollapsedDiffView(!collapsedDiffView);
+                }}
+              >
+                {collapsedDiffView ? (
+                  <ListChevronsUpDownIcon className={cn('size-3 shrink-0')} />
+                ) : (
+                  <ListChevronsDownUpIcon className={cn('size-3 shrink-0')} />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {collapsedDiffView ? 'Expand code diff' : 'Collapse code diff'}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      );
+    else return undefined;
+  }, [state, diff, collapsedDiffView, part.input?.relative_path, posthog]);
 
   return (
     <ToolPartUI
@@ -89,7 +139,9 @@ export const DeleteFileToolPart = ({
       setExpanded={setExpanded}
       trigger={trigger}
       content={content}
-      contentClassName="max-h-56"
+      contentClassName={cn(streaming ? 'max-h-24' : 'max-h-56')}
+      contentFooter={contentFooter}
+      contentFooterClassName="px-0"
     />
   );
 };
@@ -109,10 +161,10 @@ const ErrorHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <XIcon className="size-3 shrink-0 text-muted-foreground" />
+      <XIcon className="size-3 shrink-0" />
       <Tooltip>
         <TooltipTrigger>
-          <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
+          <span className="min-w-0 flex-1 truncate text-xs">
             {errorTextContent}
           </span>
         </TooltipTrigger>
@@ -151,9 +203,13 @@ const SuccessHeader = ({
           <TooltipContent>{relativePath ?? ''}</TooltipContent>
         </Tooltip>
       </div>
-      <span className="shrink-0 text-error text-xs">(deleted)</span>
+      <span className="shrink-0 text-error-foreground text-xs group-hover/trigger:text-hover-derived">
+        (deleted)
+      </span>
       {(deletedLineCount ?? 0) > 0 && (
-        <span className="shrink-0 text-error text-xs">-{deletedLineCount}</span>
+        <span className="shrink-0 text-error-foreground text-xs group-hover/trigger:text-hover-derived">
+          -{deletedLineCount}
+        </span>
       )}
     </div>
   );
@@ -162,10 +218,10 @@ const SuccessHeader = ({
 const LoadingHeader = ({ relativePath }: { relativePath?: string }) => {
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <TrashIcon className="size-3 shrink-0 text-primary" />
+      <Loader2Icon className="size-3 shrink-0 animate-spin text-primary" />
       {relativePath !== null ? (
         <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">
-          <span dir="ltr" className="text-muted-foreground">
+          <span dir="ltr" className="shimmer-text-primary">
             {relativePath}
           </span>
         </span>
