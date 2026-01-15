@@ -116,10 +116,15 @@ export class DiffHistoryService extends DisposableService {
       this.history[0].trigger === 'INITIAL_LOAD'
     ) {
       for (const file of Object.keys(files)) {
-        if (!this.history[0].files[file]) {
-          // File doesn't exist in initial snapshot, add it
+        // Check if file is already being tracked in current snapshot (created by agent)
+        const currentFiles = this.history[this.currentIndex]?.files ?? {};
+        const isAlreadyTracked = Object.hasOwn(currentFiles, file);
+
+        if (!this.history[0].files[file] && !isAlreadyTracked) {
+          // File doesn't exist in initial snapshot AND not already tracked
+          // This means it's an existing file being edited for the first time
           this.history[0].files[file] = files[file];
-        } else {
+        } else if (this.history[0].files[file]) {
           // File exists - check if disk content differs from computed baseline
           // This handles cases where user reverted changes externally (e.g., git checkout)
           const baseline = this.getComputedBaseline(this.currentIndex);
@@ -324,7 +329,7 @@ export class DiffHistoryService extends DisposableService {
 
   /**
    * User clicks "Accept All".
-   * Marks ALL files in the current node as accepted.
+   * Marks ALL files in the current node as accepted, including deletions.
    */
   public acceptPendingChanges(): void {
     if (this.currentIndex === -1) return;
@@ -335,8 +340,23 @@ export class DiffHistoryService extends DisposableService {
       this.logError('No chat id found', new Error('No chat id found'));
       return;
     }
-    // Mark all current files as accepted.
-    currentNode.acceptedPaths = Object.keys(currentNode.files);
+
+    // Get previous baseline to detect deletions
+    const previousBaseline =
+      this.currentIndex > 0
+        ? this.getComputedBaseline(this.currentIndex - 1)
+        : (this.history[0]?.files ?? {});
+
+    // Files that currently exist
+    const existingPaths = Object.keys(currentNode.files);
+
+    // Files that were deleted (existed in baseline but not in current)
+    const deletedPaths = Object.keys(previousBaseline).filter(
+      (path) => !Object.hasOwn(currentNode.files, path),
+    );
+
+    // Mark both existing AND deleted files as accepted
+    currentNode.acceptedPaths = [...existingPaths, ...deletedPaths];
 
     this.updateWatcher();
     this.uiKarton.setState((draft) => {
@@ -351,17 +371,24 @@ export class DiffHistoryService extends DisposableService {
 
   /**
    * User clicks "Accept" on specific files (Granular Commit).
+   * This handles both file modifications/creations AND deletions.
+   * A deletion is accepted when the file path is in filesToAccept but
+   * doesn't exist in the current files (it was deleted).
    */
-  public partialAccept(filesToKeep: string[]): void {
+  public partialAccept(filesToAccept: string[]): void {
     if (this.currentIndex === -1) throw new Error('No history');
 
     const currentNode = this.history[this.currentIndex];
 
     // Push new snapshot: Files stay exactly the same!
+    // The filesToAccept array can include both:
+    // - Paths of files that exist (modifications/creations)
+    // - Paths of files that were deleted (not in currentNode.files)
+    // The getComputedBaseline() method handles both cases correctly.
     this.pushSnapshot(
       'PARTIAL_USER_ACCEPT',
       currentNode.files,
-      filesToKeep, // These become part of the baseline
+      filesToAccept, // These become part of the baseline (including deletions)
     );
   }
 

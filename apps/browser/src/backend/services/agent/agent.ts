@@ -1190,9 +1190,18 @@ export class AgentService {
                   result.result.hiddenFromLLM.diff.path,
                 );
                 if (!absolutePath) return;
-                this.diffHistoryService?.addInitialFileSnapshotIfNeeded({
-                  [absolutePath]: result.result.hiddenFromLLM.diff.before ?? '',
-                });
+                // Always ensure an initial snapshot exists.
+                // For existing files: add original content to initial snapshot
+                // For new files: create empty initial snapshot (file won't be in it)
+                // This ensures AGENT_EDIT is never history[0], so baseline != current
+                if (result.result.hiddenFromLLM.diff.before !== null) {
+                  this.diffHistoryService?.addInitialFileSnapshotIfNeeded({
+                    [absolutePath]: result.result.hiddenFromLLM.diff.before,
+                  });
+                } else {
+                  // New file - ensure initial snapshot exists but don't include this file
+                  this.diffHistoryService?.addInitialFileSnapshotIfNeeded({});
+                }
                 // Use pushAgentFileEdit which handles merging with current state
                 // Pass null for deletions, content for creates/updates
                 this.diffHistoryService?.pushAgentFileEdit(
