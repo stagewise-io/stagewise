@@ -280,6 +280,8 @@ const SuccessHeader = ({
   newLineCount: number;
   deletedLineCount: number;
 }) => {
+  const fileName = relativePath?.split('/').pop() ?? relativePath;
+
   return (
     <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
       <div className="pointer-events-auto flex flex-row items-center justify-start gap-1">
@@ -291,7 +293,7 @@ const SuccessHeader = ({
                 className="items-center gap-0.5 text-foreground text-xs group-hover/trigger:text-hover-derived"
                 dir="ltr"
               >
-                {relativePath}
+                {fileName}
               </span>
             </span>
           </TooltipTrigger>
@@ -313,15 +315,22 @@ const SuccessHeader = ({
 };
 
 const LoadingHeader = ({ relativePath }: { relativePath?: string }) => {
+  const fileName = relativePath?.split('/').pop() ?? relativePath;
+
   return (
     <div className="flex flex-row items-center justify-start gap-1">
       <Loader2Icon className="size-3 shrink-0 animate-spin text-primary" />
       {relativePath !== null ? (
-        <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">
-          <span dir="ltr" className="shimmer-text-primary">
-            {relativePath}
-          </span>
-        </span>
+        <Tooltip>
+          <TooltipTrigger>
+            <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">
+              <span dir="ltr" className="shimmer-text-primary">
+                {fileName}
+              </span>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{relativePath ?? ''}</TooltipContent>
+        </Tooltip>
       ) : (
         <Skeleton className="h-3 w-16" variant="text" />
       )}
