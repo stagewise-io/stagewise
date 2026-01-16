@@ -52,6 +52,8 @@ jobs:
       version: ${{ steps.bump.outputs.version }}
       tag: ${{ steps.bump.outputs.tag }}
       notes: ${{ steps.bump.outputs.notes }}
+    env:
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
 
     steps:
       - uses: actions/checkout@v4
