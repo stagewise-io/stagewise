@@ -9,6 +9,9 @@ import {
 } from '../utils/tool-output-capper.js';
 import { rethrowCappedToolOutputError } from '../utils/error.js';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `List files and directories in a path (like 'ls' or 'tree' command). Use when exploring directory structure.
   
   Parameters:

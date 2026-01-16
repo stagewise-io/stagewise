@@ -5,6 +5,9 @@ import { rethrowCappedToolOutputError } from '../utils/error';
 import { capToolOutput } from '../utils/tool-output-capper';
 import { TOOL_OUTPUT_LIMITS } from '../constants';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Execute synchronous JavaScript in the browser console of a specific tab. Works on ANY website (external sites or localhost).
 
 IMPORTANT LIMITATIONS:

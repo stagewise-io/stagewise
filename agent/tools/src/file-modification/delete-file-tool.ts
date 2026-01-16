@@ -6,6 +6,9 @@ import { validateToolOutput } from '../index.js';
 import { z } from 'zod';
 import { prepareDiffContent } from '../utils/file.js';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Delete a file from the file system with undo capability.
 
 Parameters:

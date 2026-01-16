@@ -12,6 +12,9 @@ import { TOOL_OUTPUT_LIMITS } from '../constants';
 import { capToolOutput } from '../utils/tool-output-capper';
 import { rethrowCappedToolOutputError } from '../utils/error';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Search the web for information.
 
 Parameters:

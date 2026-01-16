@@ -187,7 +187,7 @@ export function knowledgeAgentTools(
 }
 
 export type CodingAgentCallbacks = {
-  onUpdateStagewiseMd: () => Promise<void>;
+  onUpdateStagewiseMd: ({ reason }: { reason: string }) => Promise<void>;
   getLintingDiagnostics: () => Promise<LintingDiagnosticsResult>;
 };
 

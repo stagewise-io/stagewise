@@ -242,6 +242,7 @@ export async function generateStagewiseMd(
   modelOptions: ReturnType<typeof getModelOptions>,
   clientRuntime: ClientRuntime,
   overwriteClientRuntime: ClientRuntime,
+  _reason?: string,
 ): Promise<{ success: boolean; message: string; filePath?: string }> {
   const projectRoot = clientRuntime.fileSystem.getCurrentWorkingDirectory();
   const system = await getSystemPrompt(clientRuntime);

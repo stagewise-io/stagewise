@@ -9,6 +9,9 @@ import {
 } from '../utils/tool-output-capper.js';
 import { rethrowCappedToolOutputError } from '../utils/error.js';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Find files and directories BY THEIR PATH/NAME using glob patterns (like 'find' command). Use when searching for files by name or extension. NOT for searching inside file contents (use grepSearchTool for that).
 
 Parameters:

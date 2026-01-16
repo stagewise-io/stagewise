@@ -7,7 +7,16 @@ import { FILE_SIZE_LIMITS, TOOL_OUTPUT_LIMITS } from '../constants.js';
 import { capToolOutput } from '../utils/tool-output-capper.js';
 import { rethrowCappedToolOutputError } from '../utils/error.js';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Read file contents with optional line range control. Line numbers are 1-indexed (first line is 1, not 0).
+
+Parameters:
+- relative_path (string, REQUIRED): Relative path of file to read. File must exist.
+- start_line (number, OPTIONAL): Starting line number (1-indexed, INCLUSIVE). Must be >= 1. Omit to read from beginning.
+- end_line (number, OPTIONAL): Ending line number (1-indexed, INCLUSIVE). Must be >= start_line. Omit to read to end.
+- explanation (string, REQUIRED): One sentence explaining why this tool is being used.
 
 Behavior: Returns content with totalLines count. Output capped at 200KB (~50k tokens, ~6k lines of code). If truncated, suggests reading in chunks using line ranges. Respects .gitignore.`;
 

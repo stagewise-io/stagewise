@@ -231,7 +231,8 @@ export class AgentService {
         getMinimalBrowserRuntime(this.windowLayoutService),
         this.client,
         {
-          onUpdateStagewiseMd: () => this.updateStagewiseMd(),
+          onUpdateStagewiseMd: ({ reason }) =>
+            this.updateStagewiseMd({ reason }),
           getLintingDiagnostics: () => this.getStructuredLintingDiagnostics(),
         },
       ),
@@ -337,7 +338,7 @@ export class AgentService {
     this.client = createAuthenticatedClient(this.apiKey);
   }
 
-  private async updateStagewiseMd() {
+  private async updateStagewiseMd({ reason }: { reason: string }) {
     if (!this.clientRuntime) return;
     if (!this.uiKarton.state.workspace?.paths.data) return;
     if (!this.apiKey) {
@@ -371,6 +372,7 @@ export class AgentService {
         workingDirectory: stagewiseMdPath,
         rgBinaryBasePath: this.globalDataPathService.globalDataPath,
       }),
+      reason,
     );
   }
 

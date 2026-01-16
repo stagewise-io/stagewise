@@ -6,6 +6,9 @@ import { z } from 'zod';
 import { prepareDiffContent } from '../utils/file.js';
 import { rethrowCappedToolOutputError } from '../utils/error.js';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Make multiple find-and-replace edits to a single file in one operation. CRITICAL: Edits are applied SEQUENTIALLY - each edit sees the results of previous edits.
 
 Parameters:

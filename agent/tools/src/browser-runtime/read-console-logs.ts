@@ -5,6 +5,9 @@ import { capToolOutput } from '../utils/tool-output-capper';
 import { TOOL_OUTPUT_LIMITS } from '../constants';
 import type { BrowserRuntime } from '..';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Read console logs from a browser tab. Returns logs captured since the page loaded (logs are cleared on navigation).
 
 Use cases:

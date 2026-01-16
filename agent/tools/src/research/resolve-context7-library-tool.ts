@@ -6,6 +6,9 @@ import { TOOL_OUTPUT_LIMITS } from '../constants.js';
 import { capToolOutput } from '../utils/tool-output-capper.js';
 import { rethrowCappedToolOutputError } from '../utils/error.js';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Use this tool to start searching for library documentation. 
 It will return a list of context7 library ids and titles that are relevant to the library name.
 You can then use the getContext7LibraryDocs tool to get the documentation for a given context7 library id and topic.

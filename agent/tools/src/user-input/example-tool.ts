@@ -27,6 +27,9 @@ import { z } from 'zod';
  * - Describe the visual behavior (what the user sees)
  * - Explain the outcome (what the tool returns)
  */
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Ask the [USER] for input via a UI component.
 IMPORTANT: When using this tool, ask the [USER] a question before calling it.
 

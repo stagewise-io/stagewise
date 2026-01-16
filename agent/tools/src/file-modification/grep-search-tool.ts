@@ -10,6 +10,9 @@ import {
 } from '../utils/tool-output-capper.js';
 import { rethrowCappedToolOutputError } from '../utils/error.js';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Fast regex search INSIDE file contents using ripgrep. Use to find code patterns, function definitions, or specific text within files. NOT for finding files by name (use globTool for that).
 
 Parameters:

@@ -7,6 +7,9 @@ import { z } from 'zod';
 import { prepareDiffContent } from '../utils/file.js';
 import type { PreparedDiffContent } from '../utils/file.js';
 
+/* Due to an issue in zod schema conversion in the ai sdk,
+   the schema descriptions are not properly used for the prompts -
+   thus, we include them in the descriptions as well. */
 export const DESCRIPTION = `Overwrite entire file content, creating the file if it does not exist.
 
 Parameters:
