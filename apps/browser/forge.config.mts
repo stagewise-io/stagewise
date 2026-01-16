@@ -9,9 +9,13 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { SquirrelInstallerNameFixPlugin } from './etc/forge-plugins/squirrel-installer-name-fix';
+import { getWindowsSignConfig } from './etc/windows/windowsSign';
 import path from 'node:path';
 import fs from 'node:fs';
 import * as buildConstants from './build-constants';
+
+// Get Windows signing configuration (returns undefined if not configured)
+const windowsSignConfig = getWindowsSignConfig();
 
 /**
  * Release channel for the build.
@@ -87,6 +91,7 @@ const config: ForgeConfig = {
         schemes: ['stagewise'],
       },
     ],
+    // macOS code signing (only for non-dev builds)
     ...(buildConstants.__APP_RELEASE_CHANNEL__ !== 'dev'
       ? {
           osxSign: {
@@ -104,6 +109,8 @@ const config: ForgeConfig = {
           },
         }
       : {}),
+    // Windows code signing via Azure Trusted Signing (only when configured)
+    ...(windowsSignConfig ? { windowsSign: windowsSignConfig } : {}),
   },
   rebuildConfig: {
     force: true,
@@ -118,6 +125,9 @@ const config: ForgeConfig = {
       setupIcon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.ico`,
       loadingGif: `./assets/install/${buildConstants.__APP_RELEASE_CHANNEL__}/windows-install-image.gif`,
       title: `Installing ${buildConstants.__APP_NAME__}...`,
+      // Windows code signing for the installer (uses same config as packager)
+      // @ts-expect-error - windowsSign type is not correctly exported by MakerSquirrel
+      ...(windowsSignConfig ? { windowsSign: windowsSignConfig } : {}),
     })),
     new MakerRpm({
       options: {

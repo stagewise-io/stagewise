@@ -29,6 +29,19 @@ on:
         required: false
       MACOS_CERT_P12_PASSWORD:
         required: false
+      # Azure Trusted Signing secrets (Windows code signing)
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_CLIENT_ID:
+        required: false
+      AZURE_CLIENT_SECRET:
+        required: false
+      AZURE_ACCOUNT_NAME:
+        required: false
+      AZURE_ACCOUNT_ENDPOINT_URI:
+        required: false
+      AZURE_CERTIFICATE_PROFILE_NAME:
+        required: false
 
 jobs:
   version-bump:
@@ -135,6 +148,59 @@ jobs:
           p12-file-base64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
           p12-password: ${{ secrets.MACOS_CERT_P12_PASSWORD }}
 
+      - name: Setup Windows code signing
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Install Azure.CodeSigning.Dlib via NuGet
+          $nugetDir = "${{ runner.temp }}\nuget"
+          New-Item -ItemType Directory -Force -Path $nugetDir | Out-Null
+
+          Write-Host "Installing Microsoft.Trusted.Signing.Client NuGet package..."
+          nuget install Microsoft.Trusted.Signing.Client -OutputDirectory $nugetDir -Source https://api.nuget.org/v3/index.json
+
+          # Find the installed dlib
+          $dlibPath = Get-ChildItem -Path $nugetDir -Recurse -Filter "Azure.CodeSigning.Dlib.dll" |
+            Where-Object { $_.FullName -match "x64" } |
+            Select-Object -First 1 -ExpandProperty FullName
+
+          if (-not $dlibPath) {
+            Write-Error "Failed to find Azure.CodeSigning.Dlib.dll"
+            exit 1
+          }
+          Write-Host "Found DLIB at: $dlibPath"
+
+          # Find signtool.exe from Windows SDK
+          $sdkPath = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $signtoolPath = Get-ChildItem -Path $sdkPath -Recurse -Filter "signtool.exe" |
+            Where-Object { $_.FullName -match "x64" } |
+            Sort-Object { [version]($_.Directory.Parent.Name -replace '^(\d+\.\d+\.\d+\.\d+).*', '$1') } -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+
+          if (-not $signtoolPath) {
+            Write-Error "Failed to find signtool.exe in Windows SDK"
+            exit 1
+          }
+          Write-Host "Found signtool.exe at: $signtoolPath"
+
+          # Create metadata.json for Azure Trusted Signing
+          $metadataPath = "${{ runner.temp }}\metadata.json"
+          $metadata = @{
+            Endpoint = "${{ secrets.AZURE_ACCOUNT_ENDPOINT_URI }}"
+            CodeSigningAccountName = "${{ secrets.AZURE_ACCOUNT_NAME }}"
+            CertificateProfileName = "${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}"
+          } | ConvertTo-Json
+
+          Set-Content -Path $metadataPath -Value $metadata
+          Write-Host "Created metadata.json at: $metadataPath"
+          Write-Host "Metadata content:"
+          Get-Content $metadataPath
+
+          # Export environment variables for subsequent steps
+          echo "SIGNTOOL_PATH=$signtoolPath" >> $env:GITHUB_ENV
+          echo "AZURE_CODE_SIGNING_DLIB=$dlibPath" >> $env:GITHUB_ENV
+          echo "AZURE_METADATA_JSON=$metadataPath" >> $env:GITHUB_ENV
+
       - run: pnpm build
 
       - name: Build Electron App
@@ -142,10 +208,16 @@ jobs:
         run: pnpm make --arch=${{ matrix.arch }}
         env:
           BUILD_MODE: production
+          # macOS signing
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # Windows signing (Azure Trusted Signing authentication)
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          # Release channel
           RELEASE_CHANNEL: ${{ inputs.channel == 'release' && 'release' || 'prerelease' }}
 
       - name: List build output
