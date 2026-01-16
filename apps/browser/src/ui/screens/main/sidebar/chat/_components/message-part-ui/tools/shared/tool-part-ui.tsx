@@ -226,7 +226,7 @@ export const ToolPartUI = ({
             {contentFooter && (
               <div
                 className={cn(
-                  'absolute right-0 bottom-0 left-0 flex h-6 flex-row items-center justify-start gap-1 rounded-b-lg border-derived-subtle border-t bg-background px-2 py-1 text-muted-foreground dark:bg-surface-1',
+                  'absolute right-0 bottom-0 left-0 flex h-6 flex-row items-center justify-start gap-1 rounded-b-lg border-derived border-t bg-background px-2 py-1 text-muted-foreground dark:bg-surface-1',
                   contentFooterClassName,
                 )}
               >

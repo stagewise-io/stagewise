@@ -7,15 +7,15 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          'border border-derived-subtle bg-primary-solid font-normal text-solid-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
+          'border border-derived bg-primary-solid font-normal text-solid-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
         secondary:
-          'border border-derived-subtle bg-surface-1 font-normal text-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
+          'border border-derived bg-surface-1 font-normal text-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
         destructive:
-          'border border-derived-subtle bg-error-solid font-normal text-solid-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
+          'border border-derived bg-error-solid font-normal text-solid-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
         warning:
-          'border border-derived-subtle bg-warning-solid font-normal text-solid-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
+          'border border-derived bg-warning-solid font-normal text-solid-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
         success:
-          'border border-derived-subtle bg-success-solid font-normal text-solid-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
+          'border border-derived bg-success-solid font-normal text-solid-foreground not-disabled:hover:bg-hover-derived not-disabled:active:bg-active-derived',
         ghost:
           'bg-transparent font-normal text-muted-foreground not-disabled:hover:text-foreground not-disabled:active:text-foreground/l-4_c-3',
       },

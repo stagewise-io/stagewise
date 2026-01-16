@@ -99,14 +99,14 @@
   --active-derived-l: -0.02;
   --active-derived-c: -0.002;
 
-  --border-derived-l: -0.098;
-  --border-derived-c: -0.014;
+  --border-derived-subtle-l: -0.031;
+  --border-derived-subtle-c: -0.005;
 
-  --border-derived-subtle-l: -0.055;
-  --border-derived-subtle-c: -0.009;
+  --border-derived-l: -0.055;
+  --border-derived-c: -0.009;
 
-  --border-derived-subtler-l: -0.031;
-  --border-derived-subtler-c: -0.005;
+  --border-derived-strong-l: -0.098;
+  --border-derived-strong-c: -0.014;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -123,20 +123,21 @@
     --active-derived-l: 0.007;
     --active-derived-c: 0.001;
 
-    --border-derived-l: 0.07;
-    --border-derived-c: 0.012;
+    --border-derived-subtle-l: 0.031;
+    --border-derived-subtle-c: 0.005;
 
-    --border-derived-subtle-l: 0.055;
-    --border-derived-subtle-c: 0.011;
+    --border-derived-l: 0.055;
+    --border-derived-c: 0.011;
 
-    --border-derived-subtler-l: 0.031;
-    --border-derived-subtler-c: 0.005;
+    --border-derived-strong-l: 0.07;
+    --border-derived-strong-c: 0.012;
+
   }
 }
 
 /* Used for subtle borders via 'border border-derived-subtle' */
 @utility border-derived-subtle {
-  border-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--border-derived-subtle-l)) calc(c + var(--border-derived-subtle-c)) h);
+  border-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-subtle-l)) calc(c + var(--border-derived-subtle-c)) h);
 }
 
 /* Used for regular borders via 'border border-derived' */
@@ -144,9 +145,9 @@
   border-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-l)) calc(c + var(--border-derived-c)) h);
 }
 
-/* Used for subtler borders via 'border border-derived-subtler' */
-@utility border-derived-subtler {
-  border-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-subtler-l)) calc(c + var(--border-derived-subtler-c)) h);
+/* Used for strong borders via 'border border-derived-strong' */
+@utility border-derived-strong {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-strong-l)) calc(c + var(--border-derived-strong-c)) h);
 }
 
 /* Used for subtle rings via 'ring ring-derived-subtle' */
@@ -157,6 +158,11 @@
 /* Used for regular rings via 'ring ring-derived' */
 @utility ring-derived {
   --tw-ring-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-l)) calc(c + var(--border-derived-c)) h);
+}
+
+/* Used for strong rings via 'ring ring-derived-strong' */
+@utility ring-derived-strong {
+  --tw-ring-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-strong-l)) calc(c + var(--border-derived-strong-c)) h);
 }
 
 @utility text-hover-derived {

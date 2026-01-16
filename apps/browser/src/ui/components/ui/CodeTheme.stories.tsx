@@ -344,8 +344,8 @@ const ComparisonToggle = ({
     onClick={onToggle}
     className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
       enabled
-        ? 'border-derived bg-primary-solid text-solid-foreground'
-        : 'border-derived bg-surface-1 text-muted-foreground hover:bg-hover-derived'
+        ? 'border-derived-strong bg-primary-solid text-solid-foreground'
+        : 'border-derived-strong bg-surface-1 text-muted-foreground hover:bg-hover-derived'
     }`}
   >
     <span

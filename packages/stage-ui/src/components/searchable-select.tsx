@@ -110,7 +110,7 @@ const triggerVariants = {
   ghost:
     'bg-transparent text-muted-foreground hover:text-foreground data-popup-open:text-foreground',
   secondary:
-    'border border-derived-subtle bg-surface-1 text-foreground hover:bg-hover-derived active:bg-active-derived data-popup-open:bg-hover-derived',
+    'border border-derived bg-surface-1 text-foreground hover:bg-hover-derived active:bg-active-derived data-popup-open:bg-hover-derived',
 } satisfies Record<SearchableSelectTriggerVariant, string>;
 
 export const SearchableSelect = ({
@@ -462,7 +462,7 @@ export const SearchableSelect = ({
               <div
                 ref={sidePanelRef}
                 className={cn(
-                  'absolute left-full ml-1 flex max-w-64 flex-col gap-1 rounded-lg border border-derived-subtle bg-background p-2.5 text-foreground shadow-lg transition-[top] duration-100 ease-out',
+                  'absolute left-full ml-1 flex max-w-64 flex-col gap-1 rounded-lg border border-derived bg-background p-2.5 text-foreground shadow-lg transition-[top] duration-100 ease-out',
                   'fade-in-0 slide-in-from-left-1 animate-in duration-150',
                   sizes.popup[size],
                 )}

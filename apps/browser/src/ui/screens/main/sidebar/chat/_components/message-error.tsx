@@ -110,7 +110,7 @@ export function MessageError({ error }: { error: AgentError }) {
       >
         <div
           className={cn(
-            'markdown group wrap-break-word relative min-h-8 space-y-3 rounded-lg border border-derived-subtle bg-surface-1 px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
+            'markdown group wrap-break-word relative min-h-8 space-y-3 rounded-lg border border-derived bg-surface-1 px-2.5 py-1.5 font-normal text-sm last:mb-0.5',
             'min-w-48 origin-bottom-left',
           )}
         >

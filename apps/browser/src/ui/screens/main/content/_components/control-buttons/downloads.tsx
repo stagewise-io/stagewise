@@ -426,7 +426,7 @@ export function DownloadsControlButton() {
                   onDelete={handleDelete}
                 />
                 {index < items.length - 1 && (
-                  <hr className="w-full border-derived-subtle border-b bg-background" />
+                  <hr className="w-full border-derived border-b bg-background" />
                 )}
               </Fragment>
             ))

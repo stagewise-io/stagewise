@@ -641,7 +641,7 @@ export const MessageUser = memo(
               {/* Edit mode container styled like user message */}
               <div
                 className={cn(
-                  'message-user-edit-container relative flex w-full flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.05),0_-6px_48px_-24px_rgba(0,0,0,0.08)] ring-1 ring-derived transition-colors before:absolute before:inset-0 before:rounded-lg dark:bg-surface-1',
+                  'message-user-edit-container relative flex w-full flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.05),0_-6px_48px_-24px_rgba(0,0,0,0.08)] ring-1 ring-derived-strong transition-colors before:absolute before:inset-0 before:rounded-lg dark:bg-surface-1',
                   isEditDragOver && 'bg-hover-derived!',
                 )}
               >
@@ -731,7 +731,7 @@ export const MessageUser = memo(
           >
             <div
               className={cn(
-                'group group/chat-bubble-user wrap-break-word relative min-h-8 max-w-xl origin-bottom-right select-text space-y-2 rounded-lg rounded-br-sm border border-derived-subtle bg-surface-tinted px-2.5 py-1.5 font-normal text-foreground text-sm last:mb-0.5',
+                'group group/chat-bubble-user wrap-break-word relative min-h-8 max-w-xl origin-bottom-right select-text space-y-2 rounded-lg rounded-br-sm border border-derived bg-surface-tinted px-2.5 py-1.5 font-normal text-foreground text-sm last:mb-0.5',
                 canEdit &&
                   'cursor-pointer hover:bg-hover-derived active:bg-active-derived',
               )}

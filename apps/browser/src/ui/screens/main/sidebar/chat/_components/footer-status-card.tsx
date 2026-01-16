@@ -85,7 +85,7 @@ function StatusCardItemComponent({
         </CollapsibleContent>
       </Collapsible>
       {showDivider && (
-        <hr className="my-1 h-px w-[calc(100%+6px)] border-derived-subtler bg-background" />
+        <hr className="my-1 h-px w-[calc(100%+6px)] border-derived-subtle bg-background" />
       )}
     </div>
   );
@@ -101,7 +101,7 @@ function StatusCardComponent({
   return (
     <div
       ref={ref}
-      className="-z-10 absolute right-2 bottom-[calc(100%+1px)] left-2 flex flex-col items-center justify-between rounded-t-lg border-derived-subtle border-t border-r border-l bg-background p-1 backdrop-blur-lg"
+      className="-z-10 absolute right-2 bottom-[calc(100%+1px)] left-2 flex flex-col items-center justify-between rounded-t-lg border-derived border-t border-r border-l bg-background p-1 backdrop-blur-lg"
     >
       {items.map((item, index) => (
         <StatusCardItemComponent

@@ -268,7 +268,7 @@ const triggerVariants = {
   ghost:
     'bg-transparent text-muted-foreground hover:text-foreground data-[popup-open]:text-foreground',
   secondary:
-    'border border-derived-subtle bg-surface-1 text-foreground hover:bg-hover-derived active:bg-active-derived data-popup-open:bg-hover-derived',
+    'border border-derived bg-surface-1 text-foreground hover:bg-hover-derived active:bg-active-derived data-popup-open:bg-hover-derived',
 } satisfies Record<SelectTriggerVariant, string>;
 
 // ============================================================================
@@ -508,7 +508,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
           <SelectBase.Popup
             className={cn(
               'flex origin-(--transform-origin) flex-col items-stretch gap-0.5',
-              'rounded-lg border border-derived-subtle bg-background p-1 shadow-lg',
+              'rounded-lg border border-derived bg-background p-1 shadow-lg',
               'transition-[transform,scale,opacity] duration-150 ease-out',
               'data-[ending-style]:scale-90 data-[ending-style]:opacity-0',
               'data-[starting-style]:scale-90 data-[starting-style]:opacity-0',

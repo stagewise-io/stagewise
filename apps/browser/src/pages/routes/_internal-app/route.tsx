@@ -29,7 +29,7 @@ function RouteComponent() {
     <div className="flex h-screen w-screen items-center justify-center bg-app-background p-3">
       <div className="flex h-full w-full flex-row items-start justify-start gap-6">
         <Sidebar />
-        <div className="scrollbar-subtle h-full flex-1 overflow-y-auto rounded-lg bg-background ring-1 ring-derived">
+        <div className="scrollbar-subtle h-full flex-1 overflow-y-auto rounded-lg bg-background ring-1 ring-derived-strong">
           <Outlet />
         </div>
       </div>
@@ -71,7 +71,7 @@ function Sidebar() {
               Account
             </SidebarNav.Item>
           </SidebarNav.Group>
-          <hr className="ml-1 border-derived bg-app-background" />
+          <hr className="ml-1 border-derived-strong bg-app-background" />
           <SidebarNav.Group label="Browsing data">
             <SidebarNav.Item
               to="/history"
@@ -92,7 +92,7 @@ function Sidebar() {
               Clear data
             </SidebarNav.Item>
           </SidebarNav.Group>
-          <hr className="ml-1 border-derived bg-app-background" />
+          <hr className="ml-1 border-derived-strong bg-app-background" />
           <SidebarNav.Item
             to="/about"
             icon={<IconCircleInfoFillDuo18 className="size-5" />}

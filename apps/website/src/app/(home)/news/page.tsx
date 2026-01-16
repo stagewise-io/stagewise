@@ -76,7 +76,7 @@ export default function BlogPage() {
           .map((post, index) => (
             <ScrollReveal key={post.path} delay={200 + index * 100}>
               <Link href={post.url}>
-                <div className="flex w-full flex-col items-start justify-center gap-1 rounded-xl border border-derived-subtle bg-surface-1 p-4 transition-colors">
+                <div className="flex w-full flex-col items-start justify-center gap-1 rounded-xl border border-derived bg-surface-1 p-4 transition-colors">
                   <p className="font-semibold text-foreground text-xl tracking-tight">
                     {post.data.title}
                   </p>

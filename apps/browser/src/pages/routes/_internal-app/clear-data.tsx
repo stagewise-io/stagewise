@@ -213,7 +213,7 @@ function Page() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <div className="flex items-center border-derived-subtle border-b bg-background px-6 py-4">
+      <div className="flex items-center border-derived border-b bg-background px-6 py-4">
         <div className="mx-auto w-full max-w-3xl">
           <h1 className="font-semibold text-foreground text-xl">Clear Data</h1>
         </div>
@@ -234,7 +234,7 @@ function Page() {
               {dataOptions.map((option) => (
                 <label
                   key={option.id}
-                  className="flex cursor-pointer select-none items-start gap-3 rounded-lg border border-derived-subtle bg-background p-2.5 transition-colors hover:bg-hover-derived"
+                  className="flex cursor-pointer select-none items-start gap-3 rounded-lg border border-derived bg-background p-2.5 transition-colors hover:bg-hover-derived"
                   htmlFor={option.id}
                 >
                   <Checkbox
@@ -298,8 +298,8 @@ function Page() {
             <div
               className={`rounded-lg border p-4 ${
                 result.success
-                  ? 'border border-derived bg-success-background text-success-foreground'
-                  : 'border border-derived bg-error-background text-error-foreground'
+                  ? 'border border-derived-strong bg-success-background text-success-foreground'
+                  : 'border border-derived-strong bg-error-background text-error-foreground'
               }`}
             >
               <p className="text-sm">{result.message}</p>
