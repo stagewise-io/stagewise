@@ -20,6 +20,7 @@ import { ThinkingPart } from './message-part-ui/thinking';
 import { FilePart } from './message-part-ui/file';
 import { TextPart } from './message-part-ui/text';
 import { DeleteFileToolPart } from './message-part-ui/tools/delete-file';
+import { UpdateStagewiseMdToolPart } from './message-part-ui/tools/update-stagewise-md';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
 import { OverwriteFileToolPart } from './message-part-ui/tools/overwrite-file';
 import {
@@ -181,6 +182,13 @@ export const MessageAssistant = memo(
                       );
                     case 'tool-deleteFileTool':
                       return <DeleteFileToolPart key={stableKey} part={part} />;
+                    case 'tool-updateStagewiseMdTool':
+                      return (
+                        <UpdateStagewiseMdToolPart
+                          key={stableKey}
+                          part={part}
+                        />
+                      );
                     case 'tool-multiEditTool':
                       return <MultiEditToolPart key={stableKey} part={part} />;
                     case 'tool-executeConsoleScriptTool':
