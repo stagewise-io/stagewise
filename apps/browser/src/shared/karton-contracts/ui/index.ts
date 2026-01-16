@@ -111,6 +111,15 @@ export type Chat = {
   pendingEdits: FileDiff[];
 };
 
+/**
+ * A message that has been queued for sending when the agent is busy.
+ */
+export type QueuedMessage = {
+  id: string;
+  message: ChatMessage;
+  queuedAt: Date;
+};
+
 export enum AgentErrorType {
   INSUFFICIENT_CREDITS = 'insufficient-credits-message',
   PLAN_LIMITS_EXCEEDED = 'plan-limits-exceeded',
@@ -445,6 +454,10 @@ export type AppState = {
     chats: Record<ChatId, Chat>;
     toolCallApprovalRequests: string[];
     isWorking: boolean;
+    /** Queue of messages waiting to be sent, keyed by chat ID */
+    messageQueue: Record<ChatId, QueuedMessage[]>;
+    /** Chats where queue processing is paused (e.g., after an error) */
+    queuePausedChats: Record<ChatId, boolean>;
   } | null;
   workspace: {
     path: string;
@@ -617,6 +630,23 @@ export type KartonContract = {
         shouldUndoUserMessage?: boolean,
       ) => Promise<void>;
       setSelectedModel: (model: string) => Promise<void>;
+      // Message queue procedures
+      /** Queue a message to be sent when the agent finishes (called automatically by sendUserMessage when agent is working) */
+      queueUserMessage: (message: ChatMessage) => Promise<void>;
+      /** Remove a specific queued message */
+      removeQueuedMessage: (
+        chatId: string,
+        queuedMessageId: string,
+      ) => Promise<void>;
+      /** Clear all queued messages for a chat */
+      clearMessageQueue: (chatId: string) => Promise<void>;
+      /** Resume queue processing after it was paused (e.g., after an error) */
+      resumeMessageQueue: (chatId: string) => Promise<void>;
+      /** Abort current agent call and immediately send a queued message */
+      sendQueuedMessageNow: (
+        chatId: string,
+        queuedMessageId: string,
+      ) => Promise<void>;
     };
     userAccount: {
       refreshStatus: () => Promise<void>;

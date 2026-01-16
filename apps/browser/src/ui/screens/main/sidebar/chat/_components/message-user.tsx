@@ -666,9 +666,10 @@ export const MessageUser = memo(
                   className="w-full"
                 />
                 <div className="relative flex shrink-0 flex-col items-center justify-end gap-1">
-                  {/* ChatInputActions without stop button */}
+                  {/* ChatInputActions for inline edit mode (never shows stop button) */}
                   <ChatInputActions
-                    showStopButton={false}
+                    isAgentWorking={false}
+                    hasTextInput={editedText.trim().length > 0}
                     showElementSelectorButton
                     elementSelectionActive={elementSelectionActive}
                     onToggleElementSelection={handleToggleElementSelection}
@@ -731,7 +732,8 @@ export const MessageUser = memo(
             <div
               className={cn(
                 'group group/chat-bubble-user wrap-break-word relative min-h-8 max-w-xl origin-bottom-right select-text space-y-2 rounded-lg rounded-br-sm border border-derived-subtle bg-surface-tinted px-2.5 py-1.5 font-normal text-foreground text-sm last:mb-0.5',
-                canEdit && 'cursor-pointer hover:border-primary/30',
+                canEdit &&
+                  'cursor-pointer hover:bg-hover-derived active:bg-active-derived',
               )}
               onClick={canEdit ? handleStartEditing : undefined}
               role={canEdit ? 'button' : undefined}

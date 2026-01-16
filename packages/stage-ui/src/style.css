@@ -44,14 +44,11 @@
 @media (prefers-color-scheme: dark) {
   :root {
      --shadow-elev-1:
-      inset 0 1px 0 color-mix(in oklch, var(--color-base-100) 7%, transparent),
       0 1px 2px color-mix(in oklch, var(--color-base-950) 40%, transparent),
       0 10px 28px color-mix(in oklch, var(--color-base-950) 32%, transparent);
     
 
     --shadow-elev-2:
-      inset 0 1px 0 color-mix(in oklch, var(--color-base-100) 9%, transparent),
-      inset 0 0 0 1px color-mix(in oklch, var(--color-base-100) 7%, transparent),
       0 2px 0 color-mix(in oklch, var(--color-base-950) 60%, transparent),
       0 22px 60px color-mix(in oklch, var(--color-base-950) 45%, transparent);
   }
@@ -107,6 +104,9 @@
 
   --border-derived-subtle-l: -0.055;
   --border-derived-subtle-c: -0.009;
+
+  --border-derived-subtler-l: -0.031;
+  --border-derived-subtler-c: -0.005;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -128,6 +128,9 @@
 
     --border-derived-subtle-l: 0.055;
     --border-derived-subtle-c: 0.011;
+
+    --border-derived-subtler-l: 0.031;
+    --border-derived-subtler-c: 0.005;
   }
 }
 
@@ -139,6 +142,11 @@
 /* Used for regular borders via 'border border-derived' */
 @utility border-derived {
   border-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-l)) calc(c + var(--border-derived-c)) h);
+}
+
+/* Used for subtler borders via 'border border-derived-subtler' */
+@utility border-derived-subtler {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-subtler-l)) calc(c + var(--border-derived-subtler-c)) h);
 }
 
 /* Used for subtle rings via 'ring ring-derived-subtle' */

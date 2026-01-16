@@ -110,6 +110,20 @@ export interface EventProperties {
     messages_compacted: number;
     summary_length: number;
   };
+  'agent-message-queued': {
+    chat_id: string;
+    queue_size: number;
+  };
+  'agent-queued-message-processing': {
+    chat_id: string;
+    queued_message_id: string;
+    time_in_queue_ms: number;
+  };
+  'agent-queued-message-sent-now': {
+    chat_id: string;
+    queued_message_id: string;
+    time_in_queue_ms: number;
+  };
 }
 
 export interface UserProperties {

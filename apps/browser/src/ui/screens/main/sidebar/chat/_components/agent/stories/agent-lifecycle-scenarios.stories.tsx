@@ -48,6 +48,8 @@ const baseState: Partial<AppState> = {
     activeChatId: 'streaming-chat',
     toolCallApprovalRequests: [],
     isWorking: false,
+    messageQueue: {},
+    queuePausedChats: {},
     selectedModel: availableModels[0],
   },
   userExperience: {

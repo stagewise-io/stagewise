@@ -15,6 +15,7 @@ import {
   type KartonContract,
   type History,
   type ChatMessage,
+  type QueuedMessage,
   AgentErrorType,
   agentPreferencesSchema,
 } from '@shared/karton-contracts/ui';
@@ -409,6 +410,15 @@ export class AgentService {
     const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
     if (!activeChatId) return;
 
+    // If agent is currently working, queue the message for later processing
+    if (this.isWorking) {
+      this.logger.debug(
+        '[AgentService] Agent is working, queueing message instead',
+      );
+      this.queueMessage(message, activeChatId);
+      return;
+    }
+
     // Reset thinking durations for this chat (new user message = new turn)
     this.thinkingDurationsPerChat.set(activeChatId, {
       durations: [],
@@ -471,6 +481,173 @@ export class AgentService {
       chatId: activeChatId,
       history: messages,
     });
+  }
+
+  /**
+   * Queue a message to be sent when the agent finishes working.
+   * Used when user sends a message while the agent is busy.
+   */
+  private queueMessage(message: ChatMessage, chatId: string): void {
+    this.logger.debug('[AgentService] Queueing message for later', { chatId });
+
+    const queuedMessage: QueuedMessage = {
+      id: generateId(),
+      message,
+      queuedAt: new Date(),
+    };
+
+    this.uiKarton.setState((draft) => {
+      if (!draft.agentChat) return;
+
+      // Initialize queue for this chat if it doesn't exist
+      if (!draft.agentChat.messageQueue[chatId])
+        draft.agentChat.messageQueue[chatId] = [];
+
+      draft.agentChat.messageQueue[chatId].push(queuedMessage as any);
+    });
+
+    this.telemetryService.capture('agent-message-queued', {
+      chat_id: chatId,
+      queue_size:
+        (this.uiKarton.state.agentChat?.messageQueue[chatId]?.length ?? 0) + 1,
+    });
+  }
+
+  /**
+   * Process the next queued message for the active chat, if any.
+   * Called after the agent finishes working.
+   */
+  private async processNextQueuedMessage(): Promise<void> {
+    const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
+    if (!activeChatId) return;
+
+    // Check if queue is paused for this chat (e.g., after an error)
+    const isPaused =
+      this.uiKarton.state.agentChat?.queuePausedChats[activeChatId];
+    if (isPaused) {
+      this.logger.debug(
+        '[AgentService] Queue is paused for chat, skipping processing',
+        { chatId: activeChatId },
+      );
+      return;
+    }
+
+    const queue = this.uiKarton.state.agentChat?.messageQueue[activeChatId];
+    if (!queue || queue.length === 0) return;
+
+    // Dequeue the first message
+    const queuedMessage = queue[0];
+    if (!queuedMessage) return;
+
+    this.logger.debug('[AgentService] Processing queued message', {
+      chatId: activeChatId,
+      queuedMessageId: queuedMessage.id,
+      remainingInQueue: queue.length - 1,
+    });
+
+    // Remove from queue
+    this.uiKarton.setState((draft) => {
+      if (!draft.agentChat) return;
+      const chatQueue = draft.agentChat.messageQueue[activeChatId];
+      if (chatQueue && chatQueue.length > 0) {
+        chatQueue.shift();
+      }
+    });
+
+    this.telemetryService.capture('agent-queued-message-processing', {
+      chat_id: activeChatId,
+      queued_message_id: queuedMessage.id,
+      time_in_queue_ms: Date.now() - new Date(queuedMessage.queuedAt).getTime(),
+    });
+
+    // Send the message (this will set isWorking to true and call the agent)
+    await this.sendUserMessage(queuedMessage.message);
+  }
+
+  /**
+   * Pause the message queue for a specific chat.
+   * Called when an error occurs to prevent auto-sending more messages.
+   */
+  private pauseMessageQueue(chatId: string): void {
+    this.logger.debug('[AgentService] Pausing message queue for chat', {
+      chatId,
+    });
+    this.uiKarton.setState((draft) => {
+      if (draft.agentChat) {
+        draft.agentChat.queuePausedChats[chatId] = true;
+      }
+    });
+  }
+
+  /**
+   * Resume the message queue for a specific chat and process next message.
+   * Called by the user to continue after an error.
+   */
+  private resumeMessageQueueForChat(chatId: string): void {
+    this.logger.debug('[AgentService] Resuming message queue for chat', {
+      chatId,
+    });
+    this.uiKarton.setState((draft) => {
+      if (draft.agentChat) {
+        draft.agentChat.queuePausedChats[chatId] = false;
+      }
+    });
+
+    // Process next queued message if any
+    void this.processNextQueuedMessage();
+  }
+
+  /**
+   * Abort current agent work and immediately send a specific queued message.
+   * This removes the message from the queue, aborts any current work, and sends it.
+   */
+  private async sendQueuedMessageNow(
+    chatId: string,
+    queuedMessageId: string,
+  ): Promise<void> {
+    this.logger.debug('[AgentService] Sending queued message now', {
+      chatId,
+      queuedMessageId,
+    });
+
+    // Find and remove the queued message from state
+    const queue = this.uiKarton.state.agentChat?.messageQueue[chatId];
+    const queuedMessage = queue?.find((m) => m.id === queuedMessageId);
+
+    if (!queuedMessage) {
+      this.logger.warn('[AgentService] Queued message not found', {
+        chatId,
+        queuedMessageId,
+      });
+      return;
+    }
+
+    // Remove from queue
+    this.uiKarton.setState((draft) => {
+      if (!draft.agentChat) return;
+      const chatQueue = draft.agentChat.messageQueue[chatId];
+      if (chatQueue) {
+        const index = chatQueue.findIndex((m) => m.id === queuedMessageId);
+        if (index !== -1) chatQueue.splice(index, 1);
+      }
+    });
+
+    // Abort current agent call if working
+    if (this.isWorking) {
+      this.logger.debug(
+        '[AgentService] Aborting current agent call to send queued message',
+      );
+      this.abortAgentCall();
+    }
+
+    this.telemetryService.capture('agent-queued-message-sent-now', {
+      chat_id: chatId,
+      queued_message_id: queuedMessageId,
+      time_in_queue_ms: Date.now() - new Date(queuedMessage.queuedAt).getTime(),
+    });
+
+    // Send the message immediately
+    await this.sendUserMessage(queuedMessage.message);
   }
 
   public setCurrentWorkingDirectory(
@@ -545,6 +722,7 @@ export class AgentService {
     _reason?: string,
     resetRecursionDepth = true,
     chatId?: string,
+    shouldProcessQueue = false,
   ): void {
     if (chatId && this.lastMessageId) {
       const pendingToolCalls = findPendingToolCalls(
@@ -575,6 +753,20 @@ export class AgentService {
     if (resetRecursionDepth) this.recursionDepth = 0;
 
     this.setAgentWorking(false);
+
+    // Process next queued message if requested (only on natural completion, not on abort/error)
+    if (shouldProcessQueue) {
+      // Successful completion clears any paused state from previous errors
+      // This allows the queue to resume after user retries/resends successfully
+      const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
+      if (activeChatId) {
+        this.uiKarton.setState((draft) => {
+          if (draft.agentChat)
+            draft.agentChat.queuePausedChats[activeChatId] = false;
+        });
+      }
+      void this.processNextQueuedMessage();
+    }
   }
 
   private onAuthStateChange = (async (newAuthState: AuthState) => {
@@ -608,6 +800,8 @@ export class AgentService {
           toolCallApprovalRequests: [],
           isWorking: false,
           selectedModel: initialModel,
+          messageQueue: {},
+          queuePausedChats: {},
         };
       }
     });
@@ -845,6 +1039,11 @@ export class AgentService {
           this.uiKarton.setState((draft) => {
             if (draft.agentChat?.chats[chatId])
               delete draft.agentChat?.chats[chatId];
+            // Clean up message queue and paused state for deleted chat
+            if (draft.agentChat?.messageQueue[chatId])
+              delete draft.agentChat.messageQueue[chatId];
+            if (draft.agentChat?.queuePausedChats[chatId])
+              delete draft.agentChat.queuePausedChats[chatId];
           });
         },
       );
@@ -853,6 +1052,64 @@ export class AgentService {
         'agentChat.sendUserMessage',
         async (_callingClientId: string, message: ChatMessage) => {
           await this.sendUserMessage(message);
+        },
+      );
+
+      // Message queue procedures
+      this.uiKarton.registerServerProcedureHandler(
+        'agentChat.queueUserMessage',
+        async (_callingClientId: string, message: ChatMessage) => {
+          const activeChatId = this.uiKarton.state.agentChat?.activeChatId;
+          if (!activeChatId) return;
+          this.queueMessage(message, activeChatId);
+        },
+      );
+
+      this.uiKarton.registerServerProcedureHandler(
+        'agentChat.removeQueuedMessage',
+        async (
+          _callingClientId: string,
+          chatId: string,
+          queuedMessageId: string,
+        ) => {
+          this.uiKarton.setState((draft) => {
+            if (!draft.agentChat) return;
+            const queue = draft.agentChat.messageQueue[chatId];
+            if (queue) {
+              const index = queue.findIndex((m) => m.id === queuedMessageId);
+              if (index !== -1) {
+                queue.splice(index, 1);
+              }
+            }
+          });
+        },
+      );
+
+      this.uiKarton.registerServerProcedureHandler(
+        'agentChat.clearMessageQueue',
+        async (_callingClientId: string, chatId: string) => {
+          this.uiKarton.setState((draft) => {
+            if (!draft.agentChat) return;
+            draft.agentChat.messageQueue[chatId] = [];
+          });
+        },
+      );
+
+      this.uiKarton.registerServerProcedureHandler(
+        'agentChat.resumeMessageQueue',
+        async (_callingClientId: string, chatId: string) => {
+          this.resumeMessageQueueForChat(chatId);
+        },
+      );
+
+      this.uiKarton.registerServerProcedureHandler(
+        'agentChat.sendQueuedMessageNow',
+        async (
+          _callingClientId: string,
+          chatId: string,
+          queuedMessageId: string,
+        ) => {
+          await this.sendQueuedMessageNow(chatId, queuedMessageId);
         },
       );
 
@@ -961,6 +1218,14 @@ export class AgentService {
     this.uiKarton.removeServerProcedureHandler('agentChat.switch');
     this.uiKarton.removeServerProcedureHandler('agentChat.delete');
     this.uiKarton.removeServerProcedureHandler('agentChat.sendUserMessage');
+    // Message queue procedures
+    this.uiKarton.removeServerProcedureHandler('agentChat.queueUserMessage');
+    this.uiKarton.removeServerProcedureHandler('agentChat.removeQueuedMessage');
+    this.uiKarton.removeServerProcedureHandler('agentChat.clearMessageQueue');
+    this.uiKarton.removeServerProcedureHandler('agentChat.resumeMessageQueue');
+    this.uiKarton.removeServerProcedureHandler(
+      'agentChat.sendQueuedMessageNow',
+    );
     this.uiKarton.removeServerProcedureHandler(
       'userAccount.refreshSubscription',
     );
@@ -1324,6 +1589,8 @@ export class AgentService {
           this.cleanupPendingOperations(
             'Agent task completed successfully',
             false,
+            undefined,
+            true, // Process next queued message on natural completion
           );
         },
       });
@@ -1786,6 +2053,7 @@ export class AgentService {
         }
       });
 
+      this.pauseMessageQueue(chatId);
       this.cleanupPendingOperations('Plan limits exceeded');
       return;
     } else if (
@@ -1824,6 +2092,7 @@ export class AgentService {
           };
         }
       });
+      this.pauseMessageQueue(chatId);
       return;
     } else if (isContextLimitError(error.error)) {
       this.uiKarton.setState((draft) => {
@@ -1838,6 +2107,7 @@ export class AgentService {
             },
           };
       });
+      this.pauseMessageQueue(chatId);
       this.cleanupPendingOperations('Context limit exceeded');
       return;
     } else {
@@ -1854,6 +2124,7 @@ export class AgentService {
           };
         }
       });
+      this.pauseMessageQueue(chatId);
     }
   }
 

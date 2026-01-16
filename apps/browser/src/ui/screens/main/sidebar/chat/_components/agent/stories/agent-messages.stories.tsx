@@ -49,6 +49,8 @@ const baseState: Partial<AppState> = {
       'chat-1': createEmptyChat(),
     },
     activeChatId: 'chat-1',
+    messageQueue: {},
+    queuePausedChats: {},
     toolCallApprovalRequests: [],
     isWorking: false,
     selectedModel: availableModels[0],

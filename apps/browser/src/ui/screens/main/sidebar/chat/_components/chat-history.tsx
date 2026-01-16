@@ -150,13 +150,15 @@ export const ChatHistory = () => {
 
   // Auto-scroll to bottom when content changes, but only if user was at bottom
   // or if a message was just sent (forceScrollOnNextUpdateRef)
+  // Use messages array reference as dependency to avoid scrolling on unrelated state changes
+  const messages = activeChat?.messages;
   useEffect(() => {
     if (forceScrollOnNextUpdateRef.current || wasAtBottomRef.current) {
       scrollToBottom();
       wasAtBottomRef.current = true;
       forceScrollOnNextUpdateRef.current = false;
     }
-  }, [activeChat]);
+  }, [messages]);
 
   // Initialize scroll position to bottom on mount
   useEffect(() => {
