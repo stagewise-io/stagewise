@@ -16,7 +16,7 @@ const Panel = ({
     <section
       ref={ref}
       className={cn(
-        'glass-body pointer-events-auto flex size-full flex-col items-stretch justify-start overflow-hidden rounded-3xl bg-white/20',
+        'pointer-events-auto flex size-full flex-col items-stretch justify-start overflow-hidden rounded-3xl bg-white/20',
         alwaysFullHeight && 'h-full',
         className,
       )}

@@ -428,7 +428,7 @@ function DesignInspirationCard({
       onClick={(e) => onClick(e)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="flex w-64 shrink-0 cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-derived-strong bg-background text-foreground shadow-[0_0_6px_0_rgba(0,0,0,0.08),0_-6px_48px_-24px_rgba(0,0,0,0.15)] transition-shadow duration-300 hover:shadow-[0_0_12px_0_rgba(0,0,0,0.12),0_-8px_56px_-24px_rgba(0,0,0,0.2)] dark:bg-surface-1"
+      className="flex w-64 shrink-0 cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-derived-strong bg-background text-foreground shadow-elevation-1 transition-shadow duration-300 hover:bg-hover-derived hover:text-hover-derived dark:bg-surface-1"
     >
       <div className="relative h-40 w-full">
         {!isImageLoaded && <Skeleton className="h-40 w-full rounded-none" />}

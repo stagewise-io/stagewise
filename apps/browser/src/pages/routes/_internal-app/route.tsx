@@ -41,7 +41,7 @@ function Sidebar() {
   return (
     <div className="flex h-full min-w-fit max-w-64 basis-1/4 flex-col items-start justify-between gap-2 py-2 pl-2">
       <div className="flex flex-row items-center justify-start gap-4 dark:drop-shadow-md">
-        <div className="glass-body -ml-0.5 flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full">
+        <div className="-ml-0.5 flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full">
           <AnimatedGradientBackground className="absolute inset-0 z-0 size-full" />
           <Logo
             color="white"

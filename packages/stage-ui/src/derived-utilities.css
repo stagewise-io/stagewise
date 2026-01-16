@@ -1,0 +1,153 @@
+/**
+ * Auto-derived color utilities
+ * These derive border, ring, text, and background colors from the element's
+ * background color (--cm-bg-color) which is automatically set by bg-* utilities
+ * via the color-modifiers plugin.
+ * 
+ * Falls back to semantic colors when no background is set.
+ * 
+ * Usage examples:
+ *   border border-derived-subtle  - subtle border derived from background
+ *   border border-derived         - regular border derived from background
+ *   ring ring-derived-strong      - strong ring derived from background
+ *   hover:bg-hover-derived        - hover state background
+ */
+
+:root {
+  --hover-text-derived-l: -0.09;
+  --hover-text-derived-c: -0.01;
+
+  --text-derived-lighter-subtle-l: 0.06;
+  --text-derived-lighter-subtle-c: 0.011;
+
+  --text-derived-lighter-l: 0.09;
+  --text-derived-lighter-c: 0.014;
+
+  --active-text-derived-l: -0.011;
+  --active-text-derived-c: -0.001;
+
+  --hover-derived-l: -0.01;
+  --hover-derived-c: -0.001;
+
+  --active-derived-l: -0.02;
+  --active-derived-c: -0.002;
+
+  --border-derived-subtle-l: -0.031;
+  --border-derived-subtle-c: -0.005;
+
+  --border-derived-l: -0.055;
+  --border-derived-c: -0.009;
+
+  --border-derived-strong-l: -0.098;
+  --border-derived-strong-c: -0.014;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hover-text-derived-l: 0.09;
+    --hover-text-derived-c: 0.01;
+
+    --active-text-derived-l: 0.007;
+    --active-text-derived-c: 0.001;
+
+    --hover-derived-l: 0.031;
+    --hover-derived-c: 0.001;
+
+    --active-derived-l: 0.007;
+    --active-derived-c: 0.001;
+
+    --border-derived-subtle-l: 0.031;
+    --border-derived-subtle-c: 0.005;
+
+    --border-derived-l: 0.055;
+    --border-derived-c: 0.011;
+
+    --border-derived-strong-l: 0.07;
+    --border-derived-strong-c: 0.012;
+
+  }
+}
+
+/* Border utilities */
+@utility border-derived-subtle {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-subtle-l)) calc(c + var(--border-derived-subtle-c)) h);
+}
+
+@utility border-derived {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-l)) calc(c + var(--border-derived-c)) h);
+}
+
+@utility border-derived-strong {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-strong-l)) calc(c + var(--border-derived-strong-c)) h);
+}
+
+@utility border-derived-lighter-subtle {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.06) calc(c + 0.011) h);
+}
+
+@utility border-derived-lighter {
+  border-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.09) calc(c + 0.014) h);
+}
+
+/* Ring utilities */
+@utility ring-derived-subtle {
+  --tw-ring-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--border-derived-subtle-l)) calc(c + var(--border-derived-subtle-c)) h);
+}
+
+@utility ring-derived {
+  --tw-ring-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-l)) calc(c + var(--border-derived-c)) h);
+}
+
+@utility ring-derived-strong {
+  --tw-ring-color: oklch(from var(--cm-bg-color, var(--color-border)) calc(l + var(--border-derived-strong-l)) calc(c + var(--border-derived-strong-c)) h);
+}
+
+@utility ring-derived-lighter-subtle {
+  --tw-ring-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.06) calc(c + 0.011) h);
+}
+
+@utility ring-derived-lighter {
+  --tw-ring-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.09) calc(c + 0.014) h);
+}
+
+/* Text utilities */
+@utility text-hover-derived {
+  color: oklch(from var(--cm-text-color, var(--color-foreground)) calc(l + var(--hover-text-derived-l)) calc(c + var(--hover-text-derived-c)) h);
+}
+
+@utility text-active-derived {
+  color: oklch(from var(--cm-text-color, var(--color-foreground)) calc(l + var(--active-text-derived-l)) calc(c + var(--active-text-derived-c)) h);
+}
+
+@utility text-derived-lighter-subtle {
+  color: oklch(from var(--cm-text-color, var(--color-foreground)) calc(l + var(--text-derived-lighter-subtle-l)) calc(c + var(--text-derived-lighter-subtle-c)) h);
+}
+
+@utility text-derived-lighter {
+  color: oklch(from var(--cm-text-color, var(--color-foreground)) calc(l + var(--text-derived-lighter-l)) calc(c + var(--text-derived-lighter-c)) h);
+}
+
+/* Background utilities */
+@utility bg-hover-derived {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--hover-derived-l)) calc(c + var(--hover-derived-c)) h);
+}
+
+@utility bg-active-derived {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--active-derived-l)) calc(c + var(--active-derived-c)) h);
+}
+
+@utility bg-derived-lighter-subtle {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.06) calc(c + 0.011) h);
+}
+
+@utility bg-derived-lighter {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + 0.09) calc(c + 0.014) h);
+}
+
+@utility bg-derived-darker-subtle {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l - 0.06) calc(c - 0.011) h);
+}
+
+@utility bg-derived-darker {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l - 0.09) calc(c - 0.014) h);
+}

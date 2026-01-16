@@ -1,0 +1,37 @@
+/**
+ * Shadow and elevation utilities
+ * Provides elevation-based shadow tokens and utilities for depth perception.
+ */
+
+@theme default {
+  /* Light mode elevation shadows (very subtle) */
+  --shadow-elev-1:
+    0 1px 2px color-mix(in oklch, var(--color-base-950) 8%, transparent),
+    0 1px 1px color-mix(in oklch, var(--color-base-950) 6%, transparent);
+
+  --shadow-elev-2:
+    0 8px 24px color-mix(in oklch, var(--color-base-950) 14%, transparent),
+    0 2px 6px color-mix(in oklch, var(--color-base-950) 10%, transparent);
+}
+
+/* Dark mode elevation shadows (create depth) */
+@media (prefers-color-scheme: dark) {
+  :root {
+     --shadow-elev-1:
+      0 1px 2px color-mix(in oklch, var(--color-base-950) 40%, transparent),
+      0 10px 28px color-mix(in oklch, var(--color-base-950) 32%, transparent);
+    
+
+    --shadow-elev-2:
+      0 2px 0 color-mix(in oklch, var(--color-base-950) 60%, transparent),
+      0 22px 60px color-mix(in oklch, var(--color-base-950) 45%, transparent);
+  }
+}
+
+@utility shadow-elevation-1 {
+  @apply shadow-(--shadow-elev-1);
+}
+
+@utility shadow-elevation-2 {
+  @apply shadow-(--shadow-elev-2);
+}

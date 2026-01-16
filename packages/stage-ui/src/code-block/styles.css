@@ -1,0 +1,70 @@
+/**
+ * Code block UI utilities
+ * Provides styling for code block features like diffs, line numbers,
+ * and collapsed line indicators.
+ */
+
+/* ==========================================================================
+   Diff Highlighting
+   ========================================================================== */
+
+@utility code-block-diff-add {
+  @apply bg-success-solid/12 dark:bg-success-solid/31;
+}
+
+@utility code-block-diff-remove {
+  @apply bg-error-solid/18 dark:bg-error-solid/31;
+}
+
+/* ==========================================================================
+   Line Numbers
+   ========================================================================== */
+
+@utility line-numbers-container {
+  @apply pl-0 pr-2 flex flex-col items-end text-muted-foreground/30 text-[10px]/4 shrink-0;
+}
+
+/* ==========================================================================
+   Collapsed Lines
+   Used for hiding unchanged lines in diff views with expand indicators.
+   ========================================================================== */
+
+/* Edge-top collapsed lines (before first diff) - hidden */
+@utility code-line-collapsed-edge-top {
+  @apply hidden;
+}
+
+/* Edge-bottom collapsed lines (after last diff) - hidden */
+@utility code-line-collapsed-edge-bottom {
+  @apply hidden;
+}
+
+/* Middle collapsed lines (between diffs) - divider with centered count */
+@utility code-line-collapsed-middle {
+  @apply hidden;
+  &[data-hidden-count] {
+    @apply flex items-center gap-2 my-3 text-muted-foreground/50 text-[10px];
+    &::before, &::after {
+      @apply flex-1 h-px bg-muted-foreground/20 content-[""];
+    }
+  }
+}
+
+/* ==========================================================================
+   Line Number Variants for Collapsed Lines
+   ========================================================================== */
+
+@utility code-line-number-collapsed-edge-top {
+  @apply hidden;
+}
+
+@utility code-line-number-collapsed-edge-bottom {
+  @apply hidden;
+}
+
+@utility code-line-number-collapsed-middle {
+  @apply block size-0 select-none invisible;
+  &:has(+ :not(.code-line-number-collapsed-middle)) {
+    @apply my-3;
+  }
+}

@@ -1,0 +1,145 @@
+/**
+ * Shared animations and animation utilities
+ * Contains reusable animations for loading states, shimmer effects, and more.
+ */
+
+@theme default {
+  /* Progress bar animation */
+  --animate-progress-bar-indicator: progress-bar-indicator 500ms linear infinite;
+  @keyframes progress-bar-indicator {
+    0% {
+      transform: translateX(-50px);
+    }
+    100% {
+      transform: translateX(0px);
+    }
+  }
+
+  /* Skeleton loading shimmer */
+  --animate-skeleton-shimmer: skeleton-shimmer 2s ease-in-out infinite;
+  @keyframes skeleton-shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Icon pulse (stroke width pulse) */
+  --animate-icon-pulse: icon-pulse 750ms linear infinite alternate;
+  @keyframes icon-pulse {
+    0% {
+      stroke-width: 1.5px;
+    }
+    100% {
+      stroke-width: 2.5px;
+    }
+  }
+}
+
+/* Full opacity pulse */
+@utility animate-pulse-full {
+  animation: pulse-full 1s ease-in-out infinite;
+}
+@keyframes pulse-full {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   Shimmer Text Animations
+   Creates a shimmering highlight effect that moves across text.
+   
+   Usage:
+     shimmer-text                    - base shimmer animation
+     shimmer-text-primary            - primary-colored shimmer preset
+     shimmer-text-once               - one-shot shimmer that settles
+     shimmer-duration-{ms}           - custom duration (e.g., shimmer-duration-1500)
+     shimmer-from-{color}            - start/end color
+     shimmer-to-{color}              - highlight color
+   ========================================================================== */
+
+@utility shimmer-text {
+  background-image: linear-gradient(
+    120deg,
+    var(--shimmer-color-1) 0%,
+    var(--shimmer-color-1) 25%,
+    var(--shimmer-color-2) 50%,
+    var(--shimmer-color-1) 75%,
+    var(--shimmer-color-1) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-move calc(var(--shimmer-duration, 2000) * 1ms) linear infinite;
+}
+
+@keyframes shimmer-move {
+  0% {
+    background-position: 140% 0%;
+  }
+  100% {
+    background-position: -40% 0%;
+  }
+}
+
+@utility shimmer-text-primary {
+  @apply shimmer-text shimmer-duration-1500 shimmer-from-primary-foreground shimmer-to-primary-foreground/l27_c0.02;
+}
+
+/* One-shot shimmer that settles to normal text color */
+@utility shimmer-text-once {
+  background-image: linear-gradient(
+    120deg,
+    var(--shimmer-color-1) 0%,
+    var(--shimmer-color-1) 25%,
+    var(--shimmer-color-2) 50%,
+    var(--shimmer-color-1) 75%,
+    var(--shimmer-color-1) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-once calc(var(--shimmer-duration, 2000) * 1ms) linear forwards;
+}
+
+@keyframes shimmer-once {
+  0% {
+    /* Start with shimmer highlight already entering visible area */
+    background-position: 100% 0%;
+  }
+  75% {
+    background-position: -40% 0%;
+  }
+  100% {
+    background-position: -40% 0%;
+    color: var(--color-muted-foreground);
+    -webkit-text-fill-color: var(--color-muted-foreground);
+    background-image: none;
+  }
+}
+
+/* Shimmer configuration utilities */
+@utility shimmer-duration-* {
+  --shimmer-duration: --value(integer);
+}
+
+@utility shimmer-from-* {
+  --shimmer-color-1: --value(--color-*);
+}
+
+@utility shimmer-to-* {
+  --shimmer-color-2: --value(--color-*);
+}
