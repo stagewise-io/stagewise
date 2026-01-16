@@ -134,8 +134,9 @@ export const ToolPartUI = ({
     return (
       <div
         className={cn(
-          '-mx-1 flex h-6 w-full items-center gap-1 truncate px-2.5 font-normal text-muted-foreground',
-          showBorder && 'rounded-lg border border-border bg-surface-1',
+          '-mx-1 flex h-6 w-full items-center gap-1 truncate font-normal text-muted-foreground',
+          showBorder &&
+            'rounded-lg border border-border bg-background px-2.5 dark:bg-surface-1',
         )}
       >
         {trigger}
@@ -189,15 +190,16 @@ export const ToolPartUI = ({
         {content && (
           <CollapsibleContent
             className={cn(
-              'relative flex flex-col pb-0 text-xs',
+              'relative pb-0 text-xs duration-0!',
               !showBorder && 'pt-1',
             )}
           >
             <div
               ref={contentScrollRef}
               className={cn(
-                'mask-alpha scrollbar-hover-only block overscroll-contain py-0.5 transition-[max-height] duration-300 ease-spring-soft',
+                'scrollbar-hover-only mask-alpha overscroll-contain py-0.5',
                 showBorder ? 'max-h-32' : 'max-h-none',
+                contentFooter && 'mb-6',
                 contentClassName,
               )}
               style={
@@ -205,6 +207,7 @@ export const ToolPartUI = ({
                   ...getMaskStyle(),
                   overflowY: 'auto',
                   overflowX: 'auto',
+                  contain: 'layout',
                   maskImage: `
                     linear-gradient(to right, transparent 0px, black var(--left-fade), black calc(100% - var(--right-fade)), transparent 100%),
                     linear-gradient(to bottom, transparent 0px, black var(--top-fade), black calc(100% - var(--bottom-fade)), transparent 100%)
@@ -223,7 +226,7 @@ export const ToolPartUI = ({
             {contentFooter && (
               <div
                 className={cn(
-                  '-ml-2 -mr-2 flex h-6 shrink-0 flex-row items-center justify-start gap-1 rounded-b-lg border-border-subtle/50 border-t px-2 py-1 text-muted-foreground transition-all duration-150 ease-out dark:border-border/70',
+                  'absolute right-0 bottom-0 left-0 flex h-6 flex-row items-center justify-start gap-1 rounded-b-lg border-derived-subtle border-t bg-background px-2 py-1 text-muted-foreground dark:bg-surface-1',
                   contentFooterClassName,
                 )}
               >

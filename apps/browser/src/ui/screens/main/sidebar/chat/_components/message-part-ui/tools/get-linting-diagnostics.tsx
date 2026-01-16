@@ -55,7 +55,7 @@ export const GetLintingDiagnosticsToolPart = ({
   if (state === 'error') {
     return (
       <div className={cn('group/exploring-part block min-w-32 rounded-xl')}>
-        <div className="flex h-6 cursor-default items-center gap-1 rounded-xl px-2.5 text-muted-foreground">
+        <div className="flex h-6 cursor-default items-center gap-1 rounded-lg text-muted-foreground">
           <div className="flex w-full flex-row items-center justify-start gap-1">
             <XCircleIcon className="size-3 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">

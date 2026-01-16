@@ -78,7 +78,7 @@ export const ExecuteConsoleScriptToolPart = ({
   if (state === 'error') {
     return (
       <div className={cn('group/exploring-part block min-w-32 rounded-xl')}>
-        <div className="flex h-6 cursor-default items-center gap-1 rounded-xl px-2.5">
+        <div className="flex h-6 cursor-default items-center gap-1 rounded-lg text-muted-foreground">
           <div className="flex w-full flex-row items-center justify-start gap-1">
             <ErrorHeader errorText={part.errorText ?? undefined} />
           </div>
@@ -143,7 +143,7 @@ export const ExecuteConsoleScriptToolPart = ({
                     Script
                   </button>
                 </CollapsibleTrigger>
-                <CollapsibleContent>
+                <CollapsibleContent className="duration-0!">
                   <div
                     className={cn(
                       'scrollbar-hover-only',
@@ -180,7 +180,7 @@ export const ExecuteConsoleScriptToolPart = ({
                       Result
                     </button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent>
+                  <CollapsibleContent className="duration-0!">
                     <div
                       className={cn(
                         'scrollbar-hover-only',
