@@ -11,7 +11,7 @@
 
 @config "../../../tailwind.config.js";
 
-@import "../../../node_modules/@stagewise/stage-ui/src/style.css";
+@import "../../../../../packages/stage-ui/src/styles/index.css";
 @import "../../../assets/fonts/Geist/geist.css";
 @import "../../../assets/fonts/GeistMono/geist-mono.css";
 

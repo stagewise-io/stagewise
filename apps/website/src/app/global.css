@@ -2,7 +2,7 @@
 @config '../../tailwind.config.js';
 
 /* Additional watch source for tailwind */
-@import "../../node_modules/@stagewise/stage-ui/src/style.css";
+@import "../../node_modules/@stagewise/stage-ui/src/styles/index.css";
 @source "../../node_modules/@stagewise/stage-ui";
 
 @import 'fumadocs-ui/css/neutral.css';

@@ -93,8 +93,8 @@ function extractVariables(css: string, vars: ColorVariables): void {
  * Parse all CSS files and return light/dark color maps
  */
 function parseCSSFiles(): ThemeColors {
-  const palettePath = path.join(__dirname, 'palette.css');
-  const themePath = path.join(__dirname, 'theme.css');
+  const palettePath = path.join(__dirname, 'styles/palette.css');
+  const themePath = path.join(__dirname, 'styles/theme.css');
 
   const paletteCss = fs.readFileSync(palettePath, 'utf-8');
   const themeCss = fs.readFileSync(themePath, 'utf-8');

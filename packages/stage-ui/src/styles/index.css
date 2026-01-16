@@ -11,7 +11,7 @@
 @import "./shadows.css";
 @import "./derived-utilities.css";
 @import "./animations.css";
-@import "./code-block/syntax.css";
-@import "./code-block/syntax-example-theme.css";
-@import "./code-block/styles.css";
+@import "./code-block-syntax.css";
+@import "./code-block-syntax-example.css";
+@import "./code-block.css";
 @import "./constants.css";

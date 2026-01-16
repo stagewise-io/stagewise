@@ -928,7 +928,10 @@ function main() {
 
   const lightThemePath = path.join(__dirname, 'example-theme-light.json');
   const darkThemePath = path.join(__dirname, 'example-theme-dark.json');
-  const outputPath = path.join(__dirname, 'syntax-example-theme.css');
+  const outputPath = path.join(
+    __dirname,
+    '../styles/code-block-syntax-example.css',
+  );
 
   // Parse themes
   console.log('📖 Reading theme files...');
