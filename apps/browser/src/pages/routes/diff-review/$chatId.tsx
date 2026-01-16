@@ -75,7 +75,7 @@ const FileDiffItem: FC<{
             <FileIcon filePath={edit.fileName} className="size-5 shrink-0" />
             <Tooltip>
               <TooltipTrigger>
-                <span className="min-w-0 truncate text-foreground text-xs hover:text-foreground group-hover:text-hover-derived">
+                <span className="min-w-0 truncate font-normal text-foreground text-xs hover:text-foreground group-hover:text-hover-derived">
                   {edit.fileName}
                 </span>
               </TooltipTrigger>

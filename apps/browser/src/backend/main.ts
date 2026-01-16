@@ -9,6 +9,7 @@ import { UserExperienceService } from './services/experience';
 import { WorkspaceService } from './services/workspace';
 import { FilePickerService } from './services/file-picker';
 import { existsSync, unlinkSync } from 'node:fs';
+import path from 'node:path';
 import { AppMenuService } from './services/app-menu';
 import { URIHandlerService } from './services/uri-handler';
 import { IdentifierService } from './services/identifier';
@@ -457,10 +458,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       return { found: false, edits: [] };
     }
     const pendingEdits = agentChat.chats[chatId].pendingEdits ?? [];
+    const workspacePath = uiKarton.state.workspace?.path;
     return {
       found: true,
       edits: pendingEdits.map((edit) => ({
-        path: edit.path,
+        // Convert absolute paths to relative paths for display in pages API
+        path: workspacePath
+          ? path.relative(workspacePath, edit.path)
+          : edit.path,
         before: edit.before,
         after: edit.after,
       })),
@@ -473,6 +478,8 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   const pendingEditsSyncCallback = (state: typeof uiKarton.state) => {
     const agentChat = state.agentChat;
     if (!agentChat) return;
+
+    const workspacePath = state.workspace?.path;
 
     // Check each chat for pending edits changes
     for (const [chatId, chat] of Object.entries(agentChat.chats)) {
@@ -487,7 +494,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         pagesService.updatePendingEditsState(
           chatId,
           pendingEdits.map((edit) => ({
-            path: edit.path,
+            // Convert absolute paths to relative paths for display in pages API
+            path: workspacePath
+              ? path.relative(workspacePath, edit.path)
+              : edit.path,
             before: edit.before,
             after: edit.after,
           })),
@@ -704,7 +714,12 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         );
         return;
       }
-      agentService.acceptPendingEdit(filePath);
+      // Convert relative path back to absolute path for the agent service
+      const workspacePath = uiKarton.state.workspace?.path;
+      const absolutePath = workspacePath
+        ? path.resolve(workspacePath, filePath)
+        : filePath;
+      agentService.acceptPendingEdit(absolutePath);
     },
   );
 
@@ -717,7 +732,12 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         );
         return;
       }
-      agentService.rejectPendingEdit(filePath);
+      // Convert relative path back to absolute path for the agent service
+      const workspacePath = uiKarton.state.workspace?.path;
+      const absolutePath = workspacePath
+        ? path.resolve(workspacePath, filePath)
+        : filePath;
+      agentService.rejectPendingEdit(absolutePath);
     },
   );
 
