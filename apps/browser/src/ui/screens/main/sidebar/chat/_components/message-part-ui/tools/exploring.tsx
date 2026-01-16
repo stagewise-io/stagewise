@@ -411,7 +411,7 @@ export const ExploringToolParts = ({
           ToolPart,
           { type: 'tool-getContext7LibraryDocsTool' }
         >;
-        if (!p.input.libraryId) return 'Exploring documentation...';
+        if (!p.input?.libraryId) return 'Exploring documentation...';
         return `Reading docs for ${p.input.libraryId}...`;
       }
       case 'tool-resolveContext7LibraryTool': {

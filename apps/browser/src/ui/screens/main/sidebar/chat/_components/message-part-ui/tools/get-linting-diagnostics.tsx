@@ -96,7 +96,7 @@ export const GetLintingDiagnosticsToolPart = ({
       content={
         <>
           {streaming && (
-            <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground/75 text-xs">
+            <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground text-xs opacity-75">
               Checking for issues...
             </pre>
           )}
@@ -142,7 +142,7 @@ const DiagnosticRow = ({ diagnostic }: { diagnostic: LintingDiagnostic }) => {
       ) : (
         <IconTriangleWarningOutline18 className="mt-0.5 size-3 shrink-0 text-warning-foreground" />
       )}
-      <span className="min-w-0 flex-1 truncate text-muted-foreground/75">
+      <span className="min-w-0 flex-1 truncate text-muted-foreground opacity-75">
         {diagnostic.message}
       </span>
       <span className="shrink-0 text-[10px] text-muted-foreground/50 tabular-nums">

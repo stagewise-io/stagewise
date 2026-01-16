@@ -351,7 +351,7 @@ function RecentlyOpenedWorkspaceItem({
       <IconDocFolder className="size-4 shrink-0 text-muted-foreground" />
       <div className="flex w-full flex-col items-start justify-start gap-0">
         <div className="flex w-full items-baseline justify-start gap-3 text-foreground text-sm">
-          <span className="truncate font-medium">{workspace.name}</span>
+          <span className="truncate font-normal">{workspace.name}</span>
           <span className="hidden shrink-0 font-normal text-muted-foreground/40 text-xs sm:inline">
             <TimeAgo date={workspace.openedAt} live={false} />
           </span>

@@ -19,7 +19,7 @@ export const ListFilesToolPart = ({
     part.state === 'output-available' ? (
       <span className="flex min-w-0 gap-1">
         <span className="shrink-0 truncate font-medium">Listed </span>
-        <span className="truncate font-normal text-muted-foreground/75">
+        <span className="truncate font-normal opacity-75">
           {part.output?.result?.totalFiles}{' '}
           {part.input?.includeDirectories ? 'directories' : 'files'}
           {part.input?.relative_path && (

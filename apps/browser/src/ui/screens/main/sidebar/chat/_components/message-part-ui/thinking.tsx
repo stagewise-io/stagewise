@@ -48,9 +48,7 @@ export const ThinkingPart = ({
           <BrainIcon
             className={cn(
               'size-3',
-              isShimmering
-                ? 'animate-thinking-part-brain-pulse text-primary-foreground'
-                : '',
+              isShimmering ? 'animate-icon-pulse text-primary-foreground' : '',
             )}
           />
           <span

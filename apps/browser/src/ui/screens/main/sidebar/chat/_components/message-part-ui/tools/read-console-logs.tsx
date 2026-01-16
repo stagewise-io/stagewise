@@ -1,5 +1,5 @@
 import type { ToolPart } from '@shared/karton-contracts/ui';
-import { Loader2Icon, XIcon, TerminalIcon } from 'lucide-react';
+import { XIcon, TerminalIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import {
   Tooltip,
@@ -190,10 +190,10 @@ const LoadingHeader = ({
     : 'Reading console logs...';
   return (
     <div className="flex flex-row items-center justify-start gap-1 overflow-hidden">
-      <Loader2Icon
+      <TerminalIcon
         className={cn(
-          'size-3 shrink-0 animate-spin',
-          disableShimmer ? '' : 'text-primary-foreground',
+          'size-3 shrink-0',
+          disableShimmer ? '' : 'animate-icon-pulse text-primary-foreground',
         )}
       />
       <span

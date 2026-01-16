@@ -19,7 +19,7 @@ export const GlobToolPart = ({
     part.state === 'output-available' ? (
       <span className="flex min-w-0 gap-1">
         <span className="shrink-0 truncate font-medium">Found </span>
-        <span className="truncate font-normal text-muted-foreground/75">
+        <span className="truncate font-normal opacity-75">
           {part.output?.result?.totalMatches ?? 0} file
           {part.output?.result?.totalMatches !== 1 ? 's' : ''}
           {part.input?.pattern && <> matching "{part.input.pattern}"</>}

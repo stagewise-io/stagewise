@@ -20,7 +20,7 @@ export const GetContext7LibraryDocsToolPart = ({
       <span className="flex min-w-0 gap-1">
         <span className="shrink-0 truncate font-medium">Read latest docs</span>
         {part.input?.libraryId && (
-          <span className="truncate font-normal text-muted-foreground/75">
+          <span className="truncate font-normal opacity-75">
             for {part.input.libraryId}
           </span>
         )}

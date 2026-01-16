@@ -19,7 +19,7 @@ export const ReadFileToolPart = ({
     part.state === 'output-available' ? (
       <span className="flex min-w-0 gap-1">
         <span className="shrink-0 truncate font-medium">Read </span>
-        <span className="truncate font-normal text-muted-foreground/75">
+        <span className="truncate font-normal opacity-75">
           {part.input?.relative_path ?? ''}
           {part.output?.result?.linesRead && (
             <> ({part.output?.result?.linesRead} lines)</>

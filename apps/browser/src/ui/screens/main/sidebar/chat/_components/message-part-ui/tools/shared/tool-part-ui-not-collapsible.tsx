@@ -33,14 +33,10 @@ export const ToolPartUINotCollapsible = memo(
         return (
           <div
             className={cn(
-              'flex flex-row items-center justify-start gap-1 text-muted-foreground text-xs',
+              'flex cursor-default flex-row items-center justify-start gap-1 text-muted-foreground text-xs hover:text-foreground',
             )}
           >
-            {icon && (
-              <div className="size-3 shrink-0 text-muted-foreground">
-                {icon}
-              </div>
-            )}
+            {icon && <div className="size-3 shrink-0">{icon}</div>}
             <span className="min-w-0 truncate">
               {finishedText ?? `Finished`}
             </span>
@@ -55,18 +51,18 @@ export const ToolPartUINotCollapsible = memo(
         return (
           <div
             className={cn(
-              'flex min-w-0 flex-row items-center justify-start gap-1 text-xs',
+              'flex min-w-0 cursor-default flex-row items-center justify-start gap-1 text-muted-foreground text-xs hover:text-foreground',
             )}
           >
             {icon && (
               <div
-                className={`size-3 shrink-0 ${disableShimmer ? 'text-muted-foreground' : 'text-primary-foreground'}`}
+                className={`size-3 shrink-0 ${disableShimmer ? '' : 'animate-icon-pulse text-primary-foreground hover:text-primary-foreground'}`}
               >
                 {icon}
               </div>
             )}
             <span
-              className={`truncate ${disableShimmer ? 'text-muted-foreground' : 'shimmer-text-primary'}`}
+              className={`truncate ${disableShimmer ? '' : 'shimmer-text-primary'}`}
             >
               {streamingText}
             </span>
@@ -76,11 +72,11 @@ export const ToolPartUINotCollapsible = memo(
 
       if (part.state === 'output-error') {
         return (
-          <div className="flex max-w-full flex-row items-center gap-1 text-muted-foreground text-xs">
+          <div className="flex max-w-full cursor-default flex-row items-center gap-1 text-muted-foreground text-xs hover:text-foreground">
             <XIcon className="size-3 shrink-0" />
             <Tooltip>
               <TooltipTrigger>
-                <span className="min-w-0 truncate text-muted-foreground text-xs">
+                <span className="min-w-0 truncate text-xs">
                   {part.errorText ?? 'Error'}
                 </span>
               </TooltipTrigger>
