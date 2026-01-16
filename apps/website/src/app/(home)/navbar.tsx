@@ -74,7 +74,7 @@ export function Navbar() {
     <div className="fixed top-0 left-0 z-50 flex w-full justify-center bg-background/80 backdrop-blur-lg">
       <div
         className={cn(
-          'z-50 flex h-14 w-full max-w-6xl flex-col items-start justify-between gap-2 overflow-hidden px-4 py-3 transition-all duration-150 ease-out sm:h-14 sm:flex-row sm:items-center sm:py-0',
+          'z-50 flex h-14 w-full max-w-7xl flex-col items-start justify-between gap-2 overflow-hidden px-4 py-3 transition-all duration-150 ease-out sm:h-14 sm:flex-row sm:items-center sm:py-0',
           isOpen &&
             'h-[calc-size(auto,size)] h-auto border-zinc-200 border-b shadow-sm dark:border-zinc-800',
         )}

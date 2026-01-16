@@ -1,181 +1,197 @@
 'use client';
 import Link from 'next/link';
 
-import { Code, Sparkles, Globe, Shield, Rocket, Eye } from 'lucide-react';
-import { IconDownload4FillDuo18 } from 'nucleo-ui-fill-duo-18';
+import {
+  IconChatBotFillDuo18,
+  IconColorPalette2FillDuo18,
+  IconDownload4FillDuo18,
+  IconLockFillDuo18,
+  IconSparkleFillDuo18,
+} from 'nucleo-ui-fill-duo-18';
 import { IconGithub } from 'nucleo-social-media';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { PackageManagerClipboard } from '@/components/package-manager-clipboard';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { usePostHog } from 'posthog-js/react';
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import agentInBrowserImage from './_components/feature-images/agent_in_browser.png';
+import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
 
-// Simplified Setup Guide Component
-function _SimplifiedSetupGuide() {
+function FeatureSection() {
   return (
-    <div className="flex max-w-3xl flex-col items-center text-center">
-      <h2 className="mb-6 font-bold text-3xl md:text-4xl">Get started</h2>
-      <p className="mb-8 text-lg text-zinc-600 dark:text-zinc-400">
-        Get up and running with stagewise in just 3 simple steps
-      </p>
-
-      {/* 3 Steps and Command Side by Side */}
-      <div className="mb-8 grid gap-8 lg:grid-cols-2 lg:items-center">
-        {/* Steps List */}
-        <div className="space-y-4 justify-self-center text-left lg:justify-self-start">
-          <div className="flex items-start gap-4">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 font-semibold text-blue-600 text-sm dark:bg-blue-400/20 dark:text-blue-400">
-              1
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">
-                Start the dev server of your app
-              </h3>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Start the dev server of your local dev project
-              </p>
-            </div>
+    <section className="relative z-10 w-full py-40 md:py-48">
+      <div className="flex justify-center">
+        <ScrollReveal>
+          <div className="mb-20 max-w-3xl pt-8 text-center">
+            <h2 className="mb-4 font-medium text-2xl tracking-tight md:text-3xl">
+              Built for web developers
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              Stagewise delivers a browser experience that is tailored to the
+              needs of web developers.
+            </p>
           </div>
-
-          <div className="flex items-start gap-4">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/20 font-semibold text-indigo-600 text-sm dark:bg-indigo-400/20 dark:text-indigo-400">
-              2
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Open a second terminal</h3>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Open a second terminal window in the root of your dev project
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-4">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/20 font-semibold text-sm text-violet-600 dark:bg-violet-400/20 dark:text-violet-400">
-              3
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">
-                Invoke the stagewise command
-              </h3>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Run the stagewise command and start building
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Command */}
-        <div className="flex items-center justify-center lg:justify-start">
-          <PackageManagerClipboard />
-        </div>
+        </ScrollReveal>
       </div>
 
-      {/* Integration with other agents banner */}
-      <div className="mt-8">
-        <div className="max-w-lg rounded-lg bg-blue-50/80 p-6 dark:bg-blue-950/20">
-          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <p className="text-left text-blue-700 text-sm dark:text-blue-300">
-              Here for the stagewise integration with other agents?
+      <div className="flex flex-col items-stretch gap-10 md:gap-20">
+        <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-4 md:flex-row md:items-center md:gap-12 md:p-6">
+          <div className="space-y-4">
+            <p className="text-foreground text-xl">
+              No more context switching
+              <br />
+              <span className="text-lg text-muted-foreground">
+                Prompt changes right where you see them - not in a separate code
+                editor.
+              </span>
             </p>
-            <Link
-              href="/docs/advanced-usage/use-different-agents"
-              className={`${buttonVariants({ variant: 'primary', size: 'sm' })} shrink-0`}
-            >
-              Get Started
+            <Link href="" className="text-primary-foreground hover:underline">
+              Learn more <IconArrowRightFill18 className="inline size-4" />
             </Link>
           </div>
+          <Image
+            src={agentInBrowserImage}
+            className="w-full shrink-0 rounded-md md:basis-2/3"
+            alt="Image showing a browser with an integrated coding agent"
+          />
+        </div>
+
+        <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-4 md:flex-row-reverse md:items-center md:gap-12 md:p-6">
+          <div className="space-y-4">
+            <p className="text-foreground text-xl">
+              Efficient DevTools
+              <br />
+              <span className="text-lg text-muted-foreground">
+                A single layer of workflow-oriented and AI-native tools.
+              </span>
+            </p>
+            <Link href="" className="text-primary-foreground hover:underline">
+              Learn more <IconArrowRightFill18 className="inline size-4" />
+            </Link>
+          </div>
+          <Image
+            src={agentInBrowserImage}
+            className="w-full shrink-0 rounded-md md:basis-2/3"
+            alt="Image showing a browser with an integrated coding agent"
+          />
+        </div>
+
+        <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-4 md:flex-row md:items-center md:gap-12 md:p-6">
+          <div className="space-y-4">
+            <p className="text-foreground text-xl">
+              Powerful reverse engineering tools
+              <br />
+              <span className="text-lg text-muted-foreground">
+                Understand and re-use components, style systems and color
+                palettes from any website.
+              </span>
+            </p>
+            <Link href="" className="text-primary-foreground hover:underline">
+              Learn more <IconArrowRightFill18 className="inline size-4" />
+            </Link>
+          </div>
+          <Image
+            src={agentInBrowserImage}
+            className="w-full shrink-0 rounded-md md:basis-2/3"
+            alt="Image showing a browser with an integrated coding agent"
+          />
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
-// Enhanced Bento Grid Features Component with 16:9 aspect ratio
-function BentoGrid() {
-  const features = [
-    {
-      title: 'No more context switching',
-      description:
-        'Prompt changes right where you see them - not in a separate code editor.',
-      icon: <Eye className="h-8 w-8 text-blue-500 dark:text-blue-400" />,
-      className:
-        'aspect-video bg-gradient-to-br from-blue-300/8 via-blue-200/4 to-transparent dark:from-blue-400/20 dark:via-blue-300/10 dark:to-transparent',
-      iconPosition: 'bottom-right',
-    },
-    {
-      title: 'Open Source',
-      description:
-        'Built in public with full transparency and community contributions',
-      icon: <Code className="h-8 w-8 text-fuchsia-500 dark:text-fuchsia-400" />,
-      className:
-        'aspect-video bg-gradient-to-br from-fuchsia-300/8 via-fuchsia-200/4 to-transparent dark:from-fuchsia-400/20 dark:via-fuchsia-300/10 dark:to-transparent',
-      iconPosition: 'bottom-right',
-    },
-    {
-      title: 'Secure by Design',
-      description:
-        'Fully local agent architecture. Use your own model providers - or get maximum ease of use with our subscription.',
-      icon: <Shield className="h-8 w-8 text-violet-500 dark:text-violet-400" />,
-      className:
-        'aspect-video bg-gradient-to-br from-violet-300/8 via-violet-200/4 to-transparent dark:from-violet-400/20 dark:via-violet-300/10 dark:to-transparent',
-      iconPosition: 'bottom-right',
-    },
-    {
-      title: 'Lightning Fast',
-      description:
-        'When iterating on UX and UI, you need snappy responses. stagewise focuses on maximum speed to deliver an unmatched experience.',
-      icon: <Rocket className="h-8 w-8 text-indigo-500 dark:text-indigo-400" />,
-      className:
-        'aspect-video bg-gradient-to-br from-indigo-300/8 via-indigo-200/4 to-transparent dark:from-indigo-400/20 dark:via-indigo-300/10 dark:to-transparent',
-      iconPosition: 'bottom-right',
-    },
-    {
-      title: 'Universal Compatibility',
-      description:
-        'Works seamlessly with React, Vue, Angular, Tailwind, Bootstrap, Material-UI, and countless other frameworks and design systems',
-      icon: <Globe className="h-8 w-8 text-blue-500 dark:text-blue-400" />,
-      className:
-        'aspect-video bg-gradient-to-br from-blue-300/8 via-blue-200/4 to-transparent',
-      iconPosition: 'bottom-right',
-    },
-    {
-      title: 'Smart Suggestions',
-      description:
-        'Smart improvement suggestions that understand your design system and maintain your brand identity.',
-      icon: (
-        <Sparkles className="h-8 w-8 text-fuchsia-500 dark:text-fuchsia-400" />
-      ),
-      className:
-        'aspect-video bg-gradient-to-br from-fuchsia-300/8 via-fuchsia-200/4 to-transparent',
-      iconPosition: 'bottom-right',
-    },
-  ];
-
+function ProductValuesSection() {
   return (
-    <div className="flex justify-center">
-      <div className="grid max-w-7xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {features.map((feature, index) => (
-          <ScrollReveal key={feature.title} delay={index * 100}>
-            <div
-              className={`group relative overflow-hidden rounded-xl bg-white/20 p-6 transition-all duration-300 hover:bg-white/30 dark:bg-transparent dark:hover:bg-white/5 ${feature.className} flex flex-col justify-between`}
-            >
-              <div className="relative z-10">
-                <h3 className="mb-2 font-semibold text-lg">{feature.title}</h3>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {feature.description}
-                </p>
-              </div>
-
-              {/* Large icon positioned at bottom right, contained within bounds */}
-              <div className="group-hover:-translate-y-2 absolute right-2 bottom-2 opacity-50 transition-all duration-500 group-hover:opacity-60">
-                <div className="scale-[4] transform">{feature.icon}</div>
-              </div>
-            </div>
-          </ScrollReveal>
-        ))}
+    <section className="relative z-10 w-full py-40 md:py-48">
+      <div className="flex justify-center">
+        <ScrollReveal>
+          <div className="mb-20 max-w-3xl pt-8 text-center">
+            <h2 className="mb-4 font-medium text-2xl tracking-tight md:text-3xl">
+              Focus on what matters
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              Stagewise is a browser that focuses on what's important to you.
+            </p>
+          </div>
+        </ScrollReveal>
       </div>
-    </div>
+
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-10 lg:grid-cols-4 lg:gap-4 xl:gap-10">
+        <ScrollReveal>
+          <div className="aspect-square rounded-lg bg-surface-1 p-4 pt-8 md:p-6 md:pt-10">
+            <div className="space-y-4">
+              <IconLockFillDuo18 className="size-10" />
+              <p className="text-foreground text-xl">
+                Privacy first
+                <br />
+                <span className="text-lg text-muted-foreground">
+                  Your browsing history is never synced.
+                </span>
+              </p>
+              <Link href="" className="text-primary-foreground hover:underline">
+                Learn more <IconArrowRightFill18 className="inline size-4" />
+              </Link>
+            </div>
+          </div>
+        </ScrollReveal>
+
+        <ScrollReveal delay={100}>
+          <div className="aspect-square rounded-lg bg-surface-1 p-4 pt-8 md:p-6 md:pt-10">
+            <div className="space-y-4">
+              <IconChatBotFillDuo18 className="size-10" />
+              <p className="text-foreground text-xl">
+                Powerful agent
+                <br />
+                <span className="text-lg text-muted-foreground">
+                  Coding, debugging, and more - all in one place.
+                </span>
+              </p>
+              <Link href="" className="text-primary-foreground hover:underline">
+                Learn more <IconArrowRightFill18 className="inline size-4" />
+              </Link>
+            </div>
+          </div>
+        </ScrollReveal>
+
+        <ScrollReveal delay={200}>
+          <div className="aspect-square rounded-lg bg-surface-1 p-4 pt-8 md:p-6 md:pt-10">
+            <div className="space-y-4">
+              <IconColorPalette2FillDuo18 className="size-10" />
+              <p className="text-foreground text-xl">
+                Smart tools
+                <br />
+                <span className="text-lg text-muted-foreground">
+                  Developer Tools that save you time.
+                </span>
+              </p>
+              <Link href="" className="text-primary-foreground hover:underline">
+                Learn more <IconArrowRightFill18 className="inline size-4" />
+              </Link>
+            </div>
+          </div>
+        </ScrollReveal>
+
+        <ScrollReveal delay={300}>
+          <div className="aspect-square rounded-lg bg-surface-1 p-4 pt-8 md:p-6 md:pt-10">
+            <div className="space-y-4">
+              <IconSparkleFillDuo18 className="size-10" />
+              <p className="text-foreground text-xl">
+                Pixel perfect
+                <br />
+                <span className="text-lg text-muted-foreground">
+                  Built to delight designers and developers alike.
+                </span>
+              </p>
+              <Link href="" className="text-primary-foreground hover:underline">
+                Learn more <IconArrowRightFill18 className="inline size-4" />
+              </Link>
+            </div>
+          </div>
+        </ScrollReveal>
+      </div>
+    </section>
   );
 }
 
@@ -247,15 +263,15 @@ export default function Home() {
   };
 
   return (
-    <div className="relative mx-auto mt-12 min-h-screen w-full max-w-6xl px-4">
+    <div className="relative mx-auto mt-12 min-h-screen w-full max-w-7xl px-4">
       {/* Hero Section */}
       <section className="relative z-10 w-full pb-16 md:pb-20">
         <div className="flex justify-start">
-          <div className="w-full max-w-6xl">
+          <div className="w-full max-w-7xl">
             <ScrollReveal>
               <div className="mb-12 flex flex-col items-start px-4 text-left sm:px-0">
                 <h1 className="mb-8 font-medium text-3xl tracking-tight md:text-5xl">
-                  <span className="bg-gradient-to-br from-zinc-800 via-zinc-900 to-black bg-clip-text text-transparent dark:from-zinc-100 dark:via-zinc-300 dark:to-white">
+                  <span className="text-foreground">
                     Stagewise is a purpose-built
                     <br />
                     browser for web development.
@@ -340,31 +356,18 @@ export default function Home() {
       </section>
 
       {/* Enhanced Bento Grid Features Section */}
-      <section className="relative z-10 w-full py-40 md:py-48">
-        <div className="flex justify-center">
-          <ScrollReveal>
-            <div className="mb-20 max-w-3xl pt-8 text-center">
-              <h2 className="mb-6 font-bold text-3xl md:text-4xl">
-                Why Choose stagewise
-              </h2>
-              <p className="text-lg text-zinc-600 dark:text-zinc-400">
-                Discover the powerful features that make stagewise the ultimate
-                frontend coding agent
-              </p>
-            </div>
-          </ScrollReveal>
-        </div>
+      <FeatureSection />
 
-        <BentoGrid />
-      </section>
+      {/* Product values section */}
+      <ProductValuesSection />
 
       {/* Second Get Started Section */}
       <section className="relative z-10 w-full py-40 md:py-48">
         <div className="flex justify-center">
           <ScrollReveal>
-            <div className="w-full max-w-6xl pt-8 text-center">
+            <div className="w-full max-w-7xl pt-8 text-center">
               <h2 className="mb-8 font-medium text-3xl tracking-tight md:text-5xl">
-                <span className="bg-gradient-to-br from-zinc-800 via-zinc-900 to-black bg-clip-text text-transparent dark:from-zinc-100 dark:via-zinc-300 dark:to-white">
+                <span className="text-foreground">
                   The browser for web developers.
                 </span>
               </h2>

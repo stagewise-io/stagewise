@@ -4,7 +4,7 @@ import Image from 'next/image';
 
 export default function TeamPage() {
   return (
-    <div className="relative mx-auto w-full max-w-6xl px-4 pb-16">
+    <div className="relative mx-auto w-full max-w-7xl px-4 pb-16">
       <ScrollReveal>
         <div className="flex flex-col items-start gap-4 text-left">
           <h1 className="font-medium text-3xl text-foreground tracking-tight md:text-5xl">
@@ -40,7 +40,7 @@ export default function TeamPage() {
                   href="https://www.linkedin.com/in/juliangoetze/"
                 >
                   Julian
-                </a>
+                </a>{' '}
                 and{' '}
                 <a
                   target="_blank"

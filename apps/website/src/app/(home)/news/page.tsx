@@ -26,7 +26,7 @@ export default function BlogPage() {
   const posts = news.getPages();
 
   return (
-    <div className="relative mx-auto w-full max-w-6xl px-4 ">
+    <div className="relative mx-auto w-full max-w-7xl px-4">
       <ScrollReveal>
         <div className="mb-12 flex flex-col items-start gap-4 text-left">
           <h1 className="font-medium text-3xl tracking-tight md:text-5xl">

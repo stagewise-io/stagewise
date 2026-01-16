@@ -3,6 +3,7 @@
 import { CheckCircle } from 'lucide-react';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { cn } from '@stagewise/stage-ui/lib/utils';
 
 interface Plan {
   name: string;
@@ -24,7 +25,7 @@ export function PricingCards({ plans }: PricingCardsProps) {
       <div className="grid gap-8 md:grid-cols-2 md:items-stretch">
         {plans.map((plan) => (
           <ScrollReveal key={plan.name} delay={100}>
-            <div className="glass-body relative flex h-full flex-col rounded-2xl bg-white/80 p-8 dark:bg-zinc-900/80">
+            <div className="relative flex h-full flex-col rounded-2xl bg-surface-1 p-8">
               <div className="mb-8 text-center">
                 <h3 className="mb-6 font-bold text-2xl text-zinc-900 dark:text-white">
                   {plan.name}
@@ -64,7 +65,7 @@ export function PricingCards({ plans }: PricingCardsProps) {
                 onClick={() =>
                   window.open('https://console.stagewise.io', '_blank')
                 }
-                className="w-full"
+                className={cn('w-full', !plan.popular && 'bg-surface-2')}
                 variant={plan.popular ? 'primary' : 'secondary'}
                 size="lg"
               >

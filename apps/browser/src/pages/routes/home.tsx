@@ -215,7 +215,7 @@ function StartPageWithConnectedWorkspace() {
   );
 
   return (
-    <div className="flex w-full max-w-6xl flex-col items-start gap-8 px-20">
+    <div className="flex w-full max-w-7xl flex-col items-start gap-8 px-20">
       <div className="flex items-center gap-2">
         <LogoWithText className="h-10 text-foreground" />
         <div className="ml-1 inline-flex shrink-0 items-center font-normal text-primary-foreground text-xs">

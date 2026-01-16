@@ -8,7 +8,7 @@ import { usePostHog } from 'posthog-js/react';
 export function Footer() {
   const posthog = usePostHog();
   return (
-    <footer className="relative z-10 mx-auto w-full max-w-6xl px-4 py-12">
+    <footer className="relative z-10 mx-auto w-full max-w-7xl px-4 py-12">
       <div className="flex flex-col items-center justify-between md:flex-row">
         <div className="mb-4 flex items-center gap-2 md:mb-0">
           <span className="text-sm text-zinc-600 dark:text-zinc-500">
