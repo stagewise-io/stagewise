@@ -43,9 +43,10 @@ export function getWindowsSignConfig(): WindowsSignOptions | undefined {
   return {
     signToolPath: process.env.SIGNTOOL_PATH,
     // Use Azure Trusted Signing via the dlib parameter
-    // /v = verbose, /debug = debug output, /fd = file digest algorithm
+    // /v = verbose, /debug = debug output
     // /dlib = path to signing DLL, /dmdf = path to metadata JSON
-    signWithParams: `/v /debug /fd SHA256 /dlib "${process.env.AZURE_CODE_SIGNING_DLIB}" /dmdf "${process.env.AZURE_METADATA_JSON}"`,
+    // Note: /fd is added automatically by @electron/windows-sign based on hashes option
+    signWithParams: `/v /debug /dlib "${process.env.AZURE_CODE_SIGNING_DLIB}" /dmdf "${process.env.AZURE_METADATA_JSON}"`,
     timestampServer: 'http://timestamp.acs.microsoft.com',
     hashes: ['sha256' as HASHES],
   };
