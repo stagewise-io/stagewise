@@ -187,8 +187,83 @@ function FileDiffItem(props: FileDiffItemProps): StatusCardItem | null {
   };
 }
 
-function MessageQueueItem(props: MessageQueueItemProps): StatusCardItem | null {
+function MessageQueueContent(props: MessageQueueItemProps) {
   const { messageQueue, activeChatId, onRemoveMessage, onSendNow } = props;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  return (
+    <div className="pt-1" onMouseLeave={() => setHoveredIndex(null)}>
+      {messageQueue.map((queuedMsg, index) => {
+        const isFirst = index === 0;
+        // Show buttons for first item when nothing is hovered, or when this specific item is hovered
+        const showButtons = isFirst
+          ? hoveredIndex === null || hoveredIndex === 0
+          : hoveredIndex === index;
+
+        return (
+          <div
+            key={queuedMsg.id}
+            className="relative flex w-full flex-row items-center rounded px-1 py-0.5 text-foreground hover:bg-surface-1 hover:text-hover-derived"
+            onMouseEnter={() => setHoveredIndex(index)}
+          >
+            <div className="flex size-5 shrink-0 items-center justify-center">
+              <div className="size-1 rounded-full bg-foreground" />
+            </div>
+            <span
+              className={cn(
+                'w-full overflow-hidden truncate text-xs transition-[mask-image] duration-200',
+                showButtons &&
+                  'mask-[linear-gradient(to_left,transparent_0px,transparent_56px,black_88px)]',
+              )}
+            >
+              {getMessageText(queuedMsg.message)}
+            </span>
+            <div
+              className={cn(
+                '-translate-y-1/2 absolute top-1/2 right-1 flex-row items-center',
+                showButtons ? 'flex' : 'hidden',
+              )}
+            >
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => {
+                      if (activeChatId)
+                        void onSendNow(activeChatId, queuedMsg.id);
+                    }}
+                  >
+                    <IconArrowUpOutline24 className="size-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Send now</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => {
+                      if (activeChatId)
+                        void onRemoveMessage(activeChatId, queuedMsg.id);
+                    }}
+                  >
+                    <IconTrash2Outline24 className="size-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Remove from queue</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MessageQueueItem(props: MessageQueueItemProps): StatusCardItem | null {
+  const { messageQueue } = props;
 
   if (messageQueue.length === 0) return null;
 
@@ -206,57 +281,7 @@ function MessageQueueItem(props: MessageQueueItemProps): StatusCardItem | null {
       </div>
     ),
     contentClassName: 'px-0',
-    content: (
-      <div className="pt-1">
-        {messageQueue.map((queuedMsg) => (
-          <div
-            key={queuedMsg.id}
-            className="group/item flex w-full flex-row items-center rounded px-1 py-0 text-foreground hover:bg-surface-1 hover:text-hover-derived"
-          >
-            <div className="flex flex-1 flex-row items-center justify-start gap-1">
-              <div className="flex size-5 items-center justify-center">
-                <div className="size-1 rounded-full bg-foreground" />
-              </div>
-              <span className="truncate pr-3 text-xs">
-                {getMessageText(queuedMsg.message)}
-              </span>
-            </div>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="opacity-0 transition-opacity group-hover/item:opacity-100"
-                  onClick={() => {
-                    if (activeChatId)
-                      void onSendNow(activeChatId, queuedMsg.id);
-                  }}
-                >
-                  <IconArrowUpOutline24 className="size-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Send now</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="opacity-0 transition-opacity group-hover/item:opacity-100"
-                  onClick={() => {
-                    if (activeChatId)
-                      void onRemoveMessage(activeChatId, queuedMsg.id);
-                  }}
-                >
-                  <IconTrash2Outline24 className="size-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Remove from queue</TooltipContent>
-            </Tooltip>
-          </div>
-        ))}
-      </div>
-    ),
+    content: <MessageQueueContent {...props} />,
   };
 }
 
