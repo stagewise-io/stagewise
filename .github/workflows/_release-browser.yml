@@ -186,12 +186,22 @@ jobs:
           Write-Host "Found signtool.exe at: $signtoolPath"
 
           # Create metadata.json for Azure Trusted Signing
+          # ExcludeCredentials ensures only EnvironmentCredential is used (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
           $metadataPath = "${{ runner.temp }}\metadata.json"
           $metadata = @{
             Endpoint = "${{ secrets.AZURE_ACCOUNT_ENDPOINT_URI }}"
             CodeSigningAccountName = "${{ secrets.AZURE_ACCOUNT_NAME }}"
             CertificateProfileName = "${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}"
-          } | ConvertTo-Json
+            ExcludeCredentials = @(
+              "ManagedIdentityCredential",
+              "SharedTokenCacheCredential",
+              "VisualStudioCredential",
+              "VisualStudioCodeCredential",
+              "AzureCliCredential",
+              "AzurePowerShellCredential",
+              "InteractiveBrowserCredential"
+            )
+          } | ConvertTo-Json -Depth 3
 
           Set-Content -Path $metadataPath -Value $metadata
           Write-Host "Created metadata.json at: $metadataPath"
@@ -204,6 +214,32 @@ jobs:
           echo "AZURE_METADATA_JSON=$metadataPath" >> $env:GITHUB_ENV
 
       - run: pnpm build
+
+      - name: Verify Windows signing setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "=== Windows Signing Configuration Debug ==="
+          Write-Host "SIGNTOOL_PATH: $env:SIGNTOOL_PATH"
+          Write-Host "AZURE_CODE_SIGNING_DLIB: $env:AZURE_CODE_SIGNING_DLIB"
+          Write-Host "AZURE_METADATA_JSON: $env:AZURE_METADATA_JSON"
+          Write-Host "AZURE_TENANT_ID set: $([bool]$env:AZURE_TENANT_ID)"
+          Write-Host "AZURE_CLIENT_ID set: $([bool]$env:AZURE_CLIENT_ID)"
+          Write-Host "AZURE_CLIENT_SECRET set: $([bool]$env:AZURE_CLIENT_SECRET)"
+          if (Test-Path $env:AZURE_METADATA_JSON) {
+            Write-Host "metadata.json exists and contains:"
+            Get-Content $env:AZURE_METADATA_JSON
+          }
+          if (Test-Path $env:AZURE_CODE_SIGNING_DLIB) {
+            Write-Host "DLIB file exists: $env:AZURE_CODE_SIGNING_DLIB"
+          }
+          if (Test-Path $env:SIGNTOOL_PATH) {
+            Write-Host "signtool.exe exists: $env:SIGNTOOL_PATH"
+          }
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Build Electron App
         working-directory: apps/browser
