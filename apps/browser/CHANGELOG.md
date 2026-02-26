@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.0.0-alpha.5 (2026-02-26)
+
+### Features
+
+* add user questioning tool (da08b19)
+* add env-messges for sandbox-restarts (e1ba1c8)
+* watch skills- and md-paths to sync with settings-info (94735d2)
+* include basic skills-overview in agent-settings (f98e420)
+* add workspace-information to workspace-badges (1fed92c)
+* support disabling skills per workspace (1979c2e)
+* persist and re-initialize mounted workspaces per agent (66d600b)
+
+### Bug Fixes
+
+* reset sandbox timer on API.output* (ad3a64c)
+* fix posthog-client disabling and add logs for posthog-errors (3a01176)
+* improve 'isWorking' indication in chat-history (15c7542)
+* align agents.md settings-section with workspace-select (29ba256)
+* increase error-logging verbosity for base-agent (760cc41)
+* don't dedupe workspace-skills by name (but show all) (d0ebbdc)
+* include detailed attachment-error messages for the agent (6f0e2c8)
+* use nucleo icon for branch icon (7aa8095)
+* include additional error-metadata for posthog errors (a511b6e)
+* make attachment-badges 'secondary' on inputs (8858526)
+* fix attachment-drop error on edited user-messages (05e72df)
+* enable create agent button only when applicable (3f7466f)
+* alphabetically sort skills in workspace-info card (7606663)
+* prevent creating new agent when another empty agent already exists (0ea34a9)
+* fix model-select compat with new combobox (6de86be)
+* fix auto-scroll to workspace-md on 'Show file'-click (0d046ef)
+* remove unused biome-ignore (e040ff6)
+* include agents/workspace-md content in karton state (948c4ac)
+* fix attachment-drop for huge on-device attachments (b17ade6)
+* align padding on active-agent toggle (82d8956)
+* set correct initial pre-release channel and make it adjustable in settings (05d7abb)
+* allow individual release channel instances to run in parallel (81e5c66)
+
+### Other Changes
+
+* clean up agent notifications mechanism (d232768)
+
 ## 1.0.0-alpha.4 (2026-02-24)
 
 ### Features
