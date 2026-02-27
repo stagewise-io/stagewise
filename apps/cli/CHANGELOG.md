@@ -1,5 +1,11 @@
 # stagewise
 
+## 0.11.2
+
+### Patch Changes
+
+- 9d65e91: Updating claude and gemini models.
+
 ## 0.11.1
 
 ### Patch Changes

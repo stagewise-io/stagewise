@@ -1,0 +1,18 @@
+name: "Release Karton"
+
+on:
+  workflow_dispatch:
+
+run-name: "Release Karton"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release-tests'
+    uses: ./.github/workflows/_release-karton.yml
+    with:
+      channel: release
+    secrets: inherit

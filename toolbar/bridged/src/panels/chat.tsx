@@ -162,11 +162,15 @@ export function ChatPanel() {
           createdAt: new Date(),
           contentItems: [{ type: 'text' as const, text: chatState.chatInput }],
           metadata,
+          role: 'user' as const,
+          parts: [{ type: 'text' as const, text: chatState.chatInput }],
           pluginContent: {},
           sentByPlugin: false,
         };
 
-        const handlerResult = await plugin.onPromptSend?.(baseUserMessage);
+        const handlerResult = await plugin.onPromptSend?.(
+          baseUserMessage as any, // TODO: fix
+        );
 
         if (
           !handlerResult ||

@@ -1,0 +1,62 @@
+name: "Release Browser: Alpha (New Cycle)"
+
+on:
+  workflow_dispatch:
+
+run-name: "Release Browser Alpha (New Cycle)"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  check-prerelease:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release-tests'
+    permissions:
+      contents: read
+    outputs:
+      is-prerelease: ${{ steps.check.outputs.is_prerelease }}
+      current-version: ${{ steps.check.outputs.current_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check current version
+        id: check
+        run: |
+          VERSION=$(node -p "require('./apps/browser/package.json').version")
+          echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+
+          if [[ "$VERSION" == *"-alpha."* ]] || [[ "$VERSION" == *"-beta."* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "Current version $VERSION is a prerelease"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "::error::Current version $VERSION is not a prerelease. Use regular alpha release instead."
+          fi
+
+  release:
+    needs: check-prerelease
+    if: needs.check-prerelease.outputs.is-prerelease == 'true'
+    uses: ./.github/workflows/_release-browser.yml
+    with:
+      channel: alpha
+      new-cycle: true
+    secrets: inherit
+
+  skip-notice:
+    needs: check-prerelease
+    if: needs.check-prerelease.outputs.is-prerelease == 'false'
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Show skip reason
+        run: |
+          echo "## Skipped: Not a prerelease version" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Current version **${{ needs.check-prerelease.outputs.current-version }}** is not a prerelease." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The 'New Cycle' option is only available when the current version is an alpha or beta." >> $GITHUB_STEP_SUMMARY
+          echo "Use the regular **Release Browser: Alpha** workflow instead." >> $GITHUB_STEP_SUMMARY
+          exit 1

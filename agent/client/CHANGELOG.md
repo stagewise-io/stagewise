@@ -1,5 +1,11 @@
 # @stagewise-agent/client-sdk
 
+## 0.6.1
+
+### Patch Changes
+
+- 9d65e91: Updating claude and gemini models.
+
 ## 0.6.0
 
 ### Minor Changes

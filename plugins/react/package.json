@@ -45,8 +45,8 @@
   "devDependencies": {
     "@stagewise/plugin-sdk": "workspace:*",
     "typescript": "~5.8.3",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "react": "19.1.2",
+    "react-dom": "19.1.2",
     "@types/react": "^19.1.8",
     "vite": "7.0.6",
     "@vitejs/plugin-react-swc": "3.7.0"

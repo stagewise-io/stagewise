@@ -218,23 +218,27 @@ function CompatibilitySection() {
     {
       component1: {
         name: 'React',
-        icon: <img src={ReactLogo.src} alt="React" className="h-1/3" />,
+        icon: <Image src={ReactLogo} alt="React" className="h-1/3 w-auto" />,
         glow: 'shadow-cyan-500/12 dark:shadow-cyan-400/40 bg-cyan-300/5 dark:bg-cyan-400/10',
       },
       component2: {
         name: 'Next.js',
-        icon: <img src={NextJsLogo.src} alt="Next.js" className="h-1/3" />,
+        icon: <Image src={NextJsLogo} alt="Next.js" className="h-1/3 w-auto" />,
         glow: 'shadow-gray-500/12 dark:shadow-gray-400/40 bg-gray-300/5 dark:bg-gray-400/10',
       },
       component3: {
         name: 'ShadCN',
-        icon: <img src={ShadCNLogo.src} alt="ShadCN" className="h-1/3" />,
+        icon: <Image src={ShadCNLogo} alt="ShadCN" className="h-1/3 w-auto" />,
         glow: 'shadow-gray-500/12 dark:shadow-gray-400/40 bg-gray-300/5 dark:bg-gray-400/10',
       },
       component4: {
         name: 'TailwindCSS',
         icon: (
-          <img src={TailwindLogo.src} alt="TailwindCSS" className="h-1/3" />
+          <Image
+            src={TailwindLogo}
+            alt="TailwindCSS"
+            className="h-1/3 w-auto"
+          />
         ),
         glow: 'shadow-blue-500/12 dark:shadow-blue-400/40 bg-blue-300/5 dark:bg-blue-400/10',
       },
@@ -242,23 +246,29 @@ function CompatibilitySection() {
     {
       component1: {
         name: 'Vue',
-        icon: <img src={VueLogo.src} alt="Vue" className="h-1/3" />,
+        icon: <Image src={VueLogo} alt="Vue" className="h-1/3 w-auto" />,
         glow: 'shadow-emerald-500/12 dark:shadow-emerald-400/40 bg-emerald-300/5 dark:bg-emerald-400/10',
       },
       component2: {
         name: 'Nuxt',
-        icon: <img src={NuxtLogo.src} alt="Nuxt" className="h-1/3" />,
+        icon: <Image src={NuxtLogo} alt="Nuxt" className="h-1/3 w-auto" />,
         glow: 'shadow-green-500/12 dark:shadow-green-400/40 bg-green-300/5 dark:bg-green-400/10',
       },
       component3: {
         name: 'PrimeVue',
-        icon: <img src={PrimeVueLogo.src} alt="PrimeVue" className="h-1/3" />,
+        icon: (
+          <Image src={PrimeVueLogo} alt="PrimeVue" className="h-1/3 w-auto" />
+        ),
         glow: 'shadow-gray-500/12 dark:shadow-gray-400/40 bg-gray-300/5 dark:bg-gray-400/10',
       },
       component4: {
         name: 'TailwindCSS',
         icon: (
-          <img src={TailwindLogo.src} alt="TailwindCSS" className="h-1/3" />
+          <Image
+            src={TailwindLogo}
+            alt="TailwindCSS"
+            className="h-1/3 w-auto"
+          />
         ),
         glow: 'shadow-blue-500/12 dark:shadow-blue-400/40 bg-blue-300/5 dark:bg-blue-400/10',
       },
@@ -266,70 +276,86 @@ function CompatibilitySection() {
     {
       component1: {
         name: 'Angular',
-        icon: <img src={AngularLogo.src} alt="Angular" className="h-1/3" />,
+        icon: (
+          <Image src={AngularLogo} alt="Angular" className="h-1/3 w-auto" />
+        ),
         glow: 'shadow-fuchsia-500/12 dark:shadow-fuchsia-400/40 bg-fuchsia-300/5 dark:bg-fuchsia-400/10',
       },
       component2: {
         name: 'Vite',
-        icon: <img src={ViteLogo.src} alt="Vite" className="h-1/3" />,
+        icon: <Image src={ViteLogo} alt="Vite" className="h-1/3 w-auto" />,
         glow: 'shadow-yellow-500/12 dark:shadow-yellow-400/40 bg-yellow-300/5 dark:bg-yellow-400/10',
       },
       component3: {
         name: 'Material UI',
         icon: (
-          <img src={MaterialUILogo.src} alt="Material UI" className="h-1/3" />
+          <Image
+            src={MaterialUILogo}
+            alt="Material UI"
+            className="h-1/3 w-auto"
+          />
         ),
         glow: 'shadow-red-500/12 dark:shadow-red-400/40 bg-red-300/5 dark:bg-red-400/10',
       },
       component4: {
         name: 'Sass',
-        icon: <img src={SassLogo.src} alt="Sass" className="h-1/3" />,
+        icon: <Image src={SassLogo} alt="Sass" className="h-1/3 w-auto" />,
         glow: 'shadow-pink-500/12 dark:shadow-pink-400/40 bg-pink-300/5 dark:bg-pink-400/10',
       },
     },
     {
       component1: {
         name: 'Angular',
-        icon: <img src={AngularLogo.src} alt="Angular" className="h-1/3" />,
+        icon: (
+          <Image src={AngularLogo} alt="Angular" className="h-1/3 w-auto" />
+        ),
         glow: 'shadow-violet-500/12 dark:shadow-violet-400/40 bg-violet-300/5 dark:bg-violet-400/10',
       },
       component2: {
         name: 'Vite',
-        icon: <img src={ViteLogo.src} alt="Vite" className="h-1/3" />,
+        icon: <Image src={ViteLogo} alt="Vite" className="h-1/3 w-auto" />,
         glow: 'shadow-yellow-500/12 dark:shadow-yellow-400/40 bg-yellow-300/5 dark:bg-yellow-400/10',
       },
       component3: {
         name: 'Material UI',
         icon: (
-          <img src={MaterialUILogo.src} alt="Material UI" className="h-1/3" />
+          <Image
+            src={MaterialUILogo}
+            alt="Material UI"
+            className="h-1/3 w-auto"
+          />
         ),
         glow: 'shadow-red-500/12 dark:shadow-red-400/40 bg-red-300/5 dark:bg-red-400/10',
       },
       component4: {
         name: 'Sass',
-        icon: <img src={SassLogo.src} alt="Sass" className="h-1/3" />,
+        icon: <Image src={SassLogo} alt="Sass" className="h-1/3 w-auto" />,
         glow: 'shadow-pink-500/12 dark:shadow-pink-400/40 bg-pink-300/5 dark:bg-pink-400/10',
       },
     },
     {
       component1: {
         name: 'Svelte',
-        icon: <img src={SvelteLogo.src} alt="Svelte" className="h-1/3" />,
+        icon: <Image src={SvelteLogo} alt="Svelte" className="h-1/3 w-auto" />,
         glow: 'shadow-orange-500/12 dark:shadow-orange-400/40 bg-orange-300/5 dark:bg-orange-400/10',
       },
       component2: {
         name: 'SvelteKit',
-        icon: <img src={SvelteKitLogo.src} alt="SvelteKit" className="h-1/3" />,
+        icon: (
+          <Image src={SvelteKitLogo} alt="SvelteKit" className="h-1/3 w-auto" />
+        ),
         glow: 'shadow-orange-500/12 dark:shadow-orange-400/40 bg-orange-300/5 dark:bg-orange-400/10',
       },
       component3: {
         name: 'Flowbite',
-        icon: <img src={FlowbiteUILogo.src} alt="Flowbite" className="h-1/3" />,
+        icon: (
+          <Image src={FlowbiteUILogo} alt="Flowbite" className="h-1/3 w-auto" />
+        ),
         glow: 'shadow-blue-500/12 dark:shadow-blue-400/40 bg-blue-300/5 dark:bg-blue-400/10',
       },
       component4: {
         name: 'CSS',
-        icon: <img src={CSSLogo.src} alt="CSS" className="h-1/3" />,
+        icon: <Image src={CSSLogo} alt="CSS" className="h-1/3 w-auto" />,
         glow: 'shadow-blue-500/12 dark:shadow-blue-400/40 bg-blue-300/5 dark:bg-blue-400/10',
       },
     },
@@ -752,10 +778,12 @@ function CustomerReviewsSlideshow() {
 
                     <div className="flex flex-col items-center gap-4">
                       {review.avatar && (
-                        <img
+                        <Image
                           src={review.avatar}
                           alt={review.author}
                           className="h-16 w-16 rounded-full object-cover"
+                          width={64}
+                          height={64}
                         />
                       )}
                       <div>
