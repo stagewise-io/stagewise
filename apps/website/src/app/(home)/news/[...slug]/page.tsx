@@ -1,5 +1,4 @@
-import { news, source } from '@/lib/source';
-import { createRelativeLink } from 'fumadocs-ui/mdx';
+import { news } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -71,12 +70,7 @@ export default async function PostPage(props: {
         </div>
       </div>
       <div className="prose prose-zinc dark:prose-invert">
-        <MDXContent
-          components={getMDXComponents({
-            // this allows you to link to other pages with relative file paths
-            a: createRelativeLink(source, post),
-          })}
-        />
+        <MDXContent components={getMDXComponents({})} />
       </div>
     </div>
   );

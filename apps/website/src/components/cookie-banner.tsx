@@ -36,8 +36,8 @@ export function CookieBanner() {
   }
 
   return (
-    <div className="slide-in-from-bottom fixed right-4 bottom-4 z-50 w-sm animate-in rounded-xl bg-background/80 backdrop-blur-lg duration-300">
-      <div className="flex flex-col items-start gap-3 rounded-2xl bg-white/80 p-3">
+    <div className="slide-in-from-bottom fixed right-4 bottom-4 z-50 w-full max-w-[calc(100%-2rem)] animate-in duration-300 sm:w-sm">
+      <div className="flex flex-col items-start gap-3 rounded-2xl border border-border bg-background/80 p-4 backdrop-blur-lg dark:bg-background/80">
         <div className="flex flex-col items-start gap-1">
           <h2 className="font-semibold text-base text-foreground">
             Cookie Consent

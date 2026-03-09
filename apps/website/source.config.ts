@@ -1,20 +1,14 @@
 import {
-  defineDocs,
   defineConfig,
   defineCollections,
+  defineDocs,
   frontmatterSchema,
 } from 'fumadocs-mdx/config';
 import { z } from 'zod';
 
-// Options: https://fumadocs.vercel.app/docs/mdx/collections#define-docs
-export const docs = defineDocs({
-  dir: 'content/docs',
-});
-
 export const newsPosts = defineCollections({
   type: 'doc',
   dir: 'content/news',
-  // add required frontmatter properties
   schema: frontmatterSchema.extend({
     author: z.string(),
     title: z.string(),
@@ -29,7 +23,5 @@ export const legalTexts = defineDocs({
 });
 
 export default defineConfig({
-  mdxOptions: {
-    // MDX options
-  },
+  mdxOptions: {},
 });

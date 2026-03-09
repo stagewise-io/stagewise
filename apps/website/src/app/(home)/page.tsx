@@ -7,6 +7,7 @@ import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { usePostHog } from 'posthog-js/react';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { cn } from '@stagewise/stage-ui/lib/utils';
 import experimentsImage from '../../../../browser/src/ui/assets/feature-images/experiments-light.png';
 import experimentsImageDark from '../../../../browser/src/ui/assets/feature-images/experiments-dark.png';
 import agentIdeIntegrationDark from '../../../../browser/src/ui/assets/feature-images/agent-ide-integration-dark.png';
@@ -22,7 +23,13 @@ import bgLight from '../../../../browser/src/ui/assets/feature-images/bg-light.j
 import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
 import { IconCheckOutline18 } from 'nucleo-ui-outline-18';
 
-function WaitlistForm({ className }: { className?: string }) {
+function WaitlistForm({
+  className,
+  align = 'start',
+}: {
+  className?: string;
+  align?: 'start' | 'center';
+}) {
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -72,7 +79,10 @@ function WaitlistForm({ className }: { className?: string }) {
   return (
     <div className={className}>
       <form
-        className="flex flex-col items-start gap-3 sm:flex-row sm:items-center"
+        className={cn(
+          'flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center',
+          align === 'start' ? 'items-start' : 'items-center',
+        )}
         onSubmit={handleSubmit}
       >
         <input
@@ -113,7 +123,7 @@ function FeatureSection() {
 
       <div className="flex flex-col items-stretch gap-10 md:gap-20">
         <ScrollReveal delay={100}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-4 md:flex-row md:items-center md:gap-12 md:p-6">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg border border-border bg-surface-1 p-4 md:flex-row md:items-center md:gap-12 md:p-6">
             <div className="space-y-2">
               <h3 className="text-foreground text-xl">
                 Full access to the devtools
@@ -121,29 +131,22 @@ function FeatureSection() {
               <p className="font-light text-base text-muted-foreground">
                 The stagewise agent has console and debugger access on all tabs.
               </p>
-              {/* <Link
-                href="/features/stage"
-                className="text-primary-foreground hover:text-hover-derived active:text-active-derived"
-              >
-                Learn more about stage{' '}
-                <IconArrowRightFill18 className="inline size-4" />
-              </Link> */}
             </div>
             <Image
               src={debuggerAccessLight}
-              className="block w-full max-w-[66.67%] shrink-0 rounded-md border border-border dark:hidden"
+              className="block w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:hidden"
               alt="Image showing a browser with an integrated coding agent"
             />
             <Image
               src={debuggerAccessDark}
-              className="hidden w-full max-w-[66.67%] shrink-0 rounded-md border border-border dark:block"
+              className="hidden w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:block"
               alt="Image showing a browser with an integrated coding agent"
             />
           </div>
         </ScrollReveal>
 
         <ScrollReveal delay={200}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-4 md:flex-row-reverse md:items-center md:gap-12 md:p-6">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg border border-border bg-surface-1 p-4 md:flex-row-reverse md:items-center md:gap-12 md:p-6">
             <div className="space-y-2">
               <h3 className="text-foreground text-xl">
                 Temporary or permanent changes
@@ -152,29 +155,22 @@ function FeatureSection() {
                 Make quick test changes to any page, or connect a codebase for
                 permanent edits.
               </p>
-              {/* <Link
-                href="/features/code-changes"
-                className="text-primary-foreground hover:text-hover-derived active:text-active-derived"
-              >
-                Learn more about code changes{' '}
-                <IconArrowRightFill18 className="inline size-4" />
-              </Link> */}
             </div>
             <Image
               src={experimentsImage}
-              className="block w-full max-w-[66.67%] shrink-0 rounded-md border border-border dark:hidden"
+              className="block w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:hidden"
               alt="Image showing a browser with an integrated coding agent"
             />
             <Image
               src={experimentsImageDark}
-              className="hidden w-full max-w-[66.67%] shrink-0 rounded-md border border-border dark:block"
+              className="hidden w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:block"
               alt="Image showing a browser with an integrated coding agent"
             />
           </div>
         </ScrollReveal>
 
         <ScrollReveal delay={300}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-4 md:flex-row md:items-center md:gap-12 md:p-6">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg border border-border bg-surface-1 p-4 md:flex-row md:items-center md:gap-12 md:p-6">
             <div className="space-y-2">
               <h3 className="text-foreground text-xl">
                 Powerful reverse engineering tools
@@ -183,31 +179,24 @@ function FeatureSection() {
                 Understand and re-use components, style systems and color
                 palettes from any website.
               </p>
-              {/* <Link
-                href="/features/reverse-engineering"
-                className="text-primary-foreground hover:text-hover-derived active:text-active-derived"
-              >
-                Learn more about reverse-engineering{' '}
-                <IconArrowRightFill18 className="inline size-4" />
-              </Link> */}
             </div>
             {/* Light mode image */}
             <Image
               src={reverseEngineeringLight}
-              className="block w-full max-w-[66.67%] shrink-0 rounded-md border border-border dark:hidden"
+              className="block w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:hidden"
               alt="Reverse engineering tools extracting styles from websites"
             />
             {/* Dark mode image */}
             <Image
               src={reverseEngineeringDark}
-              className="hidden w-full max-w-[66.67%] shrink-0 rounded-md border border-border dark:block"
+              className="hidden w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:block"
               alt="Reverse engineering tools extracting styles from websites"
             />
           </div>
         </ScrollReveal>
 
         <ScrollReveal delay={400}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-4 md:flex-row-reverse md:items-center md:gap-12 md:p-6">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg border border-border bg-surface-1 p-4 md:flex-row-reverse md:items-center md:gap-12 md:p-6">
             <div className="space-y-2">
               <h3 className="text-foreground text-xl">
                 Integrated with your setup
@@ -215,24 +204,17 @@ function FeatureSection() {
               <p className="font-light text-base text-muted-foreground">
                 Opt-in to view relevant and modified files in your favorite IDE
               </p>
-              {/* <Link
-                href="/features/ide-integrations"
-                className="text-primary-foreground hover:text-hover-derived active:text-active-derived"
-              >
-                Learn more about IDE integrations{' '}
-                <IconArrowRightFill18 className="inline size-4" />
-              </Link> */}
             </div>
             {/* Light mode image */}
             <Image
               src={agentIdeIntegrationLight}
-              className="block w-full max-w-[66.67%] shrink-0 rounded-md border border-border dark:hidden"
+              className="block w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:hidden"
               alt="IDE integration showing code changes in your favorite editor"
             />
             {/* Dark mode image */}
             <Image
               src={agentIdeIntegrationDark}
-              className="hidden w-full max-w-[66.67%] shrink-0 rounded-md border border-border dark:block"
+              className="hidden w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:block"
               alt="IDE integration showing code changes in your favorite editor"
             />
           </div>
@@ -434,7 +416,7 @@ export default function Home() {
               </h2>
 
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <WaitlistForm />
+                <WaitlistForm align="center" />
               </div>
             </div>
           </ScrollReveal>
