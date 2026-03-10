@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0-alpha.9 (2026-03-10)
+
+### Bug Fixes
+
+* add missing auto-mount of workspaces to ActiveAgentsGrid creation (7ab1990)
+* place env-messages **before** tool-approval parts to ensure ai-sdk conversions work (6cc5bfb)
+* disable 'approve'/'skip' buttons in bash execution on input-stream (2353638)
+* replace deprecated sonnet-4-5 with 4-6 (faf596f)
+
 ## 1.0.0-alpha.8 (2026-03-09)
 
 ### Features
