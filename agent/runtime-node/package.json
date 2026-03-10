@@ -29,7 +29,7 @@
     "chokidar": "^4.0.3",
     "https-proxy-agent": "^7.0.6",
     "ignore": "^7.0.5",
-    "minimatch": "^9.0.5",
+    "minimatch": "^9.0.7",
     "proxy-from-env": "^1.1.0",
     "yauzl": "^3.2.0"
   },
