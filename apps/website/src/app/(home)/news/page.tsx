@@ -1,4 +1,4 @@
-import { news } from '@/lib/source';
+import { getAllNewsPosts } from '@/lib/source';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export default function BlogPage() {
-  const posts = news.getPages();
+  const posts = getAllNewsPosts();
 
   return (
     <div className="relative mx-auto w-full max-w-7xl px-4">
@@ -68,34 +68,29 @@ export default function BlogPage() {
         </div>
       </ScrollReveal>
       <div className="flex flex-col gap-6 md:ml-24">
-        {posts
-          .sort(
-            (a, b) =>
-              new Date(b.data.date).getTime() - new Date(a.data.date).getTime(),
-          )
-          .map((post, index) => (
-            <ScrollReveal key={post.path} delay={200 + index * 100}>
-              <Link href={post.url}>
-                <div className="flex w-full flex-col items-start justify-center gap-1 rounded-xl border border-derived bg-surface-1 p-4 transition-colors">
-                  <p className="font-semibold text-foreground text-xl tracking-tight">
-                    {post.data.title}
-                  </p>
-                  <span className="text-base text-muted-foreground">
-                    {post.data.description}
+        {posts.map((post, index) => (
+          <ScrollReveal key={post.slug} delay={200 + index * 100}>
+            <Link href={post.url}>
+              <div className="flex w-full flex-col items-start justify-center gap-1 rounded-xl border border-derived bg-surface-1 p-4 transition-colors">
+                <p className="font-semibold text-foreground text-xl tracking-tight">
+                  {post.title}
+                </p>
+                <span className="text-base text-muted-foreground">
+                  {post.description}
+                </span>
+                <div className="mt-1 flex w-full flex-row items-end justify-end gap-6">
+                  <span className="text-muted-foreground text-sm">
+                    {post.date.toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
                   </span>
-                  <div className="mt-1 flex w-full flex-row items-end justify-end gap-6">
-                    <span className="text-muted-foreground text-sm">
-                      {post.data.date.toLocaleString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  </div>
                 </div>
-              </Link>
-            </ScrollReveal>
-          ))}
+              </div>
+            </Link>
+          </ScrollReveal>
+        ))}
       </div>
     </div>
   );

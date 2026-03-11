@@ -1,16 +1,14 @@
-import { legal } from '@/lib/source';
-import { getMDXComponents } from '@/mdx-components';
+import { getLegalPage } from '@/lib/source';
 import { notFound } from 'next/navigation';
+import { MDXRemote } from 'next-mdx-remote/rsc';
 
 export default async function TrademarkPolicyPage() {
-  const page = legal.getPage(['trademark-policy']);
+  const page = getLegalPage('trademark-policy');
   if (!page) notFound();
-
-  const MDXContent = page.data.body;
 
   return (
     <div className="prose mx-auto w-full max-w-7xl px-4">
-      <MDXContent components={getMDXComponents({})} />
+      <MDXRemote source={page.source} />
     </div>
   );
 }

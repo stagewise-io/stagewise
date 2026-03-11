@@ -1,5 +1,6 @@
 @theme default {
   --H: 265;
+  --H-base: 85; /* Warm complement of primary, used for base neutrals */
   --H-green: 152; /* Near triadic color */
   --H-red: 28; /* Near triadic color */
   --H-blue: 220; 
@@ -31,25 +32,25 @@
   --color-primary-950: oklch(0.26 0.082 var(--H));
 
   /* Neutrals (tinted, low chroma) - more nuance in dark range for elevation */
-  --color-base-50:  oklch(0.992 0.003 var(--H));
-  --color-base-100: oklch(0.96 0.005 var(--H));
-  --color-base-150: oklch(0.92 0.006 var(--H));
-  --color-base-200: oklch(0.88 0.007 var(--H)); /* current light mode bg #d3d8e1 */
-  --color-base-250: oklch(0.81 0.008 var(--H)); /* #bcc1cc */
-  --color-base-300: oklch(0.74 0.009 var(--H));
-  --color-base-350: oklch(0.665 0.01 var(--H));
-  --color-base-400: oklch(0.59 0.011 var(--H));
-  --color-base-450: oklch(0.525 0.012 var(--H));
-  --color-base-500: oklch(0.46 0.014 var(--H));
-  --color-base-550: oklch(0.40 0.013 var(--H));
-  --color-base-600: oklch(0.34 0.012 var(--H));
-  --color-base-650: oklch(0.3175 0.0108 var(--H));
-  --color-base-700: oklch(0.295 0.009 var(--H));
-  --color-base-750: oklch(0.2645 0.007 var(--H));
-  --color-base-800: oklch(0.234 0.006 var(--H));
-  --color-base-850: oklch(0.216 0.005 var(--H));
-  --color-base-900: oklch(0.198 0.004 var(--H));
-  --color-base-950: oklch(0.161 0.002 var(--H));
+  --color-base-50:  oklch(0.992 0.001 var(--H-base));
+  --color-base-100: oklch(0.96 0.0015 var(--H-base));
+  --color-base-150: oklch(0.92 0.002 var(--H-base));
+  --color-base-200: oklch(0.88 0.0024 var(--H-base)); /* current light mode bg #d3d8e1 */
+  --color-base-250: oklch(0.81 0.0026 var(--H-base)); /* #bcc1cc */
+  --color-base-300: oklch(0.74 0.003 var(--H-base));
+  --color-base-350: oklch(0.665 0.0034 var(--H-base));
+  --color-base-400: oklch(0.59 0.0038 var(--H-base));
+  --color-base-450: oklch(0.525 0.004 var(--H-base));
+  --color-base-500: oklch(0.46 0.0045 var(--H-base));
+  --color-base-550: oklch(0.40 0.004 var(--H-base));
+  --color-base-600: oklch(0.34 0.0025 var(--H-base));
+  --color-base-650: oklch(0.3175 0.0018 var(--H-base));
+  --color-base-700: oklch(0.295 0.0015 var(--H-base));
+  --color-base-750: oklch(0.2645 0.0012 var(--H-base));
+  --color-base-800: oklch(0.234 0.001 var(--H-base));
+  --color-base-850: oklch(0.216 0.0008 var(--H-base));
+  --color-base-900: oklch(0.198 0.0005 var(--H-base));
+  --color-base-950: oklch(0.161 0.0003 var(--H-base));
 
   /* SUCCESS LIGHT */
   --color-success-background-light: oklch(0.94 0.045 var(--H-green));

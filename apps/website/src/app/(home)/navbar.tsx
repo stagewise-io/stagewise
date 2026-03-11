@@ -1,7 +1,6 @@
 'use client';
 
-import { LogoText } from '@stagewise/stage-ui/components/logo-text';
-import Image from 'next/image';
+import { LogoCombo } from '@stagewise/stage-ui/components/logo-combo';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 
 import { cn } from '@stagewise/stage-ui/lib/utils';
@@ -45,19 +44,8 @@ export function Navbar() {
         {/* Top row: always visible */}
         <div className="flex h-14 w-full items-center justify-between">
           {/* Logo */}
-          <Link
-            href="/"
-            className="flex items-center gap-2"
-            aria-label="stagewise"
-          >
-            <Image
-              src="/icon.png"
-              alt=""
-              width={28}
-              height={28}
-              className="size-7 rounded-full ring-1 ring-border"
-            />
-            <LogoText className="h-6 text-foreground" />
+          <Link href="/" className="flex items-center" aria-label="stagewise">
+            <LogoCombo size={24} />
           </Link>
 
           {/* Desktop nav links (centered absolutely) */}

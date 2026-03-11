@@ -1,49 +1,31 @@
-import { news } from '@/lib/source';
-import { getMDXComponents } from '@/mdx-components';
+import { getAllNewsParams, getNewsPost } from '@/lib/source';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-
-// Sanitize slug to prevent path traversal attacks
-function _sanitizeSlug(slug: string[] | undefined): string {
-  if (!slug || slug.length === 0) return 'index';
-
-  // Join the slug parts and normalize
-  const slugPath = slug.join('/');
-
-  // Remove any path traversal attempts and restrict to safe characters
-  const sanitized = slugPath
-    .replace(/\.\./g, '') // Remove .. sequences
-    .replace(/[^a-zA-Z0-9\-_/]/g, '') // Only allow alphanumeric, hyphens, underscores, and forward slashes
-    .replace(/\/+/g, '/') // Collapse multiple slashes
-    .replace(/^\/|\/$/g, ''); // Remove leading/trailing slashes
-
-  return sanitized || 'index';
-}
+import { MDXRemote } from 'next-mdx-remote/rsc';
 
 export default async function PostPage(props: {
-  params: Promise<{ slug?: string[] }>;
+  params: Promise<{ slug: string[] }>;
 }) {
   const params = await props.params;
-  const post = news.getPage(params.slug);
+  const slug = params.slug?.join('/') ?? '';
+  const post = getNewsPost(slug);
   if (!post) notFound();
-
-  const { title, description, body: MDXContent, date } = post.data;
 
   return (
     <div className="flex w-full max-w-6xl flex-col gap-12 p-4">
       <div className="flex flex-col items-start gap-4 text-left">
         <span className="text-base text-muted-foreground">
-          {date.toLocaleString('en-US', {
+          {post.date.toLocaleString('en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
           })}
         </span>
         <h1 className="font-medium text-3xl text-foreground tracking-tight md:text-5xl">
-          {title}
+          {post.title}
         </h1>
-        <p className="text-lg text-muted-foreground">{description}</p>
+        <p className="text-lg text-muted-foreground">{post.description}</p>
         <div className="flex flex-row gap-4">
           <Link
             href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
@@ -58,7 +40,7 @@ export default async function PostPage(props: {
           </Link>
           <Link
             href={`https://x.com/intent/tweet?text=${encodeURIComponent(
-              `Check out the news from @stagewise_io: ${title}`,
+              `Check out the news from @stagewise_io: ${post.title}`,
             )}&url=${encodeURIComponent(`https://stagewise.io${post.url}`)}`}
             target="_blank"
             rel="noopener noreferrer"
@@ -69,42 +51,41 @@ export default async function PostPage(props: {
           </Link>
         </div>
       </div>
-      <div className="prose prose-zinc dark:prose-invert">
-        <MDXContent components={getMDXComponents({})} />
+      <div className="prose prose-zinc dark:prose-invert max-w-none">
+        <MDXRemote source={post.source} />
       </div>
     </div>
   );
 }
 
 export async function generateStaticParams() {
-  return news.generateParams();
+  return getAllNewsParams();
 }
 
 export async function generateMetadata(props: {
-  params: Promise<{ slug?: string[] }>;
+  params: Promise<{ slug: string[] }>;
 }): Promise<Metadata> {
   const params = await props.params;
-  const page = news.getPage(params.slug);
-  if (!page) notFound();
+  const slug = params.slug?.join('/') ?? '';
+  const post = getNewsPost(slug);
+  if (!post) notFound();
 
-  const metadata: Metadata = {
-    title: `${page.data.title} · stagewise Newsroom`,
-    description: page.data.description,
+  return {
+    title: `${post.title} · stagewise Newsroom`,
+    description: post.description,
     openGraph: {
-      title: `${page.data.title} · stagewise Newsroom`,
-      description: page.data.description,
+      title: `${post.title} · stagewise Newsroom`,
+      description: post.description,
       locale: 'en_US',
-      images: page.data.ogImage ? [page.data.ogImage] : undefined,
+      images: post.ogImage ? [post.ogImage] : undefined,
     },
     twitter: {
-      title: `${page.data.title} · stagewise Newsroom`,
-      description: page.data.description,
+      title: `${post.title} · stagewise Newsroom`,
+      description: post.description,
       creator: '@stagewise_io',
     },
     category: 'News',
     applicationName: 'stagewise',
     publisher: 'stagewise',
   };
-
-  return metadata;
 }

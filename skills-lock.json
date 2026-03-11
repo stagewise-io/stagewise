@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "copywriting": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "computedHash": "2e83eda2221e97166172a0798e9b0379e34080595e107e2fc0cf580e9b3bbf7b"
+    },
     "create-skill": {
       "source": "siviter-xyz/dot-agent",
       "sourceType": "github",

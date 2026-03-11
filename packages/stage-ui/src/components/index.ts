@@ -1,4 +1,7 @@
 // Export all components
+export { Logo, type LogoProps } from './logo';
+export { LogoText, type LogoTextProps } from './logo-text';
+export { LogoCombo, type LogoComboProps } from './logo-combo';
 export { Button, type ButtonProps } from './button';
 export { Switch } from './switch';
 export { Checkbox } from './checkbox';

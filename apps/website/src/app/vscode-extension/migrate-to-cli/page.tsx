@@ -27,15 +27,17 @@ export default function MigrateToCLI() {
     if (userAgent.includes('mac')) {
       setUserOS('macOS');
       setDownloadUrl(
-        'https://dl.stagewise.io/download/stagewise/beta/macos/arm64',
+        'https://dl.stagewise.io/download/stagewise/alpha/macos/arm64',
       );
     } else if (userAgent.includes('win')) {
       setUserOS('Windows');
-      setDownloadUrl('https://dl.stagewise.io/download/stagewise/beta/win/x64');
+      setDownloadUrl(
+        'https://dl.stagewise.io/download/stagewise/alpha/win/x64',
+      );
     } else if (userAgent.includes('linux')) {
       setUserOS('Linux');
       setDownloadUrl(
-        'https://dl.stagewise.io/download/stagewise/beta/linux/deb/x86_64',
+        'https://dl.stagewise.io/download/stagewise/alpha/linux/deb/x86_64',
       );
     } else {
       setIsOsSupported(false);

@@ -5,31 +5,11 @@
 @import "../../node_modules/@stagewise/stage-ui/src/styles/index.css";
 @source "../../node_modules/@stagewise/stage-ui";
 
-@import 'fumadocs-ui/css/neutral.css';
-@import 'fumadocs-ui/css/preset.css';
-
 @custom-variant dark (&:is(.dark *));
-
 
 @theme default {
   --animate-shine: shine 3s ease-in-out infinite;
   --animate-button-shine: button-shine 2s ease-in-out infinite;
-}
-
-:root {
-  /* Fumadocs theme integration */
-  --color-fd-background: var(--color-background);
-  --color-fd-foreground: var(--color-foreground);
-  --color-fd-primary: var(--color-foreground);
-  --color-fd-border: var(--color-zinc-200);
-}
-
-:root.dark {
-  /* Fumadocs theme integration */
-  --color-fd-background: var(--color-background);
-  --color-fd-foreground: var(--color-foreground);
-  --color-fd-primary: var(--color-foreground);
-  --color-fd-border: var(--color-zinc-800);
 }
 
 .root {
@@ -171,6 +151,4 @@
 }
 
 
-#nd-nav nav {
-  @apply max-w-2xl mx-auto;
-}
+

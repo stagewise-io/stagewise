@@ -8,7 +8,6 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/.source": ["./.source/index.ts"],
       "@/*": ["./src/*"]
     },
     "plugins": [

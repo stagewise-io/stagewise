@@ -19,8 +19,7 @@ import {
 import { IconEarthFillDuo18 } from 'nucleo-ui-fill-duo-18';
 import { cn } from '@/utils';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
-import { LogoText } from '@stagewise/stage-ui/components/logo-text';
-import LogoImage from '@assets/icons/icon-64.png';
+import { LogoCombo } from '@stagewise/stage-ui/components/logo-combo';
 
 const PAGE_SIZE = 24;
 const SKELETON_KEYS = Array.from({ length: 6 }, (_, i) => `skeleton-${i}`);
@@ -44,9 +43,8 @@ function HomePage() {
     return (
       <div className="flex size-full min-h-screen min-w-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex items-center gap-2">
-            <img src={LogoImage} alt="stagewise Logo" className="size-8" />
-            <LogoText className="h-8 text-foreground" />
+          <div className="flex items-center">
+            <LogoCombo size={32} />
           </div>
           <span className="text-muted-foreground text-sm">Loading...</span>
         </div>
@@ -66,9 +64,8 @@ function StartPage() {
 
   return (
     <div className="flex w-full max-w-7xl flex-col items-start gap-8 px-20">
-      <div className="flex items-center gap-2">
-        <img src={LogoImage} alt="stagewise Logo" className="size-8" />
-        <LogoText className="h-8 text-foreground" />
+      <div className="flex items-center">
+        <LogoCombo size={32} />
         {releaseChannel === 'dev' && (
           <span className="ml-2 rounded-full border border-derived bg-warning-background px-2 py-px text-sm text-warning-foreground">
             Development Build

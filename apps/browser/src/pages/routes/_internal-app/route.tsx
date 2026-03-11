@@ -20,7 +20,7 @@ import {
 import { Outlet } from '@tanstack/react-router';
 import { buttonVariants } from '@stagewise/stage-ui/components/button';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import LogoImage from '@assets/icons/icon-64.png';
+import { LogoCombo } from '@stagewise/stage-ui/components/logo-combo';
 
 export const Route = createFileRoute('/_internal-app')({
   component: RouteComponent,
@@ -50,12 +50,8 @@ function RouteComponent() {
 function Sidebar() {
   return (
     <div className="flex h-full min-w-fit max-w-56 basis-1/4 flex-col items-start justify-between gap-2 pt-2 pb-0 pl-2">
-      <div className="flex flex-row items-center justify-start gap-4 dark:drop-shadow-md">
-        <img
-          src={LogoImage}
-          alt="stagewise"
-          className="size-10 rounded-full ring-1 ring-derived-strong"
-        />
+      <div className="flex flex-row items-center justify-start gap-4">
+        <LogoCombo size={24} />
       </div>
       <div className="mt-6 flex w-full flex-1 flex-col items-start justify-start">
         <SidebarNav>

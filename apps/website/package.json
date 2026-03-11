@@ -5,8 +5,7 @@
     "build": "next build",
     "dev": "next dev --port 3000",
     "dev:stagewise": "stagewise -- next dev --port 3000",
-    "start": "next start",
-    "postinstall": "fumadocs-mdx"
+    "start": "next start"
   },
   "dependencies": {
     "@headlessui/react": "2.2.2",
@@ -16,10 +15,8 @@
     "@radix-ui/react-navigation-menu": "^1.2.12",
     "@stagewise/stage-ui": "workspace:*",
     "@stagewise/tailwindcss-color-modifiers": "workspace:*",
+    "@tailwindcss/typography": "^0.5.19",
     "framer-motion": "^12.23.3",
-    "fumadocs-core": "15.6.4",
-    "fumadocs-mdx": "11.6.1",
-    "fumadocs-ui": "15.6.3",
     "geist": "^1.4.2",
     "gray-matter": "^4.0.3",
     "lucide-react": "0.554.0",
@@ -39,6 +36,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-icons": "^5.5.0",
+    "server-only": "^0.0.1",
     "zod": "3.25.76"
   },
   "devDependencies": {

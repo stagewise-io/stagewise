@@ -32,8 +32,8 @@ export function TabFavicon({ tabState }: { tabState: TabState }) {
   return (
     <>
       {isStagewisePage ? (
-        <div className="flex size-4 items-center justify-center rounded-full bg-linear-to-br from-blue-700 to-violet-700">
-          <Logo color="current" className="size-1/2 text-white" />
+        <div className="flex size-4 items-center justify-center p-[1px]">
+          <Logo color="current" className="size-full text-primary-solid" />
         </div>
       ) : tabState?.isLoading ? (
         <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" />

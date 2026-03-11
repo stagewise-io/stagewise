@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StagewiseOrb } from '@/assets/stagewise';
+import { Logo } from '@/components/ui/logo';
 import { useWindowFocused } from '@/hooks/use-window-focused';
 import { cn } from '@/utils';
 import { SplitText } from '@stagewise/stage-ui/components/split-text';
@@ -47,13 +47,7 @@ export function StepWelcome({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2">
-      <img
-        src={StagewiseOrb}
-        alt="stagewise"
-        className={cn(
-          'mb-2 size-16 rounded-full ring-1 ring-derived-strong ease-out',
-        )}
-      />
+      <Logo className="mb-2 size-16" />
       <div className="relative w-full text-center">
         <span className="invisible font-normal text-foreground text-lg">
           Welcome to a new way to interact with the internet.

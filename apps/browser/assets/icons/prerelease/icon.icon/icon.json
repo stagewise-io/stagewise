@@ -1,24 +1,48 @@
 {
-  "fill": "system-dark",
+  "fill-specializations": [
+    {
+      "value": {
+        "solid": "srgb:0.94902,0.94902,0.94118,1.00000"
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "solid": "srgb:0.11765,0.11765,0.11373,1.00000"
+      }
+    }
+  ],
   "groups": [
     {
+      "blur-material": null,
       "layers": [
         {
-          "image-name": "inkscape-logoonly.svg",
-          "name": "inkscape-logoonly",
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "srgb:0.14510,0.34902,0.99608,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": "automatic"
+            }
+          ],
+          "image-name": "logo.svg",
+          "name": "logo",
           "position": {
-            "scale": 0.2,
+            "scale": 5.53,
             "translation-in-points": [0, 0]
           }
         }
       ],
       "shadow": {
-        "kind": "neutral",
-        "opacity": 0.5
+        "kind": "layer-color",
+        "opacity": 1
       },
       "translucency": {
         "enabled": true,
-        "value": 0.5
+        "value": 0.2
       }
     },
     {
@@ -26,6 +50,9 @@
       "blur-material": null,
       "layers": [
         {
+          "fill": {
+            "solid": "srgb:0.14510,0.34902,0.99608,1.00000"
+          },
           "glass": true,
           "image-name": "inkscape-starsonly.svg",
           "name": "inkscape-starsonly",
@@ -36,45 +63,13 @@
         }
       ],
       "shadow": {
-        "kind": "neutral",
+        "kind": "layer-color",
         "opacity": 1
       },
       "specular": true,
       "translucency": {
         "enabled": true,
-        "value": 0
-      }
-    },
-    {
-      "layers": [
-        {
-          "glass": false,
-          "hidden-specializations": [
-            {
-              "appearance": "light",
-              "value": false
-            },
-            {
-              "appearance": "tinted",
-              "value": true
-            }
-          ],
-          "image-name": "inkscape-bgonly.svg",
-          "name": "inkscape-bgonly",
-          "position": {
-            "scale": 0.2,
-            "translation-in-points": [0, 0]
-          }
-        }
-      ],
-      "shadow": {
-        "kind": "none",
-        "opacity": 0.5
-      },
-      "specular": false,
-      "translucency": {
-        "enabled": false,
-        "value": 0.5
+        "value": 1
       }
     }
   ],

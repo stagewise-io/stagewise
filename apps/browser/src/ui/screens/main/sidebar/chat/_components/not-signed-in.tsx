@@ -2,7 +2,7 @@ import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { Input } from '@stagewise/stage-ui/components/input';
 import { InputOtp } from '@stagewise/stage-ui/components/input-otp';
 import { useKartonProcedure } from '@/hooks/use-karton';
-import { StagewiseOrb } from '@/assets/stagewise';
+import { Logo } from '@/components/ui/logo';
 import { useState, useCallback } from 'react';
 import { cn } from '@/utils';
 
@@ -50,7 +50,7 @@ export function NotSignedIn() {
   return (
     <div className="flex size-full flex-col items-center justify-center gap-4 p-6 text-center">
       <div className="flex flex-col items-center justify-center gap-2">
-        <img src={StagewiseOrb} alt="stagewise" className="size-12" />
+        <Logo className="size-12" />
         <span className="font-medium text-foreground text-xl">
           Authenticate
         </span>
