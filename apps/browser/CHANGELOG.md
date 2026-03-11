@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.13 (2026-03-11)
+
+### Bug Fixes
+
+* fix windows build signing (8a58f5a)
+
 ## 1.0.0-alpha.12 (2026-03-11)
 
 ### Features
