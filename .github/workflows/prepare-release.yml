@@ -111,7 +111,7 @@ jobs:
           git checkout -b "${{ steps.branch.outputs.name }}"
           git add .
           git commit -m "chore(${{ inputs.package }}): release ${{ steps.bump.outputs.version }}"
-          git push origin "${{ steps.branch.outputs.name }}"
+          git push --force origin "${{ steps.branch.outputs.name }}"
 
       - name: Create Pull Request
         env:
