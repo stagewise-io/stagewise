@@ -1,0 +1,150 @@
+name: "Prepare Release"
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to release"
+        required: true
+        type: choice
+        options:
+          - stagewise
+          - karton
+      channel:
+        description: "Release channel"
+        required: true
+        type: choice
+        options:
+          - alpha
+          - beta
+          - release
+      new-cycle:
+        description: "Start new version cycle (abandon current prerelease)"
+        required: false
+        type: boolean
+        default: false
+
+run-name: "Prepare Release: ${{ inputs.package }} (${{ inputs.channel }}${{ inputs.new-cycle && ', new cycle' || '' }})"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    # Only run on main or release-tests branch
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release-tests'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
+
+      # For karton: validate prerelease is not requested
+      - name: Validate karton channel
+        if: inputs.package == 'karton' && inputs.channel != 'release'
+        run: |
+          echo "::error::Karton only supports the 'release' channel. Prerelease channels are not enabled."
+          exit 1
+
+      # For karton new-cycle: not supported
+      - name: Validate karton new-cycle
+        if: inputs.package == 'karton' && inputs.new-cycle
+        run: |
+          echo "::error::--new-cycle is not supported for karton."
+          exit 1
+
+      # For stagewise new-cycle: validate current version is a prerelease
+      - name: Validate new-cycle precondition
+        if: inputs.new-cycle && inputs.package == 'stagewise'
+        run: |
+          VERSION=$(node -p "require('./apps/browser/package.json').version")
+          if [[ "$VERSION" != *"-alpha."* ]] && [[ "$VERSION" != *"-beta."* ]]; then
+            echo "::error::Current version $VERSION is not a prerelease. --new-cycle requires a prerelease version."
+            exit 1
+          fi
+
+      - name: Bump Version
+        id: bump
+        run: |
+          ARGS="--package ${{ inputs.package }} --channel ${{ inputs.channel }}"
+          [ "${{ inputs.new-cycle }}" == "true" ] && ARGS="$ARGS --new-cycle"
+          pnpm tsx scripts/release/index.ts $ARGS
+          echo "version=$(cat .release-version)" >> $GITHUB_OUTPUT
+          echo "tag=$(cat .release-tag)" >> $GITHUB_OUTPUT
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat .release-notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Determine branch name
+        id: branch
+        run: |
+          TAG="${{ steps.bump.outputs.tag }}"
+          # Sanitize tag for branch name: replace @ and / with -
+          SAFE_TAG=$(echo "$TAG" | sed 's/@/-/g; s/\//-/g; s/^-//; s/--*/-/g')
+          BRANCH="release/${SAFE_TAG}"
+          echo "name=${BRANCH}" >> $GITHUB_OUTPUT
+
+      - name: Create release branch and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${{ steps.branch.outputs.name }}"
+          git add .
+          git commit -m "chore(${{ inputs.package }}): release ${{ steps.bump.outputs.version }}"
+          git push origin "${{ steps.branch.outputs.name }}"
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BODY="## Release: ${{ inputs.package }} ${{ steps.bump.outputs.version }}
+
+          **Channel:** ${{ inputs.channel }}
+          **Tag:** \`${{ steps.bump.outputs.tag }}\`
+
+          ### Release Notes
+
+          ${{ steps.bump.outputs.notes }}
+
+          ---
+
+          > Merge this PR to trigger the auto-release pipeline on \`${{ github.ref_name }}\`."
+
+          gh pr create \
+            --base "${{ github.ref_name }}" \
+            --head "${{ steps.branch.outputs.name }}" \
+            --title "release(${{ inputs.package }}): ${{ steps.bump.outputs.version }}" \
+            --body "$BODY" \
+            --label "release"
+
+      - name: Summary
+        run: |
+          echo "## Release PR Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package:** ${{ inputs.package }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.bump.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Channel:** ${{ inputs.channel }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** \`${{ steps.bump.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** \`${{ steps.branch.outputs.name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Merge the PR to trigger the release." >> $GITHUB_STEP_SUMMARY

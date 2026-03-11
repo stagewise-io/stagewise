@@ -3,13 +3,18 @@ name: _Release Browser (Reusable)
 on:
   workflow_call:
     inputs:
+      version:
+        required: true
+        type: string
+        description: "Version to release (e.g., 1.0.0-alpha.11)"
+      tag:
+        required: true
+        type: string
+        description: "Git tag to create (e.g., stagewise@1.0.0-alpha.11)"
       channel:
         required: true
         type: string
-      new-cycle:
-        required: false
-        type: boolean
-        default: false
+        description: "Release channel (alpha, beta, release)"
     secrets:
       NUCLEO_LICENSE_KEY:
         required: false
@@ -53,58 +58,62 @@ on:
         required: false
 
 jobs:
-  version-bump:
+  # Create the git tag from the current commit
+  tag:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    outputs:
-      version: ${{ steps.bump.outputs.version }}
-      tag: ${{ steps.bump.outputs.tag }}
-      notes: ${{ steps.bump.outputs.notes }}
-    env:
-      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.30.3
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Bump Version
-        id: bump
-        run: |
-          ARGS="--package stagewise --channel ${{ inputs.channel }}"
-          [ "${{ inputs.new-cycle }}" == "true" ] && ARGS="$ARGS --new-cycle"
-          pnpm tsx scripts/release/index.ts $ARGS
-          echo "version=$(cat .release-version)" >> $GITHUB_OUTPUT
-          echo "tag=$(cat .release-tag)" >> $GITHUB_OUTPUT
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          cat .release-notes.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Commit and Tag
+      - name: Create and push tag (idempotent)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "chore(stagewise): release ${{ steps.bump.outputs.version }} [skip ci]"
-          git push
-          git tag ${{ steps.bump.outputs.tag }}
-          git push origin ${{ steps.bump.outputs.tag }}
+
+          if git rev-parse "refs/tags/${{ inputs.tag }}" >/dev/null 2>&1; then
+            EXISTING=$(git rev-list -n 1 "refs/tags/${{ inputs.tag }}")
+            CURRENT=$(git rev-parse HEAD)
+            if [ "$EXISTING" = "$CURRENT" ]; then
+              echo "Tag ${{ inputs.tag }} already exists on current commit — skipping"
+              exit 0
+            else
+              echo "::error::Tag ${{ inputs.tag }} exists but points to a different commit ($EXISTING vs $CURRENT)"
+              exit 1
+            fi
+          fi
+
+          git tag "${{ inputs.tag }}"
+          git push origin "${{ inputs.tag }}"
+
+      - name: Read release notes
+        id: notes
+        run: |
+          PACKAGE_DIR="apps/browser"
+          VERSION="${{ inputs.version }}"
+
+          NOTES=""
+          if [ -f "$PACKAGE_DIR/CHANGELOG.md" ]; then
+            NOTES=$(sed -n "/## ${VERSION}/,/## [0-9]/p" "$PACKAGE_DIR/CHANGELOG.md" | head -n -1)
+          fi
+
+          if [ -z "$NOTES" ]; then
+            NOTES="Release ${VERSION}"
+          fi
+
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+    outputs:
+      notes: ${{ steps.notes.outputs.notes }}
 
   build:
-    needs: version-bump
+    needs: tag
     environment: Release
     strategy:
       fail-fast: false
@@ -146,7 +155,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.version-bump.outputs.tag }}
+          ref: ${{ inputs.tag }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -246,7 +255,7 @@ jobs:
           if-no-files-found: warn
 
   release:
-    needs: [version-bump, build]
+    needs: [tag, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -271,9 +280,9 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.version-bump.outputs.tag }}
-          name: "Stagewise ${{ needs.version-bump.outputs.version }}"
-          body: ${{ needs.version-bump.outputs.notes }}
+          tag_name: ${{ inputs.tag }}
+          name: "Stagewise ${{ inputs.version }}"
+          body: ${{ needs.tag.outputs.notes }}
           prerelease: ${{ inputs.channel != 'release' }}
           files: release/*
         env:
