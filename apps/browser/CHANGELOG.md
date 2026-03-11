@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.12 (2026-03-11)
+
+### Features
+
+* use cached asset urls for images to prevent errors with size-constraints in our api (bdfbc2f)
+
 ## 1.0.0-alpha.11 (2026-03-11)
 
 ### Bug Fixes
