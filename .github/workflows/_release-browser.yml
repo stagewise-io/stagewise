@@ -182,7 +182,7 @@ jobs:
           # Install Azure.CodeSigning.Dlib via NuGet
           $nugetDir = "${{ runner.temp }}\nuget"
           New-Item -ItemType Directory -Force -Path $nugetDir | Out-Null
-          nuget install Microsoft.Trusted.Signing.Client -OutputDirectory $nugetDir -Source https://api.nuget.org/v3/index.json
+          nuget install Microsoft.Trusted.Signing.Client -Version 1.0.95 -OutputDirectory $nugetDir -Source https://api.nuget.org/v3/index.json
 
           # Find the installed dlib
           $dlibPath = Get-ChildItem -Path $nugetDir -Recurse -Filter "Azure.CodeSigning.Dlib.dll" |
