@@ -32,6 +32,8 @@ import xml from 'xml';
 import specialTokens from '../prompts/utils/special-tokens';
 import type { ModelCapabilities } from '@shared/karton-contracts/ui/shared-types';
 import { findModelsAcceptingMime } from '@shared/available-models';
+import type { AssetCacheService } from '@/services/asset-cache';
+import { getBlobPath } from '@/utils/attachment-blobs';
 
 export type BlobReader = (
   agentId: string,
@@ -57,8 +59,19 @@ export interface SandboxFileAttachment {
 
 import type { ModalityConstraint } from '@shared/karton-contracts/ui/shared-types';
 
+const IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+]);
+
+function isImageMime(mediaType: string): boolean {
+  return IMAGE_MIME_TYPES.has(mediaType.toLowerCase());
+}
+
 const DEFAULT_IMAGE_CONSTRAINT: ModalityConstraint = {
-  mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+  mimeTypes: [...IMAGE_MIME_TYPES],
   maxBytes: 5_242_880, // 5 MB — conservative fallback
 };
 
@@ -228,6 +241,7 @@ async function buildSyntheticUserMessageForAttachments(
   capabilities?: ModelCapabilities,
   onBlobError?: BlobErrorReporter,
   currentModelId?: string,
+  assetCacheService?: AssetCacheService,
 ): Promise<UserModelMessage> {
   const content: UserContent = [];
 
@@ -258,13 +272,45 @@ async function buildSyntheticUserMessageForAttachments(
 
     if (check.canConsume) {
       try {
-        const buf = await blobReader(agentInstanceId, f.id);
-        content.push({
-          type: 'file',
-          data: new Uint8Array(buf),
-          mediaType: f.mediaType,
-          filename: f.fileName,
-        });
+        const filePath = getBlobPath(agentInstanceId, f.id);
+        const result = await assetCacheService?.resolve(
+          filePath,
+          f.mediaType,
+          f.fileName,
+        );
+        if (result?.type === 'url') {
+          if (isImageMime(f.mediaType)) {
+            content.push({
+              type: 'image',
+              image: new URL(result.url),
+              mediaType: f.mediaType,
+            } satisfies ImagePart);
+          } else {
+            content.push({
+              type: 'file',
+              data: new URL(result.url),
+              mediaType: f.mediaType,
+              filename: f.fileName,
+            } satisfies FilePart);
+          }
+        } else {
+          const buf =
+            result?.buffer ?? (await blobReader(agentInstanceId, f.id));
+          if (isImageMime(f.mediaType)) {
+            content.push({
+              type: 'image',
+              image: new Uint8Array(buf),
+              mediaType: f.mediaType,
+            } satisfies ImagePart);
+          } else {
+            content.push({
+              type: 'file',
+              data: new Uint8Array(buf),
+              mediaType: f.mediaType,
+              filename: f.fileName,
+            } satisfies FilePart);
+          }
+        }
       } catch (err) {
         onBlobError?.(err, {
           operation: 'readSandboxAttachmentBlob',
@@ -353,6 +399,7 @@ export const convertAgentMessagesToModelMessages = async (
   currentModelId?: string,
   shellInfo?: ShellInfo | null,
   skillDetails?: Map<string, SkillInfo>,
+  assetCacheService?: AssetCacheService,
 ): Promise<ModelMessage[]> => {
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
@@ -404,6 +451,7 @@ export const convertAgentMessagesToModelMessages = async (
         modelCapabilities,
         onBlobError,
         currentModelId,
+        assetCacheService,
       );
       // convertUserMessage always returns content as an array of parts
       const content = userMsg.content as (TextPart | ImagePart | FilePart)[];
@@ -451,6 +499,7 @@ export const convertAgentMessagesToModelMessages = async (
             modelCapabilities,
             onBlobError,
             currentModelId,
+            assetCacheService,
           );
           const attachContent = Array.isArray(attachmentMsg.content)
             ? attachmentMsg.content
@@ -625,6 +674,7 @@ async function convertUserMessage(
   modelCapabilities?: ModelCapabilities,
   onBlobError?: BlobErrorReporter,
   currentModelId?: string,
+  assetCacheService?: AssetCacheService,
 ): Promise<UserModelMessage> {
   const parts = message.parts.map((part) => {
     if (part.type === 'text')
@@ -634,6 +684,11 @@ async function convertUserMessage(
       };
     return { ...part };
   });
+
+  // File parts that carry raw buffer data cannot go through convertToModelMessages
+  // because FileUIPart only accepts url: string (http/https). We collect them
+  // separately and splice them directly into converted.content as FilePart/ImagePart objects.
+  const directParts: (FilePart | ImagePart)[] = [];
 
   if ((message.metadata?.fileAttachments?.length || 0) > 0) {
     for (const f of message.metadata!.fileAttachments!) {
@@ -663,13 +718,49 @@ async function convertUserMessage(
 
       if (check.canConsume) {
         try {
-          const content = await blobReader(agentInstanceId, f.id);
-          parts.push({
-            type: 'file',
-            url: content.toString('base64'),
-            mediaType: f.mediaType,
-            filename: f.fileName,
-          });
+          const filePath = getBlobPath(agentInstanceId, f.id);
+          const result = await assetCacheService?.resolve(
+            filePath,
+            f.mediaType,
+            f.fileName,
+          );
+          if (result?.type === 'url') {
+            if (isImageMime(f.mediaType)) {
+              // Images with URLs bypass convertToModelMessages entirely
+              // so the SDK passes the URL through to the provider as-is
+              // instead of downloading and base64-encoding the content.
+              directParts.push({
+                type: 'image',
+                image: new URL(result.url),
+                mediaType: f.mediaType,
+              } satisfies ImagePart);
+            } else {
+              // Non-image presigned URL: FileUIPart goes through convertToModelMessages.
+              parts.push({
+                type: 'file',
+                url: result.url,
+                mediaType: f.mediaType,
+                filename: f.fileName,
+              } as unknown as (typeof parts)[number]);
+            }
+          } else {
+            const buf =
+              result?.buffer ?? (await blobReader(agentInstanceId, f.id));
+            if (isImageMime(f.mediaType)) {
+              directParts.push({
+                type: 'image',
+                image: new Uint8Array(buf),
+                mediaType: f.mediaType,
+              } satisfies ImagePart);
+            } else {
+              directParts.push({
+                type: 'file',
+                data: new Uint8Array(buf),
+                mediaType: f.mediaType,
+                filename: f.fileName,
+              });
+            }
+          }
         } catch (err) {
           onBlobError?.(err, {
             operation: 'readAttachmentBlob',
@@ -686,6 +777,15 @@ async function convertUserMessage(
 
   if (typeof converted.content === 'string') {
     converted.content = [{ type: 'text', text: converted.content }];
+  }
+
+  // Splice buffer-backed file/image parts directly into the model-level content.
+  if (directParts.length > 0) {
+    const existing: (TextPart | ImagePart | FilePart)[] =
+      typeof converted.content === 'string'
+        ? [{ type: 'text', text: converted.content }]
+        : (converted.content as (TextPart | ImagePart | FilePart)[]);
+    converted.content = [...existing, ...directParts];
   }
 
   const attachmentParts: string[] = [];
@@ -722,7 +822,7 @@ async function convertUserMessage(
   }
 
   if (attachmentParts.length > 0) {
-    converted.content.push({
+    (converted.content as (TextPart | ImagePart | FilePart)[]).push({
       type: 'text',
       text: attachmentParts.join('\n'),
     });

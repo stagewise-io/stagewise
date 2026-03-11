@@ -8,7 +8,12 @@ export const getDataRoot = (): string =>
 export const getTempRoot = (): string =>
   path.join(app.getPath('temp'), 'stagewise');
 
-export type DbName = 'favicon' | 'web-data' | 'history' | 'thumbnails';
+export type DbName =
+  | 'favicon'
+  | 'web-data'
+  | 'history'
+  | 'thumbnails'
+  | 'asset-cache';
 
 export const getDbPath = (name: DbName): string =>
   path.join(getDataRoot(), `${name}.sqlite`);

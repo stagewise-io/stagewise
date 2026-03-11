@@ -38,6 +38,7 @@ import {
 import { generateSimpleTitle } from './title-generation';
 import { generateSimpleCompressedHistory } from './history-compression';
 import { readBlob } from '@/utils/attachment-blobs';
+import type { AssetCacheService } from '@/services/asset-cache';
 import { randomUUID } from 'node:crypto';
 import {
   resolveEffectiveSnapshot,
@@ -329,6 +330,7 @@ export abstract class BaseAgent<
   protected readonly telemetryService: TelemetryService;
   protected readonly logger: Logger;
   protected readonly modelProviderService: ModelProviderService;
+  protected readonly assetCacheService?: AssetCacheService;
 
   // Internal state
   private stepAbortController: AbortController | null = null;
@@ -421,6 +423,7 @@ export abstract class BaseAgent<
     ) => void | Promise<void>,
     finishToolErrorHandler?: (error: Error) => void | Promise<void>,
     initialState?: Partial<AgentState>,
+    assetCacheService?: AssetCacheService,
   ) {
     this.instanceId = instanceId;
     this.state = state;
@@ -432,6 +435,7 @@ export abstract class BaseAgent<
     this.spawnChildAgentHandler = spawnChildAgentHandler;
     this.finishToolHandler = finishToolHandler;
     this.finishToolErrorHandler = finishToolErrorHandler;
+    this.assetCacheService = assetCacheService;
 
     this.state.set((draft) => {
       draft.title =
@@ -1004,6 +1008,7 @@ export abstract class BaseAgent<
       activeModelId,
       shellInfo,
       skillDetails,
+      this.assetCacheService,
     );
   }
 

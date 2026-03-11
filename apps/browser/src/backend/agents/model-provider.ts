@@ -17,9 +17,22 @@ import { createVertex } from '@ai-sdk/google-vertex';
 import { createStagewise } from './stagewise-provider';
 import type { AuthService } from '@/services/auth';
 import type { PreferencesService } from '@/services/preferences';
-import type { streamText } from 'ai';
+import type { streamText, LanguageModelMiddleware } from 'ai';
+import { wrapLanguageModel } from 'ai';
 
 type ProviderOptions = Parameters<typeof streamText>[0]['providerOptions'];
+
+/**
+ * Middleware that tells the SDK all HTTP(S) URLs are natively supported by the
+ * stagewise gateway. Without this the SDK downloads every image/file URL and
+ * inlines the content as base64, causing "payload too large" errors.
+ */
+const stagewiseUrlPassthroughMiddleware: LanguageModelMiddleware = {
+  specificationVersion: 'v3',
+  overrideSupportedUrls: () => ({
+    '*': [/^https?:\/\//i],
+  }),
+};
 
 export type ProviderMode = 'stagewise' | 'official' | 'custom';
 
@@ -258,11 +271,13 @@ export class ModelProviderService {
         baseURL: proxyBaseUrl,
       });
 
+      const model = wrapLanguageModel({
+        model: stagewiseProvider.chatModel(prefixedModelId),
+        middleware: stagewiseUrlPassthroughMiddleware,
+      });
+
       return {
-        model: this.telemetryService.withTracing(
-          stagewiseProvider.chatModel(prefixedModelId),
-          posthogConfig,
-        ),
+        model: this.telemetryService.withTracing(model, posthogConfig),
         headers,
         providerOptions: modelSettings.providerOptions as Parameters<
           typeof streamText

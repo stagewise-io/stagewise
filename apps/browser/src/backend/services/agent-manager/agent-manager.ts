@@ -19,6 +19,7 @@ import type { AgentState } from '@shared/karton-contracts/ui/agent';
 import { writeBlob } from '@/utils/attachment-blobs';
 import type { QuestionAnswerValue } from '@shared/karton-contracts/ui/agent/tools/types';
 import { readWorkspaceMd } from '@/agents/shared/prompts/utils/read-workspace-md';
+import type { AssetCacheService } from '@/services/asset-cache';
 
 /**
  * @note Due to the complex type inference for all this stuff, we sometimes explicitly define types here to avoid errors.
@@ -36,6 +37,7 @@ export class AgentManagerService extends DisposableService {
   private readonly toolbox: ToolboxService;
   private readonly logger: Logger;
   private readonly modelProviderService: ModelProviderService;
+  private readonly assetCacheService?: AssetCacheService;
 
   private agentPersistenceDB: AgentPersistenceDB | null = null;
   private readonly dbReadyPromise: Promise<AgentPersistenceDB | null>;
@@ -46,6 +48,7 @@ export class AgentManagerService extends DisposableService {
     toolbox: ToolboxService,
     logger: Logger,
     modelProviderService: ModelProviderService,
+    assetCacheService?: AssetCacheService,
   ) {
     super();
     this.karton = karton;
@@ -53,6 +56,7 @@ export class AgentManagerService extends DisposableService {
     this.toolbox = toolbox;
     this.logger = logger;
     this.modelProviderService = modelProviderService;
+    this.assetCacheService = assetCacheService;
 
     this.registerKartonHandlers();
 
@@ -528,6 +532,7 @@ export class AgentManagerService extends DisposableService {
             ? lastChatModelId
             : undefined,
       },
+      this.assetCacheService,
     );
 
     this.activeAgents.set(agentInstanceId, agent);

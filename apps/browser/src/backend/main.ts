@@ -37,6 +37,7 @@ import { wirePagesStateSync } from './wiring/pages-state-sync';
 import { wirePagesHandlers } from './wiring/pages-handler-wiring';
 import { ensureDataDirectories, getRipgrepBasePath } from './utils/paths';
 import { migrateLegacyPaths } from './utils/migrate-legacy-paths';
+import { AssetCacheService } from './services/asset-cache';
 
 export type MainParameters = {
   launchOptions: {
@@ -293,12 +294,18 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     preferencesService,
   );
 
+  const assetCacheService = await AssetCacheService.create(
+    () => authService.accessToken,
+    logger,
+  );
+
   const agentManagerService = new AgentManagerService(
     uiKarton,
     telemetryService,
     toolboxService,
     logger,
     modelProviderService,
+    assetCacheService,
   );
 
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
@@ -357,6 +364,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     faviconService.teardown();
     thumbnailService.teardown();
     diffHistoryService.teardown();
+    assetCacheService.teardown();
     logger.debug('[Main] Services shut down');
   };
 
