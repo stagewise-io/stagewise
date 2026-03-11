@@ -1,0 +1,108 @@
+name: "Auto Release"
+
+# Detects unreleased package versions and triggers builds + releases.
+# Runs on push to main/release-tests (i.e., when a release PR is merged).
+
+on:
+  push:
+    branches:
+      - main
+      - release-tests
+
+# Only one release at a time per branch
+concurrency:
+  group: auto-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+  id-token: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Detect which packages have versions without a matching git tag
+  # ---------------------------------------------------------------------------
+  detect:
+    name: Detect Unreleased Packages
+    runs-on: ubuntu-latest
+    outputs:
+      stagewise-needs-release: ${{ steps.check.outputs.stagewise_needs_release }}
+      stagewise-version: ${{ steps.check.outputs.stagewise_version }}
+      stagewise-tag: ${{ steps.check.outputs.stagewise_tag }}
+      stagewise-channel: ${{ steps.check.outputs.stagewise_channel }}
+      karton-needs-release: ${{ steps.check.outputs.karton_needs_release }}
+      karton-version: ${{ steps.check.outputs.karton_version }}
+      karton-tag: ${{ steps.check.outputs.karton_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check package versions against tags
+        id: check
+        run: |
+          check_package() {
+            local name="$1"
+            local pkg_json="$2"
+            local tag_prefix="$3"
+
+            local version
+            version=$(node -p "require('./${pkg_json}').version")
+            local tag="${tag_prefix}${version}"
+
+            echo "Checking ${name}: version=${version}, expected tag=${tag}"
+
+            if git rev-parse "refs/tags/${tag}" >/dev/null 2>&1; then
+              echo "  ✅ Tag exists — already released"
+              echo "${name}_needs_release=false" >> $GITHUB_OUTPUT
+            else
+              echo "  🚀 Tag missing — needs release"
+              echo "${name}_needs_release=true" >> $GITHUB_OUTPUT
+            fi
+
+            echo "${name}_version=${version}" >> $GITHUB_OUTPUT
+            echo "${name}_tag=${tag}" >> $GITHUB_OUTPUT
+
+            # Determine channel from version
+            if [[ "$version" == *"-alpha."* ]]; then
+              echo "${name}_channel=alpha" >> $GITHUB_OUTPUT
+            elif [[ "$version" == *"-beta."* ]]; then
+              echo "${name}_channel=beta" >> $GITHUB_OUTPUT
+            else
+              echo "${name}_channel=release" >> $GITHUB_OUTPUT
+            fi
+          }
+
+          # --- Releasable packages (add new packages here) ---
+          check_package "stagewise" "apps/browser/package.json" "stagewise@"
+          check_package "karton" "packages/karton/package.json" "@stagewise/karton@"
+
+  # ---------------------------------------------------------------------------
+  # Release: stagewise (Electron browser app)
+  # ---------------------------------------------------------------------------
+  release-stagewise:
+    name: Release stagewise
+    needs: detect
+    if: needs.detect.outputs.stagewise-needs-release == 'true'
+    uses: ./.github/workflows/_release-browser.yml
+    with:
+      version: ${{ needs.detect.outputs.stagewise-version }}
+      tag: ${{ needs.detect.outputs.stagewise-tag }}
+      channel: ${{ needs.detect.outputs.stagewise-channel }}
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # Release: karton (npm package)
+  # ---------------------------------------------------------------------------
+  release-karton:
+    name: Release karton
+    needs: detect
+    if: needs.detect.outputs.karton-needs-release == 'true'
+    uses: ./.github/workflows/_release-karton.yml
+    with:
+      version: ${{ needs.detect.outputs.karton-version }}
+      tag: ${{ needs.detect.outputs.karton-tag }}
+    secrets: inherit

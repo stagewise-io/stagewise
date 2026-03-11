@@ -1,0 +1,104 @@
+name: _Release Karton (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+        description: "Version to release (e.g., 1.2.3)"
+      tag:
+        required: true
+        type: string
+        description: "Git tag to create (e.g., @stagewise/karton@1.2.3)"
+    secrets:
+      NPM_TOKEN:
+        required: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  # Create the git tag from the current commit
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push tag (idempotent)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git rev-parse "refs/tags/${{ inputs.tag }}" >/dev/null 2>&1; then
+            EXISTING=$(git rev-list -n 1 "refs/tags/${{ inputs.tag }}")
+            CURRENT=$(git rev-parse HEAD)
+            if [ "$EXISTING" = "$CURRENT" ]; then
+              echo "Tag ${{ inputs.tag }} already exists on current commit — skipping"
+              exit 0
+            else
+              echo "::error::Tag ${{ inputs.tag }} exists but points to a different commit ($EXISTING vs $CURRENT)"
+              exit 1
+            fi
+          fi
+
+          git tag "${{ inputs.tag }}"
+          git push origin "${{ inputs.tag }}"
+
+  publish:
+    needs: tag
+    runs-on: ubuntu-latest
+    env:
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @stagewise/karton build
+
+      - name: Publish to npm
+        working-directory: packages/karton
+        run: npm publish --tag latest --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  release:
+    needs: [tag, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: "Karton ${{ inputs.version }}"
+          body: |
+            **@stagewise/karton ${{ inputs.version }}**
+
+            ```bash
+            npm install @stagewise/karton@${{ inputs.version }}
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
