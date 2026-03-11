@@ -1226,8 +1226,21 @@ export class WindowLayoutService extends DisposableService {
   private handleTogglePanelKeyboardFocus = async (
     panel: 'stagewise-ui' | 'tab-content',
   ) => {
-    if (panel === 'stagewise-ui') this.uiController?.focus();
-    else this.activeTab?.focus();
+    if (panel === 'stagewise-ui') {
+      // On Windows the UI WebContentsView must be the topmost Win32 child
+      // window *before* webContents.focus() is called, otherwise the tab
+      // view (which sits on top after the remove/re-add dance) intercepts
+      // all keyboard and mouse events and the omnibox never gets focus.
+      // Scoped to win32 only â macOS/Linux don't need it and the plain
+      // addChildView re-order is sufficient there.
+      if (process.platform === 'win32') {
+        this.isWebContentInteractive = false;
+        this.updateZOrder();
+      }
+      this.uiController?.focus();
+    } else {
+      this.activeTab?.focus();
+    }
   };
 
   private updateZOrder() {
