@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-alpha.15 (2026-03-11)
+
+### Bug Fixes
+
+* change default-settings url to agent models (fe7a716)
+* move telemetry settings to 'user' (eff1858)
+* make scrollbars in settings-about subtle (1dc1930)
+* show workspace info in file-diff-section (42c5ddf)
+* only open new diff-review tabs when none is already present (e90cc02)
+
 ## 1.0.0-alpha.14 (2026-03-11)
 
 ### Bug Fixes
