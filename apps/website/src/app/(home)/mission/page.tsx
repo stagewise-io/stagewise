@@ -1,7 +1,7 @@
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { IconGithub } from 'nucleo-social-media';
 
-export default function TeamPage() {
+export default function MissionPage() {
   return (
     <div className="relative mx-auto w-full max-w-7xl px-4">
       <ScrollReveal>

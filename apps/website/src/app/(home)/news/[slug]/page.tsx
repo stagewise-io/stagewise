@@ -5,10 +5,9 @@ import { notFound } from 'next/navigation';
 import { MDXRemote } from 'next-mdx-remote/rsc';
 
 export default async function PostPage(props: {
-  params: Promise<{ slug: string[] }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const params = await props.params;
-  const slug = params.slug?.join('/') ?? '';
+  const { slug } = await props.params;
   const post = getNewsPost(slug);
   if (!post) notFound();
 
@@ -59,14 +58,13 @@ export default async function PostPage(props: {
 }
 
 export async function generateStaticParams() {
-  return getAllNewsParams();
+  return getAllNewsParams().map(({ slug }) => ({ slug: slug[0] }));
 }
 
 export async function generateMetadata(props: {
-  params: Promise<{ slug: string[] }>;
+  params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const params = await props.params;
-  const slug = params.slug?.join('/') ?? '';
+  const { slug } = await props.params;
   const post = getNewsPost(slug);
   if (!post) notFound();
 
@@ -77,7 +75,6 @@ export async function generateMetadata(props: {
       title: `${post.title} · stagewise Newsroom`,
       description: post.description,
       locale: 'en_US',
-      images: post.ogImage ? [post.ogImage] : undefined,
     },
     twitter: {
       title: `${post.title} · stagewise Newsroom`,

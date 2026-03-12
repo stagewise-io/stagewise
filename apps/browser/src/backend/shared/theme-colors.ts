@@ -10,17 +10,17 @@
 
 export const THEME_COLORS = {
   light: {
-    background: '#e2e4e9', // theme.css: --color-app-background → --color-base-150
+    background: '#e5e4e3', // theme.css: --color-app-background → --color-base-150
     titleBarOverlay: {
-      color: '#e2e4e9', // theme.css: --color-app-background → --color-base-150
-      symbolColor: '#151617', // theme.css: --color-foreground → --color-base-900
+      color: '#e5e4e3', // theme.css: --color-app-background → --color-base-150
+      symbolColor: '#161515', // theme.css: --color-foreground → --color-base-900
     },
   },
   dark: {
-    background: '#0d0d0e', // theme.css: --color-app-background → --color-base-950
+    background: '#0d0d0d', // theme.css: --color-app-background → --color-base-950
     titleBarOverlay: {
-      color: '#0d0d0e', // theme.css: --color-app-background → --color-base-950
-      symbolColor: '#d5d7dc', // theme.css: --color-foreground → --color-base-200
+      color: '#0d0d0d', // theme.css: --color-app-background → --color-base-950
+      symbolColor: '#d8d7d6', // theme.css: --color-foreground → --color-base-200
     },
   },
 } as const;
