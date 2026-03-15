@@ -27,6 +27,9 @@ const ANTHROPIC_INPUT_CONSTRAINTS: InputConstraints = {
   image: {
     mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
     maxBytes: 5_242_880, // 5 MB per image
+    maxWidthPx: 8000,
+    maxHeightPx: 8000,
+    maxTotalPixels: 1_200_000, // Anthropic enforces a 1.2 MP per-image limit
   },
   file: {
     mimeTypes: ['application/pdf'],
@@ -34,10 +37,20 @@ const ANTHROPIC_INPUT_CONSTRAINTS: InputConstraints = {
   },
 };
 
+// Patch-based tokenization (32×32 px patches) for all supported OpenAI models.
+// Two constraints apply simultaneously:
+//   1. Neither dimension may exceed 2048 px.
+//   2. Total pixels may not exceed patch_budget × 32².
+//
+// Supported OpenAI models (GPT-4o, GPT-4.1, o-series excl. o4-mini): 1,536 patches
+//   → 1,536 × 1,024 = 1,572,864 px ≈ 1.54 MP
 const OPENAI_INPUT_CONSTRAINTS: InputConstraints = {
   image: {
     mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-    maxBytes: 20_971_520, // 20 MB
+    maxBytes: 5_242_880, // 5 MB effective limit (20 MB API cap)
+    maxWidthPx: 2048,
+    maxHeightPx: 2048,
+    maxTotalPixels: 1_572_864, // 1,536 patches × 32²
   },
   file: {
     mimeTypes: ['application/pdf'],
@@ -45,10 +58,27 @@ const OPENAI_INPUT_CONSTRAINTS: InputConstraints = {
   },
 };
 
+// GPT-5.4 and later: 2,500 patches
+//   → 2,500 × 1,024 = 2,560,000 px ≈ 2.5 MP
+//   Same 2048 max-dimension rule applies.
+const GPT54_INPUT_CONSTRAINTS: InputConstraints = {
+  ...OPENAI_INPUT_CONSTRAINTS,
+  image: {
+    mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    maxBytes: 5_242_880,
+    maxWidthPx: 2048,
+    maxHeightPx: 2048,
+    maxTotalPixels: 2_560_000, // 2,500 patches × 32²
+  },
+};
+
 const GOOGLE_INPUT_CONSTRAINTS: InputConstraints = {
   image: {
     mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
     maxBytes: 104_857_600, // 100 MB inline
+    maxWidthPx: 4096,
+    maxHeightPx: 4096,
+    maxTotalPixels: 2_500_000, // 2.5 MP
   },
   file: {
     mimeTypes: ['application/pdf'],
@@ -142,7 +172,7 @@ export const availableModels = [
         video: false,
         file: false,
       },
-      inputConstraints: OPENAI_INPUT_CONSTRAINTS,
+      inputConstraints: GPT54_INPUT_CONSTRAINTS,
       toolCalling: true,
     },
   },

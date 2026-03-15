@@ -98,7 +98,17 @@ export type CustomEndpoint = z.infer<typeof customEndpointSchema>;
 /** Per-modality constraint: accepted MIME types and max inline size */
 const modalityConstraintSchema = z.object({
   mimeTypes: z.array(z.string()),
+  /**
+   * Maximum raw (decoded) file size in bytes. Providers enforce this against
+   * the actual image/file data, not the base64-encoded transport representation.
+   * The image processor compares raw buffer length against this value directly.
+   */
   maxBytes: z.number(),
+  /** Maximum pixels on a single axis (width or height). Images exceeding this are downscaled. */
+  maxWidthPx: z.number().optional(),
+  maxHeightPx: z.number().optional(),
+  /** Maximum total pixel count (width × height). Applied after per-axis limits. */
+  maxTotalPixels: z.number().optional(),
 });
 export type ModalityConstraint = z.infer<typeof modalityConstraintSchema>;
 

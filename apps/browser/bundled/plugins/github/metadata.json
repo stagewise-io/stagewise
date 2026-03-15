@@ -1,0 +1,5 @@
+{
+  "displayName": "GitHub",
+  "description": "Lets the agent interact with GitHub repositories, issues, pull requests, actions, and more via the REST API.",
+  "requiredCredentials": ["github-pat"]
+}

@@ -38,6 +38,7 @@ import { wirePagesHandlers } from './wiring/pages-handler-wiring';
 import { ensureDataDirectories, getRipgrepBasePath } from './utils/paths';
 import { migrateLegacyPaths } from './utils/migrate-legacy-paths';
 import { AssetCacheService } from './services/asset-cache';
+import { ProcessedImageCacheService } from './services/processed-image-cache';
 
 export type MainParameters = {
   launchOptions: {
@@ -299,6 +300,16 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
   );
 
+  let processedImageCacheService: ProcessedImageCacheService | undefined;
+  try {
+    processedImageCacheService =
+      await ProcessedImageCacheService.create(logger);
+  } catch (err) {
+    logger.warn(
+      `[main] ProcessedImageCacheService failed to initialise — image caching disabled: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   const agentManagerService = new AgentManagerService(
     uiKarton,
     telemetryService,
@@ -306,6 +317,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
     modelProviderService,
     assetCacheService,
+    processedImageCacheService,
   );
 
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
@@ -365,6 +377,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     thumbnailService.teardown();
     diffHistoryService.teardown();
     assetCacheService.teardown();
+    processedImageCacheService?.teardown();
     logger.debug('[Main] Services shut down');
   };
 

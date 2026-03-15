@@ -414,6 +414,108 @@ describe('createCredentialFetch — Origin restriction', () => {
 });
 
 // ---------------------------------------------------------------------------
+// createCredentialFetch — Wildcard origin patterns
+// ---------------------------------------------------------------------------
+
+describe('createCredentialFetch — Wildcard origin patterns', () => {
+  let mockFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockFetch = vi.fn().mockResolvedValue(new Response('ok'));
+  });
+
+  it('allows a request matching a single-segment wildcard subdomain', async () => {
+    const secrets = makeSecrets([
+      [TOKEN_PLACEHOLDER, TOKEN_REAL, ['https://*.supabase.co']],
+    ]);
+    const proxied = createCredentialFetch(mockFetch, () => secrets);
+    await proxied(
+      `https://myproject.supabase.co/rest/v1?t=${TOKEN_PLACEHOLDER}`,
+    );
+    expect(mockFetch).toHaveBeenCalled();
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      `https://myproject.supabase.co/rest/v1?t=${TOKEN_REAL}`,
+    );
+  });
+
+  it('allows a request matching a wildcard deeper in the host', async () => {
+    const secrets = makeSecrets([
+      [TOKEN_PLACEHOLDER, TOKEN_REAL, ['https://*.api.example.com']],
+    ]);
+    const proxied = createCredentialFetch(mockFetch, () => secrets);
+    await proxied(`https://us1.api.example.com/v1?t=${TOKEN_PLACEHOLDER}`);
+    expect(mockFetch).toHaveBeenCalled();
+  });
+
+  it('rejects when wildcard segment count does not match', async () => {
+    const secrets = makeSecrets([
+      [TOKEN_PLACEHOLDER, TOKEN_REAL, ['https://*.supabase.co']],
+    ]);
+    const proxied = createCredentialFetch(mockFetch, () => secrets);
+    // sub.sub.supabase.co has 4 segments, pattern has 3 → no match
+    await expect(
+      proxied(`https://sub.sub.supabase.co/v1?t=${TOKEN_PLACEHOLDER}`),
+    ).rejects.toThrow(/not allowed to be sent to/);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects when scheme differs', async () => {
+    const secrets = makeSecrets([
+      [TOKEN_PLACEHOLDER, TOKEN_REAL, ['https://*.example.com']],
+    ]);
+    const proxied = createCredentialFetch(mockFetch, () => secrets);
+    await expect(
+      proxied(`http://api.example.com/v1?t=${TOKEN_PLACEHOLDER}`),
+    ).rejects.toThrow(/not allowed to be sent to/);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects when non-wildcard segments differ', async () => {
+    const secrets = makeSecrets([
+      [TOKEN_PLACEHOLDER, TOKEN_REAL, ['https://*.supabase.co']],
+    ]);
+    const proxied = createCredentialFetch(mockFetch, () => secrets);
+    await expect(
+      proxied(`https://proj.evil.co/v1?t=${TOKEN_PLACEHOLDER}`),
+    ).rejects.toThrow(/not allowed to be sent to/);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('still allows exact matches alongside wildcard patterns', async () => {
+    const secrets = makeSecrets([
+      [
+        TOKEN_PLACEHOLDER,
+        TOKEN_REAL,
+        ['https://api.figma.com', 'https://*.figma.com'],
+      ],
+    ]);
+    const proxied = createCredentialFetch(mockFetch, () => secrets);
+    await proxied(`https://api.figma.com/v1?t=${TOKEN_PLACEHOLDER}`);
+    expect(mockFetch).toHaveBeenCalled();
+  });
+
+  it('matches wildcard with port in pattern', async () => {
+    const secrets = makeSecrets([
+      [TOKEN_PLACEHOLDER, TOKEN_REAL, ['https://*.example.com:8443']],
+    ]);
+    const proxied = createCredentialFetch(mockFetch, () => secrets);
+    await proxied(`https://api.example.com:8443/v1?t=${TOKEN_PLACEHOLDER}`);
+    expect(mockFetch).toHaveBeenCalled();
+  });
+
+  it('rejects when port does not match', async () => {
+    const secrets = makeSecrets([
+      [TOKEN_PLACEHOLDER, TOKEN_REAL, ['https://*.example.com:8443']],
+    ]);
+    const proxied = createCredentialFetch(mockFetch, () => secrets);
+    await expect(
+      proxied(`https://api.example.com:9999/v1?t=${TOKEN_PLACEHOLDER}`),
+    ).rejects.toThrow(/not allowed to be sent to/);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // createCredentialFetch — Redirect safety
 // ---------------------------------------------------------------------------
 

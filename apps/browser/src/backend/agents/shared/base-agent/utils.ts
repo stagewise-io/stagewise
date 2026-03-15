@@ -32,6 +32,9 @@ import xml from 'xml';
 import specialTokens from '../prompts/utils/special-tokens';
 import type { ModelCapabilities } from '@shared/karton-contracts/ui/shared-types';
 import { findModelsAcceptingMime } from '@shared/available-models';
+import { processImageForModel } from './image-processor';
+import type { Logger } from '@/services/logger';
+import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
 
 export type BlobReader = (
   agentId: string,
@@ -93,9 +96,43 @@ function checkConstraint(
   sizeBytes: number,
 ): ConstraintMatch {
   if (!constraint.mimeTypes.includes(mime)) return { mime: false };
-  const base64Size = Math.ceil((sizeBytes * 4) / 3);
-  if (base64Size <= constraint.maxBytes) return { mime: true, size: true };
+  // maxBytes is a raw-byte limit (see ModalityConstraint JSDoc — the image
+  // processor compares raw buffer length directly). Base64 encoding overhead
+  // is a transport concern handled by the AI SDK, not by this gate check.
+  if (sizeBytes <= constraint.maxBytes) return { mime: true, size: true };
   return { mime: true, size: false, maxBytes: constraint.maxBytes };
+}
+
+/**
+ * Determine the MIME type and byte count that the image will have *after*
+ * the image processor runs. For images the processor can always output WebP,
+ * so we check against WebP being in the constraint's mimeTypes and assume
+ * the processor will bring the size within limits (it falls back to ok:false
+ * if it cannot, handled at the call site).
+ *
+ * Returns the effective values to use for the `canModelConsumeAttachment` check.
+ */
+function effectiveMimeAndSize(
+  capabilities: ModelCapabilities | undefined,
+  mediaType: string,
+  sizeBytes: number,
+): { mime: string; size: number } {
+  if (!capabilities) return { mime: mediaType.toLowerCase(), size: sizeBytes };
+  const mime = mediaType.toLowerCase();
+
+  // If it's an image and the model accepts WebP, the processor will convert
+  // to WebP and compress — treat the mime as WebP and size as 0 (will fit
+  // after processing) for the gate check.
+  if (isImageMime(mime)) {
+    const constraint = capabilities.inputConstraints?.image;
+    if (constraint?.mimeTypes.includes('image/webp')) {
+      // The processor will handle size/resolution — skip the size gate here
+      // by reporting 0 bytes so canModelConsumeAttachment only checks modality.
+      return { mime: 'image/webp', size: 0 };
+    }
+  }
+
+  return { mime, size: sizeBytes };
 }
 
 type AttachmentCheck =
@@ -104,9 +141,16 @@ type AttachmentCheck =
 
 /**
  * Runtime check: can the current model consume this attachment as an
- * inline file part?  Uses per-model `inputConstraints` when available,
- * otherwise falls back to conservative defaults for image/file.
- * Video and audio require explicit constraints — no defaults.
+ * inline part?
+ *
+ * For images: the processor will handle MIME conversion, resize, and
+ * compression before this ever reaches the model — so we only gate on
+ * whether the model supports the image modality at all (using the
+ * post-processing effective MIME). Actual size/resolution enforcement is
+ * delegated to `processImageForModel`.
+ *
+ * For non-image files (PDF, video, audio): checked as before — no
+ * processor exists for those types.
  *
  * Returns a rejection reason when the attachment cannot be consumed.
  */
@@ -118,7 +162,18 @@ function canModelConsumeAttachment(
 ): AttachmentCheck {
   if (!capabilities)
     return { canConsume: false, reason: 'Model capabilities unknown.' };
-  const mime = mediaType.toLowerCase();
+
+  // For images: derive the effective MIME/size that will exist *after* the
+  // image processor runs (converter + resize + WebP compression). This way
+  // we only block on "model doesn't support images at all" rather than on
+  // the pre-processing size or MIME. The processor itself handles the rest
+  // and falls back to ok:false when it can't fit the image.
+  const { mime, size: effectiveSize } = effectiveMimeAndSize(
+    capabilities,
+    mediaType,
+    sizeBytes,
+  );
+
   const constraints = capabilities.inputConstraints;
 
   const modalityChecks: {
@@ -152,7 +207,7 @@ function canModelConsumeAttachment(
 
   for (const m of modalityChecks) {
     if (!m.enabled || !m.constraint) continue;
-    const result = checkConstraint(m.constraint, mime, sizeBytes);
+    const result = checkConstraint(m.constraint, mime, effectiveSize);
     if ('size' in result && result.size) return { canConsume: true };
     if ('size' in result && !result.size && !sizeExceeded)
       sizeExceeded = { name: m.name, maxBytes: result.maxBytes };
@@ -161,7 +216,7 @@ function canModelConsumeAttachment(
   if (sizeExceeded) {
     return {
       canConsume: false,
-      reason: `File too large for inline ${sizeExceeded.name} input (${formatMB(sizeBytes)} exceeds ~${formatMB(Math.floor((sizeExceeded.maxBytes * 3) / 4))} limit).`,
+      reason: `File too large for inline ${sizeExceeded.name} input (${formatMB(sizeBytes)} exceeds ${formatMB(sizeExceeded.maxBytes)} limit).`,
     };
   }
 
@@ -239,6 +294,8 @@ async function buildSyntheticUserMessageForAttachments(
   capabilities?: ModelCapabilities,
   onBlobError?: BlobErrorReporter,
   currentModelId?: string,
+  logger?: Logger,
+  imageCache?: ProcessedImageCacheService,
 ): Promise<UserModelMessage> {
   const content: UserContent = [];
 
@@ -274,17 +331,63 @@ async function buildSyntheticUserMessageForAttachments(
     // intentionally not used here.
     if (check.canConsume) {
       try {
-        const buf = await blobReader(agentInstanceId, f.id);
+        const rawBuf = await blobReader(agentInstanceId, f.id);
         if (isImageMime(f.mediaType)) {
-          content.push({
-            type: 'image',
-            image: new Uint8Array(buf),
-            mediaType: f.mediaType,
-          } satisfies ImagePart);
+          // Run the image through the pre-processing pipeline to ensure it
+          // meets the model's resolution and byte-size constraints.
+          const imageConstraint = capabilities?.inputConstraints?.image;
+          const processed = imageConstraint
+            ? await processImageForModel(
+                rawBuf,
+                f.mediaType,
+                imageConstraint,
+                logger,
+                imageCache,
+              )
+            : {
+                ok: true as const,
+                buf: rawBuf,
+                mediaType: f.mediaType,
+                transformed: false,
+              };
+
+          if (processed.ok) {
+            content.push({
+              type: 'image',
+              image: new Uint8Array(processed.buf),
+              mediaType: processed.mediaType,
+            } satisfies ImagePart);
+          } else {
+            // Processor failed (e.g. corrupt image or cannot compress enough).
+            // Replace the earlier hint text-part with a failure notice so the
+            // model understands it cannot see the image.
+            const failReason =
+              processed.error instanceof Error
+                ? processed.error.message
+                : 'Image processing failed.';
+            // Overwrite the last pushed text part (the XML hint) to include
+            // the failure reason.
+            const lastPart = content[content.length - 1];
+            if (lastPart?.type === 'text') {
+              content[content.length - 1] = {
+                type: 'text',
+                text: xml({
+                  [specialTokens.userMsgAttachmentXmlTag]: {
+                    _attr: {
+                      type: 'file',
+                      filename: f.fileName,
+                      id: f.id,
+                      hint: `Image could not be processed for inline delivery: ${failReason} Access via fs.readFile('att/${f.id}') in the sandbox.`,
+                    },
+                  },
+                }),
+              };
+            }
+          }
         } else {
           content.push({
             type: 'file',
-            data: new Uint8Array(buf),
+            data: new Uint8Array(rawBuf),
             mediaType: f.mediaType,
             filename: f.fileName,
           } satisfies FilePart);
@@ -377,6 +480,8 @@ export const convertAgentMessagesToModelMessages = async (
   currentModelId?: string,
   shellInfo?: ShellInfo | null,
   skillDetails?: Map<string, SkillInfo>,
+  logger?: Logger,
+  imageCache?: ProcessedImageCacheService,
 ): Promise<ModelMessage[]> => {
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
@@ -428,6 +533,8 @@ export const convertAgentMessagesToModelMessages = async (
         modelCapabilities,
         onBlobError,
         currentModelId,
+        logger,
+        imageCache,
       );
       // convertUserMessage always returns content as an array of parts
       const content = userMsg.content as (TextPart | ImagePart | FilePart)[];
@@ -475,6 +582,8 @@ export const convertAgentMessagesToModelMessages = async (
             modelCapabilities,
             onBlobError,
             currentModelId,
+            logger,
+            imageCache,
           );
           const attachContent = Array.isArray(attachmentMsg.content)
             ? attachmentMsg.content
@@ -669,6 +778,8 @@ async function convertUserMessage(
   modelCapabilities?: ModelCapabilities,
   onBlobError?: BlobErrorReporter,
   currentModelId?: string,
+  logger?: Logger,
+  imageCache?: ProcessedImageCacheService,
 ): Promise<UserModelMessage> {
   const parts = message.parts.map((part) => {
     if (part.type === 'text')
@@ -692,23 +803,6 @@ async function convertUserMessage(
         f.sizeBytes,
         currentModelId,
       );
-      const hint = check.canConsume
-        ? 'User-attached file. See next part for inline content.'
-        : `${check.reason} Access via fs.readFile('att/${f.id}') in the sandbox.`;
-
-      parts.push({
-        type: 'text',
-        text: xml({
-          [specialTokens.userMsgAttachmentXmlTag]: {
-            _attr: {
-              type: 'file',
-              filename: f.fileName,
-              id: f.id,
-              hint,
-            },
-          },
-        }),
-      });
 
       // NOTE: Attachments are always sent as inline data (Uint8Array), never
       // as URLs. The Vercel AI gateway may route requests to upstream providers
@@ -716,28 +810,100 @@ async function convertUserMessage(
       // AssetCacheService exists for future per-provider URL support but is
       // intentionally not used here.
       if (check.canConsume) {
+        // Build XML hint and inline part together so the hint can reflect
+        // the actual processing outcome (e.g. processor failure).
+        let hint = 'User-attached file. See next part for inline content.';
+        let pushedInlinePart = false;
+
         try {
-          const buf = await blobReader(agentInstanceId, f.id);
+          const rawBuf = await blobReader(agentInstanceId, f.id);
           if (isImageMime(f.mediaType)) {
-            directParts.push({
-              type: 'image',
-              image: new Uint8Array(buf),
-              mediaType: f.mediaType,
-            } satisfies ImagePart);
+            // Run the image through the pre-processing pipeline to ensure it
+            // meets the model's resolution and byte-size constraints.
+            const imageConstraint = modelCapabilities?.inputConstraints?.image;
+            const processed = imageConstraint
+              ? await processImageForModel(
+                  rawBuf,
+                  f.mediaType,
+                  imageConstraint,
+                  logger,
+                  imageCache,
+                )
+              : {
+                  ok: true as const,
+                  buf: rawBuf,
+                  mediaType: f.mediaType,
+                  transformed: false,
+                };
+
+            if (processed.ok) {
+              directParts.push({
+                type: 'image',
+                image: new Uint8Array(processed.buf),
+                mediaType: processed.mediaType,
+              } satisfies ImagePart);
+              pushedInlinePart = true;
+            } else {
+              // Processor failed — fall back to description-only, same as
+              // canConsume:false path below.
+              const failReason =
+                processed.error instanceof Error
+                  ? processed.error.message
+                  : 'Image processing failed.';
+              hint = `Image could not be processed for inline delivery: ${failReason} Access via fs.readFile('att/${f.id}') in the sandbox.`;
+            }
           } else {
             directParts.push({
               type: 'file',
-              data: new Uint8Array(buf),
+              data: new Uint8Array(rawBuf),
               mediaType: f.mediaType,
               filename: f.fileName,
             } satisfies FilePart);
+            pushedInlinePart = true;
           }
         } catch (err) {
           onBlobError?.(err, {
             operation: 'readAttachmentBlob',
             attachmentId: f.id,
           });
+          hint = `Attachment could not be read. Access via fs.readFile('att/${f.id}') in the sandbox.`;
         }
+
+        // Only emit the "see next part" hint when we actually have an inline part.
+        if (!pushedInlinePart) {
+          hint = hint.startsWith('User-attached')
+            ? `Attachment could not be delivered inline. Access via fs.readFile('att/${f.id}') in the sandbox.`
+            : hint;
+        }
+
+        parts.push({
+          type: 'text',
+          text: xml({
+            [specialTokens.userMsgAttachmentXmlTag]: {
+              _attr: {
+                type: 'file',
+                filename: f.fileName,
+                id: f.id,
+                hint,
+              },
+            },
+          }),
+        });
+      } else {
+        // Model cannot consume this attachment at all — describe it as text only.
+        parts.push({
+          type: 'text',
+          text: xml({
+            [specialTokens.userMsgAttachmentXmlTag]: {
+              _attr: {
+                type: 'file',
+                filename: f.fileName,
+                id: f.id,
+                hint: `${check.reason} Access via fs.readFile('att/${f.id}') in the sandbox.`,
+              },
+            },
+          }),
+        });
       }
     }
   }

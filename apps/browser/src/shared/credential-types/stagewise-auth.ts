@@ -13,7 +13,7 @@ export const stagewiseAuthCredentialType: CredentialTypeDefinition<StageWiseAuth
     description:
       'Automatically provided when you are signed in to stagewise. Grants access to the stagewise API.',
     schema,
-    allowedOrigins: ['https://v1.api.stagewise.io', 'llm.stagewise.io'],
+    allowedOrigins: ['https://*.stagewise.io'],
     fieldMetadata: {},
     onGet: async (current) => current,
   };

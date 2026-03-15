@@ -1,4 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@stagewise/stage-ui/components/tooltip';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -43,7 +48,10 @@ function PluginIcon({
   if (logoSvg) {
     return (
       <div
-        className={cn(className, 'overflow-hidden [&>svg]:size-full')}
+        className={cn(
+          className,
+          'overflow-hidden text-foreground [&>svg]:size-full',
+        )}
         dangerouslySetInnerHTML={{ __html: logoSvg }}
       />
     );
@@ -262,14 +270,21 @@ function CredentialFieldInput({
           {metadata.helpUrl ? (
             <div className="flex items-center gap-0">
               {metadata.helpText}
-              <a
-                href={metadata.helpUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(buttonVariants({ variant: 'link', size: 'xs' }))}
-              >
-                (Learn more)
-              </a>
+              <Tooltip>
+                <TooltipTrigger>
+                  <a
+                    href={metadata.helpUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      buttonVariants({ variant: 'link', size: 'xs' }),
+                    )}
+                  >
+                    (Learn more)
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent>{metadata.helpUrl}</TooltipContent>
+              </Tooltip>
             </div>
           ) : (
             metadata.helpText

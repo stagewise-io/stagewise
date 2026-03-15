@@ -1,0 +1,5 @@
+{
+  "displayName": "PostHog",
+  "description": "Lets the agent query analytics, manage feature flags, inspect events and persons, run HogQL queries, and more via the PostHog REST API.",
+  "requiredCredentials": ["posthog-pat"]
+}

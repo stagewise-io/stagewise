@@ -78,6 +78,47 @@ function headerValues(headers: HeadersInit): string[] {
 }
 
 /**
+ * Check whether `origin` matches a single `pattern`.
+ *
+ * Patterns are origin strings (`scheme://host[:port]`) that may contain
+ * `*` as a **whole** dot-separated segment to match exactly one label.
+ *
+ * Examples:
+ * - `'https://api.figma.com'`      — exact match only
+ * - `'https://*.supabase.co'`      — matches `https://xyz.supabase.co`
+ * - `'https://*.api.example.com'`  — matches `https://us1.api.example.com`
+ *
+ * A bare `*` as the entire host (e.g. `'https://*'`) is intentionally
+ * disallowed — every segment of the pattern must correspond to a segment
+ * in the origin.
+ */
+function originMatchesPattern(origin: string, pattern: string): boolean {
+  // Fast path: exact equality (covers all non-wildcard patterns).
+  if (origin === pattern) return true;
+  if (!pattern.includes('*')) return false;
+
+  // Split scheme from host manually to avoid URL normalisation
+  // lowercasing the wildcard placeholder.
+  const pIdx = pattern.indexOf('://');
+  const oIdx = origin.indexOf('://');
+  if (pIdx === -1 || oIdx === -1) return false;
+
+  const pScheme = pattern.slice(0, pIdx);
+  const oScheme = origin.slice(0, oIdx);
+  if (pScheme !== oScheme) return false;
+
+  // Everything after "://" up to the first "/" (or end) is host[:port].
+  const pHostRaw = pattern.slice(pIdx + 3).split('/')[0];
+  const oHostRaw = origin.slice(oIdx + 3).split('/')[0];
+
+  const pParts = pHostRaw.split('.');
+  const oParts = oHostRaw.split('.');
+  if (pParts.length !== oParts.length) return false;
+
+  return pParts.every((seg, i) => seg === '*' || seg === oParts[i]);
+}
+
+/**
  * Validate that every placeholder used in the request is allowed to be
  * sent to `destinationOrigin`. Throws with a descriptive message if any
  * placeholder is disallowed.
@@ -90,7 +131,11 @@ function assertOriginsAllowed(
   for (const placeholder of placeholders) {
     const entry = secrets.get(placeholder);
     if (!entry) continue;
-    if (!entry.allowedOrigins.includes(destinationOrigin)) {
+    if (
+      !entry.allowedOrigins.some((pattern) =>
+        originMatchesPattern(destinationOrigin, pattern),
+      )
+    ) {
       const typeId = placeholder.split(':')[1] ?? 'unknown';
       throw new Error(
         `Credential "${typeId}" is not allowed to be sent to ` +
