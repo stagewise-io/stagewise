@@ -183,6 +183,7 @@ export const ChatInput = ({
         italic: false,
         strike: false,
         code: false,
+        link: false,
         paragraph: {
           HTMLAttributes: {
             class: 'min-h-[1.5em]',
