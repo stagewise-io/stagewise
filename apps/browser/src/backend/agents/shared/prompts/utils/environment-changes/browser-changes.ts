@@ -12,8 +12,8 @@ export function computeBrowserChanges(
 ): EnvironmentChangeEntry[] {
   if (!previous) return [];
 
-  const prevTabs = new Map(previous.tabs.map((t) => [t.handle, t]));
-  const currTabs = new Map(current.tabs.map((t) => [t.handle, t]));
+  const prevTabs = new Map(previous.tabs.map((t) => [t.id, t]));
+  const currTabs = new Map(current.tabs.map((t) => [t.id, t]));
 
   const closed: string[] = [];
   const opened: string[] = [];
@@ -22,32 +22,30 @@ export function computeBrowserChanges(
   const errorChanges: string[] = [];
   const consoleChanges: string[] = [];
 
-  for (const [handle] of prevTabs)
-    if (!currTabs.has(handle)) closed.push(handle);
+  for (const [id] of prevTabs) if (!currTabs.has(id)) closed.push(id);
 
-  for (const [handle, curr] of currTabs) {
-    if (!prevTabs.has(handle)) {
-      opened.push(`${handle} (${curr.url})`);
+  for (const [id, curr] of currTabs) {
+    if (!prevTabs.has(id)) {
+      opened.push(`${id} (${curr.url})`);
       continue;
     }
-    const prev = prevTabs.get(handle)!;
+    const prev = prevTabs.get(id)!;
     if (prev.url !== curr.url)
-      navigated.push(`${handle} (${prev.url} -> ${curr.url})`);
+      navigated.push(`${id} (${prev.url} -> ${curr.url})`);
     if (prev.title !== curr.title)
-      titleChanged.push(`${handle} ("${prev.title}" -> "${curr.title}")`);
+      titleChanged.push(`${id} ("${prev.title}" -> "${curr.title}")`);
 
     const prevErr = prev.error;
     const currErr = curr.error;
     if (JSON.stringify(prevErr) !== JSON.stringify(currErr)) {
       if (!prevErr && currErr)
         errorChanges.push(
-          `${handle}: error ${currErr.code}${currErr.message ? ` - ${currErr.message}` : ''}`,
+          `${id}: error ${currErr.code}${currErr.message ? ` - ${currErr.message}` : ''}`,
         );
-      else if (prevErr && !currErr)
-        errorChanges.push(`${handle}: error cleared`);
+      else if (prevErr && !currErr) errorChanges.push(`${id}: error cleared`);
       else if (prevErr && currErr)
         errorChanges.push(
-          `${handle}: error changed ${prevErr.code} -> ${currErr.code}`,
+          `${id}: error changed ${prevErr.code} -> ${currErr.code}`,
         );
     }
 
@@ -60,7 +58,7 @@ export function computeBrowserChanges(
       if (currLogs > prevLogs) parts.push(`+${currLogs - prevLogs} log(s)`);
       if (currErrors > prevErrors)
         parts.push(`+${currErrors - prevErrors} error(s)`);
-      consoleChanges.push(`${handle}: ${parts.join(', ')}`);
+      consoleChanges.push(`${id}: ${parts.join(', ')}`);
     }
   }
 
@@ -107,13 +105,13 @@ export function computeBrowserChanges(
   }
 
   if (
-    previous.activeTabHandle !== current.activeTabHandle &&
-    current.activeTabHandle !== null
+    previous.activeTabId !== current.activeTabId &&
+    current.activeTabId !== null
   ) {
     const summary =
-      previous.activeTabHandle === null
-        ? `active tab: ${current.activeTabHandle}`
-        : `active tab: ${previous.activeTabHandle} -> ${current.activeTabHandle}`;
+      previous.activeTabId === null
+        ? `active tab: ${current.activeTabId}`
+        : `active tab: ${previous.activeTabId} -> ${current.activeTabId}`;
     changes.push({ type: 'active-tab-changed', summary });
   }
 

@@ -34,7 +34,7 @@ export function renderFullEnvironmentContext(
   if (browser.tabs.length > 0) {
     const tabLines = browser.tabs.map((tab) => {
       const attrs: string[] = [
-        `handle="${tab.handle}"`,
+        `id="${tab.id}"`,
         `title="${esc(tab.title)}"`,
         `url="${esc(tab.url)}"`,
       ];
@@ -48,7 +48,7 @@ export function renderFullEnvironmentContext(
         );
       if (tab.lastFocusedAt)
         attrs.push(`lastActiveAt="${formatTimestamp(tab.lastFocusedAt)}"`);
-      if (tab.handle === browser.activeTabHandle) attrs.push('active="true"');
+      if (tab.id === browser.activeTabId) attrs.push('active="true"');
       return `  <tab ${attrs.join(' ')} />`;
     });
     sections.push(

@@ -3,10 +3,10 @@ import type { BrowserSnapshot } from '@shared/karton-contracts/ui/agent/metadata
 import { computeBrowserChanges } from './browser-changes';
 
 function makeBrowser(
-  tabs: { handle: string; url: string; title: string }[],
-  activeTabHandle: string | null = null,
+  tabs: { id: string; url: string; title: string }[],
+  activeTabId: string | null = null,
 ): BrowserSnapshot {
-  return { tabs, activeTabHandle };
+  return { tabs, activeTabId };
 }
 
 function summaries(
@@ -18,7 +18,7 @@ function summaries(
 describe('computeBrowserChanges', () => {
   it('returns empty array when previous is null', () => {
     const current = makeBrowser(
-      [{ handle: 't_1', url: 'https://a.com', title: 'A' }],
+      [{ id: 't_1', url: 'https://a.com', title: 'A' }],
       't_1',
     );
     expect(computeBrowserChanges(null, current)).toEqual([]);
@@ -26,7 +26,7 @@ describe('computeBrowserChanges', () => {
 
   it('returns empty array when nothing changed', () => {
     const snap = makeBrowser(
-      [{ handle: 't_1', url: 'https://a.com', title: 'A' }],
+      [{ id: 't_1', url: 'https://a.com', title: 'A' }],
       't_1',
     );
     expect(computeBrowserChanges(snap, snap)).toEqual([]);
@@ -34,11 +34,11 @@ describe('computeBrowserChanges', () => {
 
   it('detects a closed tab (singular)', () => {
     const previous = makeBrowser([
-      { handle: 't_1', url: 'https://a.com', title: 'Tab A' },
-      { handle: 't_2', url: 'https://b.com', title: 'Tab B' },
+      { id: 't_1', url: 'https://a.com', title: 'Tab A' },
+      { id: 't_2', url: 'https://b.com', title: 'Tab B' },
     ]);
     const current = makeBrowser([
-      { handle: 't_1', url: 'https://a.com', title: 'Tab A' },
+      { id: 't_1', url: 'https://a.com', title: 'Tab A' },
     ]);
     const result = summaries(computeBrowserChanges(previous, current));
     expect(result).toContain('tab closed: [t_2]');
@@ -46,12 +46,12 @@ describe('computeBrowserChanges', () => {
 
   it('detects multiple closed tabs (plural)', () => {
     const previous = makeBrowser([
-      { handle: 't_1', url: 'https://a.com', title: 'A' },
-      { handle: 't_2', url: 'https://b.com', title: 'B' },
-      { handle: 't_3', url: 'https://c.com', title: 'C' },
+      { id: 't_1', url: 'https://a.com', title: 'A' },
+      { id: 't_2', url: 'https://b.com', title: 'B' },
+      { id: 't_3', url: 'https://c.com', title: 'C' },
     ]);
     const current = makeBrowser([
-      { handle: 't_1', url: 'https://a.com', title: 'A' },
+      { id: 't_1', url: 'https://a.com', title: 'A' },
     ]);
     const result = summaries(computeBrowserChanges(previous, current));
     expect(result).toContain('tabs closed: [t_2, t_3]');
@@ -59,11 +59,11 @@ describe('computeBrowserChanges', () => {
 
   it('detects a new tab (singular)', () => {
     const previous = makeBrowser([
-      { handle: 't_1', url: 'https://a.com', title: 'A' },
+      { id: 't_1', url: 'https://a.com', title: 'A' },
     ]);
     const current = makeBrowser([
-      { handle: 't_1', url: 'https://a.com', title: 'A' },
-      { handle: 't_2', url: 'https://b.com', title: 'B' },
+      { id: 't_1', url: 'https://a.com', title: 'A' },
+      { id: 't_2', url: 'https://b.com', title: 'B' },
     ]);
     const result = summaries(computeBrowserChanges(previous, current));
     expect(result).toContain('new tab opened: [t_2 (https://b.com)]');
@@ -71,10 +71,10 @@ describe('computeBrowserChanges', () => {
 
   it('detects tab navigation', () => {
     const previous = makeBrowser([
-      { handle: 't_1', url: 'https://a.com', title: 'A' },
+      { id: 't_1', url: 'https://a.com', title: 'A' },
     ]);
     const current = makeBrowser([
-      { handle: 't_1', url: 'https://b.com', title: 'B' },
+      { id: 't_1', url: 'https://b.com', title: 'B' },
     ]);
     const result = summaries(computeBrowserChanges(previous, current));
     expect(result).toContain(
@@ -85,15 +85,15 @@ describe('computeBrowserChanges', () => {
   it('detects active tab change', () => {
     const previous = makeBrowser(
       [
-        { handle: 't_1', url: 'https://a.com', title: 'A' },
-        { handle: 't_2', url: 'https://b.com', title: 'B' },
+        { id: 't_1', url: 'https://a.com', title: 'A' },
+        { id: 't_2', url: 'https://b.com', title: 'B' },
       ],
       't_1',
     );
     const current = makeBrowser(
       [
-        { handle: 't_1', url: 'https://a.com', title: 'A' },
-        { handle: 't_2', url: 'https://b.com', title: 'B' },
+        { id: 't_1', url: 'https://a.com', title: 'A' },
+        { id: 't_2', url: 'https://b.com', title: 'B' },
       ],
       't_2',
     );
@@ -103,11 +103,11 @@ describe('computeBrowserChanges', () => {
 
   it('detects active tab set from null', () => {
     const previous = makeBrowser(
-      [{ handle: 't_1', url: 'https://a.com', title: 'A' }],
+      [{ id: 't_1', url: 'https://a.com', title: 'A' }],
       null,
     );
     const current = makeBrowser(
-      [{ handle: 't_1', url: 'https://a.com', title: 'A' }],
+      [{ id: 't_1', url: 'https://a.com', title: 'A' }],
       't_1',
     );
     const result = summaries(computeBrowserChanges(previous, current));
@@ -116,7 +116,7 @@ describe('computeBrowserChanges', () => {
 
   it('does not report active tab change when it becomes null', () => {
     const previous = makeBrowser(
-      [{ handle: 't_1', url: 'https://a.com', title: 'A' }],
+      [{ id: 't_1', url: 'https://a.com', title: 'A' }],
       't_1',
     );
     const current = makeBrowser([], null);
@@ -128,19 +128,19 @@ describe('computeBrowserChanges', () => {
   it('handles multiple simultaneous changes', () => {
     const previous = makeBrowser(
       [
-        { handle: 't_1', url: 'https://a.com', title: 'A' },
-        { handle: 't_2', url: 'https://b.com', title: 'B' },
+        { id: 't_1', url: 'https://a.com', title: 'A' },
+        { id: 't_2', url: 'https://b.com', title: 'B' },
       ],
       't_1',
     );
     const current = makeBrowser(
       [
         {
-          handle: 't_2',
+          id: 't_2',
           url: 'https://b2.com',
           title: 'B2',
         },
-        { handle: 't_3', url: 'https://c.com', title: 'C' },
+        { id: 't_3', url: 'https://c.com', title: 'C' },
       ],
       't_3',
     );

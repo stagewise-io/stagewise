@@ -7,9 +7,7 @@ import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import type { TabMentionMeta } from '@shared/karton-contracts/ui/agent/metadata';
 
 interface TabMentionBadgeProps {
-  /** Tab handle (e.g. "t_1"). Null when meta was lost in markdown round-trip. */
-  handle: string | null;
-  /** Tab UUID — always available from the mention node's id attr. */
+  /** Tab ID — always available from the mention node's id attr. */
   tabId?: string;
   /** Direct meta from @-mention node attrs (takes priority over context lookup) */
   meta?: TabMentionMeta | null;
@@ -49,7 +47,6 @@ function TabFaviconMini({
 }
 
 export function TabMentionBadge({
-  handle,
   tabId,
   meta,
   selected = false,
@@ -62,13 +59,7 @@ export function TabMentionBadge({
   const createTab = useKartonProcedure((p) => p.browser.createTab);
 
   const liveTab = useKartonState((s) => {
-    const tabs = s.browser.tabs;
-    if (handle) {
-      for (const id in tabs) {
-        if (tabs[id]?.handle === handle) return tabs[id];
-      }
-    }
-    if (tabId && tabs[tabId]) return tabs[tabId]!;
+    if (tabId && s.browser.tabs[tabId]) return s.browser.tabs[tabId]!;
     return null;
   });
 
@@ -82,19 +73,6 @@ export function TabMentionBadge({
         isOpen: true,
         tabId: liveTab.id,
       };
-    }
-
-    if (handle) {
-      const snapshot = tabSnapshots?.get(handle);
-      if (snapshot) {
-        return {
-          title: snapshot.title,
-          url: snapshot.url,
-          faviconUrl: snapshot.faviconUrl,
-          isOpen: false,
-          tabId: null,
-        };
-      }
     }
 
     if (tabId) {
@@ -121,19 +99,19 @@ export function TabMentionBadge({
     }
 
     return null;
-  }, [liveTab, tabSnapshots, handle, tabId, meta]);
+  }, [liveTab, tabSnapshots, tabId, meta]);
 
   const displayLabel = useMemo(() => {
-    if (!tabData) return handle ?? tabId ?? '?';
+    if (!tabData) return tabId ?? '?';
     const title = tabData.title;
     if (title && title.length > 24) return `${title.slice(0, 24)}...`;
-    return title || handle || tabId || '?';
-  }, [tabData, handle, tabId]);
+    return title || tabId || '?';
+  }, [tabData, tabId]);
 
   const tooltipContent = useMemo(() => {
-    if (!tabData) return handle ?? tabId ?? '';
+    if (!tabData) return tabId ?? '';
     return tabData.url ?? '';
-  }, [tabData, handle, tabId]);
+  }, [tabData, tabId]);
 
   const handleClick = useCallback(() => {
     if (!tabData) return;

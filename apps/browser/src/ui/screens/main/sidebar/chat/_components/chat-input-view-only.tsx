@@ -105,7 +105,7 @@ export function ChatInputViewOnly({
  */
 function getNodeKey(node: TiptapNode, index: number): string {
   const id = node.attrs?.id;
-  if (typeof id === 'string' && id) return `${node.type}-${id}`;
+  if (typeof id === 'string' && id) return `${node.type}-${id}-${index}`;
 
   return `${node.type}-${index}`;
 }

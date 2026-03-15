@@ -31,7 +31,6 @@ export const tabProvider: MentionProvider = {
       meta: {
         providerType: 'tab' as const,
         tabId,
-        tabHandle: tab.handle,
         url: tab.url,
         title: tab.title,
         faviconUrl: tab.faviconUrls?.[0],

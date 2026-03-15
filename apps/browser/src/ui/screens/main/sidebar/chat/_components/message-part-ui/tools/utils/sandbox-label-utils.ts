@@ -5,7 +5,7 @@ import { getBaseName } from '@shared/path-utils';
  * Represents a parsed CDP call extracted from a sandbox script.
  */
 export interface ParsedCDPCall {
-  tabHandle: string;
+  tabId: string;
   method: string;
 }
 
@@ -163,7 +163,7 @@ const CDP_METHOD_LABELS: Record<
  * Matches patterns like: API.sendCDP("t_1", "CSS.getComputedStyleForNode", ...)
  */
 export function parseCDPCalls(script: string): ParsedCDPCall[] {
-  // Regex to match API.sendCDP("tabHandle", "Method.name", ...)
+  // Regex to match API.sendCDP("tabId", "Method.name", ...)
   // Supports both single and double quotes
   const regex = /API\.sendCDP\s*\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']/g;
   const calls: ParsedCDPCall[] = [];
@@ -171,7 +171,7 @@ export function parseCDPCalls(script: string): ParsedCDPCall[] {
   let match = regex.exec(script);
   while (match !== null) {
     calls.push({
-      tabHandle: match[1]!,
+      tabId: match[1]!,
       method: match[2]!,
     });
     match = regex.exec(script);
@@ -312,14 +312,14 @@ export function getMethodLabel(
 }
 
 /**
- * Resolves a tab handle (e.g., "t_1") to its hostname.
+ * Resolves a tab ID to its hostname.
  * Returns undefined if the tab is not found or URL parsing fails.
  */
 export function resolveTabHostname(
-  tabHandle: string,
+  tabId: string,
   activeTabs: Record<string, TabState>,
 ): string | undefined {
-  const tab = Object.values(activeTabs).find((t) => t.handle === tabHandle);
+  const tab = activeTabs[tabId];
   if (!tab) return undefined;
 
   try {
@@ -431,16 +431,14 @@ export function getSandboxLabel(
   }
 
   // 5. CDP calls
-  const uniqueTabHandles = Array.from(
-    new Set(cdpCalls.map((c) => c.tabHandle)),
-  );
+  const uniqueTabIds = Array.from(new Set(cdpCalls.map((c) => c.tabId)));
 
-  if (uniqueTabHandles.length > 1)
+  if (uniqueTabIds.length > 1)
     return isInProgress
-      ? `Running a script on ${uniqueTabHandles.length} tabs...`
-      : `Ran a script on ${uniqueTabHandles.length} tabs`;
+      ? `Running a script on ${uniqueTabIds.length} tabs...`
+      : `Ran a script on ${uniqueTabIds.length} tabs`;
 
-  const hostname = resolveTabHostname(uniqueTabHandles[0]!, activeTabs);
+  const hostname = resolveTabHostname(uniqueTabIds[0]!, activeTabs);
   const latestMethod = cdpCalls[cdpCalls.length - 1]!.method;
   const { label, preposition } = getMethodLabel(latestMethod, isInProgress);
   const suffix = hostname ? ` ${preposition} ${hostname}` : '';

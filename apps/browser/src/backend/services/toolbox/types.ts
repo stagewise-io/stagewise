@@ -17,7 +17,6 @@ export type BrowserTabInfo = {
   error: { code: number; message?: string } | null;
   consoleLogCount: number;
   consoleErrorCount: number;
-  handle: string;
   faviconUrl?: string;
 };
 

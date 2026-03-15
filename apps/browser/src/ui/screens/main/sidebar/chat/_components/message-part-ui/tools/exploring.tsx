@@ -366,7 +366,7 @@ export const ExploringToolParts = ({
 
           if (cdpCalls.length > 0) {
             for (const call of cdpCalls) {
-              const hostname = resolveTabHostname(call.tabHandle, activeTabs);
+              const hostname = resolveTabHostname(call.tabId, activeTabs);
               if (hostname) inspectedHostnames.add(hostname);
 
               if (call.method === 'Page.captureScreenshot') screenshotsTaken++;
@@ -588,9 +588,7 @@ export const ExploringToolParts = ({
           AgentToolUIPart,
           { type: 'tool-readConsoleLogsTool' }
         >;
-        const tab = Object.values(activeTabs).find(
-          (tab) => tab.handle === p.input?.id,
-        );
+        const tab = activeTabs[p.input?.id ?? ''];
         if (!tab) return 'Exploring the browser...';
         const hostname = new URL(tab.url).hostname;
         return `Reading logs from ${hostname}...`;

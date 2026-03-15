@@ -151,7 +151,7 @@ export const convertAgentMessagesToCompactMessageHistoryString = (
         if (m.providerType === 'file')
           return `[MENTIONED FILE: Path:'${m.relativePath}'${m.isDirectory ? ', Directory' : ''}]`;
         if (m.providerType === 'tab')
-          return `[MENTIONED TAB: Handle:'${m.tabHandle}', URL:'${m.url}']`;
+          return `[MENTIONED TAB: Id:'${m.tabId}', URL:'${m.url}']`;
         return `[MENTIONED WORKSPACE: Prefix:'${m.prefix}', Path:'${m.path}']`;
       });
 

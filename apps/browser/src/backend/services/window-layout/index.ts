@@ -2,7 +2,7 @@ import { BaseWindow, app, ipcMain, nativeTheme, session } from 'electron';
 import path from 'node:path';
 import type { SelectedElement } from '@shared/karton-contracts/ui';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
-import { randomUUID } from 'node:crypto';
+import { generateTabId } from './tab-id';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
@@ -785,7 +785,7 @@ export class WindowLayoutService extends DisposableService {
     setActive: boolean,
     sourceTabId?: string,
   ): Promise<string> {
-    const id = randomUUID();
+    const id = generateTabId(new Set(Object.keys(this.tabs)));
 
     // Create search utilities config that reads from current Karton state and preferences
     const searchUtilsConfig: SearchUtilsConfig = {
@@ -1894,32 +1894,24 @@ export class WindowLayoutService extends DisposableService {
   // =========================================================================
 
   /**
-   * Resolves a tab handle (e.g., "t_1") or UUID to a TabController instance.
-   * Handles can be used by the agent for easier addressing.
+   * Resolves a tab ID to a TabController instance.
    *
-   * @param tabHandleOrId - Either a handle like "t_1" or a UUID
+   * @param tabId - The tab ID (e.g., "t_k7m2xp")
    * @returns The TabController instance or null if not found
    */
-  private resolveTabByHandleOrId(tabHandleOrId: string): TabController | null {
-    // First, try direct ID lookup (for UUIDs)
-    if (this.tabs[tabHandleOrId]) return this.tabs[tabHandleOrId];
-
-    // Then, try to find by handle
-    for (const tab of Object.values(this.tabs))
-      if (tab.handle === tabHandleOrId) return tab;
-
-    return null;
+  private resolveTabById(tabId: string): TabController | null {
+    return this.tabs[tabId] ?? null;
   }
 
   public async sendCDP(
-    tabHandleOrId: string,
+    tabId: string,
     method: string,
     params: any,
   ): Promise<any> {
-    const tab = this.resolveTabByHandleOrId(tabHandleOrId);
+    const tab = this.resolveTabById(tabId);
     if (!tab)
       throw new Error(
-        `Tab not found: "${tabHandleOrId}". Check browser-information for available tabs.`,
+        `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       );
 
     return await tab.sendCDP(method, params);
@@ -1930,14 +1922,14 @@ export class WindowLayoutService extends DisposableService {
    * Returns an unsubscribe function to remove the listener.
    */
   public subscribeCDPEvent(
-    tabHandleOrId: string,
+    tabId: string,
     event: string,
     callback: (params: unknown) => void,
   ): () => void {
-    const tab = this.resolveTabByHandleOrId(tabHandleOrId);
+    const tab = this.resolveTabById(tabId);
     if (!tab)
       throw new Error(
-        `Tab not found: "${tabHandleOrId}". Check browser-information for available tabs.`,
+        `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       );
 
     return tab.subscribeCDPEvent(event, callback);
@@ -1947,19 +1939,19 @@ export class WindowLayoutService extends DisposableService {
    * Executes a JavaScript expression in the console of the specified tab.
    *
    * @param expression - The JavaScript expression to execute
-   * @param tabHandleOrId - Tab handle (e.g., "t_1") or UUID to execute the script on
+   * @param tabId - The tab ID to execute the script on
    * @returns An object with success status and either the result or an error message
    */
   public async executeConsoleScript(
     expression: string,
-    tabHandleOrId: string,
+    tabId: string,
   ): Promise<{ success: boolean; result?: any; error?: string }> {
-    const tab = this.resolveTabByHandleOrId(tabHandleOrId);
+    const tab = this.resolveTabById(tabId);
 
     if (!tab) {
       return {
         success: false,
-        error: `Tab not found: "${tabHandleOrId}". Check browser-information for available tabs.`,
+        error: `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       };
     }
 
@@ -1969,12 +1961,12 @@ export class WindowLayoutService extends DisposableService {
   /**
    * Gets console logs from the specified tab with optional filtering.
    *
-   * @param tabHandleOrId - Tab handle (e.g., "t_1") or UUID to get logs from
+   * @param tabId - The tab ID to get logs from
    * @param options - Optional filter and limit options
    * @returns An object with success status and either the logs or an error message
    */
   public getConsoleLogs(
-    tabHandleOrId: string,
+    tabId: string,
     options?: GetConsoleLogsOptions,
   ): {
     success: boolean;
@@ -1982,12 +1974,12 @@ export class WindowLayoutService extends DisposableService {
     totalCount?: number;
     error?: string;
   } {
-    const tab = this.resolveTabByHandleOrId(tabHandleOrId);
+    const tab = this.resolveTabById(tabId);
 
     if (!tab) {
       return {
         success: false,
-        error: `Tab not found: "${tabHandleOrId}". Check browser-information for available tabs.`,
+        error: `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       };
     }
 
@@ -2004,19 +1996,19 @@ export class WindowLayoutService extends DisposableService {
   /**
    * Clears console logs for the specified tab.
    *
-   * @param tabHandleOrId - Tab handle (e.g., "t_1") or UUID to clear logs for
+   * @param tabId - The tab ID to clear logs for
    * @returns An object with success status or an error message
    */
-  public clearConsoleLogs(tabHandleOrId: string): {
+  public clearConsoleLogs(tabId: string): {
     success: boolean;
     error?: string;
   } {
-    const tab = this.resolveTabByHandleOrId(tabHandleOrId);
+    const tab = this.resolveTabById(tabId);
 
     if (!tab) {
       return {
         success: false,
-        error: `Tab not found: "${tabHandleOrId}". Check browser-information for available tabs.`,
+        error: `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       };
     }
 

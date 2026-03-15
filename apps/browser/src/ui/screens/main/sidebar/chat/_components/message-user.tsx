@@ -681,7 +681,7 @@ export const MessageUser = memo(
                         open={isConfirmOpen}
                         onOpenChange={setIsConfirmOpen}
                       >
-                        <PopoverTrigger>
+                        <PopoverTrigger nativeButton={false}>
                           <span className="pointer-events-none absolute right-0 bottom-0 size-8" />
                         </PopoverTrigger>
                         <PopoverContent>

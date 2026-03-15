@@ -109,7 +109,7 @@ export type AttachmentLinkData =
       lineNumber?: string;
       incomplete?: boolean;
     }
-  | { type: 'tab'; handle: string }
+  | { type: 'tab'; id: string }
   | { type: 'workspace'; prefix: string }
   | { type: 'mention'; providerType: string; id: string; label?: string };
 
@@ -141,7 +141,7 @@ const ATTACHMENT_LINK_PATTERNS: Array<{
   },
   {
     prefix: 'tab:',
-    parse: (rest) => ({ type: 'tab', handle: rest }),
+    parse: (rest) => ({ type: 'tab', id: rest }),
   },
   {
     prefix: 'workspace:',
@@ -263,7 +263,7 @@ export function getAttachmentKey(linkData: AttachmentLinkData): string {
     case 'color':
       return `color-${linkData.color}`;
     case 'tab':
-      return `tab-${linkData.handle}`;
+      return `tab-${linkData.id}`;
     case 'workspace':
       return `workspace-${linkData.prefix}`;
     case 'mention':
@@ -497,7 +497,7 @@ export const AttachmentLinkRouter = ({
     case 'color':
       return <ColorBadge color={linkData.color} />;
     case 'tab':
-      return <TabMentionBadge handle={linkData.handle} />;
+      return <TabMentionBadge tabId={linkData.id} />;
     case 'workspace':
       return <WorkspaceMentionBadge prefix={linkData.prefix} />;
     case 'mention':

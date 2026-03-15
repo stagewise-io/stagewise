@@ -42,9 +42,7 @@ export const ReadConsoleLogsToolPart = ({
   });
 
   const tab = useMemo(() => {
-    return Object.values(activeTabs).find(
-      (tab) => tab.handle === part.input?.id,
-    );
+    return activeTabs[part.input?.id ?? ''];
   }, [part.input?.id, activeTabs]);
 
   const hostname = useMemo(() => {

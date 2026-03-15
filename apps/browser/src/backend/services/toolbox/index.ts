@@ -572,7 +572,6 @@ export class ToolboxService extends DisposableService {
           : null,
         consoleLogCount: tab.consoleLogCount,
         consoleErrorCount: tab.consoleErrorCount,
-        handle: tab.handle,
         faviconUrl: tab.faviconUrls?.[0],
         lastFocusedAt: tab.lastFocusedAt,
       }));
@@ -586,7 +585,6 @@ export class ToolboxService extends DisposableService {
             error: activeTab.error,
             consoleLogCount: activeTab.consoleLogCount,
             consoleErrorCount: activeTab.consoleErrorCount,
-            handle: activeTab.handle,
           }
         : null,
       tabs: allTabs,
@@ -647,7 +645,7 @@ export class ToolboxService extends DisposableService {
     const snapshot: EnvironmentSnapshot = {
       browser: {
         tabs: browserState.tabs.map((t) => ({
-          handle: t.handle,
+          id: t.id,
           url: t.url,
           title: t.title,
           consoleErrorCount: t.consoleErrorCount,
@@ -655,7 +653,7 @@ export class ToolboxService extends DisposableService {
           error: t.error,
           lastFocusedAt: t.lastFocusedAt,
         })),
-        activeTabHandle: browserState.activeTab?.handle ?? null,
+        activeTabId: browserState.activeTab?.id ?? null,
       },
       workspace: { mounts: allMounts },
       fileDiffs: toolboxState

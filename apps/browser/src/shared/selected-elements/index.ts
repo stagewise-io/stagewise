@@ -34,7 +34,6 @@ const baseSelectedElementSchema = z.object({
   frameTitle: z.string().nullable().optional(),
   backendNodeId: z.number().optional(),
   tabId: z.string().optional(),
-  tabHandle: z.string().optional(), // Human-readable handle for CDP (e.g., "t_1")
   codeMetadata: z
     .array(
       z.object({

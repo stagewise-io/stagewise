@@ -35,7 +35,7 @@ export const textClipAttachmentSchema = z.object({
 export type TextClipAttachment = z.infer<typeof textClipAttachmentSchema>;
 
 export const browserTabSnapshotSchema = z.object({
-  handle: z.string(),
+  id: z.string(),
   url: z.string(),
   title: z.string(),
   faviconUrl: z.string().optional(),
@@ -55,7 +55,7 @@ export type BrowserTabSnapshot = z.infer<typeof browserTabSnapshotSchema>;
 
 export const browserSnapshotSchema = z.object({
   tabs: z.array(browserTabSnapshotSchema),
-  activeTabHandle: z.string().nullable(),
+  activeTabId: z.string().nullable(),
 });
 
 export type BrowserSnapshot = z.infer<typeof browserSnapshotSchema>;
@@ -107,10 +107,8 @@ export type FileMentionMeta = z.infer<typeof fileMentionMetaSchema>;
 
 export const tabMentionMetaSchema = z.object({
   providerType: z.literal('tab'),
-  /** Internal tab ID */
+  /** Tab ID */
   tabId: z.string(),
-  /** LLM-visible handle, e.g. "t_1" */
-  tabHandle: z.string(),
   /** Tab URL at mention time */
   url: z.string(),
   /** Tab title at mention time */

@@ -22,7 +22,7 @@ export function mentionToContextSnippet(mention: MentionMeta): string {
       [specialTokens.userMsgAttachmentXmlTag]: {
         _attr: {
           type: 'tab-mention',
-          'tab-handle': mention.tabHandle,
+          'tab-id': mention.tabId,
           url: mention.url,
           title: mention.title,
         },

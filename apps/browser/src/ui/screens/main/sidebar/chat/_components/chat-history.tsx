@@ -413,30 +413,26 @@ export const ChatHistory = () => {
     const tabsByKey = new Map<string, BrowserTabSnapshot>();
     for (const msg of filteredMessages) {
       const tabs = msg?.metadata?.environmentSnapshot?.browser?.tabs;
-      if (tabs) for (const tab of tabs) tabsByKey.set(tab.handle, tab);
+      if (tabs) for (const tab of tabs) tabsByKey.set(tab.id, tab);
 
       const mentions = msg?.metadata?.mentions;
       if (mentions) {
         for (const m of mentions) {
           if (m.providerType !== 'tab') continue;
           const snapshot: BrowserTabSnapshot = {
-            handle: m.tabHandle,
+            id: m.tabId,
             url: m.url,
             title: m.title,
             faviconUrl: m.faviconUrl,
           };
-          const existing = tabsByKey.get(m.tabHandle);
+          const existing = tabsByKey.get(m.tabId);
           if (existing) {
             if (m.faviconUrl && !existing.faviconUrl)
-              tabsByKey.set(m.tabHandle, {
+              tabsByKey.set(m.tabId, {
                 ...existing,
                 faviconUrl: m.faviconUrl,
               });
-          } else tabsByKey.set(m.tabHandle, snapshot);
-
-          // Also index by tabId (UUID) so user-mentions that lost
-          // their handle during markdown round-trip can still resolve.
-          tabsByKey.set(m.tabId, tabsByKey.get(m.tabHandle) ?? snapshot);
+          } else tabsByKey.set(m.tabId, snapshot);
         }
       }
     }

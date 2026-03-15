@@ -230,7 +230,7 @@ function serializeSelectedElementPart(
   const frameChildNode: xml.XmlObject = {
     frame: {
       _attr: {
-        tabHandle: element.tabHandle ?? 'unknown',
+        tabId: element.tabId ?? 'unknown',
         frameId: element.frameId ?? 'unknown',
         backendNodeId: element.backendNodeId ?? 'unknown',
         isMainFrame: element.isMainFrame ?? 'unknown',

@@ -28,12 +28,9 @@ export function MentionNodeView(props: InlineNodeViewProps) {
   );
 
   if (isTab) {
-    const tabHandle =
-      attrs.meta?.providerType === 'tab' ? attrs.meta.tabHandle : null;
     const tabMeta = attrs.meta?.providerType === 'tab' ? attrs.meta : null;
     return (
       <TabMentionBadge
-        handle={tabHandle}
         tabId={attrs.id}
         meta={tabMeta}
         selected={props.selected}

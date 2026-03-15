@@ -373,7 +373,6 @@ export type TabState = {
   isSearchBarActive: boolean; // Whether the search bar UI is active for this tab
   zoomPercentage: number; // Page zoom level as percentage (100 = default)
   lastFocusedAt: number; // Timestamp (Date.now()) of when this tab was last focused
-  handle: string; // Human-readable handle for LLM addressing (e.g., t_1, t_2)
   consoleLogCount: number; // Total number of console logs captured since page load
   consoleErrorCount: number; // Number of error-level console logs
   /** Pending permission requests for this tab */
