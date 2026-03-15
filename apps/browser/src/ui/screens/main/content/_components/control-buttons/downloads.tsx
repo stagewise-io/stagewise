@@ -1,4 +1,4 @@
-import { Fragment, useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Tooltip,
   TooltipTrigger,
@@ -142,7 +142,7 @@ function DownloadItemRow({
 
   return (
     <div
-      className={`group relative flex cursor-pointer select-none flex-col gap-1 overflow-hidden rounded-lg bg-background px-1.5 py-1.5 hover:bg-hover-derived ${
+      className={`group relative flex cursor-pointer select-none flex-col overflow-hidden rounded-lg px-2 py-1.5 hover:bg-hover-derived ${
         download.isActive || isComplete ? '' : 'opacity-60'
       }`}
       onClick={handleRowClick}
@@ -422,21 +422,17 @@ export function DownloadsControlButton({ isActive }: { isActive: boolean }) {
               <span className="text-sm">No downloads</span>
             </div>
           ) : (
-            items.map((download, index) => (
-              <Fragment key={download.id}>
-                <DownloadItemRow
-                  download={download}
-                  onPause={handlePause}
-                  onResume={handleResume}
-                  onCancel={handleCancel}
-                  onOpenFile={handleOpenFile}
-                  onShowInFolder={handleShowInFolder}
-                  onDelete={handleDelete}
-                />
-                {index < items.length - 1 && (
-                  <hr className="w-full border-derived border-b bg-background" />
-                )}
-              </Fragment>
+            items.map((download) => (
+              <DownloadItemRow
+                key={download.id}
+                download={download}
+                onPause={handlePause}
+                onResume={handleResume}
+                onCancel={handleCancel}
+                onOpenFile={handleOpenFile}
+                onShowInFolder={handleShowInFolder}
+                onDelete={handleDelete}
+              />
             ))
           )}
         </OverlayScrollbar>

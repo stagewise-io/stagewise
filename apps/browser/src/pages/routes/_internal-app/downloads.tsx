@@ -49,7 +49,8 @@ export const Route = createFileRoute('/_internal-app/downloads')({
 
 const PAGE_SIZE = 50;
 const DATE_HEADER_HEIGHT = 64;
-const ENTRY_ROW_HEIGHT = 80;
+const ENTRY_ROW_HEIGHT = 56;
+const ACTIVE_ENTRY_ROW_HEIGHT = 80;
 
 type DateHeaderRow = {
   type: 'date-header';
@@ -349,7 +350,7 @@ function RowComponent({
         <SpeedGraph speedHistory={row.speedHistory} startTime={row.startTime} />
       )}
       <div
-        className={`group relative z-10 flex h-full cursor-pointer select-none flex-col justify-center gap-2 rounded-lg bg-background px-4 ${
+        className={`group relative z-10 flex h-full cursor-pointer select-none flex-col justify-center rounded-lg px-3 ${
           row.fileExists || row.isActive
             ? 'hover:bg-hover-derived'
             : 'opacity-60'
@@ -360,7 +361,7 @@ function RowComponent({
           }
         }}
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <IconDownloadFill18 className="size-4 shrink-0 text-muted-foreground" />
           <div className="flex-1 truncate">
             <div className="flex items-center gap-2">
@@ -510,7 +511,7 @@ function RowComponent({
 
         {/* Progress bar for active downloads */}
         {row.isActive && (
-          <div className="ml-8 flex items-center gap-2">
+          <div className="mt-1.5 ml-7 flex items-center gap-2">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/10">
               {row.totalBytes > 0 ? (
                 // Determinate progress bar
@@ -833,7 +834,8 @@ function Page() {
         return ENTRY_ROW_HEIGHT;
       }
       const row = rows[index]!;
-      return row.type === 'date-header' ? DATE_HEADER_HEIGHT : ENTRY_ROW_HEIGHT;
+      if (row.type === 'date-header') return DATE_HEADER_HEIGHT;
+      return row.isActive ? ACTIVE_ENTRY_ROW_HEIGHT : ENTRY_ROW_HEIGHT;
     },
     [rows],
   );
