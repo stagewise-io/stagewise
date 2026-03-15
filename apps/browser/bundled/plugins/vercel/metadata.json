@@ -1,0 +1,5 @@
+{
+  "displayName": "Vercel",
+  "description": "Lets the agent manage deployments, inspect logs, and interact with the Vercel API on your behalf.",
+  "requiredCredentials": ["vercel-pat"]
+}

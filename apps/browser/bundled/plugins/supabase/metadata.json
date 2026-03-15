@@ -1,0 +1,5 @@
+{
+  "displayName": "Supabase",
+  "description": "Lets the agent interact with Supabase projects via the Management API — run SQL queries, list projects, manage edge functions, secrets, migrations, and more.",
+  "requiredCredentials": ["supabase-pat"]
+}
