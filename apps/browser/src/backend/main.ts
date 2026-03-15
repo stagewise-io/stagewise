@@ -300,8 +300,15 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
   );
 
-  const processedImageCacheService =
-    await ProcessedImageCacheService.create(logger);
+  let processedImageCacheService: ProcessedImageCacheService | undefined;
+  try {
+    processedImageCacheService =
+      await ProcessedImageCacheService.create(logger);
+  } catch (err) {
+    logger.warn(
+      `[main] ProcessedImageCacheService failed to initialise — image caching disabled: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 
   const agentManagerService = new AgentManagerService(
     uiKarton,
@@ -370,7 +377,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     thumbnailService.teardown();
     diffHistoryService.teardown();
     assetCacheService.teardown();
-    processedImageCacheService.teardown();
+    processedImageCacheService?.teardown();
     logger.debug('[Main] Services shut down');
   };
 

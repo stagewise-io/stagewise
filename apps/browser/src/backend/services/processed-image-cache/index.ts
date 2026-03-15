@@ -1,7 +1,7 @@
 import { createClient, type Client } from '@libsql/client';
 import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
 import { createHash } from 'node:crypto';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import { processedImageCache, meta } from './schema';
 import { migrateDatabase } from '@/utils/migrate-database';
 import { registry, schemaVersion } from './migrations';
@@ -35,6 +35,11 @@ type Schema = {
  * `ModalityConstraint`. Undefined dimensions are encoded as `*`.
  *
  * Format: `maxWidthPx|maxHeightPx|maxTotalPixels|maxBytes`
+ *
+ * `mimeTypes` is intentionally excluded from the key. The output MIME type
+ * is stored in the `media_type` column and filtered at lookup time, so a
+ * WebP result cached for one constraint can be reused by any other constraint
+ * that also allows WebP — avoiding redundant re-processing.
  */
 export function buildConstraintKey(constraint: ModalityConstraint): string {
   const w = constraint.maxWidthPx ?? '*';
@@ -141,6 +146,10 @@ export class ProcessedImageCacheService extends DisposableService {
     const sourceHash = sha256Hex(rawBuf);
     const constraintKey = buildConstraintKey(constraint);
 
+    // Also filter by media_type: only return a cached result whose output
+    // format is actually allowed by this constraint. This lets a WebP result
+    // cached under one constraint serve any other constraint that also permits
+    // WebP, without re-processing the image.
     const row = await this.db
       .select()
       .from(processedImageCache)
@@ -148,6 +157,7 @@ export class ProcessedImageCacheService extends DisposableService {
         and(
           eq(processedImageCache.sourceHash, sourceHash),
           eq(processedImageCache.constraintKey, constraintKey),
+          inArray(processedImageCache.mediaType, constraint.mimeTypes),
         ),
       )
       .get();

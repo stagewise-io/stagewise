@@ -129,15 +129,20 @@ async function installReactDevToolsOnUISession(logger: Logger): Promise<void> {
       logger.warn('[UIController] Failed to load React DevTools:', err);
     }
 
-    // Background update: force-redownload to refresh the on-disk cache.
-    // The updated version will be picked up on the next launch.
+    // Background update: force-redownload to refresh the on-disk cache so
+    // the next launch picks up the latest version on the UI session.
+    // Note: omitting `session` targets session.defaultSession (not the
+    // partitioned UI session). This is intentional here — the goal is only
+    // to update the on-disk extension cache; the UI session (see
+    // UI_SESSION_PARTITION above) loads from that same cache on next launch.
     installExtension(REACT_DEVELOPER_TOOLS, {
       loadExtensionOptions: { allowFileAccess: true },
       forceDownload: true,
+      session: undefined, // defaultSession — cache refresh only
     })
       .then((ext) => {
         logger.debug(
-          `[UIController] React DevTools cache refreshed to ${ext.version}; active on next launch`,
+          `[UIController] React DevTools cache refreshed to ${ext.version}; UI session will pick it up on next launch`,
         );
       })
       .catch((err) => {
@@ -148,18 +153,22 @@ async function installReactDevToolsOnUISession(logger: Logger): Promise<void> {
       });
   } else {
     // Slow path: no cache — would require a network download. Do not await;
-    // fire in background so startup is not blocked. Extension will load on
-    // the next launch once the cache folder exists.
+    // fire in background so startup is not blocked.
+    // Note: omitting `session` targets session.defaultSession (not the
+    // partitioned UI session). The purpose is to populate the on-disk cache;
+    // the partitioned UI session (UI_SESSION_PARTITION) will load the
+    // extension from that cache on the next launch.
     logger.debug(
       '[UIController] React DevTools not cached; downloading in background for next launch',
     );
     installExtension(REACT_DEVELOPER_TOOLS, {
       loadExtensionOptions: { allowFileAccess: true },
       forceDownload: false,
+      session: undefined, // defaultSession — cache population only
     })
       .then((ext) => {
         logger.debug(
-          `[UIController] React DevTools ${ext.version} downloaded; will load on next launch`,
+          `[UIController] React DevTools ${ext.version} downloaded into cache; UI session will load it on next launch`,
         );
       })
       .catch((err) => {
