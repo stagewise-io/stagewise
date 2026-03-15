@@ -96,8 +96,10 @@ function checkConstraint(
   sizeBytes: number,
 ): ConstraintMatch {
   if (!constraint.mimeTypes.includes(mime)) return { mime: false };
-  const base64Size = Math.ceil((sizeBytes * 4) / 3);
-  if (base64Size <= constraint.maxBytes) return { mime: true, size: true };
+  // maxBytes is a raw-byte limit (see ModalityConstraint JSDoc — the image
+  // processor compares raw buffer length directly). Base64 encoding overhead
+  // is a transport concern handled by the AI SDK, not by this gate check.
+  if (sizeBytes <= constraint.maxBytes) return { mime: true, size: true };
   return { mime: true, size: false, maxBytes: constraint.maxBytes };
 }
 
@@ -214,7 +216,7 @@ function canModelConsumeAttachment(
   if (sizeExceeded) {
     return {
       canConsume: false,
-      reason: `File too large for inline ${sizeExceeded.name} input (${formatMB(sizeBytes)} exceeds ~${formatMB(Math.floor((sizeExceeded.maxBytes * 3) / 4))} limit).`,
+      reason: `File too large for inline ${sizeExceeded.name} input (${formatMB(sizeBytes)} exceeds ${formatMB(sizeExceeded.maxBytes)} limit).`,
     };
   }
 

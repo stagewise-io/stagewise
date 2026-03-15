@@ -131,7 +131,7 @@ describe('processImageForModel – fast-path (no transformation needed)', () => 
     expect(result.mediaType).toBe('image/webp');
   });
 
-  it('PNG within limits is still re-encoded to WebP (always-WebP policy)', async () => {
+  it('PNG within limits is still re-encoded to WebP when WebP is allowed', async () => {
     const buf = await makePng(100, 100);
     const constraint: ModalityConstraint = {
       mimeTypes: ['image/png', 'image/webp'],
@@ -148,7 +148,7 @@ describe('processImageForModel – fast-path (no transformation needed)', () => 
     expect(meta.format).toBe('webp');
   });
 
-  it('JPEG within limits is re-encoded to WebP (always-WebP policy)', async () => {
+  it('JPEG within limits is re-encoded to WebP when WebP is allowed', async () => {
     const buf = await makeJpeg(100, 100);
     const result = await processImageForModel(
       buf,
@@ -160,6 +160,37 @@ describe('processImageForModel – fast-path (no transformation needed)', () => 
     if (!result.ok) return;
     expect(result.transformed).toBe(true);
     expect(result.mediaType).toBe('image/webp');
+  });
+
+  it('PNG is re-encoded to JPEG when constraint disallows WebP but allows JPEG', async () => {
+    const buf = await makePng(100, 100);
+    const constraint: ModalityConstraint = {
+      mimeTypes: ['image/jpeg', 'image/png'], // no WebP
+      maxBytes: 10_000_000,
+    };
+    const result = await processImageForModel(buf, 'image/png', constraint);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.transformed).toBe(true);
+    expect(result.mediaType).toBe('image/jpeg');
+    const meta = await sharp(result.buf).metadata();
+    expect(meta.format).toBe('jpeg');
+  });
+
+  it('PNG is re-encoded to PNG when constraint only allows PNG', async () => {
+    const buf = await makePng(100, 100);
+    const constraint: ModalityConstraint = {
+      mimeTypes: ['image/png'], // only PNG
+      maxBytes: 10_000_000,
+    };
+    const result = await processImageForModel(buf, 'image/png', constraint);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.mediaType).toBe('image/png');
+    const meta = await sharp(result.buf).metadata();
+    expect(meta.format).toBe('png');
   });
 });
 
@@ -436,8 +467,7 @@ describe('processImageForModel – byte-size compression', () => {
     expect(result.mediaType).toBe('image/webp');
   });
 
-  it('output is always image/webp regardless of input format', async () => {
-    // The always-WebP policy means JPEG is re-encoded even when within limits.
+  it('output is image/webp when constraint allows WebP (preferred format)', async () => {
     const buf = await makeJpeg(800, 800);
     const result = await processImageForModel(
       buf,

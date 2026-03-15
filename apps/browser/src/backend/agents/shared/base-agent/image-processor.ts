@@ -58,13 +58,27 @@ const _SUPPORTED_MIMES = new Set([
 ]);
 
 /**
- * Output format used for re-encoded images.
+ * Preferred output format when WebP is allowed by the constraint.
  * WebP:
  *  - No DCT block artifacts (critical for screenshots / text-heavy images)
  *  - ~25–35 % smaller than JPEG at equivalent visual quality
  *  - Universally accepted by Anthropic, OpenAI, and Google
  */
 const OUTPUT_MIME = 'image/webp';
+
+/**
+ * Determine the best output MIME type allowed by the constraint.
+ * Preference order: WebP → JPEG → PNG.
+ * Falls back to WebP if none of the preferred formats are listed (should not
+ * happen with well-formed constraints, but avoids a hard failure).
+ */
+function pickOutputMime(constraint: { mimeTypes: string[] }): string {
+  const allowed = constraint.mimeTypes;
+  if (allowed.includes('image/webp')) return 'image/webp';
+  if (allowed.includes('image/jpeg')) return 'image/jpeg';
+  if (allowed.includes('image/png')) return 'image/png';
+  return OUTPUT_MIME; // fallback — WebP is universally supported
+}
 
 /** WebP quality steps tried in order when the byte limit is still exceeded. */
 const QUALITY_STEPS = [80, 65, 50] as const;
@@ -94,34 +108,41 @@ export async function processImageForModel(
 
   // ── Cache lookup ──────────────────────────────────────────────────────────
   if (cache) {
-    const cached = await cache.get(rawBuf, constraint);
-    if (cached) {
-      logger?.debug(
-        `[ImageProcessor] Cache hit — returning ${cached.buf.length} bytes ${cached.mediaType} (${Date.now() - startMs}ms)`,
+    try {
+      const cached = await cache.get(rawBuf, constraint);
+      if (cached) {
+        logger?.debug(
+          `[ImageProcessor] Cache hit — returning ${cached.buf.length} bytes ${cached.mediaType} (${Date.now() - startMs}ms)`,
+        );
+        return {
+          ok: true,
+          buf: cached.buf,
+          mediaType: cached.mediaType,
+          transformed: true,
+        };
+      }
+    } catch (cacheErr) {
+      logger?.warn(
+        `[ImageProcessor] Cache lookup failed, proceeding as cache miss: ${cacheErr}`,
       );
-      return {
-        ok: true,
-        buf: cached.buf,
-        mediaType: cached.mediaType,
-        transformed: true,
-      };
     }
   }
 
-  // Fast-path: only skip processing when the image is already WebP,
-  // already fits within all constraints, and no resolution limits apply.
-  // Everything else is funnelled through the WebP encode pipeline so that
-  // all outgoing images are WebP regardless of their original format.
+  // Fast-path: only skip processing when the image is already in the chosen
+  // output format (per constraint), already fits within all constraints, and
+  // no resolution limits apply.  Otherwise the image is funnelled through
+  // the encode pipeline with the best allowed format.
   const noResolutionLimits =
     constraint.maxWidthPx === undefined &&
     constraint.maxHeightPx === undefined &&
     constraint.maxTotalPixels === undefined;
 
+  const outputMime = pickOutputMime(constraint);
+
   if (
     noResolutionLimits &&
     rawBuf.length <= constraint.maxBytes &&
-    mime === OUTPUT_MIME &&
-    constraint.mimeTypes.includes(mime)
+    mime === outputMime
   ) {
     return { ok: true, buf: rawBuf, mediaType: mime, transformed: false };
   }
@@ -176,8 +197,7 @@ export async function processImageForModel(
     // and within the byte limit.
     const alreadyOptimal =
       !needsResize &&
-      mime === OUTPUT_MIME &&
-      constraint.mimeTypes.includes(mime) &&
+      mime === outputMime &&
       rawBuf.length <= constraint.maxBytes;
 
     if (alreadyOptimal) {
@@ -202,15 +222,22 @@ export async function processImageForModel(
         });
       }
 
-      // Always encode to WebP for the compression loop — it's the best
-      // trade-off between size and quality for this use case.
-      pipeline = pipeline.webp({ quality });
+      // Encode to the best format allowed by the constraint.
+      if (outputMime === 'image/jpeg') {
+        pipeline = pipeline.jpeg({ quality });
+      } else if (outputMime === 'image/png') {
+        // PNG is lossless; quality is ignored — use compressionLevel as proxy.
+        pipeline = pipeline.png({ compressionLevel: 9 });
+      } else {
+        // Default: WebP (preferred format).
+        pipeline = pipeline.webp({ quality });
+      }
 
       const outBuf = await pipeline.toBuffer();
 
       if (outBuf.length <= constraint.maxBytes) {
         logger?.debug(
-          `[ImageProcessor] Output: image/webp, ${outBuf.length} bytes` +
+          `[ImageProcessor] Output: ${outputMime}, ${outBuf.length} bytes` +
             (needsResize
               ? `, resized ${origWidth}×${origHeight} → ${targetWidth}×${targetHeight}`
               : '') +
@@ -219,13 +246,13 @@ export async function processImageForModel(
         const result: ImageProcessResult = {
           ok: true,
           buf: outBuf,
-          mediaType: OUTPUT_MIME,
+          mediaType: outputMime,
           transformed: true,
         };
         // Store in cache asynchronously — do not block the caller.
         if (cache) {
           cache
-            .set(rawBuf, constraint, { buf: outBuf, mediaType: OUTPUT_MIME })
+            .set(rawBuf, constraint, { buf: outBuf, mediaType: outputMime })
             .catch((e: unknown) => {
               logger?.debug(
                 `[ImageProcessor] Cache write failed: ${e instanceof Error ? e.message : String(e)}`,

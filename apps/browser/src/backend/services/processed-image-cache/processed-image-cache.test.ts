@@ -96,7 +96,7 @@ async function freshDbUrl(): Promise<string> {
 // ---------------------------------------------------------------------------
 
 describe('buildConstraintKey', () => {
-  it('encodes all defined fields', () => {
+  it('encodes all defined numeric fields', () => {
     expect(buildConstraintKey(CONSTRAINT_OPENAI)).toBe(
       '2048|2048|1572864|5242880',
     );
@@ -117,6 +117,19 @@ describe('buildConstraintKey', () => {
       maxWidthPx: 1024,
     };
     expect(buildConstraintKey(c)).toBe('1024|*|*|2000000');
+  });
+
+  it('mimeTypes differences do not affect the constraint key', () => {
+    const c1: ModalityConstraint = {
+      mimeTypes: ['image/webp'],
+      maxBytes: 1_000_000,
+    };
+    const c2: ModalityConstraint = {
+      mimeTypes: ['image/jpeg'],
+      maxBytes: 1_000_000,
+    };
+    // Same numeric constraints — same key; MIME filtering happens at lookup
+    expect(buildConstraintKey(c1)).toBe(buildConstraintKey(c2));
   });
 
   it('different constraints produce different keys', () => {
@@ -214,6 +227,52 @@ describe('ProcessedImageCacheService – get/set basics', () => {
 
     const hit = await svc.get(raw, CONSTRAINT_OPENAI);
     expect(Buffer.compare(hit!.buf, v2)).toBe(0);
+  });
+
+  it('cached result is reused when fetched with a different constraint that allows the stored mediaType', async () => {
+    // Store a WebP result under a constraint with a broad MIME set.
+    const raw = await makePng(100, 100);
+    const processed = await makeWebp(80, 80);
+    const constraintFull: ModalityConstraint = {
+      ...CONSTRAINT_OPENAI,
+      mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    };
+    await svc.set(raw, constraintFull, {
+      buf: processed,
+      mediaType: 'image/webp',
+    });
+
+    // A second constraint with the same numeric limits but only WebP allowed
+    // should still hit — same constraint key, mediaType 'image/webp' is in mimeTypes.
+    const constraintWebpOnly: ModalityConstraint = {
+      ...CONSTRAINT_OPENAI,
+      mimeTypes: ['image/webp'],
+    };
+    const hit = await svc.get(raw, constraintWebpOnly);
+    expect(hit).not.toBeNull();
+    expect(hit!.mediaType).toBe('image/webp');
+  });
+
+  it('cached result is not returned when the stored mediaType is not in the fetching constraint', async () => {
+    // Store a JPEG result.
+    const raw = await makePng(100, 100);
+    const processed = await makeWebp(80, 80); // content irrelevant, just use as a buffer
+    const constraintWithJpeg: ModalityConstraint = {
+      ...CONSTRAINT_OPENAI,
+      mimeTypes: ['image/jpeg'],
+    };
+    await svc.set(raw, constraintWithJpeg, {
+      buf: processed,
+      mediaType: 'image/jpeg',
+    });
+
+    // A constraint that only allows WebP should miss — stored entry is JPEG.
+    const constraintWebpOnly: ModalityConstraint = {
+      ...CONSTRAINT_OPENAI,
+      mimeTypes: ['image/webp'],
+    };
+    const miss = await svc.get(raw, constraintWebpOnly);
+    expect(miss).toBeNull();
   });
 });
 
