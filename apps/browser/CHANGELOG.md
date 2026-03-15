@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha.28 (2026-03-15)
+
+### Bug Fixes
+
+* move telemetry-filter to application-level (4fa167e)
+* prevent link-clicking default behaviour in chat-input (7896a57)
+
 ## 1.0.0-alpha.27 (2026-03-13)
 
 ### Bug Fixes
