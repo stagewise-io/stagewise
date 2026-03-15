@@ -34,6 +34,7 @@ import { selectedElementToAttachmentAttributes } from '@ui/utils/attachment-conv
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { availableModels } from '@shared/available-models';
 import { useChatDraft } from '@ui/hooks/use-chat-draft';
 import type { Content } from '@tiptap/core';
 import {
@@ -499,7 +500,18 @@ export function ChatPanelFooter() {
   const usedTokens = useKartonState((s) =>
     openAgent ? s.agents.instances[openAgent]?.state.usedTokens : 0,
   );
-  const maxTokens = 200000; // TODO Add max tokens info to agent state
+  const activeModelId = useKartonState((s) =>
+    openAgent ? s.agents.instances[openAgent]?.state.activeModelId : null,
+  );
+  const customModels = useKartonState((s) => s.preferences.customModels);
+  const maxTokens = useMemo(() => {
+    if (!activeModelId) return 200000;
+    const builtIn = availableModels.find((m) => m.modelId === activeModelId);
+    if (builtIn) return builtIn.modelContextRaw;
+    const custom = customModels.find((m) => m.modelId === activeModelId);
+    if (custom) return custom.contextWindowSize;
+    return 200000;
+  }, [activeModelId, customModels]);
 
   const contextUsed = useMemo(() => {
     const used = usedTokens ?? 0;
