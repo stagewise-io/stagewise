@@ -139,7 +139,9 @@ const uploadSourceMapsAndCleanup = (
 const config: ForgeConfig = {
   buildIdentifier: buildConstants.__APP_RELEASE_CHANNEL__,
   packagerConfig: {
-    asar: true,
+    asar: {
+      unpack: '**/{sharp,@img}/**',
+    },
     extraResource: [
       './bundled',
       `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.png`,
