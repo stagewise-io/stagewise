@@ -17,6 +17,7 @@ import {
   default as installExtension,
   REACT_DEVELOPER_TOOLS,
 } from 'electron-devtools-installer';
+import fsSync from 'node:fs';
 import { getBlobPath, blobExists } from '@/utils/attachment-blobs';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { inferMimeType } from '@shared/mime-utils';
@@ -74,48 +75,99 @@ function findMediaTypeInSandboxOutputs(
 }
 
 /**
- * Installs React DevTools extension on the UI session.
- * Must be called before creating any WebContentsView that uses the UI session.
+ * Returns the on-disk cache path that electron-devtools-installer uses for an
+ * extension, mirroring its internal `getPath()` + chromeStoreID logic.
+ */
+function getExtensionCachePath(extensionId: string): string {
+  return path.resolve(app.getPath('userData'), 'extensions', extensionId);
+}
+
+/**
+ * Installs React DevTools on the UI session without blocking startup.
+ *
+ * How electron-devtools-installer works (relevant to the perf decision):
+ *   - It stores extensions at `{userData}/extensions/{extensionId}/`.
+ *   - On install, it checks `fs.existsSync(extensionFolder)`. If the folder
+ *     already exists AND `forceDownload` is false, it skips the network entirely
+ *     and just calls `session.loadExtension(folder)`. There is no version check.
+ *   - The only network call is on first download (when the folder is absent).
+ *
+ * Strategy:
+ *   - If the cache folder exists: call installExtension normally — it is a fast
+ *     filesystem-only operation, safe to await. Also fire a background
+ *     `forceDownload: true` call to refresh the extension on disk for the next
+ *     launch (this is the update mechanism, since the library has no built-in
+ *     version checking).
+ *   - If the cache folder is absent (first launch): do NOT await — the network
+ *     download would block startup. Fire it in the background; the extension
+ *     will be available on the next launch.
+ *
+ * The Chromium constraint (extension must be registered before the session
+ * hosts any WebContentsView) only applies when we actually load the extension.
+ * On first launch we skip loading, so the constraint is not violated.
  */
 async function installReactDevToolsOnUISession(logger: Logger): Promise<void> {
   if (app.isPackaged) return; // Don't install in production
 
-  try {
-    // Get the UI session (creates it if it doesn't exist)
-    const uiSession = session.fromPartition(UI_SESSION_PARTITION);
+  const extensionId = REACT_DEVELOPER_TOOLS.id;
+  const cacheFolder = getExtensionCachePath(extensionId);
+  const isCached = fsSync.existsSync(cacheFolder);
 
-    // First, use electron-devtools-installer to download/cache the extension
-    // This returns extension info including the path
-    const extensionInfo = await installExtension(REACT_DEVELOPER_TOOLS, {
-      loadExtensionOptions: { allowFileAccess: true },
-      forceDownload: false,
-    });
-
-    // Now load the extension explicitly on the UI session
-    // electron-devtools-installer loads on defaultSession, but we need it on UI session
-    const extensionPath =
-      typeof extensionInfo === 'object' && extensionInfo.path
-        ? extensionInfo.path
-        : null;
-    if (!extensionPath) {
-      logger.warn(
-        '[UIController] Could not determine React DevTools extension path',
+  if (isCached) {
+    // Fast path: folder exists, installExtension will skip the network and
+    // just call session.loadExtension — safe to await.
+    try {
+      const uiSession = session.fromPartition(UI_SESSION_PARTITION);
+      const ext = await installExtension(REACT_DEVELOPER_TOOLS, {
+        loadExtensionOptions: { allowFileAccess: true },
+        session: uiSession,
+      });
+      logger.debug(
+        `[UIController] Loaded React DevTools ${ext.version} on UI session`,
       );
-      return;
+    } catch (err) {
+      logger.warn('[UIController] Failed to load React DevTools:', err);
     }
 
-    // Load extension on the UI session specifically
-    const loadedExtension = await uiSession.extensions.loadExtension(
-      extensionPath,
-      {
-        allowFileAccess: true,
-      },
-    );
+    // Background update: force-redownload to refresh the on-disk cache.
+    // The updated version will be picked up on the next launch.
+    installExtension(REACT_DEVELOPER_TOOLS, {
+      loadExtensionOptions: { allowFileAccess: true },
+      forceDownload: true,
+    })
+      .then((ext) => {
+        logger.debug(
+          `[UIController] React DevTools cache refreshed to ${ext.version}; active on next launch`,
+        );
+      })
+      .catch((err) => {
+        logger.debug(
+          '[UIController] Background React DevTools refresh failed (non-critical):',
+          err,
+        );
+      });
+  } else {
+    // Slow path: no cache — would require a network download. Do not await;
+    // fire in background so startup is not blocked. Extension will load on
+    // the next launch once the cache folder exists.
     logger.debug(
-      `[UIController] Loaded React DevTools on UI session: ${loadedExtension.name}`,
+      '[UIController] React DevTools not cached; downloading in background for next launch',
     );
-  } catch (err) {
-    logger.warn('[UIController] Failed to install React DevTools:', err);
+    installExtension(REACT_DEVELOPER_TOOLS, {
+      loadExtensionOptions: { allowFileAccess: true },
+      forceDownload: false,
+    })
+      .then((ext) => {
+        logger.debug(
+          `[UIController] React DevTools ${ext.version} downloaded; will load on next launch`,
+        );
+      })
+      .catch((err) => {
+        logger.warn(
+          '[UIController] Background React DevTools download failed:',
+          err,
+        );
+      });
   }
 }
 
