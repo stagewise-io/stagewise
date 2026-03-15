@@ -45,7 +45,9 @@ export function FileContextMenu({
 
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger className="contents">{children}</ContextMenu.Trigger>
+      <ContextMenu.Trigger render={<span />} className="contents">
+        {children}
+      </ContextMenu.Trigger>
       <MenuBase.Portal>
         <MenuBase.Positioner
           className="z-50"
