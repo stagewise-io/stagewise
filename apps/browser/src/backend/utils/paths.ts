@@ -13,7 +13,8 @@ export type DbName =
   | 'web-data'
   | 'history'
   | 'thumbnails'
-  | 'asset-cache';
+  | 'asset-cache'
+  | 'processed-image-cache';
 
 export const getDbPath = (name: DbName): string =>
   path.join(getDataRoot(), `${name}.sqlite`);

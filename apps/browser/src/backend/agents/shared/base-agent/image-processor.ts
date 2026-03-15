@@ -20,6 +20,7 @@
 import sharp from 'sharp';
 import type { ModalityConstraint } from '@shared/karton-contracts/ui/shared-types';
 import type { Logger } from '@/services/logger';
+import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -66,7 +67,7 @@ const _SUPPORTED_MIMES = new Set([
 const OUTPUT_MIME = 'image/webp';
 
 /** WebP quality steps tried in order when the byte limit is still exceeded. */
-const QUALITY_STEPS = [70, 55, 40] as const;
+const QUALITY_STEPS = [80, 65, 50] as const;
 
 /** Minimum quality we will encode at — below this we give up and return ok:false. */
 const MIN_QUALITY = QUALITY_STEPS[QUALITY_STEPS.length - 1];
@@ -86,23 +87,26 @@ export async function processImageForModel(
   mediaType: string,
   constraint: ModalityConstraint,
   logger?: Logger,
+  cache?: ProcessedImageCacheService,
 ): Promise<ImageProcessResult> {
   const mime = mediaType.toLowerCase();
   const startMs = Date.now();
 
-  logger?.debug(
-    `[ImageProcessor] Input: ${mime}, ${rawBuf.length} bytes` +
-      (constraint.maxWidthPx !== undefined
-        ? `, maxW=${constraint.maxWidthPx}px`
-        : '') +
-      (constraint.maxHeightPx !== undefined
-        ? `, maxH=${constraint.maxHeightPx}px`
-        : '') +
-      (constraint.maxTotalPixels !== undefined
-        ? `, maxPixels=${constraint.maxTotalPixels}`
-        : '') +
-      `, maxBytes=${constraint.maxBytes}`,
-  );
+  // ── Cache lookup ──────────────────────────────────────────────────────────
+  if (cache) {
+    const cached = await cache.get(rawBuf, constraint);
+    if (cached) {
+      logger?.debug(
+        `[ImageProcessor] Cache hit — returning ${cached.buf.length} bytes ${cached.mediaType} (${Date.now() - startMs}ms)`,
+      );
+      return {
+        ok: true,
+        buf: cached.buf,
+        mediaType: cached.mediaType,
+        transformed: true,
+      };
+    }
+  }
 
   // Fast-path: only skip processing when the image is already WebP,
   // already fits within all constraints, and no resolution limits apply.
@@ -177,9 +181,6 @@ export async function processImageForModel(
       rawBuf.length <= constraint.maxBytes;
 
     if (alreadyOptimal) {
-      logger?.debug(
-        `[ImageProcessor] Fast-path: already optimal, no transformation needed (${Date.now() - startMs}ms)`,
-      );
       return { ok: true, buf: rawBuf, mediaType: mime, transformed: false };
     }
 
@@ -207,11 +208,6 @@ export async function processImageForModel(
 
       const outBuf = await pipeline.toBuffer();
 
-      logger?.debug(
-        `[ImageProcessor] Encoded at quality=${quality}: ${outBuf.length} bytes` +
-          (outBuf.length <= constraint.maxBytes ? ' ✓ fits' : ' ✗ too large'),
-      );
-
       if (outBuf.length <= constraint.maxBytes) {
         logger?.debug(
           `[ImageProcessor] Output: image/webp, ${outBuf.length} bytes` +
@@ -220,12 +216,23 @@ export async function processImageForModel(
               : '') +
             `, quality=${quality}, duration=${Date.now() - startMs}ms`,
         );
-        return {
+        const result: ImageProcessResult = {
           ok: true,
           buf: outBuf,
           mediaType: OUTPUT_MIME,
           transformed: true,
         };
+        // Store in cache asynchronously — do not block the caller.
+        if (cache) {
+          cache
+            .set(rawBuf, constraint, { buf: outBuf, mediaType: OUTPUT_MIME })
+            .catch((e: unknown) => {
+              logger?.debug(
+                `[ImageProcessor] Cache write failed: ${e instanceof Error ? e.message : String(e)}`,
+              );
+            });
+        }
+        return result;
       }
 
       // If we've hit the minimum quality and it's still over the limit,

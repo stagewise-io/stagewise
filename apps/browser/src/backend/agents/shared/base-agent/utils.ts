@@ -34,6 +34,7 @@ import type { ModelCapabilities } from '@shared/karton-contracts/ui/shared-types
 import { findModelsAcceptingMime } from '@shared/available-models';
 import { processImageForModel } from './image-processor';
 import type { Logger } from '@/services/logger';
+import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
 
 export type BlobReader = (
   agentId: string,
@@ -292,6 +293,7 @@ async function buildSyntheticUserMessageForAttachments(
   onBlobError?: BlobErrorReporter,
   currentModelId?: string,
   logger?: Logger,
+  imageCache?: ProcessedImageCacheService,
 ): Promise<UserModelMessage> {
   const content: UserContent = [];
 
@@ -338,6 +340,7 @@ async function buildSyntheticUserMessageForAttachments(
                 f.mediaType,
                 imageConstraint,
                 logger,
+                imageCache,
               )
             : {
                 ok: true as const,
@@ -476,6 +479,7 @@ export const convertAgentMessagesToModelMessages = async (
   shellInfo?: ShellInfo | null,
   skillDetails?: Map<string, SkillInfo>,
   logger?: Logger,
+  imageCache?: ProcessedImageCacheService,
 ): Promise<ModelMessage[]> => {
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
@@ -528,6 +532,7 @@ export const convertAgentMessagesToModelMessages = async (
         onBlobError,
         currentModelId,
         logger,
+        imageCache,
       );
       // convertUserMessage always returns content as an array of parts
       const content = userMsg.content as (TextPart | ImagePart | FilePart)[];
@@ -576,6 +581,7 @@ export const convertAgentMessagesToModelMessages = async (
             onBlobError,
             currentModelId,
             logger,
+            imageCache,
           );
           const attachContent = Array.isArray(attachmentMsg.content)
             ? attachmentMsg.content
@@ -771,6 +777,7 @@ async function convertUserMessage(
   onBlobError?: BlobErrorReporter,
   currentModelId?: string,
   logger?: Logger,
+  imageCache?: ProcessedImageCacheService,
 ): Promise<UserModelMessage> {
   const parts = message.parts.map((part) => {
     if (part.type === 'text')
@@ -818,6 +825,7 @@ async function convertUserMessage(
                   f.mediaType,
                   imageConstraint,
                   logger,
+                  imageCache,
                 )
               : {
                   ok: true as const,
