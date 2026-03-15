@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.31 (2026-03-15)
+
+### Bug Fixes
+
+* make context-usage ring use dynamic context size (be816ce)
+
 ## 1.0.0-alpha.30 (2026-03-15)
 
 ### Bug Fixes
