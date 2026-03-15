@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0-alpha.29 (2026-03-15)
+
+### Bug Fixes
+
+* add 'sharp' to dependencies (f7de61b)
+* fix '<div> cannot be a descendant of <p>' for file context menu (50494c3)
+* align downloads-ui with history-ui (f3d0e71)
+
+### Other Changes
+
+* replace tabHandle with shorter, unique tabIds (d1ef5b1)
+
 ## 1.0.0-alpha.28 (2026-03-15)
 
 ### Bug Fixes
