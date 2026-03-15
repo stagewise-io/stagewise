@@ -43,6 +43,10 @@ const nativeDependencies = [
   'promise-limit',
   'js-base64',
   'ws',
+  'sharp',
+  '@img',
+  'detect-libc',
+  'semver',
 ];
 
 const copyNativeDependencies = (

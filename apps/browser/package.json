@@ -36,7 +36,8 @@
     "fzy.js": "^0.4.1",
     "gray-matter": "^4.0.3",
     "immer": "^10.2.0",
-    "react-virtuoso": "^4.18.1"
+    "react-virtuoso": "^4.18.1",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@ai-sdk/amazon-bedrock": "^4.0.77",
