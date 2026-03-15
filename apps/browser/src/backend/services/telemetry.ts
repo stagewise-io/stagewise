@@ -128,7 +128,6 @@ export class TelemetryService extends DisposableService {
       disabled: !apiKey,
     });
 
-    this.syncTelemetryOptIn();
     this.identifyUser();
 
     this.preferencesService.addListener((newPrefs, oldPrefs) => {
@@ -137,7 +136,6 @@ export class TelemetryService extends DisposableService {
           from: oldPrefs.privacy.telemetryLevel,
           to: newPrefs.privacy.telemetryLevel,
         });
-        this.syncTelemetryOptIn();
       }
     });
 
@@ -153,21 +151,6 @@ export class TelemetryService extends DisposableService {
 
   private getTelemetryLevel(): TelemetryLevel {
     return this.telemetryLevel;
-  }
-
-  private syncTelemetryOptIn(): void {
-    const level = this.getTelemetryLevel();
-    if (level === 'off') {
-      // Flush any pending events (e.g. telemetry-level-changed) before
-      // disabling the client so they are not silently dropped.
-      this.posthogClient.flush().finally(() => {
-        this.posthogClient.disable();
-      });
-    } else this.posthogClient.enable();
-
-    this.logger.debug(
-      `[TelemetryService] Telemetry opt-in synced: level=${level}`,
-    );
   }
 
   setUserProperties(properties: UserProperties): void {
