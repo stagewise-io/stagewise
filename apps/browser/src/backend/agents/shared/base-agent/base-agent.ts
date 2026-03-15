@@ -39,6 +39,7 @@ import { generateSimpleTitle } from './title-generation';
 import { generateSimpleCompressedHistory } from './history-compression';
 import { readBlob } from '@/utils/attachment-blobs';
 import type { AssetCacheService } from '@/services/asset-cache';
+import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
 import { randomUUID } from 'node:crypto';
 import {
   resolveEffectiveSnapshot,
@@ -342,6 +343,7 @@ export abstract class BaseAgent<
    * See also: AssetCacheService in services/asset-cache/index.ts
    */
   protected readonly assetCacheService?: AssetCacheService;
+  protected readonly processedImageCacheService?: ProcessedImageCacheService;
 
   // Internal state
   private stepAbortController: AbortController | null = null;
@@ -435,6 +437,7 @@ export abstract class BaseAgent<
     finishToolErrorHandler?: (error: Error) => void | Promise<void>,
     initialState?: Partial<AgentState>,
     assetCacheService?: AssetCacheService,
+    processedImageCacheService?: ProcessedImageCacheService,
   ) {
     this.instanceId = instanceId;
     this.state = state;
@@ -447,6 +450,7 @@ export abstract class BaseAgent<
     this.finishToolHandler = finishToolHandler;
     this.finishToolErrorHandler = finishToolErrorHandler;
     this.assetCacheService = assetCacheService;
+    this.processedImageCacheService = processedImageCacheService;
 
     this.state.set((draft) => {
       draft.title =
@@ -1020,6 +1024,7 @@ export abstract class BaseAgent<
       shellInfo,
       skillDetails,
       this.logger,
+      this.processedImageCacheService,
     );
   }
 

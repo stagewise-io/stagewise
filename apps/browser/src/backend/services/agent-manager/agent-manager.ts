@@ -20,6 +20,7 @@ import { writeBlob } from '@/utils/attachment-blobs';
 import type { QuestionAnswerValue } from '@shared/karton-contracts/ui/agent/tools/types';
 import { readWorkspaceMd } from '@/agents/shared/prompts/utils/read-workspace-md';
 import type { AssetCacheService } from '@/services/asset-cache';
+import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
 
 /**
  * @note Due to the complex type inference for all this stuff, we sometimes explicitly define types here to avoid errors.
@@ -38,6 +39,7 @@ export class AgentManagerService extends DisposableService {
   private readonly logger: Logger;
   private readonly modelProviderService: ModelProviderService;
   private readonly assetCacheService?: AssetCacheService;
+  private readonly processedImageCacheService?: ProcessedImageCacheService;
 
   private agentPersistenceDB: AgentPersistenceDB | null = null;
   private readonly dbReadyPromise: Promise<AgentPersistenceDB | null>;
@@ -49,6 +51,7 @@ export class AgentManagerService extends DisposableService {
     logger: Logger,
     modelProviderService: ModelProviderService,
     assetCacheService?: AssetCacheService,
+    processedImageCacheService?: ProcessedImageCacheService,
   ) {
     super();
     this.karton = karton;
@@ -57,6 +60,7 @@ export class AgentManagerService extends DisposableService {
     this.logger = logger;
     this.modelProviderService = modelProviderService;
     this.assetCacheService = assetCacheService;
+    this.processedImageCacheService = processedImageCacheService;
 
     this.registerKartonHandlers();
 
@@ -533,6 +537,7 @@ export class AgentManagerService extends DisposableService {
             : undefined,
       },
       this.assetCacheService,
+      this.processedImageCacheService,
     );
 
     this.activeAgents.set(agentInstanceId, agent);
