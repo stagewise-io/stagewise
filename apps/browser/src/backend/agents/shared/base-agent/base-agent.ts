@@ -1019,6 +1019,7 @@ export abstract class BaseAgent<
       activeModelId,
       shellInfo,
       skillDetails,
+      this.logger,
     );
   }
 
