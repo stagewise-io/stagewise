@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.30 (2026-03-15)
+
+### Bug Fixes
+
+* add missing asar-unpacking for 'sharp' (96e3b52)
+
 ## 1.0.0-alpha.29 (2026-03-15)
 
 ### Bug Fixes
