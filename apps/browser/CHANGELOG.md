@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha.32 (2026-03-16)
+
+### Bug Fixes
+
+* don't show env-message when agent reverts its own edits (21d7c09)
+* name 'handle' to 'id' for tabs in message-structure (752dfc9)
+
 ## 1.0.0-alpha.31 (2026-03-15)
 
 ### Bug Fixes
