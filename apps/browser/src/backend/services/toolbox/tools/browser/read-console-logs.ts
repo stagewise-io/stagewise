@@ -66,9 +66,7 @@ Returns logs in reverse chronological order (most recent first) with:
 - stackTrace: Stack trace (for errors)
 `;
 
-export const readConsoleLogsTool = (
-  windowLayoutService: WindowLayoutService,
-) => {
+export const readConsoleLogs = (windowLayoutService: WindowLayoutService) => {
   return tool({
     description: DESCRIPTION,
     inputSchema: readConsoleLogsToolInputSchema,

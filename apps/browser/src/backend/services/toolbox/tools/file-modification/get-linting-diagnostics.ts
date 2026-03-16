@@ -169,9 +169,7 @@ async function doGetLintingDiagnostics(
   };
 }
 
-export const getLintingDiagnosticsTool = (
-  mountedLspServices: MountedLspServices,
-) =>
+export const getLintingDiagnostics = (mountedLspServices: MountedLspServices) =>
   tool({
     description: DESCRIPTION,
     inputSchema: getLintingDiagnosticsToolInputSchema,

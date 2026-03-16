@@ -110,7 +110,7 @@ await fsPromises.writeFile('apps/my-dashboard/styles.css', '* { box-sizing: bord
 await API.openApp("my-dashboard");
 \`\`\`
 
-To iterate on an existing app, use the dedicated file tools (e.g. multiEditTool on \`apps/{appId}/index.html\`) instead of rewriting the entire file via the sandbox. Call \`API.openApp\` again with the same appId to reload after edits.
+To iterate on an existing app, use the dedicated file tools (e.g. multiEdit on \`apps/{appId}/index.html\`) instead of rewriting the entire file via the sandbox. Call \`API.openApp\` again with the same appId to reload after edits.
 
 ### Sandbox API (\`API.*\`)
 
@@ -259,7 +259,7 @@ const lib = (await importModule('https://esm.sh/some-lib?target=node')).default;
 - Do NOT use console logging.
 - ONLY use "fetch" for network requests.
 - Implement error handling with working fallbacks and sensible retries if possible.
-- For editing existing files, prefer dedicated file tools (multiEditTool, overwriteFileTool) over sandbox fs — they integrate with diff-history and undo. Use sandbox fs for binary operations, bulk scaffolding, or cross-mount copies.
+- For editing existing files, prefer dedicated file tools (multiEdit, overwriteFile) over sandbox fs — they integrate with diff-history and undo. Use sandbox fs for binary operations, bulk scaffolding, or cross-mount copies.
 - For long running tasks (i.e. image encoding, file writing): 
   - Call \`API.output()\` periodically as a progress heartbeat to prevent the 45s inactivity timeout from firing.
   - Ensure the code returns gracefully with information on how to recover/continue the task, even if it's due to a timeout.
@@ -343,7 +343,7 @@ You can execute shell commands on the user's machine via the shell tool.
 
 ### Best practices
 
-- Prefer dedicated file tools (readFileTool, multiEditTool, etc.) over shell commands for file operations — they integrate with diff-history and undo.
+- Prefer dedicated file tools (readFile, multiEdit, etc.) over shell commands for file operations — they integrate with diff-history and undo.
 - Use the shell for tasks that require system tools: running tests, building projects, installing dependencies, git operations, etc.
 - For long-running commands, set an appropriate \`timeout_ms\`.
 - Avoid interactive commands that wait for stdin — stdin is not connected.`;

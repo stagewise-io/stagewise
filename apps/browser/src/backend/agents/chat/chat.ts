@@ -42,25 +42,22 @@ export class ChatAgent extends BaseAgent<never, undefined> {
     const id = this.instanceId;
     const box = this.toolbox;
     const tools = {
-      executeSandboxJsTool: await box.getTool('executeSandboxJsTool', id),
-      listLibraryDocsTool: await box.getTool('listLibraryDocsTool', id),
-      searchInLibraryDocsTool: await box.getTool('searchInLibraryDocsTool', id),
-      getLintingDiagnosticsTool: await box.getTool(
-        'getLintingDiagnosticsTool',
-        id,
-      ),
-      deleteFileTool: await box.getTool('deleteFileTool', id),
-      overwriteFileTool: await box.getTool('overwriteFileTool', id),
-      readFileTool: await box.getTool('readFileTool', id),
-      listFilesTool: await box.getTool('listFilesTool', id),
-      globTool: await box.getTool('globTool', id),
-      multiEditTool: await box.getTool('multiEditTool', id),
-      grepSearchTool: await box.getTool('grepSearchTool', id),
-      readConsoleLogsTool: await box.getTool('readConsoleLogsTool', id),
-      askUserQuestionsTool: await box.getTool('askUserQuestionsTool', id),
-      executeShellCommandTool: await box.getTool('executeShellCommandTool', id),
+      executeSandboxJs: await box.getTool('executeSandboxJs', id),
+      listLibraryDocs: await box.getTool('listLibraryDocs', id),
+      searchInLibraryDocs: await box.getTool('searchInLibraryDocs', id),
+      getLintingDiagnostics: await box.getTool('getLintingDiagnostics', id),
+      deleteFile: await box.getTool('deleteFile', id),
+      overwriteFile: await box.getTool('overwriteFile', id),
+      readFile: await box.getTool('readFile', id),
+      listFiles: await box.getTool('listFiles', id),
+      glob: await box.getTool('glob', id),
+      multiEdit: await box.getTool('multiEdit', id),
+      grepSearch: await box.getTool('grepSearch', id),
+      readConsoleLogs: await box.getTool('readConsoleLogs', id),
+      askUserQuestions: await box.getTool('askUserQuestions', id),
+      executeShellCommand: await box.getTool('executeShellCommand', id),
       // IMPORTANT: The type for this tool is defined in @apps/browser/src/shared/karton-contracts/ui/agent/tools/types.ts - update the type when you change this input schema.
-      updateWorkspaceMdTool: this.getSpawnChildAgentTool(
+      updateWorkspaceMd: this.getSpawnChildAgentTool(
         'Triggers an update of the `.stagewise/WORKSPACE.md` file. Use this whenever you find that the content of the file `.stagewise/WORKSPACE.md` in the system context is outdated or needs to be updated. Provide a brief reason for the update. Most importantly, provide the mount prefix of the workspace to update.',
         z.object({
           updateReason: z.string().min(5),

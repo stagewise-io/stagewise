@@ -86,7 +86,7 @@ export async function overwriteFileToolExecute(
   }
 }
 
-export const overwriteFileTool = (mountedRuntimes: MountedClientRuntimes) =>
+export const overwriteFile = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: overwriteFileToolInputSchema,

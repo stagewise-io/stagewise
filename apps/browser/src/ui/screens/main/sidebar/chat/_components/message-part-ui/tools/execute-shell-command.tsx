@@ -19,7 +19,7 @@ export const ExecuteShellCommandToolPart = ({
   part,
   isLastPart = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-executeShellCommandTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-executeShellCommand' }>;
   isLastPart?: boolean;
 }) => {
   const [openAgentId] = useOpenAgent();

@@ -36,26 +36,26 @@ import {
   deleteFileToolExecute,
   DESCRIPTION as DELETE_FILE_DESCRIPTION,
 } from './tools/file-modification/delete-file';
-import { globTool } from './tools/file-modification/glob';
-import { readFileTool } from './tools/file-modification/read-file';
-import { getLintingDiagnosticsTool } from './tools/file-modification/get-linting-diagnostics';
-import { listLibraryDocsTool } from './tools/research/list-library-docs';
-import { searchInLibraryDocsTool } from './tools/research/search-in-library-docs';
+import { glob as globTool } from './tools/file-modification/glob';
+import { readFile as readFileTool } from './tools/file-modification/read-file';
+import { getLintingDiagnostics as getLintingDiagnosticsTool } from './tools/file-modification/get-linting-diagnostics';
+import { listLibraryDocs as listLibraryDocsTool } from './tools/research/list-library-docs';
+import { searchInLibraryDocs as searchInLibraryDocsTool } from './tools/research/search-in-library-docs';
 import {
   overwriteFileToolExecute,
   DESCRIPTION as OVERWRITE_FILE_DESCRIPTION,
 } from './tools/file-modification/overwrite-file';
-import { listFilesTool } from './tools/file-modification/list-files';
+import { listFiles as listFilesTool } from './tools/file-modification/list-files';
 import {
   multiEditToolExecute,
   DESCRIPTION as MULTI_EDIT_DESCRIPTION,
 } from './tools/file-modification/multi-edit';
-import { grepSearchTool } from './tools/file-modification/grep-search';
-import { executeSandboxJsTool } from './tools/browser/execute-sandbox-js';
-import { executeShellCommandTool } from './tools/shell/execute-shell-command';
-import { readConsoleLogsTool } from './tools/browser/read-console-logs';
+import { grepSearch as grepSearchTool } from './tools/file-modification/grep-search';
+import { executeSandboxJs as executeSandboxJsTool } from './tools/browser/execute-sandbox-js';
+import { executeShellCommand as executeShellCommandTool } from './tools/shell/execute-shell-command';
+import { readConsoleLogs as readConsoleLogsTool } from './tools/browser/read-console-logs';
 import {
-  askUserQuestionsTool,
+  askUserQuestions as askUserQuestionsTool,
   advanceOrCompleteQuestion,
   cancelQuestion,
   goBackQuestion,
@@ -370,7 +370,7 @@ export class ToolboxService extends DisposableService {
     if (!mountedLspServices) return null;
 
     switch (tool) {
-      case 'deleteFileTool':
+      case 'deleteFile':
         if (mountedRuntimes.size === 0) return null;
         return this.wrapFileModifyingTool(
           DELETE_FILE_DESCRIPTION,
@@ -378,16 +378,16 @@ export class ToolboxService extends DisposableService {
           deleteFileToolExecute,
           agentInstanceId,
         );
-      case 'globTool':
+      case 'glob':
         if (mountedRuntimes.size === 0) return null;
         return globTool(mountedRuntimes);
-      case 'grepSearchTool':
+      case 'grepSearch':
         if (mountedRuntimes.size === 0) return null;
         return grepSearchTool(mountedRuntimes);
-      case 'listFilesTool':
+      case 'listFiles':
         if (mountedRuntimes.size === 0) return null;
         return listFilesTool(mountedRuntimes);
-      case 'multiEditTool':
+      case 'multiEdit':
         if (mountedRuntimes.size === 0) return null;
         return this.wrapFileModifyingTool(
           MULTI_EDIT_DESCRIPTION,
@@ -395,7 +395,7 @@ export class ToolboxService extends DisposableService {
           multiEditToolExecute,
           agentInstanceId,
         );
-      case 'overwriteFileTool':
+      case 'overwriteFile':
         if (mountedRuntimes.size === 0) return null;
         return this.wrapFileModifyingTool(
           OVERWRITE_FILE_DESCRIPTION,
@@ -403,28 +403,28 @@ export class ToolboxService extends DisposableService {
           overwriteFileToolExecute,
           agentInstanceId,
         );
-      case 'readFileTool':
+      case 'readFile':
         if (mountedRuntimes.size === 0) return null;
         return readFileTool(mountedRuntimes);
-      case 'listLibraryDocsTool':
+      case 'listLibraryDocs':
         if (!this.apiClient) return null;
         return listLibraryDocsTool(this.apiClient);
-      case 'searchInLibraryDocsTool':
+      case 'searchInLibraryDocs':
         if (!this.apiClient) return null;
         return searchInLibraryDocsTool(this.apiClient);
-      case 'getLintingDiagnosticsTool': {
+      case 'getLintingDiagnostics': {
         if (!mountedLspServices) return null;
         return getLintingDiagnosticsTool(mountedLspServices);
       }
-      case 'executeSandboxJsTool':
+      case 'executeSandboxJs':
         if (!this.windowLayoutService) return null;
         return executeSandboxJsTool(this.sandboxService!, agentInstanceId);
-      case 'readConsoleLogsTool':
+      case 'readConsoleLogs':
         if (!this.windowLayoutService) return null;
         return readConsoleLogsTool(this.windowLayoutService);
-      case 'askUserQuestionsTool':
+      case 'askUserQuestions':
         return askUserQuestionsTool(this.uiKarton, agentInstanceId);
-      case 'executeShellCommandTool':
+      case 'executeShellCommand':
         if (!this.shellService?.isAvailable()) return null;
         return executeShellCommandTool(this.shellService, agentInstanceId, () =>
           this.getMountedPathsForAgent(agentInstanceId),

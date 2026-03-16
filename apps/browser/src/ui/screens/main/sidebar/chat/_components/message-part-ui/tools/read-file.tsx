@@ -8,7 +8,7 @@ export const ReadFileToolPart = ({
   disableShimmer = false,
   minimal = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-readFileTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-readFile' }>;
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {

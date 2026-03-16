@@ -58,7 +58,7 @@ export async function deleteFileToolExecute(
   }
 }
 
-export const deleteFileTool = (mountedRuntimes: MountedClientRuntimes) =>
+export const deleteFile = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: deleteFileToolInputSchema,

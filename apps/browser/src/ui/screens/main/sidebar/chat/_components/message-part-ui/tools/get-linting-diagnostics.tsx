@@ -16,7 +16,7 @@ export const GetLintingDiagnosticsToolPart = ({
   capMaxHeight = false,
   isLastPart = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-getLintingDiagnosticsTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-getLintingDiagnostics' }>;
   disableShimmer?: boolean;
   capMaxHeight?: boolean;
   isLastPart?: boolean;

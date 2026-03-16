@@ -120,7 +120,7 @@ export async function multiEditToolExecute(
   }
 }
 
-export const multiEditTool = (mountedRuntimes: MountedClientRuntimes) =>
+export const multiEdit = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: multiEditToolInputSchema,

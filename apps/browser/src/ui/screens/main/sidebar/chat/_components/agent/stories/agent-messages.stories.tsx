@@ -232,7 +232,7 @@ export const AssistantToolErrorRecovery: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-readFileTool' as const,
+            type: 'tool-readFile' as const,
             toolCallId: 'read-1',
             state: 'output-error' as const,
             input: {
@@ -269,7 +269,7 @@ export const AssistantDeleteFileComplete: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-deleteFileTool' as const,
+            type: 'tool-deleteFile' as const,
             toolCallId: 'delete-1',
             state: 'output-available' as const,
             input: {
@@ -334,7 +334,7 @@ export const AssistantDeleteFileStreaming: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-deleteFileTool' as const,
+            type: 'tool-deleteFile' as const,
             toolCallId: 'delete-2',
             state: 'output-available' as const,
             input: {
@@ -404,7 +404,7 @@ export const AssistantDeleteFileError: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-deleteFileTool' as const,
+            type: 'tool-deleteFile' as const,
             toolCallId: 'delete-3',
             state: 'output-error' as const,
             input: {
@@ -500,7 +500,7 @@ export const AssistantGlobError: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-globTool' as const,
+            type: 'tool-glob' as const,
             toolCallId: 'glob-error-1',
             state: 'output-error' as const,
             input: {
@@ -590,7 +590,7 @@ export const AssistantGrepSearchError: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-grepSearchTool' as const,
+            type: 'tool-grepSearch' as const,
             toolCallId: 'grep-error-1',
             state: 'output-error' as const,
             input: {
@@ -719,7 +719,7 @@ export const AssistantListFilesError: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-listFilesTool' as const,
+            type: 'tool-listFiles' as const,
             toolCallId: 'list-1',
             state: 'output-error' as const,
             input: {
@@ -833,7 +833,7 @@ export const AssistantOverwriteFileError: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-overwriteFileTool' as const,
+            type: 'tool-overwriteFile' as const,
             toolCallId: 'overwrite-error-1',
             state: 'output-error' as const,
             input: {
@@ -998,7 +998,7 @@ export const AssistantMultiEditError: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-multiEditTool' as const,
+            type: 'tool-multiEdit' as const,
             toolCallId: 'multi-edit-error-1',
             state: 'output-error' as const,
             input: {
@@ -1106,7 +1106,7 @@ export const AssistantUnknownTool: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-experimentalTool' as any,
+            type: 'tool-experimental' as any,
             toolCallId: 'experimental-1',
             state: 'output-available' as const,
             input: {

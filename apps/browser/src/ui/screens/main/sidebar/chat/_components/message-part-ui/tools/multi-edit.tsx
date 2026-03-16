@@ -33,7 +33,7 @@ import {
 export const MultiEditToolPart = ({
   part,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-multiEditTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-multiEdit' }>;
 }) => {
   const [expanded, setExpanded] = useState(true);
   const { getFileIDEHref, needsIdePicker, pickIdeAndOpen, resolvePath } =

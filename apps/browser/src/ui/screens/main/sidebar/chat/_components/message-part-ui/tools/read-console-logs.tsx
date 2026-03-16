@@ -18,7 +18,7 @@ export const ReadConsoleLogsToolPart = ({
   disableShimmer = false,
   isLastPart = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-readConsoleLogsTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-readConsoleLogs' }>;
   capMaxHeight?: boolean;
   disableShimmer?: boolean;
   isLastPart?: boolean;

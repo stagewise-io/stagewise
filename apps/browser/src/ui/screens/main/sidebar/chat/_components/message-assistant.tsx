@@ -197,18 +197,18 @@ export const MessageAssistant = memo(
                       return (
                         <FilePart key={stableKey} part={part as FileUIPart} />
                       );
-                    case 'tool-deleteFileTool':
+                    case 'tool-deleteFile':
                       return <DeleteFileToolPart key={stableKey} part={part} />;
-                    case 'tool-updateWorkspaceMdTool':
+                    case 'tool-updateWorkspaceMd':
                       return (
                         <UpdateWorkspaceMdToolPart
                           key={stableKey}
                           part={part}
                         />
                       );
-                    case 'tool-multiEditTool':
+                    case 'tool-multiEdit':
                       return <MultiEditToolPart key={stableKey} part={part} />;
-                    case 'tool-executeSandboxJsTool':
+                    case 'tool-executeSandboxJs':
                       return (
                         <ExecuteSandboxJsToolPart
                           key={stableKey}
@@ -216,7 +216,7 @@ export const MessageAssistant = memo(
                           isLastPart={isLastPart}
                         />
                       );
-                    case 'tool-readConsoleLogsTool':
+                    case 'tool-readConsoleLogs':
                       return (
                         <ReadConsoleLogsToolPart
                           key={stableKey}
@@ -224,15 +224,15 @@ export const MessageAssistant = memo(
                           isLastPart={isLastPart}
                         />
                       );
-                    case 'tool-overwriteFileTool':
+                    case 'tool-overwriteFile':
                       return (
                         <OverwriteFileToolPart key={stableKey} part={part} />
                       );
-                    case 'tool-askUserQuestionsTool':
+                    case 'tool-askUserQuestions':
                       return (
                         <AskUserQuestionsToolPart key={stableKey} part={part} />
                       );
-                    case 'tool-executeShellCommandTool':
+                    case 'tool-executeShellCommand':
                       return (
                         <ExecuteShellCommandToolPart
                           key={stableKey}
