@@ -6,6 +6,7 @@ import {
   useKartonConnected,
 } from '@pages/hooks/use-karton';
 import type {
+  FaviconBitmapResult,
   MostVisitedOriginEntry,
   OriginThumbnailResult,
 } from '@shared/karton-contracts/pages-api/types';
@@ -90,6 +91,7 @@ function MostVisitedSection() {
   const getThumbnailsForOrigins = useKartonProcedure(
     (p) => p.getThumbnailsForOrigins,
   );
+  const getFaviconBitmaps = useKartonProcedure((p) => p.getFaviconBitmaps);
   const scanLocalPorts = useKartonProcedure((p) => p.scanLocalPorts);
   const localPorts = useKartonState((s) => s.homePage.localPorts);
 
@@ -105,6 +107,9 @@ function MostVisitedSection() {
   const [thumbnails, setThumbnails] = useState<
     Record<string, OriginThumbnailResult>
   >({});
+  const [favicons, setFavicons] = useState<Record<string, FaviconBitmapResult>>(
+    {},
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -133,6 +138,8 @@ function MostVisitedSection() {
   getMostVisitedOriginsRef.current = getMostVisitedOrigins;
   const getThumbnailsForOriginsRef = useRef(getThumbnailsForOrigins);
   getThumbnailsForOriginsRef.current = getThumbnailsForOrigins;
+  const getFaviconBitmapsRef = useRef(getFaviconBitmaps);
+  getFaviconBitmapsRef.current = getFaviconBitmaps;
   const scanLocalPortsRef = useRef(scanLocalPorts);
   scanLocalPortsRef.current = scanLocalPorts;
 
@@ -151,6 +158,15 @@ function MostVisitedSection() {
         const origins = result.map((e) => e.origin);
         const thumbs = await getThumbnailsForOriginsRef.current(origins);
         setThumbnails(thumbs);
+
+        // Fetch favicon bitmaps for entries that have a faviconUrl
+        const faviconUrls = result
+          .map((e) => e.faviconUrl)
+          .filter((u): u is string => u != null);
+        if (faviconUrls.length > 0) {
+          const bitmaps = await getFaviconBitmapsRef.current(faviconUrls);
+          setFavicons(bitmaps);
+        }
       }
     } finally {
       setIsLoading(false);
@@ -180,6 +196,15 @@ function MostVisitedSection() {
       const origins = result.map((e) => e.origin);
       const thumbs = await getThumbnailsForOriginsRef.current(origins);
       setThumbnails((prev) => ({ ...prev, ...thumbs }));
+
+      // Fetch favicon bitmaps for new entries
+      const faviconUrls = result
+        .map((e) => e.faviconUrl)
+        .filter((u): u is string => u != null);
+      if (faviconUrls.length > 0) {
+        const bitmaps = await getFaviconBitmapsRef.current(faviconUrls);
+        setFavicons((prev) => ({ ...prev, ...bitmaps }));
+      }
     } finally {
       isLoadingMoreRef.current = false;
       setIsLoadingMore(false);
@@ -337,6 +362,9 @@ function MostVisitedSection() {
                 key={entry.origin}
                 entry={entry}
                 thumbnail={thumbnails[entry.origin] ?? null}
+                favicon={
+                  entry.faviconUrl ? (favicons[entry.faviconUrl] ?? null) : null
+                }
                 localPortOrigins={localPortOrigins}
                 onClick={(event) =>
                   handleClick(entry.lastUrl ?? entry.origin, event)
@@ -384,11 +412,13 @@ function isLocalOrigin(origin: string): boolean {
 function MostVisitedCard({
   entry,
   thumbnail,
+  favicon,
   localPortOrigins,
   onClick,
 }: {
   entry: MostVisitedOriginEntry;
   thumbnail: OriginThumbnailResult | null;
+  favicon: FaviconBitmapResult | null;
   localPortOrigins: Set<string>;
   onClick: (event: React.MouseEvent) => void;
 }) {
@@ -431,9 +461,20 @@ function MostVisitedCard({
         )}
       </div>
       <div className="flex w-full items-center justify-between gap-2 p-2 dark:border-derived-strong dark:border-t">
-        <span className="truncate font-normal text-foreground text-sm">
-          {hostname}
-        </span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {favicon?.imageData ? (
+            <img
+              src={`data:image/png;base64,${favicon.imageData}`}
+              alt=""
+              className="size-3.5 shrink-0 rounded-sm"
+            />
+          ) : (
+            <IconEarthFillDuo18 className="size-3.5 shrink-0 text-muted-foreground/50" />
+          )}
+          <span className="truncate font-normal text-foreground text-sm">
+            {hostname}
+          </span>
+        </div>
         {isRunning && (
           <div className="flex shrink-0 items-center gap-1 text-success-foreground text-xs">
             <div className="size-1.5 rounded-full bg-success-foreground" />

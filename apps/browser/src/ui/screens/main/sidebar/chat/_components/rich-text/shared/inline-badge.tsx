@@ -63,7 +63,7 @@ export const BadgeContainer = forwardRef<HTMLSpanElement, BadgeContainerProps>(
         className={cn(
           'group/badge -translate-y-px relative inline-flex h-4 cursor-default items-center gap-1 rounded px-1.5 align-middle text-foreground ring-1 ring-derived',
           editMode
-            ? 'bg-surface-1'
+            ? 'dark:bg-surface-1'
             : 'bg-inherit group-hover/chat-message-user:bg-hover-derived group-hover/chat-message-user:ring-derived-strong dark:group-hover/chat-message-user:ring-derived-strong',
           selected && 'ring-primary-foreground',
           className,

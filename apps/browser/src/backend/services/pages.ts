@@ -1204,6 +1204,15 @@ export class PagesService extends DisposableService {
           origins.map((o) => o.origin),
         );
 
+        // Batch-fetch favicon URLs for the last visited pages
+        const lastUrls = [...details.values()]
+          .map((d) => d.url)
+          .filter(Boolean);
+        const faviconMap =
+          lastUrls.length > 0
+            ? await this.faviconService.getFaviconsForUrls(lastUrls)
+            : new Map<string, string>();
+
         return origins.map((o) => {
           const detail = details.get(o.origin);
           return {
@@ -1212,6 +1221,7 @@ export class PagesService extends DisposableService {
             lastVisitTime: o.lastVisitTime.getTime(),
             title: detail?.title ?? null,
             lastUrl: detail?.url ?? null,
+            faviconUrl: (detail?.url && faviconMap.get(detail.url)) ?? null,
           };
         });
       },
