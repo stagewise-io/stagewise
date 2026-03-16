@@ -577,4 +577,171 @@ describe('computeFileDiffChanges', () => {
     );
     expect(result).toContain(`${ABS} modified by: [agent-42]`);
   });
+
+  it('does not report edits gone when agent reverts its own changes to baseline', () => {
+    const previous = makeEnv(
+      [
+        makeSnapshot({
+          path: ABS,
+          baselineOid: 'base-oid',
+          currentOid: 'agent-edit-oid',
+          contributors: ['agent-1'],
+        }),
+      ],
+      [
+        makeSnapshot({
+          path: ABS,
+          baselineOid: 'base-oid',
+          currentOid: 'agent-edit-oid',
+          contributors: ['agent-1'],
+        }),
+      ],
+    );
+    const current = makeEnv(
+      [],
+      [
+        makeSnapshot({
+          path: ABS,
+          baselineOid: 'base-oid',
+          currentOid: 'base-oid',
+          contributors: [],
+        }),
+      ],
+    );
+    const result = computeFileDiffChanges(previous, current, AGENT_ID);
+    expect(result).toEqual([]);
+  });
+
+  it('still reports edits gone when another contributor was present and file reverts to baseline', () => {
+    const previous = makeEnv(
+      [
+        makeSnapshot({
+          path: ABS,
+          baselineOid: 'base-oid',
+          currentOid: 'mixed-edit-oid',
+          contributors: ['agent-1', 'agent-42'],
+        }),
+      ],
+      [],
+    );
+    const current = makeEnv(
+      [],
+      [
+        makeSnapshot({
+          path: ABS,
+          baselineOid: 'base-oid',
+          currentOid: 'base-oid',
+          contributors: [],
+        }),
+      ],
+    );
+    const result = summaries(
+      computeFileDiffChanges(previous, current, AGENT_ID),
+    );
+    expect(result).toContain(`${ABS}: your edits no longer present`);
+  });
+
+  it('silently swallows user edit when file first appears with self + user contributors', () => {
+    const previous = makeEnv([], []);
+    const current = makeEnv(
+      [
+        makeSnapshot({
+          path: ABS,
+          contributors: ['agent-1', 'user'],
+        }),
+      ],
+      [],
+    );
+    const result = computeFileDiffChanges(previous, current, AGENT_ID);
+    expect(result).toEqual([]);
+  });
+
+  it('does not report partial removal when baseline changes and hunks are reduced', () => {
+    const previous = makeEnv(
+      [
+        makeSnapshot({
+          path: ABS,
+          baselineOid: 'old-base',
+          currentOid: 'old-curr',
+          hunkIds: ['h1', 'h2'],
+          contributors: ['agent-1', 'user'],
+        }),
+      ],
+      [],
+    );
+    const current = makeEnv(
+      [
+        makeSnapshot({
+          path: ABS,
+          baselineOid: 'new-base',
+          currentOid: 'new-curr',
+          hunkIds: ['h2'],
+          contributors: ['agent-1', 'user'],
+        }),
+      ],
+      [],
+    );
+    const result = computeFileDiffChanges(previous, current, AGENT_ID);
+    expect(result).toEqual([]);
+  });
+
+  it('handles multiple files changing simultaneously', () => {
+    const pathA = '/home/user/project/src/a.txt';
+    const pathB = '/home/user/project/src/b.txt';
+    const previous = makeEnv(
+      [
+        makeSnapshot({
+          path: pathA,
+          currentOid: 'a-old',
+          contributors: ['agent-1'],
+        }),
+      ],
+      [],
+    );
+    const current = makeEnv(
+      [
+        makeSnapshot({
+          path: pathA,
+          currentOid: 'a-new',
+          contributors: ['agent-1', 'user'],
+        }),
+        makeSnapshot({
+          path: pathB,
+          contributors: ['agent-42'],
+        }),
+      ],
+      [],
+    );
+    const result = summaries(
+      computeFileDiffChanges(previous, current, AGENT_ID),
+    );
+    expect(result).toContain(`${pathA} modified by: [user]`);
+    expect(result).toContain(`${pathB} modified by: [agent-42]`);
+    expect(result).toHaveLength(2);
+  });
+
+  it('does not report when a contributor is removed but self remains', () => {
+    const previous = makeEnv(
+      [
+        makeSnapshot({
+          path: ABS,
+          currentOid: 'old-curr',
+          contributors: ['agent-1', 'agent-42'],
+        }),
+      ],
+      [],
+    );
+    const current = makeEnv(
+      [
+        makeSnapshot({
+          path: ABS,
+          currentOid: 'new-curr',
+          contributors: ['agent-1'],
+        }),
+      ],
+      [],
+    );
+    const result = computeFileDiffChanges(previous, current, AGENT_ID);
+    expect(result).toEqual([]);
+  });
 });

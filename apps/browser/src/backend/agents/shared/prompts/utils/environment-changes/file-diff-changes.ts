@@ -138,7 +138,21 @@ export function computeFileDiffChanges(
     const editsStillReflectedInSummary =
       summarySnap != null && summarySnap.currentOid === prev.currentOid;
 
-    if (selfWasContributor && !editsStillReflectedInSummary) {
+    // If the summary shows currentOid === baselineOid, the file was reverted
+    // to baseline. If self was the only contributor in the previous pending
+    // snapshot, this was a self-revert (agent undid its own changes) — not
+    // an external revert. Don't report it.
+    const selfRevertedToBaseline =
+      selfWasContributor &&
+      summarySnap != null &&
+      summarySnap.currentOid === summarySnap.baselineOid &&
+      prev.contributors.every((c) => c === selfKey);
+
+    if (
+      selfWasContributor &&
+      !editsStillReflectedInSummary &&
+      !selfRevertedToBaseline
+    ) {
       const entry = getOrCreate(fileChanges, path);
       entry.editsGone = true;
     }
