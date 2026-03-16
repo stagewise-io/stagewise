@@ -342,6 +342,8 @@ export interface MostVisitedOriginEntry {
   title: string | null;
   /** The last specific URL visited within this origin (for navigation) */
   lastUrl: string | null;
+  /** Favicon URL resolved from the last visited page within this origin */
+  faviconUrl: string | null;
 }
 
 /** Result of getExternalFileContent procedure */
