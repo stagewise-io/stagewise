@@ -59,16 +59,16 @@ export type ReadOnlyToolPart =
       AgentToolUIPart,
       {
         type:
-          | 'tool-globTool'
-          | 'tool-grepSearchTool'
-          | 'tool-listFilesTool'
-          | 'tool-readFileTool'
-          | 'tool-searchInLibraryDocsTool'
-          | 'tool-listLibraryDocsTool'
-          | 'tool-executeSandboxJsTool'
-          | 'tool-readConsoleLogsTool'
-          | 'tool-getLintingDiagnosticsTool'
-          | 'tool-updateWorkspaceMdTool';
+          | 'tool-glob'
+          | 'tool-grepSearch'
+          | 'tool-listFiles'
+          | 'tool-readFile'
+          | 'tool-searchInLibraryDocs'
+          | 'tool-listLibraryDocs'
+          | 'tool-executeSandboxJs'
+          | 'tool-readConsoleLogs'
+          | 'tool-getLintingDiagnostics'
+          | 'tool-updateWorkspaceMd';
       }
     >
   | ReasoningUIPart;
@@ -78,16 +78,16 @@ export function isReadOnlyToolPart(
 ): part is ReadOnlyToolPart {
   return (
     part.type === 'reasoning' ||
-    part.type === 'tool-globTool' ||
-    part.type === 'tool-grepSearchTool' ||
-    part.type === 'tool-listFilesTool' ||
-    part.type === 'tool-readFileTool' ||
-    part.type === 'tool-searchInLibraryDocsTool' ||
-    part.type === 'tool-listLibraryDocsTool' ||
-    part.type === 'tool-executeSandboxJsTool' ||
-    part.type === 'tool-readConsoleLogsTool' ||
-    part.type === 'tool-getLintingDiagnosticsTool' ||
-    part.type === 'tool-updateWorkspaceMdTool'
+    part.type === 'tool-glob' ||
+    part.type === 'tool-grepSearch' ||
+    part.type === 'tool-listFiles' ||
+    part.type === 'tool-readFile' ||
+    part.type === 'tool-searchInLibraryDocs' ||
+    part.type === 'tool-listLibraryDocs' ||
+    part.type === 'tool-executeSandboxJs' ||
+    part.type === 'tool-readConsoleLogs' ||
+    part.type === 'tool-getLintingDiagnostics' ||
+    part.type === 'tool-updateWorkspaceMd'
   );
 }
 
@@ -117,7 +117,7 @@ const PartContent = ({
           capMaxHeight={capMaxHeight}
         />
       );
-    case 'tool-globTool':
+    case 'tool-glob':
       return (
         <GlobToolPart
           key={part.toolCallId}
@@ -126,7 +126,7 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
-    case 'tool-grepSearchTool':
+    case 'tool-grepSearch':
       return (
         <GrepSearchToolPart
           key={part.toolCallId}
@@ -135,7 +135,7 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
-    case 'tool-listFilesTool':
+    case 'tool-listFiles':
       return (
         <ListFilesToolPart
           key={part.toolCallId}
@@ -144,7 +144,7 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
-    case 'tool-readFileTool':
+    case 'tool-readFile':
       return (
         <ReadFileToolPart
           minimal={minimal}
@@ -153,7 +153,7 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
-    case 'tool-searchInLibraryDocsTool':
+    case 'tool-searchInLibraryDocs':
       return (
         <SearchInLibraryDocsToolPart
           key={part.toolCallId}
@@ -162,7 +162,7 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
-    case 'tool-listLibraryDocsTool':
+    case 'tool-listLibraryDocs':
       return (
         <ListLibraryDocsToolPart
           key={part.toolCallId}
@@ -171,7 +171,7 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
-    case 'tool-executeSandboxJsTool':
+    case 'tool-executeSandboxJs':
       return (
         <ExecuteSandboxJsToolPart
           key={part.toolCallId}
@@ -182,7 +182,7 @@ const PartContent = ({
           capMaxHeight={capMaxHeight}
         />
       );
-    case 'tool-readConsoleLogsTool':
+    case 'tool-readConsoleLogs':
       return (
         <ReadConsoleLogsToolPart
           key={part.toolCallId}
@@ -192,7 +192,7 @@ const PartContent = ({
           capMaxHeight={capMaxHeight}
         />
       );
-    case 'tool-getLintingDiagnosticsTool':
+    case 'tool-getLintingDiagnostics':
       return (
         <GetLintingDiagnosticsToolPart
           key={part.toolCallId}
@@ -202,7 +202,7 @@ const PartContent = ({
           capMaxHeight={capMaxHeight}
         />
       );
-    case 'tool-updateWorkspaceMdTool':
+    case 'tool-updateWorkspaceMd':
       return (
         <UpdateWorkspaceMdToolPart
           key={part.toolCallId}
@@ -311,25 +311,25 @@ export const ExploringToolParts = ({
     );
     finishedParts.forEach((part) => {
       switch (part.type) {
-        case 'tool-readFileTool':
+        case 'tool-readFile':
           filesRead += 1;
           linesRead += part.output?.result?.totalLines ?? 0;
           hasUsedFileTools = true;
           break;
-        case 'tool-globTool':
-        case 'tool-grepSearchTool':
+        case 'tool-glob':
+        case 'tool-grepSearch':
           filesFound += part.output?.result?.totalMatches ?? 0;
           hasUsedFileTools = true;
           break;
-        case 'tool-listFilesTool':
+        case 'tool-listFiles':
           filesFound += part.output?.result?.totalFiles ?? 0;
           hasUsedFileTools = true;
           break;
-        case 'tool-searchInLibraryDocsTool':
+        case 'tool-searchInLibraryDocs':
           docsRead += 1;
           hasUsedContext7Tools = true;
           break;
-        case 'tool-executeSandboxJsTool': {
+        case 'tool-executeSandboxJs': {
           const script = part.input?.script ?? '';
           const cdpCalls = parseCDPCalls(script);
           const writeFileCalls = parseWriteFileCalls(script);
@@ -385,10 +385,10 @@ export const ExploringToolParts = ({
 
           break;
         }
-        case 'tool-readConsoleLogsTool':
+        case 'tool-readConsoleLogs':
           consoleLogsRead += 1;
           break;
-        case 'tool-getLintingDiagnosticsTool':
+        case 'tool-getLintingDiagnostics':
           hasCheckedLinting = true;
           lintingErrors += part.output?.summary?.errors ?? 0;
           lintingWarnings += part.output?.summary?.warnings ?? 0;
@@ -555,45 +555,45 @@ export const ExploringToolParts = ({
       .filter((part) => part.type !== 'reasoning')
       .at(-1);
     switch (lastNonReasoningPart?.type || '') {
-      case 'tool-readFileTool':
-      case 'tool-globTool':
-      case 'tool-grepSearchTool':
-      case 'tool-listFilesTool':
+      case 'tool-readFile':
+      case 'tool-glob':
+      case 'tool-grepSearch':
+      case 'tool-listFiles':
         return 'Exploring files...';
-      case 'tool-searchInLibraryDocsTool': {
+      case 'tool-searchInLibraryDocs': {
         const p = lastNonReasoningPart as Extract<
           AgentToolUIPart,
-          { type: 'tool-searchInLibraryDocsTool' }
+          { type: 'tool-searchInLibraryDocs' }
         >;
         if (!p.input?.libraryId) return 'Exploring documentation...';
         return `Reading docs for ${p.input.libraryId}...`;
       }
-      case 'tool-listLibraryDocsTool': {
+      case 'tool-listLibraryDocs': {
         const p = lastNonReasoningPart as Extract<
           AgentToolUIPart,
-          { type: 'tool-listLibraryDocsTool' }
+          { type: 'tool-listLibraryDocs' }
         >;
         if (!p.input?.name) return 'Exploring documentation...';
         return `Searching docs for ${p.input.name}...`;
       }
-      case 'tool-executeSandboxJsTool': {
+      case 'tool-executeSandboxJs': {
         const p = lastNonReasoningPart as Extract<
           AgentToolUIPart,
-          { type: 'tool-executeSandboxJsTool' }
+          { type: 'tool-executeSandboxJs' }
         >;
         return getSandboxLabel(p.input?.script, activeTabs, true);
       }
-      case 'tool-readConsoleLogsTool': {
+      case 'tool-readConsoleLogs': {
         const p = lastNonReasoningPart as Extract<
           AgentToolUIPart,
-          { type: 'tool-readConsoleLogsTool' }
+          { type: 'tool-readConsoleLogs' }
         >;
         const tab = activeTabs[p.input?.id ?? ''];
         if (!tab) return 'Exploring the browser...';
         const hostname = new URL(tab.url).hostname;
         return `Reading logs from ${hostname}...`;
       }
-      case 'tool-getLintingDiagnosticsTool':
+      case 'tool-getLintingDiagnostics':
         return 'Checking linting...';
       default:
         return isReasoningOnly ? 'Thinking...' : 'Exploring...';

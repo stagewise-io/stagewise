@@ -19,7 +19,7 @@ Parameters:
 - script (string, REQUIRED): JavaScript code to execute in the sandbox.
 `;
 
-export const executeSandboxJsTool = (
+export const executeSandboxJs = (
   sandboxService: SandboxService,
   agentInstanceId: string,
 ) => {

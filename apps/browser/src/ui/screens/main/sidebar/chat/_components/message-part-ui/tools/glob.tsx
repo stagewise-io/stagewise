@@ -7,7 +7,7 @@ export const GlobToolPart = ({
   disableShimmer = false,
   minimal = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-globTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-glob' }>;
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {

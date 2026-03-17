@@ -30,7 +30,7 @@ export const ExecuteSandboxJsToolPart = ({
   disableShimmer = false,
   isLastPart = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-executeSandboxJsTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-executeSandboxJs' }>;
   capMaxHeight?: boolean;
   showBorder?: boolean;
   disableShimmer?: boolean;

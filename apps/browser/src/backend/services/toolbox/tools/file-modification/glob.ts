@@ -13,7 +13,7 @@ import {
 /* Due to an issue in zod schema conversion in the ai sdk,
    the schema descriptions are not properly used for the prompts -
    thus, we include them in the descriptions as well. */
-export const DESCRIPTION = `Find files and directories BY THEIR PATH/NAME using glob patterns (like 'find' command). Use when searching for files by name or extension. NOT for searching inside file contents (use grepSearchTool for that).
+export const DESCRIPTION = `Find files and directories BY THEIR PATH/NAME using glob patterns (like 'find' command). Use when searching for files by name or extension. NOT for searching inside file contents (use grepSearch for that).
 
 Parameters:
 - pattern (string, REQUIRED): Glob pattern supporting standard syntax (*, **, ?, [abc]). Examples: '**/*.test.ts' for test files, 'src/**/config.json' for configs.
@@ -103,7 +103,7 @@ export async function globToolExecute(
   }
 }
 
-export const globTool = (mountedRuntimes: MountedClientRuntimes) =>
+export const glob = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: globToolInputSchema,

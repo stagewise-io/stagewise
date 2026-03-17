@@ -13,7 +13,7 @@ import { InlineMarkdown } from '@ui/components/streamdown';
 
 type AskUserQuestionsPart = Extract<
   AgentToolUIPart,
-  { type: 'tool-askUserQuestionsTool' }
+  { type: 'tool-askUserQuestions' }
 >;
 
 /** Format a field's answered value for display */

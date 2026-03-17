@@ -67,16 +67,16 @@ type GroupedPart =
 function isReadOnlyToolPart(part: MessagePart): boolean {
   return (
     part.type === 'reasoning' ||
-    part.type === 'tool-globTool' ||
-    part.type === 'tool-grepSearchTool' ||
-    part.type === 'tool-listFilesTool' ||
-    part.type === 'tool-readFileTool' ||
-    part.type === 'tool-searchInLibraryDocsTool' ||
-    part.type === 'tool-listLibraryDocsTool' ||
-    part.type === 'tool-executeSandboxJsTool' ||
-    part.type === 'tool-readConsoleLogsTool' ||
-    part.type === 'tool-getLintingDiagnosticsTool' ||
-    part.type === 'tool-updateWorkspaceMdTool'
+    part.type === 'tool-glob' ||
+    part.type === 'tool-grepSearch' ||
+    part.type === 'tool-listFiles' ||
+    part.type === 'tool-readFile' ||
+    part.type === 'tool-searchInLibraryDocs' ||
+    part.type === 'tool-listLibraryDocs' ||
+    part.type === 'tool-executeSandboxJs' ||
+    part.type === 'tool-readConsoleLogs' ||
+    part.type === 'tool-getLintingDiagnostics' ||
+    part.type === 'tool-updateWorkspaceMd'
   );
 }
 
@@ -281,9 +281,9 @@ function estimateAssistantMessageHeight(
           break;
         }
 
-        case 'tool-multiEditTool':
-        case 'tool-overwriteFileTool':
-        case 'tool-deleteFileTool': {
+        case 'tool-multiEdit':
+        case 'tool-overwriteFile':
+        case 'tool-deleteFile': {
           partHeight = estimateWriteToolHeight(
             part as ToolUIPart<UIAgentTools>,
           );

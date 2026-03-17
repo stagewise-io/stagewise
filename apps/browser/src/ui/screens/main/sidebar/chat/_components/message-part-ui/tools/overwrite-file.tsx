@@ -34,7 +34,7 @@ import {
 export const OverwriteFileToolPart = ({
   part,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-overwriteFileTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-overwriteFile' }>;
 }) => {
   const [codeDiffCollapsed, setCodeDiffCollapsed] = useState(true);
   const [expanded, setExpanded] = useState(true);

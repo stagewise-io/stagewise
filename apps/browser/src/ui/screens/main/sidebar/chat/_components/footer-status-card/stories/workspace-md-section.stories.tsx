@@ -125,7 +125,7 @@ export const RunningReadingFiles: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-readFileTool', {
+      createMockToolMessage('tool-readFile', {
         relative_path: 'src/components/Button.tsx',
       }),
     ],
@@ -143,7 +143,7 @@ export const RunningListingFiles: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-listFilesTool', {
+      createMockToolMessage('tool-listFiles', {
         relative_path: 'src/components',
       }),
     ],
@@ -161,7 +161,7 @@ export const RunningGlobSearch: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-globTool', {
+      createMockToolMessage('tool-glob', {
         pattern: '**/*.tsx',
       }),
     ],
@@ -179,7 +179,7 @@ export const RunningGrepSearch: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-grepSearchTool', {
+      createMockToolMessage('tool-grepSearch', {
         query: 'useState',
       }),
     ],
@@ -196,7 +196,7 @@ export const RunningWritingFile: Story = {
   name: 'Running / Writing ',
   args: {
     status: 'running',
-    history: [createMockToolMessage('tool-overwriteFileTool', {})],
+    history: [createMockToolMessage('tool-overwriteFile', {})],
   },
 };
 
@@ -211,11 +211,11 @@ export const RunningMultipleToolCalls: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-listFilesTool', { relative_path: 'src' }),
-      createMockToolMessage('tool-readFileTool', {
+      createMockToolMessage('tool-listFiles', { relative_path: 'src' }),
+      createMockToolMessage('tool-readFile', {
         relative_path: 'package.json',
       }),
-      createMockToolMessage('tool-grepSearchTool', { query: 'dependencies' }),
+      createMockToolMessage('tool-grepSearch', { query: 'dependencies' }),
     ],
   },
 };
@@ -231,7 +231,7 @@ export const RunningAbsolutePathNoMounts: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-listFilesTool', {
+      createMockToolMessage('tool-listFiles', {
         relative_path: '/Users/user/projects/my-app/src/components',
       }),
     ],
@@ -250,7 +250,7 @@ export const RunningAbsolutePathWithMounts: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-listFilesTool', {
+      createMockToolMessage('tool-listFiles', {
         relative_path: '/Users/user/projects/my-app/src/components',
       }),
     ],

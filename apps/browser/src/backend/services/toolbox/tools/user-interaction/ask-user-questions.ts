@@ -149,7 +149,7 @@ export function cleanupQuestionsForAgent(
   cancelQuestion(questionId, 'agent_stopped', uiKarton, agentInstanceId);
 }
 
-export const askUserQuestionsTool = (
+export const askUserQuestions = (
   uiKarton: KartonService,
   agentInstanceId: string,
 ) => {

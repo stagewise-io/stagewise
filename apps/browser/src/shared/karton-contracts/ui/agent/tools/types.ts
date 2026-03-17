@@ -38,7 +38,7 @@ export type OverwriteFileToolOutput = z.infer<
 >;
 
 /**
- * Schema definition for overwriteFileTool (without execute function)
+ * Schema definition for overwriteFile (without execute function)
  */
 export const overwriteFileToolSchema = {
   inputSchema: overwriteFileToolInputSchema,
@@ -86,7 +86,7 @@ export type ReadFileToolInput = z.infer<typeof readFileToolInputSchema>;
 export type ReadFileToolOutput = z.infer<typeof readFileToolOutputSchema>;
 
 /**
- * Schema definition for readFileTool (without execute function)
+ * Schema definition for readFile (without execute function)
  */
 export const readFileToolSchema = {
   inputSchema: readFileToolInputSchema,
@@ -688,21 +688,21 @@ export const executeShellCommandToolSchema = {
  * Used with InferUITools to derive TypeScript types.
  */
 export const allToolSchemas = {
-  overwriteFileTool: overwriteFileToolSchema,
-  readFileTool: readFileToolSchema,
-  listFilesTool: listFilesToolSchema,
-  grepSearchTool: grepSearchToolSchema,
-  globTool: globToolSchema,
-  multiEditTool: multiEditToolSchema,
-  deleteFileTool: deleteFileToolSchema,
-  getLintingDiagnosticsTool: getLintingDiagnosticsToolSchema,
-  updateWorkspaceMdTool: updateWorkspaceMdToolSchema,
-  executeSandboxJsTool: executeSandboxJsToolSchema,
-  readConsoleLogsTool: readConsoleLogsToolSchema,
-  listLibraryDocsTool: listLibraryDocsToolSchema,
-  searchInLibraryDocsTool: searchInLibraryDocsToolSchema,
-  askUserQuestionsTool: askUserQuestionsToolSchema,
-  executeShellCommandTool: executeShellCommandToolSchema,
+  overwriteFile: overwriteFileToolSchema,
+  readFile: readFileToolSchema,
+  listFiles: listFilesToolSchema,
+  grepSearch: grepSearchToolSchema,
+  glob: globToolSchema,
+  multiEdit: multiEditToolSchema,
+  deleteFile: deleteFileToolSchema,
+  getLintingDiagnostics: getLintingDiagnosticsToolSchema,
+  updateWorkspaceMd: updateWorkspaceMdToolSchema,
+  executeSandboxJs: executeSandboxJsToolSchema,
+  readConsoleLogs: readConsoleLogsToolSchema,
+  listLibraryDocs: listLibraryDocsToolSchema,
+  searchInLibraryDocs: searchInLibraryDocsToolSchema,
+  askUserQuestions: askUserQuestionsToolSchema,
+  executeShellCommand: executeShellCommandToolSchema,
 } as const;
 /**
  * Inferred UI types for all tools.

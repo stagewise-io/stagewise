@@ -7,7 +7,7 @@ export const GrepSearchToolPart = ({
   disableShimmer = false,
   minimal = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-grepSearchTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-grepSearch' }>;
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {

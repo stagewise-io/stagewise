@@ -36,7 +36,7 @@ function resolveCwd(
   return homedir();
 }
 
-export const executeShellCommandTool = (
+export const executeShellCommand = (
   shellService: ShellService,
   agentInstanceId: string,
   getMountedPaths: MountedPathsGetter,

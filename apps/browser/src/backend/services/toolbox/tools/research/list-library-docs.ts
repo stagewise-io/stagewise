@@ -53,7 +53,7 @@ export async function listPackageDocsToolExecute(
   }
 }
 
-export const listLibraryDocsTool = (apiClient: ApiClient) =>
+export const listLibraryDocs = (apiClient: ApiClient) =>
   tool({
     description: DESCRIPTION,
     inputSchema: listLibraryDocsToolInputSchema,

@@ -53,7 +53,7 @@ export async function searchInLibraryDocsToolExecute(
   }
 }
 
-export const searchInLibraryDocsTool = (apiClient: ApiClient) =>
+export const searchInLibraryDocs = (apiClient: ApiClient) =>
   tool({
     description: DESCRIPTION,
     inputSchema: searchInLibraryDocsToolInputSchema,

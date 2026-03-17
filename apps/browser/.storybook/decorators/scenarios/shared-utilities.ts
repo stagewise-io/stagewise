@@ -245,7 +245,7 @@ export function createReadFileToolPart(
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-readFileTool',
+      type: 'tool-readFile',
       toolCallId,
       state: 'input-streaming',
       input: {
@@ -256,7 +256,7 @@ export function createReadFileToolPart(
 
   if (state === 'input-available') {
     return {
-      type: 'tool-readFileTool',
+      type: 'tool-readFile',
       toolCallId,
       state: 'input-available',
       input: {
@@ -267,7 +267,7 @@ export function createReadFileToolPart(
 
   // state === 'output-available'
   return {
-    type: 'tool-readFileTool',
+    type: 'tool-readFile',
     toolCallId,
     state: 'output-available',
     input: {
@@ -310,7 +310,7 @@ export function createOverwriteFileToolPart(
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-overwriteFileTool',
+      type: 'tool-overwriteFile',
       toolCallId,
       state: 'input-streaming',
       input: {
@@ -322,7 +322,7 @@ export function createOverwriteFileToolPart(
 
   if (state === 'input-available') {
     return {
-      type: 'tool-overwriteFileTool',
+      type: 'tool-overwriteFile',
       toolCallId,
       state: 'input-available',
       input: {
@@ -334,7 +334,7 @@ export function createOverwriteFileToolPart(
 
   // state === 'output-available'
   return {
-    type: 'tool-overwriteFileTool',
+    type: 'tool-overwriteFile',
     toolCallId,
     state: 'output-available',
     input: {
@@ -376,7 +376,7 @@ export function createMultiEditToolPart(
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-multiEditTool',
+      type: 'tool-multiEdit',
       toolCallId,
       state: 'input-streaming',
       input: {
@@ -388,7 +388,7 @@ export function createMultiEditToolPart(
 
   if (state === 'input-available') {
     return {
-      type: 'tool-multiEditTool',
+      type: 'tool-multiEdit',
       toolCallId,
       state: 'input-available',
       input: {
@@ -400,7 +400,7 @@ export function createMultiEditToolPart(
 
   // state === 'output-available'
   return {
-    type: 'tool-multiEditTool',
+    type: 'tool-multiEdit',
     toolCallId,
     state: 'output-available',
     input: {
@@ -444,7 +444,7 @@ export function createDeleteFileToolPart(
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-deleteFileTool',
+      type: 'tool-deleteFile',
       toolCallId,
       state: 'input-streaming',
       input: {
@@ -455,7 +455,7 @@ export function createDeleteFileToolPart(
 
   if (state === 'input-available') {
     return {
-      type: 'tool-deleteFileTool',
+      type: 'tool-deleteFile',
       toolCallId,
       state: 'input-available',
       input: {
@@ -466,7 +466,7 @@ export function createDeleteFileToolPart(
 
   // state === 'output-available'
   return {
-    type: 'tool-deleteFileTool',
+    type: 'tool-deleteFile',
     toolCallId,
     state: 'output-available',
     input: {
@@ -511,7 +511,7 @@ export function createListFilesToolPart(
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-listFilesTool',
+      type: 'tool-listFiles',
       toolCallId,
       state: 'input-streaming',
       input: {
@@ -525,7 +525,7 @@ export function createListFilesToolPart(
 
   if (state === 'input-available') {
     return {
-      type: 'tool-listFilesTool',
+      type: 'tool-listFiles',
       toolCallId,
       state: 'input-available',
       input: {
@@ -548,7 +548,7 @@ export function createListFilesToolPart(
   message += ` - ${totalFiles} files, ${totalDirectories} directories`;
 
   return {
-    type: 'tool-listFilesTool',
+    type: 'tool-listFiles',
     toolCallId,
     state: 'output-available',
     input: {
@@ -590,7 +590,7 @@ export function createGlobToolPart(
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-globTool',
+      type: 'tool-glob',
       toolCallId,
       state: 'input-streaming',
       input: {
@@ -602,7 +602,7 @@ export function createGlobToolPart(
 
   if (state === 'input-available') {
     return {
-      type: 'tool-globTool',
+      type: 'tool-glob',
       toolCallId,
       state: 'input-available',
       input: {
@@ -614,7 +614,7 @@ export function createGlobToolPart(
 
   // state === 'output-available'
   return {
-    type: 'tool-globTool',
+    type: 'tool-glob',
     toolCallId,
     state: 'output-available',
     input: {
@@ -652,7 +652,7 @@ export function createGrepSearchToolPart(
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-grepSearchTool',
+      type: 'tool-grepSearch',
       toolCallId,
       state: 'input-streaming',
       input: {
@@ -665,7 +665,7 @@ export function createGrepSearchToolPart(
 
   if (state === 'input-available') {
     return {
-      type: 'tool-grepSearchTool',
+      type: 'tool-grepSearch',
       toolCallId,
       state: 'input-available',
       input: {
@@ -678,7 +678,7 @@ export function createGrepSearchToolPart(
 
   // state === 'output-available'
   return {
-    type: 'tool-grepSearchTool',
+    type: 'tool-grepSearch',
     toolCallId,
     state: 'output-available',
     input: {
@@ -724,7 +724,7 @@ export function createExecuteSandboxJsToolPart(
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-executeSandboxJsTool',
+      type: 'tool-executeSandboxJs',
       toolCallId,
       state: 'input-streaming',
       input: { script },
@@ -733,7 +733,7 @@ export function createExecuteSandboxJsToolPart(
 
   if (state === 'input-available') {
     return {
-      type: 'tool-executeSandboxJsTool',
+      type: 'tool-executeSandboxJs',
       toolCallId,
       state: 'input-available',
       input: { script },
@@ -742,7 +742,7 @@ export function createExecuteSandboxJsToolPart(
 
   if (state === 'output-error') {
     return {
-      type: 'tool-executeSandboxJsTool',
+      type: 'tool-executeSandboxJs',
       toolCallId,
       state: 'output-error',
       input: { script },
@@ -752,7 +752,7 @@ export function createExecuteSandboxJsToolPart(
   }
 
   return {
-    type: 'tool-executeSandboxJsTool',
+    type: 'tool-executeSandboxJs',
     toolCallId,
     state: 'output-available',
     input: { script },
@@ -798,7 +798,7 @@ export function createExecuteShellCommandToolPart(
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-executeShellCommandTool',
+      type: 'tool-executeShellCommand',
       toolCallId,
       state: 'input-streaming',
       input: { command },
@@ -807,7 +807,7 @@ export function createExecuteShellCommandToolPart(
 
   if (state === 'input-available') {
     return {
-      type: 'tool-executeShellCommandTool',
+      type: 'tool-executeShellCommand',
       toolCallId,
       state: 'input-available',
       input: { command },
@@ -816,7 +816,7 @@ export function createExecuteShellCommandToolPart(
 
   if (state === 'approval-requested') {
     return {
-      type: 'tool-executeShellCommandTool',
+      type: 'tool-executeShellCommand',
       toolCallId,
       state: 'approval-requested',
       input: { command },
@@ -826,7 +826,7 @@ export function createExecuteShellCommandToolPart(
 
   if (state === 'approval-responded') {
     return {
-      type: 'tool-executeShellCommandTool',
+      type: 'tool-executeShellCommand',
       toolCallId,
       state: 'approval-responded',
       input: { command },
@@ -840,7 +840,7 @@ export function createExecuteShellCommandToolPart(
 
   if (state === 'output-denied') {
     return {
-      type: 'tool-executeShellCommandTool',
+      type: 'tool-executeShellCommand',
       toolCallId,
       state: 'output-denied',
       input: { command },
@@ -854,7 +854,7 @@ export function createExecuteShellCommandToolPart(
 
   if (state === 'output-error') {
     return {
-      type: 'tool-executeShellCommandTool',
+      type: 'tool-executeShellCommand',
       toolCallId,
       state: 'output-error',
       input: { command },
@@ -865,7 +865,7 @@ export function createExecuteShellCommandToolPart(
   }
 
   return {
-    type: 'tool-executeShellCommandTool',
+    type: 'tool-executeShellCommand',
     toolCallId,
     state: 'output-available',
     input: { command },

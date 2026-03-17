@@ -148,7 +148,7 @@ export async function listFilesToolExecute(
   }
 }
 
-export const listFilesTool = (mountedRuntimes: MountedClientRuntimes) =>
+export const listFiles = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: listFilesToolInputSchema,

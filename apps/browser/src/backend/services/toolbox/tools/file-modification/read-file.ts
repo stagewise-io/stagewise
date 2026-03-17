@@ -130,7 +130,7 @@ export async function readFileToolExecute(
   }
 }
 
-export const readFileTool = (mountedRuntimes: MountedClientRuntimes) =>
+export const readFile = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: readFileToolInputSchema,

@@ -7,7 +7,7 @@ export const SearchInLibraryDocsToolPart = ({
   disableShimmer = false,
   minimal = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-searchInLibraryDocsTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-searchInLibraryDocs' }>;
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {

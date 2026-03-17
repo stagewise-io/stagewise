@@ -14,7 +14,7 @@ import {
 /* Due to an issue in zod schema conversion in the ai sdk,
    the schema descriptions are not properly used for the prompts -
    thus, we include them in the descriptions as well. */
-export const DESCRIPTION = `Fast regex search INSIDE file contents using ripgrep. Use to find code patterns, function definitions, or specific text within files. NOT for finding files by name (use globTool for that).
+export const DESCRIPTION = `Fast regex search INSIDE file contents using ripgrep. Use to find code patterns, function definitions, or specific text within files. NOT for finding files by name (use glob for that).
 
 Parameters:
 - query (string, REQUIRED): Regex pattern using ripgrep syntax (similar to PCRE). Search for exact code strings or patterns.
@@ -155,7 +155,7 @@ export async function grepSearchToolExecute(
   }
 }
 
-export const grepSearchTool = (mountedRuntimes: MountedClientRuntimes) =>
+export const grepSearch = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: grepSearchToolInputSchema,

@@ -8,7 +8,7 @@ export const ListFilesToolPart = ({
   disableShimmer = false,
   minimal = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-listFilesTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-listFiles' }>;
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {

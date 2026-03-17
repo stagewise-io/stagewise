@@ -12,7 +12,7 @@ export const UpdateWorkspaceMdToolPart = ({
   disableShimmer = false,
   minimal = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-updateWorkspaceMdTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-updateWorkspaceMd' }>;
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {

@@ -26,7 +26,7 @@ import { FileContextMenu } from '@ui/components/file-context-menu';
 export const DeleteFileToolPart = ({
   part,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-deleteFileTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-deleteFile' }>;
 }) => {
   const [expanded, setExpanded] = useState(true);
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);

@@ -7,7 +7,7 @@ export const ListLibraryDocsToolPart = ({
   disableShimmer = false,
   minimal = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-listLibraryDocsTool' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-listLibraryDocs' }>;
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {
