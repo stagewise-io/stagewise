@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0-alpha.34 (2026-03-17)
+
+### Features
+
+* add custom ui for plugin-/ skill-reads (ae42973)
+
+### Bug Fixes
+
+* fix 'stuck' resizable panel for chat-history on max-w (2d09a29)
+* prevent user-question checkboxes from shrinking (039732f)
+* remove duplicate 'compacted' message (74bda1d)
+
 ## 1.0.0-alpha.33 (2026-03-17)
 
 ### Other Changes
