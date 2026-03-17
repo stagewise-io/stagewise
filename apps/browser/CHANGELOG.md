@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.36 (2026-03-17)
+
+### Bug Fixes
+
+* add app-launched to bypass-list (ce0fdea)
+
 ## 1.0.0-alpha.35 (2026-03-17)
 
 ### Bug Fixes
