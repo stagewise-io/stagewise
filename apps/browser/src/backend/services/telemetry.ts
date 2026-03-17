@@ -238,6 +238,7 @@ export class TelemetryService extends DisposableService {
       // Always allow critical lifecycle events through so we can measure
       // opt-out rates and keep funnels intact even when telemetry is off.
       const bypassOptOut: Array<keyof EventProperties> = [
+        'app-launched',
         'telemetry-level-changed',
         'onboarding-completed',
       ];
