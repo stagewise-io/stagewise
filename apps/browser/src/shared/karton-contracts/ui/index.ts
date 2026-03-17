@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ModelId } from '@shared/available-models';
+import type { PluginDefinition } from '@shared/plugins';
 import type {
   UserMessageMetadata,
   MountPermission,
@@ -605,6 +606,9 @@ export type AppState = {
 
   // Current system theme (light or dark) based on OS preference
   systemTheme: 'light' | 'dark';
+
+  /** Bundled plugin definitions (static, pushed once at startup) */
+  plugins: PluginDefinition[];
 };
 
 export type AuthStatus =
@@ -1063,4 +1067,5 @@ export const defaultState: KartonContract['state'] = {
   preferences: defaultUserPreferences,
   searchEngines: [],
   systemTheme: 'light', // Will be set correctly by backend on init
+  plugins: [],
 };

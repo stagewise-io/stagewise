@@ -20,6 +20,7 @@ import { UpdateWorkspaceMdToolPart } from './update-workspace-md';
 import { SearchInLibraryDocsToolPart } from './search-in-library-docs';
 import { ListLibraryDocsToolPart } from './list-library-docs';
 import { cn } from '@ui/utils';
+import type { PluginDefinition } from '@shared/plugins';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import {
   Tooltip,
@@ -216,6 +217,10 @@ const PartContent = ({
   }
 };
 
+const PLUGIN_SKILL_RE = /^plugins\/([^/]+)\/SKILL\.md$/;
+const WORKSPACE_SKILL_RE =
+  /^[^/]+\/\.(?:stagewise|agents)\/skills\/([^/]+)\/SKILL\.md$/;
+
 export const ExploringToolParts = ({
   parts,
   isAutoExpanded,
@@ -236,6 +241,7 @@ export const ExploringToolParts = ({
   );
   const isOnlyOnePart = useMemo(() => parts.length === 1, [parts]);
   const activeTabs = useKartonState((s) => s.browser.tabs);
+  const plugins = useKartonState((s) => s.plugins);
 
   useEffect(() => {
     setExpanded(isAutoExpanded);
@@ -297,6 +303,7 @@ export const ExploringToolParts = ({
     let lintingErrors = 0;
     let lintingWarnings = 0;
     let hasCheckedLinting = false;
+    let hasUpdatedWorkspaceMd = false;
 
     let screenshotsTaken = 0;
     let stylesInspected = 0;
@@ -305,17 +312,34 @@ export const ExploringToolParts = ({
     let sandboxFilesWritten = 0;
     const attachmentLabels: string[] = [];
     const inspectedHostnames = new Set<string>();
+    const enabledPlugins = new Map<string, PluginDefinition>();
+    const enabledWorkspaceSkills = new Set<string>();
 
     const finishedParts = parts.filter(
       (part) => part.state === 'output-available',
     );
     finishedParts.forEach((part) => {
       switch (part.type) {
-        case 'tool-readFile':
+        case 'tool-readFile': {
+          const path = part.input?.relative_path ?? '';
+          const pluginSkillMatch = path.match(PLUGIN_SKILL_RE);
+          if (pluginSkillMatch) {
+            const plugin = plugins.find((p) => p.id === pluginSkillMatch[1]);
+            if (plugin) {
+              enabledPlugins.set(plugin.id, plugin);
+              break;
+            }
+          }
+          const wsSkillMatch = path.match(WORKSPACE_SKILL_RE);
+          if (wsSkillMatch?.[1]) {
+            enabledWorkspaceSkills.add(wsSkillMatch[1]);
+            break;
+          }
           filesRead += 1;
           linesRead += part.output?.result?.totalLines ?? 0;
           hasUsedFileTools = true;
           break;
+        }
         case 'tool-glob':
         case 'tool-grepSearch':
           filesFound += part.output?.result?.totalMatches ?? 0;
@@ -393,6 +417,9 @@ export const ExploringToolParts = ({
           lintingErrors += part.output?.summary?.errors ?? 0;
           lintingWarnings += part.output?.summary?.warnings ?? 0;
           break;
+        case 'tool-updateWorkspaceMd':
+          hasUpdatedWorkspaceMd = true;
+          break;
       }
     });
 
@@ -423,8 +450,11 @@ export const ExploringToolParts = ({
       sandboxFilesWritten,
       attachmentLabels,
       inspectedHostnames,
+      enabledPlugins,
+      enabledWorkspaceSkills,
+      hasUpdatedWorkspaceMd,
     };
-  }, [parts, activeTabs]);
+  }, [parts, activeTabs, plugins]);
 
   const isReasoningOnly = useMemo(
     () => parts.every((p) => p.type === 'reasoning'),
@@ -452,7 +482,25 @@ export const ExploringToolParts = ({
       sandboxFilesWritten,
       attachmentLabels,
       inspectedHostnames,
+      enabledPlugins,
+      enabledWorkspaceSkills,
+      hasUpdatedWorkspaceMd,
     } = explorationMetadata;
+
+    // Build "Enabled ..." prefix for skill reads (plugins + workspace)
+    let enabledPrefix = '';
+    const allSkillNames: string[] = [
+      ...Array.from(enabledPlugins.values()).map((p) => p.displayName),
+      ...Array.from(enabledWorkspaceSkills),
+    ];
+    if (allSkillNames.length > 0) {
+      if (allSkillNames.length <= 2)
+        enabledPrefix = `Enabled ${allSkillNames.join(', ')}`;
+      else {
+        const noun = enabledWorkspaceSkills.size > 0 ? 'skills' : 'plugins';
+        enabledPrefix = `Enabled ${allSkillNames.length} ${noun}`;
+      }
+    }
 
     const textParts: string[] = [];
     if (filesFound > 0 || filesRead > 0)
@@ -527,9 +575,15 @@ export const ExploringToolParts = ({
         textParts.push(lintParts.join(', '));
       }
 
+    if (hasUpdatedWorkspaceMd) textParts.push('workspace info');
+
     if (textParts.length === 0) {
-      if (hasCheckedLinting && lintingErrors === 0 && lintingWarnings === 0)
-        return 'Checked linting - no issues';
+      if (hasCheckedLinting && lintingErrors === 0 && lintingWarnings === 0) {
+        const lintText = 'Checked linting - no issues';
+        return enabledPrefix
+          ? `${enabledPrefix}, ${lintText.toLowerCase()}`
+          : lintText;
+      }
       if (hasUsedBrowserTools) textParts.push('the browser');
       if (hasUsedContext7Tools) textParts.push('documentation');
       if (hasUsedFileTools) textParts.push('files');
@@ -540,14 +594,31 @@ export const ExploringToolParts = ({
       hasCheckedLinting &&
       !!lintingErrors &&
       !!lintingWarnings
-    )
-      return `Found ${textParts.slice(0, -1).join(', ')} and ${textParts.at(-1)}`;
-    else if (!hasExploredFiles && hasCheckedLinting)
-      return `Found ${textParts.at(-1)}`;
+    ) {
+      const foundText = `Found ${textParts.slice(0, -1).join(', ')} and ${textParts.at(-1)}`;
+      return enabledPrefix
+        ? `${enabledPrefix}, ${foundText.toLowerCase()}`
+        : foundText;
+    } else if (!hasExploredFiles && hasCheckedLinting) {
+      const foundText = `Found ${textParts.at(-1)}`;
+      return enabledPrefix
+        ? `${enabledPrefix}, ${foundText.toLowerCase()}`
+        : foundText;
+    }
 
-    if (textParts.length === 0) return 'Explored the codebase';
-    if (textParts.length === 1) return `Explored ${textParts[0]}`;
-    return `Explored ${textParts.slice(0, -1).join(', ')} and ${textParts.at(-1)}`;
+    const exploredText =
+      textParts.length === 0
+        ? null
+        : textParts.length === 1
+          ? `explored ${textParts[0]}`
+          : `explored ${textParts.slice(0, -1).join(', ')} and ${textParts.at(-1)}`;
+
+    if (enabledPrefix && exploredText)
+      return `${enabledPrefix}, ${exploredText}`;
+    if (enabledPrefix) return enabledPrefix;
+    if (exploredText)
+      return exploredText.charAt(0).toUpperCase() + exploredText.slice(1);
+    return 'Explored the codebase';
   }, [explorationMetadata, isReasoningOnly]);
 
   const explorationInProgressText = useMemo(() => {
@@ -555,7 +626,21 @@ export const ExploringToolParts = ({
       .filter((part) => part.type !== 'reasoning')
       .at(-1);
     switch (lastNonReasoningPart?.type || '') {
-      case 'tool-readFile':
+      case 'tool-readFile': {
+        const p = lastNonReasoningPart as Extract<
+          AgentToolUIPart,
+          { type: 'tool-readFile' }
+        >;
+        const path = p.input?.relative_path ?? '';
+        const pluginMatch = path.match(PLUGIN_SKILL_RE);
+        if (pluginMatch) {
+          const plugin = plugins.find((pl) => pl.id === pluginMatch[1]);
+          if (plugin) return `Enabling ${plugin.displayName}...`;
+        }
+        const wsMatch = path.match(WORKSPACE_SKILL_RE);
+        if (wsMatch?.[1]) return `Enabling ${wsMatch[1]}...`;
+        return 'Exploring files...';
+      }
       case 'tool-glob':
       case 'tool-grepSearch':
       case 'tool-listFiles':
@@ -581,6 +666,7 @@ export const ExploringToolParts = ({
           AgentToolUIPart,
           { type: 'tool-executeSandboxJs' }
         >;
+        if (p.input?.explanation) return `${p.input.explanation}...`;
         return getSandboxLabel(p.input?.script, activeTabs, true);
       }
       case 'tool-readConsoleLogs': {
@@ -595,10 +681,12 @@ export const ExploringToolParts = ({
       }
       case 'tool-getLintingDiagnostics':
         return 'Checking linting...';
+      case 'tool-updateWorkspaceMd':
+        return 'Updating workspace info...';
       default:
         return isReasoningOnly ? 'Thinking...' : 'Exploring...';
     }
-  }, [parts, activeTabs, isReasoningOnly]);
+  }, [parts, activeTabs, plugins, isReasoningOnly]);
 
   // True when at least one tool part is still actively streaming/executing
   const anyPartStreaming = useMemo(

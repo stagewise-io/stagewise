@@ -35,8 +35,13 @@ import { ModelProviderService } from './agents/model-provider';
 import { wireDownloads } from './wiring/downloads-wiring';
 import { wirePagesStateSync } from './wiring/pages-state-sync';
 import { wirePagesHandlers } from './wiring/pages-handler-wiring';
-import { ensureDataDirectories, getRipgrepBasePath } from './utils/paths';
+import {
+  ensureDataDirectories,
+  getPluginsPath,
+  getRipgrepBasePath,
+} from './utils/paths';
 import { migrateLegacyPaths } from './utils/migrate-legacy-paths';
+import { discoverPlugins } from './utils/discover-plugins';
 import { AssetCacheService } from './services/asset-cache';
 import { ProcessedImageCacheService } from './services/processed-image-cache';
 
@@ -143,6 +148,17 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     telemetryService,
   );
   const uiKarton = windowLayoutService.uiKarton;
+
+  // Push bundled plugin definitions to UI karton state
+  discoverPlugins(getPluginsPath()).then((plugins) => {
+    uiKarton.setState((draft) => {
+      draft.plugins = plugins;
+    });
+    if (verbose)
+      logger.debug(
+        `[Main] Pushed ${plugins.length} bundled plugins to UI karton`,
+      );
+  });
 
   const diffHistoryService = await DiffHistoryService.create(
     logger,
