@@ -79,7 +79,7 @@ export function Sidebar() {
         if (size > 0 && !isCollapsed) previousSizeRef.current = size;
       }}
       data-collapsed={isCollapsed}
-      className="@container group overflow-visible! flex h-full flex-col items-stretch justify-between rounded-lg bg-background p-1 ring-1 ring-derived-strong data-[collapsed=false]:min-w-64 data-[collapsed=false]:max-w-2xl data-[collapsed=true]:max-w-0 data-[collapsed=true]:p-0 data-[collapsed=true]:ring-transparent"
+      className="@container group overflow-visible! flex h-full flex-col items-stretch justify-between rounded-lg bg-background p-1 ring-1 ring-derived-strong data-[collapsed=false]:min-w-64 data-[collapsed=true]:max-w-0 data-[collapsed=true]:p-0 data-[collapsed=true]:ring-transparent"
     >
       <OpenAgentProvider>
         <ChatDraftProvider>
