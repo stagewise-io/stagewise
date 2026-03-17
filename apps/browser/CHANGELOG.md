@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.33 (2026-03-17)
+
+### Other Changes
+
+* remove "tool" suffixes from tool names (4ebd0a3)
+
 ## 1.0.0-alpha.32 (2026-03-16)
 
 ### Bug Fixes
