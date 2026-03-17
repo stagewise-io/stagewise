@@ -1,5 +1,8 @@
 import * as React from 'react';
-import { Input as InputBase } from '@base-ui/react/input';
+import {
+  Input as InputBase,
+  type InputProps as InputBaseProps,
+} from '@base-ui/react/input';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/utils';
 
@@ -41,12 +44,37 @@ export function Input({
   const valueChangeTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const isFocused = React.useRef(false);
 
   const [optimisticLocalValue, setOptimisticLocalValue] =
     React.useState<typeof controlledValue>(controlledValue);
+
+  // Only sync external value changes into local state when the input is NOT
+  // focused. While the user is actively typing we own the value — syncing
+  // from the parent would reset the cursor position.
   React.useEffect(() => {
-    setOptimisticLocalValue(controlledValue);
+    if (!isFocused.current) {
+      setOptimisticLocalValue(controlledValue);
+    }
   }, [controlledValue]);
+
+  const handleFocus = React.useCallback<NonNullable<InputBaseProps['onFocus']>>(
+    (e) => {
+      isFocused.current = true;
+      props.onFocus?.(e);
+    },
+    [props.onFocus],
+  );
+
+  const handleBlur = React.useCallback<NonNullable<InputBaseProps['onBlur']>>(
+    (e) => {
+      isFocused.current = false;
+      // Sync any external value that arrived while we were focused.
+      setOptimisticLocalValue(controlledValue);
+      props.onBlur?.(e);
+    },
+    [props.onBlur, controlledValue],
+  );
 
   const valueChangeCallback = React.useCallback<
     NonNullable<typeof onValueChange>
@@ -61,10 +89,11 @@ export function Input({
           debounce,
         );
       } else {
+        setOptimisticLocalValue(args[0]);
         onValueChange?.(...args);
       }
     },
-    [onValueChange],
+    [onValueChange, debounce],
   );
 
   return (
@@ -72,6 +101,8 @@ export function Input({
       className={cn(inputVariants({ size }), className)}
       onValueChange={onValueChange ? valueChangeCallback : undefined}
       {...props}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
       value={optimisticLocalValue}
     />
   );
