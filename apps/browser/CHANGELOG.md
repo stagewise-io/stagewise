@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0-alpha.35 (2026-03-17)
+
+### Bug Fixes
+
+* fix license-dialog in about-page (c096a73)
+* prevent jumping around of cursor on input fields (06fc409)
+* graceful handling of token limit hits during tool calls (d162b0c)
+
 ## 1.0.0-alpha.34 (2026-03-17)
 
 ### Features
