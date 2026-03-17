@@ -616,6 +616,7 @@ function FieldRenderer({
             <Checkbox
               size="xs"
               checked={value === true}
+              className="shrink-0"
               onCheckedChange={(checked) => onChange(checked)}
             />
             <span className="text-foreground text-xs">
@@ -659,6 +660,7 @@ function FieldRenderer({
               >
                 <Checkbox
                   size="xs"
+                  className="shrink-0"
                   checked={selected.includes(opt.value)}
                   onCheckedChange={(checked) => {
                     if (checked) {
