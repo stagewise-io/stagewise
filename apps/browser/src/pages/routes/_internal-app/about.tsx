@@ -19,8 +19,14 @@ import {
 } from '@stagewise/stage-ui/components/dialog';
 import { Input } from '@stagewise/stage-ui/components/input';
 import { ExternalLinkIcon, ScrollTextIcon, SearchIcon } from 'lucide-react';
+import { IconGithub } from 'nucleo-social-media';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import agplLicenseText from '@assets/agpl-3.0-license.txt?raw';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 
 enablePatches();
 
@@ -112,31 +118,34 @@ function LicenseTextDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80vh] max-w-2xl overflow-hidden">
+      <DialogContent className="max-h-[80vh] max-w-2xl gap-4.5 overflow-hidden">
         <DialogClose />
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-3 pt-1">
             {entry.name}@{entry.version}
-          </DialogTitle>
-          <div className="flex items-center gap-3">
             <span className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-muted-foreground text-xs">
               {entry.license}
             </span>
             {entry.repository && (
-              <a
-                href={entry.repository}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  buttonVariants({ variant: 'link', size: 'sm' }),
-                  'h-auto gap-1 p-0 text-xs',
-                )}
-              >
-                Repository
-                <ExternalLinkIcon className="size-3" />
-              </a>
+              <Tooltip>
+                <TooltipTrigger>
+                  <a
+                    href={entry.repository}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      buttonVariants({ variant: 'ghost', size: 'icon-md' }),
+                      'w-min p-0',
+                    )}
+                    aria-label="GitHub Repository"
+                  >
+                    <IconGithub className="size-4" />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent>{entry.repository}</TooltipContent>
+              </Tooltip>
             )}
-          </div>
+          </DialogTitle>
         </DialogHeader>
         <div className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto rounded-lg bg-surface-1 p-4">
           {entry.licenseText ? (
