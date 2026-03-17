@@ -156,6 +156,7 @@ export const askUserQuestions = (
   return tool({
     description: DESCRIPTION,
     inputSchema: askUserQuestionsToolInputSchema,
+    strict: true,
     execute: async (params: AskUserQuestionsToolInput) => {
       // Cancel any existing pending question for this agent before creating
       // a new one, so the old deferred promise doesn't leak.

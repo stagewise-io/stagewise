@@ -26,6 +26,7 @@ export const executeSandboxJs = (
   return tool({
     description: DESCRIPTION,
     inputSchema: executeSandboxJsToolInputSchema,
+    strict: true,
     execute: async (params, options) => {
       const { toolCallId } = options as { toolCallId: string };
       sandboxService.setAgentToolCallId(agentInstanceId, toolCallId);

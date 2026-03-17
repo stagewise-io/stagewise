@@ -251,6 +251,7 @@ export class ToolboxService extends DisposableService {
     return tool({
       description,
       inputSchema: inputSchema as z.ZodType<TParams>,
+      strict: true,
       execute: async (params, options) => {
         const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
         if (!mountedRuntimes) throw new Error('No mounted workspaces found');

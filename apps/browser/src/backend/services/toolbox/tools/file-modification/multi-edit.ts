@@ -124,6 +124,7 @@ export const multiEdit = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: multiEditToolInputSchema,
+    strict: true,
     execute: async (args) => {
       return multiEditToolExecute(args, mountedRuntimes);
     },
