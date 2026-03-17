@@ -44,6 +44,7 @@ export const executeShellCommand = (
   return tool({
     description: DESCRIPTION,
     inputSchema: executeShellCommandToolInputSchema,
+    strict: true,
     needsApproval: true,
     execute: async (
       params: ExecuteShellCommandToolInput,

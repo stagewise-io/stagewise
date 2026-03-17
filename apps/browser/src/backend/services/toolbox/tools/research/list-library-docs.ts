@@ -57,6 +57,7 @@ export const listLibraryDocs = (apiClient: ApiClient) =>
   tool({
     description: DESCRIPTION,
     inputSchema: listLibraryDocsToolInputSchema,
+    strict: true,
     execute: async (args) => {
       return listPackageDocsToolExecute(args, apiClient);
     },

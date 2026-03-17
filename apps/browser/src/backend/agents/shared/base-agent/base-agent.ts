@@ -5,7 +5,6 @@ import {
   streamText,
   smoothStream,
   type StepResult,
-  NoSuchToolError,
   type AsyncIterableStream,
   type InferUIMessageChunk,
   readUIMessageStream,
@@ -178,7 +177,7 @@ export type BaseAgentConfig<TFinishToolOutputSchema extends z.ZodType | null> =
     /**
      * A configurable amount of maximum output tokens per step.
      *
-     * @default 1000
+     * @default 100000
      */
     maxOutputTokens?: number;
 
@@ -1357,7 +1356,7 @@ export abstract class BaseAgent<
           }
         : undefined,
       maxRetries: resolvedConfig.maxRetries ?? 1,
-      maxOutputTokens: resolvedConfig.maxOutputTokens ?? 5000,
+      maxOutputTokens: resolvedConfig.maxOutputTokens ?? 100000,
       abortSignal: this.stepAbortController.signal,
       onAbort: () => {
         // Guard: ignore if a newer step has started (e.g. queue flush)
@@ -1390,10 +1389,19 @@ export abstract class BaseAgent<
           });
         }
 
-        // If we're in Dev mode, we backfeed the usage data onto the assistant message
+        // Log step completion details
         this.logger.debug(
-          `[BaseAgent:${this.instanceId}] Input Tokens: ${result.usage.inputTokens}, Cache Read Tokens: ${result.usage.inputTokenDetails.cacheReadTokens}, Cache Write Tokens: ${result.usage.inputTokenDetails.cacheWriteTokens}, Output Tokens: ${result.usage.outputTokens}, Total Tokens: ${result.usage.totalTokens}`,
+          `[BaseAgent:${this.instanceId}] Step finished | finishReason=${result.finishReason} | outputTokens=${result.usage.outputTokens} | inputTokens=${result.usage.inputTokens} | cacheRead=${result.usage.inputTokenDetails.cacheReadTokens} | cacheWrite=${result.usage.inputTokenDetails.cacheWriteTokens} | totalTokens=${result.usage.totalTokens} | toolCalls=${result.toolCalls.length}`,
         );
+
+        if (result.finishReason === 'length') {
+          this.logger.warn(
+            `[BaseAgent:${this.instanceId}] Output truncated (finishReason=length). ` +
+              `outputTokens=${result.usage.outputTokens}, toolCalls=${result.toolCalls.length}. ` +
+              `The model hit maxOutputTokens and its response was cut off. ` +
+              `Tool calls in this step may have been incomplete/dropped.`,
+          );
+        }
 
         try {
           const shouldContinue = await this.handlePostStep(result);
@@ -1474,27 +1482,18 @@ export abstract class BaseAgent<
         this.stepAbortController = null;
       },
       experimental_repairToolCall: async (r) => {
-        // Haiku often returns the tool input as string instead of object - we try to parse it as object
-        // If the parsing fails, we simply return an invalid tool call
-        this.logger.debug('[AgentService] Repairing tool call', r.error);
-        this.report(r.error, 'repairToolCall');
-        if (NoSuchToolError.isInstance(r.error)) return r.toolCall;
-
-        const foundTool =
-          r.tools[r.toolCall.toolName as keyof StagewiseToolSet];
-        if (!foundTool) return null;
-
         try {
-          const input = JSON.parse(r.toolCall.input);
-          if (typeof input === 'string') {
-            const objectInput = JSON.parse(input); // Try to parse the input as object
-            if (typeof objectInput === 'object' && objectInput !== null)
-              return { ...r.toolCall, input: JSON.stringify(objectInput) };
-          } else return null; // If not a string, it already failed the initial parsing check, so we return null
+          JSON.parse(r.toolCall.input);
+          throw new Error(`Tool call input is invalid: ${r.toolCall.input}`);
         } catch {
-          return null;
+          // JSON is unparseable — almost certainly truncated by the output
+          // token limit. Throw a clear error that the SDK will surface as
+          // errorText in the tool result, so the model understands why
+          // the call failed and can adjust its strategy.
+          throw new Error(
+            `Tool call inputs were too long and most likely exceeded maximum token output limits. Create more compact tool calls, i.e. by chunking edits into smaller pieces.`,
+          );
         }
-        return null;
       },
       experimental_transform: smoothStream({
         delayInMs: 10,
@@ -1547,7 +1546,7 @@ export abstract class BaseAgent<
     } catch (err) {
       const error = err as Error;
       this.logger.error(
-        `[BaseAgent:${this.instanceId}] Error in 'runStep': ${this.formatError(error)}`,
+        `[BaseAgent:${this.instanceId}] Error in 'runStep': $this.formatError(error)`,
       );
       this.report(error, 'runStep');
       // Invalidate step generation so any pending onFinish callback won't
@@ -1561,7 +1560,7 @@ export abstract class BaseAgent<
         draft.isWorking = false;
         draft.unread = true;
         draft.error = {
-          message: `Internal error: ${error.message ?? 'Unknown error'}`,
+          message: `Internal error: $error.message ?? 'Unknown error'`,
           stack: error.stack,
         };
       });
@@ -1593,9 +1592,7 @@ export abstract class BaseAgent<
         return;
       }
 
-      this.logger.debug(
-        `[BaseAgent:${this.instanceId}] Compressing history...`,
-      );
+      this.logger.debug(`[BaseAgent:$this.instanceId] Compressing history...`);
 
       const compressedHistory = await this.compressHistory(messagesToCompact);
 
@@ -1718,6 +1715,18 @@ export abstract class BaseAgent<
 
     // We assume that approved tool calls are executed and results are attached,
     // because this is what AI-SDK with controlled tool execution promises us
+
+    // When the model hits the output token limit, its response is truncated.
+    // Tool calls with truncated JSON will have been caught by
+    // experimental_repairToolCall, which throws a clear error. The SDK
+    // surfaces that as a tool-result with errorText in history, so the
+    // model can see exactly what went wrong on the next step.
+    if (r.finishReason === 'length') {
+      this.logger.warn(
+        `[BaseAgent:${this.instanceId}] Output truncated (finishReason=length). Model will see error results and retry.`,
+      );
+      return true;
+    }
 
     // Check if the finish reason is not tool-calls (which means user intervention is needed)
     if (r.finishReason !== 'tool-calls') {

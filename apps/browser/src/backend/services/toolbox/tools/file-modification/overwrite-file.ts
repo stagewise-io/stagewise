@@ -76,7 +76,16 @@ export async function overwriteFileToolExecute(
 
     // Build success message
     const action = fileExists ? 'updated' : 'created';
-    const message = `Successfully ${action} file: ${relative_path}`;
+    let message = `Successfully ${action} file: ${relative_path}`;
+
+    // Add a recommendation when file content is large to help prevent
+    // future output-token-limit issues with overwriteFile tool calls.
+    const contentLengthChars = cleanContent.length;
+    if (contentLengthChars > 4000) {
+      message +=
+        `\n\n⚠️ Large file write (${contentLengthChars} chars). ` +
+        'Prefer incremental edits rather than making large changes like this again.';
+    }
 
     return {
       message,
@@ -90,6 +99,7 @@ export const overwriteFile = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: overwriteFileToolInputSchema,
+    strict: true,
     execute: async (args) => {
       return overwriteFileToolExecute(args, mountedRuntimes);
     },
