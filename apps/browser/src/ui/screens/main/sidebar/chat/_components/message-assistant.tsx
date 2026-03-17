@@ -1,5 +1,4 @@
 import { cn } from '@ui/utils';
-import { IconMagicWandSparkle } from 'nucleo-glass';
 import type {
   ReasoningUIPart,
   DynamicToolUIPart,
@@ -83,17 +82,6 @@ export const MessageAssistant = memo(
 
     return (
       <div className={cn('flex w-full flex-col gap-1')}>
-        {msg.metadata?.compressedHistory && (
-          <div
-            key={`compact-${msg.id}`}
-            className="mt-2 flex w-full flex-row items-center gap-2 text-xs"
-          >
-            <IconMagicWandSparkle className="size-3 text-muted-foreground" />
-            <span className="shimmer-duration-1500 shimmer-from-muted-foreground shimmer-text-once shimmer-to-foreground font-normal">
-              Compressed previous conversation
-            </span>
-          </div>
-        )}
         <div className="w-full">
           <div
             className={cn(
