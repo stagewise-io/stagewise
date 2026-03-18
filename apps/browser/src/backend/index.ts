@@ -11,7 +11,7 @@ import { main } from './main';
 const isSmokeTest = process.argv.includes('--smoke-test');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (started) {
+if (started || isSmokeTest) {
   app.quit();
 }
 

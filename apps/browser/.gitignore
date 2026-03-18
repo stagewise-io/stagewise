@@ -97,3 +97,6 @@ bundled/eslint-server/
 
 # Generated license data
 src/pages/generated/
+
+# VC++ redistributable binaries (fetched at build time, not committed)
+etc/windows/redist/
