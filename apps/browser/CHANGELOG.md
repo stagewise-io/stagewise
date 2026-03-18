@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha.40 (2026-03-18)
+
+### Bug Fixes
+
+* better escaping of inputs for context compression prompt (f21a5b5)
+* make context compression and title generation more reliable (ec0afd7)
+
 ## 1.0.0-alpha.39 (2026-03-18)
 
 ### Features
