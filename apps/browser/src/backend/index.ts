@@ -6,6 +6,10 @@ import started from 'electron-squirrel-startup';
 import path from 'node:path';
 import { main } from './main';
 
+// CI smoke test: all static imports (including the entire main.ts import tree)
+// have resolved by this point. If we got here, the bundle is intact.
+const isSmokeTest = process.argv.includes('--smoke-test');
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
@@ -102,7 +106,14 @@ if (!singleInstanceLock) {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', () => main({ launchOptions: { verbose: true } }));
+app.on('ready', () => {
+  if (isSmokeTest) {
+    console.log('[smoke-test] App ready — all modules loaded successfully.');
+    app.exit(0);
+    return;
+  }
+  main({ launchOptions: { verbose: true } });
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

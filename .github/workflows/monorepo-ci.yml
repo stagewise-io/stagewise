@@ -200,6 +200,34 @@ jobs:
           BUILD_MODE: production
           RELEASE_CHANNEL: dev
 
+      - name: Smoke Test (Linux - install xvfb)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Smoke Test
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+
+          if [ "${{ runner.os }}" == "macOS" ]; then
+            BINARY="apps/browser/out/dev/stagewise-dev-darwin-arm64/stagewise-dev.app/Contents/MacOS/stagewise-dev"
+          elif [ "${{ runner.os }}" == "Linux" ]; then
+            BINARY="apps/browser/out/dev/stagewise-dev-linux-x64/stagewise-dev"
+          elif [ "${{ runner.os }}" == "Windows" ]; then
+            BINARY="apps/browser/out/dev/stagewise-dev-win32-x64/stagewise-dev.exe"
+          fi
+
+          echo "Launching smoke test: $BINARY --smoke-test"
+
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            xvfb-run --auto-servernum "$BINARY" --no-sandbox --smoke-test
+          else
+            "$BINARY" --smoke-test
+          fi
+
+          echo "Smoke test passed — app launched and exited cleanly."
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
