@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.0-alpha.39 (2026-03-18)
+
+### Features
+
+* add file-tree-outline to mention suggestions (e47d9fd)
+* use stage-ui checkboxes in streamdown markdown (d965d1c)
+* remove external-file-link-icon from file-link (052a303)
+* add workspace:// protocol to pages app (96c2b7d)
+* add slash-components to tiptap rich-text dir (73d3d13)
+* add markdown-editor to components (200491f)
+
+### Bug Fixes
+
+* remove link-icon from file-attachments (102ac22)
+
+### Other Changes
+
+* make windows install include redistributables (041d855)
+
 ## 1.0.0-alpha.38 (2026-03-18)
 
 ### Features
