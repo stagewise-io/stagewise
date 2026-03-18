@@ -20,6 +20,8 @@
     "build-storybook": "storybook build",
     "clean-data": "tsx scripts/clean-data.ts",
     "clear-vite-cache": "tsx scripts/clear-vite-cache.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "concurrently -n ui,backend,preload,storybook -c blue,green,yellow,magenta \"tsc -p tsconfig.ui.json --noEmit\" \"tsc -p tsconfig.backend.json --noEmit\" \"tsc -p tsconfig.web-content-preload.json --noEmit\" \"tsc -p tsconfig.storybook.json --noEmit\""
   },
   "dependencies": {
