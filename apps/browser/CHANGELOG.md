@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.37 (2026-03-18)
+
+### Bug Fixes
+
+* treat file-deletion with creation as modification (2512090)
+
 ## 1.0.0-alpha.36 (2026-03-17)
 
 ### Bug Fixes
