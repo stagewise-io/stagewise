@@ -1,5 +1,4 @@
 import {
-  forwardRef,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -8,7 +7,7 @@ import {
   type FC,
 } from 'react';
 import { cn } from '@ui/utils';
-import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
+import { SuggestionPopupContainer, SuggestionSidePanel } from '../shared';
 import type { TabState } from '@shared/karton-contracts/ui';
 import { inferMimeType } from '@shared/mime-utils';
 import {
@@ -183,21 +182,21 @@ export function SuggestionPopup({
 
   if (items.length === 0) {
     return (
-      <PopupContainer clientRect={clientRect} ref={containerRef}>
+      <SuggestionPopupContainer clientRect={clientRect} ref={containerRef}>
         <div className="px-2 py-1 text-muted-foreground text-xs">
           No results
         </div>
-      </PopupContainer>
+      </SuggestionPopupContainer>
     );
   }
 
   return (
-    <PopupContainer
+    <SuggestionPopupContainer
       clientRect={clientRect}
       ref={containerRef}
       sidePanel={
         sidePanel ? (
-          <PreviewSidePanel ref={sidePanelRef} offset={sidePanelOffset}>
+          <SuggestionSidePanel ref={sidePanelRef} offset={sidePanelOffset}>
             {sidePanel.type === 'tab' ? (
               <TabPreviewContent
                 screenshot={sidePanel.screenshot}
@@ -213,7 +212,7 @@ export function SuggestionPopup({
                 Preview={sidePanel.Preview}
               />
             )}
-          </PreviewSidePanel>
+          </SuggestionSidePanel>
         ) : null
       }
     >
@@ -228,64 +227,9 @@ export function SuggestionPopup({
           }}
         />
       ))}
-    </PopupContainer>
+    </SuggestionPopupContainer>
   );
 }
-
-const MAX_POPUP_HEIGHT = 208; // max-h-52
-
-const PopupContainer = forwardRef<
-  HTMLDivElement,
-  {
-    clientRect: (() => DOMRect | null) | null;
-    children: React.ReactNode;
-    sidePanel?: React.ReactNode;
-  }
->(function PopupContainer({ clientRect, children, sidePanel }, ref) {
-  const rect = clientRect?.();
-  if (!rect) return null;
-
-  const gap = 4;
-  const spaceAbove = rect.top;
-  const placeAbove = spaceAbove >= MAX_POPUP_HEIGHT + gap;
-
-  const style: React.CSSProperties = placeAbove
-    ? { bottom: window.innerHeight - rect.top + gap, left: rect.left }
-    : { top: rect.bottom + gap, left: rect.left };
-
-  return (
-    <div
-      ref={ref}
-      className="fixed z-50 flex flex-row items-start gap-1"
-      style={style}
-    >
-      <div className="w-64 rounded-lg border border-derived bg-background p-1 shadow-lg">
-        <OverlayScrollbar className="max-h-52" defer={false}>
-          {children}
-        </OverlayScrollbar>
-      </div>
-      {sidePanel}
-    </div>
-  );
-});
-
-const PreviewSidePanel = forwardRef<
-  HTMLDivElement,
-  { offset: number; children: React.ReactNode }
->(function PreviewSidePanel({ offset, children }, ref) {
-  return (
-    <div
-      ref={ref}
-      className={cn(
-        'absolute left-full ml-1 flex w-56 flex-col gap-2 rounded-lg border border-derived bg-background p-2.5 text-foreground text-xs shadow-lg transition-[top] duration-100 ease-out',
-        'fade-in-0 slide-in-from-left-1 animate-in duration-150',
-      )}
-      style={{ top: offset }}
-    >
-      {children}
-    </div>
-  );
-});
 
 function TabPreviewContent({
   screenshot,
