@@ -1,0 +1,302 @@
+/* Markdown editor ProseMirror content styles */
+
+.markdown-editor-content {
+  min-height: 60vh;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* Headings */
+.markdown-editor-content h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.3;
+}
+
+.markdown-editor-content h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.625rem;
+  line-height: 1.35;
+}
+
+.markdown-editor-content h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.markdown-editor-content h4,
+.markdown-editor-content h5,
+.markdown-editor-content h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.375rem;
+}
+
+/* Paragraphs */
+.markdown-editor-content p {
+  margin-bottom: 0.5rem;
+}
+
+/* Lists */
+.markdown-editor-content ul {
+  list-style-type: disc;
+  margin-left: 1rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-editor-content ol {
+  list-style-type: decimal;
+  margin-left: 1rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-editor-content li {
+  padding-left: 0.25rem;
+}
+
+.markdown-editor-content li > p {
+  margin-bottom: 0.25rem;
+}
+
+/* Task lists — layout handled by NodeView, only list-level resets needed */
+.markdown-editor-content ul[data-type='taskList'] {
+  list-style: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.markdown-editor-content ul[data-type='taskList'] li {
+  padding-left: 0;
+}
+
+/* Checked task text — subtle fade */
+.markdown-editor-content ul[data-type='taskList'] li[data-checked='true'] > div {
+  opacity: 0.6;
+}
+
+/* Blockquotes */
+.markdown-editor-content blockquote {
+  border-left: 3px solid var(--color-border);
+  padding-left: 0.75rem;
+  margin-left: 0;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-muted-foreground);
+}
+
+/* Code (inline) */
+.markdown-editor-content code {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8125rem;
+  background-color: var(--color-surface-1);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+}
+
+/* Code blocks */
+.markdown-editor-content pre {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8125rem;
+  background-color: var(--color-surface-1);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  overflow-x: auto;
+}
+
+.markdown-editor-content pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Shiki dual-theme color switching */
+@media (prefers-color-scheme: dark) {
+  .markdown-editor-content .shiki,
+  .markdown-editor-content .shiki span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+  }
+
+}
+
+/* Horizontal rule */
+.markdown-editor-content hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1.5rem 0;
+}
+
+/* Strong / emphasis */
+.markdown-editor-content strong {
+  font-weight: 600;
+}
+
+.markdown-editor-content em {
+  font-style: italic;
+}
+
+/* Strikethrough */
+.markdown-editor-content s {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Links */
+.markdown-editor-content a {
+  color: var(--color-primary-solid);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.15s;
+}
+
+.markdown-editor-content a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* Placeholder */
+.markdown-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-subtle-foreground);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* ── Mermaid code block ── */
+
+.markdown-editor-content .mermaid-block {
+  /* background-color: var(--color-surface-1); */
+  background-color: var(--color-background);
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+/* Toolbar row */
+.markdown-editor-content .mermaid-block-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  user-select: none;
+}
+
+.markdown-editor-content .mermaid-block-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.markdown-editor-content .mermaid-block-toggle {
+  display: flex;
+  gap: 1px;
+  background: var(--color-background);
+  border-radius: 0.25rem;
+  padding: 1px;
+}
+
+.markdown-editor-content .mermaid-toggle-btn {
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.375rem;
+  border: none;
+  border-radius: 0.1875rem;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  font-weight: 500;
+  line-height: 1.4;
+  transition: background 0.1s, color 0.1s;
+}
+
+.markdown-editor-content .mermaid-toggle-btn:hover {
+  color: var(--color-foreground);
+}
+
+.markdown-editor-content .mermaid-toggle-btn-active {
+  background: var(--color-surface-1);
+  color: var(--color-foreground);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+/* Body (code + preview) */
+.markdown-editor-content .mermaid-block-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.markdown-editor-content .mermaid-block-body-split {
+  flex-direction: row;
+}
+
+/* Code area */
+.markdown-editor-content .mermaid-code-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.markdown-editor-content .mermaid-code-area pre {
+  margin: 0;
+  border-radius: 0.5rem;
+  background: var(--color-surface-1);
+}
+
+/* Hidden but mounted (ProseMirror needs the DOM node) */
+.markdown-editor-content .mermaid-code-area-hidden {
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  opacity: 0;
+}
+
+/* Preview area */
+.markdown-editor-content .mermaid-preview-area {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+}
+
+.markdown-editor-content .mermaid-block-body-split .mermaid-preview-area {
+  border-left: none;
+}
+
+.markdown-editor-content .mermaid-preview-diagram {
+  max-width: 100%;
+}
+
+.markdown-editor-content .mermaid-preview-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Fade-out animation for save indicator */
+@keyframes fade-out {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.animate-fade-out {
+  animation: fade-out 2s ease-out forwards;
+}
