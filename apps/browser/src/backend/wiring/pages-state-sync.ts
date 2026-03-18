@@ -92,6 +92,7 @@ export async function wirePagesStateSync(deps: {
           if (!seen.has(mount.path)) seen.set(mount.path, mount);
       }
       return [...seen.values()].map((m) => ({
+        prefix: m.prefix,
         path: m.path,
         isGitRepo: m.isGitRepo,
         gitBranch: m.gitBranch,

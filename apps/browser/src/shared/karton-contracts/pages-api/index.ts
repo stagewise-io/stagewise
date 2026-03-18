@@ -35,6 +35,7 @@ import { defaultUserPreferences } from '../ui/shared-types';
 import type { PluginDefinition } from '../../plugins';
 
 export type WorkspaceMountInfo = {
+  prefix: string;
   path: string;
   isGitRepo: boolean;
   skills: Array<{ name: string; description: string }>;
@@ -236,6 +237,12 @@ export type PagesApiContract = {
     deleteCredential: (typeId: string) => Promise<void>;
     /** Return the list of credential type IDs that have stored data */
     getConfiguredCredentialIds: () => Promise<string[]>;
+    /** Save content to a file inside a mounted workspace */
+    saveWorkspaceFile: (
+      mountPrefix: string,
+      relativePath: string,
+      content: string,
+    ) => Promise<void>;
   };
 };
 

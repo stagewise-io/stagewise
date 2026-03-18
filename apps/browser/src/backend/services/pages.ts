@@ -1,8 +1,10 @@
 import { net, session, shell } from 'electron';
 import type { Logger } from './logger';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, unlinkSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
+import { inferMimeType } from '@shared/mime-utils';
 import {
   createKartonServer,
   type KartonServer,
@@ -229,9 +231,8 @@ export class PagesService extends DisposableService {
       if (
         normalizedRequestUrl === 'stagewise://' ||
         normalizedRequestUrl.endsWith('://')
-      ) {
+      )
         normalizedRequestUrl = 'stagewise://internal/';
-      }
 
       // Parse URL and check if origin is "internal"
       let url: URL;
@@ -296,6 +297,60 @@ export class PagesService extends DisposableService {
 
     this.logger.debug(
       '[PagesService] Registered stagewise protocol handler for browsing session',
+    );
+
+    // Register workspace:// protocol on the browsing session so that
+    // internal pages (stagewise://internal/*) can fetch workspace files.
+    // Origin-gated: only requests originating from stagewise://internal are
+    // allowed; external websites in other tabs get a 403.
+    ses.protocol.handle('workspace', async (request) => {
+      try {
+        // Gate: block requests from external websites.
+        // Chromium always sends Sec-Fetch-Site, even for subresource
+        // loads (<script>, <img>, etc.) that omit Origin/Referer.
+        // Internal same-session requests are 'same-origin' or absent;
+        // external pages are 'cross-site'.
+        const secFetchSite = request.headers.get('Sec-Fetch-Site');
+        if (secFetchSite === 'cross-site')
+          return new Response('Forbidden', { status: 403 });
+
+        const url = new URL(request.url);
+        const mountPrefix = url.hostname;
+        const relativePath = decodeURIComponent(
+          url.pathname.replace(/^\//, ''),
+        );
+
+        if (!mountPrefix || !relativePath)
+          return new Response('Invalid workspace URL', { status: 400 });
+
+        // Resolve mount prefix to workspace root
+        const workspaceRoot = this.findMountPath(mountPrefix);
+        if (!workspaceRoot)
+          return new Response('Mount not found', { status: 404 });
+
+        const absolutePath = path.resolve(workspaceRoot, relativePath);
+        if (!absolutePath.startsWith(workspaceRoot + path.sep))
+          return new Response('Path traversal denied', { status: 400 });
+
+        const mime = inferMimeType(relativePath);
+        const fileUrl = pathToFileURL(absolutePath).href;
+        const fileResponse = await net.fetch(fileUrl);
+
+        return new Response(fileResponse.body, {
+          status: 200,
+          headers: { 'Content-Type': mime },
+        });
+      } catch (err) {
+        this.logger.error(
+          '[PagesService] workspace protocol error (browsing session)',
+          { error: err, url: request.url },
+        );
+        return new Response('Internal error', { status: 500 });
+      }
+    });
+
+    this.logger.debug(
+      '[PagesService] Registered workspace protocol handler for browsing session',
     );
   }
 
@@ -1498,6 +1553,25 @@ export class PagesService extends DisposableService {
       },
     );
 
+    this.kartonServer.registerServerProcedureHandler(
+      'saveWorkspaceFile',
+      async (
+        _callingClientId: string,
+        mountPrefix: string,
+        relativePath: string,
+        content: string,
+      ) => {
+        const workspaceRoot = this.findMountPath(mountPrefix);
+        if (!workspaceRoot) throw new Error(`Mount not found: ${mountPrefix}`);
+
+        const absolutePath = path.resolve(workspaceRoot, relativePath);
+        if (!absolutePath.startsWith(workspaceRoot + path.sep))
+          throw new Error('Path traversal denied');
+
+        await writeFile(absolutePath, content, 'utf-8');
+      },
+    );
+
     this.syncConfiguredCredentialIds(listConfiguredHandler);
     this.logger.debug('[PagesService] Credential handlers registered');
   }
@@ -1606,6 +1680,17 @@ export class PagesService extends DisposableService {
     this.kartonServer.setState((draft) => {
       draft.workspaceMounts = mounts;
     });
+  }
+
+  /**
+   * Resolve a mount prefix to its absolute workspace root path
+   * by looking up the current workspaceMounts state.
+   */
+  private findMountPath(prefix: string): string | null {
+    for (const mount of this.kartonServer.state.workspaceMounts)
+      if (mount.prefix === prefix) return mount.path;
+
+    return null;
   }
 
   /**
