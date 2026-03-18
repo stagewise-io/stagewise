@@ -5,7 +5,7 @@ import {
   IconBroomFillDuo18,
   IconDownloadFillDuo18,
   IconCircleInfoFillDuo18,
-  IconDatabaseKeyFillDuo18,
+  IconBrainNodesFillDuo18,
   IconUserUpdateFillDuo18,
   IconSpace3dFillDuo18,
   IconNoteFillDuo18,
@@ -64,7 +64,7 @@ function Sidebar() {
             </SidebarNav.Item>
             <SidebarNav.Item
               to="/agent-settings/models-providers"
-              icon={<IconDatabaseKeyFillDuo18 className="size-4" />}
+              icon={<IconBrainNodesFillDuo18 className="size-4" />}
             >
               Models & Providers
             </SidebarNav.Item>
