@@ -17,6 +17,7 @@ export const checkboxVariants = cva(
   {
     variants: {
       size: {
+        '2xs': 'size-2.5 rounded-xs p-px',
         xs: 'size-3.5 rounded-sm p-0.5',
         sm: 'size-4 rounded-sm p-0.5',
         md: 'size-5 rounded-sm p-0.75',
@@ -29,6 +30,7 @@ export const checkboxVariants = cva(
 );
 
 const iconSizeClasses = {
+  '2xs': 'h-2 w-2',
   xs: 'h-2.5 w-2.5',
   sm: 'h-3 w-3',
   md: 'h-3.5 w-3.5',
