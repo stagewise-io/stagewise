@@ -22,10 +22,12 @@ import {
   useRef,
   useCallback,
   type AnchorHTMLAttributes,
+  type InputHTMLAttributes,
   useMemo,
 } from 'react';
 import { cn } from '@ui/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { CopyCheckIcon, CopyIcon, DownloadIcon } from 'lucide-react';
 import type { BundledLanguage } from 'shiki';
@@ -287,6 +289,7 @@ export const Streamdown = ({
           tr: MemoTr,
           th: MemoTh,
           td: MemoTd,
+          input: MemoInput,
         }}
         rehypePlugins={[defaultRehypePlugins.raw!]}
       >
@@ -836,15 +839,32 @@ const LiComponent = ({
   ...props
 }: DetailedHTMLProps<LiHTMLAttributes<HTMLLIElement>, HTMLLIElement> &
   ExtraProps) => {
+  const isTaskItem = className?.includes('task-list-item');
   return (
     <li
-      className={cn('pl-1', className)}
+      className={cn(
+        'pl-1',
+        isTaskItem && 'flex list-none items-center gap-1.5',
+        className,
+      )}
       data-streamdown="list-item"
       {...props}
     >
       {children}
     </li>
   );
+};
+
+const InputComponent = ({
+  type,
+  checked,
+  ...props
+}: DetailedHTMLProps<InputHTMLAttributes<HTMLInputElement>, HTMLInputElement> &
+  ExtraProps) => {
+  if (type === 'checkbox')
+    return <Checkbox checked={!!checked} size="2xs" disabled />;
+
+  return <input type={type} checked={checked} {...props} />;
 };
 
 const MemoHr = memo<
@@ -964,3 +984,13 @@ const MemoLi = memo<
   (p, n) => p.children === n.children && p.className === n.className,
 );
 MemoLi.displayName = 'MarkdownLi';
+
+const MemoInput = memo<
+  DetailedHTMLProps<InputHTMLAttributes<HTMLInputElement>, HTMLInputElement> &
+    ExtraProps
+>(
+  InputComponent,
+  (p, n) =>
+    p.type === n.type && p.checked === n.checked && p.className === n.className,
+);
+MemoInput.displayName = 'MarkdownInput';
