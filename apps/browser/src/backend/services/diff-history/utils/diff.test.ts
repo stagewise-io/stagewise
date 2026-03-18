@@ -247,7 +247,7 @@ describe('diff utilities', () => {
       expect(generations[0]).toHaveLength(3);
     });
 
-    it('starts new generation after deletion (snapshot_oid = null)', () => {
+    it('keeps delete-then-recreate in single generation', () => {
       const ops = [
         createBaselineOpWithExternal({
           filepath: '/readme.md',
@@ -263,14 +263,11 @@ describe('diff utilities', () => {
       const result = segmentFileOperationsIntoGenerations(ops);
 
       const generations = Object.values(result);
-      expect(generations).toHaveLength(2);
-      // First generation: init + deletion
-      expect(generations[0]).toHaveLength(2);
-      // Second generation: recreation
-      expect(generations[1]).toHaveLength(1);
+      expect(generations).toHaveLength(1);
+      expect(generations[0]).toHaveLength(3);
     });
 
-    it('creates multiple generations for multiple deletions', () => {
+    it('keeps multiple delete-recreate cycles in single generation', () => {
       const ops = [
         createBaselineOpWithExternal({ filepath: '/readme.md' }),
         createEditOpWithExternal({
@@ -287,7 +284,8 @@ describe('diff utilities', () => {
       const result = segmentFileOperationsIntoGenerations(ops);
 
       const generations = Object.values(result);
-      expect(generations).toHaveLength(3);
+      expect(generations).toHaveLength(1);
+      expect(generations[0]).toHaveLength(5);
     });
 
     it('treats init baseline with null oid as file creation (not deletion)', () => {
@@ -314,7 +312,7 @@ describe('diff utilities', () => {
       expect(generations).toHaveLength(1);
     });
 
-    it('groups by filepath first, then segments each', () => {
+    it('groups by filepath into one generation per filepath', () => {
       const ops = [
         createBaselineOpWithExternal({ filepath: '/file1.txt' }),
         createBaselineOpWithExternal({ filepath: '/file2.txt' }),
@@ -328,8 +326,12 @@ describe('diff utilities', () => {
       const result = segmentFileOperationsIntoGenerations(ops);
 
       const generations = Object.values(result);
-      // file1: 1 generation (2 ops), file2: 2 generations (2 ops, 1 op)
-      expect(generations).toHaveLength(3);
+      // file1: 1 generation (2 ops), file2: 1 generation (3 ops)
+      expect(generations).toHaveLength(2);
+      const file1Gen = generations.find((g) => g[0].filepath === '/file1.txt');
+      const file2Gen = generations.find((g) => g[0].filepath === '/file2.txt');
+      expect(file1Gen).toHaveLength(2);
+      expect(file2Gen).toHaveLength(3);
     });
 
     it('handles deletion as last op without creating orphan generation', () => {

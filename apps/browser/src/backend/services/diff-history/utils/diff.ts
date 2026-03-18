@@ -55,27 +55,25 @@ export function isExternalFileDiff(diff: FileDiff): diff is ExternalFileDiff {
 
 type FileId = string;
 /**
- * Segments operations into 'generations' — distinct lifecycles of files separated by
- * deletion and recreation events. Each generation gets a unique fileId.
+ * Groups operations by filepath, assigning a single unique fileId per filepath.
  *
- * A new generation starts after an edit operation with snapshot_oid=null (file deletion).
- * The deletion edit belongs to the ending generation; subsequent operations start a new one.
+ * Delete-then-recreate sequences are kept in the same group so that the
+ * resulting diff shows "modified" rather than separate "deleted" + "created"
+ * entries. The downstream diff functions handle null snapshot_oid (deletion)
+ * naturally by treating the content as an empty string.
  *
- * This function is defensive: it groups operations by filepath first, even though it
- * typically receives operations for a single filepath.
- *
- * IMPORTANT: It's not guarenteed that each generation starts with an 'init' baseline! If a file was deleted, a new generation might start with an 'edit' operation.
- * We can assume that each generation without an 'init' baseline has an empty string as baseline.
+ * This function is defensive: it groups operations by filepath first, even
+ * though it typically receives operations for a single filepath.
  *
  * @param operations - Ordered operations (should be for a single filepath, but handles multiple defensively)
- * @returns Array of generations, each with a unique fileId and its operations
+ * @returns Record of fileId to operations, one entry per unique filepath
  */
 export function segmentFileOperationsIntoGenerations<
   T extends OperationWithExternal | OperationWithContent,
 >(operations: T[]): Record<FileId, T[]> {
   if (operations.length === 0) return {};
 
-  // Step 1: Group operations by filepath (defensive)
+  // Group operations by filepath — one fileId per filepath
   const opsByFilepath: Record<string, T[]> = {};
   for (const op of operations) {
     const existing = opsByFilepath[op.filepath] ?? [];
@@ -83,41 +81,9 @@ export function segmentFileOperationsIntoGenerations<
     opsByFilepath[op.filepath] = existing;
   }
 
-  // Step 2: For each filepath, segment into generations
   const result: Record<FileId, T[]> = {};
-
-  for (const filepath of Object.keys(opsByFilepath)) {
-    const fileOps = opsByFilepath[filepath];
-    let currentGeneration: T[] = [];
-    let wasDeleted = false;
-
-    for (const op of fileOps) {
-      // If we previously saw a deletion and now have a new op, start new generation
-      if (wasDeleted) {
-        // Save the previous generation (if it has ops)
-        if (currentGeneration.length > 0)
-          result[randomUUID()] = currentGeneration;
-
-        // Start new generation
-        currentGeneration = [];
-        wasDeleted = false;
-      }
-
-      // Add current op to current generation
-      currentGeneration.push(op);
-
-      // Check if this op marks a deletion (edit with null snapshot_oid)
-      // An edit with null oid means the file was deleted.
-      // An init baseline with null oid means the file is being created (didn't exist before),
-      // which is NOT a deletion - it's the start of a new generation for a new file.
-      if (op.operation === 'edit' && op.snapshot_oid === null)
-        wasDeleted = true;
-    }
-
-    // Don't forget the last generation
-    if (currentGeneration.length > 0) {
-      result[randomUUID()] = currentGeneration;
-    }
+  for (const fileOps of Object.values(opsByFilepath)) {
+    result[randomUUID()] = fileOps;
   }
 
   return result;
