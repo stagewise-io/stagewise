@@ -4,13 +4,11 @@ import type { ModelProviderService } from '@/agents/model-provider';
 
 const escapeTextForXML = (text: string): string => {
   return text
-    .replace('<user>', '\<user\>')
-    .replace('</user>', '\</user\>')
-    .replace('<assistant>', '\<assistant\>')
-    .replace('</assistant>', '\</assistant\>')
-    .replace('<chat-history>', '\<chat-history\>')
-    .replace('</chat-history>', '\</chat-history\>')
-    .replace('<previous-chat-history>', '\<previous-chat-history\>');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 };
 
 /**
