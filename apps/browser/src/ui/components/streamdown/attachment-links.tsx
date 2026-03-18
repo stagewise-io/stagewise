@@ -1,5 +1,4 @@
 import { useMemo, useState, useRef, Suspense, type ReactNode } from 'react';
-import { ExternalLinkIcon } from 'lucide-react';
 import {
   cn,
   IDE_SELECTION_ITEMS,
@@ -330,7 +329,6 @@ export const WorkspaceFileLink = ({
     >
       {displayPath || '...'}
       {lineNumber && <span className="shrink-0 opacity-70">:{lineNumber}</span>}
-      <ExternalLinkIcon className="size-3 shrink-0" />
     </a>
   );
 
