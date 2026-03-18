@@ -348,6 +348,14 @@ export abstract class BaseAgent<
   private stepAbortController: AbortController | null = null;
 
   /**
+   * Guard flag to prevent concurrent history compression runs.
+   * Set to `true` when `compressHistoryInternal` starts and reset
+   * when it finishes (success or failure). Subsequent calls bail
+   * out immediately while a compression is in progress.
+   */
+  private _isCompressingHistory = false;
+
+  /**
    * Monotonically increasing counter that identifies the "current" step.
    * Stream callbacks (onAbort, onFinish, onError) capture this value when
    * the step starts and compare before modifying `isWorking`. This prevents
@@ -1568,6 +1576,16 @@ export abstract class BaseAgent<
   }
 
   private async compressHistoryInternal(): Promise<void> {
+    // Prevent concurrent compression runs — a second trigger while
+    // compression is in-flight would see stale history and produce
+    // a redundant (or conflicting) summary.
+    if (this._isCompressingHistory) {
+      this.logger.debug(
+        `[BaseAgent:${this.instanceId}] Skipping history compression — already in progress.`,
+      );
+      return;
+    }
+    this._isCompressingHistory = true;
     try {
       const state = this.state.get();
 
@@ -1624,6 +1642,8 @@ export abstract class BaseAgent<
         `[BaseAgent:${this.instanceId}] History compression failed silently: ${error.message}`,
       );
       this.report(error, 'compressHistory');
+    } finally {
+      this._isCompressingHistory = false;
     }
   }
 
