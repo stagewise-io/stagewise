@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.38 (2026-03-18)
+
+### Features
+
+* add support for gpt 5.4 mini/ nano (c2ad158)
+
 ## 1.0.0-alpha.37 (2026-03-18)
 
 ### Bug Fixes
