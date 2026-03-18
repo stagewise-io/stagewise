@@ -125,7 +125,7 @@ jobs:
           - os: ubuntu-latest
             arch: x64
             artifact: stagewise-linux-x64
-          - os: windows-latest
+          - os: windows-x64  # explicit arch label; avoids breakage if GitHub adds ARM runners under windows-latest
             arch: x64
             artifact: stagewise-windows-x64
 

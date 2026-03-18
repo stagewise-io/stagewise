@@ -69,6 +69,110 @@ const copyNativeDependencies = (
 };
 
 /**
+ * Downloads the VC++ 2015-2022 runtime DLLs from the official NuGet package
+ * (VCRuntime.CefSharp.140, authored and signed by Microsoft) and copies the
+ * x64 DLLs next to the packaged executable.
+ *
+ * Runs as an afterComplete hook — buildPath is the final output directory
+ * (e.g. out/stagewise-win32-x64/) containing the .exe.
+ *
+ * Using NuGet guarantees the correct architecture and the latest patch-level
+ * DLLs without depending on a VS installation being present on the machine.
+ * The .nupkg is a plain ZIP; extraction uses PowerShell's Expand-Archive
+ * (built into every Windows install).
+ *
+ * No-op on non-Windows platforms.
+ */
+
+// NuGet package that ships x64 + x86 VC++ 2015-2022 CRT DLLs.
+// Authored by Microsoft, package-signed (.signature.p7s included).
+const VC_NUPKG_URL =
+  'https://api.nuget.org/v3-flatcontainer/vcruntime.cefsharp.140/1.0.5/vcruntime.cefsharp.140.1.0.5.nupkg';
+
+// Paths inside the extracted .nupkg
+const VC_NUPKG_X64_DIR = path.join('vc_redist', 'x64');
+
+const VC_REQUIRED_DLLS = [
+  'vcruntime140.dll',
+  'vcruntime140_1.dll',
+  'msvcp140.dll',
+  'msvcp140_1.dll',
+  'msvcp140_2.dll',
+];
+const VC_HARD_REQUIRED = ['vcruntime140.dll', 'msvcp140.dll'];
+
+const copyVcRedist = (
+  buildPath: string,
+  _electronVersion: string,
+  platform: string,
+  _arch: string,
+  callback: (error?: Error) => void,
+) => {
+  if (platform !== 'win32') {
+    callback();
+    return;
+  }
+
+  (async () => {
+    const os = await import('node:os');
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vcredist-'));
+    const nupkgPath = path.join(tmpDir, 'vcruntime.zip');
+    const extractDir = path.join(tmpDir, 'extracted');
+
+    try {
+      console.log(
+        `[forge.config] Downloading VC++ CRT DLLs from NuGet: ${VC_NUPKG_URL}`,
+      );
+      const resp = await fetch(VC_NUPKG_URL);
+      if (!resp.ok)
+        throw new Error(
+          `[forge.config] NuGet fetch failed: ${resp.status} ${resp.statusText}`,
+        );
+      const buf = Buffer.from(await resp.arrayBuffer());
+      fs.writeFileSync(nupkgPath, buf);
+      console.log(
+        `[forge.config] Downloaded ${(buf.length / 1024).toFixed(1)} KB`,
+      );
+
+      fs.mkdirSync(extractDir, { recursive: true });
+      execSync(
+        `powershell -NoProfile -Command "Expand-Archive -Path '${nupkgPath}' -DestinationPath '${extractDir}' -Force"`,
+        { stdio: 'inherit' },
+      );
+
+      const srcDir = path.join(extractDir, VC_NUPKG_X64_DIR);
+      const missing: string[] = [];
+      const copied: string[] = [];
+
+      for (const dll of VC_REQUIRED_DLLS) {
+        const src = path.join(srcDir, dll);
+        if (fs.existsSync(src)) {
+          fs.copyFileSync(src, path.join(buildPath, dll));
+          copied.push(dll);
+        } else if (VC_HARD_REQUIRED.includes(dll)) {
+          missing.push(dll);
+        }
+      }
+
+      if (missing.length > 0) {
+        throw new Error(
+          `[forge.config] Required VC++ DLLs missing in NuGet package: ${missing.join(', ')}`,
+        );
+      }
+
+      console.log(
+        `[forge.config] Copied ${copied.length} VC++ DLL(s): ${copied.join(', ')}`,
+      );
+      callback();
+    } catch (err) {
+      callback(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  })();
+};
+
+/**
  * After the app source is copied to the packaging directory, inject PostHog
  * source map metadata, upload maps to PostHog for stack trace resolution,
  * then delete .map files so they don't ship to users.
@@ -148,6 +252,7 @@ const config: ForgeConfig = {
     ],
     prune: true,
     afterCopy: [copyNativeDependencies, uploadSourceMapsAndCleanup],
+    afterComplete: [copyVcRedist], // sources DLLs directly from VS install on the runner
     icon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon`,
     appCopyright: `Copyright © ${new Date().getFullYear()} stagewise Inc.`,
     win32metadata: {
