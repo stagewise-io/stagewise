@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { cn } from '@ui/utils';
 import { SuggestionPopupContainer, SuggestionSidePanel } from '../shared';
-import type { TabState } from '@shared/karton-contracts/ui';
+import type { TabState, MountEntry } from '@shared/karton-contracts/ui';
 import { inferMimeType } from '@shared/mime-utils';
 import {
   getFilePreviewForFile,
@@ -20,6 +20,8 @@ import type {
   FileMentionItem,
 } from './types';
 import { MentionIcon } from './mention-icon';
+import { FilePathTree } from './file-path-tree';
+import { getBaseName } from '@shared/path-utils';
 
 type SidePanelContent =
   | {
@@ -37,11 +39,19 @@ type SidePanelContent =
       relativePath: string;
       mediaType: string;
       Preview: FC<FilePreviewProps>;
+    }
+  | {
+      type: 'file-path';
+      key: string;
+      workspaceName: string;
+      relativePath: string;
+      fileName: string;
     };
 
 function deriveSidePanel(
   item: ResolvedMentionItem | undefined,
   tabs: Record<string, TabState>,
+  mounts: MountEntry[],
 ): SidePanelContent | null {
   if (!item) return null;
 
@@ -66,7 +76,21 @@ function deriveSidePanel(
     const entry = getFilePreviewForFile(meta.fileName);
     const mime = inferMimeType(meta.fileName);
 
-    if (!entry.variants.expanded || entry.id === 'video') return null;
+    if (!entry.variants.expanded || entry.id === 'video') {
+      // Code files / unsupported previews → show path tree
+      const mount = mounts.find((m) => m.prefix === meta.mountPrefix);
+      const workspaceName = mount
+        ? getBaseName(mount.path) || mount.path
+        : meta.mountPrefix;
+
+      return {
+        type: 'file-path',
+        key: `file-path:${meta.mountedPath}`,
+        workspaceName,
+        relativePath: meta.relativePath,
+        fileName: meta.fileName,
+      };
+    }
 
     const src = `workspace://${meta.mountPrefix}/${encodeURIComponent(meta.relativePath)}`;
     return {
@@ -89,6 +113,7 @@ interface SuggestionPopupProps {
   onSelect: (item: ResolvedMentionItem) => void;
   clientRect: (() => DOMRect | null) | null;
   tabs: Record<string, TabState>;
+  mounts: MountEntry[];
 }
 
 function SuggestionItem({
@@ -143,6 +168,7 @@ export function SuggestionPopup({
   onSelect,
   clientRect,
   tabs,
+  mounts,
 }: SuggestionPopupProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Map<number, HTMLButtonElement | null>>(new Map());
@@ -156,8 +182,8 @@ export function SuggestionPopup({
 
   const selectedItem = items[selectedIndex] as ResolvedMentionItem | undefined;
   const sidePanel = useMemo(
-    () => deriveSidePanel(selectedItem, tabs),
-    [selectedItem, tabs],
+    () => deriveSidePanel(selectedItem, tabs, mounts),
+    [selectedItem, tabs, mounts],
   );
 
   useLayoutEffect(() => {
@@ -203,13 +229,19 @@ export function SuggestionPopup({
                 title={sidePanel.title}
                 url={sidePanel.url}
               />
-            ) : (
+            ) : sidePanel.type === 'file' ? (
               <FilePreviewContent
                 src={sidePanel.src}
                 fileName={sidePanel.fileName}
                 relativePath={sidePanel.relativePath}
                 mediaType={sidePanel.mediaType}
                 Preview={sidePanel.Preview}
+              />
+            ) : (
+              <FilePathTree
+                workspaceName={sidePanel.workspaceName}
+                relativePath={sidePanel.relativePath}
+                fileName={sidePanel.fileName}
               />
             )}
           </SuggestionSidePanel>

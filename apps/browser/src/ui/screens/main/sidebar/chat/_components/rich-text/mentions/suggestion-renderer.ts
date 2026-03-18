@@ -31,6 +31,7 @@ export function createSuggestionRenderer() {
         onSelect: (item: ResolvedMentionItem) => currentProps?.command(item),
         clientRect: currentProps.clientRect ?? null,
         tabs: mentionContextRef.current.tabs,
+        mounts: mentionContextRef.current.mounts,
       }),
     );
   }
