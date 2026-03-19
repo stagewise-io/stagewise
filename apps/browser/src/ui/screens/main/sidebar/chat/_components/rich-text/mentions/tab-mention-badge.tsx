@@ -1,16 +1,18 @@
 import { useMemo, useState, useCallback } from 'react';
 import { IconGlobe2Fill18 } from 'nucleo-ui-fill-18';
+import { ExternalLinkIcon } from 'lucide-react';
 import { cn } from '@ui/utils';
 import { InlineBadge, InlineBadgeWrapper } from '../shared';
-import { useTabSnapshots } from '@ui/hooks/use-tab-snapshots';
-import { useMessageBrowserSession } from '@ui/hooks/use-message-browser-session';
+import { useMessageBrowserContext } from '@ui/hooks/use-message-browser-context';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import { ContextMenu } from '@base-ui/react/context-menu';
+import { Menu as MenuBase } from '@base-ui/react/menu';
 import type { TabMentionMeta } from '@shared/karton-contracts/ui/agent/metadata';
 
 interface TabMentionBadgeProps {
   /** Tab ID — always available from the mention node's id attr. */
   tabId?: string;
-  /** Direct meta from @-mention node attrs (takes priority over context lookup) */
+  /** Direct meta from @-mention node attrs (fallback when no context snapshot) */
   meta?: TabMentionMeta | null;
   selected?: boolean;
   isEditable?: boolean;
@@ -47,6 +49,15 @@ function TabFaviconMini({
   );
 }
 
+const menuItemClassName =
+  'flex w-full cursor-default flex-row items-center justify-start gap-2 rounded-md px-2 py-1 text-foreground text-xs outline-none transition-colors duration-150 ease-out hover:bg-surface-1 data-highlighted:bg-surface-1';
+
+type TabState =
+  | 'normal' // live tab, same session, URL unchanged
+  | 'navigated' // live tab, same session, URL differs
+  | 'closed' // no live tab, same session
+  | 'restarted'; // stale session
+
 export function TabMentionBadge({
   tabId,
   meta,
@@ -55,127 +66,188 @@ export function TabMentionBadge({
   onDelete,
   viewOnly = true,
 }: TabMentionBadgeProps) {
-  const tabSnapshots = useTabSnapshots();
-  const messageBrowserSessionId = useMessageBrowserSession();
+  const { sessionId: messageBrowserSessionId, tabs: tabSnapshots } =
+    useMessageBrowserContext();
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
 
   const liveBrowserSessionId = useKartonState((s) => s.browser.sessionId);
+  const liveTab = useKartonState((s) =>
+    tabId ? (s.browser.tabs[tabId] ?? null) : null,
+  );
 
-  const liveTab = useKartonState((s) => {
-    if (tabId && s.browser.tabs[tabId]) return s.browser.tabs[tabId]!;
-    return null;
-  });
-
-  /**
-   * Whether this tab reference belongs to a previous browser session.
-   * Only applies when we have both a message-time session ID and a live one,
-   * and they differ — meaning the browser has restarted since this message.
-   */
   const isStaleSession =
     messageBrowserSessionId !== null &&
     messageBrowserSessionId !== '' &&
     liveBrowserSessionId !== '' &&
     messageBrowserSessionId !== liveBrowserSessionId;
 
-  // Resolution priority: live state (only if same session) > persisted snapshot > inline meta
-  const tabData = useMemo(() => {
-    if (liveTab && !isStaleSession) {
-      return {
-        title: liveTab.title,
-        url: liveTab.url,
-        faviconUrl: liveTab.faviconUrls?.[0],
-        isOpen: true,
-        tabId: liveTab.id,
-      };
-    }
-
-    if (tabId) {
-      const snapshot = tabSnapshots?.get(tabId);
-      if (snapshot) {
+  /**
+   * The tab's title/url/favicon as they were when the message was sent.
+   * Resolution order: per-message snapshot (from sparse env snapshot) → inline meta.
+   */
+  const historicalData = useMemo(() => {
+    if (tabId && tabSnapshots) {
+      const snap = tabSnapshots.get(tabId);
+      if (snap) {
         return {
-          title: snapshot.title,
-          url: snapshot.url,
-          faviconUrl: snapshot.faviconUrl,
-          isOpen: false,
-          tabId: null,
+          title: snap.title,
+          url: snap.url,
+          faviconUrl: snap.faviconUrl,
         };
       }
     }
-
     if (meta) {
       return {
         title: meta.title,
         url: meta.url,
         faviconUrl: meta.faviconUrl,
-        isOpen: false,
-        tabId: null,
       };
     }
-
     return null;
-  }, [liveTab, isStaleSession, tabSnapshots, tabId, meta]);
+  }, [tabId, tabSnapshots, meta]);
+
+  /** Determine which state the badge is in. */
+  const tabState = useMemo<TabState>(() => {
+    if (isStaleSession) return 'restarted';
+    if (!liveTab) return 'closed';
+    // Same session, tab is open — check URL drift
+    const originalUrl = historicalData?.url;
+    if (originalUrl && liveTab.url && liveTab.url !== originalUrl) {
+      return 'navigated';
+    }
+    return 'normal';
+  }, [isStaleSession, liveTab, historicalData]);
+
+  /**
+   * Display data: for 'normal' state use the live favicon so it stays fresh
+   * (e.g. after a favicon change). Title/url always come from historical data
+   * so the label is stable. For all other states use historical only.
+   */
+  const displayData = useMemo(() => {
+    const base = historicalData ?? {
+      title: liveTab?.title,
+      url: liveTab?.url,
+      faviconUrl: liveTab?.faviconUrls?.[0],
+    };
+    if (tabState === 'normal' && liveTab?.faviconUrls?.[0]) {
+      return { ...base, faviconUrl: liveTab.faviconUrls[0] };
+    }
+    return base;
+  }, [historicalData, liveTab, tabState]);
 
   const displayLabel = useMemo(() => {
-    if (!tabData) return tabId ?? '?';
-    const title = tabData.title;
-    if (title && title.length > 24) return `${title.slice(0, 24)}...`;
-    return title || tabId || '?';
-  }, [tabData, tabId]);
+    const title = displayData.title;
+    if (!title) return tabId ?? '?';
+    if (title.length > 24) return `${title.slice(0, 24)}…`;
+    return title;
+  }, [displayData.title, tabId]);
+
+  const isWarning = tabState !== 'normal';
 
   const tooltipContent = useMemo(() => {
-    if (isStaleSession) {
-      const label = tabData?.url ?? tabData?.title ?? tabId ?? '';
-      return (
-        <span>
-          {label && <span className="block font-medium">{label}</span>}
-          <span className="block text-muted-foreground">
-            Tab no longer available — browser was restarted.
-          </span>
-        </span>
-      );
-    }
-    if (!tabData?.isOpen) {
-      const label = tabData?.url ?? tabData?.title ?? tabId ?? '';
-      return (
-        <span>
-          {label && <span className="block font-medium">{label}</span>}
-          <span className="block text-muted-foreground">
-            This tab has been closed.
-          </span>
-        </span>
-      );
-    }
-    return tabData?.url ?? tabId ?? '';
-  }, [tabData, tabId, isStaleSession]);
+    const url = displayData.url ?? tabId ?? '';
+
+    const statusLine = (() => {
+      switch (tabState) {
+        case 'navigated':
+          return 'Tab is on a different URL now.';
+        case 'closed':
+          return 'Tab is closed.';
+        case 'restarted':
+          return 'Browser was restarted.';
+        default:
+          return null;
+      }
+    })();
+
+    if (!statusLine) return url;
+
+    return (
+      <span>
+        {url && <span className="block font-medium">{url}</span>}
+        <span className="block text-muted-foreground">{statusLine}</span>
+      </span>
+    );
+  }, [tabState, displayData.url, tabId]);
+
+  const originalUrl = displayData.url;
 
   const handleClick = useCallback(() => {
-    if (isStaleSession || !tabData) return;
-    if (tabData.isOpen && tabData.tabId) {
-      void switchTab(tabData.tabId);
-    } else if (tabData.url) {
-      void createTab(tabData.url);
+    switch (tabState) {
+      case 'normal':
+      case 'navigated':
+        if (tabId) void switchTab(tabId);
+        break;
+      case 'closed':
+      case 'restarted':
+        if (originalUrl) void createTab(originalUrl);
+        break;
     }
-  }, [tabData, isStaleSession, switchTab, createTab]);
+  }, [tabState, tabId, originalUrl, switchTab, createTab]);
 
-  const icon = (
-    <TabFaviconMini url={tabData?.faviconUrl} title={tabData?.title} />
-  );
+  const handleOpenOriginalInNewTab = useCallback(() => {
+    if (originalUrl) void createTab(originalUrl);
+  }, [originalUrl, createTab]);
 
-  return (
+  const badge = (
     <InlineBadgeWrapper viewOnly={viewOnly} tooltipContent={tooltipContent}>
       <InlineBadge
-        icon={icon}
+        icon={
+          <TabFaviconMini
+            url={displayData.faviconUrl}
+            title={displayData.title}
+          />
+        }
         label={displayLabel}
         selected={selected}
         isEditable={isEditable}
         onDelete={() => onDelete?.()}
-        className={cn(
-          !isStaleSession && 'cursor-pointer',
-          (isStaleSession || !tabData?.isOpen) && 'opacity-70',
-        )}
-        onClick={isStaleSession ? undefined : handleClick}
+        className={cn('cursor-pointer', isWarning && 'opacity-50')}
+        onClick={handleClick}
       />
     </InlineBadgeWrapper>
   );
+
+  // 'navigated': right-click offers opening the original URL in a new tab
+  if (tabState === 'navigated' && !isEditable) {
+    return (
+      <ContextMenu.Root>
+        <ContextMenu.Trigger render={<span />} className="contents">
+          {badge}
+        </ContextMenu.Trigger>
+        <MenuBase.Portal>
+          <MenuBase.Positioner
+            className="z-50"
+            sideOffset={4}
+            align="start"
+            side="bottom"
+          >
+            <MenuBase.Popup
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={cn(
+                'flex origin-(--transform-origin) flex-col items-stretch gap-0.5',
+                'rounded-lg border border-border-subtle bg-background p-1',
+                'text-xs shadow-lg',
+                'transition-[transform,scale,opacity] duration-150 ease-out',
+                'data-ending-style:scale-90 data-starting-style:scale-90',
+                'data-ending-style:opacity-0 data-starting-style:opacity-0',
+              )}
+            >
+              <MenuBase.Item
+                className={menuItemClassName}
+                onClick={handleOpenOriginalInNewTab}
+              >
+                <ExternalLinkIcon className="size-3.5 shrink-0" />
+                <span>Open original URL in new tab</span>
+              </MenuBase.Item>
+            </MenuBase.Popup>
+          </MenuBase.Positioner>
+        </MenuBase.Portal>
+      </ContextMenu.Root>
+    );
+  }
+
+  return badge;
 }
