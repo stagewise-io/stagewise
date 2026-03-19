@@ -1,5 +1,4 @@
 import type { BrowserSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
-import { renderBrowserTabsXml } from '../../system/browser-tabs-renderer';
 import type { EnvironmentChangeEntry } from './types';
 
 /**
@@ -7,10 +6,10 @@ import type { EnvironmentChangeEntry } from './types';
  * change descriptions. Returns an empty array when there is no
  * previous snapshot (first message) or when nothing changed.
  *
- * When `browserSessionId` changes between snapshots, a single
- * `browser-restarted` event is emitted and all individual tab-level
- * events are suppressed — the agent should treat all old tab IDs as
- * invalid and use the new session's tab list instead.
+ * When `browserSessionId` changes between snapshots, a `browser-restarted`
+ * entry is prepended, `tab-closed` entries are suppressed (the restart notice
+ * already implies all old tabs are gone), and new tabs appear as regular
+ * `tab-opened` entries.
  */
 export function computeBrowserChanges(
   previous: BrowserSnapshot | null,
@@ -20,125 +19,104 @@ export function computeBrowserChanges(
 ): EnvironmentChangeEntry[] {
   if (!previous) return [];
 
-  // Browser restart detected — session ID changed between messages.
-  // Suppress all individual tab events; emit a single restart notice instead.
-  if (
-    previousSessionId &&
-    currentSessionId &&
-    previousSessionId !== currentSessionId
-  ) {
-    const tabDetail = renderBrowserTabsXml(current);
-    return [
-      {
-        type: 'browser-restarted',
-        summary:
-          'all old tabs were closed and the user is in a new session. Tab IDs have been reset.',
-        detail: tabDetail,
-      },
-    ];
-  }
+  const isRestart =
+    !!previousSessionId &&
+    !!currentSessionId &&
+    previousSessionId !== currentSessionId;
 
   const prevTabs = new Map(previous.tabs.map((t) => [t.id, t]));
   const currTabs = new Map(current.tabs.map((t) => [t.id, t]));
 
-  const closed: string[] = [];
-  const opened: string[] = [];
-  const navigated: string[] = [];
-  const titleChanged: string[] = [];
-  const errorChanges: string[] = [];
-  const consoleChanges: string[] = [];
+  const changes: EnvironmentChangeEntry[] = [];
 
-  for (const [id] of prevTabs) if (!currTabs.has(id)) closed.push(id);
+  if (isRestart) {
+    changes.push({ type: 'browser-restarted' });
+  }
+
+  // Closed tabs — suppressed on restart (implied by browser-restarted)
+  if (!isRestart) {
+    for (const [id] of prevTabs) {
+      if (!currTabs.has(id)) {
+        changes.push({ type: 'tab-closed', attributes: { tabId: id } });
+      }
+    }
+  }
 
   for (const [id, curr] of currTabs) {
     if (!prevTabs.has(id)) {
-      opened.push(`${id} (${curr.url})`);
+      // Newly opened tab
+      changes.push({
+        type: 'tab-opened',
+        attributes: { tabId: id, url: curr.url },
+      });
       continue;
     }
-    const prev = prevTabs.get(id)!;
-    if (prev.url !== curr.url)
-      navigated.push(`${id} (${prev.url} -> ${curr.url})`);
-    if (prev.title !== curr.title)
-      titleChanged.push(`${id} ("${prev.title}" -> "${curr.title}")`);
 
+    const prev = prevTabs.get(id)!;
+
+    // Navigation: url changed → show new url (+ new title if it also changed).
+    // Title-only change (SPA): show new title.
+    if (prev.url !== curr.url) {
+      const attrs: Record<string, string> = { tabId: id, url: curr.url };
+      if (prev.title !== curr.title) attrs.title = curr.title ?? '';
+      changes.push({ type: 'tab-navigated', attributes: attrs });
+    } else if (prev.title !== curr.title) {
+      changes.push({
+        type: 'tab-navigated',
+        attributes: { tabId: id, title: curr.title ?? '' },
+      });
+    }
+
+    // Page error state
     const prevErr = prev.error;
     const currErr = curr.error;
     if (JSON.stringify(prevErr) !== JSON.stringify(currErr)) {
-      if (!prevErr && currErr)
-        errorChanges.push(
-          `${id}: error ${currErr.code}${currErr.message ? ` - ${currErr.message}` : ''}`,
-        );
-      else if (prevErr && !currErr) errorChanges.push(`${id}: error cleared`);
-      else if (prevErr && currErr)
-        errorChanges.push(
-          `${id}: error changed ${prevErr.code} -> ${currErr.code}`,
-        );
+      if (!prevErr && currErr) {
+        const attrs: Record<string, string> = {
+          tabId: id,
+          code: String(currErr.code),
+        };
+        if (currErr.message) attrs.message = currErr.message;
+        changes.push({ type: 'tab-error', attributes: attrs });
+      } else if (prevErr && !currErr) {
+        changes.push({
+          type: 'tab-error-cleared',
+          attributes: { tabId: id },
+        });
+      } else if (prevErr && currErr) {
+        changes.push({
+          type: 'tab-error',
+          attributes: {
+            tabId: id,
+            code: String(currErr.code),
+            ...(currErr.message ? { message: currErr.message } : {}),
+          },
+        });
+      }
     }
 
+    // Console activity
     const prevLogs = prev.consoleLogCount ?? 0;
     const currLogs = curr.consoleLogCount ?? 0;
     const prevErrors = prev.consoleErrorCount ?? 0;
     const currErrors = curr.consoleErrorCount ?? 0;
     if (currLogs > prevLogs || currErrors > prevErrors) {
-      const parts: string[] = [];
-      if (currLogs > prevLogs) parts.push(`+${currLogs - prevLogs} log(s)`);
+      const attrs: Record<string, string> = { tabId: id };
+      if (currLogs > prevLogs) attrs.newLogs = String(currLogs - prevLogs);
       if (currErrors > prevErrors)
-        parts.push(`+${currErrors - prevErrors} error(s)`);
-      consoleChanges.push(`${id}: ${parts.join(', ')}`);
+        attrs.newErrors = String(currErrors - prevErrors);
+      changes.push({ type: 'tab-console', attributes: attrs });
     }
   }
 
-  const changes: EnvironmentChangeEntry[] = [];
-
-  if (closed.length > 0) {
-    const label = closed.length === 1 ? 'tab closed' : 'tabs closed';
-    changes.push({
-      type: 'tab-closed',
-      summary: `${label}: [${closed.join(', ')}]`,
-    });
-  }
-  if (opened.length > 0) {
-    const label = opened.length === 1 ? 'new tab opened' : 'new tabs opened';
-    changes.push({
-      type: 'tab-opened',
-      summary: `${label}: [${opened.join(', ')}]`,
-    });
-  }
-  if (navigated.length > 0) {
-    const label = navigated.length === 1 ? 'tab navigated' : 'tabs navigated';
-    changes.push({
-      type: 'tab-navigated',
-      summary: `${label}: [${navigated.join(', ')}]`,
-    });
-  }
-  if (titleChanged.length > 0) {
-    changes.push({
-      type: 'tab-title-changed',
-      summary: `tab title changed: [${titleChanged.join(', ')}]`,
-    });
-  }
-  if (errorChanges.length > 0) {
-    changes.push({
-      type: 'tab-error',
-      summary: `tab errors: [${errorChanges.join(', ')}]`,
-    });
-  }
-  if (consoleChanges.length > 0) {
-    changes.push({
-      type: 'tab-console',
-      summary: `console output: [${consoleChanges.join(', ')}]`,
-    });
-  }
-
+  // Active tab change
   if (
     previous.activeTabId !== current.activeTabId &&
     current.activeTabId !== null
   ) {
-    const summary =
-      previous.activeTabId === null
-        ? `active tab: ${current.activeTabId}`
-        : `active tab: ${previous.activeTabId} -> ${current.activeTabId}`;
-    changes.push({ type: 'active-tab-changed', summary });
+    const attrs: Record<string, string> = { to: current.activeTabId };
+    if (previous.activeTabId !== null) attrs.from = previous.activeTabId;
+    changes.push({ type: 'active-tab-changed', attributes: attrs });
   }
 
   return changes;

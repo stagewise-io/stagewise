@@ -9,14 +9,32 @@ describe('renderEnvironmentChangesXml', () => {
     expect(renderEnvironmentChangesXml([])).toBe('');
   });
 
-  it('renders simple entry with type and summary', () => {
+  it('renders simple entry with type as tag name and summary as body', () => {
     const entries: EnvironmentChangeEntry[] = [
-      { type: 'tab-closed', summary: 'tab closed: [t_1]' },
+      { type: 'tab-closed', summary: 'tab closed' },
     ];
     const xml = renderEnvironmentChangesXml(entries);
     expect(xml).toContain('<env-changes>');
     expect(xml).toContain('</env-changes>');
-    expect(xml).toContain('<entry type="tab-closed">tab closed: [t_1]</entry>');
+    expect(xml).toContain('<tab-closed>tab closed</tab-closed>');
+  });
+
+  it('renders self-closing tag when no summary or detail', () => {
+    const entries: EnvironmentChangeEntry[] = [{ type: 'browser-restarted' }];
+    const xml = renderEnvironmentChangesXml(entries);
+    expect(xml).toContain('<browser-restarted />');
+    expect(xml).not.toContain('</browser-restarted>');
+  });
+
+  it('renders self-closing tag with attributes when no body', () => {
+    const entries: EnvironmentChangeEntry[] = [
+      {
+        type: 'tab-opened',
+        attributes: { tabId: 't_1', url: 'https://a.com' },
+      },
+    ];
+    const xml = renderEnvironmentChangesXml(entries);
+    expect(xml).toContain('<tab-opened tabId="t_1" url="https://a.com" />');
   });
 
   it('renders entry with attributes and escapes special chars', () => {
@@ -36,29 +54,28 @@ describe('renderEnvironmentChangesXml', () => {
     const entries: EnvironmentChangeEntry[] = [
       {
         type: 'agents-md-updated',
-        summary: 'AGENTS.md updated in w1',
         detail: '--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new',
         attributes: { path: 'w1' },
       },
     ];
     const xml = renderEnvironmentChangesXml(entries);
-    expect(xml).toContain('AGENTS.md updated in w1\n--- a');
-    expect(xml).toContain('+new</entry>');
+    expect(xml).toContain('--- a');
+    expect(xml).toContain('+new</agents-md-updated>');
   });
 
-  it('renders multiple entries', () => {
+  it('renders multiple self-closing entries', () => {
     const entries: EnvironmentChangeEntry[] = [
-      { type: 'sandbox-restarted', summary: 'sandbox restarted' },
-      { type: 'tab-opened', summary: 'new tab opened: [t_2]' },
+      { type: 'sandbox-restarted' },
       {
-        type: 'skill-enabled',
-        summary: 'skill enabled: foo',
-        attributes: { path: 'foo' },
+        type: 'tab-opened',
+        attributes: { tabId: 't_2', url: 'https://b.com' },
       },
+      { type: 'skill-enabled', attributes: { path: 'foo' } },
     ];
     const xml = renderEnvironmentChangesXml(entries);
-    expect(xml.match(/<entry /g)).toHaveLength(3);
-    expect(xml.match(/<\/entry>/g)).toHaveLength(3);
+    expect(xml).toContain('<sandbox-restarted />');
+    expect(xml).toContain('<tab-opened tabId="t_2" url="https://b.com" />');
+    expect(xml).toContain('<skill-enabled path="foo" />');
     expect(xml).toMatch(/^<env-changes>\n.*\n<\/env-changes>$/s);
   });
 
@@ -66,14 +83,11 @@ describe('renderEnvironmentChangesXml', () => {
     const entries: EnvironmentChangeEntry[] = [
       {
         type: 'agents-md-updated',
-        summary: 'AGENTS.md updated',
         detail: 'use <b>bold</b> & italic',
       },
     ];
     const xml = renderEnvironmentChangesXml(entries);
-    expect(xml).toContain(
-      '<![CDATA[AGENTS.md updated\nuse <b>bold</b> & italic]]>',
-    );
+    expect(xml).toContain('<![CDATA[use <b>bold</b> & italic]]>');
   });
 
   it('does not wrap body in CDATA when no special chars', () => {
@@ -82,7 +96,7 @@ describe('renderEnvironmentChangesXml', () => {
     ];
     const xml = renderEnvironmentChangesXml(entries);
     expect(xml).not.toContain('CDATA');
-    expect(xml).toContain('>tab closed</entry>');
+    expect(xml).toContain('>tab closed</tab-closed>');
   });
 
   it('escapes ]]> within CDATA body', () => {
@@ -93,7 +107,6 @@ describe('renderEnvironmentChangesXml', () => {
       },
     ];
     const xml = renderEnvironmentChangesXml(entries);
-    // The literal ]]> in body content gets split into ]]]]><![CDATA[>
     expect(xml).toContain(']]]]><![CDATA[>');
   });
 });

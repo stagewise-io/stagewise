@@ -26,7 +26,6 @@ export function computeAgentsMdChanges(
     if (prevContent === undefined) {
       changes.push({
         type: 'agents-md-created',
-        summary: `AGENTS.md created in ${prefix}`,
         detail: currContent,
         attributes: { path: prefix },
       });
@@ -41,7 +40,6 @@ export function computeAgentsMdChanges(
       );
       changes.push({
         type: 'agents-md-updated',
-        summary: `AGENTS.md updated in ${prefix}`,
         detail: diff,
         attributes: { path: prefix },
       });
@@ -52,7 +50,6 @@ export function computeAgentsMdChanges(
     if (!currEntries.has(prefix)) {
       changes.push({
         type: 'agents-md-deleted',
-        summary: `AGENTS.md removed from ${prefix}`,
         attributes: { path: prefix },
       });
     }
@@ -65,7 +62,6 @@ export function computeAgentsMdChanges(
     if (!prevRespected.has(mount)) {
       changes.push({
         type: 'agents-md-enabled',
-        summary: `AGENTS.md now respected in ${mount}`,
         attributes: { path: mount },
       });
     }
@@ -74,7 +70,6 @@ export function computeAgentsMdChanges(
     if (!currRespected.has(mount)) {
       changes.push({
         type: 'agents-md-disabled',
-        summary: `AGENTS.md no longer respected in ${mount}`,
         attributes: { path: mount },
       });
     }

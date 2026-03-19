@@ -33,7 +33,7 @@ describe('computeAgentsMdChanges', () => {
     const result = computeAgentsMdChanges(prev, curr);
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('agents-md-created');
-    expect(result[0].summary).toContain('w1');
+    expect(result[0].summary).toBeUndefined();
     expect(result[0].detail).toBe('# New rules');
     expect(result[0].attributes?.path).toBe('w1');
   });
@@ -59,7 +59,7 @@ describe('computeAgentsMdChanges', () => {
     const result = computeAgentsMdChanges(prev, curr);
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('agents-md-deleted');
-    expect(result[0].summary).toContain('removed');
+    expect(result[0].summary).toBeUndefined();
     expect(result[0].attributes?.path).toBe('w1');
   });
 
@@ -69,7 +69,8 @@ describe('computeAgentsMdChanges', () => {
     const result = computeAgentsMdChanges(prev, curr);
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('agents-md-enabled');
-    expect(result[0].summary).toContain('respected');
+    expect(result[0].summary).toBeUndefined();
+    expect(result[0].attributes?.path).toBe('w1');
   });
 
   it('detects AGENTS.md disabled (respect toggled off)', () => {
@@ -78,7 +79,8 @@ describe('computeAgentsMdChanges', () => {
     const result = computeAgentsMdChanges(prev, curr);
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('agents-md-disabled');
-    expect(result[0].summary).toContain('no longer respected');
+    expect(result[0].summary).toBeUndefined();
+    expect(result[0].attributes?.path).toBe('w1');
   });
 
   it('handles multiple mounts with mixed changes', () => {
