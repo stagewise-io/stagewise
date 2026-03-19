@@ -31,7 +31,7 @@ describe('computeWorkspaceMdChanges', () => {
     const result = computeWorkspaceMdChanges(prev, curr);
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('workspace-md-created');
-    expect(result[0].summary).toContain('w1');
+    expect(result[0].summary).toBeUndefined();
     expect(result[0].detail).toBe('# My Project');
     expect(result[0].attributes?.path).toBe('w1');
   });
@@ -57,7 +57,7 @@ describe('computeWorkspaceMdChanges', () => {
     const result = computeWorkspaceMdChanges(prev, curr);
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('workspace-md-deleted');
-    expect(result[0].summary).toContain('removed');
+    expect(result[0].summary).toBeUndefined();
     expect(result[0].attributes?.path).toBe('w1');
   });
 

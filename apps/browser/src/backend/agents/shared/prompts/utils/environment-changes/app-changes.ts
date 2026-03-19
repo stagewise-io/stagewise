@@ -1,10 +1,6 @@
 import type { ActiveAppSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
 import type { EnvironmentChangeEntry } from './types';
 
-function formatAppLabel(app: NonNullable<ActiveAppSnapshot>): string {
-  return app.pluginId ? `${app.appId} (plugin: ${app.pluginId})` : app.appId;
-}
-
 /**
  * Compares two active-app snapshots and produces a change description
  * when the app was opened, closed, or switched.
@@ -18,28 +14,21 @@ export function computeAppChanges(
   if (same) return [];
 
   if (!prev && curr) {
-    return [
-      {
-        type: 'app-opened',
-        summary: `app opened: ${formatAppLabel(curr)}`,
-      },
-    ];
+    const attrs: Record<string, string> = { appId: curr.appId };
+    if (curr.pluginId) attrs.pluginId = curr.pluginId;
+    return [{ type: 'app-opened', attributes: attrs }];
   }
+
   if (prev && !curr) {
-    return [
-      {
-        type: 'app-closed',
-        summary: `app closed: ${formatAppLabel(prev)}`,
-      },
-    ];
+    const attrs: Record<string, string> = { appId: prev.appId };
+    if (prev.pluginId) attrs.pluginId = prev.pluginId;
+    return [{ type: 'app-closed', attributes: attrs }];
   }
+
   if (prev && curr) {
-    return [
-      {
-        type: 'app-changed',
-        summary: `app changed: ${formatAppLabel(prev)} -> ${formatAppLabel(curr)}`,
-      },
-    ];
+    const from = prev.pluginId ? `${prev.appId}:${prev.pluginId}` : prev.appId;
+    const to = curr.pluginId ? `${curr.appId}:${curr.pluginId}` : curr.appId;
+    return [{ type: 'app-changed', attributes: { from, to } }];
   }
 
   return [];

@@ -28,7 +28,7 @@ function makeEnv(
 
 function summaries(
   entries: ReturnType<typeof computeFileDiffChanges>,
-): string[] {
+): (string | undefined)[] {
   return entries.map((e) => e.summary);
 }
 

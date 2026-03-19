@@ -16,27 +16,5 @@ export function computeSandboxChanges(
   if (!prevSessionId || !currSessionId) return [];
   if (prevSessionId === currSessionId) return [];
 
-  if (prevSessionId && !currSessionId)
-    return [
-      {
-        type: 'sandbox-session-ended',
-        summary:
-          'treat sandbox as uninitialized — previous globalThis state and cached modules are gone',
-      },
-    ];
-
-  if (!prevSessionId && currSessionId)
-    return [
-      {
-        type: 'sandbox-session-started',
-        summary: 'globalThis context is fresh',
-      },
-    ];
-
-  return [
-    {
-      type: 'sandbox-restarted',
-      summary: 'previous globalThis state and cached modules have been cleared',
-    },
-  ];
+  return [{ type: 'sandbox-restarted' }];
 }

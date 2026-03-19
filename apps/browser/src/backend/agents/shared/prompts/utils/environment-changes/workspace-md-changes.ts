@@ -26,7 +26,6 @@ export function computeWorkspaceMdChanges(
     if (prevContent === undefined) {
       changes.push({
         type: 'workspace-md-created',
-        summary: `WORKSPACE.md created in ${prefix}`,
         detail: currContent,
         attributes: { path: prefix },
       });
@@ -41,7 +40,6 @@ export function computeWorkspaceMdChanges(
       );
       changes.push({
         type: 'workspace-md-updated',
-        summary: `WORKSPACE.md updated in ${prefix}`,
         detail: diff,
         attributes: { path: prefix },
       });
@@ -52,7 +50,6 @@ export function computeWorkspaceMdChanges(
     if (!currEntries.has(prefix)) {
       changes.push({
         type: 'workspace-md-deleted',
-        summary: `WORKSPACE.md removed from ${prefix}`,
         attributes: { path: prefix },
       });
     }

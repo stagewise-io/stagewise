@@ -9,10 +9,15 @@ function makeBrowser(
   return { tabs, activeTabId };
 }
 
-function summaries(
+function types(entries: ReturnType<typeof computeBrowserChanges>): string[] {
+  return entries.map((e) => e.type);
+}
+
+function attrs(
   entries: ReturnType<typeof computeBrowserChanges>,
-): string[] {
-  return entries.map((e) => e.summary);
+  type: string,
+) {
+  return entries.find((e) => e.type === type)?.attributes;
 }
 
 describe('computeBrowserChanges', () => {
@@ -32,19 +37,23 @@ describe('computeBrowserChanges', () => {
     expect(computeBrowserChanges(snap, snap)).toEqual([]);
   });
 
-  it('detects a closed tab (singular)', () => {
+  // ── tab-closed ────────────────────────────────────────────────────────────
+
+  it('detects a closed tab via tabId attribute', () => {
     const previous = makeBrowser([
-      { id: 't_1', url: 'https://a.com', title: 'Tab A' },
-      { id: 't_2', url: 'https://b.com', title: 'Tab B' },
+      { id: 't_1', url: 'https://a.com', title: 'A' },
+      { id: 't_2', url: 'https://b.com', title: 'B' },
     ]);
     const current = makeBrowser([
-      { id: 't_1', url: 'https://a.com', title: 'Tab A' },
+      { id: 't_1', url: 'https://a.com', title: 'A' },
     ]);
-    const result = summaries(computeBrowserChanges(previous, current));
-    expect(result).toContain('tab closed: [t_2]');
+    const result = computeBrowserChanges(previous, current);
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('tab-closed');
+    expect(result[0].attributes?.tabId).toBe('t_2');
   });
 
-  it('detects multiple closed tabs (plural)', () => {
+  it('emits one tab-closed entry per closed tab', () => {
     const previous = makeBrowser([
       { id: 't_1', url: 'https://a.com', title: 'A' },
       { id: 't_2', url: 'https://b.com', title: 'B' },
@@ -53,11 +62,18 @@ describe('computeBrowserChanges', () => {
     const current = makeBrowser([
       { id: 't_1', url: 'https://a.com', title: 'A' },
     ]);
-    const result = summaries(computeBrowserChanges(previous, current));
-    expect(result).toContain('tabs closed: [t_2, t_3]');
+    const result = computeBrowserChanges(previous, current);
+    const closed = result.filter((e) => e.type === 'tab-closed');
+    expect(closed).toHaveLength(2);
+    expect(closed.map((e) => e.attributes?.tabId).sort()).toEqual([
+      't_2',
+      't_3',
+    ]);
   });
 
-  it('detects a new tab (singular)', () => {
+  // ── tab-opened ────────────────────────────────────────────────────────────
+
+  it('detects a new tab with tabId and url attributes', () => {
     const previous = makeBrowser([
       { id: 't_1', url: 'https://a.com', title: 'A' },
     ]);
@@ -65,24 +81,66 @@ describe('computeBrowserChanges', () => {
       { id: 't_1', url: 'https://a.com', title: 'A' },
       { id: 't_2', url: 'https://b.com', title: 'B' },
     ]);
-    const result = summaries(computeBrowserChanges(previous, current));
-    expect(result).toContain('new tab opened: [t_2 (https://b.com)]');
+    const result = computeBrowserChanges(previous, current);
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('tab-opened');
+    expect(result[0].attributes).toEqual({
+      tabId: 't_2',
+      url: 'https://b.com',
+    });
   });
 
-  it('detects tab navigation', () => {
+  // ── tab-navigated ─────────────────────────────────────────────────────────
+
+  it('merges url navigation and title change into one tab-navigated entry', () => {
     const previous = makeBrowser([
       { id: 't_1', url: 'https://a.com', title: 'A' },
     ]);
     const current = makeBrowser([
       { id: 't_1', url: 'https://b.com', title: 'B' },
     ]);
-    const result = summaries(computeBrowserChanges(previous, current));
-    expect(result).toContain(
-      'tab navigated: [t_1 (https://a.com -> https://b.com)]',
-    );
+    const result = computeBrowserChanges(previous, current);
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('tab-navigated');
+    expect(result[0].attributes).toEqual({
+      tabId: 't_1',
+      url: 'https://b.com',
+      title: 'B',
+    });
   });
 
-  it('detects active tab change', () => {
+  it('navigation without title change omits title attribute', () => {
+    const previous = makeBrowser([
+      { id: 't_1', url: 'https://a.com', title: 'Same' },
+    ]);
+    const current = makeBrowser([
+      { id: 't_1', url: 'https://b.com', title: 'Same' },
+    ]);
+    const result = computeBrowserChanges(previous, current);
+    expect(result[0].attributes).toEqual({
+      tabId: 't_1',
+      url: 'https://b.com',
+    });
+    expect(result[0].attributes?.title).toBeUndefined();
+  });
+
+  it('title-only change (SPA) is reported as tab-navigated with title attribute', () => {
+    const previous = makeBrowser([
+      { id: 't_1', url: 'https://a.com', title: 'Old Title' },
+    ]);
+    const current = makeBrowser([
+      { id: 't_1', url: 'https://a.com', title: 'New Title' },
+    ]);
+    const result = computeBrowserChanges(previous, current);
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('tab-navigated');
+    expect(result[0].attributes).toEqual({ tabId: 't_1', title: 'New Title' });
+    expect(result[0].attributes?.url).toBeUndefined();
+  });
+
+  // ── active-tab-changed ────────────────────────────────────────────────────
+
+  it('detects active tab change with from/to attributes', () => {
     const previous = makeBrowser(
       [
         { id: 't_1', url: 'https://a.com', title: 'A' },
@@ -97,11 +155,13 @@ describe('computeBrowserChanges', () => {
       ],
       't_2',
     );
-    const result = summaries(computeBrowserChanges(previous, current));
-    expect(result).toContain('active tab: t_1 -> t_2');
+    const result = computeBrowserChanges(previous, current);
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('active-tab-changed');
+    expect(result[0].attributes).toEqual({ from: 't_1', to: 't_2' });
   });
 
-  it('detects active tab set from null', () => {
+  it('active tab set from null omits from attribute', () => {
     const previous = makeBrowser(
       [{ id: 't_1', url: 'https://a.com', title: 'A' }],
       null,
@@ -110,8 +170,10 @@ describe('computeBrowserChanges', () => {
       [{ id: 't_1', url: 'https://a.com', title: 'A' }],
       't_1',
     );
-    const result = summaries(computeBrowserChanges(previous, current));
-    expect(result).toContain('active tab: t_1');
+    const result = computeBrowserChanges(previous, current);
+    expect(result[0].type).toBe('active-tab-changed');
+    expect(result[0].attributes?.to).toBe('t_1');
+    expect(result[0].attributes?.from).toBeUndefined();
   });
 
   it('does not report active tab change when it becomes null', () => {
@@ -120,70 +182,50 @@ describe('computeBrowserChanges', () => {
       't_1',
     );
     const current = makeBrowser([], null);
-    const result = summaries(computeBrowserChanges(previous, current));
-    expect(result).toContain('tab closed: [t_1]');
-    expect(result.some((c) => c.startsWith('active tab'))).toBe(false);
+    const result = computeBrowserChanges(previous, current);
+    expect(result.some((e) => e.type === 'active-tab-changed')).toBe(false);
   });
 
-  it('emits browser-restarted when session ID changes', () => {
+  // ── browser-restarted ─────────────────────────────────────────────────────
+
+  it('emits browser-restarted then tab-opened (no tab-closed) on session ID change', () => {
     const previous = makeBrowser([
       { id: 't_1', url: 'https://a.com', title: 'A' },
     ]);
     const current = makeBrowser([
       { id: 't_2', url: 'https://b.com', title: 'B' },
-      { id: 't_3', url: 'https://c.com', title: 'C' },
     ]);
     const result = computeBrowserChanges(previous, current, 'sess-1', 'sess-2');
-    expect(result).toHaveLength(1);
     expect(result[0].type).toBe('browser-restarted');
-    expect(result[0].summary).toContain('new session');
+    expect(types(result)).toContain('tab-opened');
+    expect(types(result)).not.toContain('tab-closed');
   });
 
-  it('browser-restarted detail includes new tab list', () => {
+  it('browser restart shows new tabs as opened', () => {
     const previous = makeBrowser([
-      { id: 't_1', url: 'https://old.com', title: 'Old' },
+      { id: 't_old', url: 'https://old.com', title: 'Old' },
     ]);
     const current = makeBrowser(
-      [
-        { id: 't_new1', url: 'https://example.com', title: 'Example' },
-        { id: 't_new2', url: 'https://other.com', title: 'Other' },
-      ],
-      't_new1',
+      [{ id: 't_new', url: 'https://new.com', title: 'New' }],
+      't_new',
     );
     const result = computeBrowserChanges(previous, current, 'sess-1', 'sess-2');
-    expect(result).toHaveLength(1);
-    const detail = result[0].detail ?? '';
-    expect(detail).toContain('<open-tabs>');
-    expect(detail).toContain('id="t_new1"');
-    expect(detail).toContain('url="https://example.com"');
-    expect(detail).toContain('active="true"');
-    expect(detail).toContain('id="t_new2"');
-    expect(detail).not.toContain('t_1');
-    expect(detail).not.toContain('old.com');
+    expect(attrs(result, 'tab-opened')).toEqual({
+      tabId: 't_new',
+      url: 'https://new.com',
+    });
   });
 
-  it('browser-restarted detail says no tabs when new session is empty', () => {
+  it('browser restart with no new tabs only emits browser-restarted', () => {
     const previous = makeBrowser([
       { id: 't_1', url: 'https://a.com', title: 'A' },
     ]);
     const current = makeBrowser([]);
     const result = computeBrowserChanges(previous, current, 'sess-1', 'sess-2');
-    expect(result).toHaveLength(1);
-    expect(result[0].detail).toBe('No tabs open.');
+    expect(types(result)).toEqual(['browser-restarted']);
   });
 
-  it('suppresses individual tab events on browser restart', () => {
-    const previous = makeBrowser([
-      { id: 't_1', url: 'https://a.com', title: 'A' },
-    ]);
-    const current = makeBrowser([
-      { id: 't_2', url: 'https://b.com', title: 'B' },
-    ]);
-    const result = computeBrowserChanges(previous, current, 'sess-1', 'sess-2');
-    // Only the restart entry — no tab-closed / tab-opened / etc.
-    expect(result).toHaveLength(1);
-    expect(result[0].type).toBe('browser-restarted');
-  });
+  // ── combined ──────────────────────────────────────────────────────────────
 
   it('handles multiple simultaneous changes', () => {
     const previous = makeBrowser(
@@ -195,21 +237,29 @@ describe('computeBrowserChanges', () => {
     );
     const current = makeBrowser(
       [
-        {
-          id: 't_2',
-          url: 'https://b2.com',
-          title: 'B2',
-        },
+        { id: 't_2', url: 'https://b2.com', title: 'B2' },
         { id: 't_3', url: 'https://c.com', title: 'C' },
       ],
       't_3',
     );
-    const result = summaries(computeBrowserChanges(previous, current));
-    expect(result).toContain('tab closed: [t_1]');
-    expect(result).toContain('new tab opened: [t_3 (https://c.com)]');
-    expect(result).toContain(
-      'tab navigated: [t_2 (https://b.com -> https://b2.com)]',
-    );
-    expect(result).toContain('active tab: t_1 -> t_3');
+    const result = computeBrowserChanges(previous, current);
+    expect(types(result)).toContain('tab-closed');
+    expect(attrs(result, 'tab-closed')?.tabId).toBe('t_1');
+    expect(types(result)).toContain('tab-opened');
+    expect(attrs(result, 'tab-opened')).toEqual({
+      tabId: 't_3',
+      url: 'https://c.com',
+    });
+    expect(types(result)).toContain('tab-navigated');
+    expect(attrs(result, 'tab-navigated')).toEqual({
+      tabId: 't_2',
+      url: 'https://b2.com',
+      title: 'B2',
+    });
+    expect(types(result)).toContain('active-tab-changed');
+    expect(attrs(result, 'active-tab-changed')).toEqual({
+      from: 't_1',
+      to: 't_3',
+    });
   });
 });

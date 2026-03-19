@@ -1,14 +1,9 @@
 import type { WorkspaceSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
 import type { EnvironmentChangeEntry } from './types';
 
-function formatPermissions(permissions?: string[]): string {
-  if (!permissions || permissions.length === 0) return '';
-  return ` [${permissions.join(', ')}]`;
-}
-
 /**
- * Compares two workspace snapshots and produces human-readable
- * change descriptions. Detects mounts added, removed, or changed.
+ * Compares two workspace snapshots and produces structured change
+ * entries. Detects mounts added, removed, or changed.
  * Returns an empty array when there is no previous snapshot
  * (first message) or when nothing changed.
  */
@@ -28,14 +23,12 @@ export function computeWorkspaceChanges(
     if (!prev) {
       changes.push({
         type: 'workspace-mounted',
-        summary: `workspace mounted: ${prefix} -> ${mount.path}${formatPermissions(mount.permissions)}`,
-        attributes: { prefix },
+        attributes: { prefix, path: mount.path },
       });
     } else if (prev.path !== mount.path) {
       changes.push({
         type: 'workspace-path-changed',
-        summary: `workspace ${prefix} changed: ${prev.path} -> ${mount.path}${formatPermissions(mount.permissions)}`,
-        attributes: { prefix },
+        attributes: { prefix, from: prev.path, to: mount.path },
       });
     } else {
       const prevPerms = (prev.permissions ?? []).join(',');
@@ -43,8 +36,11 @@ export function computeWorkspaceChanges(
       if (prevPerms !== currPerms) {
         changes.push({
           type: 'workspace-permissions-changed',
-          summary: `workspace ${prefix} permissions changed: [${prevPerms}] -> [${currPerms}]`,
-          attributes: { prefix },
+          attributes: {
+            prefix,
+            from: prevPerms,
+            to: currPerms,
+          },
         });
       }
     }
@@ -54,8 +50,7 @@ export function computeWorkspaceChanges(
     if (!currMap.has(prefix)) {
       changes.push({
         type: 'workspace-unmounted',
-        summary: `workspace unmounted: ${prefix} (was ${mount.path})`,
-        attributes: { prefix },
+        attributes: { prefix, path: mount.path },
       });
     }
   }

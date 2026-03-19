@@ -18,20 +18,12 @@ export function computeSkillsChanges(
 
   for (const p of currSet) {
     if (!prevSet.has(p)) {
-      changes.push({
-        type: 'skill-enabled',
-        summary: `skill enabled: ${p}`,
-        attributes: { path: p },
-      });
+      changes.push({ type: 'skill-enabled', attributes: { path: p } });
     }
   }
   for (const p of prevSet) {
     if (!currSet.has(p)) {
-      changes.push({
-        type: 'skill-disabled',
-        summary: `skill disabled: ${p}`,
-        attributes: { path: p },
-      });
+      changes.push({ type: 'skill-disabled', attributes: { path: p } });
     }
   }
 

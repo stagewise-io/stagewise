@@ -18,24 +18,26 @@ describe('computeSkillsChanges', () => {
     expect(computeSkillsChanges(snap, snap)).toEqual([]);
   });
 
-  it('detects skill enabled', () => {
-    const prev = makeSnap([]);
-    const curr = makeSnap(['w1/.stagewise/skills/foo']);
-    const result = computeSkillsChanges(prev, curr);
+  it('skill-enabled carries path attribute (no summary)', () => {
+    const result = computeSkillsChanges(
+      makeSnap([]),
+      makeSnap(['w1/.stagewise/skills/foo']),
+    );
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('skill-enabled');
-    expect(result[0].summary).toContain('w1/.stagewise/skills/foo');
     expect(result[0].attributes?.path).toBe('w1/.stagewise/skills/foo');
+    expect(result[0].summary).toBeUndefined();
   });
 
-  it('detects skill disabled', () => {
-    const prev = makeSnap(['plugins/bar/SKILL.md']);
-    const curr = makeSnap([]);
-    const result = computeSkillsChanges(prev, curr);
+  it('skill-disabled carries path attribute (no summary)', () => {
+    const result = computeSkillsChanges(
+      makeSnap(['plugins/bar/SKILL.md']),
+      makeSnap([]),
+    );
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('skill-disabled');
-    expect(result[0].summary).toContain('plugins/bar/SKILL.md');
     expect(result[0].attributes?.path).toBe('plugins/bar/SKILL.md');
+    expect(result[0].summary).toBeUndefined();
   });
 
   it('detects multiple skills changed at once', () => {
@@ -49,9 +51,6 @@ describe('computeSkillsChanges', () => {
     ]);
     const result = computeSkillsChanges(prev, curr);
     expect(result).toHaveLength(2);
-    const types = result.map((r) => r.type);
-    expect(types).toContain('skill-enabled');
-    expect(types).toContain('skill-disabled');
     expect(
       result.find((r) => r.type === 'skill-enabled')?.attributes?.path,
     ).toBe('plugins/new-plugin/SKILL.md');
