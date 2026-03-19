@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { SelectedElement } from '@shared/karton-contracts/ui';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import { generateTabId, resetTabIdCounter } from './tab-id';
+import { getBrowserSessionId } from './browser-session';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
@@ -294,6 +295,7 @@ export class WindowLayoutService extends DisposableService {
       draft.browser = {
         tabs: {},
         activeTabId: null,
+        sessionId: getBrowserSessionId(),
         history: [],
         contextSelectionMode: false,
         selectedElements: [],
@@ -1898,7 +1900,7 @@ export class WindowLayoutService extends DisposableService {
   /**
    * Resolves a tab ID to a TabController instance.
    *
-   * @param tabId - The tab ID (e.g., "t_k7m2xp")
+   * @param tabId - The tab ID (e.g., "1", "2", …)
    * @returns The TabController instance or null if not found
    */
   private resolveTabById(tabId: string): TabController | null {

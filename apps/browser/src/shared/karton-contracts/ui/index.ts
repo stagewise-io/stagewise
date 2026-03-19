@@ -571,6 +571,8 @@ export type AppState = {
   browser: {
     tabs: Record<string, TabState>;
     activeTabId: string | null;
+    /** Unique identifier for the current browser process lifetime. Changes on restart. */
+    sessionId: string;
     history: HistoryEntry[];
     contextSelectionMode: boolean;
     // Selected elements
@@ -1052,6 +1054,7 @@ export const defaultState: KartonContract['state'] = {
   browser: {
     tabs: {},
     activeTabId: null,
+    sessionId: '',
     history: [],
     contextSelectionMode: false,
     selectedElements: [],

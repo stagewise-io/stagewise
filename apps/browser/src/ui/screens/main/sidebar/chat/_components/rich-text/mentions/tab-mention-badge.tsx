@@ -3,6 +3,7 @@ import { IconGlobe2Fill18 } from 'nucleo-ui-fill-18';
 import { cn } from '@ui/utils';
 import { InlineBadge, InlineBadgeWrapper } from '../shared';
 import { useTabSnapshots } from '@ui/hooks/use-tab-snapshots';
+import { useMessageBrowserSession } from '@ui/hooks/use-message-browser-session';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import type { TabMentionMeta } from '@shared/karton-contracts/ui/agent/metadata';
 
@@ -55,17 +56,31 @@ export function TabMentionBadge({
   viewOnly = true,
 }: TabMentionBadgeProps) {
   const tabSnapshots = useTabSnapshots();
+  const messageBrowserSessionId = useMessageBrowserSession();
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
+
+  const liveBrowserSessionId = useKartonState((s) => s.browser.sessionId);
 
   const liveTab = useKartonState((s) => {
     if (tabId && s.browser.tabs[tabId]) return s.browser.tabs[tabId]!;
     return null;
   });
 
-  // Resolution priority: live state > persisted snapshot > inline meta
+  /**
+   * Whether this tab reference belongs to a previous browser session.
+   * Only applies when we have both a message-time session ID and a live one,
+   * and they differ — meaning the browser has restarted since this message.
+   */
+  const isStaleSession =
+    messageBrowserSessionId !== null &&
+    messageBrowserSessionId !== '' &&
+    liveBrowserSessionId !== '' &&
+    messageBrowserSessionId !== liveBrowserSessionId;
+
+  // Resolution priority: live state (only if same session) > persisted snapshot > inline meta
   const tabData = useMemo(() => {
-    if (liveTab) {
+    if (liveTab && !isStaleSession) {
       return {
         title: liveTab.title,
         url: liveTab.url,
@@ -99,7 +114,7 @@ export function TabMentionBadge({
     }
 
     return null;
-  }, [liveTab, tabSnapshots, tabId, meta]);
+  }, [liveTab, isStaleSession, tabSnapshots, tabId, meta]);
 
   const displayLabel = useMemo(() => {
     if (!tabData) return tabId ?? '?';
@@ -109,24 +124,45 @@ export function TabMentionBadge({
   }, [tabData, tabId]);
 
   const tooltipContent = useMemo(() => {
-    if (!tabData) return tabId ?? '';
-    return tabData.url ?? '';
-  }, [tabData, tabId]);
+    if (isStaleSession) {
+      const label = tabData?.url ?? tabData?.title ?? tabId ?? '';
+      return (
+        <span>
+          {label && <span className="block font-medium">{label}</span>}
+          <span className="block text-muted-foreground">
+            Tab no longer available — browser was restarted.
+          </span>
+        </span>
+      );
+    }
+    if (!tabData?.isOpen) {
+      const label = tabData?.url ?? tabData?.title ?? tabId ?? '';
+      return (
+        <span>
+          {label && <span className="block font-medium">{label}</span>}
+          <span className="block text-muted-foreground">
+            This tab has been closed.
+          </span>
+        </span>
+      );
+    }
+    return tabData?.url ?? tabId ?? '';
+  }, [tabData, tabId, isStaleSession]);
 
   const handleClick = useCallback(() => {
-    if (!tabData) return;
+    if (isStaleSession || !tabData) return;
     if (tabData.isOpen && tabData.tabId) {
       void switchTab(tabData.tabId);
     } else if (tabData.url) {
       void createTab(tabData.url);
     }
-  }, [tabData, switchTab, createTab]);
+  }, [tabData, isStaleSession, switchTab, createTab]);
 
   const icon = (
     <TabFaviconMini url={tabData?.faviconUrl} title={tabData?.title} />
   );
 
-  const badge = (
+  return (
     <InlineBadgeWrapper viewOnly={viewOnly} tooltipContent={tooltipContent}>
       <InlineBadge
         icon={icon}
@@ -134,11 +170,12 @@ export function TabMentionBadge({
         selected={selected}
         isEditable={isEditable}
         onDelete={() => onDelete?.()}
-        className={cn('cursor-pointer', !tabData?.isOpen && 'opacity-70')}
-        onClick={handleClick}
+        className={cn(
+          !isStaleSession && 'cursor-pointer',
+          (isStaleSession || !tabData?.isOpen) && 'opacity-70',
+        )}
+        onClick={isStaleSession ? undefined : handleClick}
       />
     </InlineBadgeWrapper>
   );
-
-  return badge;
 }
