@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.0-alpha.41 (2026-03-19)
+
+### Features
+
+* solid tab badge handling (766329b)
+
+### Bug Fixes
+
+* make tab badges show when closed or browser restarted (dfc02c4)
+* fix buggy web frame error handling (44bbc9e)
+* default maxOutputTokens is undefined now to prevent api errors (1649343)
+* fix unchecked array access on tool input (1a652e4)
+
+### Other Changes
+
+* simplify and shorten env-changes strings (2aa3449)
+* make tab ids simple counter numerics like in chrome (25ac595)
+
 ## 1.0.0-alpha.40 (2026-03-18)
 
 ### Bug Fixes
