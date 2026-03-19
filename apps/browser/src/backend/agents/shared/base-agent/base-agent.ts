@@ -176,8 +176,6 @@ export type BaseAgentConfig<TFinishToolOutputSchema extends z.ZodType | null> =
 
     /**
      * A configurable amount of maximum output tokens per step.
-     *
-     * @default 100000
      */
     maxOutputTokens?: number;
 
@@ -1364,7 +1362,7 @@ export abstract class BaseAgent<
           }
         : undefined,
       maxRetries: resolvedConfig.maxRetries ?? 1,
-      maxOutputTokens: resolvedConfig.maxOutputTokens ?? 100000,
+      maxOutputTokens: resolvedConfig.maxOutputTokens,
       abortSignal: this.stepAbortController.signal,
       onAbort: () => {
         // Guard: ignore if a newer step has started (e.g. queue flush)
