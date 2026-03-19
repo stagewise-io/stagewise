@@ -1443,14 +1443,21 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
     // Note: Error handling UI is managed by TabErrorHandler (setupErrorHandler)
     // This handler clears pending navigation to prevent failed loads from being logged
-    wc.on('did-fail-load', (_event, errorCode) => {
-      // Ignore abort errors (user stopped navigation)
-      if (errorCode !== -3) {
-        // Clear pending navigation and history URL on failure
-        this.pendingNavigation = null;
-        this.pendingHistoryUrl = null;
-      }
-    });
+    wc.on(
+      'did-fail-load',
+      (_event, errorCode, _errorDescription, _validatedUrl, isMainFrame) => {
+        // Only clear main-frame navigation state; subframe failures should not
+        // interfere with the top-level navigation tracking.
+        if (!isMainFrame) return;
+
+        // Ignore abort errors (user stopped navigation)
+        if (errorCode !== -3) {
+          // Clear pending navigation and history URL on failure
+          this.pendingNavigation = null;
+          this.pendingHistoryUrl = null;
+        }
+      },
+    );
 
     wc.on('focus', () => {
       this.updateState({ lastFocusedAt: Date.now() });
