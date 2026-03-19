@@ -22,6 +22,7 @@ import { useScrollbarWidth } from '@ui/hooks/use-scrollbar-width';
 import { AttachmentMetadataProvider } from '@ui/hooks/use-attachment-metadata';
 import { MountedPathsProvider } from '@ui/hooks/use-mounted-paths';
 import { TabSnapshotsProvider } from '@ui/hooks/use-tab-snapshots';
+import { MessageBrowserSessionProvider } from '@ui/hooks/use-message-browser-session';
 import type {
   Mount,
   BrowserTabSnapshot,
@@ -671,26 +672,41 @@ export const ChatHistory = () => {
       const isLastAssistantMessage =
         isLastMessage && message.role === 'assistant';
 
-      const messageComponent =
-        message.role === 'user' ? (
-          <MessageUser
-            message={message as AgentMessage & { role: 'user' }}
-            isLastMessage={isLastMessage}
-            isWorking={isWorking ?? false}
-            hasSubsequentFileModifications={
-              hasFileModsAfterMap.get(message.id) ?? false
-            }
-          />
-        ) : (
-          <MessageAssistant
-            message={message as AgentMessage & { role: 'assistant' }}
-            isLastMessage={isLastMessage}
-            isWorking={isWorking ?? false}
-            showBetweenStepsIndicator={
-              isLastMessage ? showBetweenStepsIndicator : false
-            }
-          />
-        );
+      // Resolve browserSessionId at this message's position by walking backward
+      // through sparse snapshots — same logic as resolveEffectiveSnapshot.
+      let messageBrowserSessionId: string | null = null;
+      for (let i = index; i >= 0; i--) {
+        const sid =
+          filteredMessages[i]?.metadata?.environmentSnapshot?.browserSessionId;
+        if (sid !== undefined) {
+          messageBrowserSessionId = sid;
+          break;
+        }
+      }
+
+      const messageComponent = (
+        <MessageBrowserSessionProvider value={messageBrowserSessionId}>
+          {message.role === 'user' ? (
+            <MessageUser
+              message={message as AgentMessage & { role: 'user' }}
+              isLastMessage={isLastMessage}
+              isWorking={isWorking ?? false}
+              hasSubsequentFileModifications={
+                hasFileModsAfterMap.get(message.id) ?? false
+              }
+            />
+          ) : (
+            <MessageAssistant
+              message={message as AgentMessage & { role: 'assistant' }}
+              isLastMessage={isLastMessage}
+              isWorking={isWorking ?? false}
+              showBetweenStepsIndicator={
+                isLastMessage ? showBetweenStepsIndicator : false
+              }
+            />
+          )}
+        </MessageBrowserSessionProvider>
+      );
 
       // Attach ref to last assistant message wrapper for height measurement
       // minHeight is set directly via DOM mutation in the callback ref (no React state)
@@ -771,7 +787,7 @@ export const ChatHistory = () => {
       );
     },
     [
-      filteredMessages.length,
+      filteredMessages,
       lastUserMsgIndex,
       showWorkingIndicator,
       showBetweenStepsIndicator,

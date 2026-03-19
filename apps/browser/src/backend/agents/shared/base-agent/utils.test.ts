@@ -18,8 +18,8 @@ function makeSnapshot(
 ): FullEnvironmentSnapshot {
   return {
     browser: {
-      tabs: [{ id: 't_1', url: 'https://a.com', title: 'A' }],
-      activeTabId: 't_1',
+      tabs: [{ id: '1', url: 'https://a.com', title: 'A' }],
+      activeTabId: '1',
     },
     workspace: {
       mounts: [{ prefix: 'w1', path: '/project' }],
@@ -365,12 +365,12 @@ describe('convertAgentMessagesToModelMessages – env context injection', () => 
       browser: {
         tabs: [
           {
-            id: 't_5',
+            id: '5',
             url: 'https://new.com',
             title: 'New',
           },
         ],
-        activeTabId: 't_5',
+        activeTabId: '5',
       },
     });
     const messages: AgentMessage[] = [
@@ -480,8 +480,8 @@ describe('resolveEffectiveSnapshot', () => {
     const baseSnap = makeSnapshot();
     const sparse1: EnvironmentSnapshot = {
       browser: {
-        tabs: [{ id: 't_2', url: 'https://b.com', title: 'B' }],
-        activeTabId: 't_2',
+        tabs: [{ id: '2', url: 'https://b.com', title: 'B' }],
+        activeTabId: '2',
       },
     };
     const sparse2: EnvironmentSnapshot = {
@@ -612,8 +612,8 @@ describe('sparse snapshot diffing in convertAgentMessagesToModelMessages', () =>
     const snap1 = makeSnapshot();
     const snap2 = makeSnapshot({
       browser: {
-        tabs: [{ id: 't_2', url: 'https://b.com', title: 'B' }],
-        activeTabId: 't_2',
+        tabs: [{ id: '2', url: 'https://b.com', title: 'B' }],
+        activeTabId: '2',
       },
     });
     const messages: AgentMessage[] = [
@@ -701,8 +701,8 @@ describe('convertAgentMessagesToModelMessages – overall message structure', ()
   it('env-snapshot includes browser tabs from the snapshot', async () => {
     const snap = makeSnapshot({
       browser: {
-        tabs: [{ id: 't_1', url: 'https://example.com', title: 'Example' }],
-        activeTabId: 't_1',
+        tabs: [{ id: '1', url: 'https://example.com', title: 'Example' }],
+        activeTabId: '1',
       },
     });
     const messages: AgentMessage[] = [makeUserMsg('u1', 'hello', snap)];
@@ -917,10 +917,10 @@ describe('convertAgentMessagesToModelMessages – env-changes after assistant', 
     const snap2: EnvironmentSnapshot = {
       browser: {
         tabs: [
-          { id: 't_1', url: 'https://a.com', title: 'A' },
-          { id: 't_2', url: 'https://b.com', title: 'B' },
+          { id: '1', url: 'https://a.com', title: 'A' },
+          { id: '2', url: 'https://b.com', title: 'B' },
         ],
-        activeTabId: 't_2',
+        activeTabId: '2',
       },
     };
     const messages: AgentMessage[] = [
@@ -1022,8 +1022,8 @@ describe('convertAgentMessagesToModelMessages – fresh chat env-snapshot', () =
   it('fresh chat env-snapshot includes all domain data', async () => {
     const snap = makeSnapshot({
       browser: {
-        tabs: [{ id: 't_1', url: 'https://example.com', title: 'My Page' }],
-        activeTabId: 't_1',
+        tabs: [{ id: '1', url: 'https://example.com', title: 'My Page' }],
+        activeTabId: '1',
       },
       workspace: {
         mounts: [{ prefix: 'w1', path: '/my-project' }],
