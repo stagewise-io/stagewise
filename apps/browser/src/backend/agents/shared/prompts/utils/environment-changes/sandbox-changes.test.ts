@@ -21,8 +21,8 @@ describe('computeSandboxChanges', () => {
   it('returns restart message when session ID changed', () => {
     const result = computeSandboxChanges('abc-123', 'def-456');
     expect(result).toHaveLength(1);
-    expect(result[0].summary).toContain('sandbox restarted');
     expect(result[0].summary).toContain('globalThis');
+    expect(result[0].summary).toContain('cleared');
     expect(result[0].type).toBe('sandbox-restarted');
   });
 });

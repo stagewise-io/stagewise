@@ -17,6 +17,8 @@ vi.mock('@/utils/paths', async () => {
       path.join(testTempDir, 'diff-history', 'data.sqlite'),
     getDiffHistoryBlobsDir: () =>
       path.join(testTempDir, 'diff-history', 'data-blobs'),
+    getAgentAppsDir: (agentId: string) =>
+      path.join(testTempDir, 'agents', agentId, 'apps'),
   };
 });
 
