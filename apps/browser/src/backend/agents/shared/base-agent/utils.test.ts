@@ -319,7 +319,9 @@ describe('convertAgentMessagesToModelMessages – env context injection', () => 
     // Second user message gets env-changes (merged in)
     expect(hasEnvChanges(userMessages[1])).toBe(true);
     const texts = getUserMsgTexts(userMessages[1]);
-    expect(texts.some((t) => t.includes('workspace unmounted: w1'))).toBe(true);
+    expect(
+      texts.some((t) => t.includes('<workspace-unmounted') && t.includes('w1')),
+    ).toBe(true);
   });
 
   it('env-changes come before <user-msg> in content', async () => {
@@ -581,7 +583,7 @@ describe('sparse snapshot diffing in convertAgentMessagesToModelMessages', () =>
     const secondUser = result.filter((m) => m.role === 'user')[1];
     expect(hasEnvChanges(secondUser)).toBe(true);
     const texts = getUserMsgTexts(secondUser);
-    expect(texts.some((t) => t.includes('tab closed'))).toBe(true);
+    expect(texts.some((t) => t.includes('<tab-closed'))).toBe(true);
   });
 
   it('does not inject env-changes when sparse snapshots carry no effective change', async () => {
@@ -631,7 +633,7 @@ describe('sparse snapshot diffing in convertAgentMessagesToModelMessages', () =>
     const secondUser = result.filter((m) => m.role === 'user')[1];
     expect(hasEnvChanges(secondUser)).toBe(true);
     const texts = getUserMsgTexts(secondUser);
-    expect(texts.some((t) => t.includes('tab opened'))).toBe(true);
+    expect(texts.some((t) => t.includes('<tab-opened'))).toBe(true);
   });
 });
 
@@ -952,7 +954,7 @@ describe('convertAgentMessagesToModelMessages – env-changes after assistant', 
     expect(afterAssistant.role).toBe('user');
     const afterTexts = getUserMsgTexts(afterAssistant);
     expect(afterTexts.some((t) => t.includes('<env-changes>'))).toBe(true);
-    expect(afterTexts.some((t) => t.includes('tab opened'))).toBe(true);
+    expect(afterTexts.some((t) => t.includes('<tab-opened'))).toBe(true);
 
     // The last user message should NOT also contain those env-changes
     const lastUserMsg = result[result.length - 1];
@@ -1218,7 +1220,7 @@ describe('convertAgentMessagesToModelMessages – multi-mount workspaces', () =>
     // New workspace mounted
     expect(changesText).toContain('w3');
     expect(changesText).toContain('workspace-md-created');
-    expect(changesText).toContain('workspace mounted');
+    expect(changesText).toContain('<workspace-mounted');
   });
 
   it('env-changes reflect one mount unmounted and its AGENTS.md removed', async () => {
@@ -1255,7 +1257,7 @@ describe('convertAgentMessagesToModelMessages – multi-mount workspaces', () =>
     const changesText = texts.find((t) => t.includes('<env-changes>'))!;
     expect(changesText).toBeDefined();
     // w2 unmounted
-    expect(changesText).toContain('workspace unmounted');
+    expect(changesText).toContain('<workspace-unmounted');
     expect(changesText).toContain('w2');
     // w2 AGENTS.md and WORKSPACE.md removed
     expect(changesText).toContain('agents-md-deleted');
