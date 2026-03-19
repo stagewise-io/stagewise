@@ -22,6 +22,7 @@ import type { GlobalConfigService } from '@/services/global-config';
 import { DisposableService } from '@/services/disposable';
 import type { DiffHistoryService } from '@/services/diff-history';
 import type { WindowLayoutService } from '@/services/window-layout';
+import { getBrowserSessionId } from '@/services/window-layout/browser-session';
 import type { AuthService } from '@/services/auth';
 import type { TelemetryService } from '@/services/telemetry';
 import type { CredentialsService } from '@/services/credentials';
@@ -687,6 +688,7 @@ export class ToolboxService extends DisposableService {
       enabledSkills: {
         paths: skills.map((s) => s.path),
       },
+      browserSessionId: getBrowserSessionId(),
     };
 
     return snapshot;
@@ -930,12 +932,24 @@ export class ToolboxService extends DisposableService {
     );
   }
 
-  public clearAgentTracking(agentInstanceId: string): void {
+  /**
+   * Release runtime resources (sandbox, shell, mounts, etc.) for an agent.
+   *
+   * @param deleteBlobs When `true`, permanently removes the agent's on-disk
+   *   attachment blobs.  Pass `false` (or omit) when *archiving* an agent so
+   *   that blobs survive for a later `resumeAgent` call.
+   */
+  public clearAgentTracking(
+    agentInstanceId: string,
+    { deleteBlobs = false }: { deleteBlobs?: boolean } = {},
+  ): void {
     this.mountManagerService?.clearAgentMounts(agentInstanceId);
     this.sandboxService?.destroyAgent(agentInstanceId);
     this.shellService?.destroyAgent(agentInstanceId);
     this.appsRuntimes.delete(agentInstanceId);
-    void deleteAgentBlobs(agentInstanceId);
+    if (deleteBlobs) {
+      void deleteAgentBlobs(agentInstanceId);
+    }
     this.cancelPendingQuestions(agentInstanceId);
   }
 

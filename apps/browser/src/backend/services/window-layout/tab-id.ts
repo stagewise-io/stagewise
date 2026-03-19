@@ -1,26 +1,29 @@
-import { randomBytes } from 'node:crypto';
+/**
+ * Monotonic tab ID counter — mimics Chrome's per-session integer tab IDs.
+ *
+ * IDs start at 1 and increment on each call to `generateTabId()`.
+ * Unlike the old random-bytes approach, IDs are sequential, never collide,
+ * and need no collision-check parameter.
+ *
+ * `resetTabIdCounter()` must be called exactly once at cold start
+ * (i.e. in the `WindowLayoutService` constructor).
+ */
 
-const TAB_ID_PREFIX = 't_';
-const TAB_ID_CHAR_LENGTH = 6;
+let nextTabId = 1;
 
 /**
- * Generates a short, stable tab ID in the format `t_<6 base36 chars>`.
- *
- * Example: `t_k7m2xp`
- *
- * @param existingIds Set of currently used IDs to avoid collisions.
- * @returns A unique tab ID string.
+ * Returns the next tab ID as a string (e.g. `"1"`, `"2"`, …).
+ * The string representation keeps the rest of the codebase unchanged
+ * since `browserTabSnapshotSchema.id` is typed as `z.string()`.
  */
-export function generateTabId(existingIds?: Set<string>): string {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const bytes = randomBytes(4);
-    const num = bytes.readUInt32BE(0);
-    const base36 = num.toString(36).padStart(TAB_ID_CHAR_LENGTH, '0');
-    const id = `${TAB_ID_PREFIX}${base36.slice(0, TAB_ID_CHAR_LENGTH)}`;
+export function generateTabId(): string {
+  return String(nextTabId++);
+}
 
-    if (!existingIds || !existingIds.has(id)) return id;
-  }
-
-  // Extremely unlikely fallback — 10 collisions in a row with ~2.2B space
-  throw new Error('Failed to generate unique tab ID after 10 attempts');
+/**
+ * Resets the counter back to 1.
+ * Call this once per process lifetime — in `WindowLayoutService` constructor.
+ */
+export function resetTabIdCounter(): void {
+  nextTabId = 1;
 }

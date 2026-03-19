@@ -43,7 +43,12 @@ export function computeAllEnvironmentChanges(
       previous.sandboxSessionId,
       current.sandboxSessionId,
     ),
-    ...computeBrowserChanges(previous.browser, current.browser),
+    ...computeBrowserChanges(
+      previous.browser,
+      current.browser,
+      previous.browserSessionId,
+      current.browserSessionId,
+    ),
     ...computeWorkspaceChanges(previous.workspace, current.workspace),
     ...computeFileDiffChanges(
       previous.fileDiffs,

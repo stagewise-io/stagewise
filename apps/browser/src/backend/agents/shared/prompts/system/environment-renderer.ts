@@ -1,13 +1,7 @@
 import type { FullEnvironmentSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
+import { renderBrowserTabsXml, esc } from './browser-tabs-renderer';
 import { renderAvailableSkillsList } from './skills';
 import type { SkillInfo } from './skills';
-
-function formatTimestamp(epochMs: number): string {
-  const d = new Date(epochMs);
-  const pad2 = (n: number) => String(n).padStart(2, '0');
-  const pad3 = (n: number) => String(n).padStart(3, '0');
-  return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${String(d.getFullYear()).slice(2)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}.${pad3(d.getMilliseconds())}`;
-}
 
 export interface ShellInfo {
   type: string;
@@ -31,32 +25,7 @@ export function renderFullEnvironmentContext(
 
   // Browser tabs
   const { browser } = snapshot;
-  if (browser.tabs.length > 0) {
-    const tabLines = browser.tabs.map((tab) => {
-      const attrs: string[] = [
-        `id="${tab.id}"`,
-        `title="${esc(tab.title)}"`,
-        `url="${esc(tab.url)}"`,
-      ];
-      if (tab.consoleErrorCount)
-        attrs.push(`consoleErrors="${tab.consoleErrorCount}"`);
-      if (tab.consoleLogCount)
-        attrs.push(`consoleLogs="${tab.consoleLogCount}"`);
-      if (tab.error)
-        attrs.push(
-          `error="${tab.error.code}${tab.error.message ? `: ${esc(tab.error.message)}` : ''}"`,
-        );
-      if (tab.lastFocusedAt)
-        attrs.push(`lastActiveAt="${formatTimestamp(tab.lastFocusedAt)}"`);
-      if (tab.id === browser.activeTabId) attrs.push('active="true"');
-      return `  <tab ${attrs.join(' ')} />`;
-    });
-    sections.push(
-      `# Browser Tabs\n<open-tabs>\n${tabLines.join('\n')}\n</open-tabs>`,
-    );
-  } else {
-    sections.push('# Browser Tabs\nNo tabs open.');
-  }
+  sections.push(`# Browser Tabs\n${renderBrowserTabsXml(browser)}`);
 
   // Mounted workspaces
   const { workspace } = snapshot;
@@ -148,12 +117,4 @@ export function renderFullEnvironmentContext(
   }
 
   return `<env-snapshot>\n${sections.join('\n\n')}\n</env-snapshot>`;
-}
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }

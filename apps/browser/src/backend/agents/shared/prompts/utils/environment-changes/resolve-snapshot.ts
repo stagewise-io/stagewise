@@ -31,6 +31,7 @@ export function resolveEffectiveSnapshot(
   let agentsMd: AgentsMdSnapshot | undefined;
   let workspaceMd: WorkspaceMdSnapshot | undefined;
   let enabledSkills: EnabledSkillsSnapshot | undefined;
+  let browserSessionId: string | undefined;
 
   for (let i = upToIndex; i >= 0; i--) {
     const snap = messages[i]?.metadata?.environmentSnapshot;
@@ -51,6 +52,8 @@ export function resolveEffectiveSnapshot(
       workspaceMd = snap.workspaceMd;
     if (enabledSkills === undefined && snap.enabledSkills !== undefined)
       enabledSkills = snap.enabledSkills;
+    if (browserSessionId === undefined && snap.browserSessionId !== undefined)
+      browserSessionId = snap.browserSessionId;
     if (
       browser !== undefined &&
       workspace !== undefined &&
@@ -59,7 +62,8 @@ export function resolveEffectiveSnapshot(
       activeApp !== undefined &&
       agentsMd !== undefined &&
       workspaceMd !== undefined &&
-      enabledSkills !== undefined
+      enabledSkills !== undefined &&
+      browserSessionId !== undefined
     ) {
       break;
     }
@@ -83,6 +87,7 @@ export function resolveEffectiveSnapshot(
     agentsMd: agentsMd ?? { entries: [], respectedMounts: [] },
     workspaceMd: workspaceMd ?? { entries: [] },
     enabledSkills: enabledSkills ?? { paths: [] },
+    browserSessionId: browserSessionId ?? '',
   };
 }
 
@@ -150,6 +155,8 @@ export function sparsifySnapshot(
     sparse.workspaceMd = full.workspaceMd;
   if (!deepEqual(full.enabledSkills, previous.enabledSkills))
     sparse.enabledSkills = full.enabledSkills;
+  if (full.browserSessionId !== previous.browserSessionId)
+    sparse.browserSessionId = full.browserSessionId;
 
   return sparse;
 }

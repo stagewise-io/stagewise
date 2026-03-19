@@ -2,7 +2,7 @@ import { BaseWindow, app, ipcMain, nativeTheme, session } from 'electron';
 import path from 'node:path';
 import type { SelectedElement } from '@shared/karton-contracts/ui';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
-import { generateTabId } from './tab-id';
+import { generateTabId, resetTabIdCounter } from './tab-id';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
@@ -112,6 +112,8 @@ export class WindowLayoutService extends DisposableService {
     telemetryService?: TelemetryService,
   ) {
     super();
+    // Reset to 1 on every cold start — mimics Chrome's per-session tab IDs.
+    resetTabIdCounter();
     this.logger = logger;
     this.historyService = historyService;
     this.faviconService = faviconService;
@@ -785,7 +787,7 @@ export class WindowLayoutService extends DisposableService {
     setActive: boolean,
     sourceTabId?: string,
   ): Promise<string> {
-    const id = generateTabId(new Set(Object.keys(this.tabs)));
+    const id = generateTabId();
 
     // Create search utilities config that reads from current Karton state and preferences
     const searchUtilsConfig: SearchUtilsConfig = {
