@@ -207,6 +207,12 @@ export const environmentSnapshotSchema = z.object({
   agentsMd: agentsMdSnapshotSchema.optional(),
   workspaceMd: workspaceMdSnapshotSchema.optional(),
   enabledSkills: enabledSkillsSnapshotSchema.optional(),
+  /**
+   * Unique identifier for the current browser process lifetime.
+   * Changes on every app restart. Agents use this to detect restarts
+   * and treat all previous tab IDs as invalid.
+   */
+  browserSessionId: z.string().optional(),
 });
 
 export type EnvironmentSnapshot = z.infer<typeof environmentSnapshotSchema>;

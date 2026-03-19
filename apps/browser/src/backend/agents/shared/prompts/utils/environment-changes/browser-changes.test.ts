@@ -125,6 +125,66 @@ describe('computeBrowserChanges', () => {
     expect(result.some((c) => c.startsWith('active tab'))).toBe(false);
   });
 
+  it('emits browser-restarted when session ID changes', () => {
+    const previous = makeBrowser([
+      { id: 't_1', url: 'https://a.com', title: 'A' },
+    ]);
+    const current = makeBrowser([
+      { id: 't_2', url: 'https://b.com', title: 'B' },
+      { id: 't_3', url: 'https://c.com', title: 'C' },
+    ]);
+    const result = computeBrowserChanges(previous, current, 'sess-1', 'sess-2');
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('browser-restarted');
+    expect(result[0].summary).toContain('new session');
+  });
+
+  it('browser-restarted detail includes new tab list', () => {
+    const previous = makeBrowser([
+      { id: 't_1', url: 'https://old.com', title: 'Old' },
+    ]);
+    const current = makeBrowser(
+      [
+        { id: 't_new1', url: 'https://example.com', title: 'Example' },
+        { id: 't_new2', url: 'https://other.com', title: 'Other' },
+      ],
+      't_new1',
+    );
+    const result = computeBrowserChanges(previous, current, 'sess-1', 'sess-2');
+    expect(result).toHaveLength(1);
+    const detail = result[0].detail ?? '';
+    expect(detail).toContain('<open-tabs>');
+    expect(detail).toContain('id="t_new1"');
+    expect(detail).toContain('url="https://example.com"');
+    expect(detail).toContain('active="true"');
+    expect(detail).toContain('id="t_new2"');
+    expect(detail).not.toContain('t_1');
+    expect(detail).not.toContain('old.com');
+  });
+
+  it('browser-restarted detail says no tabs when new session is empty', () => {
+    const previous = makeBrowser([
+      { id: 't_1', url: 'https://a.com', title: 'A' },
+    ]);
+    const current = makeBrowser([]);
+    const result = computeBrowserChanges(previous, current, 'sess-1', 'sess-2');
+    expect(result).toHaveLength(1);
+    expect(result[0].detail).toBe('No tabs open.');
+  });
+
+  it('suppresses individual tab events on browser restart', () => {
+    const previous = makeBrowser([
+      { id: 't_1', url: 'https://a.com', title: 'A' },
+    ]);
+    const current = makeBrowser([
+      { id: 't_2', url: 'https://b.com', title: 'B' },
+    ]);
+    const result = computeBrowserChanges(previous, current, 'sess-1', 'sess-2');
+    // Only the restart entry — no tab-closed / tab-opened / etc.
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('browser-restarted');
+  });
+
   it('handles multiple simultaneous changes', () => {
     const previous = makeBrowser(
       [

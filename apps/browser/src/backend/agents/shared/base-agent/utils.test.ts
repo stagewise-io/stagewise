@@ -30,6 +30,7 @@ function makeSnapshot(
     agentsMd: { entries: [], respectedMounts: [] },
     workspaceMd: { entries: [] },
     enabledSkills: { paths: [] },
+    browserSessionId: 'test-browser-session-id',
     ...overrides,
   };
 }

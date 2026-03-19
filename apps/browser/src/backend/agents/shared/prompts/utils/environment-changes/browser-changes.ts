@@ -1,16 +1,42 @@
 import type { BrowserSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
+import { renderBrowserTabsXml } from '../../system/browser-tabs-renderer';
 import type { EnvironmentChangeEntry } from './types';
 
 /**
  * Compares two browser snapshots and produces compact, grouped
  * change descriptions. Returns an empty array when there is no
  * previous snapshot (first message) or when nothing changed.
+ *
+ * When `browserSessionId` changes between snapshots, a single
+ * `browser-restarted` event is emitted and all individual tab-level
+ * events are suppressed — the agent should treat all old tab IDs as
+ * invalid and use the new session's tab list instead.
  */
 export function computeBrowserChanges(
   previous: BrowserSnapshot | null,
   current: BrowserSnapshot,
+  previousSessionId?: string,
+  currentSessionId?: string,
 ): EnvironmentChangeEntry[] {
   if (!previous) return [];
+
+  // Browser restart detected — session ID changed between messages.
+  // Suppress all individual tab events; emit a single restart notice instead.
+  if (
+    previousSessionId &&
+    currentSessionId &&
+    previousSessionId !== currentSessionId
+  ) {
+    const tabDetail = renderBrowserTabsXml(current);
+    return [
+      {
+        type: 'browser-restarted',
+        summary:
+          'all old tabs were closed and the user is in a new session. Tab IDs have been reset.',
+        detail: tabDetail,
+      },
+    ];
+  }
 
   const prevTabs = new Map(previous.tabs.map((t) => [t.id, t]));
   const currTabs = new Map(current.tabs.map((t) => [t.id, t]));
