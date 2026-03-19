@@ -97,7 +97,8 @@ export const MultiEditToolPart = ({
   }, [diff]);
 
   const hasNewContent = useMemo(() => {
-    return part.input?.edits?.some(
+    if (!Array.isArray(part.input?.edits)) return false;
+    return part.input.edits.some(
       (edit) => (edit?.new_string?.length ?? 0) > 10,
     );
   }, [part.input?.edits]);
@@ -159,9 +160,11 @@ export const MultiEditToolPart = ({
       return (
         <StreamingCodeBlock
           code={
-            part.input?.edits
-              ?.map((edit) => edit?.new_string ?? '')
-              .join('\n\n') ?? ''
+            (Array.isArray(part.input?.edits)
+              ? part.input.edits
+                  .map((edit) => edit?.new_string ?? '')
+                  .join('\n\n')
+              : '') ?? ''
           }
           language={getLanguageFromPath(part.input?.relative_path)}
         />
