@@ -84,7 +84,6 @@ export async function grepSearchToolExecute(
 
     // Apply output capping to prevent LLM context bloat
     const cappedMatches = capToolOutput(resultData.matches, {
-      maxBytes: 40 * 1024, // 40KB
       maxItems: Math.min(max_matches, 50),
     });
 

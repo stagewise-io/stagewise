@@ -84,7 +84,6 @@ export async function listFilesToolExecute(
 
     // Apply output capping to prevent LLM context bloat
     const cappedFiles = capToolOutput(result.files || [], {
-      maxBytes: 40 * 1024, // 40KB
       maxItems: 50,
     });
 

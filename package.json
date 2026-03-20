@@ -26,7 +26,8 @@
     "version:browser:alpha": "tsx scripts/release/index.ts --package browser --channel alpha",
     "version:browser:beta": "tsx scripts/release/index.ts --package browser --channel beta",
     "version:browser:release": "tsx scripts/release/index.ts --package browser --channel release",
-    "version:karton": "tsx scripts/release/index.ts --package karton"
+    "version:karton": "tsx scripts/release/index.ts --package karton",
+    "extract:compression-test-data": "tsx scripts/experiments/extract-compression-test-data.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.0.6",

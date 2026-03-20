@@ -51,12 +51,12 @@ describe('capToolOutput', () => {
       expect(result.result).toBe(str);
     });
 
-    it('truncates a large string with the default 100KB limit', () => {
+    it('truncates a large string with the default 40KB limit', () => {
       const input = makeString(200_000);
       const result = capToolOutput(input);
 
       expect(result.truncated).toBe(true);
-      expect(jsonByteSize(result.result)).toBeLessThanOrEqual(100 * 1024);
+      expect(jsonByteSize(result.result)).toBeLessThanOrEqual(40 * 1024);
     });
   });
 
