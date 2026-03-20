@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-alpha.42 (2026-03-20)
+
+### Bug Fixes
+
+* account for truncation marker length in text cap budget (4c5730d)
+* truncate user-message as well (d1aca4a)
+* lower fraction of messagesKept to 0.2, account for metadata overhead (f3bc2d8)
+* handle edge cases in history compression (297a91d)
+* make compression respect context size for kept messages, reduce tool output cap (c4ff9ee)
+* fix tool-error message (handle 'noSuchTool', etc.) (79df676)
+
 ## 1.0.0-alpha.41 (2026-03-19)
 
 ### Features
