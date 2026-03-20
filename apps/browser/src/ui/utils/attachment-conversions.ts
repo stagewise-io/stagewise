@@ -1,19 +1,23 @@
 import type { SelectedElement } from '@shared/selected-elements';
 import { generateId } from '@ui/utils';
-import type { FileAttachment } from '@shared/karton-contracts/ui/agent/metadata';
+import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import type { AttachmentAttributes } from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
 
 /**
- * Convert a FileAttachment to AttachmentAttributes for TipTap editor insertion.
+ * Convert an Attachment to AttachmentAttributes for TipTap editor insertion.
+ * The TipTap node stores `id` = path and `label` = display name.
  */
-export function fileAttachmentToAttachmentAttributes(
-  attachment: FileAttachment,
+export function attachmentToAttachmentAttributes(
+  attachment: Attachment,
 ): AttachmentAttributes {
+  const displayName =
+    attachment.originalFileName ??
+    attachment.path.split('/').pop() ??
+    attachment.path;
   return {
-    id: attachment.id,
+    id: attachment.path,
     type: 'attachment',
-    label: attachment.fileName ?? 'File',
-    mediaType: attachment.mediaType,
+    label: displayName,
   };
 }
 

@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import type { SelectedElement } from '@shared/selected-elements';
 import type {
-  FileAttachment,
+  Attachment,
   TextClipAttachment,
 } from '@shared/karton-contracts/ui/agent/metadata';
 
@@ -17,15 +17,15 @@ import type {
 interface MessageAttachmentsContext {
   /** Selected DOM elements */
   elements: SelectedElement[];
-  /** File/image attachment metadata (content stored on disk) */
-  fileAttachments: FileAttachment[];
+  /** Path-based attachments (workspace files or att/ blobs) */
+  attachments: Attachment[];
   /** Text clip attachments with content */
   textClipAttachments: TextClipAttachment[];
 }
 
 const MessageAttachmentsContext = createContext<MessageAttachmentsContext>({
   elements: [],
-  fileAttachments: [],
+  attachments: [],
   textClipAttachments: [],
 });
 
@@ -33,8 +33,8 @@ interface MessageAttachmentsProviderProps {
   children: ReactNode;
   /** Selected DOM elements */
   elements: SelectedElement[];
-  /** File/image attachments */
-  fileAttachments?: FileAttachment[];
+  /** Path-based attachments */
+  attachments?: Attachment[];
   /** Text clip attachments */
   textClipAttachments?: TextClipAttachment[];
 }
@@ -42,12 +42,12 @@ interface MessageAttachmentsProviderProps {
 export function MessageAttachmentsProvider({
   children,
   elements,
-  fileAttachments = [],
+  attachments = [],
   textClipAttachments = [],
 }: MessageAttachmentsProviderProps) {
   const value = useMemo(
-    () => ({ elements, fileAttachments, textClipAttachments }),
-    [elements, fileAttachments, textClipAttachments],
+    () => ({ elements, attachments, textClipAttachments }),
+    [elements, attachments, textClipAttachments],
   );
 
   return (

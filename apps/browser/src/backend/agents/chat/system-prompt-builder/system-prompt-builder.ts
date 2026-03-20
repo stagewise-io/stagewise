@@ -1,4 +1,4 @@
-import { getApplicationInfo } from '../../shared/prompts/system/application-info';
+import ApplicationInfo from '../../shared/prompts/system/application-info.md?raw';
 import Identity from '../../shared/prompts/system/identity.md?raw';
 import Behavior from '../../shared/prompts/system/behavior.md?raw';
 import MessageStructure from '../../shared/prompts/system/message-structure.md?raw';
@@ -19,7 +19,7 @@ export function buildChatSystemPrompt(): string {
   return [
     `<identity>${Identity}</identity>`,
     `<behavior>${Behavior}</behavior>`,
-    `<application-environment-info>${getApplicationInfo()}</application-environment-info>`,
+    `<application-environment-info>${ApplicationInfo}</application-environment-info>`,
     `<message-structure>${MessageStructure}</message-structure>`,
     `<security-authority-model>${SecurityAuthorityModel}</security-authority-model>`,
     `<skills-usage>${skillsUsageInstructions}</skills-usage>`,

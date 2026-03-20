@@ -21,6 +21,7 @@ export const mentionContextRef: { current: MentionContext } = {
     tabs: {},
     activeTabId: null,
     mounts: [],
+    onFileMentionSelected: null,
   },
 };
 
@@ -107,6 +108,18 @@ export const MentionExtension = Mention.extend({
     },
     command: ({ editor, range, props }: any) => {
       const item = props as ResolvedMentionItem;
+      // Side-effect: register file mentions as FileAttachment entries in the
+      // composer immediately on selection so the backend never needs to
+      // resolve mount paths from mention metadata at send time.
+      if (
+        item.providerType === 'file' &&
+        !item.meta.isDirectory &&
+        mentionContextRef.current.onFileMentionSelected
+      ) {
+        mentionContextRef.current.onFileMentionSelected(
+          item as import('./types').FileMentionItem,
+        );
+      }
       editor
         .chain()
         .focus()

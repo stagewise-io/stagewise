@@ -5,6 +5,7 @@ import type {
   UserMessageMetadata,
   MountPermission,
   MentionFileCandidate,
+  Attachment,
 } from './agent/metadata';
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
@@ -480,15 +481,7 @@ export type AppState = {
       editSummary: FileDiff[];
       pendingUserQuestion: PendingUserQuestion | null;
       pendingSandboxOutputs?: Record<string, string[]>;
-      pendingSandboxAttachments?: Record<
-        string,
-        Array<{
-          id: string;
-          mediaType: string;
-          fileName?: string;
-          sizeBytes: number;
-        }>
-      >;
+      pendingSandboxAttachments?: Record<string, Attachment[]>;
       pendingShellOutputs?: Record<string, string[]>;
       activeApp?: {
         appId: string;
@@ -682,20 +675,14 @@ export type KartonContract = {
       setActiveModelId: (agentId: string, modelId: ModelId) => Promise<void>;
       storeAttachment: (
         agentId: string,
-        attachmentId: string,
-        mediaType: string,
-        fileName: string,
-        sizeBytes: number,
+        originalFileName: string,
         data: string,
-      ) => Promise<void>;
+      ) => Promise<string>;
       storeAttachmentByPath: (
         agentId: string,
-        attachmentId: string,
-        mediaType: string,
-        fileName: string,
-        sizeBytes: number,
+        originalFileName: string,
         filePath: string,
-      ) => Promise<void>;
+      ) => Promise<string>;
     };
     toolbox: {
       acceptHunks: (hunkIds: string[]) => Promise<void>;

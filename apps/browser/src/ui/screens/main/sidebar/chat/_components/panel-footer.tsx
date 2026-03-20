@@ -30,6 +30,8 @@ import {
 } from './chat-input';
 import type { AttachmentType } from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
 import type { MentionContext } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions';
+import type { FileMentionItem } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/types';
+import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import { selectedElementToAttachmentAttributes } from '@ui/utils/attachment-conversions';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
@@ -130,11 +132,11 @@ export function ChatPanelFooter() {
 
   // File attachments via shared hook
   const {
-    fileAttachments,
+    attachments: fileAttachments,
     addFileAttachment,
-    removeFileAttachment,
-    clearFileAttachments,
-    setFileAttachments,
+    removeAttachment: removeFileAttachment,
+    clearAttachments: clearFileAttachments,
+    setAttachments: setFileAttachments,
   } = useFileAttachments({
     chatInputRef: chatInputRef as RefObject<ChatInputHandle>,
     agentId: openAgent,
@@ -205,6 +207,24 @@ export function ChatPanelFooter() {
       ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
       : EMPTY_MOUNTS,
   );
+  // Stable ref so the mention command handler (configured once by TipTap)
+  // always sees the latest setFileAttachments without re-creating the context.
+  const setFileAttachmentsRef = useRef(setFileAttachments);
+  setFileAttachmentsRef.current = setFileAttachments;
+
+  const onFileMentionSelected = useCallback((item: FileMentionItem) => {
+    const attachment: Attachment = {
+      // mountedPath is the agent-facing path (e.g. "w1/src/button.tsx")
+      path: item.meta.mountedPath,
+      // No originalFileName for workspace paths — basename is derived from path
+    };
+    setFileAttachmentsRef.current((prev) => {
+      // Deduplicate by path
+      if (prev.some((a) => a.path === attachment.path)) return prev;
+      return [...prev, attachment];
+    });
+  }, []);
+
   const mentionContext = useMemo<MentionContext>(
     () => ({
       agentInstanceId: openAgent,
@@ -212,6 +232,7 @@ export function ChatPanelFooter() {
       tabs: mentionTabs,
       activeTabId: mentionActiveTabId,
       mounts: mentionMounts,
+      onFileMentionSelected,
     }),
     [
       openAgent,
@@ -219,6 +240,7 @@ export function ChatPanelFooter() {
       mentionTabs,
       mentionActiveTabId,
       mentionMounts,
+      onFileMentionSelected,
     ],
   );
 
@@ -262,7 +284,7 @@ export function ChatPanelFooter() {
       if (text) {
         const parsed = markdownToTipTapContent(text);
         const tiptapContent = enrichTipTapContent(parsed, {
-          fileAttachments: message.metadata?.fileAttachments,
+          attachments: message.metadata?.attachments,
           textClipAttachments: message.metadata?.textClipAttachments,
           selectedPreviewElements: message.metadata?.selectedPreviewElements as
             | SelectedElement[]
@@ -274,9 +296,9 @@ export function ChatPanelFooter() {
         });
       }
 
-      // Restore file attachments state (used by handleSubmit for the message)
-      if (message.metadata?.fileAttachments?.length) {
-        setFileAttachments(message.metadata.fileAttachments);
+      // Restore attachments state (used by handleSubmit for the message)
+      if (message.metadata?.attachments?.length) {
+        setFileAttachments(message.metadata.attachments);
       }
 
       // Restore selected elements state
@@ -408,10 +430,17 @@ export function ChatPanelFooter() {
     // Snapshot pending question ID — used for the atomic interrupt call below.
     const currentPendingQuestionId = pendingQuestionIdRef.current;
 
-    // Collect metadata for selected elements and text clips
+    // Collect metadata for selected elements, text clips, and mentions.
     const metadata = collectUserMessageMetadata(
       currentSelectedElements,
       currentLocalInputState,
+    );
+
+    // File mentions are converted to FileAttachment entries at selection time
+    // (via onFileMentionSelected). Strip them from the mentions array so the
+    // backend doesn't see duplicate context.
+    const filteredMentions = metadata.mentions?.filter(
+      (m) => m.providerType !== 'file',
     );
 
     const markdownText = chatInputRef.current!.getTextContent();
@@ -425,7 +454,11 @@ export function ChatPanelFooter() {
       role: 'user',
       metadata: {
         ...metadata,
-        fileAttachments: currentFileAttachments,
+        attachments: currentFileAttachments,
+        mentions:
+          filteredMentions && filteredMentions.length > 0
+            ? filteredMentions
+            : undefined,
       },
     };
 
@@ -711,7 +744,8 @@ export function ChatPanelFooter() {
    */
   const handleAttachmentRemoved = useCallback(
     (id: string, type: AttachmentType) => {
-      if (type === 'attachment') removeFileAttachment(id);
+      if (type === 'attachment')
+        removeFileAttachment(id); // id is the path
       else if (type === 'element') {
         removeSelectedElementProc(id);
         setLocalSelectedElements((prev) =>

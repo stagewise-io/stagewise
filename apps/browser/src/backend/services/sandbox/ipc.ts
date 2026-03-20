@@ -52,6 +52,13 @@ export type MainToWorkerMessage =
       error?: string;
     }
   | {
+      type: 'create-attachment-result';
+      id: string;
+      /** Canonical disk filename (blob key) returned to the agent */
+      fileName?: string;
+      error?: string;
+    }
+  | {
       type: 'open-app-result';
       id: string;
       success: boolean;
@@ -99,12 +106,6 @@ export type WorkerToMainMessage =
       error?: string;
       errorStack?: string;
       outputs?: string[];
-      customFileAttachments?: Array<{
-        id: string;
-        mediaType: string;
-        fileName?: string;
-        sizeBytes: number;
-      }>;
     }
   | {
       type: 'file-diff-notification';
@@ -121,14 +122,13 @@ export type WorkerToMainMessage =
       output: string;
     }
   | {
-      type: 'sandbox-output-attachment';
+      /** Agent calls API.createAttachment() — main process writes the blob and returns the canonical fileName */
+      type: 'create-attachment';
+      id: string;
       agentId: string;
-      attachment: {
-        id: string;
-        mediaType: string;
-        fileName?: string;
-        sizeBytes: number;
-      };
+      originalFileName: string;
+      /** base64-encoded file content */
+      data: string;
     }
   | {
       type: 'resolve-credential';

@@ -1,6 +1,7 @@
 import type { MentionItem } from '../types';
 import type { MentionFileCandidate } from '@shared/karton-contracts/ui/agent/metadata';
 import type { TabState, MountEntry } from '@shared/karton-contracts/ui';
+import type { FileMentionItem } from '../types';
 
 export interface MentionProviderIcon {
   id: string;
@@ -15,6 +16,12 @@ export interface MentionContext {
   tabs: Record<string, TabState>;
   activeTabId: string | null;
   mounts: MountEntry[];
+  /**
+   * Called when a file mention is selected from the popup.
+   * Allows the composer to register the file as a FileAttachment immediately
+   * so the backend never needs to resolve mount paths from mention metadata.
+   */
+  onFileMentionSelected: ((item: FileMentionItem) => void) | null;
 }
 
 export interface MentionProvider {

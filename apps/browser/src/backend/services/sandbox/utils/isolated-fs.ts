@@ -198,10 +198,10 @@ const PERMISSION_SUGGESTIONS: Record<
   read: {},
   list: {},
   create: {
-    att: 'Attachment already exists. Write to a new ID instead.',
+    att: 'Use API.createAttachment() to produce output attachments — direct writes to att/ are not permitted.',
   },
   edit: {
-    att: 'Attachments are append-only. Write to a new ID instead of overwriting.',
+    att: 'Use API.createAttachment() to produce output attachments — direct writes to att/ are not permitted.',
   },
   delete: {
     att: 'Attachments cannot be deleted.',

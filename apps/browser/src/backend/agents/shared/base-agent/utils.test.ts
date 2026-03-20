@@ -240,7 +240,12 @@ function makeUserMsgWithAttachment(
       createdAt: new Date(),
       partsMetadata: [],
       environmentSnapshot: undefined,
-      fileAttachments: [attachment],
+      attachments: [
+        {
+          path: `att/${attachment.fileName}`,
+          originalFileName: attachment.fileName,
+        },
+      ],
     },
   } as any;
 }
@@ -1593,8 +1598,8 @@ function makeAssistantMsgWithSandboxAttachment(
   return {
     id,
     role: 'assistant',
-    // The sandbox attachment lives inside a tool-result part's `output._customFileAttachments`
-    // array — that is what `collectCustomFileAttachments` reads.
+    // Attachments are now stored in metadata.attachments on the assistant message
+    // (populated by drainSandboxAttachments after the step completes).
     parts: [
       { type: 'text', text, state: 'done' },
       {
@@ -1602,7 +1607,6 @@ function makeAssistantMsgWithSandboxAttachment(
         toolCallId: 'tc-1',
         toolName: 'execute_script',
         output: {
-          _customFileAttachments: [attachment],
           result: 'ok',
         },
         state: 'output-available',
@@ -1612,6 +1616,12 @@ function makeAssistantMsgWithSandboxAttachment(
       createdAt: new Date(),
       partsMetadata: [],
       environmentSnapshot: snapshot,
+      attachments: [
+        {
+          path: `att/${attachment.fileName}`,
+          originalFileName: attachment.fileName,
+        },
+      ],
     },
   } as any;
 }

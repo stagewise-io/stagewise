@@ -44,6 +44,8 @@ import { ChatInputViewOnly } from './chat-input-view-only';
 import { generateId } from 'ai';
 import type { AttachmentType } from './rich-text/attachments';
 import type { MentionContext } from './rich-text/mentions';
+import type { FileMentionItem } from './rich-text/mentions/types';
+import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import type { Content } from '@tiptap/core';
 import { IconMagicWandSparkle } from 'nucleo-micro-bold';
@@ -70,11 +72,11 @@ export const MessageUser = memo(
 
     // File attachments via shared hook
     const {
-      fileAttachments: editedFileAttachments,
+      attachments: editedFileAttachments,
       addFileAttachment,
-      removeFileAttachment,
-      clearFileAttachments,
-      setFileAttachments: setEditedFileAttachments,
+      removeAttachment: removeFileAttachment,
+      clearAttachments: clearFileAttachments,
+      setAttachments: setEditedFileAttachments,
     } = useFileAttachments({
       chatInputRef: chatInputRef as RefObject<ChatInputHandle>,
       insertIntoEditor: true,
@@ -178,10 +180,10 @@ export const MessageUser = memo(
       clearSelectedElements();
 
       // Use file attachments directly from message metadata (preserves original IDs)
-      // Note: msg.parts only contains text, files are stored in metadata.fileAttachments
-      const existingFileAttachments = msg.metadata?.fileAttachments ?? [];
+      // Note: msg.parts only contains text, attachments are stored in metadata.attachments
+      const existingAttachments = msg.metadata?.attachments ?? [];
 
-      setEditedFileAttachments(existingFileAttachments);
+      setEditedFileAttachments(existingAttachments);
 
       setIsEditing(true);
 
@@ -198,7 +200,7 @@ export const MessageUser = memo(
     }, [
       canEdit,
       editMessageId,
-      msg.metadata?.fileAttachments,
+      msg.metadata?.attachments,
       msg.metadata?.textClipAttachments,
       clearSelectedElements,
       markdownText,
@@ -267,6 +269,13 @@ export const MessageUser = memo(
 
           const markdownText = chatInputRef.current.getTextContent().trim();
 
+          // File mentions are converted to FileAttachment entries at
+          // selection time. Strip them from mentions so the backend doesn't
+          // receive duplicate context.
+          const filteredMentions = metadata.mentions?.filter(
+            (m) => m.providerType !== 'file',
+          );
+
           // Build the new message object
           const newMessage: AgentMessage & { role: 'user' } = {
             id: newMessageId,
@@ -279,9 +288,13 @@ export const MessageUser = memo(
             role: 'user',
             metadata: {
               ...metadata,
-              fileAttachments: editedFileAttachments,
+              attachments: editedFileAttachments,
               textClipAttachments:
                 mergedTextClips.length > 0 ? mergedTextClips : undefined,
+              mentions:
+                filteredMentions && filteredMentions.length > 0
+                  ? filteredMentions
+                  : undefined,
             },
           };
 
@@ -513,6 +526,19 @@ export const MessageUser = memo(
         : EMPTY_MOUNTS,
     );
 
+    const setEditedFileAttachmentsRef = useRef(setEditedFileAttachments);
+    setEditedFileAttachmentsRef.current = setEditedFileAttachments;
+
+    const onFileMentionSelected = useCallback((item: FileMentionItem) => {
+      const attachment: Attachment = {
+        path: item.meta.mountedPath,
+      };
+      setEditedFileAttachmentsRef.current((prev) => {
+        if (prev.some((a) => a.path === attachment.path)) return prev;
+        return [...prev, attachment];
+      });
+    }, []);
+
     const mentionContext = useMemo<MentionContext>(
       () => ({
         agentInstanceId: openAgent,
@@ -520,8 +546,16 @@ export const MessageUser = memo(
         tabs,
         activeTabId,
         mounts: mentionMounts,
+        onFileMentionSelected,
       }),
-      [openAgent, searchMentionFiles, tabs, activeTabId, mentionMounts],
+      [
+        openAgent,
+        searchMentionFiles,
+        tabs,
+        activeTabId,
+        mentionMounts,
+        onFileMentionSelected,
+      ],
     );
 
     // Count total attachments for display
@@ -558,13 +592,13 @@ export const MessageUser = memo(
       selectedElementsFromWebcontents,
     ]);
 
-    // File attachments: use edited state during editing, otherwise from metadata
+    // Attachments: use edited state during editing, otherwise from metadata
     const allFileAttachments = useMemo(() => {
       if (isEditing) {
         return editedFileAttachments;
       }
-      return msg.metadata?.fileAttachments ?? [];
-    }, [isEditing, editedFileAttachments, msg.metadata?.fileAttachments]);
+      return msg.metadata?.attachments ?? [];
+    }, [isEditing, editedFileAttachments, msg.metadata?.attachments]);
 
     // Text clip attachments: always from metadata (not editable separately)
     const allTextClipAttachments = msg.metadata?.textClipAttachments;
@@ -575,7 +609,7 @@ export const MessageUser = memo(
     return (
       <MessageAttachmentsProvider
         elements={allAvailableElements}
-        fileAttachments={allFileAttachments}
+        attachments={allFileAttachments}
         textClipAttachments={allTextClipAttachments}
       >
         <div

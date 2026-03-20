@@ -13,6 +13,8 @@ import { cn } from '@ui/utils';
 import { useToolAutoExpand } from './shared/use-tool-auto-expand';
 import { useKartonState } from '@ui/hooks/use-karton';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
+import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
+import { inferMimeType } from '@shared/mime-utils';
 
 import { getSandboxLabel } from './utils/sandbox-label-utils';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -29,12 +31,15 @@ export const ExecuteSandboxJsToolPart = ({
   showBorder = false,
   disableShimmer = false,
   isLastPart = false,
+  messageAttachments,
 }: {
   part: Extract<AgentToolUIPart, { type: 'tool-executeSandboxJs' }>;
   capMaxHeight?: boolean;
   showBorder?: boolean;
   disableShimmer?: boolean;
   isLastPart?: boolean;
+  /** Attachments from the parent message metadata — populated after the step completes. */
+  messageAttachments?: Attachment[];
 }) => {
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const [resultExpanded, setResultExpanded] = useState(true);
@@ -50,6 +55,8 @@ export const ExecuteSandboxJsToolPart = ({
       ? s.toolbox[openAgentId]?.pendingSandboxOutputs?.[part.toolCallId]
       : undefined,
   );
+  // During streaming: show live pending attachments from Karton state.
+  // After completion: use attachments from the parent message metadata.
   const pendingAttachments = useKartonState((s) =>
     openAgentId
       ? s.toolbox[openAgentId]?.pendingSandboxAttachments?.[part.toolCallId]
@@ -57,20 +64,15 @@ export const ExecuteSandboxJsToolPart = ({
   );
 
   const retainedOutputsRef = useRef<string[] | null>(null);
-  const retainedAttachmentsRef = useRef<SandboxAttachment[] | null>(null);
 
   if (pendingOutputs && pendingOutputs.length > 0)
     retainedOutputsRef.current = pendingOutputs;
-
-  if (pendingAttachments && pendingAttachments.length > 0)
-    retainedAttachmentsRef.current = pendingAttachments;
 
   const finished =
     part.state === 'output-available' || part.state === 'output-error';
   const prevFinishedRef = useRef(finished);
   if (finished && !prevFinishedRef.current) {
     retainedOutputsRef.current = null;
-    retainedAttachmentsRef.current = null;
   }
   prevFinishedRef.current = finished;
 
@@ -118,17 +120,17 @@ export const ExecuteSandboxJsToolPart = ({
     }
   }, [part.output?.result?.result]);
 
-  const customAttachments = useMemo(() => {
-    const raw = (part.output as Record<string, unknown> | undefined)
-      ?._customFileAttachments;
-    if (!Array.isArray(raw) || raw.length === 0) return null;
-    return raw as SandboxAttachment[];
-  }, [part.output]);
+  // Resolved attachments: message metadata (post-step) > live pending (streaming)
+  const effectiveAttachments = useMemo(() => {
+    if (finished && messageAttachments && messageAttachments.length > 0)
+      return messageAttachments;
+    if (pendingAttachments && pendingAttachments.length > 0)
+      return pendingAttachments as Attachment[];
+    return null;
+  }, [finished, messageAttachments, pendingAttachments]);
 
   const effectiveOutputText =
     formattedResult ?? retainedOutputsRef.current?.join('\n') ?? null;
-  const effectiveAttachments =
-    customAttachments ?? retainedAttachmentsRef.current ?? null;
   const hasAnyResult = !!effectiveOutputText || !!effectiveAttachments;
 
   const resultRef = useRef<HTMLDivElement>(null);
@@ -392,31 +394,29 @@ export const ExecuteSandboxJsToolPart = ({
   );
 };
 
-interface SandboxAttachment {
-  id: string;
-  mediaType: string;
-  fileName?: string;
-  sizeBytes?: number;
-}
-
 const AttachmentPreviewCards = ({
   attachments,
 }: {
-  attachments: SandboxAttachment[];
+  attachments: Attachment[];
 }) => {
   const [openAgentId] = useOpenAgent();
   return (
     <div className="scrollbar-hover-only flex flex-row gap-2 overflow-x-auto px-1 py-2 [&_embed]:max-h-38 [&_img]:max-h-38 [&_video]:max-h-38">
       {attachments.map((att) => {
-        const renderer = getRenderer(att.mediaType);
+        const isAtt = att.path.startsWith('att/');
+        const blobKey = isAtt ? att.path.slice(4) : att.path;
+        const displayName =
+          att.originalFileName ?? blobKey.split('/').pop() ?? blobKey;
+        const mediaType = inferMimeType(displayName);
+        const renderer = getRenderer(mediaType);
         const blobUrl = openAgentId
-          ? `attachment://${openAgentId}/${att.id}`
+          ? `attachment://${openAgentId}/${blobKey}`
           : '';
         const rendererProps: RendererProps = {
-          attachmentId: att.id,
-          mediaType: att.mediaType,
-          fileName: att.fileName ?? att.id,
-          sizeBytes: att.sizeBytes ?? 0,
+          attachmentId: blobKey,
+          mediaType,
+          fileName: displayName,
+          sizeBytes: 0,
           blobUrl,
           params: {},
         };
@@ -424,7 +424,7 @@ const AttachmentPreviewCards = ({
         if (renderer.Expanded) {
           return (
             <Suspense
-              key={att.id}
+              key={att.path}
               fallback={
                 <ExpandedShell fileName={rendererProps.fileName}>
                   <span className="text-muted-foreground text-xs">
@@ -438,7 +438,7 @@ const AttachmentPreviewCards = ({
           );
         }
 
-        return <renderer.Badge key={att.id} {...rendererProps} viewOnly />;
+        return <renderer.Badge key={att.path} {...rendererProps} viewOnly />;
       })}
     </div>
   );

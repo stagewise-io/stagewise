@@ -6,7 +6,6 @@ import { tool } from 'ai';
 import { rethrowCappedToolOutputError } from '../../utils';
 import { capToolOutput } from '../../utils';
 import type { SandboxService } from '@/services/sandbox';
-import type { SandboxFileAttachment } from '@/agents/shared/base-agent/utils';
 
 /* Due to an issue in zod schema conversion in the ai sdk,
    the schema descriptions are not properly used for the prompts -
@@ -56,8 +55,10 @@ async function executeSandboxJsToolExecute(
   sandboxService: SandboxService,
 ) {
   try {
-    const { value, outputs, customFileAttachments } =
-      await sandboxService.execute(agentInstanceId, params.script);
+    const { value, outputs } = await sandboxService.execute(
+      agentInstanceId,
+      params.script,
+    );
 
     const parts: string[] = [...outputs];
     if (value !== undefined && value !== null) {
@@ -65,20 +66,9 @@ async function executeSandboxJsToolExecute(
     }
     const scriptResult = parts.join('\n');
 
-    let validatedAttachments: SandboxFileAttachment[] | undefined;
-    if (customFileAttachments.length > 0) {
-      validatedAttachments = customFileAttachments.map((att) => ({
-        id: att.id,
-        mediaType: att.mediaType,
-        fileName: att.fileName ?? 'attachment',
-        sizeBytes: att.sizeBytes,
-      }));
-    }
-
     return {
       message: 'Successfully executed sandbox JavaScript',
       result: capToolOutput(scriptResult),
-      _customFileAttachments: validatedAttachments,
     };
   } catch (error) {
     rethrowCappedToolOutputError(error);

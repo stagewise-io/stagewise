@@ -915,7 +915,7 @@ describe('append-only permissions mount', () => {
       isolatedFs.writeFileSync('att/overwrite-me.txt', 'new', 'utf-8');
       expect.unreachable('should have thrown');
     } catch (e: any) {
-      expect(e.message).toContain('Write to a new ID');
+      expect(e.message).toContain('API.createAttachment()');
     }
   });
 
