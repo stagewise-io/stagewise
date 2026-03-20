@@ -10,7 +10,11 @@ import {
 } from 'ai';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import type { SkillDefinition } from '@shared/skills';
-import type { FullEnvironmentSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
+import type {
+  Attachment,
+  FullEnvironmentSnapshot,
+} from '@shared/karton-contracts/ui/agent/metadata';
+import { inferMimeType } from '@shared/mime-utils';
 import type { SelectedElement } from '@shared/selected-elements';
 import {
   computeAllEnvironmentChanges,
@@ -43,27 +47,21 @@ import { processImageForModel } from './image-processor';
 import type { Logger } from '@/services/logger';
 import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
 
-export type BlobReader = (
-  agentId: string,
-  attachmentId: string,
-) => Promise<Buffer>;
+/**
+ * Reads a file by its full mount-prefixed path.
+ * Supported prefixes:
+ *   - `att/<key>` — agent data-attachment blob
+ *   - `w{prefix}/<relative>` — file inside an open workspace mount
+ *
+ * The reader is responsible for resolving paths to bytes; callers pass
+ * paths as-is without pre-stripping any prefix.
+ */
+export type BlobReader = (agentId: string, path: string) => Promise<Buffer>;
 
 export type BlobErrorReporter = (
   error: unknown,
   context: { operation: string; attachmentId: string },
 ) => void;
-
-/**
- * Internal type for file attachments produced by the sandbox at runtime.
- * The sandbox writes binary data directly to the `att/` mount; this type
- * carries only metadata registered via `API.outputAttachment`.
- */
-export interface SandboxFileAttachment {
-  id: string;
-  mediaType: string;
-  fileName: string;
-  sizeBytes: number;
-}
 
 import type { ModalityConstraint } from '@shared/karton-contracts/ui/shared-types';
 
@@ -264,38 +262,13 @@ export function stripUnderscoreProperties(
 }
 
 /**
- * Collect all `_customFileAttachments` from tool part outputs on an
- * assistant message. These are multimodal attachments produced by the
- * sandbox during script execution that need to be injected as a
- * synthetic user message so the LLM can "see" them.
+ * Build a synthetic `UserModelMessage` carrying multimodal file/image parts
+ * for attachments on an assistant message (e.g. created by API.createAttachment()).
+ * Injected after the assistant turn so the LLM can see the files inline.
+ * Binary content is read via the blobReader.
  */
-function collectCustomFileAttachments(
-  message: AgentMessage,
-): SandboxFileAttachment[] {
-  const attachments: SandboxFileAttachment[] = [];
-  for (const part of message.parts) {
-    if (
-      (part.type.startsWith('tool-') || part.type === 'dynamic-tool') &&
-      'output' in part &&
-      part.output &&
-      typeof part.output === 'object'
-    ) {
-      const output = part.output as Record<string, unknown>;
-      const custom = output._customFileAttachments;
-      if (Array.isArray(custom))
-        attachments.push(...(custom as SandboxFileAttachment[]));
-    }
-  }
-  return attachments;
-}
-
-/**
- * Build a synthetic `UserModelMessage` carrying multimodal file/image
- * parts for custom file attachments collected from sandbox tool outputs.
- * Binary content is read from disk via the `att/` mount.
- */
-async function buildSyntheticUserMessageForAttachments(
-  attachments: SandboxFileAttachment[],
+async function buildAttachmentContextMessage(
+  attachments: Attachment[],
   agentInstanceId: string,
   blobReader: BlobReader,
   capabilities?: ModelCapabilities,
@@ -303,112 +276,100 @@ async function buildSyntheticUserMessageForAttachments(
   currentModelId?: string,
   logger?: Logger,
   imageCache?: ProcessedImageCacheService,
-): Promise<UserModelMessage> {
-  const content: UserContent = [];
+): Promise<(TextPart | ImagePart | FilePart)[]> {
+  const parts: (TextPart | ImagePart | FilePart)[] = [];
 
   for (const f of attachments) {
+    const displayName = f.originalFileName ?? f.path.split('/').pop() ?? f.path;
+    const mimeType = inferMimeType(displayName);
+
+    let rawBuf: Buffer | undefined;
+    try {
+      rawBuf = await blobReader(agentInstanceId, f.path);
+    } catch (err) {
+      onBlobError?.(err, {
+        operation: 'readAttachmentBlob',
+        attachmentId: f.path,
+      });
+    }
+
+    const sizeBytes = rawBuf?.length ?? 0;
     const check = canModelConsumeAttachment(
       capabilities,
-      f.mediaType,
-      f.sizeBytes,
+      mimeType,
+      sizeBytes,
       currentModelId,
     );
     const hint = check.canConsume
-      ? 'Sandbox-produced attachment. See next part for inline content.'
-      : `${check.reason} Access via fs.readFile('att/${f.id}') in the sandbox. To view inline, read it, resize/compress to a new file, then API.outputAttachment() the smaller copy.`;
+      ? 'Agent-created attachment. See next part for inline content.'
+      : `${check.reason} Access via fs.readFile('${f.path}') in the sandbox.`;
 
-    content.push({
+    parts.push({
       type: 'text',
       text: xml({
         [specialTokens.userMsgAttachmentXmlTag]: {
-          _attr: {
-            type: 'file',
-            filename: f.fileName,
-            id: f.id,
-            hint,
-          },
+          _attr: { type: 'file', filename: displayName, id: f.path, hint },
         },
       }),
     });
 
-    // NOTE: Attachments are always sent as inline data (Uint8Array), never
-    // as URLs. The Vercel AI gateway may route requests to upstream providers
-    // (AWS Bedrock, Vertex AI, etc.) that reject URL-based image/file parts.
-    // AssetCacheService exists for future per-provider URL support but is
-    // intentionally not used here.
-    if (check.canConsume) {
-      try {
-        const rawBuf = await blobReader(agentInstanceId, f.id);
-        if (isImageMime(f.mediaType)) {
-          // Run the image through the pre-processing pipeline to ensure it
-          // meets the model's resolution and byte-size constraints.
-          const imageConstraint = capabilities?.inputConstraints?.image;
-          const processed = imageConstraint
-            ? await processImageForModel(
-                rawBuf,
-                f.mediaType,
-                imageConstraint,
-                logger,
-                imageCache,
-              )
-            : {
-                ok: true as const,
-                buf: rawBuf,
-                mediaType: f.mediaType,
-                transformed: false,
-              };
-
-          if (processed.ok) {
-            content.push({
-              type: 'image',
-              image: new Uint8Array(processed.buf),
-              mediaType: processed.mediaType,
-            } satisfies ImagePart);
-          } else {
-            // Processor failed (e.g. corrupt image or cannot compress enough).
-            // Replace the earlier hint text-part with a failure notice so the
-            // model understands it cannot see the image.
-            const failReason =
-              processed.error instanceof Error
-                ? processed.error.message
-                : 'Image processing failed.';
-            // Overwrite the last pushed text part (the XML hint) to include
-            // the failure reason.
-            const lastPart = content[content.length - 1];
-            if (lastPart?.type === 'text') {
-              content[content.length - 1] = {
-                type: 'text',
-                text: xml({
-                  [specialTokens.userMsgAttachmentXmlTag]: {
-                    _attr: {
-                      type: 'file',
-                      filename: f.fileName,
-                      id: f.id,
-                      hint: `Image could not be processed for inline delivery: ${failReason} Access via fs.readFile('att/${f.id}') in the sandbox.`,
-                    },
-                  },
-                }),
-              };
-            }
-          }
+    if (check.canConsume && rawBuf) {
+      if (isImageMime(mimeType)) {
+        const imageConstraint = capabilities?.inputConstraints?.image;
+        const processed = imageConstraint
+          ? await processImageForModel(
+              rawBuf,
+              mimeType,
+              imageConstraint,
+              logger,
+              imageCache,
+            )
+          : {
+              ok: true as const,
+              buf: rawBuf,
+              mediaType: mimeType,
+              transformed: false,
+            };
+        if (processed.ok) {
+          parts.push({
+            type: 'image',
+            image: new Uint8Array(processed.buf),
+            mediaType: processed.mediaType,
+          } satisfies ImagePart);
         } else {
-          content.push({
-            type: 'file',
-            data: new Uint8Array(rawBuf),
-            mediaType: f.mediaType,
-            filename: f.fileName,
-          } satisfies FilePart);
+          const failReason =
+            processed.error instanceof Error
+              ? processed.error.message
+              : 'Image processing failed.';
+          const last = parts[parts.length - 1];
+          if (last?.type === 'text') {
+            parts[parts.length - 1] = {
+              type: 'text',
+              text: xml({
+                [specialTokens.userMsgAttachmentXmlTag]: {
+                  _attr: {
+                    type: 'file',
+                    filename: displayName,
+                    id: f.path,
+                    hint: `Image could not be processed: ${failReason} Access via fs.readFile('${f.path}') in the sandbox.`,
+                  },
+                },
+              }),
+            };
+          }
         }
-      } catch (err) {
-        onBlobError?.(err, {
-          operation: 'readSandboxAttachmentBlob',
-          attachmentId: f.id,
-        });
+      } else {
+        parts.push({
+          type: 'file',
+          data: new Uint8Array(rawBuf),
+          mediaType: mimeType,
+          filename: displayName,
+        } satisfies FilePart);
       }
     }
   }
 
-  return { role: 'user', content };
+  return parts;
 }
 
 /**
@@ -566,39 +527,30 @@ export const convertAgentMessagesToModelMessages = async (
       const assistantMsgs = await convertAssistantMessage(message, tools);
       modelMessages.push(...assistantMsgs);
 
-      // Env-changes and sandbox file attachments go AFTER the assistant
-      // message because the snapshot captures state after this step's
-      // tool calls executed. Consolidated into a single synthetic user
-      // message when both are present.
-      const sandboxAttachments = collectCustomFileAttachments(message);
-      const hasSandboxAttachments = sandboxAttachments.length > 0;
-      const hasEnvParts = envParts.parts.length > 0;
+      // Build a single synthetic user message after the assistant turn for:
+      // 1. Env-changes (state after this step's tool calls)
+      // 2. Agent-created attachments (from API.createAttachment() calls)
+      // Both are consolidated to avoid unnecessary turn boundaries.
+      const assistantAttachments = message.metadata?.attachments ?? [];
+      const attachmentParts =
+        assistantAttachments.length > 0
+          ? await buildAttachmentContextMessage(
+              assistantAttachments,
+              agentInstanceId,
+              blobReader,
+              modelCapabilities,
+              onBlobError,
+              currentModelId,
+              logger,
+              imageCache,
+            )
+          : [];
 
-      if (hasEnvParts || hasSandboxAttachments) {
-        const syntheticParts: (TextPart | ImagePart | FilePart)[] = [];
-        if (hasEnvParts) {
-          syntheticParts.push(
-            ...(envParts.parts as (TextPart | ImagePart | FilePart)[]),
-          );
-        }
-        if (hasSandboxAttachments) {
-          const attachmentMsg = await buildSyntheticUserMessageForAttachments(
-            sandboxAttachments,
-            agentInstanceId,
-            blobReader,
-            modelCapabilities,
-            onBlobError,
-            currentModelId,
-            logger,
-            imageCache,
-          );
-          const attachContent = Array.isArray(attachmentMsg.content)
-            ? attachmentMsg.content
-            : [{ type: 'text' as const, text: attachmentMsg.content }];
-          syntheticParts.push(
-            ...(attachContent as (TextPart | ImagePart | FilePart)[]),
-          );
-        }
+      const syntheticParts = [
+        ...(envParts.parts as (TextPart | ImagePart | FilePart)[]),
+        ...attachmentParts,
+      ];
+      if (syntheticParts.length > 0) {
         modelMessages.push({ role: 'user', content: syntheticParts });
       }
     }
@@ -818,85 +770,89 @@ async function convertUserMessage(
   // separately and splice them directly into converted.content as FilePart/ImagePart objects.
   const directParts: (FilePart | ImagePart)[] = [];
 
-  if ((message.metadata?.fileAttachments?.length || 0) > 0) {
-    for (const f of message.metadata!.fileAttachments!) {
+  if ((message.metadata?.attachments?.length || 0) > 0) {
+    for (const f of message.metadata!.attachments!) {
+      // Display name: originalFileName for att/ blobs, basename for workspace paths.
+      const displayName =
+        f.originalFileName ?? f.path.split('/').pop() ?? f.path;
+
+      const mimeType = inferMimeType(displayName);
+
+      // Read the buffer first so we can derive sizeBytes for the modality check.
+      // Pass the raw path — the blobReader resolves att/ vs workspace routing.
+      let rawBuf: Buffer | undefined;
+      try {
+        rawBuf = await blobReader(agentInstanceId, f.path);
+      } catch (err) {
+        onBlobError?.(err, {
+          operation: 'readAttachmentBlob',
+          attachmentId: f.path,
+        });
+      }
+
+      const sizeBytes = rawBuf?.length ?? 0;
       const check = canModelConsumeAttachment(
         modelCapabilities,
-        f.mediaType,
-        f.sizeBytes,
+        mimeType,
+        sizeBytes,
         currentModelId,
       );
 
       // NOTE: Attachments are always sent as inline data (Uint8Array), never
       // as URLs. The Vercel AI gateway may route requests to upstream providers
       // (AWS Bedrock, Vertex AI, etc.) that reject URL-based image/file parts.
-      // AssetCacheService exists for future per-provider URL support but is
-      // intentionally not used here.
-      if (check.canConsume) {
+      if (check.canConsume && rawBuf) {
         // Build XML hint and inline part together so the hint can reflect
         // the actual processing outcome (e.g. processor failure).
         let hint = 'User-attached file. See next part for inline content.';
         let pushedInlinePart = false;
 
-        try {
-          const rawBuf = await blobReader(agentInstanceId, f.id);
-          if (isImageMime(f.mediaType)) {
-            // Run the image through the pre-processing pipeline to ensure it
-            // meets the model's resolution and byte-size constraints.
-            const imageConstraint = modelCapabilities?.inputConstraints?.image;
-            const processed = imageConstraint
-              ? await processImageForModel(
-                  rawBuf,
-                  f.mediaType,
-                  imageConstraint,
-                  logger,
-                  imageCache,
-                )
-              : {
-                  ok: true as const,
-                  buf: rawBuf,
-                  mediaType: f.mediaType,
-                  transformed: false,
-                };
+        if (isImageMime(mimeType)) {
+          // Run the image through the pre-processing pipeline to ensure it
+          // meets the model's resolution and byte-size constraints.
+          const imageConstraint = modelCapabilities?.inputConstraints?.image;
+          const processed = imageConstraint
+            ? await processImageForModel(
+                rawBuf,
+                mimeType,
+                imageConstraint,
+                logger,
+                imageCache,
+              )
+            : {
+                ok: true as const,
+                buf: rawBuf,
+                mediaType: mimeType,
+                transformed: false,
+              };
 
-            if (processed.ok) {
-              directParts.push({
-                type: 'image',
-                image: new Uint8Array(processed.buf),
-                mediaType: processed.mediaType,
-              } satisfies ImagePart);
-              pushedInlinePart = true;
-            } else {
-              // Processor failed — fall back to description-only, same as
-              // canConsume:false path below.
-              const failReason =
-                processed.error instanceof Error
-                  ? processed.error.message
-                  : 'Image processing failed.';
-              hint = `Image could not be processed for inline delivery: ${failReason} Access via fs.readFile('att/${f.id}') in the sandbox.`;
-            }
-          } else {
+          if (processed.ok) {
             directParts.push({
-              type: 'file',
-              data: new Uint8Array(rawBuf),
-              mediaType: f.mediaType,
-              filename: f.fileName,
-            } satisfies FilePart);
+              type: 'image',
+              image: new Uint8Array(processed.buf),
+              mediaType: processed.mediaType,
+            } satisfies ImagePart);
             pushedInlinePart = true;
+          } else {
+            // Processor failed — fall back to description-only.
+            const failReason =
+              processed.error instanceof Error
+                ? processed.error.message
+                : 'Image processing failed.';
+            hint = `Image could not be processed for inline delivery: ${failReason} Access via fs.readFile('${f.path}') in the sandbox.`;
           }
-        } catch (err) {
-          onBlobError?.(err, {
-            operation: 'readAttachmentBlob',
-            attachmentId: f.id,
-          });
-          hint = `Attachment could not be read. Access via fs.readFile('att/${f.id}') in the sandbox.`;
+        } else {
+          directParts.push({
+            type: 'file',
+            data: new Uint8Array(rawBuf),
+            mediaType: mimeType,
+            filename: displayName,
+          } satisfies FilePart);
+          pushedInlinePart = true;
         }
 
-        // Only emit the "see next part" hint when we actually have an inline part.
         if (!pushedInlinePart) {
-          hint = hint.startsWith('User-attached')
-            ? `Attachment could not be delivered inline. Access via fs.readFile('att/${f.id}') in the sandbox.`
-            : hint;
+          hint = `Attachment could not be delivered inline. Access via fs.readFile('${f.path}') in the sandbox.`;
         }
 
         parts.push({
@@ -905,24 +861,29 @@ async function convertUserMessage(
             [specialTokens.userMsgAttachmentXmlTag]: {
               _attr: {
                 type: 'file',
-                filename: f.fileName,
-                id: f.id,
+                filename: displayName,
+                id: f.path,
                 hint,
               },
             },
           }),
         });
       } else {
-        // Model cannot consume this attachment at all — describe it as text only.
+        // Model cannot consume this attachment or read failed — describe as text only.
+        const reason = !rawBuf
+          ? 'Attachment could not be read.'
+          : !check.canConsume
+            ? check.reason
+            : 'Unknown error.';
         parts.push({
           type: 'text',
           text: xml({
             [specialTokens.userMsgAttachmentXmlTag]: {
               _attr: {
                 type: 'file',
-                filename: f.fileName,
-                id: f.id,
-                hint: `${check.reason} Access via fs.readFile('att/${f.id}') in the sandbox.`,
+                filename: displayName,
+                id: f.path,
+                hint: `${reason} Access via fs.readFile('${f.path}') in the sandbox.`,
               },
             },
           }),

@@ -16,7 +16,9 @@ import type { ModelId } from '@shared/available-models';
 import type { z } from 'zod';
 import { AgentPersistenceDB } from './persistence/db';
 import type { AgentState } from '@shared/karton-contracts/ui/agent';
-import { writeBlob } from '@/utils/attachment-blobs';
+import { writeBlob, deleteAgentBlobs } from '@/utils/attachment-blobs';
+import { generateAttachmentFilename } from '@shared/utils/attachment-filename';
+
 import type { QuestionAnswerValue } from '@shared/karton-contracts/ui/agent/tools/types';
 import { readWorkspaceMd } from '@/agents/shared/prompts/utils/read-workspace-md';
 import type { AssetCacheService } from '@/services/asset-cache';
@@ -352,14 +354,13 @@ export class AgentManagerService extends DisposableService {
       async (
         _callingClientId: string,
         agentId: string,
-        attachmentId: string,
-        _mediaType: string,
-        _fileName: string,
-        _sizeBytes: number,
+        originalFileName: string,
         data: string,
-      ) => {
+      ): Promise<string> => {
+        const fileName = generateAttachmentFilename(originalFileName);
         const buffer = Buffer.from(data, 'base64');
-        await writeBlob(agentId, attachmentId, buffer);
+        await writeBlob(agentId, fileName, buffer);
+        return fileName;
       },
     );
     this.karton.registerServerProcedureHandler(
@@ -367,13 +368,12 @@ export class AgentManagerService extends DisposableService {
       async (
         _callingClientId: string,
         agentId: string,
-        attachmentId: string,
-        _mediaType: string,
-        _fileName: string,
-        _sizeBytes: number,
+        originalFileName: string,
         filePath: string,
-      ) => {
-        await writeBlob(agentId, attachmentId, filePath);
+      ): Promise<string> => {
+        const fileName = generateAttachmentFilename(originalFileName);
+        await writeBlob(agentId, fileName, filePath);
+        return fileName;
       },
     );
     this.karton.registerServerProcedureHandler(
@@ -719,6 +719,10 @@ export class AgentManagerService extends DisposableService {
 
     // Clear the agent from the persistence layer
     await this.agentPersistenceDB?.deleteAgentInstance(instanceId);
+
+    // Permanently remove on-disk attachment blobs (archive intentionally
+    // preserves them so a resumed agent can still access its attachments).
+    void deleteAgentBlobs(instanceId);
 
     this.telemetryService.capture('agent-deleted', {
       agent_type: agentType,

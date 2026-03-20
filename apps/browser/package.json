@@ -27,12 +27,14 @@
   "dependencies": {
     "@bokuweb/zstd-wasm": "^0.0.27",
     "@libsql/client": "^0.15.15",
+    "@paralleldrive/cuid2": "^3.3.0",
     "@streamdown/math": "^1.0.2",
     "@tiptap/extension-mention": "^3.20.0",
     "@tiptap/extension-placeholder": "^3.20.0",
     "@tiptap/extension-task-item": "^3.20.4",
     "@tiptap/extension-task-list": "^3.20.4",
     "@tiptap/markdown": "^3.20.0",
+
     "chokidar": "^4.0.3",
     "electron-squirrel-startup": "^1.0.1",
     "electron-unhandled": "^5.0.0",
@@ -41,6 +43,7 @@
     "gray-matter": "^4.0.3",
     "immer": "^10.2.0",
     "prosemirror-highlight": "^0.15.0",
+    "mime-types": "^3.0.2",
     "react-virtuoso": "^4.18.1",
     "sharp": "^0.34.5",
     "tiptap-markdown": "^0.9.0"
@@ -93,6 +96,7 @@
     "@tiptap/starter-kit": "^3.20.0",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/hast": "^3.0.4",
+    "@types/mime-types": "^3.0.1",
     "@types/node": "22.15.2",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",

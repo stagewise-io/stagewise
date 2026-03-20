@@ -174,6 +174,7 @@ export const MessageAssistant = memo(
                         originalIndices={item.parts.map((p) => p.originalIndex)}
                         isAutoExpanded={isLastPart}
                         isShimmering={isWorking && isLastPart && isLastMessage}
+                        messageAttachments={msg.metadata?.attachments}
                       />
                     );
                   }
@@ -238,6 +239,7 @@ export const MessageAssistant = memo(
                           key={stableKey}
                           part={part}
                           isLastPart={isLastPart}
+                          messageAttachments={msg.metadata?.attachments}
                         />
                       );
                     case 'tool-readConsoleLogs':

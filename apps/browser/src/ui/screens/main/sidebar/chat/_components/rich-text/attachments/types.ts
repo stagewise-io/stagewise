@@ -2,11 +2,8 @@ import type { BaseNodeAttrs } from '../shared/types';
 
 /**
  * Attributes for file attachments (unified node).
- * mediaType drives renderer selection via the attachment registry.
  */
-export interface AttachmentAttrs extends BaseNodeAttrs {
-  mediaType: string;
-}
+export interface AttachmentAttrs extends BaseNodeAttrs {}
 
 /**
  * Attributes for selected element attachments.
