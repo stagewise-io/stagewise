@@ -1593,7 +1593,7 @@ export abstract class BaseAgent<
    * messages may occupy after compression. Kept intentionally low so
    * the agent restarts with ample headroom.
    */
-  private static readonly KEPT_BUDGET_FRACTION = 0.3;
+  private static readonly KEPT_BUDGET_FRACTION = 0.2;
 
   private async compressHistoryInternal(): Promise<void> {
     // Prevent concurrent compression runs — a second trigger while

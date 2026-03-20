@@ -1,4 +1,5 @@
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
+import type { UserMessageMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 
 const escapeTextForXML = (text: string): string => {
   return String(text ?? '')
@@ -246,11 +247,11 @@ const serializeUserMetadataAnnotations = (
  * Estimates the token count for a single AgentMessage using a simple
  * character-based heuristic (chars / 4). This is intentionally imprecise —
  * it serves as a safety check to prevent context window overflow, not as a
- * billing calculation. The 30% budget target provides ample margin for
- * estimation errors of 20-30%.
+ * billing calculation.
  *
  * Extraction per role:
- * - **user**: all text parts
+ * - **user**: all text parts + metadata overhead (env-snapshot,
+ *   annotations, text clips, mentions, selected elements)
  * - **assistant**: all text parts + tool-call names & JSON-stringified args
  * - **tool results**: tool name + stringified result/output
  *
@@ -279,6 +280,13 @@ export const estimateMessageTokens = (msg: AgentMessage): number => {
     }
   }
 
+  // Account for metadata that the conversion pipeline injects into the
+  // actual LLM prompt but that isn't visible in msg.parts: env-snapshot,
+  // env-changes, text clips, mentions, selected elements, and compressed
+  // history. Without this, the budget walk under-counts kept messages and
+  // compression triggers too late.
+  totalChars += estimateMetadataChars(msg.metadata);
+
   return Math.ceil(totalChars / 4);
 };
 
@@ -289,6 +297,65 @@ const safeStringifyLength = (value: unknown): number => {
   } catch {
     return 0;
   }
+};
+
+/**
+ * Flat per-message overhead for XML wrappers, role tags, and other
+ * structural boilerplate injected by the conversion pipeline.
+ */
+const PER_MESSAGE_OVERHEAD_CHARS = 400;
+
+/**
+ * Estimates the character count of metadata fields that get injected into
+ * the LLM prompt by the conversion pipeline but are not present in
+ * `msg.parts`. Handles missing/malformed metadata gracefully.
+ */
+const estimateMetadataChars = (
+  metadata: UserMessageMetadata | undefined,
+): number => {
+  if (!metadata) return PER_MESSAGE_OVERHEAD_CHARS;
+
+  let chars = PER_MESSAGE_OVERHEAD_CHARS;
+
+  try {
+    // Environment snapshot / env-changes — serialised as XML into the prompt
+    if (metadata.environmentSnapshot) {
+      chars += safeStringifyLength(metadata.environmentSnapshot);
+    }
+
+    // Compressed history on boundary messages
+    if (metadata.compressedHistory) {
+      chars += metadata.compressedHistory.length;
+    }
+
+    // Text clip attachments
+    if (metadata.textClipAttachments) {
+      for (const clip of metadata.textClipAttachments) {
+        chars += (clip.content?.length ?? 0) + (clip.label?.length ?? 0);
+      }
+    }
+
+    // @-mentions
+    if (metadata.mentions) {
+      chars += safeStringifyLength(metadata.mentions);
+    }
+
+    // Selected DOM elements
+    if (metadata.selectedPreviewElements) {
+      chars += safeStringifyLength(metadata.selectedPreviewElements);
+    }
+
+    // File attachment metadata (not the binary content, just the XML hints)
+    if (metadata.fileAttachments) {
+      // ~100 chars per attachment for the XML hint tag
+      chars += metadata.fileAttachments.length * 100;
+    }
+  } catch {
+    // Malformed metadata — add a conservative fallback
+    chars += 2000;
+  }
+
+  return chars;
 };
 
 // ─── Main serialisation function ───────────────────────────────────────────

@@ -1236,7 +1236,8 @@ describe('estimateMessageTokens', () => {
       parts: [{ type: 'text', text: 'Hello world' }], // 11 chars → ceil(11/4) = 3
       metadata: { createdAt: new Date(), partsMetadata: [] },
     } as AgentMessage;
-    expect(estimateMessageTokens(msg)).toBe(Math.ceil(11 / 4));
+    // 11 chars content + 400 metadata overhead
+    expect(estimateMessageTokens(msg)).toBe(Math.ceil((11 + 400) / 4));
   });
 
   it('estimates user message with multiple text parts', () => {
@@ -1249,7 +1250,8 @@ describe('estimateMessageTokens', () => {
       ],
       metadata: { createdAt: new Date(), partsMetadata: [] },
     } as AgentMessage;
-    expect(estimateMessageTokens(msg)).toBe(Math.ceil(12 / 4));
+    // 12 chars content + 400 metadata overhead
+    expect(estimateMessageTokens(msg)).toBe(Math.ceil((12 + 400) / 4));
   });
 
   it('estimates assistant message with text and tool call', () => {
@@ -1270,12 +1272,13 @@ describe('estimateMessageTokens', () => {
       metadata: { createdAt: new Date(), partsMetadata: [] },
     } as unknown as AgentMessage;
     const result = estimateMessageTokens(msg);
-    // Should include text + toolName + serialised input + serialised output
+    // Should include text + toolName + serialised input + serialised output + metadata overhead
     const expectedChars =
       'Let me read that file.'.length +
       'readFile'.length +
       JSON.stringify(toolInput).length +
-      JSON.stringify({ content: 'file contents here' }).length;
+      JSON.stringify({ content: 'file contents here' }).length +
+      400; // metadata overhead
     expect(result).toBe(Math.ceil(expectedChars / 4));
   });
 
@@ -1286,7 +1289,8 @@ describe('estimateMessageTokens', () => {
       parts: [],
       metadata: { createdAt: new Date(), partsMetadata: [] },
     } as AgentMessage;
-    expect(estimateMessageTokens(msg)).toBe(0);
+    // Empty parts but still has metadata overhead
+    expect(estimateMessageTokens(msg)).toBe(Math.ceil(400 / 4));
   });
 
   it('returns 0 for null/undefined message', () => {
@@ -1307,10 +1311,11 @@ describe('estimateMessageTokens', () => {
       metadata: { createdAt: new Date(), partsMetadata: [] },
     } as unknown as AgentMessage;
     const result = estimateMessageTokens(msg);
-    const expectedChars = JSON.stringify({
-      type: 'custom-widget',
-      data: { foo: 'bar' },
-    }).length;
+    const expectedChars =
+      JSON.stringify({
+        type: 'custom-widget',
+        data: { foo: 'bar' },
+      }).length + 400; // metadata overhead
     expect(result).toBe(Math.ceil(expectedChars / 4));
   });
 
@@ -1322,6 +1327,7 @@ describe('estimateMessageTokens', () => {
       parts: [{ type: 'text', text: largeText }],
       metadata: { createdAt: new Date(), partsMetadata: [] },
     } as AgentMessage;
-    expect(estimateMessageTokens(msg)).toBe(25_000);
+    // 100k chars + 400 metadata overhead
+    expect(estimateMessageTokens(msg)).toBe(Math.ceil((100_000 + 400) / 4));
   });
 });
