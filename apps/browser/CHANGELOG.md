@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.43 (2026-03-20)
+
+### Bug Fixes
+
+* increase timeout for compression-llm retries to 30s (33fb877)
+
 ## 1.0.0-alpha.42 (2026-03-20)
 
 ### Bug Fixes
