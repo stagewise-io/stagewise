@@ -187,7 +187,7 @@ Make sure the selector is correct and the element exists on the page.`,
  * Sandbox With 2 Image Attachments
  *
  * Script that uses API.outputAttachment() twice to produce two PNG screenshots.
- * The output includes _customFileAttachments with the image data.
+ * The script uses API.outputAttachment() to produce two PNG screenshots.
  */
 export const SandboxWith2ImageAttachments: Story = {
   name: 'Sandbox/With-2-Image-Attachments',
@@ -232,20 +232,6 @@ return JSON.stringify({ headerCaptured: true, footerCaptured: true });`,
                   headerCaptured: true,
                   footerCaptured: true,
                 }),
-                customFileAttachments: [
-                  {
-                    id: 'header-screenshot',
-                    mediaType: 'image/png',
-                    fileName: 'header.png',
-                    sizeBytes: 1024,
-                  },
-                  {
-                    id: 'footer-screenshot',
-                    mediaType: 'image/png',
-                    fileName: 'footer.png',
-                    sizeBytes: 1024,
-                  },
-                ],
               },
             ),
           ],
@@ -335,26 +321,6 @@ return JSON.stringify({
                   svgFound: true,
                   htmlLength: 2847,
                 }),
-                customFileAttachments: [
-                  {
-                    id: 'hero-screenshot',
-                    mediaType: 'image/png',
-                    fileName: 'hero-section.png',
-                    sizeBytes: 1024,
-                  },
-                  {
-                    id: 'hero-logo-svg',
-                    mediaType: 'image/svg+xml',
-                    fileName: 'hero-logo.svg',
-                    sizeBytes: 512,
-                  },
-                  {
-                    id: 'hero-html',
-                    mediaType: 'text/html',
-                    fileName: 'hero-section.html',
-                    sizeBytes: 256,
-                  },
-                ],
               },
             ),
           ],
@@ -421,20 +387,6 @@ return JSON.stringify({ screenshotCaptured: true, videoExtracted: true });`,
                   screenshotCaptured: true,
                   videoExtracted: true,
                 }),
-                customFileAttachments: [
-                  {
-                    id: 'page-screenshot',
-                    mediaType: 'image/png',
-                    fileName: 'page.png',
-                    sizeBytes: 1024,
-                  },
-                  {
-                    id: 'video-source',
-                    mediaType: 'video/mp4',
-                    fileName: 'background-video.mp4',
-                    sizeBytes: 10240,
-                  },
-                ],
               },
             ),
           ],

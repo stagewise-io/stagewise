@@ -99,6 +99,7 @@ const PartContent = ({
   thinkingDuration,
   isLastPart = false,
   capMaxHeight = false,
+  messageAttachments,
 }: {
   part: ReadOnlyToolPart;
   minimal?: boolean;
@@ -106,6 +107,7 @@ const PartContent = ({
   thinkingDuration?: number;
   isLastPart?: boolean;
   capMaxHeight?: boolean;
+  messageAttachments?: import('@shared/karton-contracts/ui/agent/metadata').Attachment[];
 }) => {
   switch (part.type) {
     case 'reasoning':
@@ -181,6 +183,7 @@ const PartContent = ({
           disableShimmer={disableShimmer}
           isLastPart={isLastPart}
           capMaxHeight={capMaxHeight}
+          messageAttachments={messageAttachments}
         />
       );
     case 'tool-readConsoleLogs':
@@ -227,6 +230,7 @@ export const ExploringToolParts = ({
   isShimmering,
   partsMetadata,
   originalIndices,
+  messageAttachments,
 }: {
   parts: ReadOnlyToolPart[];
   isAutoExpanded: boolean;
@@ -234,6 +238,8 @@ export const ExploringToolParts = ({
   partsMetadata: UserMessageMetadata['partsMetadata'];
   /** Original indices in msg.parts for each part, used for correct metadata lookup */
   originalIndices: number[];
+  /** Attachments from the parent assistant message metadata */
+  messageAttachments?: import('@shared/karton-contracts/ui/agent/metadata').Attachment[];
 }) => {
   const [expanded, setExpanded] = useState(isAutoExpanded);
   const [expandedChildren, setExpandedChildren] = useState<Set<string>>(
@@ -281,6 +287,7 @@ export const ExploringToolParts = ({
           minimal={true}
           disableShimmer
           isLastPart={isLastPart}
+          messageAttachments={messageAttachments}
           thinkingDuration={
             part.type === 'reasoning' && originalIndex !== undefined
               ? (partsMetadata?.[originalIndex]?.endedAt?.getTime() ?? 0) -
@@ -361,22 +368,8 @@ export const ExploringToolParts = ({
           const multimodalCalls = parseOutputAttachmentCalls(script);
 
           if (multimodalCalls.length > 0) {
-            const customAtts = (part.output as any)?._customFileAttachments as
-              | { mediaType?: string }[]
-              | undefined;
-            if (Array.isArray(customAtts))
-              for (const att of customAtts)
-                attachmentLabels.push(getAttachmentLabel(att.mediaType));
-            else
-              for (const call of multimodalCalls)
-                attachmentLabels.push(getAttachmentLabel(call.mediaType));
-          } else {
-            const customAtts = (part.output as any)?._customFileAttachments as
-              | { mediaType?: string }[]
-              | undefined;
-            if (Array.isArray(customAtts))
-              for (const att of customAtts)
-                attachmentLabels.push(getAttachmentLabel(att.mediaType));
+            for (let i = 0; i < multimodalCalls.length; i++)
+              attachmentLabels.push(getAttachmentLabel(undefined));
           }
 
           if (readAttCalls.length > 0)
@@ -723,6 +716,7 @@ export const ExploringToolParts = ({
         part={parts[0]!}
         minimal={true}
         disableShimmer={!isShimmering}
+        messageAttachments={messageAttachments}
         thinkingDuration={
           originalIndex !== undefined
             ? (partsMetadata?.[originalIndex]?.endedAt?.getTime() ?? 0) -

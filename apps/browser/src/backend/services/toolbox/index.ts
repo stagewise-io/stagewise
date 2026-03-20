@@ -11,13 +11,13 @@ import type { UserExperienceService } from '@/services/experience';
 import { SandboxService } from '../sandbox';
 import { ShellService, detectShell, resolveShellEnv } from './services/shell';
 import {
-  APPEND_ONLY_PERMISSIONS,
   FULL_PERMISSIONS,
   NON_WORKSPACE_PREFIXES,
   READ_ONLY_PERMISSIONS,
   type MountDescriptor,
 } from '../sandbox/ipc';
 import type { WorkspaceAgentSettings } from '@shared/karton-contracts/ui/shared-types';
+import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import type { KartonService } from '@/services/karton';
 import type { GlobalConfigService } from '@/services/global-config';
 import { DisposableService } from '@/services/disposable';
@@ -527,7 +527,7 @@ export class ToolboxService extends DisposableService {
     mounts.push({
       prefix: 'att',
       absolutePath: attDir,
-      permissions: APPEND_ONLY_PERMISSIONS,
+      permissions: READ_ONLY_PERMISSIONS,
     });
 
     mounts.push({
@@ -633,7 +633,7 @@ export class ToolboxService extends DisposableService {
       {
         prefix: 'att',
         path: getAgentBlobDir(agentInstanceId),
-        permissions: [...APPEND_ONLY_PERMISSIONS] as MountPermission[],
+        permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
       },
       {
         prefix: 'plugins',
@@ -977,6 +977,16 @@ export class ToolboxService extends DisposableService {
     }
 
     return this.apiClient;
+  }
+
+  /**
+   * Drains all pending sandbox attachments (created via API.createAttachment()
+   * during this step) for the given agent and returns them as a flat array.
+   * Clears the pending buffers as a side effect.
+   */
+  public drainSandboxAttachments(agentInstanceId: string): Attachment[] {
+    if (!this.sandboxService) return [];
+    return this.sandboxService.drainPendingAttachments(agentInstanceId);
   }
 
   public getMountedPathsForAgent(

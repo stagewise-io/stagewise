@@ -712,12 +712,6 @@ export function createExecuteSandboxJsToolPart(
     toolCallId?: string;
     result?: string;
     errorText?: string;
-    customFileAttachments?: Array<{
-      id: string;
-      mediaType: string;
-      fileName?: string;
-      sizeBytes: number;
-    }>;
   },
 ): AgentToolUIPart {
   const toolCallId = options?.toolCallId || generateId();
@@ -759,9 +753,6 @@ export function createExecuteSandboxJsToolPart(
     output: {
       message: 'Successfully executed sandbox JavaScript',
       result: { result: options?.result ?? '{}' },
-      ...(options?.customFileAttachments && {
-        _customFileAttachments: options.customFileAttachments,
-      }),
     },
   } as AgentToolUIPart;
 }

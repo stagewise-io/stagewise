@@ -42,6 +42,8 @@ import {
 } from './history-compression';
 import { readBlob } from '@/utils/attachment-blobs';
 import { capToolOutput } from '@/services/toolbox/utils';
+import fs from 'node:fs/promises';
+import nodePath from 'node:path';
 import type { AssetCacheService } from '@/services/asset-cache';
 import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
 import { randomUUID } from 'node:crypto';
@@ -1035,7 +1037,25 @@ export abstract class BaseAgent<
       systemPrompt,
       await this.getToolsForStep(),
       this.instanceId,
-      (agentId, attachmentId) => readBlob(agentId, attachmentId),
+      async (agentId, path) => {
+        // path is always a full mount-prefixed path:
+        //   "att/<key>"          — agent data-attachment blob
+        //   "w{prefix}/<rel>"    — file inside an open workspace mount
+        if (path.startsWith('att/')) {
+          return readBlob(agentId, path.slice(4));
+        }
+        // Workspace path — resolve prefix via mount registry.
+        const slashIdx = path.indexOf('/');
+        if (slashIdx <= 0)
+          throw new Error(`Unrecognised attachment path format: "${path}"`);
+        const prefix = path.slice(0, slashIdx);
+        const relative = path.slice(slashIdx + 1);
+        const mountPaths = this.toolbox.getMountedPathsForAgent(agentId);
+        const mountRoot = mountPaths.get(prefix);
+        if (!mountRoot)
+          throw new Error(`Mount "${prefix}" not found for agent ${agentId}`);
+        return fs.readFile(nodePath.join(mountRoot, relative));
+      },
       capabilities,
       (err, ctx) => {
         const error = err instanceof Error ? err : new Error(String(err));
@@ -1865,6 +1885,23 @@ export abstract class BaseAgent<
 
     // Save the agent state for recovery
     await this.saveState();
+
+    // Drain sandbox-produced attachments (from API.createAttachment() calls during
+    // this step) into metadata.attachments on the current assistant message.
+    // pendingSandboxAttachments is keyed by toolCallId; merge all into one array.
+    const sandboxAtts = this.toolbox.drainSandboxAttachments(this.instanceId);
+    if (sandboxAtts.length > 0) {
+      this.state.set((draft) => {
+        const last = draft.history[draft.history.length - 1];
+        if (last?.role === 'assistant') {
+          last.metadata ??= { createdAt: new Date(), partsMetadata: [] };
+          last.metadata.attachments = [
+            ...(last.metadata.attachments ?? []),
+            ...sandboxAtts,
+          ];
+        }
+      });
+    }
 
     this.telemetryService.capture('agent-step-completed', {
       agent_type: this.agentType,

@@ -1,4 +1,4 @@
-import { webFrameMain, type WebContents } from 'electron';
+import type { WebContents } from 'electron';
 import type { Logger } from '../../logger';
 
 /**
@@ -60,7 +60,7 @@ export const ERROR_PAGE_PATH = '/error/page-load-failed';
  * Responsibilities:
  * - Hook into did-fail-load and certificate-error events
  * - Navigate to error pages for main frame errors
- * - Navigate subframes to error pages for non-safety subframe errors
+ * - Track subframe errors (without navigating them — matching Chrome behavior)
  * - Silently block subframe certificate errors (matching Chrome behavior)
  * - Track original failed URL for reload behavior
  * - Provide navigation offsets to skip error pages during back/forward
@@ -293,8 +293,15 @@ export class TabErrorHandler {
   }
 
   /**
-   * Handle subframe error - navigate only the failed frame, never the top-level page.
-   * Matches Chrome behavior: subframe failures should not affect the parent page.
+   * Handle subframe error - track it but never navigate the subframe or the parent page.
+   * Matches Chrome behavior: subframe failures show a broken/blank iframe and
+   * do not affect the parent page in any way.
+   *
+   * Previously this method tried to navigate failed subframes to internal error
+   * pages (stagewise://internal/error/...), but that caused several issues:
+   * - Loading a full React app (with karton connections) inside third-party iframes
+   * - Cascading did-fail-load events when the internal URL failed to load in the frame
+   * - Potential renderer instability from executing JS in frames with no document context
    */
   private handleSubframeError(
     errorCode: number,
@@ -303,15 +310,6 @@ export class TabErrorHandler {
     frameProcessId: number,
     frameRoutingId: number,
   ): void {
-    // Navigate just the failed frame to an error page
-    this.navigateFrameToError(
-      frameProcessId,
-      frameRoutingId,
-      errorCode,
-      errorDescription,
-      failedUrl,
-    );
-
     // Track subframe error in state
     const subframeError: SubframeError = {
       frameId: `${frameProcessId}:${frameRoutingId}`,
@@ -389,58 +387,18 @@ export class TabErrorHandler {
   }
 
   /**
-   * Navigate a specific subframe to error page
-   */
-  private async navigateFrameToError(
-    frameProcessId: number,
-    frameRoutingId: number,
-    errorCode: number,
-    errorMessage: string,
-    errorUrl: string,
-  ): Promise<void> {
-    const errorPageUrl = this.buildErrorPageUrl(
-      errorCode,
-      errorMessage,
-      errorUrl,
-      true, // isSubframe
-    );
-
-    try {
-      const frame = webFrameMain.fromId(frameProcessId, frameRoutingId);
-      if (frame && !frame.url.includes(ERROR_PAGE_PATH)) {
-        await frame.executeJavaScript(`
-          window.location.replace('${errorPageUrl.replace(/'/g, "\\'")}');
-        `);
-        this.logger.debug(
-          `[TabErrorHandler] Navigated subframe to error page for ${errorUrl}`,
-        );
-      }
-    } catch (err) {
-      // Frame might be destroyed or inaccessible - that's OK
-      this.logger.debug(
-        `[TabErrorHandler] Could not navigate subframe: ${err}`,
-      );
-    }
-  }
-
-  /**
    * Build error page URL with query parameters
    */
   private buildErrorPageUrl(
     errorCode: number,
     errorMessage: string,
     errorUrl: string,
-    isSubframe = false,
   ): string {
     const params = new URLSearchParams();
     params.set('errorUrl', errorUrl);
     params.set('errorCode', errorCode.toString());
     params.set('errorMessage', errorMessage);
     params.set('tabId', this.tabId);
-
-    if (isSubframe) {
-      params.set('isSubframe', 'true');
-    }
 
     return `stagewise://internal${ERROR_PAGE_PATH}?${params.toString()}`;
   }

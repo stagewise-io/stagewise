@@ -3,20 +3,36 @@ import { selectedElementSchema } from '../../../selected-elements';
 import { environmentDiffSnapshotSchema } from '../shared-types';
 
 /**
- * Schema for file attachments.
- * Lightweight metadata only — binary content is stored on disk at
- * `<dataRoot>/agents/<agentId>/data-attachments/<attachmentId>`.
- * The backend reads blobs from disk when building LLM prompts.
- * Agents access attachments via `fs.readFile('att/{id}')` in the sandbox.
+ * A path-based attachment on a user message.
+ *
+ * `path` is either:
+ * - A mount-prefixed workspace path: `"w1/src/button.tsx"` — points directly
+ *   into an open workspace; display name is derived from the basename.
+ * - A blob path: `"att/my_file_a8kt2m.png"` — a file that was copied into
+ *   the agent's data-attachments directory (external drag-in or upload).
+ *
+ * `originalFileName` is only set for `att/` paths where the blob key is a
+ * randomised filename (e.g. `my_file_a8kt2m.png`). It stores the human-
+ * readable original name (e.g. `"My Screenshot.png"`) for badge display.
+ * For workspace paths the basename of `path` is used directly.
  */
-export const fileAttachmentSchema = z.object({
-  id: z.string(),
-  fileName: z.string(),
-  mediaType: z.string(),
-  sizeBytes: z.number(),
+export const attachmentSchema = z.object({
+  /** Full path: either `"w{prefix}/..."` (workspace) or `"att/..."` (blob). */
+  path: z.string(),
+  /**
+   * Human-readable original filename. Only set for `att/` paths where the
+   * stored filename is randomised. Display code falls back to the basename
+   * of `path` when unset.
+   */
+  originalFileName: z.string().optional(),
 });
 
-export type FileAttachment = z.infer<typeof fileAttachmentSchema>;
+export type Attachment = z.infer<typeof attachmentSchema>;
+
+/** @deprecated Use {@link Attachment} instead. Legacy alias kept for migration compatibility. */
+export const fileAttachmentSchema = attachmentSchema;
+/** @deprecated Use {@link Attachment} instead. Legacy alias kept for migration compatibility. */
+export type FileAttachment = Attachment;
 
 /**
  * Schema for text clip attachments - collapsed long text pasted by user.
@@ -271,8 +287,8 @@ const metadataSchema = z.object({
   textClipAttachments: z.array(textClipAttachmentSchema).optional(),
   /** Compressed history of the agent in markdown format. Contains information about the whole previous conversation. */
   compressedHistory: z.string().optional(),
-  /** Lightweight file attachment metadata (content stored on disk). */
-  fileAttachments: z.array(fileAttachmentSchema).optional(),
+  /** Path-based attachments on this message (workspace files or att/ blobs). */
+  attachments: z.array(attachmentSchema).optional(),
   /** Snapshot of browser, workspace, and file-diff state at message creation time. Used to compute environment change descriptions between agent turns. */
   environmentSnapshot: environmentSnapshotSchema.optional(),
   /** @-mentions of files, tabs, or other items the user referenced inline */

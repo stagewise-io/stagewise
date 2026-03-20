@@ -32,6 +32,8 @@ import {
   getRenderer,
   type RendererProps,
 } from '@ui/components/attachment-renderers';
+import { inferMimeType } from '@shared/mime-utils';
+import { getBaseName } from '@shared/path-utils';
 import type { SelectedElement } from '@shared/selected-elements';
 
 interface ColorBadgeProps {
@@ -107,15 +109,88 @@ export type AttachmentLinkData =
       filePath: string;
       lineNumber?: string;
       incomplete?: boolean;
+      /** Query params after the path (e.g. `?display=expanded`) */
+      params?: Record<string, string>;
     }
   | { type: 'tab'; id: string }
   | { type: 'workspace'; prefix: string }
   | { type: 'mention'; providerType: string; id: string; label?: string };
 
+/**
+ * Parses a `path:` unified link into AttachmentLinkData.
+ *
+ * Semantics:
+ *   path:att/<id>[?params]   → att attachment
+ *   path:<mountPrefix>/...   → wsfile (file inside a workspace mount)
+ *   path:<mountPrefix>       → workspace (mount root, no slash after prefix)
+ *
+ * Mount prefixes are non-empty strings that do NOT contain slashes.
+ */
+function parsePathLink(rest: string): AttachmentLinkData | null {
+  // att/ prefix → file attachment (never incomplete, always fully known)
+  if (rest.startsWith('att/')) {
+    const attRest = rest.slice('att/'.length);
+    const qIdx = attRest.indexOf('?');
+    const id = qIdx >= 0 ? attRest.slice(0, qIdx) : attRest;
+    const params: Record<string, string> = {};
+    if (qIdx >= 0) {
+      for (const pair of attRest.slice(qIdx + 1).split('&')) {
+        const eqIdx = pair.indexOf('=');
+        if (eqIdx >= 0) params[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
+        else params[pair] = 'true';
+      }
+    }
+    return { type: 'att', id, params };
+  }
+
+  // incomplete: marker emitted by the streaming pre-processor
+  // (only ever for workspace-file paths, never for att/ links)
+  const incomplete = rest.startsWith('incomplete:');
+  const path = incomplete ? rest.slice('incomplete:'.length) : rest;
+
+  const slashIdx = path.indexOf('/');
+  if (slashIdx <= 0) {
+    // No slash → workspace-only link (just mount prefix)
+    if (!path) return null;
+    return { type: 'workspace', prefix: path };
+  }
+
+  // Has slash → workspace file link — strip query params first
+  const qIdx = path.indexOf('?');
+  const rawPath = qIdx >= 0 ? path.slice(0, qIdx) : path;
+  const params: Record<string, string> = {};
+  if (qIdx >= 0) {
+    for (const pair of path.slice(qIdx + 1).split('&')) {
+      const eqIdx = pair.indexOf('=');
+      if (eqIdx >= 0) params[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
+      else params[pair] = 'true';
+    }
+  }
+  const decoded = decodeURIComponent(rawPath);
+  const colonIndex = decoded.lastIndexOf(':');
+  const hasLineNumber =
+    colonIndex > 0 && /^\d+$/.test(decoded.slice(colonIndex + 1));
+  const rawFilePath = hasLineNumber ? decoded.slice(0, colonIndex) : decoded;
+  const lineNumber = hasLineNumber ? decoded.slice(colonIndex + 1) : undefined;
+  return {
+    type: 'wsfile',
+    filePath: rawFilePath,
+    lineNumber,
+    incomplete,
+    params: Object.keys(params).length > 0 ? params : undefined,
+  };
+}
+
 const ATTACHMENT_LINK_PATTERNS: Array<{
   prefix: string;
-  parse: (rest: string) => AttachmentLinkData;
+  parse: (rest: string) => AttachmentLinkData | null;
 }> = [
+  // ── Canonical unified protocol ──────────────────────────────────────────
+  {
+    prefix: 'path:',
+    parse: parsePathLink,
+  },
+  // ── Legacy protocols (kept as read-time aliases) ─────────────────────────
   { prefix: 'element:', parse: (rest) => ({ type: 'element', id: rest }) },
   {
     prefix: 'att:',
@@ -163,14 +238,35 @@ const ATTACHMENT_LINK_PATTERNS: Array<{
     prefix: 'wsfile:',
     parse: (rest) => {
       const incomplete = rest.startsWith('incomplete:');
-      const path = incomplete ? rest.slice('incomplete:'.length) : rest;
-      const colonIndex = path.lastIndexOf(':');
+      const raw = incomplete ? rest.slice('incomplete:'.length) : rest;
+      // Strip query params
+      const qIdx = raw.indexOf('?');
+      const pathPart = qIdx >= 0 ? raw.slice(0, qIdx) : raw;
+      const params: Record<string, string> = {};
+      if (qIdx >= 0) {
+        for (const pair of raw.slice(qIdx + 1).split('&')) {
+          const eqIdx = pair.indexOf('=');
+          if (eqIdx >= 0) params[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
+          else params[pair] = 'true';
+        }
+      }
+      const colonIndex = pathPart.lastIndexOf(':');
       const hasLineNumber =
-        colonIndex > 0 && /^\d+$/.test(path.slice(colonIndex + 1));
-      const rawFilePath = hasLineNumber ? path.slice(0, colonIndex) : path;
+        colonIndex > 0 && /^\d+$/.test(pathPart.slice(colonIndex + 1));
+      const rawFilePath = hasLineNumber
+        ? pathPart.slice(0, colonIndex)
+        : pathPart;
       const filePath = decodeURIComponent(rawFilePath);
-      const lineNumber = hasLineNumber ? path.slice(colonIndex + 1) : undefined;
-      return { type: 'wsfile', filePath, lineNumber, incomplete };
+      const lineNumber = hasLineNumber
+        ? pathPart.slice(colonIndex + 1)
+        : undefined;
+      return {
+        type: 'wsfile',
+        filePath,
+        lineNumber,
+        incomplete,
+        params: Object.keys(params).length > 0 ? params : undefined,
+      };
     },
   },
 ];
@@ -187,6 +283,22 @@ export function parseAttachmentLink(
   }
   return null;
 }
+
+/**
+ * All protocol prefixes recognised by the attachment link parser.
+ * Used by streaming pre-processors to detect incomplete links.
+ */
+export const ATTACHMENT_LINK_PREFIXES: readonly string[] = [
+  'path:',
+  'element:',
+  'att:',
+  'text-clip:',
+  'color:',
+  'tab:',
+  'workspace:',
+  'mention:',
+  'wsfile:',
+];
 
 export type MessageSegment =
   | { kind: 'text'; content: string }
@@ -420,30 +532,68 @@ const TextClipAttachmentLink = ({ id, metadata }: AttachmentLinkBaseProps) => {
   );
 };
 
-const AttachmentRendererLink = ({
-  id,
+/**
+ * Unified file renderer for both attachment (`att/<filename>`) and workspace
+ * (`<mountPrefix>/<relativePath>`) file paths.
+ *
+ * Both are just paths with real file extensions — MIME type is inferred from
+ * the filename. The only difference is the URL scheme used to load the blob:
+ *   - `att/<name>`         → `attachment://<agentId>/<name>`
+ *   - `<mount>/<relPath>`  → `workspace://<mount>/<relPath>`
+ *
+ * When `params.display === 'expanded'` and the renderer has an Expanded
+ * variant (image/*, video/*), renders the full preview; otherwise renders
+ * the compact inline badge.
+ */
+const PathFileRendererLink = ({
+  path,
   params,
 }: {
-  id: string;
+  /** Full path including mount/att prefix, e.g. `att/shot.png` or `w1/src/logo.svg` */
+  path: string;
   params: Record<string, string>;
 }) => {
   const [openAgent] = useOpenAgent();
   const attachments = useAttachmentMetadata();
-  const metadata = attachments[id];
-  const mediaType =
-    metadata && 'mediaType' in metadata
-      ? metadata.mediaType
-      : 'application/octet-stream';
+
+  const isAtt = path.startsWith('att/');
+  const fileName = getBaseName(path) || path;
+  const mediaType = inferMimeType(fileName);
+
+  const blobUrl = useMemo(() => {
+    if (isAtt) {
+      const id = path.slice('att/'.length);
+      return openAgent ? `attachment://${openAgent}/${id}` : '';
+    }
+    // workspace file: split at first slash → mountPrefix / relativePath
+    const slashIdx = path.indexOf('/');
+    if (slashIdx <= 0) return '';
+    const mountPrefix = path.slice(0, slashIdx);
+    const relativePath = path.slice(slashIdx + 1);
+    return `workspace://${mountPrefix}/${encodeURIComponent(relativePath)}`;
+  }, [isAtt, path, openAgent]);
+
+  // For att/ paths, look up originalFileName from attachment metadata for
+  // human-readable badge display. For workspace paths the basename is used.
+  const id = isAtt ? path.slice('att/'.length) : path;
+  const metadata = attachments[path];
+  const displayFileName =
+    metadata && 'originalFileName' in metadata && metadata.originalFileName
+      ? metadata.originalFileName
+      : fileName;
+  // sizeBytes is only present on sandbox-produced attachments (tool outputs).
+  const sizeBytes =
+    metadata && 'sizeBytes' in metadata ? (metadata.sizeBytes as number) : 0;
+
   const renderer = getRenderer(mediaType);
-  const blobUrl = openAgent ? `attachment://${openAgent}/${id}` : '';
   const isExpanded = params.display === 'expanded';
   const rendererProps: RendererProps = {
     attachmentId: id,
     mediaType,
     blobUrl,
     params,
-    fileName: metadata && 'fileName' in metadata ? metadata.fileName : 'file',
-    sizeBytes: metadata && 'sizeBytes' in metadata ? metadata.sizeBytes : 0,
+    fileName: displayFileName,
+    sizeBytes,
   };
 
   if (isExpanded && renderer.Expanded) {
@@ -475,7 +625,10 @@ export const AttachmentLinkRouter = ({
       );
     case 'att':
       return (
-        <AttachmentRendererLink id={linkData.id} params={linkData.params} />
+        <PathFileRendererLink
+          path={`att/${linkData.id}`}
+          params={linkData.params}
+        />
       );
     case 'textClip':
       return (
@@ -484,7 +637,13 @@ export const AttachmentLinkRouter = ({
           metadata={attachments[linkData.id]}
         />
       );
-    case 'wsfile':
+    case 'wsfile': {
+      const wsParams = linkData.params ?? {};
+      if (wsParams.display === 'expanded' && !linkData.incomplete) {
+        return (
+          <PathFileRendererLink path={linkData.filePath} params={wsParams} />
+        );
+      }
       return (
         <WorkspaceFileLink
           filePath={linkData.filePath}
@@ -492,6 +651,7 @@ export const AttachmentLinkRouter = ({
           incomplete={linkData.incomplete}
         />
       );
+    }
     case 'color':
       return <ColorBadge color={linkData.color} />;
     case 'tab':
