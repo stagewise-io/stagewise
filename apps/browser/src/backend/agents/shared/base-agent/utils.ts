@@ -1007,12 +1007,15 @@ function capUserMessageTextParts(
     const maxCut = text.length - keepChars * 2;
     if (maxCut <= 0) continue;
 
-    const cut = Math.min(excess, maxCut);
+    // Ensure we remove at least enough to offset the inserted marker
+    const minCut = TRUNCATION_MARKER.length;
+    const cut = Math.min(Math.max(excess + minCut, minCut), maxCut);
     const headEnd = Math.ceil((text.length - cut) / 2);
     const tailStart = text.length - Math.floor((text.length - cut) / 2);
     entry.part.text =
       text.slice(0, headEnd) + TRUNCATION_MARKER + text.slice(tailStart);
-    excess -= cut;
+    // Net reduction: chars removed minus marker inserted
+    excess -= cut - TRUNCATION_MARKER.length;
   }
 }
 
