@@ -36,8 +36,12 @@ import {
   capitalizeFirstLetter,
 } from './utils';
 import { generateSimpleTitle } from './title-generation';
-import { generateSimpleCompressedHistory } from './history-compression';
+import {
+  generateSimpleCompressedHistory,
+  estimateMessageTokens,
+} from './history-compression';
 import { readBlob } from '@/utils/attachment-blobs';
+import { capToolOutput } from '@/services/toolbox/utils';
 import type { AssetCacheService } from '@/services/asset-cache';
 import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
 import { randomUUID } from 'node:crypto';
@@ -117,9 +121,12 @@ export type BaseAgentConfig<TFinishToolOutputSchema extends z.ZodType | null> =
     historyCompressionThreshold?: number;
 
     /**
-     * How many uncompacted messages to keep in the internal history. Only older messages beyond this limit will be compacted.
+     * Preferred number of recent messages to keep uncompacted after
+     * history compression. The actual count may be lower if the kept
+     * messages would exceed 30% of the model's context window (token
+     * budget). In that case, the floor is reduced adaptively to fit.
      *
-     * @note The minimum value is 5, any lower value will be ignored.
+     * @note The minimum value is 5, any lower value will be clamped.
      *
      * @default 10
      */
@@ -1016,7 +1023,6 @@ export abstract class BaseAgent<
       messages,
       systemPrompt,
       await this.getToolsForStep(),
-      Math.max(this.config.minUncompressedMessages ?? 0, 5),
       this.instanceId,
       (agentId, attachmentId) => readBlob(agentId, attachmentId),
       capabilities,
@@ -1321,6 +1327,7 @@ export abstract class BaseAgent<
       tools = await this.getToolsForStep();
       this._toolCallDurations.clear();
       tools = this.wrapToolsWithTiming(tools);
+      tools = this.wrapToolsWithOutputBudget(tools);
       resolvedConfig = {
         ...this.config,
         ...(await this.getModelSettings(this.messages)),
@@ -1581,6 +1588,13 @@ export abstract class BaseAgent<
     }
   }
 
+  /**
+   * Fraction of the model's context window that kept (uncompressed)
+   * messages may occupy after compression. Kept intentionally low so
+   * the agent restarts with ample headroom.
+   */
+  private static readonly KEPT_BUDGET_FRACTION = 0.3;
+
   private async compressHistoryInternal(): Promise<void> {
     // Prevent concurrent compression runs — a second trigger while
     // compression is in-flight would see stale history and produce
@@ -1594,46 +1608,98 @@ export abstract class BaseAgent<
     this._isCompressingHistory = true;
     try {
       const state = this.state.get();
+      const { history } = state;
 
-      const lastUncompactedMessageIndex =
-        state.history.length -
-        Math.max(5, this.config.minUncompressedMessages ?? 0);
-      const lastUncompactedMessageId =
-        state.history[lastUncompactedMessageIndex].id;
-
-      if (lastUncompactedMessageIndex < 1) return;
-
-      // We fetch all the messages that should be compacted (everything up until the current messages - the amount of uncompacted messages to keep).
-      const messagesToCompact = state.history.slice(
-        0,
-        lastUncompactedMessageIndex,
+      // ── Compute token budget for kept messages ────────────────────
+      let contextWindowSize: number;
+      try {
+        contextWindowSize = this.modelProviderService.getModelWithOptions(
+          state.activeModelId,
+          '',
+        ).contextWindowSize;
+      } catch {
+        // Model may have been deleted — fall back to a conservative size
+        contextWindowSize = 100_000;
+      }
+      const keptBudget = Math.floor(
+        contextWindowSize * BaseAgent.KEPT_BUDGET_FRACTION,
+      );
+      const preferredFloor = Math.max(
+        5,
+        this.config.minUncompressedMessages ?? 10,
       );
 
-      // if the last message already includes a compacted chat history, we skip compaction
-      if (
-        state.history[lastUncompactedMessageIndex].metadata?.compressedHistory
-      ) {
-        return;
+      // ── Adaptive boundary: walk backward, respect token budget ────
+      let boundaryIndex = history.length; // start past the end
+      let accumulatedTokens = 0;
+
+      for (let i = history.length - 1; i >= 0; i--) {
+        const msgTokens = estimateMessageTokens(history[i]);
+
+        if (accumulatedTokens + msgTokens > keptBudget) {
+          // This message would bust the budget — stop here
+          boundaryIndex = i + 1;
+          break;
+        }
+
+        accumulatedTokens += msgTokens;
+        const keptCount = history.length - i;
+
+        if (keptCount >= preferredFloor) {
+          // Reached preferred floor and still within budget
+          boundaryIndex = i;
+          break;
+        }
+
+        // Scanned everything, it all fits — nothing to compress
+        if (i === 0) return;
       }
 
-      this.logger.debug(`[BaseAgent:$this.instanceId] Compressing history...`);
+      // Edge case: even the last message alone exceeds the budget
+      if (boundaryIndex >= history.length) {
+        boundaryIndex = history.length - 1;
+        this.logger.warn(
+          `[BaseAgent:${this.instanceId}] Single message exceeds kept-token budget (${keptBudget} tokens). Keeping 1 message.`,
+        );
+      }
+
+      if (boundaryIndex < 1) return; // nothing meaningful to compress
+
+      const actualKept = history.length - boundaryIndex;
+      if (actualKept < preferredFloor) {
+        this.logger.debug(
+          `[BaseAgent:${this.instanceId}] Adaptive compression: keeping ${actualKept} messages (preferred ${preferredFloor}) to stay within token budget.`,
+        );
+      }
+
+      const boundaryMessageId = history[boundaryIndex].id;
+
+      // If the boundary message already has compressed history, the
+      // previous summary is included in messagesToCompact and will be
+      // folded into the new summary by the LLM.
+      const messagesToCompact = history.slice(0, boundaryIndex);
+
+      this.logger.debug(
+        `[BaseAgent:${this.instanceId}] Compressing history (${messagesToCompact.length} messages, keeping ${actualKept})...`,
+      );
 
       const compressedHistory = await this.compressHistory(messagesToCompact);
 
       this.state.set((draft) => {
-        // We fetch the correct message again here, because users could've undone/manipulate messages while we were busy compressing the history
-        const lastUncompactedMessage = draft.history.find(
-          (m) => m.id === lastUncompactedMessageId,
+        // Re-fetch the correct message — user could've undone/manipulated
+        // messages while we were busy compressing.
+        const boundaryMessage = draft.history.find(
+          (m) => m.id === boundaryMessageId,
         );
 
-        if (lastUncompactedMessage?.metadata) {
+        if (boundaryMessage?.metadata) {
           this.logger.debug(
-            `[BaseAgent:${this.instanceId}] Stored compressed history in message ${lastUncompactedMessageId}`,
+            `[BaseAgent:${this.instanceId}] Stored compressed history in message ${boundaryMessageId}`,
           );
-          lastUncompactedMessage.metadata.compressedHistory = compressedHistory;
+          boundaryMessage.metadata.compressedHistory = compressedHistory;
         } else {
           this.logger.warn(
-            `[BaseAgent:${this.instanceId}] Last uncompacted message not found in history after compressing history. Maybe the user undid/manipulated messages while we were busy compressing the history.`,
+            `[BaseAgent:${this.instanceId}] Boundary message not found in history after compression. The user may have undone or manipulated messages.`,
           );
         }
       });
@@ -2352,6 +2418,72 @@ export abstract class BaseAgent<
             )(input, options);
           } finally {
             this._toolCallDurations.set(options.toolCallId, Date.now() - start);
+          }
+        },
+      };
+    }
+    return wrapped;
+  }
+
+  /**
+   * Wraps each tool's execute to enforce a shared per-step output budget.
+   * All tool calls within a single step share one cumulative byte allowance.
+   * When the budget is exhausted, later-finishing tools have their output
+   * aggressively truncated, signalling the model to reduce parallelism.
+   */
+  private wrapToolsWithOutputBudget(
+    tools: Partial<StagewiseToolSet>,
+    maxBytes = 60 * 1024, // ~15k tokens
+  ): Partial<StagewiseToolSet> {
+    let used = 0;
+    const wrapped: Partial<StagewiseToolSet> = {};
+
+    for (const [name, t] of Object.entries(tools)) {
+      if (!t || typeof t !== 'object' || !('execute' in t) || !t.execute) {
+        (wrapped as Record<string, unknown>)[name] = t;
+        continue;
+      }
+      const originalExecute = t.execute;
+      (wrapped as Record<string, unknown>)[name] = {
+        ...t,
+        execute: async (input: unknown, options: { toolCallId: string }) => {
+          const result = await (
+            originalExecute as (
+              input: unknown,
+              options: { toolCallId: string },
+            ) => Promise<unknown>
+          )(input, options);
+
+          try {
+            const resultBytes = new TextEncoder().encode(
+              JSON.stringify(result),
+            ).length;
+            const remaining = Math.max(0, maxBytes - used);
+
+            if (resultBytes <= remaining) {
+              used += resultBytes;
+              return result;
+            }
+
+            // Budget exceeded — truncate this result to fit
+            used += Math.min(resultBytes, remaining);
+            if (remaining === 0) {
+              return {
+                message:
+                  'Tool output omitted: combined tool output budget for this step was exceeded. ' +
+                  'Reduce the number of parallel tool calls or request smaller outputs.',
+              };
+            }
+            return capToolOutput(result, { maxBytes: remaining }).result;
+          } catch (err) {
+            // If size measurement fails (e.g. circular refs), let the
+            // result through unmodified — over-budget is better than
+            // crashing a successful tool call.
+            this.report(err as Error, 'wrapToolsWithOutputBudget', {
+              toolName: name,
+              toolCallId: options.toolCallId,
+            });
+            return result;
           }
         },
       };

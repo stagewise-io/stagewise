@@ -21,7 +21,7 @@ Parameters:
 - start_line (number, OPTIONAL): Starting line number (1-indexed, INCLUSIVE). Must be >= 1. Omit to read from beginning.
 - end_line (number, OPTIONAL): Ending line number (1-indexed, INCLUSIVE). Must be >= start_line. Omit to read to end.
 
-Behavior: Returns content with totalLines count. Output capped at 200KB (~50k tokens, ~6k lines of code). If truncated, suggests reading in chunks using line ranges. Respects .gitignore.`;
+Behavior: Returns content with totalLines count. Output capped at 40KB (~10k tokens). If truncated, suggests reading in chunks using line ranges. Respects .gitignore.`;
 
 /**
  * Read content from a file tool

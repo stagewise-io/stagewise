@@ -413,9 +413,8 @@ async function buildSyntheticUserMessageForAttachments(
  * UI Messages (AgentMessage[])
  *   │
  *   ▼  Step 1 — Find compression boundary
- *   │  Scan backward for the last message with compressedHistory that is
- *   │  far enough from the end (>= minUncompressedCount). Everything
- *   │  before it is discarded.
+ *   │  Scan backward for the last message with compressedHistory.
+ *   │  Everything before it is discarded.
  *   │
  *   ▼  Step 2 — Forward pass: convert each UI message to model messages
  *   │  For each message from boundary → end:
@@ -472,7 +471,6 @@ export const convertAgentMessagesToModelMessages = async (
   messages: AgentMessage[],
   systemPrompt: string,
   tools: ToolSet,
-  minUncompressedCount: number,
   agentInstanceId: string,
   blobReader: BlobReader,
   modelCapabilities?: ModelCapabilities,
@@ -485,7 +483,7 @@ export const convertAgentMessagesToModelMessages = async (
 ): Promise<ModelMessage[]> => {
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
-  const boundaryIndex = findCompressionBoundary(messages, minUncompressedCount);
+  const boundaryIndex = findCompressionBoundary(messages);
 
   // ─── Step 2: Forward pass — convert messages to model format ────────
 
@@ -522,7 +520,6 @@ export const convertAgentMessagesToModelMessages = async (
       message,
       i,
       boundaryIndex,
-      minUncompressedCount,
     );
 
     if (message.role === 'user') {
@@ -539,7 +536,6 @@ export const convertAgentMessagesToModelMessages = async (
       // convertUserMessage always returns content as an array of parts
       const content = userMsg.content as (TextPart | ImagePart | FilePart)[];
 
-      // Merge everything into the user message:
       // compressed-history → env-context → [original content with user-msg]
       const merged: (TextPart | ImagePart | FilePart)[] = [];
       if (compressedPart) merged.push(compressedPart);
@@ -547,8 +543,10 @@ export const convertAgentMessagesToModelMessages = async (
       merged.push(...content);
       modelMessages.push({ role: 'user', content: merged });
     } else {
-      // For assistant messages, compressed-history (if any) goes BEFORE
-      // as context about what came before this point in the conversation.
+      // For assistant boundary messages, emit the compressed history as
+      // a standalone user message before the assistant reply. This
+      // naturally alternates roles (user → assistant) without needing
+      // a synthetic ack.
       if (compressedPart) {
         modelMessages.push({
           role: 'user',
@@ -608,19 +606,15 @@ export const convertAgentMessagesToModelMessages = async (
 
 /**
  * Scan backward from the end to find the compression boundary — the last
- * message with `compressedHistory` that is at least `minUncompressedCount`
- * messages before the end. Returns its index, or 0 if none found.
+ * message with `compressedHistory`. Returns its index, or 0 if none found.
+ *
+ * The boundary placement is fully controlled by `compressHistoryInternal`
+ * which uses a token-budget-aware algorithm. This reader simply trusts
+ * wherever the boundary was placed.
  */
-function findCompressionBoundary(
-  messages: AgentMessage[],
-  minUncompressedCount: number,
-): number {
+function findCompressionBoundary(messages: AgentMessage[]): number {
   for (let i = messages.length - 1; i >= 0; i--) {
-    const reverseMsgCount = messages.length - i;
-    if (
-      minUncompressedCount <= reverseMsgCount &&
-      messages[i].metadata?.compressedHistory !== undefined
-    ) {
+    if (messages[i].metadata?.compressedHistory !== undefined) {
       return i;
     }
   }
@@ -696,10 +690,8 @@ function buildCompressedHistoryPart(
   message: AgentMessage,
   msgIndex: number,
   boundaryIndex: number,
-  minUncompressedCount: number,
 ): { type: 'text'; text: string } | null {
   if (msgIndex !== boundaryIndex) return null;
-  if (minUncompressedCount <= 0) return null;
   const history = message.metadata?.compressedHistory;
   if (!history) return null;
   return {

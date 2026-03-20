@@ -114,7 +114,7 @@ function truncateStringToByteSize(
  * ```typescript
  * const result = capToolOutput(
  *   { matches: [...1000 matches...] },
- *   { maxBytes: 100 * 1024, maxItems: 200 }
+ *   { maxBytes: 40 * 1024, maxItems: 200 }
  * );
  * ```
  */
@@ -122,8 +122,8 @@ export function capToolOutput<T>(
   output: T,
   options?: CapToolOutputOptions,
 ): CappedToolOutput<T> {
-  // Default to 100KB if maxBytes is not specified
-  const { maxBytes = 100 * 1024, maxItems } = options || {};
+  // Default to 40KB if maxBytes is not specified
+  const { maxBytes = 40 * 1024, maxItems } = options || {};
 
   // Calculate original size and item count
   const originalSize = calculateJsonByteSize(output);

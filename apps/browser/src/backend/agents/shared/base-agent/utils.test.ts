@@ -259,7 +259,6 @@ describe('convertAgentMessagesToModelMessages – env context injection', () => 
       messages,
       'system prompt',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -281,7 +280,6 @@ describe('convertAgentMessagesToModelMessages – env context injection', () => 
       messages,
       'system prompt',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -308,7 +306,6 @@ describe('convertAgentMessagesToModelMessages – env context injection', () => 
       messages,
       'system prompt',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -339,7 +336,6 @@ describe('convertAgentMessagesToModelMessages – env context injection', () => 
       messages,
       'system prompt',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -383,7 +379,6 @@ describe('convertAgentMessagesToModelMessages – env context injection', () => 
       messages,
       'system prompt',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -405,7 +400,6 @@ describe('convertAgentMessagesToModelMessages – env context injection', () => 
       messages,
       'system prompt',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -575,7 +569,6 @@ describe('sparse snapshot diffing in convertAgentMessagesToModelMessages', () =>
       messages,
       'system prompt',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -599,7 +592,6 @@ describe('sparse snapshot diffing in convertAgentMessagesToModelMessages', () =>
       messages,
       'system prompt',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -625,7 +617,6 @@ describe('sparse snapshot diffing in convertAgentMessagesToModelMessages', () =>
       messages,
       'system prompt',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -651,7 +642,6 @@ describe('convertAgentMessagesToModelMessages – overall message structure', ()
       messages,
       'system prompt',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -667,7 +657,6 @@ describe('convertAgentMessagesToModelMessages – overall message structure', ()
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -686,7 +675,6 @@ describe('convertAgentMessagesToModelMessages – overall message structure', ()
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -711,7 +699,6 @@ describe('convertAgentMessagesToModelMessages – overall message structure', ()
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -764,7 +751,6 @@ describe('convertAgentMessagesToModelMessages – compression boundary', () => {
       messages,
       'sys',
       {},
-      2,
       agentId,
       noopBlobReader,
     );
@@ -777,7 +763,7 @@ describe('convertAgentMessagesToModelMessages – compression boundary', () => {
     });
     // Old messages before boundary are excluded
     expect(allTexts.some((t) => t.includes('old message'))).toBe(false);
-    // Compressed history is present (merged into the boundary user msg)
+    // Compressed history is present as a standalone user message
     expect(
       allTexts.some((t) => t.includes('Previous conversation summary')),
     ).toBe(true);
@@ -798,15 +784,14 @@ describe('convertAgentMessagesToModelMessages – compression boundary', () => {
       messages,
       'sys',
       {},
-      2,
       agentId,
       noopBlobReader,
     );
 
     // The boundary user message should contain compressed-history,
     // env-snapshot, and user-msg all in one message
-    const userMessages = result.filter((m) => m.role === 'user');
-    const boundaryUser = userMessages.find((m) => {
+    const boundaryUser = result.find((m) => {
+      if (m.role !== 'user') return false;
       const texts = getUserMsgTexts(m);
       return texts.some((t) => t.includes('boundary'));
     })!;
@@ -825,6 +810,16 @@ describe('convertAgentMessagesToModelMessages – compression boundary', () => {
     const userIdx = texts.findIndex((t) => t.includes('<user-msg'));
     expect(compIdx).toBeLessThan(envIdx);
     expect(envIdx).toBeLessThan(userIdx);
+
+    // No synthetic assistant ack anywhere
+    const ackMsg = result.find(
+      (m) =>
+        m.role === 'assistant' &&
+        (typeof m.content === 'string' ? m.content : '').includes(
+          'prior conversation',
+        ),
+    );
+    expect(ackMsg).toBeUndefined();
   });
 
   it('first user message after compression gets env-snapshot', async () => {
@@ -841,7 +836,6 @@ describe('convertAgentMessagesToModelMessages – compression boundary', () => {
       messages,
       'sys',
       {},
-      2,
       agentId,
       noopBlobReader,
     );
@@ -856,7 +850,7 @@ describe('convertAgentMessagesToModelMessages – compression boundary', () => {
     expect(hasEnvSnapshot(firstRealUser)).toBe(true);
   });
 
-  it('compressed-history on assistant message creates synthetic user before it', async () => {
+  it('compressed-history on assistant message creates standalone user before it', async () => {
     const snap = makeSnapshot();
     // Simulate compression landing on an assistant message
     const assistantWithCompression: AgentMessage = {
@@ -881,12 +875,11 @@ describe('convertAgentMessagesToModelMessages – compression boundary', () => {
       messages,
       'sys',
       {},
-      3,
       agentId,
       noopBlobReader,
     );
 
-    // Should have a synthetic user message before the assistant
+    // Should have: user (compressed history) → assistant (boundary reply)
     // Find the assistant that has 'boundary reply'
     let assistantIdx = -1;
     for (let i = 0; i < result.length; i++) {
@@ -899,13 +892,25 @@ describe('convertAgentMessagesToModelMessages – compression boundary', () => {
       }
     }
     expect(assistantIdx).toBeGreaterThan(0);
-    // The message before it should be a user message with compressed history
-    const beforeAssistant = result[assistantIdx - 1];
-    expect(beforeAssistant.role).toBe('user');
-    const texts = getUserMsgTexts(beforeAssistant);
+
+    // The message right before the boundary assistant is the compressed
+    // history user message — no synthetic ack in between.
+    const compMsg = result[assistantIdx - 1];
+    expect(compMsg.role).toBe('user');
+    const texts = getUserMsgTexts(compMsg);
     expect(
       texts.some((t: string) => t.includes('<compressed-conversation-history')),
     ).toBe(true);
+
+    // No synthetic assistant ack anywhere
+    const ackMsg = result.find(
+      (m) =>
+        m.role === 'assistant' &&
+        (typeof m.content === 'string' ? m.content : '').includes(
+          'prior conversation',
+        ),
+    );
+    expect(ackMsg).toBeUndefined();
   });
 });
 
@@ -933,7 +938,6 @@ describe('convertAgentMessagesToModelMessages – env-changes after assistant', 
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -975,7 +979,6 @@ describe('convertAgentMessagesToModelMessages – env-changes after assistant', 
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -997,7 +1000,6 @@ describe('convertAgentMessagesToModelMessages – fresh chat env-snapshot', () =
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -1041,7 +1043,6 @@ describe('convertAgentMessagesToModelMessages – fresh chat env-snapshot', () =
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -1063,7 +1064,6 @@ describe('convertAgentMessagesToModelMessages – fresh chat env-snapshot', () =
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -1119,7 +1119,6 @@ describe('convertAgentMessagesToModelMessages – multi-mount workspaces', () =>
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -1164,7 +1163,6 @@ describe('convertAgentMessagesToModelMessages – multi-mount workspaces', () =>
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -1208,7 +1206,6 @@ describe('convertAgentMessagesToModelMessages – multi-mount workspaces', () =>
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -1247,7 +1244,6 @@ describe('convertAgentMessagesToModelMessages – multi-mount workspaces', () =>
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -1284,7 +1280,6 @@ describe('convertAgentMessagesToModelMessages – multi-mount workspaces', () =>
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -1321,7 +1316,6 @@ describe('convertAgentMessagesToModelMessages – multi-mount workspaces', () =>
       messages,
       'sys',
       {},
-      0,
       agentId,
       noopBlobReader,
     );
@@ -1372,7 +1366,6 @@ describe('image attachment pipeline — user-attached images (convertUserMessage
       [msg],
       '',
       {},
-      0,
       agentId,
       blobReader,
       caps,
@@ -1402,7 +1395,6 @@ describe('image attachment pipeline — user-attached images (convertUserMessage
       [msg],
       '',
       {},
-      0,
       agentId,
       blobReader,
       caps,
@@ -1439,7 +1431,6 @@ describe('image attachment pipeline — user-attached images (convertUserMessage
       [msg],
       '',
       {},
-      0,
       agentId,
       blobReader,
       caps,
@@ -1476,7 +1467,6 @@ describe('image attachment pipeline — user-attached images (convertUserMessage
       [msg],
       '',
       {},
-      0,
       agentId,
       blobReader,
       caps,
@@ -1506,7 +1496,6 @@ describe('image attachment pipeline — user-attached images (convertUserMessage
       [msg],
       '',
       {},
-      0,
       agentId,
       blobReader,
       caps,
@@ -1540,7 +1529,6 @@ describe('image attachment pipeline — user-attached images (convertUserMessage
       [msg],
       '',
       {},
-      0,
       agentId,
       blobReader,
       caps,
@@ -1568,7 +1556,6 @@ describe('image attachment pipeline — user-attached images (convertUserMessage
       [msg],
       '',
       {},
-      0,
       agentId,
       blobReader,
       caps,
@@ -1657,7 +1644,6 @@ describe('image attachment pipeline — sandbox-produced attachments (buildSynth
       messages,
       '',
       {},
-      0,
       agentId,
       blobReader,
       caps,
@@ -1708,7 +1694,6 @@ describe('image attachment pipeline — sandbox-produced attachments (buildSynth
       messages,
       '',
       {},
-      0,
       agentId,
       blobReader,
       caps,
@@ -1754,7 +1739,6 @@ describe('image attachment pipeline — sandbox-produced attachments (buildSynth
       messages,
       '',
       {},
-      0,
       agentId,
       blobReader,
       caps,
@@ -1814,7 +1798,6 @@ describe('image attachment — constraint gating behaviour', () => {
       [msg],
       '',
       {},
-      0,
       agentId,
       async () => rawBuf,
       caps,
@@ -1836,7 +1819,6 @@ describe('image attachment — constraint gating behaviour', () => {
       [msg],
       '',
       {},
-      0,
       agentId,
       async () => rawBuf,
       undefined, // no capabilities
@@ -1878,7 +1860,6 @@ describe('image attachment — constraint gating behaviour', () => {
       [msg],
       '',
       {},
-      0,
       agentId,
       async () => rawBuf,
       caps,
