@@ -31,7 +31,7 @@
     "ignore": "^7.0.5",
     "minimatch": "^9.0.5",
     "proxy-from-env": "^1.1.0",
-    "yauzl": "^3.2.0"
+    "yauzl": "^3.2.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
