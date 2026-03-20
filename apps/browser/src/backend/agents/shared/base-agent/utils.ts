@@ -957,7 +957,63 @@ async function convertUserMessage(
     });
   }
 
+  // Cap total text to prevent blowing the context window with massive
+  // pastes, text clips, or selected-element HTML.
+  capUserMessageTextParts(
+    converted.content as (TextPart | ImagePart | FilePart)[],
+  );
+
   return { role: 'user', content: converted.content };
+}
+
+/**
+ * Prevents a single user message from exceeding a reasonable text
+ * budget. Large text parts (pastes, text clips, selected-element HTML)
+ * are truncated largest-first until the total is within budget.
+ *
+ * Uses a sandwich strategy: keeps the beginning and end of each part
+ * (where the most important context typically lives) and removes from
+ * the middle.
+ *
+ * Mutates `parts` in place.
+ */
+const USER_MSG_TEXT_BUDGET_CHARS = 200_000; // ~50k tokens
+const TRUNCATION_MARKER =
+  '\n\n... [middle of content truncated \u2014 original exceeded size limit] ...\n\n';
+
+function capUserMessageTextParts(
+  parts: (TextPart | ImagePart | FilePart)[],
+): void {
+  let totalChars = 0;
+  for (const p of parts) if (p.type === 'text') totalChars += p.text.length;
+
+  if (totalChars <= USER_MSG_TEXT_BUDGET_CHARS) return;
+
+  // Collect text parts with their indices, sort largest-first
+  const textEntries = parts
+    .map((p, i) => ({ part: p, index: i }))
+    .filter(
+      (e): e is { part: TextPart; index: number } => e.part.type === 'text',
+    )
+    .sort((a, b) => b.part.text.length - a.part.text.length);
+
+  let excess = totalChars - USER_MSG_TEXT_BUDGET_CHARS;
+
+  for (const entry of textEntries) {
+    if (excess <= 0) break;
+
+    const text = entry.part.text;
+    const keepChars = 200; // chars to preserve on each side
+    const maxCut = text.length - keepChars * 2;
+    if (maxCut <= 0) continue;
+
+    const cut = Math.min(excess, maxCut);
+    const headEnd = Math.ceil((text.length - cut) / 2);
+    const tailStart = text.length - Math.floor((text.length - cut) / 2);
+    entry.part.text =
+      text.slice(0, headEnd) + TRUNCATION_MARKER + text.slice(tailStart);
+    excess -= cut;
+  }
 }
 
 /**
