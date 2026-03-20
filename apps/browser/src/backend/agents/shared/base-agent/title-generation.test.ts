@@ -175,7 +175,7 @@ describe('generateSimpleTitle', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(2);
   });
 
-  it('aborts a hanging first model via the 15s timeout and falls back', async () => {
+  it('aborts a hanging first model via the 30s timeout and falls back', async () => {
     // First call: simulate a model that never responds — it only rejects
     // when the AbortController fires.
     generateTextMock.mockImplementationOnce(({ abortSignal }: any) => {
@@ -193,8 +193,8 @@ describe('generateSimpleTitle', () => {
     const mps = makeMockModelProviderService();
     const promise = generateSimpleTitle(makeMessages(2), mps, 'agent-1');
 
-    // Advance past the 15 s timeout
-    await vi.advanceTimersByTimeAsync(15_000);
+    // Advance past the 30 s timeout
+    await vi.advanceTimersByTimeAsync(30_000);
 
     const title = await promise;
     expect(title).toBe('Timeout Fallback Title');
