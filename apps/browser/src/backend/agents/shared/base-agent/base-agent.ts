@@ -1692,16 +1692,21 @@ export abstract class BaseAgent<
           (m) => m.id === boundaryMessageId,
         );
 
-        if (boundaryMessage?.metadata) {
-          this.logger.debug(
-            `[BaseAgent:${this.instanceId}] Stored compressed history in message ${boundaryMessageId}`,
-          );
-          boundaryMessage.metadata.compressedHistory = compressedHistory;
-        } else {
+        if (!boundaryMessage) {
           this.logger.warn(
             `[BaseAgent:${this.instanceId}] Boundary message not found in history after compression. The user may have undone or manipulated messages.`,
           );
+          return;
         }
+
+        boundaryMessage.metadata ??= {
+          createdAt: new Date(),
+          partsMetadata: [],
+        };
+        boundaryMessage.metadata.compressedHistory = compressedHistory;
+        this.logger.debug(
+          `[BaseAgent:${this.instanceId}] Stored compressed history in message ${boundaryMessageId}`,
+        );
       });
 
       await this.saveState();

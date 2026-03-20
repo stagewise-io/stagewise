@@ -331,7 +331,9 @@ export const convertAgentMessagesToCompactMessageHistoryString = (
         revertedCompactedHistoryStringParts.push(
           `<assistant>${serializedParts.join('\n')}</assistant>`,
         );
-      } else if (message.role === 'user') {
+      }
+
+      if (message.role === 'user') {
         const metadataAnnotations = serializeUserMetadataAnnotations(
           message.metadata,
         );
@@ -354,13 +356,13 @@ export const convertAgentMessagesToCompactMessageHistoryString = (
         revertedCompactedHistoryStringParts.push(
           `<user>${allParts.join('\n')}</user>`,
         );
+      }
 
-        if (message.metadata?.compressedHistory) {
-          revertedCompactedHistoryStringParts.push(
-            `<previous-chat-history>${message.metadata.compressedHistory}</previous-chat-history>`,
-          );
-          break;
-        }
+      if (message.metadata?.compressedHistory) {
+        revertedCompactedHistoryStringParts.push(
+          `<previous-chat-history>${message.metadata.compressedHistory}</previous-chat-history>`,
+        );
+        break;
       }
     } catch {
       // Skip this entire message rather than abort the whole history.
