@@ -31,7 +31,7 @@ const HISTORY_COMPRESSION_MODELS = [
 ] as const;
 
 /** Maximum time (ms) allowed for a single history compression attempt. */
-const HISTORY_COMPRESSION_TIMEOUT_MS = 15_000;
+const HISTORY_COMPRESSION_TIMEOUT_MS = 30_000;
 
 /** Minimum acceptable compression length; shorter results trigger a fallback. */
 const COMPRESSION_MIN_LENGTH = 30;
