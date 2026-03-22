@@ -316,12 +316,10 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
         metadata: {
           createdAt: new Date(),
           partsMetadata: [],
-          fileAttachments: [
+          attachments: [
             {
-              id: 'att-1',
-              fileName: 'screenshot.png',
-              mediaType: 'image/png',
-              sizeBytes: 1024,
+              path: 'att/screenshot.png',
+              originalFileName: 'screenshot.png',
             },
           ],
           mentions: [
@@ -801,7 +799,11 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
         metadata: {
           createdAt: new Date(),
           partsMetadata: [],
-          fileAttachments: [null, { fileName: 'a.png' }, undefined],
+          attachments: [
+            null,
+            { path: 'att/a.png', originalFileName: 'a.png' },
+            undefined,
+          ],
           mentions: [
             null,
             { providerType: 'file', mountedPath: 'w1/foo.ts' },

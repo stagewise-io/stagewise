@@ -200,7 +200,7 @@ type MentionLike = {
   title?: string;
   name?: string;
 };
-type AttachmentLike = { fileName?: string; id?: string };
+type AttachmentLike = { path?: string; originalFileName?: string };
 
 const serializeUserMetadataAnnotations = (
   metadata: AgentMessage['metadata'],
@@ -210,13 +210,13 @@ const serializeUserMetadataAnnotations = (
 
   try {
     // File / image attachments
-    const attachments = (metadata as Record<string, unknown>).fileAttachments as
+    const attachments = (metadata as Record<string, unknown>).attachments as
       | AttachmentLike[]
       | undefined;
     if (Array.isArray(attachments) && attachments.length) {
       const names = attachments
         .filter((a) => a != null)
-        .map((a) => a.fileName ?? a.id ?? 'file');
+        .map((a) => a.originalFileName ?? a.path?.split('/').pop() ?? 'file');
       annotations.push(`[attached: ${names.join(', ')}]`);
     }
 
@@ -346,9 +346,9 @@ const estimateMetadataChars = (
     }
 
     // File attachment metadata (not the binary content, just the XML hints)
-    if (metadata.fileAttachments) {
+    if (metadata.attachments) {
       // ~100 chars per attachment for the XML hint tag
-      chars += metadata.fileAttachments.length * 100;
+      chars += metadata.attachments.length * 100;
     }
   } catch {
     // Malformed metadata — add a conservative fallback
