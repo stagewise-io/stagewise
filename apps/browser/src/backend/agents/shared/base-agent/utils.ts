@@ -31,7 +31,6 @@ import {
   relevantCodebaseFilesToContextSnippet,
   selectedElementToContextSnippet,
 } from '../prompts/utils/metadata-converter/html-elements';
-import { textClipToContextSnippet } from '../prompts/utils/metadata-converter/text-clips';
 import { mentionToContextSnippet } from '../prompts/utils/metadata-converter/mentions';
 import {
   extractSlashIdsFromText,
@@ -88,6 +87,38 @@ const DEFAULT_FILE_CONSTRAINT: ModalityConstraint = {
 
 function formatMB(bytes: number): string {
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
+}
+
+/**
+ * Read a `.textclip` attachment and return it as an XML-wrapped TextPart.
+ * Shared by both `buildAttachmentContextMessage` and `convertUserMessage`.
+ */
+async function readTextClipAsTextPart(
+  agentInstanceId: string,
+  blobReader: BlobReader,
+  filePath: string,
+  onBlobError?: BlobErrorReporter,
+): Promise<TextPart | null> {
+  let textContent: string | undefined;
+  try {
+    const buf = await blobReader(agentInstanceId, filePath);
+    textContent = buf?.toString('utf-8');
+  } catch (err) {
+    onBlobError?.(err, {
+      operation: 'readAttachmentBlob',
+      attachmentId: filePath,
+    });
+  }
+  if (!textContent) return null;
+  return {
+    type: 'text',
+    text: xml({
+      [specialTokens.userMsgAttachmentXmlTag]: {
+        _attr: { type: 'text-clip', id: filePath },
+        _cdata: textContent,
+      },
+    }),
+  };
 }
 
 type ConstraintMatch =
@@ -282,6 +313,18 @@ async function buildAttachmentContextMessage(
   for (const f of attachments) {
     const displayName = f.originalFileName ?? f.path.split('/').pop() ?? f.path;
     const mimeType = inferMimeType(displayName);
+
+    // .textclip files are plain text — inline directly.
+    if (mimeType === 'text/x-textclip') {
+      const part = await readTextClipAsTextPart(
+        agentInstanceId,
+        blobReader,
+        f.path,
+        onBlobError,
+      );
+      if (part) parts.push(part);
+      continue;
+    }
 
     let rawBuf: Buffer | undefined;
     try {
@@ -778,6 +821,19 @@ async function convertUserMessage(
 
       const mimeType = inferMimeType(displayName);
 
+      // .textclip files are plain text — inline them directly as text parts.
+      // Every model supports raw text, so no modality check is needed.
+      if (mimeType === 'text/x-textclip') {
+        const part = await readTextClipAsTextPart(
+          agentInstanceId,
+          blobReader,
+          f.path,
+          onBlobError,
+        );
+        if (part) parts.push(part);
+        continue;
+      }
+
       // Read the buffer first so we can derive sizeBytes for the modality check.
       // Pass the raw path — the blobReader resolves att/ vs workspace routing.
       let rawBuf: Buffer | undefined;
@@ -919,14 +975,6 @@ async function convertUserMessage(
   }
 
   const attachmentParts: string[] = [];
-
-  if (
-    message.metadata?.textClipAttachments &&
-    message.metadata.textClipAttachments.length > 0
-  )
-    message.metadata.textClipAttachments.forEach((textClip) => {
-      attachmentParts.push(textClipToContextSnippet(textClip));
-    });
 
   if (message.metadata?.mentions && message.metadata.mentions.length > 0)
     message.metadata.mentions.forEach((mention) => {

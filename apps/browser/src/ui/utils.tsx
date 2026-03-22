@@ -1,7 +1,7 @@
 import posthog from 'posthog-js';
 import type { UserMessageMetadata } from '@shared/karton-contracts/ui';
 import type { SelectedElement } from '@shared/selected-elements';
-import { extractTextClipsFromTiptapContent } from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
+
 import { extractMentionsFromTiptapContent } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions';
 
 import { clsx, type ClassValue } from 'clsx';
@@ -54,15 +54,12 @@ export const collectUserMessageMetadata = (
   selectedElements: SelectedElement[],
   tiptapContent?: Content,
 ): UserMessageMetadata => {
-  const textClipAttachments = extractTextClipsFromTiptapContent(tiptapContent);
   const mentions = extractMentionsFromTiptapContent(tiptapContent);
 
   return {
     createdAt: new Date(),
     partsMetadata: [],
     selectedPreviewElements: selectedElements,
-    textClipAttachments:
-      textClipAttachments.length > 0 ? textClipAttachments : undefined,
     mentions: mentions.length > 0 ? mentions : undefined,
   };
 };

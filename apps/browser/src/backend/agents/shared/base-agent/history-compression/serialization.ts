@@ -328,13 +328,6 @@ const estimateMetadataChars = (
       chars += metadata.compressedHistory.length;
     }
 
-    // Text clip attachments
-    if (metadata.textClipAttachments) {
-      for (const clip of metadata.textClipAttachments) {
-        chars += (clip.content?.length ?? 0) + (clip.label?.length ?? 0);
-      }
-    }
-
     // @-mentions
     if (metadata.mentions) {
       chars += safeStringifyLength(metadata.mentions);

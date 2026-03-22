@@ -68,10 +68,6 @@ type AttachmentData =
       id: string;
     }
   | {
-      type: 'textClip';
-      id: string;
-    }
-  | {
       type: 'color';
       color: string;
     };
@@ -86,8 +82,6 @@ export function getAttachmentAnchorText(data: AttachmentData): string {
       return `[](element:${data.id})`;
     case 'att':
       return `[](path:att/${data.id})`;
-    case 'textClip':
-      return `[](text-clip:${data.id})`;
     case 'color':
       return `[](color:${data.color})`;
   }
@@ -198,7 +192,7 @@ const encodeColorLinksForMarkdown = (markdown: string): string => {
  * Preprocesses markdown to handle incomplete attachment links during streaming.
  * Converts incomplete markdown like [](path:w1/src/foo without closing ) to valid markdown.
  *
- * Handles all attachment link types: path:, wsfile:, element:, att:, text-clip:, color:
+ * Handles all attachment link types: path:, wsfile:, element:, att:, color:
  *
  * Note: This runs on every render because it's called in JSX. However, once
  * the markdown is complete with a closing ), the regex won't match anymore, so the
@@ -210,9 +204,9 @@ const preprocessMarkdown = (markdown: string): string => {
 
   // Detect incomplete attachment links at the end of the string
   // Pattern: [any-text](prefix:... without closing )
-  // Supports: path:, wsfile:, element:, att:, text-clip:, color:
+  // Supports: path:, wsfile:, element:, att:, color:
   const incompleteAttachmentLinkRegex =
-    /\[([^\]]*)\]\((path|wsfile|element|att|text-clip|color):([^)]*?)$/;
+    /\[([^\]]*)\]\((path|wsfile|element|att|color):([^)]*?)$/;
 
   processed = processed.replace(
     incompleteAttachmentLinkRegex,
@@ -497,7 +491,7 @@ const AnchorComponent = ({
   ExtraProps) => {
   const [openAgent] = useOpenAgent();
 
-  // Parse href for attachment links (element:, att:, text-clip:, wsfile:, color:)
+  // Parse href for attachment links (element:, att:, wsfile:, color:)
   const attachmentLink = useMemo(() => parseAttachmentLink(href), [href]);
 
   // Resolve link aliases (report-agent-issue, socials-discord, etc.)
