@@ -286,7 +286,6 @@ export function ChatPanelFooter() {
         const parsed = markdownToTipTapContent(text);
         const tiptapContent = enrichTipTapContent(parsed, {
           attachments: message.metadata?.attachments,
-          textClipAttachments: message.metadata?.textClipAttachments,
           selectedPreviewElements: message.metadata?.selectedPreviewElements as
             | SelectedElement[]
             | undefined,
@@ -860,6 +859,21 @@ export function ChatPanelFooter() {
     // Register the useDragDrop handler so forwarded events get the same processing
     setMainDropHandler(dragHandlers.onDrop);
   }, [setMainDropHandler, dragHandlers.onDrop]);
+
+  // Handle textclip-expand: replace the attachment node with inline text and
+  // remove the file attachment.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { attachmentId, content } = (e as CustomEvent).detail as {
+        attachmentId: string;
+        content: string;
+      };
+      chatInputRef.current?.replaceAttachmentWithText(attachmentId, content);
+      removeFileAttachment(attachmentId);
+    };
+    window.addEventListener('textclip-expand', handler);
+    return () => window.removeEventListener('textclip-expand', handler);
+  }, [chatInputRef, removeFileAttachment]);
 
   // Watch for selected elements via shared hook
   useElementSelectionWatcher({

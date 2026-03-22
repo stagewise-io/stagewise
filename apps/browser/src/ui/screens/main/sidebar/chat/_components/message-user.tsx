@@ -1,9 +1,6 @@
 import posthog from 'posthog-js';
 import { selectedElementToAttachmentAttributes } from '@ui/utils/attachment-conversions';
-import {
-  enrichTipTapContent,
-  markdownToTipTapContent,
-} from '@ui/utils/tiptap-content-utils';
+import { markdownToTipTapContent } from '@ui/utils/tiptap-content-utils';
 import { cn, collectUserMessageMetadata } from '@ui/utils';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
@@ -181,13 +178,9 @@ export const MessageUser = memo(
 
       setIsEditing(true);
 
-      // Convert markdown text to TipTap JSON, then inject full attachment data
-      // from the message metadata so clip content is available in the editor nodes
+      // Convert markdown text back to TipTap JSON for editing
       const tiptapContent = markdownToTipTapContent(markdownText);
-      const enrichedContent = enrichTipTapContent(tiptapContent, {
-        textClipAttachments: msg.metadata?.textClipAttachments,
-      });
-      setPendingTiptapContent(enrichedContent);
+      setPendingTiptapContent(tiptapContent);
 
       // Focus the editor (will be available after state update triggers re-render)
       setTimeout(() => chatInputRef.current?.focus(), 0);
@@ -195,7 +188,6 @@ export const MessageUser = memo(
       canEdit,
       editMessageId,
       msg.metadata?.attachments,
-      msg.metadata?.textClipAttachments,
       clearSelectedElements,
       markdownText,
     ]);
@@ -228,34 +220,10 @@ export const MessageUser = memo(
           ];
 
           // Collect metadata for selected elements
-          // Note: textClipAttachments from extractTextClipsFromTiptapContent will have empty content
-          // because the TipTap JSON only stores IDs (content is looked up from context at render time)
           const metadata = collectUserMessageMetadata(
             combinedSelectedElements,
             pendingTiptapContent,
           );
-
-          // Merge text clip attachments from two sources:
-          // 1. Preserved originals: clips from the original message metadata that
-          //    are still referenced in the edited content (have full content)
-          // 2. Newly pasted clips: freshly pasted during editing (have full content
-          //    from the paste plugin, content.length > 0)
-          // Re-parsed clips from markdown round-trip have content === '' and are excluded.
-          const originalTextClips = msg.metadata?.textClipAttachments ?? [];
-          const extractedClips = metadata.textClipAttachments ?? [];
-          const textClipIdsInContent = new Set(
-            extractedClips.map((tc) => tc.id),
-          );
-          const preservedTextClips = originalTextClips.filter((tc) =>
-            textClipIdsInContent.has(tc.id),
-          );
-          const preservedClipIds = new Set(
-            preservedTextClips.map((tc) => tc.id),
-          );
-          const newlyPastedClips = extractedClips.filter(
-            (tc) => !preservedClipIds.has(tc.id) && tc.content.length > 0,
-          );
-          const mergedTextClips = [...preservedTextClips, ...newlyPastedClips];
 
           if (!chatInputRef.current) {
             return;
@@ -283,8 +251,6 @@ export const MessageUser = memo(
             metadata: {
               ...metadata,
               attachments: editedFileAttachments,
-              textClipAttachments:
-                mergedTextClips.length > 0 ? mergedTextClips : undefined,
               mentions:
                 filteredMentions && filteredMentions.length > 0
                   ? filteredMentions
@@ -483,6 +449,24 @@ export const MessageUser = memo(
       },
     );
 
+    // Handle textclip-expand during edit mode: replace the attachment node
+    // with inline text and remove the file attachment from local state.
+    // The blob file is intentionally NOT deleted — the user may cancel the edit.
+    useEffect(() => {
+      if (!isEditing) return;
+
+      const handler = (e: Event) => {
+        const { attachmentId, content } = (e as CustomEvent).detail as {
+          attachmentId: string;
+          content: string;
+        };
+        chatInputRef.current?.replaceAttachmentWithText(attachmentId, content);
+        removeFileAttachment(attachmentId);
+      };
+      window.addEventListener('textclip-expand', handler);
+      return () => window.removeEventListener('textclip-expand', handler);
+    }, [isEditing, chatInputRef, removeFileAttachment]);
+
     // Register/unregister edit mode for drop event routing
     useEffect(() => {
       if (isEditing && editMessageId) {
@@ -594,9 +578,6 @@ export const MessageUser = memo(
       return msg.metadata?.attachments ?? [];
     }, [isEditing, editedFileAttachments, msg.metadata?.attachments]);
 
-    // Text clip attachments: always from metadata (not editable separately)
-    const allTextClipAttachments = msg.metadata?.textClipAttachments;
-
     // Implement command messages get a custom card instead of a text bubble
     const hasImplementCommand = msg.parts.some(
       (p) =>
@@ -612,7 +593,6 @@ export const MessageUser = memo(
       <MessageAttachmentsProvider
         elements={allAvailableElements}
         attachments={allFileAttachments}
-        textClipAttachments={allTextClipAttachments}
       >
         <div
           className={cn('flex w-full flex-col gap-1')}

@@ -35,19 +35,17 @@ export const fileAttachmentSchema = attachmentSchema;
 export type FileAttachment = Attachment;
 
 /**
- * Schema for text clip attachments - collapsed long text pasted by user.
- * These are stored in metadata so the agent can correlate @{id} references
- * in the user message with the full text content.
+ * @deprecated Legacy schema for text clip attachments. New pastes create
+ * `.textclip` file attachments instead. Kept for backward-compat with
+ * existing DB rows.
  */
 export const textClipAttachmentSchema = z.object({
-  /** Unique identifier matching the @{id} reference in user message */
   id: z.string(),
-  /** Truncated preview label shown in UI */
   label: z.string(),
-  /** Full pasted text content */
   content: z.string(),
 });
 
+/** @deprecated Use file-based `.textclip` attachments instead. */
 export type TextClipAttachment = z.infer<typeof textClipAttachmentSchema>;
 
 export const browserTabSnapshotSchema = z.object({

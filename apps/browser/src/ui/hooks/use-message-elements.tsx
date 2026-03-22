@@ -1,9 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import type { SelectedElement } from '@shared/selected-elements';
-import type {
-  Attachment,
-  TextClipAttachment,
-} from '@shared/karton-contracts/ui/agent/metadata';
+import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 
 /**
  * Context for providing all attachment data within a message scope.
@@ -19,14 +16,11 @@ interface MessageAttachmentsContext {
   elements: SelectedElement[];
   /** Path-based attachments (workspace files or att/ blobs) */
   attachments: Attachment[];
-  /** Text clip attachments with content */
-  textClipAttachments: TextClipAttachment[];
 }
 
 const MessageAttachmentsContext = createContext<MessageAttachmentsContext>({
   elements: [],
   attachments: [],
-  textClipAttachments: [],
 });
 
 interface MessageAttachmentsProviderProps {
@@ -35,19 +29,16 @@ interface MessageAttachmentsProviderProps {
   elements: SelectedElement[];
   /** Path-based attachments */
   attachments?: Attachment[];
-  /** Text clip attachments */
-  textClipAttachments?: TextClipAttachment[];
 }
 
 export function MessageAttachmentsProvider({
   children,
   elements,
   attachments = [],
-  textClipAttachments = [],
 }: MessageAttachmentsProviderProps) {
   const value = useMemo(
-    () => ({ elements, attachments, textClipAttachments }),
-    [elements, attachments, textClipAttachments],
+    () => ({ elements, attachments }),
+    [elements, attachments],
   );
 
   return (

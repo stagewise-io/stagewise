@@ -11,25 +11,12 @@ export interface AttachmentAttrs extends BaseNodeAttrs {}
 export interface ElementAttachmentAttrs extends BaseNodeAttrs {}
 
 /**
- * Attributes for text clip attachments (collapsed long text).
- */
-export interface TextClipAttachmentAttrs extends BaseNodeAttrs {
-  /**
-   * The full pasted text content.
-   * Optional in stored content (stripped to avoid duplication), required at runtime.
-   * When rendering/editing, look up from textClipAttachments if not present.
-   */
-  content?: string;
-}
-
-/**
  * Union type for all attachment attributes with type discriminator.
  * Used for type-safe handling of different attachment types.
  */
 export type AttachmentAttributes =
   | (AttachmentAttrs & { type: 'attachment' })
-  | (ElementAttachmentAttrs & { type: 'element' })
-  | (TextClipAttachmentAttrs & { type: 'textClip' });
+  | (ElementAttachmentAttrs & { type: 'element' });
 
 export type AttachmentType = AttachmentAttributes['type'];
 
@@ -40,7 +27,6 @@ export type AttachmentType = AttachmentAttributes['type'];
 export const ATTACHMENT_NODE_NAMES = {
   attachment: 'attachment',
   element: 'elementAttachment',
-  textClip: 'textClipAttachment',
 } as const;
 
 /**
@@ -55,7 +41,6 @@ export type AttachmentNodeName =
 export const NODE_NAME_TO_TYPE: Record<AttachmentNodeName, AttachmentType> = {
   attachment: 'attachment',
   elementAttachment: 'element',
-  textClipAttachment: 'textClip',
 };
 
 /**

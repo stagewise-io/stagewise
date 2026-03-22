@@ -2,7 +2,6 @@ import { type ReactNode, createContext, useContext, useMemo } from 'react';
 
 import type {
   Attachment,
-  TextClipAttachment,
   UserMessageMetadata,
 } from '@shared/karton-contracts/ui/agent/metadata';
 
@@ -15,10 +14,7 @@ type SelectedPreviewElement = NonNullable<
   UserMessageMetadata['selectedPreviewElements']
 >[number];
 
-export type AttachmentMetadata =
-  | SelectedPreviewElement
-  | Attachment
-  | TextClipAttachment;
+export type AttachmentMetadata = SelectedPreviewElement | Attachment;
 
 interface AttachmentMetadataContextValue {
   attachmentMetadata: Record<AttachmentId, AttachmentMetadata>;
@@ -43,10 +39,6 @@ export const AttachmentMetadataProvider = ({
       // Collect attachments — keyed by path
       message.metadata?.attachments?.forEach((f) => {
         record[f.path] = f;
-      });
-      // Collect text clips
-      message.metadata?.textClipAttachments?.forEach((t) => {
-        record[t.id] = t;
       });
       // Collect selected elements
       message.metadata?.selectedPreviewElements?.forEach((e) => {

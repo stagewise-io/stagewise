@@ -5,6 +5,7 @@ import { fallbackRenderer } from './fallback';
 import { videoRenderer } from './video';
 import { audioRenderer } from './audio';
 import { pdfRenderer } from './pdf';
+import { textclipRenderer } from './textclip';
 
 export type { RendererProps, BadgeProps, BadgeContext } from './types';
 export type { AttachmentRendererEntry, ParamDescriptor } from './types';
@@ -38,6 +39,7 @@ const renderers: AttachmentRendererEntry[] = [
   imageRenderer,
   videoRenderer,
   audioRenderer,
+  textclipRenderer,
   fallbackRenderer,
 ];
 

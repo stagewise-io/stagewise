@@ -4,7 +4,6 @@ import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import {
   AttachmentRegistryNodeView,
   ElementAttachmentView,
-  TextClipAttachmentView,
 } from './rich-text/attachments';
 import { MentionNodeView } from './rich-text/mentions';
 import { SlashNodeView } from './rich-text/slash/slash-node-view';
@@ -152,15 +151,6 @@ function RenderNode({ node }: { node: TiptapNode }): React.ReactNode {
               ...node.attrs,
             },
           }}
-        />
-      );
-
-    case 'textClipAttachment':
-      return (
-        <TextClipAttachmentView
-          viewOnly
-          selected={false}
-          node={{ attrs: node.attrs ?? {} }}
         />
       );
 

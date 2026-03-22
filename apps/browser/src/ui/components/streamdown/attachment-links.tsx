@@ -6,6 +6,7 @@ import {
   Suspense,
   type ReactNode,
 } from 'react';
+
 import {
   cn,
   IDE_SELECTION_ITEMS,
@@ -27,10 +28,7 @@ import {
   type AttachmentMetadata,
 } from '@ui/hooks/use-attachment-metadata';
 import { MessageAttachmentsProvider } from '@ui/hooks/use-message-elements';
-import {
-  ElementAttachmentView,
-  TextClipAttachmentView,
-} from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
+import { ElementAttachmentView } from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
 import { MentionNodeView } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions';
 import { TabMentionBadge } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/tab-mention-badge';
 import { WorkspaceMentionBadge } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/workspace-mention-badge';
@@ -171,7 +169,6 @@ export const ColorBadge = ({ color, children }: ColorBadgeProps) => {
 export type AttachmentLinkData =
   | { type: 'element'; id: string }
   | { type: 'att'; id: string; params: Record<string, string> }
-  | { type: 'textClip'; id: string }
   | { type: 'color'; color: string }
   | {
       type: 'wsfile';
@@ -277,7 +274,7 @@ const ATTACHMENT_LINK_PATTERNS: Array<{
       return { type: 'att', id, params };
     },
   },
-  { prefix: 'text-clip:', parse: (rest) => ({ type: 'textClip', id: rest }) },
+
   {
     prefix: 'color:',
     parse: (rest) => ({ type: 'color', color: decodeURIComponent(rest) }),
@@ -361,7 +358,6 @@ export const ATTACHMENT_LINK_PREFIXES: readonly string[] = [
   'path:',
   'element:',
   'att:',
-  'text-clip:',
   'color:',
   'tab:',
   'workspace:',
@@ -435,9 +431,9 @@ export function parseMessageSegments(text: string): MessageSegment[] {
 export function getAttachmentKey(linkData: AttachmentLinkData): string {
   switch (linkData.type) {
     case 'element':
+      return `element-${linkData.id}`;
     case 'att':
-    case 'textClip':
-      return `${linkData.type}-${linkData.id}`;
+      return `att-${linkData.id}`;
     case 'wsfile':
       return `wsfile-${linkData.filePath}`;
     case 'color':
@@ -605,7 +601,7 @@ export const WorkspaceFileLink = ({
   );
 };
 
-// ─── Element & text-clip badges ──────────────────────────────────────────────
+// ─── Element badges ─────────────────────────────────────────────────────────
 
 interface AttachmentLinkBaseProps {
   id: string;
@@ -631,26 +627,6 @@ const ElementAttachmentLink = ({ id, metadata }: AttachmentLinkBaseProps) => {
         node={{ attrs: { id, label } }}
       />
     </MessageAttachmentsProvider>
-  );
-};
-
-const TextClipAttachmentLink = ({ id, metadata }: AttachmentLinkBaseProps) => {
-  const { label, content } = useMemo(() => {
-    if (!metadata || !('content' in metadata)) {
-      return { label: 'text', content: '' };
-    }
-    return {
-      label: 'label' in metadata ? metadata.label : 'text',
-      content: metadata.content,
-    };
-  }, [metadata]);
-
-  return (
-    <TextClipAttachmentView
-      viewOnly
-      selected={false}
-      node={{ attrs: { id, label, content } }}
-    />
   );
 };
 
@@ -765,13 +741,7 @@ export const AttachmentLinkRouter = ({
           params={linkData.params}
         />
       );
-    case 'textClip':
-      return (
-        <TextClipAttachmentLink
-          id={linkData.id}
-          metadata={attachments[linkData.id]}
-        />
-      );
+
     case 'wsfile': {
       const wsParams = linkData.params ?? {};
       const wsMime = inferMimeType(getBaseName(linkData.filePath));

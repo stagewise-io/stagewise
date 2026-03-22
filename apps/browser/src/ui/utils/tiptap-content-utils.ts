@@ -1,8 +1,5 @@
 import type { JSONContent } from '@tiptap/core';
-import type {
-  Attachment,
-  TextClipAttachment,
-} from '@shared/karton-contracts/ui/agent/metadata';
+import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import type { SelectedElement } from '@shared/selected-elements';
 
 // Why a custom parser instead of TipTap's MarkdownManager?
@@ -27,20 +24,19 @@ import type { SelectedElement } from '@shared/selected-elements';
 
 /**
  * Regex matching attachment link syntax: [optional label](protocol:id)
- * Protocols: path (canonical unified), element, text-clip, mention, slash
+ * Protocols: path (canonical unified), element, mention, slash
  * The label in brackets is optional — empty brackets [] are fine.
  * For path:att/ sub-paths, the id may contain query params.
  * For mention: protocol, the id contains providerType:id (e.g. mention:file:src/foo.ts).
  * For path: protocol, the id is the path remainder (att/<id>, or mount/file, or mount).
  */
 const ATTACHMENT_LINK_RE =
-  /\[([^\]]*)\]\((path|element|text-clip|mention|slash):((?:[^()]|\([^()]*\))+)\)/g;
+  /\[([^\]]*)\]\((path|element|mention|slash):((?:[^()]|\([^()]*\))+)\)/g;
 
 /** Maps attachment link protocol to TipTap node type */
 const PROTOCOL_TO_NODE: Record<string, string> = {
   path: 'attachment', // canonical path: protocol — only att/ sub-paths map to attachment nodes
   element: 'elementAttachment',
-  'text-clip': 'textClipAttachment',
   mention: 'mention',
   slash: 'slash',
 };
@@ -179,14 +175,10 @@ export function enrichTipTapContent(
   content: JSONContent,
   metadata: {
     attachments?: Attachment[];
-    textClipAttachments?: TextClipAttachment[];
     selectedPreviewElements?: SelectedElement[];
   },
 ): JSONContent {
   const fileMap = new Map((metadata.attachments ?? []).map((f) => [f.path, f]));
-  const clipMap = new Map(
-    (metadata.textClipAttachments ?? []).map((c) => [c.id, c]),
-  );
   const elementMap = new Map(
     (metadata.selectedPreviewElements ?? []).map((e) => [e.stagewiseId, e]),
   );
@@ -206,20 +198,6 @@ export function enrichTipTapContent(
           attrs: {
             ...node.attrs,
             label: displayName,
-          },
-        };
-      }
-    }
-
-    if (node.type === 'textClipAttachment' && id) {
-      const clip = clipMap.get(id);
-      if (clip) {
-        return {
-          ...node,
-          attrs: {
-            ...node.attrs,
-            label: clip.label,
-            content: clip.content,
           },
         };
       }
