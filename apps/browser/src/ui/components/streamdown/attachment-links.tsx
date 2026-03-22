@@ -1,4 +1,11 @@
-import { useMemo, useState, useRef, Suspense, type ReactNode } from 'react';
+import {
+  useMemo,
+  useCallback,
+  useState,
+  useRef,
+  Suspense,
+  type ReactNode,
+} from 'react';
 import {
   cn,
   IDE_SELECTION_ITEMS,
@@ -13,7 +20,6 @@ import {
 import { useKartonState } from '@ui/hooks/use-karton';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
-import { usePostHog } from 'posthog-js/react';
 import { IdePickerPopover } from '@ui/components/ide-picker-popover';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 import {
@@ -28,13 +34,74 @@ import {
 import { MentionNodeView } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions';
 import { TabMentionBadge } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/tab-mention-badge';
 import { WorkspaceMentionBadge } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/workspace-mention-badge';
+import { BadgeContainer } from '@ui/screens/main/sidebar/chat/_components/rich-text/shared';
+import { MentionIcon } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/mention-icon';
 import {
   getRenderer,
+  resolveAttachmentBlobUrl,
   type RendererProps,
 } from '@ui/components/attachment-renderers';
 import { inferMimeType } from '@shared/mime-utils';
 import { getBaseName } from '@shared/path-utils';
 import type { SelectedElement } from '@shared/selected-elements';
+import { useMountedPaths } from '@ui/hooks/use-mounted-paths';
+
+// ─── Shared helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Resolves the workspace display name for a mount-prefixed file path.
+ * Returns the folder name of the mount (e.g. "stagewise") or null if
+ * the mount cannot be found.
+ */
+function useWorkspaceName(filePath: string): string | null {
+  const historicalMounts = useMountedPaths();
+  const [openAgentId] = useOpenAgent();
+  const liveMounts = useKartonState((s) =>
+    openAgentId ? (s.toolbox[openAgentId]?.workspace?.mounts ?? null) : null,
+  );
+
+  return useMemo(() => {
+    const slashIdx = filePath.indexOf('/');
+    if (slashIdx <= 0) return null;
+    const prefix = filePath.slice(0, slashIdx);
+    const mounts =
+      (historicalMounts?.length ? historicalMounts : null) ?? liveMounts ?? [];
+    const mount = mounts.find((m) => m.prefix === prefix);
+    if (!mount) return null;
+    return getBaseName(mount.path) || mount.path;
+  }, [filePath, historicalMounts, liveMounts]);
+}
+
+/**
+ * Builds a JS-truncated display label for a workspace file badge.
+ * Tries to keep parent directory context while ensuring the filename
+ * (including extension) is never clipped.
+ */
+function useFileBadgeLabel(strippedPath: string, lineNumber?: string): string {
+  return useMemo(() => {
+    // Try 3 segments first, fall back to fewer if too long for the badge.
+    let truncated = getTruncatedFileUrl(strippedPath, 3, 128);
+    if (truncated.length > 30) {
+      truncated = getTruncatedFileUrl(strippedPath, 2, 128);
+    }
+    if (truncated.length > 30) {
+      truncated = getTruncatedFileUrl(strippedPath, 1, 128);
+    }
+    // If the filename alone is still too long, mid-truncate preserving ext.
+    if (truncated.length > 30) {
+      const dotIdx = truncated.lastIndexOf('.');
+      const base = dotIdx > 0 ? truncated.substring(0, dotIdx) : truncated;
+      const ext = dotIdx > 0 ? truncated.substring(dotIdx) : '';
+      const keep = 30 - ext.length - 1;
+      truncated =
+        keep > 0 ? `${base.substring(0, keep)}\u2026${ext}` : `\u2026${ext}`;
+    }
+    if (lineNumber) return `${truncated}:${lineNumber}`;
+    return truncated || '...';
+  }, [strippedPath, lineNumber]);
+}
+
+// ─── Color badge ─────────────────────────────────────────────────────────────
 
 interface ColorBadgeProps {
   color: string;
@@ -95,6 +162,8 @@ export const ColorBadge = ({ color, children }: ColorBadgeProps) => {
     </Tooltip>
   );
 };
+
+// ─── Link parsing ────────────────────────────────────────────────────────────
 
 /**
  * Parsed attachment link data - discriminated union for type safety.
@@ -382,34 +451,42 @@ export function getAttachmentKey(linkData: AttachmentLinkData): string {
   }
 }
 
-interface WorkspaceFileLinkProps {
-  filePath: string;
-  lineNumber?: string;
-  incomplete?: boolean;
-}
+// ─── Workspace file wrapper (IDE click, tooltip, context menu) ───────────────
 
-export const WorkspaceFileLink = ({
+/**
+ * Wraps any workspace-file badge with IDE-opening click behaviour, context
+ * menu, and tooltip (workspace name + path + IDE hint).
+ *
+ * Shared by both `WorkspaceFileLink` (non-media files) and
+ * `PathFileRendererLink` (images/PDFs) so the IDE-opening UX is identical.
+ */
+const WorkspaceFileClickWrapper = ({
   filePath,
   lineNumber,
   incomplete,
-}: WorkspaceFileLinkProps) => {
-  const _posthog = usePostHog();
+  children,
+}: {
+  filePath: string;
+  lineNumber?: string;
+  incomplete?: boolean;
+  children: ReactNode;
+}) => {
   const [openAgent] = useOpenAgent();
   const openInIdeChoice = useKartonState((s) => s.globalConfig.openFilesInIde);
   const ideName = IDE_SELECTION_ITEMS[openInIdeChoice];
   const { getFileIDEHref, needsIdePicker, pickIdeAndOpen, resolvePath } =
     useFileIDEHref();
+  const wsName = useWorkspaceName(filePath);
 
   const strippedPath = stripMountPrefix(filePath);
-
-  const displayPath = useMemo(() => {
-    return getTruncatedFileUrl(strippedPath, 3, 128);
-  }, [strippedPath]);
-
   const displayPathWithLine = lineNumber
     ? `${strippedPath}:${lineNumber}`
     : strippedPath;
   const pathWithLine = lineNumber ? `${filePath}:${lineNumber}` : filePath;
+
+  const parsedLineNumber = lineNumber
+    ? Number.parseInt(lineNumber, 10)
+    : undefined;
 
   const processedHref = useMemo(() => {
     if (!openAgent) return '';
@@ -421,27 +498,37 @@ export const WorkspaceFileLink = ({
     return href;
   }, [pathWithLine, getFileIDEHref, openAgent]);
 
-  const parsedLineNumber = lineNumber
-    ? Number.parseInt(lineNumber, 10)
-    : undefined;
+  const handleClick = useCallback(() => {
+    if (needsIdePicker) return;
+    if (processedHref) window.open(processedHref, '_blank');
+  }, [needsIdePicker, processedHref]);
 
-  const anchor = (
-    <a
-      href={needsIdePicker ? '#' : processedHref}
-      className={cn(
-        'inline-flex items-center gap-0.5',
-        'font-medium text-primary-foreground text-sm',
-        'hover:text-hover-derived',
-        'break-all',
-        incomplete && 'opacity-70',
-      )}
-      target={needsIdePicker ? undefined : '_blank'}
-      rel="noopener noreferrer"
-      onClick={needsIdePicker ? (e) => e.preventDefault() : undefined}
-    >
-      {displayPath || '...'}
-      {lineNumber && <span className="shrink-0 opacity-70">:{lineNumber}</span>}
-    </a>
+  const wrapped = (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            className={cn('inline cursor-pointer', incomplete && 'opacity-70')}
+            onClick={handleClick}
+            role="link"
+            aria-label={`Open ${displayPathWithLine} in ${ideName}`}
+          >
+            {children}
+          </span>
+        }
+      />
+      <TooltipContent>
+        <div className="flex max-w-96 flex-col gap-1">
+          {wsName && <div className="font-semibold text-xs">{wsName}</div>}
+          <div className="break-all font-mono text-xs">
+            {displayPathWithLine}
+          </div>
+          <div className="text-muted-foreground text-xs">
+            Click to open in {ideName}
+          </div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 
   if (needsIdePicker) {
@@ -456,7 +543,7 @@ export const WorkspaceFileLink = ({
             pickIdeAndOpen(ide, pathWithLine, parsedLineNumber)
           }
         >
-          {anchor}
+          {wrapped}
         </IdePickerPopover>
       </FileContextMenu>
     );
@@ -468,22 +555,57 @@ export const WorkspaceFileLink = ({
       resolvePath={resolvePath}
       lineNumber={parsedLineNumber}
     >
-      <Tooltip>
-        <TooltipTrigger>{anchor}</TooltipTrigger>
-        <TooltipContent>
-          <div className="flex max-w-96 flex-col gap-1">
-            <div className="break-all font-mono text-xs">
-              {displayPathWithLine}
-            </div>
-            <div className="text-muted-foreground text-xs">
-              Click to open in {ideName}
-            </div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
+      {wrapped}
     </FileContextMenu>
   );
 };
+
+// ─── Non-media workspace file badge ──────────────────────────────────────────
+
+interface WorkspaceFileLinkProps {
+  filePath: string;
+  lineNumber?: string;
+  incomplete?: boolean;
+}
+
+/**
+ * Badge for non-media workspace files (`.ts`, `.json`, etc.).
+ * Renders a file-icon badge with a JS-truncated path label.
+ * IDE-opening, tooltip, and context menu are handled by
+ * `WorkspaceFileClickWrapper`.
+ */
+export const WorkspaceFileLink = ({
+  filePath,
+  lineNumber,
+  incomplete,
+}: WorkspaceFileLinkProps) => {
+  const strippedPath = stripMountPrefix(filePath);
+  const displayLabel = useFileBadgeLabel(strippedPath, lineNumber);
+
+  return (
+    <WorkspaceFileClickWrapper
+      filePath={filePath}
+      lineNumber={lineNumber}
+      incomplete={incomplete}
+    >
+      <span className="inline shrink-0 px-0.5 pt-px">
+        <BadgeContainer className="cursor-pointer">
+          <span className="text-foreground" aria-hidden>
+            <MentionIcon providerType="file" id={filePath} />
+          </span>
+          <span
+            className="whitespace-nowrap font-medium text-xs leading-none"
+            aria-hidden
+          >
+            {displayLabel}
+          </span>
+        </BadgeContainer>
+      </span>
+    </WorkspaceFileClickWrapper>
+  );
+};
+
+// ─── Element & text-clip badges ──────────────────────────────────────────────
 
 interface AttachmentLinkBaseProps {
   id: string;
@@ -532,6 +654,8 @@ const TextClipAttachmentLink = ({ id, metadata }: AttachmentLinkBaseProps) => {
   );
 };
 
+// ─── Unified file renderer (att/ + workspace paths) ──────────────────────────
+
 /**
  * Unified file renderer for both attachment (`att/<filename>`) and workspace
  * (`<mountPrefix>/<relativePath>`) file paths.
@@ -544,6 +668,9 @@ const TextClipAttachmentLink = ({ id, metadata }: AttachmentLinkBaseProps) => {
  * When `params.display === 'expanded'` and the renderer has an Expanded
  * variant (image/*, video/*), renders the full preview; otherwise renders
  * the compact inline badge.
+ *
+ * Workspace paths are automatically wrapped with `WorkspaceFileClickWrapper`
+ * for IDE-opening behaviour.
  */
 const PathFileRendererLink = ({
   path,
@@ -560,21 +687,14 @@ const PathFileRendererLink = ({
   const fileName = getBaseName(path) || path;
   const mediaType = inferMimeType(fileName);
 
-  const blobUrl = useMemo(() => {
-    if (isAtt) {
-      const id = path.slice('att/'.length);
-      return openAgent ? `attachment://${openAgent}/${id}` : '';
-    }
-    // workspace file: split at first slash → mountPrefix / relativePath
-    const slashIdx = path.indexOf('/');
-    if (slashIdx <= 0) return '';
-    const mountPrefix = path.slice(0, slashIdx);
-    const relativePath = path.slice(slashIdx + 1);
-    return `workspace://${mountPrefix}/${encodeURIComponent(relativePath)}`;
-  }, [isAtt, path, openAgent]);
+  const blobUrl = useMemo(
+    () => resolveAttachmentBlobUrl(path, openAgent),
+    [path, openAgent],
+  );
 
   // For att/ paths, look up originalFileName from attachment metadata for
-  // human-readable badge display. For workspace paths the basename is used.
+  // human-readable badge display. For workspace paths the basename is used;
+  // truncateLabel (in BadgeShell) handles length capping.
   const id = isAtt ? path.slice('att/'.length) : path;
   const metadata = attachments[path];
   const displayFileName =
@@ -596,15 +716,30 @@ const PathFileRendererLink = ({
     sizeBytes,
   };
 
+  let content: ReactNode;
   if (isExpanded && renderer.Expanded) {
-    return (
+    content = (
       <Suspense fallback={<renderer.Badge {...rendererProps} viewOnly />}>
         <renderer.Expanded {...rendererProps} />
       </Suspense>
     );
+  } else {
+    content = <renderer.Badge {...rendererProps} viewOnly />;
   }
-  return <renderer.Badge {...rendererProps} viewOnly />;
+
+  // Workspace files get IDE-opening click + context menu + tooltip.
+  if (!isAtt) {
+    return (
+      <WorkspaceFileClickWrapper filePath={path}>
+        {content}
+      </WorkspaceFileClickWrapper>
+    );
+  }
+
+  return content;
 };
+
+// ─── Router ──────────────────────────────────────────────────────────────────
 
 interface AttachmentLinkRouterProps {
   linkData: AttachmentLinkData;
@@ -639,7 +774,13 @@ export const AttachmentLinkRouter = ({
       );
     case 'wsfile': {
       const wsParams = linkData.params ?? {};
-      if (wsParams.display === 'expanded' && !linkData.incomplete) {
+      const wsMime = inferMimeType(getBaseName(linkData.filePath));
+      const isPreviewable =
+        wsMime.startsWith('image/') || wsMime === 'application/pdf';
+      // Previewable files (images, PDFs) use PathFileRendererLink so they
+      // get the same thumbnail badge + hover preview as user-attached files.
+      // PathFileRendererLink already resolves workspace:// URLs.
+      if (isPreviewable && !linkData.incomplete) {
         return (
           <PathFileRendererLink path={linkData.filePath} params={wsParams} />
         );

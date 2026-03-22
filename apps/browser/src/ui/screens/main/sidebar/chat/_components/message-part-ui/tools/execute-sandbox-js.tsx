@@ -20,6 +20,7 @@ import { getSandboxLabel } from './utils/sandbox-label-utils';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import {
   getRenderer,
+  resolveAttachmentBlobUrl,
   type RendererProps,
 } from '@ui/components/attachment-renderers';
 import { Suspense } from 'react';
@@ -403,15 +404,14 @@ const AttachmentPreviewCards = ({
   return (
     <div className="scrollbar-hover-only flex flex-row gap-2 overflow-x-auto px-1 py-2 [&_embed]:max-h-38 [&_img]:max-h-38 [&_video]:max-h-38">
       {attachments.map((att) => {
-        const isAtt = att.path.startsWith('att/');
-        const blobKey = isAtt ? att.path.slice(4) : att.path;
+        const blobKey = att.path.startsWith('att/')
+          ? att.path.slice(4)
+          : att.path;
         const displayName =
           att.originalFileName ?? blobKey.split('/').pop() ?? blobKey;
         const mediaType = inferMimeType(displayName);
         const renderer = getRenderer(mediaType);
-        const blobUrl = openAgentId
-          ? `attachment://${openAgentId}/${blobKey}`
-          : '';
+        const blobUrl = resolveAttachmentBlobUrl(att.path, openAgentId);
         const rendererProps: RendererProps = {
           attachmentId: blobKey,
           mediaType,

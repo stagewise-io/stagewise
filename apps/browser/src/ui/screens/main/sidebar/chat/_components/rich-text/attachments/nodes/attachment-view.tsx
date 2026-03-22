@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 import type { InlineNodeViewProps } from '../../shared/types';
-import { getRenderer } from '@ui/components/attachment-renderers';
+import {
+  getRenderer,
+  resolveAttachmentBlobUrl,
+} from '@ui/components/attachment-renderers';
 import type { BadgeProps } from '@ui/components/attachment-renderers';
 import { useMessageAttachments } from '@ui/hooks/use-message-elements';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -35,22 +38,7 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
       ? (attrs.id.slice(4).split('/').pop() ?? attrs.id)
       : (attrs.id.split('/').pop() ?? attrs.id));
   const mediaType = inferMimeType(displayName);
-  const isAtt = attrs.id.startsWith('att/');
-  // att/ paths live in the agent's blob store → attachment:// protocol.
-  // Workspace paths (w1/...) live on disk → workspace:// protocol.
-  const blobUrl = (() => {
-    if (isAtt) {
-      return openAgent ? `attachment://${openAgent}/${attrs.id.slice(4)}` : '';
-    }
-    // workspace path: "w1/src/image.png" → workspace://w1/src/image.png
-    const slashIdx = attrs.id.indexOf('/');
-    if (slashIdx > 0) {
-      const mountPrefix = attrs.id.slice(0, slashIdx);
-      const relativePath = attrs.id.slice(slashIdx + 1);
-      return `workspace://${mountPrefix}/${relativePath}`;
-    }
-    return '';
-  })();
+  const blobUrl = resolveAttachmentBlobUrl(attrs.id, openAgent);
 
   const renderer = getRenderer(mediaType);
 
