@@ -1474,6 +1474,7 @@ export abstract class BaseAgent<
             agent_type: this.agentType,
             model_id: this.state.get().activeModelId,
             provider_mode: this._stepProviderMode,
+            plan: parsedError.plan ?? 'unknown',
             window_types: sortedWindows.map((w) => w.type),
             first_window_resets_at: sortedWindows[0]?.resetsAt ?? '',
             exceeded_window_count: sortedWindows.length,
@@ -2329,9 +2330,12 @@ export abstract class BaseAgent<
             type: w.type,
             resetsAt: w.resetsAt,
           })) ?? [];
+      const plan =
+        typeof body.details?.plan === 'string' ? body.details.plan : undefined;
       return {
         kind: 'plan-limit-exceeded',
         message: body.message ?? 'Usage limit exceeded',
+        plan,
         exceededWindows,
       };
     } catch {

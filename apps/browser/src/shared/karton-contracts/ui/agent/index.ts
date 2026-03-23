@@ -26,6 +26,7 @@ export type AgentRuntimeError =
   | {
       kind: 'plan-limit-exceeded';
       message: string;
+      plan?: string;
       exceededWindows: ExceededWindow[];
     };
 

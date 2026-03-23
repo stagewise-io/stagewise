@@ -78,6 +78,7 @@ export type EventProperties = {
     agent_type: string;
     model_id: string;
     provider_mode: string;
+    plan: string;
     window_types: string[];
     first_window_resets_at: string;
     exceeded_window_count: number;
