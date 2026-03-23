@@ -31,7 +31,7 @@ export interface CreateAttachmentNodeConfig<TAttrs extends object = object> {
   name: string;
   /** The data attribute used to identify this node type in HTML (e.g., 'data-file-attachment') */
   dataTag: string;
-  /** The markdown protocol prefix (e.g., 'path', 'element') */
+  /** The markdown protocol prefix (e.g., 'path') */
   markdownProtocol: string;
   /** Additional attributes specific to this attachment type */
   additionalAttributes?: {
@@ -230,14 +230,21 @@ export function createAttachmentNode<TAttrs extends object = object>(
 
             // Collect attachment nodes from old and new states
             // We track ALL attachment node types to properly detect deletions
-            const oldNodes = new Map<string, AttachmentType>();
+            const oldNodes = new Map<
+              string,
+              { type: AttachmentType; attrs: Record<string, unknown> }
+            >();
             oldState.doc.descendants((node) => {
               if (ALL_ATTACHMENT_NODE_NAMES.includes(node.type.name as never)) {
                 const type =
                   NODE_NAME_TO_TYPE[
                     node.type.name as keyof typeof NODE_NAME_TO_TYPE
                   ];
-                if (type) oldNodes.set(node.attrs.id, type);
+                if (type)
+                  oldNodes.set(node.attrs.id, {
+                    type,
+                    attrs: node.attrs as Record<string, unknown>,
+                  });
               }
             });
 
@@ -250,8 +257,8 @@ export function createAttachmentNode<TAttrs extends object = object>(
             // Fire callback for nodes that existed in old state but not in new state
             // Only fire once per deletion (use thisNodeName to ensure single callback)
             if (thisNodeName === ALL_ATTACHMENT_NODE_NAMES[0])
-              oldNodes.forEach((type, id) => {
-                if (!newNodeIds.has(id)) onNodeDeleted(id, type);
+              oldNodes.forEach(({ type, attrs }, id) => {
+                if (!newNodeIds.has(id)) onNodeDeleted(id, type, attrs);
               });
 
             return null; // Don't modify the transaction

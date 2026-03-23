@@ -6,7 +6,14 @@ import { queryAllProviders } from './providers';
 import type { MentionContext } from './providers/types';
 import type { ResolvedMentionItem } from './types';
 
-const MENTION_PROTOCOL = 'mention';
+/**
+ * Serialises a mention node to the canonical link syntax.
+ * File & workspace mentions use `path:`, tab mentions use `tab:`.
+ */
+function mentionToMarkdown(providerType: string, id: string): string {
+  const protocol = providerType === 'tab' ? 'tab' : 'path';
+  return `[](${protocol}:${id})`;
+}
 
 /**
  * Module-level ref holding the latest MentionContext.
@@ -60,31 +67,44 @@ export const MentionExtension = Mention.extend({
   },
 
   renderText({ node }) {
-    return `[${node.attrs.label ?? node.attrs.id}](mention:${node.attrs.providerType}:${node.attrs.id})`;
+    return mentionToMarkdown(node.attrs.providerType, node.attrs.id);
   },
 
   renderMarkdown(node: any) {
-    return `[${node.attrs.label ?? node.attrs.id}](${MENTION_PROTOCOL}:${node.attrs.providerType}:${node.attrs.id})`;
+    return mentionToMarkdown(node.attrs.providerType, node.attrs.id);
   },
 
   markdownTokenizer: {
     name: 'mention',
     level: 'inline' as const,
     start(src: string) {
-      return src.match(/\[[^\]]*\]\(mention:/)?.index ?? -1;
+      // Match both legacy `mention:` and canonical `path:`/`tab:` protocols
+      return src.match(/\[(?:[^\]]*)\]\((?:mention:|path:|tab:)/)?.index ?? -1;
     },
     tokenize(src: string) {
-      const match = src.match(
+      // Legacy: [label](mention:providerType:id)
+      const legacyMatch = src.match(
         /^\[([^\]]*)\]\(mention:([^:)]+):((?:[^()]|\([^()]*\))+)\)/,
       );
-      if (!match) return undefined;
-      return {
-        type: 'mention',
-        raw: match[0],
-        label: match[1],
-        providerType: match[2],
-        id: match[3],
-      };
+      if (legacyMatch) {
+        return {
+          type: 'mention',
+          raw: legacyMatch[0],
+          providerType: legacyMatch[2],
+          id: legacyMatch[3],
+        };
+      }
+      // Canonical tab: [](tab:id)
+      const tabMatch = src.match(/^\[\]\(tab:((?:[^()]|\([^()]*\))+)\)/);
+      if (tabMatch) {
+        return {
+          type: 'mention',
+          raw: tabMatch[0],
+          providerType: 'tab',
+          id: tabMatch[1],
+        };
+      }
+      return undefined;
     },
   },
 
@@ -93,7 +113,7 @@ export const MentionExtension = Mention.extend({
       type: 'mention',
       attrs: {
         id: token.id,
-        label: token.label || token.id,
+        label: token.id,
         providerType: token.providerType,
       },
     };

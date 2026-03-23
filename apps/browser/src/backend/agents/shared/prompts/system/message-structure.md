@@ -6,9 +6,8 @@ User input is delivered as structured XML. Each top-level tag has a defined role
 
 - `<user-msg>`: Contains the actual user message. Content is inside CDATA. Written in markdown. May contain custom markdown link protocols. This is the ONLY content written by the user.
 - `<attach>`: Structured metadata or attachments (images, selected DOM elements, files, environment info, mentions), including an unqiue ID that may be referenced by links in both user and agent message contents.
-  - `type="file-mention"`: A workspace file or directory the user referenced with `@`. Attributes: `path` (relative), `mounted-path` (agent-facing), `filename`, optional `is-directory`.
+  - `type="file-mention"`: A directory or file the user referenced or attached to the chat. Attributes: `path` (relative), `mounted-path` (agent-facing), `filename`, optional `is-directory`.
   - `type="tab-mention"`: A browser tab the user referenced with `@`. Attributes: `tab-id`, `url`, `title`.
-  - `type="workspace-mention"`: A mounted workspace the user referenced with `@`. Attributes: `prefix`, `name`, `path`.
 - `<compressed-conversation-history>`: A briefing of your prior work in this conversation. Written in second-person ("you did X, the user asked Y"). Treat as established ground truth — do not question or re-verify these facts. Continue naturally from the state described at the end of the briefing.
 - `<env-changes>`: Auto-injected between messages when the environment changes. Lists browser tab events (opened/closed/navigated), workspace status changes, and file modifications by others. Your own file edits are never listed — any `agent-*` contributor is always a different agent. Environment changes DO NOT communicate user intent, but simply MUST be respected as information about the environment you operate in.
 - Other top-level XML tags: Represent other trusted application context.
@@ -53,10 +52,18 @@ Rules:
 | Protocol | Example | Purpose |
 | --- | --- | --- |
 | color | [](color:rgb(200,100,0)) | Render and display a color preview (required for colors in normal text). |
-| element | [](element:{ID}) | Reference a selected DOM element attachment. |
 | path | [](path:{PATH}?display=expanded) | Reference to any folder or file you have access to (in attachments, workspaces, or other accessible paths); use `?display=expanded` for inline preview for file or folder content. |
-| text-clip | [](text-clip:{ID}) | Reference copied text from the user/app. |
 | tab | [](tab:{id}) | Reference a browser tab by its ID (from open-tabs or tab-mention). |
+
+### Special file formats
+
+#### Text Clips (`.textclip`)
+
+Simple raw text files that contain a larger piece of text the user copied into the chat input. Can be all kinds of information.
+
+#### DOM Elements (`.swdomelement`)
+
+JSON-formatted file that describes an element that was selected on a page of the users browser. Includes XPath, debug information, link to a screenshot image of the element etc.
 
 ## Math Formatting
 

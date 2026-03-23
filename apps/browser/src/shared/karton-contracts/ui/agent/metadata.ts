@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { selectedElementSchema } from '../../../selected-elements';
 import { environmentDiffSnapshotSchema } from '../shared-types';
 
 /**
@@ -27,12 +26,15 @@ export const attachmentSchema = z.object({
   originalFileName: z.string().optional(),
 });
 
-export type Attachment = z.infer<typeof attachmentSchema>;
+export type AttachmentMetadata = z.infer<typeof attachmentSchema>;
 
-/** @deprecated Use {@link Attachment} instead. Legacy alias kept for migration compatibility. */
+/** @deprecated Use {@link AttachmentMetadata} instead. Legacy alias kept for backend compat. */
+export type Attachment = AttachmentMetadata;
+
+/** @deprecated Use {@link AttachmentMetadata} instead. Legacy alias kept for migration compatibility. */
 export const fileAttachmentSchema = attachmentSchema;
-/** @deprecated Use {@link Attachment} instead. Legacy alias kept for migration compatibility. */
-export type FileAttachment = Attachment;
+/** @deprecated Use {@link AttachmentMetadata} instead. Legacy alias kept for migration compatibility. */
+export type FileAttachment = AttachmentMetadata;
 
 /**
  * @deprecated Legacy schema for text clip attachments. New pastes create
@@ -280,7 +282,6 @@ const metadataSchema = z.object({
       .object({ startedAt: z.date().optional(), endedAt: z.date().optional() })
       .optional(),
   ), // Metadata for each part of the message - indexed accordingly
-  selectedPreviewElements: z.array(selectedElementSchema).optional(),
   /** Text clip attachments - collapsed long text pasted by user */
   textClipAttachments: z.array(textClipAttachmentSchema).optional(),
   /** Compressed history of the agent in markdown format. Contains information about the whole previous conversation. */

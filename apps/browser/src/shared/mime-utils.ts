@@ -32,6 +32,8 @@ const MIME_MAP: Record<string, string> = {
   pdf: 'application/pdf',
   // Text clips (collapsed pasted text)
   textclip: 'text/x-textclip',
+  // DOM element snapshots (selected elements)
+  swdomelement: 'application/x-swdomelement',
   // Fonts
   ttf: 'font/ttf',
   otf: 'font/otf',

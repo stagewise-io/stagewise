@@ -1,6 +1,5 @@
 import posthog from 'posthog-js';
 import type { UserMessageMetadata } from '@shared/karton-contracts/ui';
-import type { SelectedElement } from '@shared/selected-elements';
 
 import { extractMentionsFromTiptapContent } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions';
 
@@ -51,7 +50,6 @@ export async function fileToDataUrl(file: File): Promise<string> {
 }
 
 export const collectUserMessageMetadata = (
-  selectedElements: SelectedElement[],
   tiptapContent?: Content,
 ): UserMessageMetadata => {
   const mentions = extractMentionsFromTiptapContent(tiptapContent);
@@ -59,7 +57,6 @@ export const collectUserMessageMetadata = (
   return {
     createdAt: new Date(),
     partsMetadata: [],
-    selectedPreviewElements: selectedElements,
     mentions: mentions.length > 0 ? mentions : undefined,
   };
 };

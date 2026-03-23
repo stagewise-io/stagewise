@@ -1,5 +1,8 @@
 import { useKartonState } from '@ui/hooks/use-karton';
-import type { UserMessageMetadata } from '@shared/karton-contracts/ui/agent/metadata';
+import type {
+  UserMessageMetadata,
+  AttachmentMetadata,
+} from '@shared/karton-contracts/ui/agent/metadata';
 import {
   useMemo,
   useState,
@@ -107,7 +110,7 @@ const PartContent = ({
   thinkingDuration?: number;
   isLastPart?: boolean;
   capMaxHeight?: boolean;
-  messageAttachments?: import('@shared/karton-contracts/ui/agent/metadata').Attachment[];
+  messageAttachments?: AttachmentMetadata[];
 }) => {
   switch (part.type) {
     case 'reasoning':
@@ -239,7 +242,7 @@ export const ExploringToolParts = ({
   /** Original indices in msg.parts for each part, used for correct metadata lookup */
   originalIndices: number[];
   /** Attachments from the parent assistant message metadata */
-  messageAttachments?: import('@shared/karton-contracts/ui/agent/metadata').Attachment[];
+  messageAttachments?: AttachmentMetadata[];
 }) => {
   const [expanded, setExpanded] = useState(isAutoExpanded);
   const [expandedChildren, setExpandedChildren] = useState<Set<string>>(

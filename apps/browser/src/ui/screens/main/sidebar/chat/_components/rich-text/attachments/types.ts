@@ -8,7 +8,21 @@ export interface AttachmentAttrs extends BaseNodeAttrs {}
 /**
  * Attributes for selected element attachments.
  */
-export interface ElementAttachmentAttrs extends BaseNodeAttrs {}
+export interface ElementAttachmentAttrs extends BaseNodeAttrs {
+  /** Truncated inner text of the element (first ~60 chars) for display */
+  innerText?: string;
+  /** Blob key for the element screenshot (stored in att/) */
+  screenshotBlobKey?: string;
+  /** The tag name of the element (e.g. 'div', 'button') */
+  tagName?: string;
+  /**
+   * Full `att/<blobKey>` path to the stored `.swdomelement` file.
+   * Set asynchronously after the blob is written. When present,
+   * `renderText` emits `[](path:<blobPath>)` so the model and
+   * streamdown layer can locate the element data.
+   */
+  blobPath?: string;
+}
 
 /**
  * Union type for all attachment attributes with type discriminator.
@@ -55,5 +69,9 @@ export const ALL_ATTACHMENT_NODE_NAMES = Object.values(
  */
 export interface AttachmentNodeOptions {
   /** Called when an attachment node is removed from the document */
-  onNodeDeleted?: (id: string, type: AttachmentType) => void;
+  onNodeDeleted?: (
+    id: string,
+    type: AttachmentType,
+    attrs?: Record<string, unknown>,
+  ) => void;
 }

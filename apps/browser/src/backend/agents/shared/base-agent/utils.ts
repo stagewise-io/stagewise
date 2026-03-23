@@ -15,7 +15,7 @@ import type {
   FullEnvironmentSnapshot,
 } from '@shared/karton-contracts/ui/agent/metadata';
 import { inferMimeType } from '@shared/mime-utils';
-import type { SelectedElement } from '@shared/selected-elements';
+
 import {
   computeAllEnvironmentChanges,
   renderEnvironmentChangesXml,
@@ -27,10 +27,7 @@ import {
 } from '../prompts/system/environment-renderer';
 import type { SkillInfo } from '../prompts/system/skills';
 import { deepMergeProviderOptions } from '@/agents/model-provider';
-import {
-  relevantCodebaseFilesToContextSnippet,
-  selectedElementToContextSnippet,
-} from '../prompts/utils/metadata-converter/html-elements';
+
 import { mentionToContextSnippet } from '../prompts/utils/metadata-converter/mentions';
 import {
   extractSlashIdsFromText,
@@ -90,10 +87,13 @@ function formatMB(bytes: number): string {
 }
 
 /**
- * Read a `.textclip` attachment and return it as an XML-wrapped TextPart.
+ * Read a text-based blob attachment and return it as an XML-wrapped TextPart.
+ * Used for `.textclip` and `.swdomelement` files — both are UTF-8 text stored
+ * as blobs that need to be read and inlined in the prompt.
+ *
  * Shared by both `buildAttachmentContextMessage` and `convertUserMessage`.
  */
-async function readTextClipAsTextPart(
+async function readTextBlobAsTextPart(
   agentInstanceId: string,
   blobReader: BlobReader,
   filePath: string,
@@ -114,7 +114,7 @@ async function readTextClipAsTextPart(
     type: 'text',
     text: xml({
       [specialTokens.userMsgAttachmentXmlTag]: {
-        _attr: { type: 'text-clip', id: filePath },
+        _attr: { filePath: filePath },
         _cdata: textContent,
       },
     }),
@@ -314,9 +314,13 @@ async function buildAttachmentContextMessage(
     const displayName = f.originalFileName ?? f.path.split('/').pop() ?? f.path;
     const mimeType = inferMimeType(displayName);
 
-    // .textclip files are plain text — inline directly.
-    if (mimeType === 'text/x-textclip') {
-      const part = await readTextClipAsTextPart(
+    // Text-based blob attachments (textclip, swdomelement) — read and
+    // inline as CDATA-wrapped XML. No modality check needed.
+    if (
+      mimeType === 'text/x-textclip' ||
+      mimeType === 'application/x-swdomelement'
+    ) {
+      const part = await readTextBlobAsTextPart(
         agentInstanceId,
         blobReader,
         f.path,
@@ -821,10 +825,13 @@ async function convertUserMessage(
 
       const mimeType = inferMimeType(displayName);
 
-      // .textclip files are plain text — inline them directly as text parts.
-      // Every model supports raw text, so no modality check is needed.
-      if (mimeType === 'text/x-textclip') {
-        const part = await readTextClipAsTextPart(
+      // Text-based blob attachments (textclip, swdomelement) — read and
+      // inline as CDATA-wrapped XML. No modality check needed.
+      if (
+        mimeType === 'text/x-textclip' ||
+        mimeType === 'application/x-swdomelement'
+      ) {
+        const part = await readTextBlobAsTextPart(
           agentInstanceId,
           blobReader,
           f.path,
@@ -980,24 +987,6 @@ async function convertUserMessage(
     message.metadata.mentions.forEach((mention) => {
       attachmentParts.push(mentionToContextSnippet(mention));
     });
-
-  if (
-    message.metadata?.selectedPreviewElements &&
-    message.metadata.selectedPreviewElements.length > 0
-  ) {
-    message.metadata.selectedPreviewElements.slice(0, 5).forEach((element) => {
-      attachmentParts.push(
-        selectedElementToContextSnippet(element as SelectedElement),
-      );
-    });
-
-    attachmentParts.push(
-      relevantCodebaseFilesToContextSnippet(
-        (message.metadata?.selectedPreviewElements ?? []) as SelectedElement[],
-        6,
-      ),
-    );
-  }
 
   if (attachmentParts.length > 0) {
     (converted.content as (TextPart | ImagePart | FilePart)[]).push({

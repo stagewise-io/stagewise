@@ -1,12 +1,12 @@
 import { init } from '@paralleldrive/cuid2';
 
-const createId = init({ length: 6 });
+const createId = init({ length: 8 });
 
 /**
  * Generates a sanitized, collision-resistant filename for an attachment stored
  * in the `att/` (data-attachments) directory.
  *
- * Format: `{sanitized_prefix}_{6-char-cuid2}.{ext}`
+ * Format: `{sanitized_prefix}_{8-char-cuid2}.{ext}`
  *
  * Rules:
  * 1. Take original filename (without extension)
@@ -15,14 +15,14 @@ const createId = init({ length: 6 });
  * 4. Lowercase
  * 5. Truncate to first 10 characters
  * 6. If empty after sanitization (e.g. unicode-only), fall back to `"file"`
- * 7. Append `_` + 6-character CUID2
+ * 7. Append `_` + 8-character CUID2
  * 8. Append `.` + original file extension (lowercased), if present
  *
  * Examples:
- *   `My Screenshot (2).png` → `my_screens_a8kt2m.png`
- *   `数据.csv`              → `file_b3xb9p.csv`
- *   `Makefile`              → `makefile_x9m3pq`  (no extension)
- *   `app.config.ts`         → `app_confi_k7b2nm.ts`
+ *   `My Screenshot (2).png` → `my_screens_a8kt2m1x.png`
+ *   `数据.csv`              → `file_b3xb9p2y.csv`
+ *   `Makefile`              → `makefile_x9m3pq4z`  (no extension)
+ *   `app.config.ts`         → `app_confi_k7b2nm9w.ts`
  *
  * @param originalFilename  - The original filename (basename + extension) from
  *                            the uploaded file or a synthesized name.

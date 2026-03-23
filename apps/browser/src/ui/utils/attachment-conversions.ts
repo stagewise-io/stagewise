@@ -1,6 +1,6 @@
 import type { SelectedElement } from '@shared/selected-elements';
 import { generateId } from '@ui/utils';
-import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
+import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 import type { AttachmentAttributes } from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
 
 /**
@@ -8,7 +8,7 @@ import type { AttachmentAttributes } from '@ui/screens/main/sidebar/chat/_compon
  * The TipTap node stores `id` = path and `label` = display name.
  */
 export function attachmentToAttachmentAttributes(
-  attachment: Attachment,
+  attachment: AttachmentMetadata,
 ): AttachmentAttributes {
   const displayName =
     attachment.originalFileName ??
@@ -21,6 +21,8 @@ export function attachmentToAttachmentAttributes(
   };
 }
 
+const MAX_INNER_TEXT_ATTR = 60;
+
 /**
  * Convert a SelectedElement to AttachmentAttributes for TipTap editor insertion.
  */
@@ -30,10 +32,13 @@ export function selectedElementToAttachmentAttributes(
   const tagName = (element.nodeType || element.tagName).toLowerCase();
   const domId = element.attributes?.id ? `#${element.attributes.id}` : '';
   const label = `${tagName}${domId}`;
+  const trimmedText = element.innerText?.trim().slice(0, MAX_INNER_TEXT_ATTR);
 
   return {
     id: element.stagewiseId ?? generateId(),
     type: 'element',
     label,
+    innerText: trimmedText || undefined,
+    tagName,
   };
 }
