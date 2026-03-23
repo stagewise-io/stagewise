@@ -71,18 +71,26 @@ function deriveSidePanel(
 
   if (item.providerType === 'file') {
     const meta = (item as FileMentionItem).meta;
-    if (meta.isDirectory) return null;
+    const mount = mounts.find((m) => m.prefix === meta.mountPrefix);
+    const workspaceName = mount
+      ? getBaseName(mount.path) || mount.path
+      : meta.mountPrefix;
+
+    if (meta.isDirectory) {
+      return {
+        type: 'file-path',
+        key: `file-path:${meta.mountedPath}`,
+        workspaceName,
+        relativePath: meta.relativePath,
+        fileName: meta.fileName,
+      };
+    }
 
     const entry = getFilePreviewForFile(meta.fileName);
     const mime = inferMimeType(meta.fileName);
 
     if (!entry.variants.expanded || entry.id === 'video') {
       // Code files / unsupported previews → show path tree
-      const mount = mounts.find((m) => m.prefix === meta.mountPrefix);
-      const workspaceName = mount
-        ? getBaseName(mount.path) || mount.path
-        : meta.mountPrefix;
-
       return {
         type: 'file-path',
         key: `file-path:${meta.mountedPath}`,
