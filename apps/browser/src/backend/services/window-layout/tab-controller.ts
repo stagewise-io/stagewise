@@ -909,7 +909,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
    */
   public async captureElementScreenshot(
     boundingRect: { top: number; left: number; width: number; height: number },
-    padding = 50,
+    padding = 20,
     isMainFrame = true,
     frameId?: string,
   ): Promise<string | null> {

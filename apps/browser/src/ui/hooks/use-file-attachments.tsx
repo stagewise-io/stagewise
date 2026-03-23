@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { attachmentToAttachmentAttributes } from '@ui/utils/attachment-conversions';
 import type {
-  Attachment,
+  AttachmentMetadata,
   Mount,
 } from '@shared/karton-contracts/ui/agent/metadata';
 import type { ChatInputHandle } from '@ui/screens/main/sidebar/chat/_components/chat-input';
@@ -76,15 +76,15 @@ export interface UseFileAttachmentsOptions {
 
 export interface UseFileAttachmentsReturn {
   /** Current attachments */
-  attachments: Attachment[];
+  attachments: AttachmentMetadata[];
   /** Add a file attachment, returns the created attachment */
-  addFileAttachment: (file: File) => Promise<Attachment>;
+  addFileAttachment: (file: File) => Promise<AttachmentMetadata>;
   /** Remove an attachment by path */
   removeAttachment: (path: string) => void;
   /** Clear all attachments */
   clearAttachments: () => void;
   /** Direct state setter for advanced use cases (e.g., restoring from message) */
-  setAttachments: Dispatch<SetStateAction<Attachment[]>>;
+  setAttachments: Dispatch<SetStateAction<AttachmentMetadata[]>>;
 }
 
 /**
@@ -101,7 +101,7 @@ export function useFileAttachments(
 ): UseFileAttachmentsReturn {
   const { chatInputRef, insertIntoEditor = true, agentId } = options;
 
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentMetadata[]>([]);
   const storeAttachment = useKartonProcedure((p) => p.agents.storeAttachment);
   const storeAttachmentByPath = useKartonProcedure(
     (p) => p.agents.storeAttachmentByPath,
@@ -112,7 +112,7 @@ export function useFileAttachments(
   );
 
   const addFileAttachment = useCallback(
-    async (file: File): Promise<Attachment> => {
+    async (file: File): Promise<AttachmentMetadata> => {
       const mediaType = file.type || 'application/octet-stream';
       // Only store a meaningful originalFileName. Clipboard pastes in Electron
       // produce a generic name like "image.png" or "blob"; fall back to a
@@ -129,7 +129,7 @@ export function useFileAttachments(
         // No agent yet — create a placeholder. path is set to the original name
         // as a best-effort key; the file is not stored on disk.
         // This path is uncommon; callers should always provide agentId.
-        const placeholder: Attachment = {
+        const placeholder: AttachmentMetadata = {
           path: originalFileName,
           originalFileName,
         };
@@ -149,7 +149,7 @@ export function useFileAttachments(
       if (filePath) {
         const wsPath = tryResolveWorkspacePath(filePath, mounts);
         if (wsPath) {
-          const attachment: Attachment = { path: wsPath };
+          const attachment: AttachmentMetadata = { path: wsPath };
           setAttachments((prev) => [...prev, attachment]);
           if (insertIntoEditor && chatInputRef?.current) {
             chatInputRef.current.insertAttachment(
@@ -193,7 +193,7 @@ export function useFileAttachments(
         return originalFileName;
       });
 
-      const attachment: Attachment = {
+      const attachment: AttachmentMetadata = {
         path: `att/${blobKey}`,
         originalFileName,
       };

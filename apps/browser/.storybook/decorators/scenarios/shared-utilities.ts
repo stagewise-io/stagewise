@@ -175,7 +175,6 @@ export function createUserMessage(
     metadata: {
       createdAt: new Date(),
       partsMetadata: [],
-      selectedPreviewElements: options?.selectedElements || [],
     },
   };
 }

@@ -333,11 +333,6 @@ const estimateMetadataChars = (
       chars += safeStringifyLength(metadata.mentions);
     }
 
-    // Selected DOM elements
-    if (metadata.selectedPreviewElements) {
-      chars += safeStringifyLength(metadata.selectedPreviewElements);
-    }
-
     // File attachment metadata (not the binary content, just the XML hints)
     if (metadata.attachments) {
       // ~100 chars per attachment for the XML hint tag

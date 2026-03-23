@@ -1,20 +1,11 @@
 import { type ReactNode, createContext, useContext, useMemo } from 'react';
 
-import type {
-  Attachment,
-  UserMessageMetadata,
-} from '@shared/karton-contracts/ui/agent/metadata';
+import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
+export type { AttachmentMetadata };
 
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 
 type AttachmentId = string;
-
-// Use the actual type from metadata for selected elements (inferred from schema)
-type SelectedPreviewElement = NonNullable<
-  UserMessageMetadata['selectedPreviewElements']
->[number];
-
-export type AttachmentMetadata = SelectedPreviewElement | Attachment;
 
 interface AttachmentMetadataContextValue {
   attachmentMetadata: Record<AttachmentId, AttachmentMetadata>;
@@ -39,10 +30,6 @@ export const AttachmentMetadataProvider = ({
       // Collect attachments — keyed by path
       message.metadata?.attachments?.forEach((f) => {
         record[f.path] = f;
-      });
-      // Collect selected elements
-      message.metadata?.selectedPreviewElements?.forEach((e) => {
-        if (e.stagewiseId) record[e.stagewiseId] = e;
       });
     }
 

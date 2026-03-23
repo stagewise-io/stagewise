@@ -13,7 +13,7 @@ import { cn } from '@ui/utils';
 import { useToolAutoExpand } from './shared/use-tool-auto-expand';
 import { useKartonState } from '@ui/hooks/use-karton';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
-import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
+import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 import { inferMimeType } from '@shared/mime-utils';
 
 import { getSandboxLabel } from './utils/sandbox-label-utils';
@@ -40,7 +40,7 @@ export const ExecuteSandboxJsToolPart = ({
   disableShimmer?: boolean;
   isLastPart?: boolean;
   /** Attachments from the parent message metadata — populated after the step completes. */
-  messageAttachments?: Attachment[];
+  messageAttachments?: AttachmentMetadata[];
 }) => {
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const [resultExpanded, setResultExpanded] = useState(true);
@@ -126,7 +126,7 @@ export const ExecuteSandboxJsToolPart = ({
     if (finished && messageAttachments && messageAttachments.length > 0)
       return messageAttachments;
     if (pendingAttachments && pendingAttachments.length > 0)
-      return pendingAttachments as Attachment[];
+      return pendingAttachments as AttachmentMetadata[];
     return null;
   }, [finished, messageAttachments, pendingAttachments]);
 
@@ -398,7 +398,7 @@ export const ExecuteSandboxJsToolPart = ({
 const AttachmentPreviewCards = ({
   attachments,
 }: {
-  attachments: Attachment[];
+  attachments: AttachmentMetadata[];
 }) => {
   const [openAgentId] = useOpenAgent();
   return (

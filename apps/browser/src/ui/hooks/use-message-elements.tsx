@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import type { SelectedElement } from '@shared/selected-elements';
-import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
+import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 
 /**
  * Context for providing all attachment data within a message scope.
@@ -15,7 +15,7 @@ interface MessageAttachmentsContext {
   /** Selected DOM elements */
   elements: SelectedElement[];
   /** Path-based attachments (workspace files or att/ blobs) */
-  attachments: Attachment[];
+  attachments: AttachmentMetadata[];
 }
 
 const MessageAttachmentsContext = createContext<MessageAttachmentsContext>({
@@ -28,7 +28,7 @@ interface MessageAttachmentsProviderProps {
   /** Selected DOM elements */
   elements: SelectedElement[];
   /** Path-based attachments */
-  attachments?: Attachment[];
+  attachments?: AttachmentMetadata[];
 }
 
 export function MessageAttachmentsProvider({

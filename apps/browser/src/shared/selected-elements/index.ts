@@ -21,7 +21,7 @@ const baseSelectedElementSchema = z.object({
     width: z.number(),
   }),
   xpath: z.string(),
-  textContent: z.string(),
+  innerText: z.string(),
   frameworkInfo: z
     .object({
       react: reactSelectedElementInfoSchema.nullable().optional(),

@@ -225,6 +225,19 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     backendNodeId: number,
     frameId: string,
   ) => Promise<boolean>;
+  private captureAndStoreElementScreenshotHandler?: (
+    agentId: string,
+    tabId: string,
+    boundingRect: {
+      top: number;
+      left: number;
+      width: number;
+      height: number;
+    },
+    isMainFrame: boolean,
+    frameId: string | undefined,
+    screenshotFileName: string,
+  ) => Promise<string | null>;
 
   /**
    * Creates a new UIController instance with React DevTools installed.
@@ -790,6 +803,35 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'browser.contextSelection.captureAndStoreElementScreenshot',
+      async (
+        _callingClientId: string,
+        agentId: string,
+        tabId: string,
+        boundingRect: {
+          top: number;
+          left: number;
+          width: number;
+          height: number;
+        },
+        isMainFrame: boolean,
+        frameId: string | undefined,
+        screenshotFileName: string,
+      ) => {
+        if (this.captureAndStoreElementScreenshotHandler) {
+          return await this.captureAndStoreElementScreenshotHandler(
+            agentId,
+            tabId,
+            boundingRect,
+            isMainFrame,
+            frameId,
+            screenshotFileName,
+          );
+        }
+        return null;
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.scrollToElement',
       async (
         _callingClientId: string,
@@ -984,6 +1026,24 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.checkElementExistsHandler = handler;
   }
 
+  public setCaptureAndStoreElementScreenshotHandler(
+    handler: (
+      agentId: string,
+      tabId: string,
+      boundingRect: {
+        top: number;
+        left: number;
+        width: number;
+        height: number;
+      },
+      isMainFrame: boolean,
+      frameId: string | undefined,
+      screenshotFileName: string,
+    ) => Promise<string | null>,
+  ) {
+    this.captureAndStoreElementScreenshotHandler = handler;
+  }
+
   public unregisterKartonProcedures() {
     this.uiKarton.removeServerProcedureHandler('browser.createTab');
     this.uiKarton.removeServerProcedureHandler('browser.closeTab');
@@ -1024,6 +1084,9 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
     this.uiKarton.removeServerProcedureHandler(
       'browser.contextSelection.clearElements',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'browser.contextSelection.captureAndStoreElementScreenshot',
     );
     // Note: Removing handlers by reference is tricky if we use arrow functions or inline handlers.
     // The karton service implementation likely matches by name or needs exact reference.

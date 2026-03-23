@@ -6,6 +6,7 @@ import { videoRenderer } from './video';
 import { audioRenderer } from './audio';
 import { pdfRenderer } from './pdf';
 import { textclipRenderer } from './textclip';
+import { swdomelementRenderer } from './swdomelement';
 
 export type { RendererProps, BadgeProps, BadgeContext } from './types';
 export type { AttachmentRendererEntry, ParamDescriptor } from './types';
@@ -40,6 +41,7 @@ const renderers: AttachmentRendererEntry[] = [
   videoRenderer,
   audioRenderer,
   textclipRenderer,
+  swdomelementRenderer,
   fallbackRenderer,
 ];
 

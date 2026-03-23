@@ -86,7 +86,11 @@ export interface ChatInputProps {
   onPasteFiles?: (files: File[]) => void;
 
   // Attachment removal callback (when badges are deleted from editor)
-  onAttachmentRemoved?: (id: string, type: AttachmentType) => void;
+  onAttachmentRemoved?: (
+    id: string,
+    type: AttachmentType,
+    attrs?: Record<string, unknown>,
+  ) => void;
 
   // Mention provider context (Karton state bridge)
   mentionContext?: MentionContext;
@@ -112,6 +116,11 @@ export interface ChatInputHandle {
   clear: () => void;
   /** Replace an attachment node (by id) with plain text */
   replaceAttachmentWithText: (attachmentId: string, text: string) => void;
+  /** Update attributes on an existing attachment node (by id) */
+  updateAttachmentAttrs: (
+    attachmentId: string,
+    attrs: Record<string, unknown>,
+  ) => void;
 }
 
 export const ChatInput = ({
@@ -489,6 +498,27 @@ export const ChatInput = ({
         return true;
       });
       if (replaced) {
+        editor.view.dispatch(tr);
+      }
+    },
+    updateAttachmentAttrs: (
+      attachmentId: string,
+      attrs: Record<string, unknown>,
+    ) => {
+      if (!editor) return;
+      isInternalChangeRef.current = true;
+      const { doc, tr } = editor.state;
+      let updated = false;
+      doc.descendants((node, pos) => {
+        if (updated) return false;
+        if (node.attrs.id === attachmentId) {
+          tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs });
+          updated = true;
+          return false;
+        }
+        return true;
+      });
+      if (updated) {
         editor.view.dispatch(tr);
       }
     },

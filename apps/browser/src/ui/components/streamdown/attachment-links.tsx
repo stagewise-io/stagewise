@@ -7,12 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import {
-  cn,
-  IDE_SELECTION_ITEMS,
-  getTruncatedFileUrl,
-  stripMountPrefix,
-} from '@ui/utils';
+import { cn, IDE_SELECTION_ITEMS, stripMountPrefix } from '@ui/utils';
 import {
   Tooltip,
   TooltipContent,
@@ -23,17 +18,9 @@ import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { IdePickerPopover } from '@ui/components/ide-picker-popover';
 import { FileContextMenu } from '@ui/components/file-context-menu';
-import {
-  useAttachmentMetadata,
-  type AttachmentMetadata,
-} from '@ui/hooks/use-attachment-metadata';
-import { MessageAttachmentsProvider } from '@ui/hooks/use-message-elements';
-import { ElementAttachmentView } from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
-import { MentionNodeView } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions';
+import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
+
 import { TabMentionBadge } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/tab-mention-badge';
-import { WorkspaceMentionBadge } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/workspace-mention-badge';
-import { BadgeContainer } from '@ui/screens/main/sidebar/chat/_components/rich-text/shared';
-import { MentionIcon } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/mention-icon';
 import {
   getRenderer,
   resolveAttachmentBlobUrl,
@@ -41,15 +28,14 @@ import {
 } from '@ui/components/attachment-renderers';
 import { inferMimeType } from '@shared/mime-utils';
 import { getBaseName } from '@shared/path-utils';
-import type { SelectedElement } from '@shared/selected-elements';
 import { useMountedPaths } from '@ui/hooks/use-mounted-paths';
+import { FileReferenceBadge } from '@ui/components/file-reference-badge';
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
 /**
  * Resolves the workspace display name for a mount-prefixed file path.
- * Returns the folder name of the mount (e.g. "stagewise") or null if
- * the mount cannot be found.
+ * Used by `WorkspaceFileClickWrapper` for the tooltip.
  */
 function useWorkspaceName(filePath: string): string | null {
   const historicalMounts = useMountedPaths();
@@ -68,35 +54,6 @@ function useWorkspaceName(filePath: string): string | null {
     if (!mount) return null;
     return getBaseName(mount.path) || mount.path;
   }, [filePath, historicalMounts, liveMounts]);
-}
-
-/**
- * Builds a JS-truncated display label for a workspace file badge.
- * Tries to keep parent directory context while ensuring the filename
- * (including extension) is never clipped.
- */
-function useFileBadgeLabel(strippedPath: string, lineNumber?: string): string {
-  return useMemo(() => {
-    // Try 3 segments first, fall back to fewer if too long for the badge.
-    let truncated = getTruncatedFileUrl(strippedPath, 3, 128);
-    if (truncated.length > 30) {
-      truncated = getTruncatedFileUrl(strippedPath, 2, 128);
-    }
-    if (truncated.length > 30) {
-      truncated = getTruncatedFileUrl(strippedPath, 1, 128);
-    }
-    // If the filename alone is still too long, mid-truncate preserving ext.
-    if (truncated.length > 30) {
-      const dotIdx = truncated.lastIndexOf('.');
-      const base = dotIdx > 0 ? truncated.substring(0, dotIdx) : truncated;
-      const ext = dotIdx > 0 ? truncated.substring(dotIdx) : '';
-      const keep = 30 - ext.length - 1;
-      truncated =
-        keep > 0 ? `${base.substring(0, keep)}\u2026${ext}` : `\u2026${ext}`;
-    }
-    if (lineNumber) return `${truncated}:${lineNumber}`;
-    return truncated || '...';
-  }, [strippedPath, lineNumber]);
 }
 
 // ─── Color badge ─────────────────────────────────────────────────────────────
@@ -167,20 +124,16 @@ export const ColorBadge = ({ color, children }: ColorBadgeProps) => {
  * Parsed attachment link data - discriminated union for type safety.
  */
 export type AttachmentLinkData =
-  | { type: 'element'; id: string }
-  | { type: 'att'; id: string; params: Record<string, string> }
   | { type: 'color'; color: string }
   | {
-      type: 'wsfile';
+      type: 'path';
       filePath: string;
       lineNumber?: string;
       incomplete?: boolean;
       /** Query params after the path (e.g. `?display=expanded`) */
       params?: Record<string, string>;
     }
-  | { type: 'tab'; id: string }
-  | { type: 'workspace'; prefix: string }
-  | { type: 'mention'; providerType: string; id: string; label?: string };
+  | { type: 'tab'; id: string };
 
 /**
  * Parses a `path:` unified link into AttachmentLinkData.
@@ -193,33 +146,10 @@ export type AttachmentLinkData =
  * Mount prefixes are non-empty strings that do NOT contain slashes.
  */
 function parsePathLink(rest: string): AttachmentLinkData | null {
-  // att/ prefix → file attachment (never incomplete, always fully known)
-  if (rest.startsWith('att/')) {
-    const attRest = rest.slice('att/'.length);
-    const qIdx = attRest.indexOf('?');
-    const id = qIdx >= 0 ? attRest.slice(0, qIdx) : attRest;
-    const params: Record<string, string> = {};
-    if (qIdx >= 0) {
-      for (const pair of attRest.slice(qIdx + 1).split('&')) {
-        const eqIdx = pair.indexOf('=');
-        if (eqIdx >= 0) params[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
-        else params[pair] = 'true';
-      }
-    }
-    return { type: 'att', id, params };
-  }
-
   // incomplete: marker emitted by the streaming pre-processor
   // (only ever for workspace-file paths, never for att/ links)
   const incomplete = rest.startsWith('incomplete:');
   const path = incomplete ? rest.slice('incomplete:'.length) : rest;
-
-  const slashIdx = path.indexOf('/');
-  if (slashIdx <= 0) {
-    // No slash → workspace-only link (just mount prefix)
-    if (!path) return null;
-    return { type: 'workspace', prefix: path };
-  }
 
   // Has slash → workspace file link — strip query params first
   const qIdx = path.indexOf('?');
@@ -239,7 +169,7 @@ function parsePathLink(rest: string): AttachmentLinkData | null {
   const rawFilePath = hasLineNumber ? decoded.slice(0, colonIndex) : decoded;
   const lineNumber = hasLineNumber ? decoded.slice(colonIndex + 1) : undefined;
   return {
-    type: 'wsfile',
+    type: 'path',
     filePath: rawFilePath,
     lineNumber,
     incomplete,
@@ -256,83 +186,23 @@ const ATTACHMENT_LINK_PATTERNS: Array<{
     prefix: 'path:',
     parse: parsePathLink,
   },
-  // ── Legacy protocols (kept as read-time aliases) ─────────────────────────
-  { prefix: 'element:', parse: (rest) => ({ type: 'element', id: rest }) },
-  {
-    prefix: 'att:',
-    parse: (rest) => {
-      const qIdx = rest.indexOf('?');
-      const id = qIdx >= 0 ? rest.slice(0, qIdx) : rest;
-      const params: Record<string, string> = {};
-      if (qIdx >= 0) {
-        for (const pair of rest.slice(qIdx + 1).split('&')) {
-          const eqIdx = pair.indexOf('=');
-          if (eqIdx >= 0) params[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
-          else params[pair] = 'true';
-        }
-      }
-      return { type: 'att', id, params };
-    },
-  },
-
+  // ── Other canonical protocols ───────────────────────────────────────────
   {
     prefix: 'color:',
     parse: (rest) => ({ type: 'color', color: decodeURIComponent(rest) }),
   },
-  {
-    prefix: 'tab:',
-    parse: (rest) => ({ type: 'tab', id: rest }),
-  },
-  {
-    prefix: 'workspace:',
-    parse: (rest) => ({ type: 'workspace', prefix: rest }),
-  },
+  { prefix: 'tab:', parse: (rest) => ({ type: 'tab', id: rest }) },
+
+  // ── Legacy protocols (read-time aliases) ─────────────────────────────────
+  { prefix: 'att:', parse: (rest) => parsePathLink(`att/${rest}`) },
+  { prefix: 'workspace:', parse: parsePathLink },
+  { prefix: 'wsfile:', parse: parsePathLink },
   {
     prefix: 'mention:',
     parse: (rest) => {
+      // Legacy mention:providerType:path — strip the providerType prefix.
       const colonIdx = rest.indexOf(':');
-      if (colonIdx < 0)
-        return { type: 'mention', providerType: 'file', id: rest };
-      return {
-        type: 'mention',
-        providerType: rest.slice(0, colonIdx),
-        id: rest.slice(colonIdx + 1),
-      };
-    },
-  },
-  {
-    prefix: 'wsfile:',
-    parse: (rest) => {
-      const incomplete = rest.startsWith('incomplete:');
-      const raw = incomplete ? rest.slice('incomplete:'.length) : rest;
-      // Strip query params
-      const qIdx = raw.indexOf('?');
-      const pathPart = qIdx >= 0 ? raw.slice(0, qIdx) : raw;
-      const params: Record<string, string> = {};
-      if (qIdx >= 0) {
-        for (const pair of raw.slice(qIdx + 1).split('&')) {
-          const eqIdx = pair.indexOf('=');
-          if (eqIdx >= 0) params[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
-          else params[pair] = 'true';
-        }
-      }
-      const colonIndex = pathPart.lastIndexOf(':');
-      const hasLineNumber =
-        colonIndex > 0 && /^\d+$/.test(pathPart.slice(colonIndex + 1));
-      const rawFilePath = hasLineNumber
-        ? pathPart.slice(0, colonIndex)
-        : pathPart;
-      const filePath = decodeURIComponent(rawFilePath);
-      const lineNumber = hasLineNumber
-        ? pathPart.slice(colonIndex + 1)
-        : undefined;
-      return {
-        type: 'wsfile',
-        filePath,
-        lineNumber,
-        incomplete,
-        params: Object.keys(params).length > 0 ? params : undefined,
-      };
+      return parsePathLink(colonIdx > 0 ? rest.slice(colonIdx + 1) : rest);
     },
   },
 ];
@@ -349,21 +219,6 @@ export function parseAttachmentLink(
   }
   return null;
 }
-
-/**
- * All protocol prefixes recognised by the attachment link parser.
- * Used by streaming pre-processors to detect incomplete links.
- */
-export const ATTACHMENT_LINK_PREFIXES: readonly string[] = [
-  'path:',
-  'element:',
-  'att:',
-  'color:',
-  'tab:',
-  'workspace:',
-  'mention:',
-  'wsfile:',
-];
 
 export type MessageSegment =
   | { kind: 'text'; content: string }
@@ -406,11 +261,6 @@ export function parseMessageSegments(text: string): MessageSegment[] {
       continue;
     }
 
-    const bracketLabel = match[1];
-    if (parsed.type === 'mention' && bracketLabel) {
-      parsed.label = bracketLabel;
-    }
-
     if (match.index > lastEnd) {
       segments.push({
         kind: 'text',
@@ -430,20 +280,12 @@ export function parseMessageSegments(text: string): MessageSegment[] {
 
 export function getAttachmentKey(linkData: AttachmentLinkData): string {
   switch (linkData.type) {
-    case 'element':
-      return `element-${linkData.id}`;
-    case 'att':
-      return `att-${linkData.id}`;
-    case 'wsfile':
-      return `wsfile-${linkData.filePath}`;
+    case 'path':
+      return `path-${linkData.filePath}`;
     case 'color':
       return `color-${linkData.color}`;
     case 'tab':
       return `tab-${linkData.id}`;
-    case 'workspace':
-      return `workspace-${linkData.prefix}`;
-    case 'mention':
-      return `mention-${linkData.providerType}-${linkData.id}`;
   }
 }
 
@@ -453,7 +295,7 @@ export function getAttachmentKey(linkData: AttachmentLinkData): string {
  * Wraps any workspace-file badge with IDE-opening click behaviour, context
  * menu, and tooltip (workspace name + path + IDE hint).
  *
- * Shared by both `WorkspaceFileLink` (non-media files) and
+ * Shared by `FileReferenceBadge` (non-media files) and
  * `PathFileRendererLink` (images/PDFs) so the IDE-opening UX is identical.
  */
 const WorkspaceFileClickWrapper = ({
@@ -556,80 +398,6 @@ const WorkspaceFileClickWrapper = ({
   );
 };
 
-// ─── Non-media workspace file badge ──────────────────────────────────────────
-
-interface WorkspaceFileLinkProps {
-  filePath: string;
-  lineNumber?: string;
-  incomplete?: boolean;
-}
-
-/**
- * Badge for non-media workspace files (`.ts`, `.json`, etc.).
- * Renders a file-icon badge with a JS-truncated path label.
- * IDE-opening, tooltip, and context menu are handled by
- * `WorkspaceFileClickWrapper`.
- */
-export const WorkspaceFileLink = ({
-  filePath,
-  lineNumber,
-  incomplete,
-}: WorkspaceFileLinkProps) => {
-  const strippedPath = stripMountPrefix(filePath);
-  const displayLabel = useFileBadgeLabel(strippedPath, lineNumber);
-
-  return (
-    <WorkspaceFileClickWrapper
-      filePath={filePath}
-      lineNumber={lineNumber}
-      incomplete={incomplete}
-    >
-      <span className="inline shrink-0 px-0.5 pt-px">
-        <BadgeContainer className="cursor-pointer">
-          <span className="text-foreground" aria-hidden>
-            <MentionIcon providerType="file" id={filePath} />
-          </span>
-          <span
-            className="whitespace-nowrap font-medium text-xs leading-none"
-            aria-hidden
-          >
-            {displayLabel}
-          </span>
-        </BadgeContainer>
-      </span>
-    </WorkspaceFileClickWrapper>
-  );
-};
-
-// ─── Element badges ─────────────────────────────────────────────────────────
-
-interface AttachmentLinkBaseProps {
-  id: string;
-  metadata: AttachmentMetadata | undefined;
-}
-
-const ElementAttachmentLink = ({ id, metadata }: AttachmentLinkBaseProps) => {
-  const element: SelectedElement | null =
-    metadata && 'tagName' in metadata ? (metadata as SelectedElement) : null;
-
-  const label = useMemo(() => {
-    if (!element) return `@${id.slice(0, 8)}`;
-    const tagName = element.tagName.toLowerCase();
-    const domId = element.attributes?.id ? `#${element.attributes.id}` : '';
-    return `${tagName}${domId}`;
-  }, [id, element]);
-
-  return (
-    <MessageAttachmentsProvider elements={element ? [element] : []}>
-      <ElementAttachmentView
-        viewOnly
-        selected={false}
-        node={{ attrs: { id, label } }}
-      />
-    </MessageAttachmentsProvider>
-  );
-};
-
 // ─── Unified file renderer (att/ + workspace paths) ──────────────────────────
 
 /**
@@ -660,29 +428,55 @@ const PathFileRendererLink = ({
   const attachments = useAttachmentMetadata();
 
   const isAtt = path.startsWith('att/');
-  const fileName = getBaseName(path) || path;
-  const mediaType = inferMimeType(fileName);
+  const rawFileName = getBaseName(path) || path;
+
+  // Resolve displayFileName BEFORE MIME inference so att/ blob keys
+  // (e.g. "a3f2-b1c4") are resolved to the real filename for correct
+  // MIME routing (e.g. "screenshot.png" → image/png).
+  const metadata = attachments[path];
+  const displayFileName =
+    metadata && 'originalFileName' in metadata && metadata.originalFileName
+      ? metadata.originalFileName
+      : rawFileName;
+
+  const mediaType = inferMimeType(displayFileName);
 
   const blobUrl = useMemo(
     () => resolveAttachmentBlobUrl(path, openAgent),
     [path, openAgent],
   );
 
-  // For att/ paths, look up originalFileName from attachment metadata for
-  // human-readable badge display. For workspace paths the basename is used;
-  // truncateLabel (in BadgeShell) handles length capping.
   const id = isAtt ? path.slice('att/'.length) : path;
-  const metadata = attachments[path];
-  const displayFileName =
-    metadata && 'originalFileName' in metadata && metadata.originalFileName
-      ? metadata.originalFileName
-      : fileName;
   // sizeBytes is only present on sandbox-produced attachments (tool outputs).
   const sizeBytes =
     metadata && 'sizeBytes' in metadata ? (metadata.sizeBytes as number) : 0;
 
   const renderer = getRenderer(mediaType);
+  const isFallback = renderer.id === 'fallback';
   const isExpanded = params.display === 'expanded';
+
+  // For non-media files (fallback renderer), use the unified
+  // FileReferenceBadge which shows seti-based type-aware icons for files
+  // and folder/git-branch icons for directories and workspace roots.
+  if (isFallback && !isExpanded) {
+    const badge = (
+      <FileReferenceBadge
+        filePath={path}
+        displayFileName={isAtt ? displayFileName : undefined}
+        bare
+        className="cursor-pointer"
+      />
+    );
+    if (!isAtt) {
+      return (
+        <WorkspaceFileClickWrapper filePath={path}>
+          {badge}
+        </WorkspaceFileClickWrapper>
+      );
+    }
+    return badge;
+  }
+
   const rendererProps: RendererProps = {
     attachmentId: id,
     mediaType,
@@ -724,64 +518,17 @@ interface AttachmentLinkRouterProps {
 export const AttachmentLinkRouter = ({
   linkData,
 }: AttachmentLinkRouterProps) => {
-  const attachments = useAttachmentMetadata();
-
   switch (linkData.type) {
-    case 'element':
-      return (
-        <ElementAttachmentLink
-          id={linkData.id}
-          metadata={attachments[linkData.id]}
-        />
-      );
-    case 'att':
+    case 'path':
       return (
         <PathFileRendererLink
-          path={`att/${linkData.id}`}
-          params={linkData.params}
+          path={linkData.filePath}
+          params={linkData.params ?? {}}
         />
       );
-
-    case 'wsfile': {
-      const wsParams = linkData.params ?? {};
-      const wsMime = inferMimeType(getBaseName(linkData.filePath));
-      const isPreviewable =
-        wsMime.startsWith('image/') || wsMime === 'application/pdf';
-      // Previewable files (images, PDFs) use PathFileRendererLink so they
-      // get the same thumbnail badge + hover preview as user-attached files.
-      // PathFileRendererLink already resolves workspace:// URLs.
-      if (isPreviewable && !linkData.incomplete) {
-        return (
-          <PathFileRendererLink path={linkData.filePath} params={wsParams} />
-        );
-      }
-      return (
-        <WorkspaceFileLink
-          filePath={linkData.filePath}
-          lineNumber={linkData.lineNumber}
-          incomplete={linkData.incomplete}
-        />
-      );
-    }
     case 'color':
       return <ColorBadge color={linkData.color} />;
     case 'tab':
       return <TabMentionBadge tabId={linkData.id} />;
-    case 'workspace':
-      return <WorkspaceMentionBadge prefix={linkData.prefix} />;
-    case 'mention':
-      return (
-        <MentionNodeView
-          viewOnly
-          selected={false}
-          node={{
-            attrs: {
-              id: linkData.id,
-              label: linkData.label ?? linkData.id,
-              providerType: linkData.providerType,
-            },
-          }}
-        />
-      );
   }
 };

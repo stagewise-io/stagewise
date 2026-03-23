@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { generateAttachmentFilename } from './attachment-filename';
 
-/** Strip the CUID2 suffix (6 chars after the last underscore) to test the prefix */
+/** Strip the CUID2 suffix (8 chars after the last underscore) to test the prefix */
 function stripSuffix(filename: string): string {
-  // Format: `{prefix}_{6-cuid2}.{ext}` or `{prefix}_{6-cuid2}`
+  // Format: `{prefix}_{8-cuid2}.{ext}` or `{prefix}_{8-cuid2}`
   const extIdx = filename.lastIndexOf('.');
   const base = extIdx > 0 ? filename.slice(0, extIdx) : filename;
   const ext = extIdx > 0 ? filename.slice(extIdx) : '';

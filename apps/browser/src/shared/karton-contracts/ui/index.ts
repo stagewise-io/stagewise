@@ -6,7 +6,7 @@ import type {
   UserMessageMetadata,
   MountPermission,
   MentionFileCandidate,
-  Attachment,
+  AttachmentMetadata,
 } from './agent/metadata';
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
@@ -494,7 +494,7 @@ export type AppState = {
       editSummary: FileDiff[];
       pendingUserQuestion: PendingUserQuestion | null;
       pendingSandboxOutputs?: Record<string, string[]>;
-      pendingSandboxAttachments?: Record<string, Attachment[]>;
+      pendingSandboxAttachments?: Record<string, AttachmentMetadata[]>;
       pendingShellOutputs?: Record<string, string[]>;
       activeApp?: {
         appId: string;
@@ -901,6 +901,23 @@ export type KartonContract = {
         clearPendingScreenshots: () => Promise<void>; // Clears pending element screenshots after UI has picked them up
         /** Restore selected elements directly (used when restoring aborted message to input) */
         restoreElements: (elements: SelectedElement[]) => Promise<void>;
+        /**
+         * Capture an element screenshot, convert to WebP, and store as an agent attachment.
+         * Returns the blob key of the stored screenshot file, or null if capture fails.
+         */
+        captureAndStoreElementScreenshot: (
+          agentId: string,
+          tabId: string,
+          boundingRect: {
+            top: number;
+            left: number;
+            width: number;
+            height: number;
+          },
+          isMainFrame: boolean,
+          frameId: string | undefined,
+          screenshotFileName: string,
+        ) => Promise<string | null>;
       };
       scrollToElement: (
         tabId: string,

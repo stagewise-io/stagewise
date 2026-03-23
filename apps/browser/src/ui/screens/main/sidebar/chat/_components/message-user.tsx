@@ -1,6 +1,9 @@
 import posthog from 'posthog-js';
 import { selectedElementToAttachmentAttributes } from '@ui/utils/attachment-conversions';
-import { markdownToTipTapContent } from '@ui/utils/tiptap-content-utils';
+import {
+  markdownToTipTapContent,
+  enrichTipTapContent,
+} from '@ui/utils/tiptap-content-utils';
 import { cn, collectUserMessageMetadata } from '@ui/utils';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
@@ -33,7 +36,7 @@ import { generateId } from 'ai';
 import type { AttachmentType } from './rich-text/attachments';
 import type { MentionContext } from './rich-text/mentions';
 import type { FileMentionItem } from './rich-text/mentions/types';
-import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
+import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import type { Content } from '@tiptap/core';
 import { IconMagicWandSparkle } from 'nucleo-micro-bold';
@@ -143,11 +146,14 @@ export const MessageUser = memo(
       return textPart?.type === 'text' ? textPart.text : '';
     }, [msg.parts]);
 
-    // Convert markdown to TipTap JSON for view mode (memoized to avoid re-conversion on every render)
-    const viewModeTipTapContent = useMemo(
-      () => markdownToTipTapContent(markdownText),
-      [markdownText],
-    );
+    // Convert markdown to TipTap JSON for view mode (memoized to avoid re-conversion on every render).
+    // Enrich with attachment metadata so element badges show proper labels/screenshots.
+    const viewModeTipTapContent = useMemo(() => {
+      const parsed = markdownToTipTapContent(markdownText);
+      return enrichTipTapContent(parsed, {
+        attachments: msg.metadata?.attachments,
+      });
+    }, [markdownText, msg.metadata?.attachments]);
 
     // Start editing - initialize the editor with message content
     const handleStartEditing = useCallback(() => {
@@ -159,13 +165,6 @@ export const MessageUser = memo(
           detail: { messageId: editMessageId },
         }),
       );
-
-      msg.metadata?.selectedPreviewElements?.forEach((element) => {
-        setSelectedElementsFromEditor((prev) => [
-          ...prev,
-          element as SelectedElement,
-        ]);
-      });
 
       // Clear Karton state for new element selections
       clearSelectedElements();
@@ -214,16 +213,8 @@ export const MessageUser = memo(
         const newMessageId = generateId();
 
         try {
-          const combinedSelectedElements = [
-            ...selectedElementsFromWebcontents,
-            ...selectedElementsFromEditor,
-          ];
-
-          // Collect metadata for selected elements
-          const metadata = collectUserMessageMetadata(
-            combinedSelectedElements,
-            pendingTiptapContent,
-          );
+          // Collect metadata for mentions.
+          const metadata = collectUserMessageMetadata(pendingTiptapContent);
 
           if (!chatInputRef.current) {
             return;
@@ -508,7 +499,7 @@ export const MessageUser = memo(
     setEditedFileAttachmentsRef.current = setEditedFileAttachments;
 
     const onFileMentionSelected = useCallback((item: FileMentionItem) => {
-      const attachment: Attachment = {
+      const attachment: AttachmentMetadata = {
         path: item.meta.mountedPath,
       };
       setEditedFileAttachmentsRef.current((prev) => {
@@ -540,16 +531,12 @@ export const MessageUser = memo(
     const totalAttachments =
       editedFileAttachments.length + selectedElementsFromWebcontents.length;
 
-    // Combine all available elements for the preview card to access
-    // In view mode: from message metadata
-    // In edit mode: from local state + Karton state
+    // Combine all available elements for the preview card to access.
+    // In edit mode: from local state + Karton state.
+    // In view mode: empty (element data lives in .swdomelement file attachments).
     const allAvailableElements = useMemo(() => {
-      const metadataElements =
-        (msg.metadata?.selectedPreviewElements as SelectedElement[]) ?? [];
       if (isEditing) {
-        // During editing, combine all sources (deduped by stagewiseId)
         const combined = [
-          ...metadataElements,
           ...selectedElementsFromEditor,
           ...selectedElementsFromWebcontents,
         ];
@@ -561,10 +548,8 @@ export const MessageUser = memo(
           return true;
         });
       }
-      // In view mode, just use metadata
-      return metadataElements;
+      return [];
     }, [
-      msg.metadata?.selectedPreviewElements,
       isEditing,
       selectedElementsFromEditor,
       selectedElementsFromWebcontents,
