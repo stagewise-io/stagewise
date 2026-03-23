@@ -52,6 +52,44 @@ export async function readFileToolExecute(
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
     if (!fileExists) throw new Error(`File does not exist: ${relative_path}`);
 
+    // If the path is a directory, fall back to listing its contents
+    // instead of erroring — saves the agent a wasted tool turn.
+    const isDir = await clientRuntime.fileSystem.isDirectory(absolutePath);
+    if (isDir) {
+      const listing = await clientRuntime.fileSystem.listDirectory(
+        absolutePath,
+        {
+          recursive: false,
+          includeDirectories: true,
+          includeFiles: true,
+          respectGitignore: true,
+        },
+      );
+
+      if (!listing.success)
+        throw new Error(
+          `Failed to list directory: ${relative_path} - ${listing.message} - ${listing.error || ''}`,
+        );
+
+      const cappedResult = capToolOutput(listing.files || [], {
+        maxItems: 50,
+      });
+
+      let message = `Path is a directory, not a file. Listing contents of: ${relative_path}`;
+      message += ` - ${listing.totalFiles || 0} files, ${listing.totalDirectories || 0} directories`;
+
+      return {
+        success: true as const,
+        message,
+        result: {
+          files: cappedResult.result,
+          totalFiles: listing.totalFiles,
+          totalDirectories: listing.totalDirectories,
+          truncated: cappedResult.truncated,
+        },
+      };
+    }
+
     // Check file size before reading (only when reading entire file)
     if (start_line === undefined && end_line === undefined) {
       const sizeCheck = await checkFileSize(
