@@ -25,6 +25,7 @@ import type {
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { PendingUserQuestion } from '@shared/karton-contracts/ui/index';
 import { dispatchArrowFromCtrl } from '@ui/utils/keyboard-nav';
+import { IconHelpChatOutline18 } from 'nucleo-ui-outline-18';
 
 /**
  * Module-level store for the current form draft answers.
@@ -711,6 +712,7 @@ export function UserQuestionSection(
               isOpen && 'rotate-180',
             )}
           />
+          <IconHelpChatOutline18 className="size-3 shrink-0" />
           <span className="truncate">
             {pendingQuestion.title}
             {stepIndicator}

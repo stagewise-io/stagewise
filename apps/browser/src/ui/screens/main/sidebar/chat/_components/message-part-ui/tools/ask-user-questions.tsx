@@ -146,7 +146,7 @@ export const AskUserQuestionsToolPart = ({
           <span className="truncate text-xs">{triggerText}</span>
         </div>
         {hasAnswers && (
-          <div className="flex flex-col gap-2 rounded-md border border-border p-2.5">
+          <div className="flex flex-col gap-2 rounded-md border border-border-subtle p-2.5">
             {answerEntries.map(([questionId, answerValue]) => {
               const field = fieldMap.get(questionId);
               const label = field?.label ?? questionId;

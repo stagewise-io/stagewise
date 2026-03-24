@@ -120,7 +120,7 @@ export function StatusCardSectionComponent({
         )}
       </Collapsible>
       {showDivider && (
-        <hr className="my-1 h-px w-[calc(100%+6px)] border-derived-subtle bg-background" />
+        <hr className="my-1 h-px w-full border-derived bg-background" />
       )}
     </div>
   );
