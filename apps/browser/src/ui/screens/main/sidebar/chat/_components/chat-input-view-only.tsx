@@ -7,6 +7,7 @@ import {
   TextClipAttachmentView,
 } from './rich-text/attachments';
 import { MentionNodeView } from './rich-text/mentions';
+import { SlashNodeView } from './rich-text/slash/slash-node-view';
 import type { Content } from '@tiptap/core';
 
 /**
@@ -166,6 +167,15 @@ function RenderNode({ node }: { node: TiptapNode }): React.ReactNode {
     case 'mention':
       return (
         <MentionNodeView
+          viewOnly
+          selected={false}
+          node={{ attrs: node.attrs ?? {} }}
+        />
+      );
+
+    case 'slash':
+      return (
+        <SlashNodeView
           viewOnly
           selected={false}
           node={{ attrs: node.attrs ?? {} }}

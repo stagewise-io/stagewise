@@ -104,6 +104,13 @@ export async function wirePagesStateSync(deps: {
     (mounts) => pagesService.syncWorkspaceMountsState(mounts),
   );
 
+  // --- Global plans sync (uiKarton -> pages) ---
+  syncDerivedState(
+    uiKarton,
+    (state) => state.plans,
+    (plans) => pagesService.syncPlansState(plans),
+  );
+
   // --- Search engines sync (webDataService -> uiKarton + pages) ---
   const syncSearchEnginesToUiKarton = async () => {
     const engines = await webDataService.getSearchEngines();

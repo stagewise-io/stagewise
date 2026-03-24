@@ -3,6 +3,7 @@ import { computeAgentsMdChanges } from './agents-md-changes';
 import { computeAppChanges } from './app-changes';
 import { computeBrowserChanges } from './browser-changes';
 import { computeFileDiffChanges } from './file-diff-changes';
+import { computePlansChanges } from './plans-changes';
 import { computeSandboxChanges } from './sandbox-changes';
 import { computeSkillsChanges } from './skills-changes';
 import type { EnvironmentChangeEntry } from './types';
@@ -13,6 +14,7 @@ export { computeAgentsMdChanges } from './agents-md-changes';
 export { computeAppChanges } from './app-changes';
 export { computeBrowserChanges } from './browser-changes';
 export { computeFileDiffChanges } from './file-diff-changes';
+export { computePlansChanges } from './plans-changes';
 export { computeSandboxChanges } from './sandbox-changes';
 export { computeSkillsChanges } from './skills-changes';
 export { computeWorkspaceChanges } from './workspace-changes';
@@ -59,5 +61,6 @@ export function computeAllEnvironmentChanges(
     ...computeAgentsMdChanges(previous.agentsMd, current.agentsMd),
     ...computeWorkspaceMdChanges(previous.workspaceMd, current.workspaceMd),
     ...computeSkillsChanges(previous.enabledSkills, current.enabledSkills),
+    ...computePlansChanges(previous.plans, current.plans),
   ];
 }

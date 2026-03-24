@@ -39,6 +39,12 @@ import {
   mentionContextRef,
   type MentionContext,
 } from './rich-text/mentions';
+import {
+  SlashExtension,
+  slashSuggestionActive,
+  slashCommandsRef,
+} from './rich-text/slash';
+import type { CommandDefinitionUI } from '@shared/commands';
 import { useState, memo } from 'react';
 // Re-export types for convenience
 export type { AttachmentAttributes, AttachmentType };
@@ -86,6 +92,9 @@ export interface ChatInputProps {
 
   // Mention provider context (Karton state bridge)
   mentionContext?: MentionContext;
+
+  // Slash command definitions (from Karton state)
+  slashCommands?: CommandDefinitionUI[];
 
   // Styling
   className?: string;
@@ -135,6 +144,7 @@ export const ChatInput = ({
   onAttachmentRemoved,
 
   mentionContext,
+  slashCommands,
 
   className,
   ref,
@@ -197,6 +207,7 @@ export const ChatInput = ({
         onNodeDeleted: onAttachmentRemoved,
       }),
       MentionExtension,
+      SlashExtension,
     ],
     content: internalValue,
     editable: !disabled,
@@ -212,7 +223,8 @@ export const ChatInput = ({
       handleKeyDown: (view, event) => {
         // Handle Enter without Shift for submit
         if (event.key === 'Enter' && !event.shiftKey) {
-          if (mentionSuggestionActive.current) return false;
+          if (mentionSuggestionActive.current || slashSuggestionActive.current)
+            return false;
           event.preventDefault();
           // If input is empty and there are queued messages, flush the queue
           const isEmpty = view.state.doc.textContent.trim().length === 0;
@@ -279,6 +291,9 @@ export const ChatInput = ({
   // so the TipTap suggestion `items` callback always has current data.
   if (mentionContext) mentionContextRef.current = mentionContext;
 
+  // Sync slash commands to the module-level ref synchronously during render.
+  if (slashCommands) slashCommandsRef.current = slashCommands;
+
   const canSendMessage = useMemo(() => {
     return !disabled && textContent.trim().length > 2;
   }, [disabled, textContent]);
@@ -339,7 +354,11 @@ export const ChatInput = ({
     if (!editorElement) return;
 
     // Build selector for all inline badge node types (attachments + mentions)
-    const allInlineNodeNames = [...ALL_ATTACHMENT_NODE_NAMES, 'mention'];
+    const allInlineNodeNames = [
+      ...ALL_ATTACHMENT_NODE_NAMES,
+      'mention',
+      'slash',
+    ];
     const attachmentSelectors = allInlineNodeNames
       .map((name) => `.react-renderer.node-${name}`)
       .join(', ');
@@ -464,6 +483,11 @@ export const ChatInput = ({
             '[&_.react-renderer.node-mention]:before:w-0.5 [&_.react-renderer.node-mention]:after:w-0.5',
             '[&_.react-renderer.node-mention]:before:h-[1em] [&_.react-renderer.node-mention]:after:h-[1em]',
             '[&_.react-renderer.node-mention]:before:align-middle [&_.react-renderer.node-mention]:after:align-middle',
+            '[&_.react-renderer.node-slash]:before:content-[""] [&_.react-renderer.node-slash]:after:content-[""]',
+            '[&_.react-renderer.node-slash]:before:inline-block [&_.react-renderer.node-slash]:after:inline-block',
+            '[&_.react-renderer.node-slash]:before:w-0.5 [&_.react-renderer.node-slash]:after:w-0.5',
+            '[&_.react-renderer.node-slash]:before:h-[1em] [&_.react-renderer.node-slash]:after:h-[1em]',
+            '[&_.react-renderer.node-slash]:before:align-middle [&_.react-renderer.node-slash]:after:align-middle',
             // Hide ProseMirror-separator elements to prevent cursor height issues at node boundaries
             '[&_.ProseMirror-separator]:hidden',
           )}

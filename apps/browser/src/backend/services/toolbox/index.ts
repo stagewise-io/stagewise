@@ -30,7 +30,7 @@ import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import { createFileDiffHandler } from './utils/sandbox-callbacks';
 import { deleteAgentBlobs, getAgentBlobDir } from '@/utils/attachment-blobs';
-import { getDataRoot, getTempRoot } from '@/utils/paths';
+import { getDataRoot, getPlansDir, getTempRoot } from '@/utils/paths';
 import { mkdirSync } from 'node:fs';
 import type { ApiClient } from '@stagewise/api-client';
 import {
@@ -98,9 +98,12 @@ import {
   discoverSkills,
   type Skill,
 } from '@/agents/shared/prompts/utils/get-skills';
+import { readPlans } from '@/agents/shared/prompts/utils/read-plans';
+import { PLANS_PREFIX, getAgentOwnedPlanPaths } from '@shared/plan-ownership';
 import { resolveMountedRelativePath } from './utils/path-mounting';
 import { normalizePath } from '@shared/path-utils';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
+import chokidar, { type FSWatcher } from 'chokidar';
 
 type MountedPrefix = string;
 type MountedPath = string;
@@ -143,7 +146,23 @@ export class ToolboxService extends DisposableService {
     if (!runtimes) return undefined;
     if (this.pluginsRuntime) runtimes.set('plugins', this.pluginsRuntime);
     runtimes.set('apps', this.getOrCreateAppsRuntime(agentInstanceId));
+    runtimes.set(PLANS_PREFIX, this.getOrCreatePlansRuntime());
     return runtimes;
+  }
+
+  private plansRuntime: ClientRuntimeNode | null = null;
+  private plansWatcher: FSWatcher | null = null;
+  private plansWatcherDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  private getOrCreatePlansRuntime(): ClientRuntimeNode {
+    if (this.plansRuntime) return this.plansRuntime;
+    const plansDir = getPlansDir();
+    mkdirSync(plansDir, { recursive: true });
+    this.plansRuntime = new ClientRuntimeNode({
+      workingDirectory: plansDir,
+      rgBinaryBasePath: getRipgrepBasePath(),
+    });
+    return this.plansRuntime;
   }
 
   private getOrCreateAppsRuntime(agentInstanceId: string): ClientRuntimeNode {
@@ -620,13 +639,20 @@ export class ToolboxService extends DisposableService {
         path: getAgentAppsDir(agentInstanceId),
         permissions: [...FULL_PERMISSIONS] as MountPermission[],
       },
+      {
+        prefix: PLANS_PREFIX,
+        path: getPlansDir(),
+        permissions: [...FULL_PERMISSIONS] as MountPermission[],
+      },
     ];
 
-    const [agentsMdEntries, workspaceMdEntries, skills] = await Promise.all([
-      this.getAllAgentsMdEntries(agentInstanceId),
-      this.getWorkspaceMd(agentInstanceId),
-      this.getSkillsList(agentInstanceId),
-    ]);
+    const [agentsMdEntries, workspaceMdEntries, skills, planEntries] =
+      await Promise.all([
+        this.getAllAgentsMdEntries(agentInstanceId),
+        this.getWorkspaceMd(agentInstanceId),
+        this.getSkillsList(agentInstanceId),
+        this.getPlansList(agentInstanceId),
+      ]);
 
     const mounts =
       this.mountManagerService?.getMountedPathsWithRuntimes(agentInstanceId);
@@ -689,6 +715,9 @@ export class ToolboxService extends DisposableService {
         paths: skills.map((s) => s.path),
       },
       browserSessionId: getBrowserSessionId(),
+      plans: {
+        entries: planEntries,
+      },
     };
 
     return snapshot;
@@ -736,6 +765,31 @@ export class ToolboxService extends DisposableService {
     }
 
     return result;
+  }
+
+  private async getPlansList(agentInstanceId: string): Promise<
+    Array<{
+      name: string;
+      description: string | null;
+      filename: string;
+      totalTasks: number;
+      completedTasks: number;
+      taskGroups: Array<{
+        label: string;
+        tasks: Array<{ text: string; completed: boolean; depth: number }>;
+      }>;
+    }>
+  > {
+    const agentEntry = this.uiKarton.state.agents.instances[agentInstanceId];
+    const ownedPaths = agentEntry
+      ? getAgentOwnedPlanPaths(agentEntry.state.history)
+      : new Set<string>();
+
+    const plans = await readPlans(getPlansDir());
+    return plans.filter((plan) => {
+      const toolPath = `${PLANS_PREFIX}/${plan.filename}`;
+      return ownedPaths.has(toolPath);
+    });
   }
 
   public getWorkspaceAgentSettings(
@@ -995,6 +1049,9 @@ export class ToolboxService extends DisposableService {
       this.pushMountsToSandbox(agentInstanceId);
     });
 
+    // Start watching the global plans directory
+    this.startPlansWatcher();
+
     const fileDiffHandler = createFileDiffHandler({
       mountManager: this.mountManagerService,
       diffHistoryService: this.diffHistoryService,
@@ -1136,8 +1193,73 @@ export class ToolboxService extends DisposableService {
     );
   }
 
+  /**
+   * Start a chokidar watcher on the global plans directory.
+   * On any change, re-reads all plans and pushes updated list to Karton state.
+   */
+  private startPlansWatcher(): void {
+    const plansDir = getPlansDir();
+    this.plansWatcher = chokidar.watch(plansDir, {
+      persistent: true,
+      ignoreInitial: false,
+      depth: 0,
+      awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
+    });
+
+    const scheduleRefresh = () => {
+      if (this.plansWatcherDebounce) clearTimeout(this.plansWatcherDebounce);
+      this.plansWatcherDebounce = setTimeout(() => {
+        this.plansWatcherDebounce = null;
+        void this.refreshGlobalPlans();
+      }, 400);
+    };
+
+    this.plansWatcher
+      .on('add', scheduleRefresh)
+      .on('change', scheduleRefresh)
+      .on('unlink', scheduleRefresh)
+      .on('error', (error) => {
+        this.logger.debug('[ToolboxService] Plans watcher error', { error });
+      });
+  }
+
+  private stopPlansWatcher(): void {
+    if (this.plansWatcherDebounce) {
+      clearTimeout(this.plansWatcherDebounce);
+      this.plansWatcherDebounce = null;
+    }
+    if (this.plansWatcher) {
+      void this.plansWatcher.close();
+      this.plansWatcher = null;
+    }
+  }
+
+  /** Re-read all plans from disk and push to top-level Karton state. */
+  private async refreshGlobalPlans(): Promise<void> {
+    try {
+      const plans = await readPlans(getPlansDir());
+      this.uiKarton.setState((draft) => {
+        draft.plans = plans.map((p) => ({
+          name: p.name,
+          description: p.description,
+          filename: p.filename,
+          totalTasks: p.totalTasks,
+          completedTasks: p.completedTasks,
+          taskGroups: p.taskGroups,
+        }));
+      });
+    } catch (error) {
+      this.logger.debug('[ToolboxService] Failed to refresh global plans', {
+        error,
+      });
+      this.report(error as Error, 'refreshGlobalPlans');
+    }
+  }
+
   protected onTeardown(): Promise<void> | void {
     this.apiClient = null;
+
+    this.stopPlansWatcher();
 
     void this.mountManagerService?.teardown();
     this.mountManagerService = null;

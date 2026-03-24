@@ -62,6 +62,11 @@ export const getDiffHistoryDir = (): string =>
 export const getDiffHistoryBlobsDir = (): string =>
   path.join(getDataRoot(), 'diff-history', 'data-blobs');
 
+export const getUserDataDir = (): string =>
+  path.join(getDataRoot(), 'user-data');
+
+export const getPlansDir = (): string => path.join(getUserDataDir(), 'plans');
+
 export const getRipgrepBasePath = (): string => path.join(getDataRoot(), 'bin');
 
 export async function ensureDataDirectories(): Promise<void> {
@@ -71,6 +76,8 @@ export async function ensureDataDirectories(): Promise<void> {
     fs.mkdir(getAgentsDir(), { recursive: true }),
     fs.mkdir(getDiffHistoryDir(), { recursive: true }),
     fs.mkdir(getRipgrepBasePath(), { recursive: true }),
+    fs.mkdir(getUserDataDir(), { recursive: true }),
+    fs.mkdir(getPlansDir(), { recursive: true }),
   ]);
 }
 
@@ -78,4 +85,10 @@ export const getPluginsPath = (): string => {
   if (app.isPackaged)
     return path.join(process.resourcesPath, 'bundled', 'plugins');
   return path.join(app.getAppPath(), 'bundled', 'plugins');
+};
+
+export const getBuiltinCommandsPath = (): string => {
+  if (app.isPackaged)
+    return path.join(process.resourcesPath, 'bundled', 'commands');
+  return path.join(app.getAppPath(), 'bundled', 'commands');
 };

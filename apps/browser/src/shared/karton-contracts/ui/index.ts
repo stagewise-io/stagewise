@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ModelId } from '@shared/available-models';
 import type { PluginDefinition } from '@shared/plugins';
+import type { CommandDefinitionUI } from '@shared/commands';
 import type {
   UserMessageMetadata,
   MountPermission,
@@ -425,6 +426,18 @@ export type OmniboxSuggestions = {
   }[];
 };
 
+export type PlanEntry = {
+  name: string;
+  description: string | null;
+  filename: string;
+  totalTasks: number;
+  completedTasks: number;
+  taskGroups: Array<{
+    label: string;
+    tasks: Array<{ text: string; completed: boolean; depth: number }>;
+  }>;
+};
+
 export type MountEntry = {
   prefix: string;
   path: string;
@@ -611,6 +624,12 @@ export type AppState = {
 
   /** Bundled plugin definitions (static, pushed once at startup) */
   plugins: PluginDefinition[];
+
+  /** Bundled slash command definitions (static, pushed once at startup) */
+  commands: CommandDefinitionUI[];
+
+  /** Global plans (workspace-independent, from user-data/plans/) */
+  plans: PlanEntry[];
 };
 
 export type AuthStatus =
@@ -1071,4 +1090,6 @@ export const defaultState: KartonContract['state'] = {
   searchEngines: [],
   systemTheme: 'light', // Will be set correctly by backend on init
   plugins: [],
+  commands: [],
+  plans: [],
 };

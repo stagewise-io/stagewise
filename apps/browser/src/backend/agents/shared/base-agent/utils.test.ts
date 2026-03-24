@@ -31,6 +31,7 @@ function makeSnapshot(
     workspaceMd: { entries: [] },
     enabledSkills: { paths: [] },
     browserSessionId: 'test-browser-session-id',
+    plans: { entries: [] },
     ...overrides,
   };
 }

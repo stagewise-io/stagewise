@@ -1,8 +1,13 @@
 import { BaseAgent, type BaseAgentConfig } from '../shared/base-agent';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
-import type { StagewiseToolSet } from '@shared/karton-contracts/ui/agent/tools/types';
+import type {
+  StagewiseToolSet,
+  OverwriteFileToolInput,
+} from '@shared/karton-contracts/ui/agent/tools/types';
+import { isPlanPath } from '@shared/plan-ownership';
 import { buildChatSystemPrompt } from './system-prompt-builder/system-prompt-builder';
 import z from 'zod';
+import type { StepResult } from 'ai';
 export class ChatAgent extends BaseAgent<never, undefined> {
   public static readonly agentType = AgentTypes.CHAT;
   public static readonly config = {
@@ -37,6 +42,28 @@ export class ChatAgent extends BaseAgent<never, undefined> {
   protected getSystemPrompt = (): string => {
     return buildChatSystemPrompt();
   };
+
+  /**
+   * Stop generation after the agent creates a new plan file.
+   *
+   * When the step contains an `overwriteFile` tool result whose path matches `plans/*.md`
+   * (i.e. the file was just created, not updated), we return `false`
+   * so the agent goes idle and the plan-creation tool part is the
+   * last visible element in the chat.
+   */
+  protected onStepFinished(result: StepResult<StagewiseToolSet>): boolean {
+    for (const tr of result.toolResults) {
+      if (tr.toolName !== 'overwriteFile') continue;
+
+      const input = tr.input as OverwriteFileToolInput;
+      if (!isPlanPath(input.relative_path)) continue;
+
+      // Plan was created or updated — stop so the UI can present it cleanly.
+      return false;
+    }
+
+    return true;
+  }
 
   protected getTools = async () => {
     const id = this.instanceId;

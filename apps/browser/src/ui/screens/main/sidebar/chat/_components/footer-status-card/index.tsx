@@ -25,6 +25,10 @@ import {
 } from './workspace-md-section';
 import { UserQuestionSection } from './user-question-section';
 import { getBaseName } from '@shared/path-utils';
+import { getAgentOwnedPlanPaths, PLANS_PREFIX } from '@shared/plan-ownership';
+import { buildPlanSections, type PlanEntry } from './plan-section';
+import { getPlanUIPhases, type LivePlanData } from '@shared/plan-lifecycle';
+import { useSendImplement } from '@ui/hooks/use-send-implement';
 
 // Stable empty arrays/sets to avoid infinite loop with useSyncExternalStore
 const EMPTY_HISTORY: AgentMessage[] = [];
@@ -90,11 +94,19 @@ export function StatusCard() {
       : EMPTY_MOUNTS,
   );
 
+  const globalPlans = useKartonState((s) => s.plans);
+
   // Message history for the open agent (used to resolve all-time mounts from env snapshots)
   const agentHistory = useKartonState((s) =>
     openAgentId
       ? (s.agents.instances[openAgentId]?.state.history ?? EMPTY_HISTORY)
       : EMPTY_HISTORY,
+  );
+
+  const isAgentWorking = useKartonState((s) =>
+    openAgentId
+      ? (s.agents.instances[openAgentId]?.state.isWorking ?? false)
+      : false,
   );
 
   // All mounts ever seen in env snapshots (survives workspace disconnects)
@@ -162,6 +174,7 @@ export function StatusCard() {
   const [dismissedPaths, setDismissedPaths] = useState<Set<string>>(
     () => new Set(),
   );
+
   const [completedPaths, setCompletedPaths] = useState<Set<string>>(
     () => new Set(),
   );
@@ -391,37 +404,75 @@ export function StatusCard() {
     stopAgent,
   ]);
 
+  // Active plans owned by this agent (excluding dismissed and just-created)
+  const ownedPlans = useMemo(() => {
+    const ownedPaths = getAgentOwnedPlanPaths(agentHistory);
+    if (ownedPaths.size === 0) return [];
+
+    // Build live data map for phase computation
+    const livePlanDataByPath = new Map<string, LivePlanData>();
+    for (const plan of globalPlans) {
+      const toolPath = `${PLANS_PREFIX}/${plan.filename}`;
+      if (!ownedPaths.has(toolPath)) continue;
+      livePlanDataByPath.set(toolPath, {
+        totalTasks: plan.totalTasks,
+        completedTasks: plan.completedTasks,
+      });
+    }
+
+    // Derive phases for all owned plans in a single history pass
+    const phases = getPlanUIPhases(
+      agentHistory,
+      ownedPaths,
+      isAgentWorking,
+      livePlanDataByPath,
+    );
+
+    const plans: PlanEntry[] = [];
+    for (const plan of globalPlans) {
+      const toolPath = `${PLANS_PREFIX}/${plan.filename}`;
+      if (!ownedPaths.has(toolPath)) continue;
+
+      const phase = phases.get(toolPath) ?? 'awaiting-action';
+
+      // Hide plans that are still in the just-created phase
+      // (create-plan.tsx owns the UI for those)
+      if (phase === 'just-created') continue;
+
+      // Auto-hide completed plans — the chat history card
+      // (create-plan.tsx) already shows the final state.
+      if (phase === 'completed') continue;
+
+      plans.push({ ...plan, phase });
+    }
+
+    return plans;
+  }, [agentHistory, globalPlans, isAgentWorking]);
+
+  const handleOpenPlan = useCallback(
+    (filename: string) => {
+      const baseUrl = `stagewise://internal/plan/${encodeURIComponent(filename)}`;
+
+      // Reuse existing plan tab for this plan if one is already open
+      const existingTab = Object.values(tabs).find((tab) =>
+        tab.url.startsWith(baseUrl),
+      );
+
+      if (existingTab) {
+        void switchTab(existingTab.id);
+        void goToUrl(baseUrl, existingTab.id);
+      } else void createTab(baseUrl, true);
+    },
+    [createTab, switchTab, goToUrl, tabs],
+  );
+
+  const handleImplement = useSendImplement();
+
   // Create status card items
   const items = useMemo(() => {
     const result: StatusCardSection[] = [];
 
-    for (const section of workspaceMdSections) {
-      result.push(section);
-    }
-
-    const messageQueueSection = MessageQueueSection({
-      queuedMessages: messageQueue ?? [],
-      onRemoveMessage: async (messageId) => {
-        if (!openAgentId) return;
-        await deleteQueuedMessage(openAgentId, messageId);
-      },
-      onFlush: async () => {
-        if (!openAgentId) return;
-        await flushQueue(openAgentId);
-      },
-    });
-    if (messageQueueSection) result.push(messageQueueSection);
-
-    const fileDiffSection = FileDiffSection({
-      pendingDiffs: formattedPendingDiffs,
-      diffSummary: formattedDiffSummary,
-      resolvedMounts,
-      activeMountPaths,
-      onRejectAll: (hunkIds: string[]) => void rejectAllPendingEdits(hunkIds),
-      onAcceptAll: (hunkIds: string[]) => void acceptAllPendingEdits(hunkIds),
-      onOpenDiffReview: openDiffReviewPage,
-    });
-    if (fileDiffSection) result.push(fileDiffSection);
+    for (const section of workspaceMdSections) result.push(section);
 
     const userQuestionSection = UserQuestionSection({
       pendingQuestion: pendingUserQuestion,
@@ -438,11 +489,45 @@ export function StatusCard() {
         await goBackUserQuestion(openAgentId, questionId);
       },
     });
+
     if (userQuestionSection) result.push(userQuestionSection);
+    const messageQueueSection = MessageQueueSection({
+      queuedMessages: messageQueue ?? [],
+      onRemoveMessage: async (messageId) => {
+        if (!openAgentId) return;
+        await deleteQueuedMessage(openAgentId, messageId);
+      },
+      onFlush: async () => {
+        if (!openAgentId) return;
+        await flushQueue(openAgentId);
+      },
+    });
+    if (messageQueueSection) result.push(messageQueueSection);
+
+    const planSections = buildPlanSections({
+      plans: ownedPlans,
+      onOpenPlan: handleOpenPlan,
+      onImplement: handleImplement,
+    });
+    for (const section of planSections) result.push(section);
+
+    const fileDiffSection = FileDiffSection({
+      pendingDiffs: formattedPendingDiffs,
+      diffSummary: formattedDiffSummary,
+      resolvedMounts,
+      activeMountPaths,
+      onRejectAll: (hunkIds: string[]) => void rejectAllPendingEdits(hunkIds),
+      onAcceptAll: (hunkIds: string[]) => void acceptAllPendingEdits(hunkIds),
+      onOpenDiffReview: openDiffReviewPage,
+    });
+    if (fileDiffSection) result.push(fileDiffSection);
 
     return result;
   }, [
     workspaceMdSections,
+    ownedPlans,
+    handleOpenPlan,
+    handleImplement,
     messageQueue,
     openAgentId,
     deleteQueuedMessage,

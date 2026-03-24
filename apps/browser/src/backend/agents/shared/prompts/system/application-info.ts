@@ -25,6 +25,7 @@ When connected to a workspace, you may create, read, modify, and delete all file
 
 - \`.stagewise\`: stagewise specific files for agent behavior and project information. Important to follow and respect.
 - \`.stagewise/\`: High-level project information. If not existing, it's being generated.
+- Plans are stored globally (workspace-independent) under a \`plans/\` mount. Structured implementation plans as Markdown files with GFM checkboxes (\`- [ ]\` / \`- [x]\`). Active plans appear in \`<env-snapshot>\` under \`# Active Plans\`.
 - \`AGENTS.md\`: User-defined behavior ruleset and project information. May be outdated or not exist. Ignore, if not explicitly listed in the chat. Superseded by files in \`.stagewise\` folder.
 
 ## Javascript sandbox

@@ -16,6 +16,7 @@ import {
   defaultState,
   type WorkspaceMountInfo,
 } from '@shared/karton-contracts/pages-api';
+import type { PlanEntry } from '@shared/karton-contracts/ui';
 import type { FileDiff } from '@shared/karton-contracts/ui/shared-types';
 import type {
   UserPreferences,
@@ -54,7 +55,7 @@ import type {
 import { DisposableService } from './disposable';
 import type { TelemetryService } from './telemetry';
 import { discoverPlugins } from '@/utils/discover-plugins';
-import { getPluginsPath } from '@/utils/paths';
+import { getPluginsPath, getPlansDir } from '@/utils/paths';
 
 declare const PAGES_VITE_DEV_SERVER_URL: string;
 declare const PAGES_VITE_NAME: string;
@@ -351,6 +352,46 @@ export class PagesService extends DisposableService {
 
     this.logger.debug(
       '[PagesService] Registered workspace protocol handler for browsing session',
+    );
+
+    // Register plans:// protocol on the browsing session so that
+    // internal pages (stagewise://internal/plan/*) can fetch plan files.
+    ses.protocol.handle('plans', async (request) => {
+      try {
+        const secFetchSite = request.headers.get('Sec-Fetch-Site');
+        if (secFetchSite === 'cross-site')
+          return new Response('Forbidden', { status: 403 });
+
+        const url = new URL(request.url);
+        const filename = decodeURIComponent(url.pathname.replace(/^\//, ''));
+
+        if (!filename)
+          return new Response('Invalid plans URL', { status: 400 });
+
+        const plansDir = getPlansDir();
+        const absolutePath = path.resolve(plansDir, filename);
+        if (!absolutePath.startsWith(plansDir + path.sep))
+          return new Response('Path traversal denied', { status: 400 });
+
+        const mime = inferMimeType(filename);
+        const fileUrl = pathToFileURL(absolutePath).href;
+        const fileResponse = await net.fetch(fileUrl);
+
+        return new Response(fileResponse.body, {
+          status: 200,
+          headers: { 'Content-Type': mime },
+        });
+      } catch (err) {
+        this.logger.error(
+          '[PagesService] plans protocol error (browsing session)',
+          { error: err, url: request.url },
+        );
+        return new Response('Internal error', { status: 500 });
+      }
+    });
+
+    this.logger.debug(
+      '[PagesService] Registered plans protocol handler for browsing session',
     );
   }
 
@@ -1572,6 +1613,18 @@ export class PagesService extends DisposableService {
       },
     );
 
+    this.kartonServer.registerServerProcedureHandler(
+      'savePlanFile',
+      async (_callingClientId: string, filename: string, content: string) => {
+        const plansDir = getPlansDir();
+        const absolutePath = path.resolve(plansDir, filename);
+        if (!absolutePath.startsWith(plansDir + path.sep))
+          throw new Error('Path traversal denied');
+
+        await writeFile(absolutePath, content, 'utf-8');
+      },
+    );
+
     this.syncConfiguredCredentialIds(listConfiguredHandler);
     this.logger.debug('[PagesService] Credential handlers registered');
   }
@@ -1679,6 +1732,12 @@ export class PagesService extends DisposableService {
   public syncWorkspaceMountsState(mounts: WorkspaceMountInfo[]): void {
     this.kartonServer.setState((draft) => {
       draft.workspaceMounts = mounts;
+    });
+  }
+
+  public syncPlansState(plans: PlanEntry[]): void {
+    this.kartonServer.setState((draft) => {
+      draft.plans = plans;
     });
   }
 
@@ -1885,6 +1944,7 @@ export class PagesService extends DisposableService {
     // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');
     ses.protocol.unhandle('stagewise');
+    ses.protocol.unhandle('plans');
 
     // Clean up all port close listeners
     for (const [port, listener] of this.portCloseListeners.entries()) {

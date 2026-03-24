@@ -28,6 +28,11 @@ import {
 } from '../prompts/utils/metadata-converter/html-elements';
 import { textClipToContextSnippet } from '../prompts/utils/metadata-converter/text-clips';
 import { mentionToContextSnippet } from '../prompts/utils/metadata-converter/mentions';
+import {
+  extractSlashIdsFromText,
+  stripSlashLinksFromText,
+  resolveSlashCommandContent,
+} from '../prompts/utils/metadata-converter/slash-items';
 import xml from 'xml';
 import specialTokens from '../prompts/utils/special-tokens';
 import type { ModelCapabilities } from '@shared/karton-contracts/ui/shared-types';
@@ -773,12 +778,27 @@ async function convertUserMessage(
   logger?: Logger,
   imageCache?: ProcessedImageCacheService,
 ): Promise<UserModelMessage> {
+  // ── Resolve slash commands ──────────────────────────────────────────
+  // Extract slash command IDs from the raw text, resolve their content
+  // from disk, and strip the `[label](slash:id)` links from the user
+  // text. Resolved content is prepended as plain-text parts *before*
+  // the <user-msg> so the LLM reads the instruction first.
+  const slashIds = extractSlashIdsFromText(message.parts);
+  const slashContentParts: TextPart[] = [];
+  for (const id of slashIds) {
+    const content = await resolveSlashCommandContent(id);
+    if (content) slashContentParts.push({ type: 'text', text: content });
+  }
+
   const parts = message.parts.map((part) => {
-    if (part.type === 'text')
+    if (part.type === 'text') {
+      // Strip slash links so <user-msg> contains only user-authored text.
+      const cleaned = stripSlashLinksFromText(part.text ?? '');
       return {
         ...part,
-        text: xml({ 'user-msg': { _cdata: part.text } }),
+        text: xml({ 'user-msg': { _cdata: cleaned } }),
       };
+    }
     return { ...part };
   });
 
@@ -906,6 +926,15 @@ async function convertUserMessage(
 
   if (typeof converted.content === 'string') {
     converted.content = [{ type: 'text', text: converted.content }];
+  }
+
+  // Prepend resolved slash-command content before the user-msg parts
+  // so the LLM reads the instruction context first.
+  if (slashContentParts.length > 0) {
+    converted.content = [
+      ...slashContentParts,
+      ...(converted.content as (TextPart | ImagePart | FilePart)[]),
+    ];
   }
 
   // Splice buffer-backed file/image parts directly into the model-level content.

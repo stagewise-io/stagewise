@@ -29,7 +29,7 @@ import type {
   GlobalConfig,
   ModelProvider,
 } from '../ui/shared-types';
-import type { ApiKeyValidationResult, AuthStatus } from '../ui';
+import type { ApiKeyValidationResult, AuthStatus, PlanEntry } from '../ui';
 import type { FileDiff } from '../ui/shared-types';
 import { defaultUserPreferences } from '../ui/shared-types';
 import type { PluginDefinition } from '../../plugins';
@@ -83,6 +83,8 @@ export type PagesApiState = {
   configuredCredentialIds: string[];
   /** Bundled plugin definitions (static, pushed once at startup) */
   plugins: PluginDefinition[];
+  /** Global plans (workspace-independent, synced from AppState.plans) */
+  plans: PlanEntry[];
   // Current stagewise app runtime information
   appInfo: {
     baseName: string; // Base name (e.g., 'stagewise-dev', 'stagewise-prerelease', 'stagewise').
@@ -243,6 +245,8 @@ export type PagesApiContract = {
       relativePath: string,
       content: string,
     ) => Promise<void>;
+    /** Save content to a plan file in the global plans directory */
+    savePlanFile: (filename: string, content: string) => Promise<void>;
   };
 };
 
@@ -263,6 +267,7 @@ export const defaultState: PagesApiState = {
   workspaceMdGenerating: {},
   configuredCredentialIds: [],
   plugins: [],
+  plans: [],
   homePage: {
     storedExperienceData: {
       recentlyOpenedWorkspaces: [],

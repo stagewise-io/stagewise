@@ -86,6 +86,16 @@ protocol.registerSchemesAsPrivileged([
     },
   },
   {
+    scheme: 'plans',
+    privileges: {
+      standard: true,
+      secure: true,
+      stream: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+  {
     scheme: 'app',
     privileges: {
       standard: true,
