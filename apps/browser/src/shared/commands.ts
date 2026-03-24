@@ -1,12 +1,3 @@
-import { z } from 'zod';
-
-export const commandMetadataSchema = z.object({
-  displayName: z.string(),
-  description: z.string(),
-});
-
-export type CommandMetadata = z.infer<typeof commandMetadataSchema>;
-
 /**
  * Full command definition used by the backend.
  * Includes `contentPath` for lazy content loading.
@@ -16,9 +7,10 @@ export type CommandDefinition = {
   displayName: string;
   description: string;
   source: 'builtin';
-  logoSvg: string | null;
-  /** Absolute path to content.md — resolved lazily at injection time */
+  /** Absolute path to the command `.md` file — resolved lazily at injection time */
   contentPath: string;
+  /** When true, the command is available to the agent but hidden from the slash-command UI. */
+  hidden?: boolean;
 };
 
 /**
@@ -30,5 +22,6 @@ export type CommandDefinitionUI = {
   displayName: string;
   description: string;
   source: 'builtin';
-  logoSvg: string | null;
+  /** When true, the command is available to the agent but hidden from the slash-command UI. */
+  hidden?: boolean;
 };

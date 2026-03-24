@@ -19,16 +19,16 @@ export function querySlashItems(query: string): SlashItem[] {
   return slashCommandsRef.current
     .filter(
       (cmd) =>
-        cmd.id.toLowerCase().includes(q) ||
-        cmd.displayName.toLowerCase().includes(q) ||
-        cmd.description.toLowerCase().includes(q),
+        !cmd.hidden &&
+        (cmd.id.toLowerCase().includes(q) ||
+          cmd.displayName.toLowerCase().includes(q) ||
+          cmd.description.toLowerCase().includes(q)),
     )
     .map(
       (cmd): SlashItem => ({
         id: cmd.id,
         label: cmd.displayName,
         description: cmd.description,
-        logoSvg: cmd.logoSvg,
         group: cmd.source,
       }),
     );

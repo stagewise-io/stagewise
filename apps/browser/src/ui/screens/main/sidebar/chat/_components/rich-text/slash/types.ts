@@ -11,6 +11,5 @@ export interface SlashItem {
   id: string;
   label: string;
   description?: string;
-  logoSvg?: string | null;
   group: string;
 }

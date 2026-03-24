@@ -1,8 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ComponentType } from 'react';
 import { cn } from '@ui/utils';
 import { TerminalSquareIcon } from 'lucide-react';
+import { IconClipboardOutline18 } from 'nucleo-ui-outline-18';
 import { SuggestionPopupContainer, SuggestionSidePanel } from '../shared';
 import type { SlashItem } from './types';
+
+/** Map of command IDs to their icon components. Falls back to TerminalSquareIcon. */
+const COMMAND_ICONS: Record<string, ComponentType<{ className?: string }>> = {
+  plan: IconClipboardOutline18,
+};
 
 interface SlashSuggestionPopupProps {
   items: SlashItem[];
@@ -22,6 +29,7 @@ function SlashSuggestionItem({
   onSelect: () => void;
   onRef: (el: HTMLButtonElement | null) => void;
 }) {
+  const Icon = COMMAND_ICONS[item.id] ?? TerminalSquareIcon;
   return (
     <button
       ref={onRef}
@@ -35,14 +43,7 @@ function SlashSuggestionItem({
       onClick={onSelect}
       onMouseDown={(e) => e.preventDefault()}
     >
-      {item.logoSvg ? (
-        <span
-          className="size-3 shrink-0 text-muted-foreground [&>svg]:size-3"
-          dangerouslySetInnerHTML={{ __html: item.logoSvg }}
-        />
-      ) : (
-        <TerminalSquareIcon className="size-3 shrink-0 text-muted-foreground" />
-      )}
+      <Icon className="size-3 shrink-0 text-muted-foreground" />
       <span className="min-w-0 shrink-0 font-medium">/{item.id}</span>
       {item.description && (
         <span className="min-w-0 truncate text-subtle-foreground text-xs">
