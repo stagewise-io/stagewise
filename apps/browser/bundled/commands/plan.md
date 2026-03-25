@@ -15,7 +15,9 @@ You must create a structured implementation plan. Follow these instructions:
 
 - **Line 1:** `# Plan Title` (h1) — used as display name in UI.
 - **Line 2:** One-sentence plain-text description — used as summary in UI.
-- **Body:** Concise, actionable markdown with GFM checkboxes (`- [ ]` / `- [x]`) for tasks. Scale detail to complexity — don't over-plan simple tasks. Do not use markdown tables or emojis.
+- **Body:** 
+    - Concise, actionable markdown with GFM checkboxes (`- [ ]` / `- [x]`) for tasks. Scale detail to complexity — don't over-plan simple tasks. Do not use emojis.
+    - **Self-contained:** The plan should be self-contained — a fresh agent with no prior context should be able to implement it without re-researching the codebase. Include relevant file paths (mount-prefixed, e.g. `w4ba9/src/...`), current behavior, key decisions and rationale. Omit sections that add no value.
 
 ## Checkbox Rules
 
