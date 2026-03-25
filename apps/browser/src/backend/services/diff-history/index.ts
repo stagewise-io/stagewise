@@ -8,6 +8,7 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import type { KartonService } from '@/services/karton';
 import {
   getDiffHistoryDbPath,
@@ -354,7 +355,8 @@ export class DiffHistoryService extends DisposableService {
     const appsDir = getAgentAppsDir(agentInstanceId);
     const plansDir = getPlansDir();
     const isInternalPath = (d: { path: string }) =>
-      d.path.startsWith(appsDir) || d.path.startsWith(plansDir);
+      d.path.startsWith(appsDir + path.sep) ||
+      d.path.startsWith(plansDir + path.sep);
 
     const pendingFileDiffs = (
       await this.getPendingFileDiffsForAgentInstanceId(agentInstanceId)

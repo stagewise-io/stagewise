@@ -3,6 +3,8 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import matter from 'gray-matter';
 import { getBuiltinCommandsPath } from '@/utils/paths';
+import xml from 'xml';
+import specialTokens from '../special-tokens';
 
 /** Regex to match `[label](slash:id)` links in message text. */
 const SLASH_LINK_RE = /\[[^\]]*\]\(slash:([^)]+)\)/g;
@@ -31,31 +33,55 @@ export function extractSlashIdsFromText(
 }
 
 /**
- * Strips `[label](slash:id)` links from text, returning only the
- * remaining user-authored content (trimmed).
+ * Replaces `[label](slash:id)` links in text with plain `/id` text
+ * so the user's intent to invoke the command stays visible in `<user-msg>`.
  */
-export function stripSlashLinksFromText(text: string): string {
-  return text.replace(SLASH_LINK_RE, '').trim();
+export function inlineSlashLinksAsText(text: string): string {
+  return text.replace(SLASH_LINK_RE, (_match, id: string) => `/${id}`);
+}
+
+/** Resolved slash command with its metadata and body content. */
+export interface ResolvedSlashCommand {
+  id: string;
+  displayName: string;
+  content: string;
 }
 
 /**
- * Resolves a slash command's content from disk and returns it as
- * plain text (frontmatter stripped).
- *
- * @param id - The slash command id (e.g. "implement", "plan")
- * @returns Plain-text command content, or null if not found
+ * Resolves a slash command from disk and returns its metadata + body
+ * content (frontmatter stripped), or null if not found.
  */
-export async function resolveSlashCommandContent(
+export async function resolveSlashCommand(
   id: string,
-): Promise<string | null> {
+): Promise<ResolvedSlashCommand | null> {
   const filePath = resolve(getBuiltinCommandsPath(), `${id}.md`);
   if (!existsSync(filePath)) return null;
 
   try {
     const raw = await readFile(filePath, 'utf-8');
-    const { content } = matter(raw);
-    return content.trim() || null;
+    const { content, data } = matter(raw);
+    const body = content.trim();
+    if (!body) return null;
+
+    return {
+      id,
+      displayName: typeof data.displayName === 'string' ? data.displayName : id,
+      content: body,
+    };
   } catch {
     return null;
   }
+}
+
+/**
+ * Wraps resolved slash command content in a `<slash-command>` XML tag
+ * so the LLM can clearly distinguish command instructions from user content.
+ */
+export function renderSlashCommandXml(cmd: ResolvedSlashCommand): string {
+  return xml({
+    [specialTokens.slashCommandXmlTag]: {
+      _attr: { id: cmd.id, name: cmd.displayName },
+      _cdata: cmd.content,
+    },
+  });
 }

@@ -30,8 +30,9 @@ import { textClipToContextSnippet } from '../prompts/utils/metadata-converter/te
 import { mentionToContextSnippet } from '../prompts/utils/metadata-converter/mentions';
 import {
   extractSlashIdsFromText,
-  stripSlashLinksFromText,
-  resolveSlashCommandContent,
+  inlineSlashLinksAsText,
+  resolveSlashCommand,
+  renderSlashCommandXml,
 } from '../prompts/utils/metadata-converter/slash-items';
 import xml from 'xml';
 import specialTokens from '../prompts/utils/special-tokens';
@@ -780,20 +781,25 @@ async function convertUserMessage(
 ): Promise<UserModelMessage> {
   // ── Resolve slash commands ──────────────────────────────────────────
   // Extract slash command IDs from the raw text, resolve their content
-  // from disk, and strip the `[label](slash:id)` links from the user
-  // text. Resolved content is prepended as plain-text parts *before*
-  // the <user-msg> so the LLM reads the instruction first.
+  // from disk, and replace `[label](slash:id)` links with plain `/id`
+  // in the user text. Resolved content is prepended as XML-wrapped
+  // parts *before* the <user-msg> so the LLM reads the instruction first.
   const slashIds = extractSlashIdsFromText(message.parts);
   const slashContentParts: TextPart[] = [];
   for (const id of slashIds) {
-    const content = await resolveSlashCommandContent(id);
-    if (content) slashContentParts.push({ type: 'text', text: content });
+    const cmd = await resolveSlashCommand(id);
+    if (cmd)
+      slashContentParts.push({
+        type: 'text',
+        text: renderSlashCommandXml(cmd),
+      });
   }
 
   const parts = message.parts.map((part) => {
     if (part.type === 'text') {
-      // Strip slash links so <user-msg> contains only user-authored text.
-      const cleaned = stripSlashLinksFromText(part.text ?? '');
+      // Replace slash links with plain /id so the command invocation
+      // stays visible in <user-msg>.
+      const cleaned = inlineSlashLinksAsText(part.text ?? '');
       return {
         ...part,
         text: xml({ 'user-msg': { _cdata: cleaned } }),
