@@ -23,6 +23,7 @@ export const DESCRIPTION = `List files and directories in a path (like 'ls' or '
   - pattern (string, OPTIONAL): File extension or glob pattern to filter results. Examples: '.ts', '*.js'.
   - includeDirectories (boolean, OPTIONAL): Include directories in results. Defaults to true.
   - includeFiles (boolean, OPTIONAL): Include files in results. Defaults to true.
+  - include_gitignored (boolean, OPTIONAL): If true, includes files from gitignored paths (e.g. node_modules, dist). Defaults to false.
   
   Behavior: At least one of includeFiles or includeDirectories must be true. Respects .gitignore by default. Returns file/directory objects with relativePath, name, type, size (files only), and depth. Output capped at 50 items and 40KB total. Path must exist and be a directory, otherwise an error is thrown.`;
 
@@ -74,7 +75,7 @@ export async function listFilesToolExecute(
       pattern,
       includeDirectories,
       includeFiles,
-      respectGitignore: true, // Respect .gitignore by default
+      respectGitignore: !params.include_gitignored,
     });
 
     if (!result.success)

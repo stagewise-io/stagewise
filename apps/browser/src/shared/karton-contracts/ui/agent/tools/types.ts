@@ -124,6 +124,12 @@ export const listFilesToolInputSchema = z.object({
     .boolean()
     .optional()
     .describe('Include files in results. Defaults to true.'),
+  include_gitignored: z
+    .boolean()
+    .optional()
+    .describe(
+      'If true, includes files from gitignored paths (e.g. node_modules, dist). Defaults to false.',
+    ),
 });
 
 export const listFilesToolOutputSchema = z.object({
