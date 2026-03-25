@@ -1,4 +1,4 @@
-import React, {
+import {
   useCallback,
   useMemo,
   useState,
@@ -695,32 +695,8 @@ export const ChatHistory = () => {
             className="flex flex-col pb-[calc(64px+var(--status-card-height,0px))] pl-4"
             style={{ paddingRight }}
           >
-            {messageComponent}
-            {showWorkingIndicator && <MessageLoading />}
-            {error && isLastMessage && openAgent && (
-              <MessageRuntimeError
-                agentInstanceId={openAgent}
-                error={error}
-                canRetry={canRetry}
-                onRetry={() => void retryLastUserMessage(openAgent)}
-              />
-            )}
-          </div>
-        );
-
-      // Attach ref to last user message wrapper for height measurement
-      // When user message is the ACTUAL last message, we need a spacer element AFTER it
-      if (isLastUserMessage && isLastMessage) {
-        return (
-          <div
-            className={cn('flex flex-col pl-4', index === 0 && 'pt-2.5')}
-            style={{ paddingRight }}
-          >
-            <div ref={lastUserMessageRef}>{messageComponent}</div>
-            {/* Spacer element receives minHeight to fill viewport below user message.
-                Error card and loading indicator live INSIDE the spacer (same pattern
-                as the assistant branch) so they don't overflow the measured area. */}
-            <div ref={lastAssistantMessageRef}>
+            <div className="mx-auto w-full max-w-3xl">
+              {messageComponent}
               {showWorkingIndicator && <MessageLoading />}
               {error && isLastMessage && openAgent && (
                 <MessageRuntimeError
@@ -733,6 +709,34 @@ export const ChatHistory = () => {
             </div>
           </div>
         );
+
+      // Attach ref to last user message wrapper for height measurement
+      // When user message is the ACTUAL last message, we need a spacer element AFTER it
+      if (isLastUserMessage && isLastMessage) {
+        return (
+          <div
+            className={cn('flex flex-col pl-4', index === 0 && 'pt-2.5')}
+            style={{ paddingRight }}
+          >
+            <div className="mx-auto w-full max-w-3xl">
+              <div ref={lastUserMessageRef}>{messageComponent}</div>
+              {/* Spacer element receives minHeight to fill viewport below user message.
+                  Error card and loading indicator live INSIDE the spacer (same pattern
+                  as the assistant branch) so they don't overflow the measured area. */}
+              <div ref={lastAssistantMessageRef}>
+                {showWorkingIndicator && <MessageLoading />}
+                {error && isLastMessage && openAgent && (
+                  <MessageRuntimeError
+                    agentInstanceId={openAgent}
+                    error={error}
+                    canRetry={canRetry}
+                    onRetry={() => void retryLastUserMessage(openAgent)}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        );
       }
 
       // Last user message but NOT the last message overall (assistant came after)
@@ -742,7 +746,9 @@ export const ChatHistory = () => {
             className={cn('flex flex-col pl-4', index === 0 && 'pt-2.5')}
             style={{ paddingRight }}
           >
-            <div ref={lastUserMessageRef}>{messageComponent}</div>
+            <div className="mx-auto w-full max-w-3xl">
+              <div ref={lastUserMessageRef}>{messageComponent}</div>
+            </div>
           </div>
         );
       }
@@ -752,15 +758,17 @@ export const ChatHistory = () => {
           className={cn('pl-4', index === 0 && 'pt-2.5')}
           style={{ paddingRight }}
         >
-          {messageComponent}
-          {error && isLastMessage && openAgent && (
-            <MessageRuntimeError
-              agentInstanceId={openAgent}
-              error={error}
-              canRetry={canRetry}
-              onRetry={() => void retryLastUserMessage(openAgent)}
-            />
-          )}
+          <div className="mx-auto w-full max-w-3xl">
+            {messageComponent}
+            {error && isLastMessage && openAgent && (
+              <MessageRuntimeError
+                agentInstanceId={openAgent}
+                error={error}
+                canRetry={canRetry}
+                onRetry={() => void retryLastUserMessage(openAgent)}
+              />
+            )}
+          </div>
         </div>
       );
     },
@@ -808,7 +816,7 @@ export const ChatHistory = () => {
         ))}
       </div>
     );
-  }, [visibleSuggestions, createTab, sendUserMessage, paddingRight, track]);
+  }, [visibleSuggestions, createTab, sendUserMessage, track]);
 
   // If no messages, show empty state directly
   if (filteredMessages.length === 0) {

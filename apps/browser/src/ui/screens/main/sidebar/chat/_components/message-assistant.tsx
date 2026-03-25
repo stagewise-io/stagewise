@@ -91,7 +91,7 @@ export const MessageAssistant = memo(
           >
             <div
               className={cn(
-                'group group/chat-message-assistant wrap-break-word relative min-h-8 w-full min-w-1/3 max-w-xl origin-bottom-left select-text space-y-2 rounded-bl-sm py-1.5 font-normal text-foreground text-sm last:mb-0.5',
+                'group group/chat-message-assistant wrap-break-word relative min-h-8 w-full min-w-1/3 origin-bottom-left select-text space-y-2 rounded-bl-sm py-1.5 font-normal text-foreground text-sm last:mb-0.5',
               )}
             >
               {(() => {

@@ -631,7 +631,7 @@ export const MessageUser = memo(
                     'w-full rounded-md bg-background p-2 shadow-[0_0_6px_0_rgba(0,0,0,0.05),0_-6px_48px_-24px_rgba(0,0,0,0.08)] ring-1 ring-derived-strong before:absolute before:inset-0 before:rounded-lg dark:bg-surface-1',
                   isEditing && isEditDragOver && 'bg-hover-derived!',
                   !isEditing &&
-                    'group wrap-break-word max-w-xl origin-bottom-right select-text rounded-lg rounded-br-sm border border-derived bg-surface-1 px-2.5 py-1.5 font-normal text-foreground text-sm last:mb-0.5 dark:bg-surface-tinted',
+                    'group wrap-break-word max-w-184 origin-bottom-right select-text rounded-lg rounded-br-sm border border-derived bg-surface-1 px-2.5 py-1.5 font-normal text-foreground text-sm last:mb-0.5 dark:bg-surface-tinted',
                   !isEditing &&
                     canEdit &&
                     'group/chat-message-user cursor-pointer hover:bg-hover-derived active:bg-active-derived',
