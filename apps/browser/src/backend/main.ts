@@ -38,10 +38,12 @@ import { wirePagesHandlers } from './wiring/pages-handler-wiring';
 import {
   ensureDataDirectories,
   getPluginsPath,
+  getBuiltinCommandsPath,
   getRipgrepBasePath,
 } from './utils/paths';
 import { migrateLegacyPaths } from './utils/migrate-legacy-paths';
 import { discoverPlugins } from './utils/discover-plugins';
+import { discoverCommands } from './utils/discover-commands';
 import { AssetCacheService } from './services/asset-cache';
 import { ProcessedImageCacheService } from './services/processed-image-cache';
 
@@ -157,6 +159,17 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     if (verbose)
       logger.debug(
         `[Main] Pushed ${plugins.length} bundled plugins to UI karton`,
+      );
+  });
+
+  // Push bundled slash command definitions to UI karton state
+  discoverCommands(getBuiltinCommandsPath()).then((commands) => {
+    uiKarton.setState((draft) => {
+      draft.commands = commands.map(({ contentPath, ...ui }) => ui);
+    });
+    if (verbose)
+      logger.debug(
+        `[Main] Pushed ${commands.length} bundled commands to UI karton`,
       );
   });
 

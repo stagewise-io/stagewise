@@ -205,6 +205,7 @@ export function ChatPanelFooter() {
       ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
       : EMPTY_MOUNTS,
   );
+  const slashCommands = useKartonState((s) => s.commands);
   const mentionContext = useMemo<MentionContext>(
     () => ({
       agentInstanceId: openAgent,
@@ -816,6 +817,7 @@ export function ChatPanelFooter() {
           onPasteFiles={handlePasteFiles}
           onAttachmentRemoved={handleAttachmentRemoved}
           mentionContext={mentionContext}
+          slashCommands={slashCommands}
         />
         <ChatInputActions
           isAgentWorking={isWorking}

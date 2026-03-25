@@ -28,6 +28,12 @@ import {
 } from '../prompts/utils/metadata-converter/html-elements';
 import { textClipToContextSnippet } from '../prompts/utils/metadata-converter/text-clips';
 import { mentionToContextSnippet } from '../prompts/utils/metadata-converter/mentions';
+import {
+  extractSlashIdsFromText,
+  inlineSlashLinksAsText,
+  resolveSlashCommand,
+  renderSlashCommandXml,
+} from '../prompts/utils/metadata-converter/slash-items';
 import xml from 'xml';
 import specialTokens from '../prompts/utils/special-tokens';
 import type { ModelCapabilities } from '@shared/karton-contracts/ui/shared-types';
@@ -773,12 +779,32 @@ async function convertUserMessage(
   logger?: Logger,
   imageCache?: ProcessedImageCacheService,
 ): Promise<UserModelMessage> {
+  // ── Resolve slash commands ──────────────────────────────────────────
+  // Extract slash command IDs from the raw text, resolve their content
+  // from disk, and replace `[label](slash:id)` links with plain `/id`
+  // in the user text. Resolved content is prepended as XML-wrapped
+  // parts *before* the <user-msg> so the LLM reads the instruction first.
+  const slashIds = extractSlashIdsFromText(message.parts);
+  const slashContentParts: TextPart[] = [];
+  for (const id of slashIds) {
+    const cmd = await resolveSlashCommand(id);
+    if (cmd)
+      slashContentParts.push({
+        type: 'text',
+        text: renderSlashCommandXml(cmd),
+      });
+  }
+
   const parts = message.parts.map((part) => {
-    if (part.type === 'text')
+    if (part.type === 'text') {
+      // Replace slash links with plain /id so the command invocation
+      // stays visible in <user-msg>.
+      const cleaned = inlineSlashLinksAsText(part.text ?? '');
       return {
         ...part,
-        text: xml({ 'user-msg': { _cdata: part.text } }),
+        text: xml({ 'user-msg': { _cdata: cleaned } }),
       };
+    }
     return { ...part };
   });
 
@@ -906,6 +932,15 @@ async function convertUserMessage(
 
   if (typeof converted.content === 'string') {
     converted.content = [{ type: 'text', text: converted.content }];
+  }
+
+  // Prepend resolved slash-command content before the user-msg parts
+  // so the LLM reads the instruction context first.
+  if (slashContentParts.length > 0) {
+    converted.content = [
+      ...slashContentParts,
+      ...(converted.content as (TextPart | ImagePart | FilePart)[]),
+    ];
   }
 
   // Splice buffer-backed file/image parts directly into the model-level content.

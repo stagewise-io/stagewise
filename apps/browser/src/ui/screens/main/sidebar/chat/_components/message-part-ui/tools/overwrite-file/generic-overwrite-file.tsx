@@ -1,40 +1,42 @@
-import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
+import type { OverwriteFilePart } from '.';
 import type { WithDiff } from '@shared/karton-contracts/ui/agent/tools/types';
-import { DiffPreview } from './shared/diff-preview';
 import { FileIcon } from '@ui/components/file-icon';
 import { getBaseName } from '@shared/path-utils';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@stagewise/stage-ui/components/tooltip';
 import {
   Loader2Icon,
   XIcon,
   ListChevronsDownUpIcon,
   ListChevronsUpDownIcon,
 } from 'lucide-react';
-import { cn, IDE_SELECTION_ITEMS, stripMountPrefix } from '@ui/utils';
+import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { IdePickerPopover } from '@ui/components/ide-picker-popover';
 import { FileContextMenu } from '@ui/components/file-context-menu';
-import { diffLines } from 'diff';
+import { DiffPreview } from '../shared/diff-preview';
+import { cn, IDE_SELECTION_ITEMS, stripMountPrefix } from '@ui/utils';
 import { useMemo, useState } from 'react';
+import { ToolPartUI } from '../shared/tool-part-ui';
+import { diffLines } from 'diff';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
+
 import { useKartonState } from '@ui/hooks/use-karton';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@stagewise/stage-ui/components/tooltip';
-import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
-import { ToolPartUI } from './shared/tool-part-ui';
 import { IdeLogo } from '@ui/components/ide-logo';
 import {
   StreamingCodeBlock,
   getLanguageFromPath,
 } from '@ui/components/ui/streaming-code-block';
 
-export const MultiEditToolPart = ({
+export const GenericOverwriteFileToolPart = ({
   part,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-multiEdit' }>;
+  part: OverwriteFilePart;
 }) => {
+  const [codeDiffCollapsed, setCodeDiffCollapsed] = useState(true);
   const [expanded, setExpanded] = useState(true);
   const { getFileIDEHref, needsIdePicker, pickIdeAndOpen, resolvePath } =
     useFileIDEHref();
@@ -68,6 +70,10 @@ export const MultiEditToolPart = ({
     [diff],
   );
 
+  const openInIdeSelection = useKartonState(
+    (s) => s.globalConfig.openFilesInIde,
+  );
+
   const streaming = useMemo(() => {
     return part.state === 'input-streaming' || part.state === 'input-available';
   }, [part.state]);
@@ -78,36 +84,14 @@ export const MultiEditToolPart = ({
     return 'success';
   }, [part.state, streaming]);
 
-  const effectiveExpanded = useMemo(() => {
-    return state === 'error' ? false : expanded;
-  }, [state, expanded]);
-
   const path = useMemo(() => {
     if (!part.input?.relative_path) return null;
     return stripMountPrefix(part.input.relative_path);
   }, [part.input?.relative_path]);
 
-  const firstLineNumberEdited = useMemo(() => {
-    let startLine = 1;
-    for (const line of diff ?? []) {
-      if (line.added || line.removed) return startLine;
-      startLine += line.count;
-    }
-    return startLine;
-  }, [diff]);
-
-  const hasNewContent = useMemo(() => {
-    if (!Array.isArray(part.input?.edits)) return false;
-    return part.input.edits.some(
-      (edit) => (edit?.new_string?.length ?? 0) > 10,
-    );
-  }, [part.input?.edits]);
-
-  const [collapsedDiffView, setCollapsedDiffView] = useState(true);
-
-  const openInIdeSelection = useKartonState(
-    (s) => s.globalConfig.openFilesInIde,
-  );
+  const effectiveExpanded = useMemo(() => {
+    return state === 'error' ? false : expanded;
+  }, [state, expanded]);
 
   const trigger = useMemo(() => {
     if (state === 'error')
@@ -133,6 +117,7 @@ export const MultiEditToolPart = ({
           resolvePath={resolvePath}
           newLineCount={newLineCount}
           deletedLineCount={deletedLineCount}
+          fileWasCreated={outputWithDiff?._diff?.before === null}
         />
       );
   }, [
@@ -142,7 +127,7 @@ export const MultiEditToolPart = ({
     part.input?.relative_path,
     newLineCount,
     deletedLineCount,
-    part.errorText,
+    outputWithDiff?._diff?.before,
     resolvePath,
   ]);
 
@@ -153,31 +138,102 @@ export const MultiEditToolPart = ({
         <DiffPreview
           diff={diff}
           filePath={part.input?.relative_path ?? ''}
-          collapsed={collapsedDiffView}
+          collapsed={codeDiffCollapsed}
         />
       );
-    else if (hasNewContent && streaming && !diff)
+    else if (streaming && part.input?.content && !diff)
       return (
         <StreamingCodeBlock
-          code={
-            (Array.isArray(part.input?.edits)
-              ? part.input.edits
-                  .map((edit) => edit?.new_string ?? '')
-                  .join('\n\n')
-              : '') ?? ''
-          }
+          code={part.input?.content ?? ''}
           language={getLanguageFromPath(part.input?.relative_path)}
         />
       );
     else return undefined;
+  }, [state, diff, part.input?.content, part.input?.relative_path, streaming]);
+
+  const contentFooter = useMemo(() => {
+    if (state === 'success' && diff)
+      return (
+        <div className="flex w-full flex-row items-center justify-between">
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  setCodeDiffCollapsed(!codeDiffCollapsed);
+                }}
+              >
+                {codeDiffCollapsed ? (
+                  <ListChevronsUpDownIcon className={cn('size-3 shrink-0')} />
+                ) : (
+                  <ListChevronsDownUpIcon className={cn('size-3 shrink-0')} />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {codeDiffCollapsed ? 'Expand code diff' : 'Collapse code diff'}
+            </TooltipContent>
+          </Tooltip>
+          {(() => {
+            const relPath = part.input?.relative_path ?? '';
+            const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
+            const anchor = (
+              <a
+                href={needsIdePicker ? '#' : getFileIDEHref(relPath)}
+                target={needsIdePicker ? undefined : '_blank'}
+                rel="noopener noreferrer"
+                onClick={needsIdePicker ? (e) => e.preventDefault() : undefined}
+                className={cn(
+                  buttonVariants({ size: 'xs', variant: 'ghost' }),
+                  'shrink-0',
+                )}
+              >
+                <div className="flex flex-row items-center justify-center gap-1">
+                  <IdeLogo
+                    ide={openInIdeSelection}
+                    className="size-3 shrink-0"
+                  />
+                  <span className="text-xs">Open file</span>
+                </div>
+              </a>
+            );
+            if (needsIdePicker) {
+              return (
+                <IdePickerPopover
+                  onSelect={(ide) => pickIdeAndOpen(ide, relPath)}
+                >
+                  {anchor}
+                </IdePickerPopover>
+              );
+            }
+            return (
+              <Tooltip>
+                <TooltipTrigger>{anchor}</TooltipTrigger>
+                <TooltipContent>
+                  <div className="flex max-w-96 flex-col gap-1">
+                    <div className="break-all font-mono text-xs">
+                      {stripMountPrefix(relPath)}
+                    </div>
+                    <div className="text-muted-foreground text-xs">
+                      Click to open in {ideName}
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            );
+          })()}
+        </div>
+      );
+    else return undefined;
   }, [
     state,
-    diff,
-    part.input?.edits,
+    codeDiffCollapsed,
     part.input?.relative_path,
-    streaming,
-    hasNewContent,
-    collapsedDiffView,
+    openInIdeSelection,
+    needsIdePicker,
+    getFileIDEHref,
+    pickIdeAndOpen,
   ]);
 
   return (
@@ -188,88 +244,7 @@ export const MultiEditToolPart = ({
       trigger={trigger}
       content={content}
       contentClassName={cn(streaming ? 'max-h-24' : 'max-h-56')}
-      contentFooter={
-        state === 'success' ? (
-          <div className="flex w-full flex-row items-center justify-between">
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => {
-                    setCollapsedDiffView(!collapsedDiffView);
-                  }}
-                >
-                  {collapsedDiffView ? (
-                    <ListChevronsUpDownIcon className={cn('size-3 shrink-0')} />
-                  ) : (
-                    <ListChevronsDownUpIcon className={cn('size-3 shrink-0')} />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {collapsedDiffView ? 'Expand code diff' : 'Collapse code diff'}
-              </TooltipContent>
-            </Tooltip>
-            {(() => {
-              const relPath = part.input?.relative_path ?? '';
-              const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
-              const anchor = (
-                <a
-                  href={
-                    needsIdePicker
-                      ? '#'
-                      : getFileIDEHref(relPath, firstLineNumberEdited)
-                  }
-                  target={needsIdePicker ? undefined : '_blank'}
-                  rel="noopener noreferrer"
-                  onClick={
-                    needsIdePicker ? (e) => e.preventDefault() : undefined
-                  }
-                  className={cn(
-                    buttonVariants({ size: 'xs', variant: 'ghost' }),
-                    'shrink-0',
-                  )}
-                >
-                  <div className="flex flex-row items-center justify-center gap-1">
-                    <IdeLogo
-                      ide={openInIdeSelection}
-                      className="size-3 shrink-0"
-                    />
-                    <span className="text-xs">Open file</span>
-                  </div>
-                </a>
-              );
-              if (needsIdePicker) {
-                return (
-                  <IdePickerPopover
-                    onSelect={(ide) =>
-                      pickIdeAndOpen(ide, relPath, firstLineNumberEdited)
-                    }
-                  >
-                    {anchor}
-                  </IdePickerPopover>
-                );
-              }
-              return (
-                <Tooltip>
-                  <TooltipTrigger>{anchor}</TooltipTrigger>
-                  <TooltipContent>
-                    <div className="flex max-w-96 flex-col gap-1">
-                      <div className="break-all font-mono text-xs">
-                        {stripMountPrefix(relPath)}
-                      </div>
-                      <div className="text-muted-foreground text-xs">
-                        Click to open in {ideName}
-                      </div>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })()}
-          </div>
-        ) : undefined
-      }
+      contentFooter={contentFooter}
       contentFooterClassName="px-0"
     />
   );
@@ -311,12 +286,14 @@ const SuccessHeader = ({
   resolvePath,
   newLineCount,
   deletedLineCount,
+  fileWasCreated,
 }: {
   relativePath?: string;
   fullPath?: string;
   resolvePath: (path: string) => string | null;
   newLineCount: number;
   deletedLineCount: number;
+  fileWasCreated: boolean;
 }) => {
   const fileName = relativePath ? getBaseName(relativePath) : relativePath;
 
@@ -346,12 +323,15 @@ const SuccessHeader = ({
           </Tooltip>
         </FileContextMenu>
       </div>
-      {newLineCount > 0 && (
+      {fileWasCreated && (
         <span className="shrink-0 text-success-foreground text-xs group-hover/trigger:text-hover-derived">
-          +{newLineCount}
+          (new)
         </span>
       )}
-      {deletedLineCount > 0 && (
+      <span className="shrink-0 text-success-foreground text-xs group-hover/trigger:text-hover-derived">
+        +{newLineCount}
+      </span>
+      {!fileWasCreated && deletedLineCount > 0 && (
         <span className="shrink-0 text-error-foreground text-xs group-hover/trigger:text-hover-derived">
           -{deletedLineCount}
         </span>
@@ -373,7 +353,9 @@ const LoadingHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <Loader2Icon className="size-3 shrink-0 animate-spin text-primary-foreground" />
+      <Loader2Icon
+        className={cn('size-3 shrink-0 animate-spin text-primary-foreground')}
+      />
       {relativePath !== null ? (
         <FileContextMenu
           relativePath={fullPath ?? relativePath ?? ''}

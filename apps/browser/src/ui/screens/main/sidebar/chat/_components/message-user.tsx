@@ -47,6 +47,7 @@ import type { MentionContext } from './rich-text/mentions';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import type { Content } from '@tiptap/core';
 import { IconMagicWandSparkle } from 'nucleo-micro-bold';
+import { MessageUserPlanAction } from './message-user-plan-action';
 
 type UserMessage = AgentMessage & { role: 'user' };
 
@@ -97,6 +98,8 @@ export const MessageUser = memo(
 
     // Element selector state and procedures
     // Check if THIS input's element selection is active (not just global mode)
+    const slashCommands = useKartonState((s) => s.commands);
+
     const elementSelectionActive = useKartonState(
       (s) => s.browser.contextSelectionMode,
     );
@@ -569,7 +572,15 @@ export const MessageUser = memo(
     // Text clip attachments: always from metadata (not editable separately)
     const allTextClipAttachments = msg.metadata?.textClipAttachments;
 
-    if (isEmptyMessage && !isLastMessage) return null;
+    // Implement command messages get a custom card instead of a text bubble
+    const hasImplementCommand = msg.parts.some(
+      (p) =>
+        p.type === 'text' &&
+        typeof p.text === 'string' &&
+        /\(slash:implement\)/.test(p.text),
+    );
+
+    if (isEmptyMessage && !hasImplementCommand && !isLastMessage) return null;
 
     // Conditional rendering: view-only mode uses lightweight renderer, edit mode uses full TipTap
     return (
@@ -597,10 +608,18 @@ export const MessageUser = memo(
             </div>
           )}
           <div ref={measureRef} className="w-full">
+            {/* Implement command card — compact full-width indicator */}
+            {hasImplementCommand && !isEditing && (
+              <MessageUserPlanAction
+                onEdit={canEdit ? handleStartEditing : undefined}
+              />
+            )}
             <div
               className={cn(
                 'mt-2 flex w-full shrink-0 flex-row-reverse items-stretch justify-start gap-1',
-                isEmptyMessage ? 'hidden' : '',
+                isEmptyMessage || (hasImplementCommand && !isEditing)
+                  ? 'hidden'
+                  : '',
               )}
             >
               {/* Container with conditional styling for view/edit modes */}
@@ -658,6 +677,7 @@ export const MessageUser = memo(
                       onPasteFiles={handlePasteFiles}
                       onAttachmentRemoved={handleRemoveAttachment}
                       mentionContext={mentionContext}
+                      slashCommands={slashCommands}
                       className="w-full"
                     />
                     {/* Action buttons */}

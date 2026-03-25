@@ -2,6 +2,7 @@ import type { FullEnvironmentSnapshot } from '@shared/karton-contracts/ui/agent/
 import { renderBrowserTabsXml, esc } from './browser-tabs-renderer';
 import { renderAvailableSkillsList } from './skills';
 import type { SkillInfo } from './skills';
+import { PLANS_PREFIX } from '@shared/plan-ownership';
 
 export interface ShellInfo {
   type: string;
@@ -102,6 +103,34 @@ export function renderFullEnvironmentContext(
     } else {
       sections.push(wsFiles.join('\n'));
     }
+  }
+
+  // Active plans
+  const { plans } = snapshot;
+  if (plans.entries.length > 0) {
+    const planLines = plans.entries.map((p) => {
+      const progress = `${p.completedTasks}/${p.totalTasks}`;
+      const file = `${PLANS_PREFIX}/${p.filename}`;
+      const desc = p.description ? ` — ${p.description}` : '';
+
+      // Find next unchecked task
+      let nextTodo: string | null = null;
+      for (const group of p.taskGroups) {
+        for (const task of group.tasks) {
+          if (!task.completed) {
+            nextTodo = task.text;
+            break;
+          }
+        }
+        if (nextTodo) break;
+      }
+
+      const next = nextTodo
+        ? `\n  Next TODO: ${nextTodo}`
+        : '\n  All tasks complete.';
+      return `- **${p.name}** (${progress})${desc}\n  File: \`${file}\`${next}`;
+    });
+    sections.push(`# Active Plans\n${planLines.join('\n')}`);
   }
 
   // Active app

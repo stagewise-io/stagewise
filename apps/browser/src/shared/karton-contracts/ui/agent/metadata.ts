@@ -198,6 +198,32 @@ export const enabledSkillsSnapshotSchema = z.object({
 
 export type EnabledSkillsSnapshot = z.infer<typeof enabledSkillsSnapshotSchema>;
 
+export const planTaskSchema = z.object({
+  text: z.string(),
+  completed: z.boolean(),
+  depth: z.number(),
+});
+
+export const taskGroupSchema = z.object({
+  label: z.string(),
+  tasks: z.array(planTaskSchema),
+});
+
+export const planEntrySchema = z.object({
+  name: z.string(),
+  description: z.string().nullable(),
+  filename: z.string(),
+  totalTasks: z.number(),
+  completedTasks: z.number(),
+  taskGroups: z.array(taskGroupSchema),
+});
+
+export const plansSnapshotSchema = z.object({
+  entries: z.array(planEntrySchema),
+});
+
+export type PlansSnapshot = z.infer<typeof plansSnapshotSchema>;
+
 export const environmentSnapshotSchema = z.object({
   browser: browserSnapshotSchema.optional(),
   workspace: workspaceSnapshotSchema.optional(),
@@ -213,6 +239,7 @@ export const environmentSnapshotSchema = z.object({
    * and treat all previous tab IDs as invalid.
    */
   browserSessionId: z.string().optional(),
+  plans: plansSnapshotSchema.optional(),
 });
 
 export type EnvironmentSnapshot = z.infer<typeof environmentSnapshotSchema>;

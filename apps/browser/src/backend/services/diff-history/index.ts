@@ -8,11 +8,13 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import type { KartonService } from '@/services/karton';
 import {
   getDiffHistoryDbPath,
   getDiffHistoryBlobsDir,
   getAgentAppsDir,
+  getPlansDir,
 } from '@/utils/paths';
 import {
   type FileDiff,
@@ -351,16 +353,20 @@ export class DiffHistoryService extends DisposableService {
       });
 
     const appsDir = getAgentAppsDir(agentInstanceId);
+    const plansDir = getPlansDir();
+    const isInternalPath = (d: { path: string }) =>
+      d.path.startsWith(appsDir + path.sep) ||
+      d.path.startsWith(plansDir + path.sep);
 
     const pendingFileDiffs = (
       await this.getPendingFileDiffsForAgentInstanceId(agentInstanceId)
-    ).filter((d) => !d.path.startsWith(appsDir));
+    ).filter((d) => !isInternalPath(d));
     this.uiKarton.setState((draft) => {
       draft.toolbox[agentInstanceId].pendingFileDiffs = pendingFileDiffs;
     });
     const editSummary = (
       await this.getEditSummaryForAgentInstanceId(agentInstanceId)
-    ).filter((d) => !d.path.startsWith(appsDir));
+    ).filter((d) => !isInternalPath(d));
     this.uiKarton.setState((draft) => {
       draft.toolbox[agentInstanceId].editSummary = editSummary;
     });

@@ -6,6 +6,7 @@ import type {
   EnabledSkillsSnapshot,
   EnvironmentSnapshot,
   FullEnvironmentSnapshot,
+  PlansSnapshot,
   WorkspaceMdSnapshot,
   WorkspaceSnapshot,
 } from '@shared/karton-contracts/ui/agent/metadata';
@@ -32,6 +33,7 @@ export function resolveEffectiveSnapshot(
   let workspaceMd: WorkspaceMdSnapshot | undefined;
   let enabledSkills: EnabledSkillsSnapshot | undefined;
   let browserSessionId: string | undefined;
+  let plans: PlansSnapshot | undefined;
 
   for (let i = upToIndex; i >= 0; i--) {
     const snap = messages[i]?.metadata?.environmentSnapshot;
@@ -54,6 +56,7 @@ export function resolveEffectiveSnapshot(
       enabledSkills = snap.enabledSkills;
     if (browserSessionId === undefined && snap.browserSessionId !== undefined)
       browserSessionId = snap.browserSessionId;
+    if (plans === undefined && snap.plans !== undefined) plans = snap.plans;
     if (
       browser !== undefined &&
       workspace !== undefined &&
@@ -63,10 +66,10 @@ export function resolveEffectiveSnapshot(
       agentsMd !== undefined &&
       workspaceMd !== undefined &&
       enabledSkills !== undefined &&
-      browserSessionId !== undefined
-    ) {
+      browserSessionId !== undefined &&
+      plans !== undefined
+    )
       break;
-    }
   }
 
   if (
@@ -88,6 +91,7 @@ export function resolveEffectiveSnapshot(
     workspaceMd: workspaceMd ?? { entries: [] },
     enabledSkills: enabledSkills ?? { paths: [] },
     browserSessionId: browserSessionId ?? '',
+    plans: plans ?? { entries: [] },
   };
 }
 
@@ -157,6 +161,7 @@ export function sparsifySnapshot(
     sparse.enabledSkills = full.enabledSkills;
   if (full.browserSessionId !== previous.browserSessionId)
     sparse.browserSessionId = full.browserSessionId;
+  if (!deepEqual(full.plans, previous.plans)) sparse.plans = full.plans;
 
   return sparse;
 }
