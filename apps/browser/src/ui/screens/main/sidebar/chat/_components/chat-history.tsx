@@ -48,6 +48,10 @@ declare global {
       replacedMessageId: string;
       newMessage: AgentMessage;
     }>;
+    'chat-restore-checkpoint': CustomEvent<{
+      assistantMessageId: string;
+      undoToolCalls: boolean;
+    }>;
   }
 }
 
@@ -282,7 +286,7 @@ export const ChatHistory = () => {
       }, []);
   }, [history]);
 
-  // For each user message, check if any subsequent messages contain
+  // For each user/assistant message, check if any subsequent messages contain
   // file-modifying tool outputs (detected via _diff or _hasFileWrites markers).
   // Uses a single reverse scan so the check is O(n) overall.
   const hasFileModsAfterMap = useMemo(() => {
@@ -293,6 +297,7 @@ export const ChatHistory = () => {
       if (!msg) continue;
       if (msg.role === 'user') result.set(msg.id, suffixHasFileMods);
       else if (msg.role === 'assistant') {
+        result.set(msg.id, suffixHasFileMods);
         if (
           !suffixHasFileMods &&
           msg.parts.some((part) => {
@@ -680,6 +685,9 @@ export const ChatHistory = () => {
               isWorking={isWorking ?? false}
               showBetweenStepsIndicator={
                 isLastMessage ? showBetweenStepsIndicator : false
+              }
+              hasSubsequentFileModifications={
+                hasFileModsAfterMap.get(message.id) ?? false
               }
             />
           )}
