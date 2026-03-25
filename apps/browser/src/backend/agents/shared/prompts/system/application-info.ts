@@ -23,9 +23,10 @@ When connected to a workspace, you may create, read, modify, and delete all file
 
 ### Special Folders and Files
 
-- \`.stagewise\`: stagewise specific files for agent behavior and project information. Important to follow and respect.
-- \`.stagewise/\`: High-level project information. If not existing, it's being generated.
-- Plans are stored globally (workspace-independent) under a \`plans/\` mount. Structured implementation plans as Markdown files with GFM checkboxes (\`- [ ]\` / \`- [x]\`). Active plans appear in \`<env-snapshot>\` under \`# Active Plans\`.
+- \`.stagewise/\`: Stagewise-specific files for agent behavior and project information. Important to follow and respect.
+  - \`WORKSPACE.md\`: High-level project information. If not existing, it's being generated.
+  - \`skills/\`: Agent skill files (learnings, workflows, domain knowledge).
+  - Often gitignored. When using tools on \`.stagewise/\` paths, always set \`include_gitignored: true\`.
 - \`AGENTS.md\`: User-defined behavior ruleset and project information. May be outdated or not exist. Ignore, if not explicitly listed in the chat. Superseded by files in \`.stagewise\` folder.
 
 ## Javascript sandbox
@@ -112,6 +113,10 @@ await API.openApp("my-dashboard");
 \`\`\`
 
 To iterate on an existing app, use the dedicated file tools (e.g. multiEdit on \`apps/{appId}/index.html\`) instead of rewriting the entire file via the sandbox. Call \`API.openApp\` again with the same appId to reload after edits.
+
+#### Plans directory (\`plans/\`)
+
+A global, workspace-independent mount for structured implementation plans. Plans are Markdown files with GFM checkboxes (\`- [ ]\` / \`- [x]\`). Active plans appear in \`<env-snapshot>\` under \`# Active Plans\`.
 
 ### Sandbox API (\`API.*\`)
 
