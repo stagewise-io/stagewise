@@ -5,9 +5,12 @@ import {
   mergeAttributes,
 } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
+import type { Node as PMNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Fragment } from '@tiptap/pm/model';
 import { generateId } from 'ai';
 import { TextClipAttachmentView } from './text-clip-attachment-view';
+import { markdownToTipTapContent } from '@ui/utils/tiptap-content-utils';
 import {
   type AttachmentNodeOptions,
   type AttachmentType,
@@ -212,8 +215,9 @@ export const TextClipAttachment = Node.create<AttachmentNodeOptions>({
   addCommands() {
     return {
       /**
-       * Resolves a text clip node back to plain text.
-       * Finds the node by ID and replaces it with its content attribute.
+       * Resolves a text clip node back to its content.
+       * Parses mention/attachment link syntax back into proper nodes.
+       * Falls back to plain text insertion if parsing fails.
        */
       resolveTextClip:
         (id: string) =>
@@ -233,12 +237,49 @@ export const TextClipAttachment = Node.create<AttachmentNodeOptions>({
           });
 
           if (nodePos !== null && dispatch) {
-            // Replace the node with plain text
-            tr.replaceWith(
-              nodePos,
-              nodePos + 1,
-              state.schema.text(nodeContent),
-            );
+            try {
+              // Parse content through the markdown pipeline to restore
+              // mention/attachment nodes from their serialized link syntax
+              const parsed = markdownToTipTapContent(nodeContent);
+              const paragraphs = parsed.content ?? [];
+
+              // Collect inline nodes from all paragraphs, joining with hardBreak
+              const inlineNodes: PMNode[] = [];
+              for (let i = 0; i < paragraphs.length; i++) {
+                const paraContent = paragraphs[i]?.content;
+                if (paraContent)
+                  for (const child of paraContent)
+                    inlineNodes.push(state.schema.nodeFromJSON(child));
+
+                // Add hard break between paragraphs (not after the last one)
+                if (i < paragraphs.length - 1)
+                  inlineNodes.push(
+                    state.schema.nodeFromJSON({ type: 'hardBreak' }),
+                  );
+              }
+
+              if (inlineNodes.length > 0) {
+                tr.replaceWith(
+                  nodePos,
+                  nodePos + 1,
+                  Fragment.from(inlineNodes),
+                );
+              } else {
+                // Empty parse result — insert content as plain text
+                tr.replaceWith(
+                  nodePos,
+                  nodePos + 1,
+                  state.schema.text(nodeContent),
+                );
+              }
+            } catch {
+              // Parsing failed — fall back to plain text
+              tr.replaceWith(
+                nodePos,
+                nodePos + 1,
+                state.schema.text(nodeContent),
+              );
+            }
             dispatch(tr);
             return true;
           }
