@@ -12,7 +12,7 @@ import type {
   AgentToolUIPart,
 } from '@shared/karton-contracts/ui/agent';
 import type { UIAgentTools } from '@shared/karton-contracts/ui/agent/tools/types';
-import { useMemo, memo } from 'react';
+import { useMemo, memo, useState, useCallback } from 'react';
 import { ThinkingPart } from './message-part-ui/thinking';
 import { FilePart } from './message-part-ui/file';
 import { TextPart } from './message-part-ui/text';
@@ -32,6 +32,15 @@ import { AskUserQuestionsToolPart } from './message-part-ui/tools/ask-user-quest
 import { ExecuteShellCommandToolPart } from './message-part-ui/tools/execute-shell-command';
 import { isToolOrReasoningPart } from './message-utils';
 import { MessageBetweenSteps } from './message-between-steps';
+import { IconDotsOutline18 } from 'nucleo-ui-outline-18';
+import {
+  Menu,
+  MenuTrigger,
+  MenuContent,
+  MenuItem,
+} from '@stagewise/stage-ui/components/menu';
+import { HistoryIcon } from 'lucide-react';
+import { RevertConfirmPopover } from './revert-confirm-popover';
 
 type AssistantMessage = AgentMessage & { role: 'assistant' };
 
@@ -51,11 +60,13 @@ export const MessageAssistant = memo(
     isLastMessage,
     isWorking,
     showBetweenStepsIndicator,
+    hasSubsequentFileModifications,
   }: {
     message: AssistantMessage;
     isLastMessage: boolean;
     isWorking: boolean;
     showBetweenStepsIndicator?: boolean;
+    hasSubsequentFileModifications?: boolean;
   }) {
     const isEmptyMessage = useMemo(() => {
       if (
@@ -77,6 +88,31 @@ export const MessageAssistant = memo(
             part.text.trim() === ''),
       );
     }, [msg.parts]);
+
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+    const dispatchRestore = useCallback(
+      (undoToolCalls: boolean) => {
+        setIsConfirmOpen(false);
+        window.dispatchEvent(
+          new CustomEvent('chat-restore-checkpoint', {
+            detail: {
+              assistantMessageId: msg.id,
+              undoToolCalls,
+            },
+          }),
+        );
+      },
+      [msg.id],
+    );
+
+    const handleRestoreCheckpoint = useCallback(() => {
+      if (hasSubsequentFileModifications) {
+        setIsConfirmOpen(true);
+      } else {
+        dispatchRestore(false);
+      }
+    }, [hasSubsequentFileModifications, dispatchRestore]);
 
     if (isEmptyMessage && !isLastMessage) return null;
 
@@ -244,6 +280,37 @@ export const MessageAssistant = memo(
                 });
               })()}
               {showBetweenStepsIndicator && <MessageBetweenSteps />}
+              {/* Actions menu — hidden on last message (restore would be a noop) and while streaming */}
+              {!isLastMessage && (
+                <div className="flex justify-end">
+                  <Menu>
+                    <MenuTrigger>
+                      <button
+                        type="button"
+                        className="flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <IconDotsOutline18 className="size-3.5" />
+                      </button>
+                    </MenuTrigger>
+                    <MenuContent
+                      side="bottom"
+                      align="end"
+                      sideOffset={2}
+                      size="xs"
+                    >
+                      <MenuItem size="xs" onClick={handleRestoreCheckpoint}>
+                        <HistoryIcon className="size-3" />
+                        Restore checkpoint
+                      </MenuItem>
+                    </MenuContent>
+                  </Menu>
+                  <RevertConfirmPopover
+                    open={isConfirmOpen}
+                    onOpenChange={setIsConfirmOpen}
+                    onConfirm={dispatchRestore}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -261,6 +328,11 @@ export const MessageAssistant = memo(
     if (
       prevProps.showBetweenStepsIndicator !==
       nextProps.showBetweenStepsIndicator
+    )
+      return false;
+    if (
+      prevProps.hasSubsequentFileModifications !==
+      nextProps.hasSubsequentFileModifications
     )
       return false;
 

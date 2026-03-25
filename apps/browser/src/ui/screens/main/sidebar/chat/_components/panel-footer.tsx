@@ -295,6 +295,98 @@ export function ChatPanelFooter() {
     setFileAttachments,
   ]);
 
+  // Restore checkpoint: find the next user message after the target assistant
+  // message, revert history to that point, and populate the chat input.
+  const executeCheckpointRestore = useCallback(
+    (detail: { assistantMessageId: string; undoToolCalls: boolean }) => {
+      const { assistantMessageId, undoToolCalls } = detail;
+      const currentHistory = historyRef.current ?? [];
+
+      // Find the assistant message's index
+      const assistantIndex = currentHistory.findIndex(
+        (m) => m.id === assistantMessageId,
+      );
+      if (assistantIndex === -1) return;
+
+      // Find the next user message after the assistant message
+      let nextUserMessage: AgentMessage | undefined;
+      for (let i = assistantIndex + 1; i < currentHistory.length; i++) {
+        if (currentHistory[i]?.role === 'user') {
+          nextUserMessage = currentHistory[i];
+          break;
+        }
+      }
+      if (!nextUserMessage) return;
+
+      // Revert history — removes nextUserMessage and everything after it
+      if (openAgent)
+        revertToUserMessage(openAgent, nextUserMessage.id, undoToolCalls);
+
+      // Reset current draft state before restoring
+      setFileAttachments([]);
+      setLocalSelectedElements([]);
+
+      // Restore the user message's content into the chat input
+      const textPart = nextUserMessage.parts.find((p) => p.type === 'text');
+      const text = textPart?.type === 'text' ? textPart.text : '';
+      const parsed = markdownToTipTapContent(text);
+      const tiptapContent = enrichTipTapContent(parsed, {
+        fileAttachments: nextUserMessage.metadata?.fileAttachments,
+        textClipAttachments: nextUserMessage.metadata?.textClipAttachments,
+        selectedPreviewElements: nextUserMessage.metadata
+          ?.selectedPreviewElements as SelectedElement[] | undefined,
+      });
+      updateChatInputState(tiptapContent);
+      requestAnimationFrame(() => {
+        chatInputRef.current?.focus();
+      });
+
+      // Restore file attachments if present
+      if (nextUserMessage.metadata?.fileAttachments?.length) {
+        setFileAttachments(nextUserMessage.metadata.fileAttachments);
+      }
+
+      // Restore selected elements if present
+      const elements = nextUserMessage.metadata?.selectedPreviewElements;
+      if (elements?.length) {
+        setLocalSelectedElements(elements as SelectedElement[]);
+      }
+    },
+    [openAgent, revertToUserMessage, updateChatInputState, setFileAttachments],
+  );
+
+  // Pending checkpoint restore: deferred until isWorking becomes false
+  // so the stream is fully done and won't race with the revert.
+  const [pendingCheckpointRestore, setPendingCheckpointRestore] = useState<{
+    assistantMessageId: string;
+    undoToolCalls: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isWorking && pendingCheckpointRestore) {
+      setPendingCheckpointRestore(null);
+      executeCheckpointRestore(pendingCheckpointRestore);
+    }
+  }, [isWorking, pendingCheckpointRestore, executeCheckpointRestore]);
+
+  // Handle "Restore checkpoint" from assistant message menu
+  useEffect(() => {
+    const handler = (e: WindowEventMap['chat-restore-checkpoint']) => {
+      const detail = e.detail;
+      if (isWorkingRef.current && openAgent) {
+        // Agent is streaming — stop first, defer restore until idle
+        setPendingCheckpointRestore(detail);
+        void stopAgent(openAgent);
+      } else {
+        // Agent idle — restore immediately
+        executeCheckpointRestore(detail);
+      }
+    };
+
+    window.addEventListener('chat-restore-checkpoint', handler);
+    return () => window.removeEventListener('chat-restore-checkpoint', handler);
+  }, [openAgent, stopAgent, executeCheckpointRestore]);
+
   const isEarlyAbortEligible = useCallback(() => {
     const currentHistory = historyRef.current ?? [];
     let lastUserMsgIndex = -1;
