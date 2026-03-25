@@ -17,6 +17,12 @@ import { cn } from '@ui/utils';
 import { IconClipboardOutline18 } from 'nucleo-ui-outline-18';
 import { usePlanPhase } from '@ui/hooks/use-plan-phase';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
+import { XIcon } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 
 /**
  * Dedicated tool-part UI for plan file creation / update.
@@ -103,16 +109,18 @@ export const CreatePlanToolPart = ({ part }: { part: OverwriteFilePart }) => {
     );
   }
 
-  // Error state
+  // Error state — matches standard tool error style (muted inline text)
   if (isError) {
+    const errorText = part.errorText ?? 'Failed to create plan';
     return (
-      <div className="w-full rounded-lg border border-border-subtle bg-background shadow-xs dark:border-border">
-        <div className="flex items-center gap-2 px-3 py-2.5 text-error-foreground">
-          <IconClipboardOutline18 className="size-4 shrink-0" />
-          <span className="text-sm">
-            {part.errorText ?? 'Failed to create plan'}
-          </span>
-        </div>
+      <div className="flex max-w-full cursor-default items-center gap-1 text-muted-foreground text-xs hover:text-foreground">
+        <XIcon className="size-3 shrink-0" />
+        <Tooltip>
+          <TooltipTrigger>
+            <span className="min-w-0 truncate text-xs">{errorText}</span>
+          </TooltipTrigger>
+          <TooltipContent>{errorText}</TooltipContent>
+        </Tooltip>
       </div>
     );
   }
