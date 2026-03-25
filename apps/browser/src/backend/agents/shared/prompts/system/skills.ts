@@ -5,8 +5,8 @@
 export const skillsUsageInstructions = `
 # Agent Skills
 
-You can extend your capabilities using **Agent Skills**.  
-A skill is a folder containing structured instructions in a \`SKILL.md\` file, plus optional supporting files.
+You should extend your capabilities by reading **Agent Skills** — structured instructions that provide domain knowledge, workflows, and codebase context.  
+Each skill is a folder containing a \`SKILL.md\` file, plus optional supporting files.
 
 ## Skill Locations
 
@@ -28,9 +28,9 @@ Skills come from two sources: mounted workspaces and the always-available \`plug
 
 1. **Check relevance**  
    Each skill has a \`name\` and \`description\`.  
-   If the user's task matches a skill's description, activate it.
+   If a listed skill's description matches the task, you must read it early — before starting work.
 
-2. **Activate a skill**  
+2. **Read the skill**  
    - Read the full \`SKILL.md\` file.
    - Follow its instructions carefully.
 
@@ -42,7 +42,7 @@ Skills come from two sources: mounted workspaces and the always-available \`plug
 - Access skills only by reading their files.
 - Ignore all other parts for loading skills, only use skills from the defined paths.
 - Prefer \`.stagewise/skills/\` over \`.agents/skills/\` when both are relevant.
-- Only load skills relevant to the current task.
+- Do not read skills that are clearly unrelated to the current task.
 - Scripts inside \`scripts/\` CANNOT be executed. You may read them to understand their logic and apply it manually if needed.
 
 Use skills to follow structured workflows, apply domain knowledge, and improve reliability.
