@@ -6,7 +6,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
-import { IconDownloadFill18, IconMagnifierFill18 } from 'nucleo-ui-fill-18';
+import { IconDownloadFill18 } from 'nucleo-ui-fill-18';
 import React, {
   useCallback,
   useEffect,
@@ -1008,21 +1008,17 @@ function Page() {
       <div className="flex items-center border-border-subtle border-b px-6 py-4">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-24">
           <h1 className="font-semibold text-foreground text-xl">Downloads</h1>
-          <div className="relative flex-1 rounded-full bg-surface-1 focus-within:bg-hover-derived">
-            <IconMagnifierFill18 className="-translate-y-1/2 absolute top-1/2 left-3.5 z-10 size-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search downloads"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="rounded-full border-none bg-transparent pl-10 before:hidden focus:border-none focus:outline-none focus:ring-0"
-            />
-          </div>
+          <Input
+            type="text"
+            placeholder="Search downloads"
+            value={searchText}
+            onValueChange={setSearchText}
+          />
         </div>
       </div>
 
       {/* Downloads entries */}
-      <div className="flex-1 overflow-hidden p-6">
+      <div className="flex-1 overflow-hidden px-6 pt-6 pb-24">
         <div
           ref={containerRef}
           className="mx-auto h-full max-w-3xl overflow-hidden"

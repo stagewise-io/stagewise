@@ -657,7 +657,7 @@ function Page() {
       </div>
 
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="p-6">
+      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
         <div className="mx-auto max-w-3xl space-y-8">
           {/* General Section */}
           <section className="space-y-6">

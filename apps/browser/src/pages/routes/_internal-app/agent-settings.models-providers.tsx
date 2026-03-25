@@ -1025,15 +1025,23 @@ function CustomModelsSection() {
 
   return (
     <div className="space-y-3">
-      <Input
-        placeholder="Filter models..."
-        value={searchQuery}
-        onValueChange={setSearchQuery}
-        size="sm"
-      />
+      <div className="flex items-center gap-3">
+        <Input
+          placeholder="Filter models..."
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          size="sm"
+          className="flex-1"
+          style={{ maxWidth: 'none' }}
+        />
+        <Button variant="secondary" size="sm" onClick={handleAdd}>
+          <IconPlusOutline18 className="size-3.5" />
+          Add Model
+        </Button>
+      </div>
 
       <OverlayScrollbar
-        className="mask-alpha max-h-96"
+        className="mask-alpha h-96"
         style={listMaskStyle}
         onViewportRef={setListScrollViewport}
         contentClassName="space-y-3"
@@ -1067,13 +1075,6 @@ function CustomModelsSection() {
           </div>
         )}
       </OverlayScrollbar>
-
-      <div className="flex justify-end">
-        <Button variant="secondary" size="sm" onClick={handleAdd}>
-          <IconPlusOutline18 className="size-3.5" />
-          Add Model
-        </Button>
-      </div>
 
       <CustomModelDialog
         model={editingModel}

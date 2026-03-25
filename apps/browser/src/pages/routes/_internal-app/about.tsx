@@ -18,7 +18,7 @@ import {
   DialogHeader,
 } from '@stagewise/stage-ui/components/dialog';
 import { Input } from '@stagewise/stage-ui/components/input';
-import { ExternalLinkIcon, ScrollTextIcon, SearchIcon } from 'lucide-react';
+import { ExternalLinkIcon, ScrollTextIcon } from 'lucide-react';
 import { IconGithub } from 'nucleo-social-media';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import agplLicenseText from '@assets/agpl-3.0-license.txt?raw';
@@ -265,20 +265,17 @@ function OpenSourceLicenses() {
             </div>
           )}
 
-          <div className="relative">
-            <SearchIcon className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-muted-foreground" />
-            <Input
-              size="sm"
-              value={search}
-              onValueChange={(val) => setSearch(val as string)}
-              placeholder="Search packages or licenses..."
-              className="pl-9"
-            />
-          </div>
+          <Input
+            size="sm"
+            value={search}
+            onValueChange={(val) => setSearch(val as string)}
+            debounce={150}
+            placeholder="Search packages or licenses..."
+          />
 
-          <div className="scrollbar-subtle max-h-[400px] overflow-y-auto rounded-lg border border-border-subtle">
+          <div className="scrollbar-subtle h-[400px] overflow-y-auto rounded-lg border border-border-subtle">
             {filteredLicenses.length === 0 ? (
-              <div className="px-4 py-8 text-center text-muted-foreground text-sm">
+              <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
                 No packages found matching &ldquo;{search}&rdquo;
               </div>
             ) : (
@@ -357,7 +354,7 @@ function Page() {
       </div>
 
       {/* Content */}
-      <div className="scrollbar-subtle flex w-full flex-1 flex-col items-center overflow-y-auto p-6">
+      <div className="scrollbar-subtle flex w-full flex-1 flex-col items-center overflow-y-auto px-6 pt-6 pb-24">
         <div className="flex w-full max-w-3xl shrink-0 flex-col gap-8">
           {/* App Name Section */}
           <div className="flex flex-col gap-2">

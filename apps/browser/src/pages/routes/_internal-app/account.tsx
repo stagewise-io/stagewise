@@ -42,7 +42,7 @@ function Page() {
       </div>
 
       {/* Content */}
-      <div className="flex w-full flex-1 flex-col items-center overflow-y-auto p-6">
+      <div className="flex w-full flex-1 flex-col items-center overflow-y-auto px-6 pt-6 pb-24">
         <div className="flex w-full max-w-3xl shrink-0 flex-col gap-8">
           {userAccount?.status === 'authenticated' ? (
             <AuthenticatedView
