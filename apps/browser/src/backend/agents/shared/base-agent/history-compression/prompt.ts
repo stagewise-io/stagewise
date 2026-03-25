@@ -27,7 +27,7 @@ The chat history uses XML-like tags:
 - The current state: what is done, what is in progress, and what is still open or unresolved
 
 ## What to preserve verbatim
-- File paths with mount prefixes (e.g. \`weba9/apps/browser/src/...\`), line numbers when present.
+- File paths: use [](wsfile:{mount-prefixed-path}) markdown links (e.g. [](wsfile:weba9/apps/browser/src/foo.ts)). Convert plain paths from tool annotations to this format. Preserve existing wsfile: links as-is.
 - Markdown links from the input — copy them as-is.
 - User decisions, stated preferences, constraints, and explicit rules.
 - Color values, directory structures, configuration details.
@@ -45,6 +45,7 @@ If present, incorporate it at the start of your output as-is. Append the new con
 - Output ONLY the briefing content. No titles, preambles, or meta-commentary.
 - Use \`##\` headings for topic separation. No other formatting (no bullets, no tables, no code blocks).
 - Preserve markdown links verbatim from the input.
+- Reference workspace files as [](wsfile:{mount-prefixed-path}) e.g. [](wsfile:w4ba9/src/foo.ts), not as inline code or plain text.
 - Use your full output budget — do not cut short.`;
 
 /**
