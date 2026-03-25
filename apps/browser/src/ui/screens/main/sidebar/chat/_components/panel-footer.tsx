@@ -322,29 +322,31 @@ export function ChatPanelFooter() {
       if (openAgent)
         revertToUserMessage(openAgent, nextUserMessage.id, undoToolCalls);
 
+      // Reset current draft state before restoring
+      setFileAttachments([]);
+      setLocalSelectedElements([]);
+
       // Restore the user message's content into the chat input
       const textPart = nextUserMessage.parts.find((p) => p.type === 'text');
       const text = textPart?.type === 'text' ? textPart.text : '';
-      if (text) {
-        const parsed = markdownToTipTapContent(text);
-        const tiptapContent = enrichTipTapContent(parsed, {
-          fileAttachments: nextUserMessage.metadata?.fileAttachments,
-          textClipAttachments: nextUserMessage.metadata?.textClipAttachments,
-          selectedPreviewElements: nextUserMessage.metadata
-            ?.selectedPreviewElements as SelectedElement[] | undefined,
-        });
-        updateChatInputState(tiptapContent);
-        requestAnimationFrame(() => {
-          chatInputRef.current?.focus();
-        });
-      }
+      const parsed = markdownToTipTapContent(text);
+      const tiptapContent = enrichTipTapContent(parsed, {
+        fileAttachments: nextUserMessage.metadata?.fileAttachments,
+        textClipAttachments: nextUserMessage.metadata?.textClipAttachments,
+        selectedPreviewElements: nextUserMessage.metadata
+          ?.selectedPreviewElements as SelectedElement[] | undefined,
+      });
+      updateChatInputState(tiptapContent);
+      requestAnimationFrame(() => {
+        chatInputRef.current?.focus();
+      });
 
-      // Restore file attachments
+      // Restore file attachments if present
       if (nextUserMessage.metadata?.fileAttachments?.length) {
         setFileAttachments(nextUserMessage.metadata.fileAttachments);
       }
 
-      // Restore selected elements
+      // Restore selected elements if present
       const elements = nextUserMessage.metadata?.selectedPreviewElements;
       if (elements?.length) {
         setLocalSelectedElements(elements as SelectedElement[]);
