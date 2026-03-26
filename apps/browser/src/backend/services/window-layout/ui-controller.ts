@@ -12,7 +12,10 @@ import type { ColorScheme } from '@shared/karton-contracts/ui';
 import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import type { SelectedElement } from '@shared/selected-elements';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { canBrowserHandleUrl } from './protocol-utils';
+import {
+  canBrowserHandleUrl,
+  openFolderFirstFileInIde,
+} from './protocol-utils';
 import {
   default as installExtension,
   REACT_DEVELOPER_TOOLS,
@@ -471,6 +474,11 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
           `[UIController] Revealing file in folder: ${filePath}`,
         );
         shell.showItemInFolder(filePath);
+        return;
+      }
+      if (url.startsWith('stagewise://open-folder-in-ide/')) {
+        event.preventDefault();
+        void openFolderFirstFileInIde(url, this.logger);
       }
     });
 
@@ -484,6 +492,13 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
           `[UIController] Revealing file in folder: ${filePath}`,
         );
         shell.showItemInFolder(filePath);
+        return { action: 'deny' };
+      }
+
+      // Intercept stagewise://open-folder-in-ide/ — find first file in
+      // the directory and open it in the IDE, or reveal in Finder/Explorer.
+      if (details.url.startsWith('stagewise://open-folder-in-ide/')) {
+        void openFolderFirstFileInIde(details.url, this.logger);
         return { action: 'deny' };
       }
 

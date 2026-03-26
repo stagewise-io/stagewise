@@ -17,8 +17,7 @@ import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { GlobToolPart } from './glob';
 import { SearchIcon } from 'lucide-react';
 import { GrepSearchToolPart } from './grep-search';
-import { ListFilesToolPart } from './list-files';
-import { ReadFileToolPart } from './read-file';
+import { ReadToolPart } from './read';
 import { UpdateWorkspaceMdToolPart } from './update-workspace-md';
 import { SearchInLibraryDocsToolPart } from './search-in-library-docs';
 import { ListLibraryDocsToolPart } from './list-library-docs';
@@ -65,8 +64,7 @@ export type ReadOnlyToolPart =
         type:
           | 'tool-glob'
           | 'tool-grepSearch'
-          | 'tool-listFiles'
-          | 'tool-readFile'
+          | 'tool-read'
           | 'tool-searchInLibraryDocs'
           | 'tool-listLibraryDocs'
           | 'tool-executeSandboxJs'
@@ -84,8 +82,7 @@ export function isReadOnlyToolPart(
     part.type === 'reasoning' ||
     part.type === 'tool-glob' ||
     part.type === 'tool-grepSearch' ||
-    part.type === 'tool-listFiles' ||
-    part.type === 'tool-readFile' ||
+    part.type === 'tool-read' ||
     part.type === 'tool-searchInLibraryDocs' ||
     part.type === 'tool-listLibraryDocs' ||
     part.type === 'tool-executeSandboxJs' ||
@@ -141,18 +138,9 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
-    case 'tool-listFiles':
+    case 'tool-read':
       return (
-        <ListFilesToolPart
-          key={part.toolCallId}
-          minimal={minimal}
-          part={part}
-          disableShimmer={disableShimmer}
-        />
-      );
-    case 'tool-readFile':
-      return (
-        <ReadFileToolPart
+        <ReadToolPart
           minimal={minimal}
           key={part.toolCallId}
           part={part}
@@ -305,7 +293,7 @@ export const ExploringToolParts = ({
   const explorationMetadata = useMemo(() => {
     let filesRead = 0;
     let filesFound = 0;
-    let linesRead = 0;
+    const linesRead = 0;
     let docsRead = 0;
     let consoleLogsRead = 0;
     let hasUsedContext7Tools = false;
@@ -330,8 +318,8 @@ export const ExploringToolParts = ({
     );
     finishedParts.forEach((part) => {
       switch (part.type) {
-        case 'tool-readFile': {
-          const path = part.input?.relative_path ?? '';
+        case 'tool-read': {
+          const path = part.input?.path ?? '';
           const pluginSkillMatch = path.match(PLUGIN_SKILL_RE);
           if (pluginSkillMatch) {
             const plugin = plugins.find((p) => p.id === pluginSkillMatch[1]);
@@ -346,17 +334,12 @@ export const ExploringToolParts = ({
             break;
           }
           filesRead += 1;
-          linesRead += part.output?.result?.totalLines ?? 0;
           hasUsedFileTools = true;
           break;
         }
         case 'tool-glob':
         case 'tool-grepSearch':
           filesFound += part.output?.result?.totalMatches ?? 0;
-          hasUsedFileTools = true;
-          break;
-        case 'tool-listFiles':
-          filesFound += part.output?.result?.totalFiles ?? 0;
           hasUsedFileTools = true;
           break;
         case 'tool-searchInLibraryDocs':
@@ -622,12 +605,12 @@ export const ExploringToolParts = ({
       .filter((part) => part.type !== 'reasoning')
       .at(-1);
     switch (lastNonReasoningPart?.type || '') {
-      case 'tool-readFile': {
+      case 'tool-read': {
         const p = lastNonReasoningPart as Extract<
           AgentToolUIPart,
-          { type: 'tool-readFile' }
+          { type: 'tool-read' }
         >;
-        const path = p.input?.relative_path ?? '';
+        const path = p.input?.path ?? '';
         const pluginMatch = path.match(PLUGIN_SKILL_RE);
         if (pluginMatch) {
           const plugin = plugins.find((pl) => pl.id === pluginMatch[1]);
@@ -639,7 +622,6 @@ export const ExploringToolParts = ({
       }
       case 'tool-glob':
       case 'tool-grepSearch':
-      case 'tool-listFiles':
         return 'Exploring files...';
       case 'tool-searchInLibraryDocs': {
         const p = lastNonReasoningPart as Extract<

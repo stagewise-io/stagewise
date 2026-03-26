@@ -11,7 +11,7 @@ import {
   createAssistantMessage,
   createReasoningPart,
   createTextPart,
-  createOverwriteFileToolPart,
+  createWriteToolPart,
   REALISTIC_TIMING,
   getRandomDuration,
   DEFAULT_STORY_AGENT_ID,
@@ -228,7 +228,7 @@ function buildOverwriteFileTimeline(
     messageId: assistantMessageId,
     partIndex: 1,
     updater: () =>
-      createOverwriteFileToolPart(config.targetFile, '', 'input-streaming', {
+      createWriteToolPart(config.targetFile, '', 'input-streaming', {
         toolCallId,
       }),
   });
@@ -256,7 +256,7 @@ function buildOverwriteFileTimeline(
     toolCallId,
     newState: 'input-available',
     input: {
-      relative_path: config.targetFile,
+      path: config.targetFile,
       content: config.fileContent,
     },
   });

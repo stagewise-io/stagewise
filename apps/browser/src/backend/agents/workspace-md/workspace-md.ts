@@ -101,12 +101,11 @@ ${workspaceMdParts}`.trim(),
     const id = this.instanceId;
     const box = this.toolbox;
     const tools = {
-      readFile: await box.getTool('readFile', id),
-      listFiles: await box.getTool('listFiles', id),
+      read: await box.getTool('read', id),
+      write: await box.getTool('write', id),
+      multiEdit: await box.getTool('multiEdit', id),
       glob: await box.getTool('glob', id),
       grepSearch: await box.getTool('grepSearch', id),
-      overwriteFile: await box.getTool('overwriteFile', id),
-      multiEdit: await box.getTool('multiEdit', id),
     };
     // Filter out null tools that miss dependencies in the toolbox
     return Object.fromEntries(

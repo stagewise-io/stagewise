@@ -70,15 +70,10 @@ function getStatusText(history: AgentMessage[]): string {
   }
 
   switch (lastToolPart?.type) {
-    case 'tool-readFile': {
-      const stripped = relativizePath(lastToolPart.input?.relative_path);
+    case 'tool-read': {
+      const stripped = relativizePath(lastToolPart.input?.path);
       const fileName = getBaseName(stripped ?? '');
       return fileName ? `Reading ${fileName}...` : 'Reading file...';
-    }
-    case 'tool-listFiles': {
-      const stripped = relativizePath(lastToolPart.input?.relative_path);
-      const isRoot = !stripped || stripped === '/' || stripped === '.';
-      return isRoot ? 'Listing files...' : `Listing files in ${stripped}...`;
     }
     case 'tool-glob': {
       const pattern = lastToolPart.input?.pattern;
@@ -88,14 +83,14 @@ function getStatusText(history: AgentMessage[]): string {
       const query = lastToolPart.input?.query;
       return query ? `Searching code for ${query}...` : 'Searching code...';
     }
-    case 'tool-overwriteFile': {
+    case 'tool-write': {
       return 'Writing WORKSPACE.md...';
     }
     default: {
       if (!lastMessage) return INITIALIZING_TEXT;
 
       const hadOverwritingWorkspaceMd = assistantMessages?.some((m) =>
-        m.parts.some((p) => p.type === 'tool-overwriteFile'),
+        m.parts.some((p) => p.type === 'tool-write'),
       );
       const lastType = lastMessage.parts.at(-1)?.type;
       if (

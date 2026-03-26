@@ -8,6 +8,7 @@ import {
 } from 'react';
 
 import { cn, IDE_SELECTION_ITEMS, stripMountPrefix } from '@ui/utils';
+import { getFolderIDEUrl } from '@shared/ide-url';
 import {
   Tooltip,
   TooltipContent,
@@ -326,15 +327,33 @@ const WorkspaceFileClickWrapper = ({
     ? Number.parseInt(lineNumber, 10)
     : undefined;
 
+  const isFolder =
+    filePath.endsWith('/') || !filePath.includes('/') /* workspace root */;
+
   const processedHref = useMemo(() => {
     if (!openAgent) return '';
+
+    if (isFolder) {
+      const absPath = resolvePath(filePath);
+      if (!absPath) return '#';
+      return getFolderIDEUrl(absPath, openInIdeChoice);
+    }
+
     let href = getFileIDEHref(pathWithLine);
     href = href.replaceAll(
       encodeURIComponent('{{CONVERSATION_ID}}'),
       openAgent,
     );
     return href;
-  }, [pathWithLine, getFileIDEHref, openAgent]);
+  }, [
+    pathWithLine,
+    getFileIDEHref,
+    openAgent,
+    isFolder,
+    resolvePath,
+    filePath,
+    openInIdeChoice,
+  ]);
 
   const handleClick = useCallback(() => {
     if (needsIdePicker) return;
@@ -377,9 +396,16 @@ const WorkspaceFileClickWrapper = ({
         lineNumber={parsedLineNumber}
       >
         <IdePickerPopover
-          onSelect={(ide) =>
-            pickIdeAndOpen(ide, pathWithLine, parsedLineNumber)
-          }
+          onSelect={(ide) => {
+            if (isFolder) {
+              const absPath = resolvePath(filePath);
+              if (absPath) {
+                window.open(getFolderIDEUrl(absPath, ide), '_blank');
+              }
+            } else {
+              pickIdeAndOpen(ide, pathWithLine, parsedLineNumber);
+            }
+          }}
         >
           {wrapped}
         </IdePickerPopover>

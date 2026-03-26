@@ -89,25 +89,30 @@ const serializeToolPart = (
   const err = getErrorSuffix(part);
 
   switch (part.type) {
-    case 'tool-readFile':
-      if (err) return `[read: ${part.input.relative_path}${err}]`;
-      return `[read: ${part.input.relative_path}]`;
+    case 'tool-read':
+      if (err) return `[read: ${part.input.path}${err}]`;
+      return `[read: ${part.input.path}]`;
 
     case 'tool-multiEdit':
-      if (err) return `[edited: ${part.input.relative_path}${err}]`;
-      return `[edited: ${part.input.relative_path} (${Array.isArray(part.input.edits) ? part.input.edits.length : '?'} edits)]`;
+      if (err) return `[edited: ${part.input.path}${err}]`;
+      return `[edited: ${part.input.path} (${Array.isArray(part.input.edits) ? part.input.edits.length : '?'} edits)]`;
 
-    case 'tool-overwriteFile': {
-      if (err) return `[wrote: ${part.input.relative_path}${err}]`;
+    case 'tool-write': {
+      if (err) return `[wrote: ${part.input.path}${err}]`;
       // Distinguish create vs update when output.message is available
       const owMsg = part.output?.message;
       if (typeof owMsg === 'string' && owMsg.includes('created'))
-        return `[created: ${part.input.relative_path}]`;
-      return `[wrote: ${part.input.relative_path}]`;
+        return `[created: ${part.input.path}]`;
+      return `[wrote: ${part.input.path}]`;
     }
 
-    case 'tool-deleteFile':
-      return `[deleted: ${part.input.relative_path}${err ?? ''}]`;
+    case 'tool-copy': {
+      const action = part.input.move ? 'moved' : 'copied';
+      return `[${action}: ${part.input.input_path} → ${part.input.output_path}${err ?? ''}]`;
+    }
+
+    case 'tool-delete':
+      return `[deleted: ${part.input.path}${err ?? ''}]`;
 
     case 'tool-executeShellCommand': {
       const label = String(
@@ -133,9 +138,6 @@ const serializeToolPart = (
 
     case 'tool-glob':
       return `[glob: ${part.input.pattern}${err ?? ''}]`;
-
-    case 'tool-listFiles':
-      return `[listed: ${part.input.relative_path}${err ?? ''}]`;
 
     case 'tool-getLintingDiagnostics': {
       const paths = Array.isArray(part.input.paths)

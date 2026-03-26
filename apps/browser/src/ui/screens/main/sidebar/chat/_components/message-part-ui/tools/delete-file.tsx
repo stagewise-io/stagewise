@@ -26,15 +26,13 @@ import { FileContextMenu } from '@ui/components/file-context-menu';
 export const DeleteFileToolPart = ({
   part,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-deleteFile' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-delete' }>;
 }) => {
   const [expanded, setExpanded] = useState(true);
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);
   const { resolvePath } = useFileIDEHref();
 
-  const outputWithDiff = part.output as
-    | WithDiff<typeof part.output>
-    | undefined;
+  const outputWithDiff = part.output as WithDiff<{}> | undefined;
 
   const diff = useMemo(
     () =>
@@ -63,9 +61,9 @@ export const DeleteFileToolPart = ({
   }, [part.state, streaming]);
 
   const path = useMemo(() => {
-    if (!part.input?.relative_path) return null;
-    return stripMountPrefix(part.input.relative_path);
-  }, [part.input?.relative_path]);
+    if (!part.input?.path) return null;
+    return stripMountPrefix(part.input.path);
+  }, [part.input?.path]);
 
   // Force expanded to false when in error state
   useEffect(() => {
@@ -84,7 +82,7 @@ export const DeleteFileToolPart = ({
       return (
         <LoadingHeader
           relativePath={path ?? undefined}
-          fullPath={part.input?.relative_path ?? undefined}
+          fullPath={part.input?.path ?? undefined}
           resolvePath={resolvePath}
         />
       );
@@ -92,7 +90,7 @@ export const DeleteFileToolPart = ({
       return (
         <SuccessHeader
           relativePath={path ?? undefined}
-          fullPath={part.input?.relative_path ?? undefined}
+          fullPath={part.input?.path ?? undefined}
           resolvePath={resolvePath}
           deletedLineCount={deletedLineCount}
         />
@@ -101,7 +99,7 @@ export const DeleteFileToolPart = ({
     state,
     streaming,
     path,
-    part.input?.relative_path,
+    part.input?.path,
     part.errorText,
     deletedLineCount,
     resolvePath,
@@ -113,12 +111,12 @@ export const DeleteFileToolPart = ({
       return (
         <DiffPreview
           diff={diff}
-          filePath={part.input?.relative_path ?? ''}
+          filePath={part.input?.path ?? ''}
           collapsed={collapsedDiffView}
         />
       );
     else return undefined;
-  }, [state, diff, part.input?.relative_path, collapsedDiffView]);
+  }, [state, diff, part.input?.path, collapsedDiffView]);
 
   const contentFooter = useMemo(() => {
     if (state === 'success' && diff)
@@ -147,7 +145,7 @@ export const DeleteFileToolPart = ({
         </div>
       );
     else return undefined;
-  }, [state, diff, collapsedDiffView, part.input?.relative_path]);
+  }, [state, diff, collapsedDiffView, part.input?.path]);
 
   return (
     <ToolPartUI

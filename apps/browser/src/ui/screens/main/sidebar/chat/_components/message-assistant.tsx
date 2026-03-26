@@ -16,10 +16,11 @@ import { useMemo, memo, useState, useCallback } from 'react';
 import { ThinkingPart } from './message-part-ui/thinking';
 import { FilePart } from './message-part-ui/file';
 import { TextPart } from './message-part-ui/text';
+import { CopyToolPart } from './message-part-ui/tools/copy';
 import { DeleteFileToolPart } from './message-part-ui/tools/delete-file';
 import { UpdateWorkspaceMdToolPart } from './message-part-ui/tools/update-workspace-md';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
-import { OverwriteFileToolPart } from './message-part-ui/tools/overwrite-file';
+import { WriteToolPart } from './message-part-ui/tools/overwrite-file';
 import {
   ExploringToolParts,
   isReadOnlyToolPart,
@@ -222,7 +223,9 @@ export const MessageAssistant = memo(
                       return (
                         <FilePart key={stableKey} part={part as FileUIPart} />
                       );
-                    case 'tool-deleteFile':
+                    case 'tool-copy':
+                      return <CopyToolPart key={stableKey} part={part} />;
+                    case 'tool-delete':
                       return <DeleteFileToolPart key={stableKey} part={part} />;
                     case 'tool-updateWorkspaceMd':
                       return (
@@ -250,10 +253,8 @@ export const MessageAssistant = memo(
                           isLastPart={isLastPart}
                         />
                       );
-                    case 'tool-overwriteFile':
-                      return (
-                        <OverwriteFileToolPart key={stableKey} part={part} />
-                      );
+                    case 'tool-write':
+                      return <WriteToolPart key={stableKey} part={part} />;
                     case 'tool-askUserQuestions':
                       return (
                         <AskUserQuestionsToolPart key={stableKey} part={part} />

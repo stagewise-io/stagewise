@@ -15,7 +15,7 @@ import { resolveMountedRelativePath } from '../../utils/path-mounting';
 export const DESCRIPTION = `Make multiple find-and-replace edits to a single file in one operation. CRITICAL: Edits are applied SEQUENTIALLY - each edit sees the results of previous edits.
 
 Parameters:
-- relative_path (string, REQUIRED): Relative file path to edit. File must exist. Must include a mount prefix, e.g. "w1/src/app.ts" or "apps/my-app/index.html".
+- path (string, REQUIRED): Relative file path to edit. File must exist. Must include a mount prefix, e.g. "w1/src/app.ts" or "apps/my-app/index.html".
 - edits (array, REQUIRED): Array of edit objects (minimum 1 edit). Each edit contains:
   - old_string (string, REQUIRED): Text to find and replace.
   - new_string (string, REQUIRED): Text to replace it with.
@@ -36,8 +36,10 @@ export async function multiEditToolExecute(
   params: MultiEditToolInput,
   mountedRuntimes: MountedClientRuntimes,
 ) {
-  const { clientRuntime, relativePath: relative_path } =
-    resolveMountedRelativePath(mountedRuntimes, params.relative_path);
+  const { clientRuntime, path } = resolveMountedRelativePath(
+    mountedRuntimes,
+    params.path,
+  );
   const { edits } = params;
 
   if (edits.length === 0)
@@ -46,17 +48,17 @@ export async function multiEditToolExecute(
     );
 
   try {
-    const absolutePath = clientRuntime.fileSystem.resolvePath(relative_path);
+    const absolutePath = clientRuntime.fileSystem.resolvePath(path);
 
     // Check if file exists
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
-    if (!fileExists) throw new Error(`File does not exist: ${relative_path}`);
+    if (!fileExists) throw new Error(`File does not exist: ${path}`);
 
     // Read the current file content
     const readResult = await clientRuntime.fileSystem.readFile(absolutePath);
     if (!readResult.success || !readResult.content)
       throw new Error(
-        `Failed to read file before edit: ${relative_path} - ${readResult.message} - ${readResult.error || ''}`,
+        `Failed to read file before edit: ${path} - ${readResult.message} - ${readResult.error || ''}`,
       );
 
     let content = readResult.content;
@@ -95,7 +97,7 @@ export async function multiEditToolExecute(
     // If no edits applied, return early without writing
     if (totalEditsApplied === 0)
       return {
-        message: `Applied 0 edits to ${relative_path}.`,
+        message: `Applied 0 edits to ${path}.`,
         result: {
           editsApplied: totalEditsApplied,
         },
@@ -108,11 +110,11 @@ export async function multiEditToolExecute(
     );
     if (!writeResult.success)
       throw new Error(
-        `Failed to write file: ${relative_path} - ${writeResult.message} - ${writeResult.error || ''}`,
+        `Failed to write file: ${path} - ${writeResult.message} - ${writeResult.error || ''}`,
       );
 
     return {
-      message: `Successfully applied ${totalEditsApplied} edits to ${relative_path}`,
+      message: `Successfully applied ${totalEditsApplied} edits`,
       result: { editsApplied: totalEditsApplied },
     };
   } catch (error) {

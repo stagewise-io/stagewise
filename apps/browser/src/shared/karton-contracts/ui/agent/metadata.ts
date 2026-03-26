@@ -292,6 +292,21 @@ const metadataSchema = z.object({
   environmentSnapshot: environmentSnapshotSchema.optional(),
   /** @-mentions of files, tabs, or other items the user referenced inline */
   mentions: z.array(mentionSchema).optional(),
+  /**
+   * Map of mount-prefixed file/directory paths to their SHA-256 content hashes
+   * at the time this message was processed.
+   *
+   * **User messages**: Populated from `path:` markdown links in the message text.
+   * Recalculated for last message in history (if user message) at every step start so hashes reflect the file state at execution time.
+   *
+   * **Assistant messages**: Populated from `readFile` tool-call paths at step end.
+   * Not populated from assistant `path:` text links.
+   *
+   * Used by the model-message conversion pipeline to inject file contents
+   * into context with deduplication — a `(path, hash)` pair is only injected
+   * once across the conversation unless the hash changes.
+   */
+  pathReferences: z.record(z.string(), z.string()).optional(),
   /** Provider routing metadata returned by the stagewise gateway. */
   stagewiseProvider: stagewiseProviderSchema.optional(),
 });

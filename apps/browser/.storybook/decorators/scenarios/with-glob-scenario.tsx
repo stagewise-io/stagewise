@@ -230,7 +230,7 @@ function buildGlobTimeline(config: GlobScenarioConfig): TimelineEvent[] {
     partIndex: 1,
     updater: () =>
       createGlobToolPart(config.pattern, 0, 'input-streaming', {
-        relativePath: config.relativePath,
+        path: config.relativePath,
       }),
   });
 
@@ -258,7 +258,7 @@ function buildGlobTimeline(config: GlobScenarioConfig): TimelineEvent[] {
     newState: 'input-available',
     input: {
       pattern: config.pattern,
-      relative_path: config.relativePath,
+      path: config.relativePath,
     },
   });
 

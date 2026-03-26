@@ -83,9 +83,9 @@ export const GenericMultiEditToolPart = ({
   }, [state, expanded]);
 
   const path = useMemo(() => {
-    if (!part.input?.relative_path) return null;
-    return stripMountPrefix(part.input.relative_path);
-  }, [part.input?.relative_path]);
+    if (!part.input?.path) return null;
+    return stripMountPrefix(part.input.path);
+  }, [part.input?.path]);
 
   const firstLineNumberEdited = useMemo(() => {
     let startLine = 1;
@@ -121,7 +121,7 @@ export const GenericMultiEditToolPart = ({
       return (
         <LoadingHeader
           relativePath={path ?? undefined}
-          fullPath={part.input?.relative_path ?? undefined}
+          fullPath={part.input?.path ?? undefined}
           resolvePath={resolvePath}
         />
       );
@@ -129,7 +129,7 @@ export const GenericMultiEditToolPart = ({
       return (
         <SuccessHeader
           relativePath={path ?? undefined}
-          fullPath={part.input?.relative_path ?? undefined}
+          fullPath={part.input?.path ?? undefined}
           resolvePath={resolvePath}
           newLineCount={newLineCount}
           deletedLineCount={deletedLineCount}
@@ -139,7 +139,7 @@ export const GenericMultiEditToolPart = ({
     state,
     streaming,
     path,
-    part.input?.relative_path,
+    part.input?.path,
     newLineCount,
     deletedLineCount,
     part.errorText,
@@ -152,7 +152,7 @@ export const GenericMultiEditToolPart = ({
       return (
         <DiffPreview
           diff={diff}
-          filePath={part.input?.relative_path ?? ''}
+          filePath={part.input?.path ?? ''}
           collapsed={collapsedDiffView}
         />
       );
@@ -166,7 +166,7 @@ export const GenericMultiEditToolPart = ({
                   .join('\n\n')
               : '') ?? ''
           }
-          language={getLanguageFromPath(part.input?.relative_path)}
+          language={getLanguageFromPath(part.input?.path)}
         />
       );
     else return undefined;
@@ -174,7 +174,7 @@ export const GenericMultiEditToolPart = ({
     state,
     diff,
     part.input?.edits,
-    part.input?.relative_path,
+    part.input?.path,
     streaming,
     hasNewContent,
     collapsedDiffView,
@@ -212,7 +212,7 @@ export const GenericMultiEditToolPart = ({
               </TooltipContent>
             </Tooltip>
             {(() => {
-              const relPath = part.input?.relative_path ?? '';
+              const relPath = part.input?.path ?? '';
               const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
               const anchor = (
                 <a

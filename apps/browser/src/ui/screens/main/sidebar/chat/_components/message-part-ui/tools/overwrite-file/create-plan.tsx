@@ -1,4 +1,4 @@
-import type { OverwriteFilePart } from '.';
+import type { WritePart } from '.';
 import { IconClipboardContentOutline18 } from 'nucleo-ui-outline-18';
 import {
   parsePlanContent,
@@ -26,16 +26,16 @@ import {
 
 /**
  * Dedicated tool-part UI for plan file creation / update.
- * Replaces the generic overwrite-file diff view when the target path
+ * Replaces the generic write diff view when the target path
  * is inside `plans/`.
  */
-export const CreatePlanToolPart = ({ part }: { part: OverwriteFilePart }) => {
+export const CreatePlanToolPart = ({ part }: { part: WritePart }) => {
   const streaming =
     part.state === 'input-streaming' || part.state === 'input-available';
   const isError = part.state === 'output-error';
 
   // Plan lifecycle phase — controls whether footer buttons are shown
-  const relativePath = part.input?.relative_path ?? '';
+  const relativePath = part.input?.path ?? '';
   const phase = usePlanPhase(relativePath || null);
 
   // Parse plan content from the tool input (static, used as fallback)
