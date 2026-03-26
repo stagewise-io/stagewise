@@ -177,10 +177,10 @@ function SuggestionItem({
         id={item.id}
         className="size-3 shrink-0 text-muted-foreground"
       />
-      <span className="min-w-0 shrink-0">{item.label}</span>
+      <span className="min-w-0 truncate">{item.label}</span>
       {item.description && (
         <span
-          className="min-w-0 truncate text-subtle-foreground text-xs"
+          className="min-w-0 flex-1 truncate text-subtle-foreground text-xs"
           dir={item.descriptionTruncation === 'start' ? 'rtl' : undefined}
         >
           {item.descriptionTruncation === 'start' ? (

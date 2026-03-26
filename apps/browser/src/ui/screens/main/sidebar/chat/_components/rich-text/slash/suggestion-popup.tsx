@@ -86,11 +86,11 @@ function SlashSuggestionItem({
         </span>
       ) : (
         <>
-          <span className="max-w-[60%] shrink-0 truncate font-medium">
+          <span className="min-w-0 truncate font-medium">
             {`/${item.label}`}
           </span>
           {item.description && (
-            <span className="min-w-0 truncate text-subtle-foreground text-xs">
+            <span className="min-w-0 flex-1 truncate text-subtle-foreground text-xs">
               {item.description}
             </span>
           )}
