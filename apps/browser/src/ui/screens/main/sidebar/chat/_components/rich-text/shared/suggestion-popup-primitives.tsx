@@ -1,6 +1,7 @@
-import { forwardRef } from 'react';
+import { forwardRef, useRef } from 'react';
 import { cn } from '@ui/utils';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
+import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 
 const MAX_POPUP_HEIGHT = 208; // max-h-52
 
@@ -20,6 +21,12 @@ export const SuggestionPopupContainer = forwardRef<
   { clientRect, children, sidePanel, onMouseMove },
   ref,
 ) {
+  const mainViewportRef = useRef<HTMLElement | null>(null);
+  const { maskStyle: mainMaskStyle } = useScrollFadeMask(mainViewportRef, {
+    axis: 'vertical',
+    fadeDistance: 12,
+  });
+
   const rect = clientRect?.();
   if (!rect) return null;
 
@@ -39,7 +46,14 @@ export const SuggestionPopupContainer = forwardRef<
       onMouseMove={onMouseMove}
     >
       <div className="w-64 rounded-lg border border-derived bg-background p-1 shadow-lg">
-        <OverlayScrollbar className="max-h-52" defer={false}>
+        <OverlayScrollbar
+          className="mask-alpha max-h-52"
+          style={mainMaskStyle}
+          defer={false}
+          onViewportRef={(el) => {
+            mainViewportRef.current = el;
+          }}
+        >
           {children}
         </OverlayScrollbar>
       </div>
@@ -56,17 +70,32 @@ export const SuggestionSidePanel = forwardRef<
   HTMLDivElement,
   { offset: number; children: React.ReactNode; className?: string }
 >(function SuggestionSidePanel({ offset, children, className }, ref) {
+  const viewportRef = useRef<HTMLElement | null>(null);
+  const { maskStyle } = useScrollFadeMask(viewportRef, {
+    axis: 'vertical',
+    fadeDistance: 12,
+  });
+
   return (
     <div
       ref={ref}
       className={cn(
-        'absolute left-full ml-1 flex w-56 flex-col gap-2 rounded-lg border border-derived bg-background p-2.5 text-foreground text-xs shadow-lg transition-[top] duration-100 ease-out',
+        'absolute left-full ml-1 w-56 rounded-lg border border-derived bg-background text-foreground text-xs shadow-lg transition-[top] duration-100 ease-out',
         'fade-in-0 slide-in-from-left-1 animate-in duration-150',
         className,
       )}
       style={{ top: offset }}
     >
-      {children}
+      <OverlayScrollbar
+        className="mask-alpha max-h-52 p-2.5"
+        style={maskStyle}
+        defer={false}
+        onViewportRef={(el) => {
+          viewportRef.current = el;
+        }}
+      >
+        <div className="flex flex-col gap-2">{children}</div>
+      </OverlayScrollbar>
     </div>
   );
 });

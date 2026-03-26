@@ -18,9 +18,11 @@ import type {
   ResolvedMentionItem,
   TabMentionItem,
   FileMentionItem,
+  WorkspaceMentionItem,
 } from './types';
 import { MentionIcon } from './mention-icon';
 import { FilePathTree } from './file-path-tree';
+import { WorkspacePreviewSummary } from './workspace-preview-summary';
 import { getBaseName } from '@shared/path-utils';
 
 type SidePanelContent =
@@ -46,6 +48,12 @@ type SidePanelContent =
       workspaceName: string;
       relativePath: string;
       fileName: string;
+    }
+  | {
+      type: 'workspace';
+      key: string;
+      mount: MountEntry;
+      name: string;
     };
 
 function deriveSidePanel(
@@ -109,6 +117,18 @@ function deriveSidePanel(
       relativePath: meta.relativePath,
       mediaType: mime,
       Preview: entry.variants.compact,
+    };
+  }
+
+  if (item.providerType === 'workspace') {
+    const meta = (item as WorkspaceMentionItem).meta;
+    const mount = mounts.find((m) => m.prefix === meta.prefix);
+    if (!mount) return null;
+    return {
+      type: 'workspace',
+      key: `workspace:${meta.prefix}`,
+      mount,
+      name: meta.name,
     };
   }
 
@@ -254,11 +274,16 @@ export function SuggestionPopup({
                 mediaType={sidePanel.mediaType}
                 Preview={sidePanel.Preview}
               />
-            ) : (
+            ) : sidePanel.type === 'file-path' ? (
               <FilePathTree
                 workspaceName={sidePanel.workspaceName}
                 relativePath={sidePanel.relativePath}
                 fileName={sidePanel.fileName}
+              />
+            ) : (
+              <WorkspacePreviewSummary
+                mount={sidePanel.mount}
+                name={sidePanel.name}
               />
             )}
           </SuggestionSidePanel>
