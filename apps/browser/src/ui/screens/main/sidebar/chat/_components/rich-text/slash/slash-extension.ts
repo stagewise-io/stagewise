@@ -100,7 +100,7 @@ export const SlashExtension = Mention.extend({
             type: 'slash',
             attrs: {
               id: item.id,
-              label: `/${item.id}`,
+              label: item.label,
             },
           },
           { type: 'text', text: ' ' },

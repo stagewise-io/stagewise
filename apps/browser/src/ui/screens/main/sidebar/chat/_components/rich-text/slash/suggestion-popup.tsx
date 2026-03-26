@@ -16,7 +16,7 @@ import type { SlashItem } from './types';
 
 /** Map of builtin command IDs to their icon components. */
 const COMMAND_ICONS: Record<string, ComponentType<{ className?: string }>> = {
-  plan: IconClipboardOutline18,
+  'command:plan': IconClipboardOutline18,
 };
 
 /** Group labels — `builtin` has no header. */
@@ -77,10 +77,10 @@ function SlashSuggestionItem({
       {Icon && <Icon className="size-3 shrink-0 text-muted-foreground" />}
       {isSynthetic ? (
         <span
-          className={
-            (cn('min-w-0 shrink-0'),
-            isSelected ? 'text-muted-foreground' : 'text-subtle-foreground')
-          }
+          className={cn(
+            'min-w-0 shrink-0',
+            isSelected ? 'text-muted-foreground' : 'text-subtle-foreground',
+          )}
         >
           {item.label}
         </span>
@@ -90,7 +90,7 @@ function SlashSuggestionItem({
             {`/${item.label}`}
           </span>
           {item.description && (
-            <span className="min-w-0 flex-1 truncate text-subtle-foreground text-xs">
+            <span className="min-w-0 flex-1 truncate font-normal text-subtle-foreground text-xs">
               {item.description}
             </span>
           )}
@@ -380,7 +380,7 @@ export function SlashSuggestionPopup({
           return (
             <div
               key={`hdr-${row.label}`}
-              className="mt-1 px-2 pt-1 pb-0.5 font-medium text-[10px] text-muted-foreground uppercase tracking-wider first:mt-0"
+              className="mt-1 px-2 pt-1 pb-0.5 font-normal text-subtle-foreground text-xs first:mt-0"
             >
               {row.label}
             </div>

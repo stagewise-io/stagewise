@@ -16,7 +16,7 @@ export async function discoverCommands(
     if (!entry.isFile() || extname(entry.name) !== '.md') continue;
 
     const filePath = resolve(commandsDir, entry.name);
-    const id = basename(entry.name, '.md');
+    const id = `command:${basename(entry.name, '.md')}`;
 
     let raw: string;
     try {

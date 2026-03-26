@@ -98,6 +98,8 @@ import {
   discoverSkills,
   type Skill,
 } from '@/agents/shared/prompts/utils/get-skills';
+import type { CommandDefinition } from '@shared/commands';
+import { toCommandDefinitionUI } from '@shared/commands';
 import { readPlans } from '@/agents/shared/prompts/utils/read-plans';
 import { PLANS_PREFIX, getAgentOwnedPlanPaths } from '@shared/plan-ownership';
 import { resolveMountedRelativePath } from './utils/path-mounting';
@@ -149,6 +151,9 @@ export class ToolboxService extends DisposableService {
     runtimes.set(PLANS_PREFIX, this.getOrCreatePlansRuntime());
     return runtimes;
   }
+
+  /** Builtin commands discovered at startup — stored for refresh merging. */
+  private builtinCommands: CommandDefinition[] = [];
 
   private plansRuntime: ClientRuntimeNode | null = null;
   private plansWatcher: FSWatcher | null = null;
@@ -767,6 +772,95 @@ export class ToolboxService extends DisposableService {
     return result;
   }
 
+  /**
+   * Store the builtin commands discovered at startup and push the
+   * initial commands list to Karton state.
+   */
+  public setBuiltinCommands(cmds: CommandDefinition[]): void {
+    this.builtinCommands = cmds;
+    // Push builtins immediately (no workspace skills yet).
+    this.uiKarton.setState((draft) => {
+      draft.commands = cmds.map(toCommandDefinitionUI);
+    });
+  }
+
+  /**
+   * Rebuild the unified commands list (builtins + workspace skills +
+   * plugin skills) for a given agent and push it to Karton state.
+   * Called on mount/unmount to keep the slash-command list in sync.
+   */
+  private async rebuildCommandsList(agentInstanceId: string): Promise<void> {
+    const commands = await this.getCommandsList(agentInstanceId);
+    this.uiKarton.setState((draft) => {
+      draft.commands = commands.map(toCommandDefinitionUI);
+    });
+  }
+
+  /**
+   * Returns the full `CommandDefinition[]` (with `contentPath`) for
+   * the given agent. Used at inference time by `resolveSlashCommand`
+   * to read command/skill content from the correct disk path.
+   */
+  public async getCommandsList(
+    agentInstanceId: string,
+  ): Promise<CommandDefinition[]> {
+    const result: CommandDefinition[] = [...this.builtinCommands];
+    const seen = new Set(result.map((c) => c.id));
+
+    // Workspace skills
+    const mounts =
+      this.mountManagerService?.getMountedPathsWithRuntimes(agentInstanceId);
+    if (mounts) {
+      for (const mount of mounts) {
+        const settings = this.uiKarton.state.preferences?.agent
+          ?.workspaceSettings?.[mount.path] ?? {
+          respectAgentsMd: false,
+          disabledSkills: [],
+        };
+        const disabled = new Set(settings.disabledSkills);
+        const skills = await getSkills(mount.clientRuntime);
+
+        for (const skill of skills) {
+          if (disabled.has(skill.name)) continue;
+          const id = `skill:${skill.name}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          result.push({
+            id,
+            displayName: skill.name,
+            description: skill.description,
+            source: 'workspace',
+            contentPath: path.resolve(skill.path, 'SKILL.md'),
+            workspacePrefix: mount.prefix,
+          });
+        }
+      }
+    }
+
+    // Plugin skills
+    const disabledPlugins = new Set(
+      this.uiKarton.state.preferences?.agent?.disabledPluginIds ?? [],
+    );
+    const pluginSkills = await discoverSkills(getPluginsPath());
+    for (const skill of pluginSkills) {
+      const pluginId = path.basename(skill.path);
+      if (disabledPlugins.has(pluginId)) continue;
+      const id = `plugin:${pluginId}:${skill.name}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      result.push({
+        id,
+        displayName: skill.name,
+        description: skill.description,
+        source: 'plugin',
+        contentPath: path.resolve(skill.path, 'SKILL.md'),
+        pluginId,
+      });
+    }
+
+    return result;
+  }
+
   private async getPlansList(agentInstanceId: string): Promise<
     Array<{
       name: string;
@@ -1047,6 +1141,7 @@ export class ToolboxService extends DisposableService {
 
     this.mountManagerService.setOnMountsChanged((agentInstanceId) => {
       this.pushMountsToSandbox(agentInstanceId);
+      void this.rebuildCommandsList(agentInstanceId);
     });
 
     // Start watching the global plans directory

@@ -1018,6 +1018,7 @@ export abstract class BaseAgent<
     const shellInfo = this.toolbox.getShellInfo();
     const skillsList = await this.toolbox.getSkillsList(this.instanceId);
     const skillDetails = new Map(skillsList.map((s) => [s.path, s]));
+    const commands = await this.toolbox.getCommandsList(this.instanceId);
 
     return convertAgentMessagesToModelMessages(
       messages,
@@ -1037,6 +1038,7 @@ export abstract class BaseAgent<
       skillDetails,
       this.logger,
       this.processedImageCacheService,
+      commands,
     );
   }
 

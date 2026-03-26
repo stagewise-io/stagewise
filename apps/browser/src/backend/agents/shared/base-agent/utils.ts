@@ -9,6 +9,7 @@ import {
   type FilePart,
 } from 'ai';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
+import type { CommandDefinition } from '@shared/commands';
 import type { FullEnvironmentSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
 import type { SelectedElement } from '@shared/selected-elements';
 import {
@@ -486,6 +487,7 @@ export const convertAgentMessagesToModelMessages = async (
   skillDetails?: Map<string, SkillInfo>,
   logger?: Logger,
   imageCache?: ProcessedImageCacheService,
+  commands?: ReadonlyArray<CommandDefinition>,
 ): Promise<ModelMessage[]> => {
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
@@ -538,6 +540,7 @@ export const convertAgentMessagesToModelMessages = async (
         currentModelId,
         logger,
         imageCache,
+        commands,
       );
       // convertUserMessage always returns content as an array of parts
       const content = userMsg.content as (TextPart | ImagePart | FilePart)[];
@@ -778,16 +781,18 @@ async function convertUserMessage(
   currentModelId?: string,
   logger?: Logger,
   imageCache?: ProcessedImageCacheService,
+  commands?: ReadonlyArray<CommandDefinition>,
 ): Promise<UserModelMessage> {
   // ── Resolve slash commands ──────────────────────────────────────────
   // Extract slash command IDs from the raw text, resolve their content
-  // from disk, and replace `[label](slash:id)` links with plain `/id`
-  // in the user text. Resolved content is prepended as XML-wrapped
-  // parts *before* the <user-msg> so the LLM reads the instruction first.
+  // from disk, and replace `[label](slash:id)` links with the
+  // human-readable label (e.g. `/plan`). Resolved content is prepended
+  // as XML-wrapped parts *before* the <user-msg> so the LLM reads the
+  // instruction first.
   const slashIds = extractSlashIdsFromText(message.parts);
   const slashContentParts: TextPart[] = [];
   for (const id of slashIds) {
-    const cmd = await resolveSlashCommand(id);
+    const cmd = await resolveSlashCommand(id, commands ?? []);
     if (cmd)
       slashContentParts.push({
         type: 'text',
@@ -797,8 +802,8 @@ async function convertUserMessage(
 
   const parts = message.parts.map((part) => {
     if (part.type === 'text') {
-      // Replace slash links with plain /id so the command invocation
-      // stays visible in <user-msg>.
+      // Replace slash links with the human-readable label so the
+      // command invocation stays visible in <user-msg>.
       const cleaned = inlineSlashLinksAsText(part.text ?? '');
       return {
         ...part,

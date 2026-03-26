@@ -162,17 +162,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       );
   });
 
-  // Push bundled slash command definitions to UI karton state
-  discoverCommands(getBuiltinCommandsPath()).then((commands) => {
-    uiKarton.setState((draft) => {
-      draft.commands = commands.map(({ contentPath, ...ui }) => ui);
-    });
-    if (verbose)
-      logger.debug(
-        `[Main] Pushed ${commands.length} bundled commands to UI karton`,
-      );
-  });
-
   const diffHistoryService = await DiffHistoryService.create(
     logger,
     uiKarton,
@@ -311,6 +300,16 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     userExperienceService,
     credentialsService,
   );
+
+  // Push bundled slash command definitions via the toolbox so it can
+  // merge them with workspace/plugin skills on mount changes.
+  discoverCommands(getBuiltinCommandsPath()).then((commands) => {
+    toolboxService.setBuiltinCommands(commands);
+    if (verbose)
+      logger.debug(
+        `[Main] Pushed ${commands.length} bundled commands to UI karton`,
+      );
+  });
 
   const _appMenuService = new AppMenuService(
     logger,

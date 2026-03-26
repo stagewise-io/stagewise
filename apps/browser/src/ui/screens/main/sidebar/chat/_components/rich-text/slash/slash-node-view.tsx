@@ -8,10 +8,10 @@ export function SlashNodeView(props: InlineNodeViewProps) {
   const attrs = props.node.attrs as SlashAttrs;
   const isEditable = !('viewOnly' in props);
 
-  const displayLabel = useMemo(
-    () => attrs.label || `/${attrs.id}`,
-    [attrs.label, attrs.id],
-  );
+  const displayLabel = useMemo(() => {
+    const name = attrs.label || attrs.id;
+    return name.startsWith('/') ? name : `/${name}`;
+  }, [attrs.label, attrs.id]);
 
   return (
     <InlineBadgeWrapper viewOnly={!isEditable} tooltipContent={displayLabel}>

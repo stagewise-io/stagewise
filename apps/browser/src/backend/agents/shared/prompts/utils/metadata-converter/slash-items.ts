@@ -1,13 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
 import matter from 'gray-matter';
-import { getBuiltinCommandsPath } from '@/utils/paths';
+import type { CommandDefinition } from '@shared/commands';
 import xml from 'xml';
 import specialTokens from '../special-tokens';
 
 /** Regex to match `[label](slash:id)` links in message text. */
-const SLASH_LINK_RE = /\[[^\]]*\]\(slash:([^)]+)\)/g;
+const SLASH_LINK_RE = /\[([^\]]*)\]\(slash:([^)]+)\)/g;
 
 /**
  * Extracts slash command IDs from the text parts of a message.
@@ -21,7 +20,7 @@ export function extractSlashIdsFromText(
   for (const part of parts) {
     if (part.type !== 'text' || !part.text) continue;
     for (const match of part.text.matchAll(SLASH_LINK_RE)) {
-      const id = match[1]!;
+      const id = match[2]!;
       if (!seen.has(id)) {
         seen.add(id);
         ids.push(id);
@@ -33,11 +32,12 @@ export function extractSlashIdsFromText(
 }
 
 /**
- * Replaces `[label](slash:id)` links in text with plain `/id` text
- * so the user's intent to invoke the command stays visible in `<user-msg>`.
+ * Replaces `[label](slash:id)` links in text with the human-readable
+ * label (e.g. `/plan`) so the command invocation stays visible in
+ * `<user-msg>` without leaking internal composite IDs.
  */
 export function inlineSlashLinksAsText(text: string): string {
-  return text.replace(SLASH_LINK_RE, (_match, id: string) => `/${id}`);
+  return text.replace(SLASH_LINK_RE, (_match, label: string) => `/${label}`);
 }
 
 /** Resolved slash command with its metadata and body content. */
@@ -50,22 +50,30 @@ export interface ResolvedSlashCommand {
 /**
  * Resolves a slash command from disk and returns its metadata + body
  * content (frontmatter stripped), or null if not found.
+ *
+ * The command is looked up by `id` in the provided `commands` list
+ * and its `contentPath` is used for disk resolution. This supports
+ * builtin, workspace-skill, and plugin-skill sources.
  */
 export async function resolveSlashCommand(
   id: string,
+  commands: ReadonlyArray<CommandDefinition>,
 ): Promise<ResolvedSlashCommand | null> {
-  const filePath = resolve(getBuiltinCommandsPath(), `${id}.md`);
+  const cmd = commands.find((c) => c.id === id);
+  if (!cmd) return null;
+
+  const filePath = cmd.contentPath;
   if (!existsSync(filePath)) return null;
 
   try {
     const raw = await readFile(filePath, 'utf-8');
-    const { content, data } = matter(raw);
+    const { content } = matter(raw);
     const body = content.trim();
     if (!body) return null;
 
     return {
       id,
-      displayName: typeof data.displayName === 'string' ? data.displayName : id,
+      displayName: cmd.displayName,
       content: body,
     };
   } catch {
