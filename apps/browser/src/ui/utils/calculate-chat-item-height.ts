@@ -70,6 +70,7 @@ function isReadOnlyToolPart(part: MessagePart): boolean {
     part.type === 'tool-glob' ||
     part.type === 'tool-grepSearch' ||
     part.type === 'tool-read' ||
+    part.type === 'tool-ls' ||
     part.type === 'tool-searchInLibraryDocs' ||
     part.type === 'tool-listLibraryDocs' ||
     part.type === 'tool-executeSandboxJs' ||

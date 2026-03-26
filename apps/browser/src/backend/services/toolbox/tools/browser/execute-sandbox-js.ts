@@ -7,15 +7,7 @@ import { rethrowCappedToolOutputError } from '../../utils';
 import { capToolOutput } from '../../utils';
 import type { SandboxService } from '@/services/sandbox';
 
-/* Due to an issue in zod schema conversion in the ai sdk,
-   the schema descriptions are not properly used for the prompts -
-   thus, we include them in the descriptions as well. */
-
 export const DESCRIPTION = `Execute JavaScript in your persistent, sandboxed Node.js VM context.
-
-Parameters:
-- explanation (string, REQUIRED): Concise (max 5 words) human-readable description of what this script does. Examples: "Take a screenshot", "Read workspace files", "Query DOM elements", "Process API response", "Generate image thumbnail".
-- script (string, REQUIRED): JavaScript code to execute in the sandbox.
 `;
 
 export const executeSandboxJs = (

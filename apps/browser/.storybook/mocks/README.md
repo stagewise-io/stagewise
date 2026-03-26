@@ -106,7 +106,7 @@ const state = createDefaultAgentState({
 - `createOverwriteFileToolPart(path, content, state?, oldContent?)` - File overwrite tool with diff support
 - `createReadToolPart(path, content, state?)` - File read tool
 - `createMultiEditToolPart(path, newContent, state?, oldContent?)` - Multi-edit tool with diff support
-- `createListFilesToolPart(path, result, state?)` - List files tool
+- `createLsToolPart(path, result, state?)` - List files tool
 - `createGlobToolPart(pattern, result, state?)` - Glob pattern search tool
 - `createGrepSearchToolPart(query, result, state?)` - Grep search tool
 - `createDeleteFileToolPart(path, state?)` - Delete file tool

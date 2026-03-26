@@ -41,7 +41,7 @@ export const readToolInputSchema = z.object({
   path: z
     .string()
     .describe(
-      'Path of file/directory to read. Must include a valid mount prefix (e.g. "ws1/path/to/file.ts", "apps/my-app/index.html", "att/screens-j8943f.webp").',
+      'Path of file to read. Must include a valid mount prefix (e.g. "ws1/path/to/file.ts", "apps/my-app/index.html", "att/screens-j8943f.webp"). For directories, use ls instead.',
     ),
   start_line: z
     .number()
@@ -75,19 +75,12 @@ export const readToolInputSchema = z.object({
     .describe(
       'Ending page number (1-indexed, INCLUSIVE). Must be >= start_page. Omit to read to end. Ignored in non-paginated content.',
     ),
-  depth: z
-    .number()
-    .min(0)
-    .optional()
-    .describe(
-      'Maximum directory depth to read. Ignored for simple files, only relevant for directories, archives, disk images.',
-    ),
   preview: z
     .boolean()
     .default(false)
     .optional()
     .describe(
-      'Only request a short preview of the file structure and heavily truncated content instead of full content. Ignored for directories.',
+      'Only request a short preview of the file structure and heavily truncated content instead of full content.',
     ),
 });
 
@@ -98,6 +91,31 @@ export type readToolInput = z.infer<typeof readToolInputSchema>;
  */
 export const readToolSchema = {
   inputSchema: readToolInputSchema,
+  outputSchema: z.void(),
+} as const;
+
+export const lsToolInputSchema = z.object({
+  path: z
+    .string()
+    .describe(
+      'Path of directory to list. Must include a valid mount prefix (e.g. "ws1/src", "apps/my-app"). For reading file contents, use read instead.',
+    ),
+  depth: z
+    .number()
+    .min(0)
+    .optional()
+    .describe(
+      'Maximum directory depth to list. Defaults to 0 (immediate children only).',
+    ),
+});
+
+export type LsToolInput = z.infer<typeof lsToolInputSchema>;
+
+/**
+ * Schema definition for ls (without execute function)
+ */
+export const lsToolSchema = {
+  inputSchema: lsToolInputSchema,
   outputSchema: z.void(),
 } as const;
 
@@ -596,6 +614,26 @@ export const askUserQuestionsToolSchema = {
 // Copy Tool
 // ============================================================================
 
+export const mkdirToolInputSchema = z.object({
+  path: z
+    .string()
+    .describe(
+      'Directory path to create. Must include a valid mount prefix. (e.g. "w1/src/components/new-dir", "apps/my-app/assets"). Parent directories are created automatically.',
+    ),
+});
+
+export const mkdirToolOutputSchema = z.object({
+  message: z.string(),
+});
+
+export type MkdirToolInput = z.infer<typeof mkdirToolInputSchema>;
+export type MkdirToolOutput = z.infer<typeof mkdirToolOutputSchema>;
+
+export const mkdirToolSchema = {
+  inputSchema: mkdirToolInputSchema,
+  outputSchema: mkdirToolOutputSchema,
+} as const;
+
 export const copyToolInputSchema = z.object({
   input_path: z
     .string()
@@ -633,11 +671,10 @@ export const executeShellCommandToolInputSchema = z.object({
       'Concise (max 5 words) explanation of what this command does. Examples: "Install dependencies", "Check git status", "List project files", "Run test suite", "Build the project"',
     ),
   command: z.string().describe('Shell command to execute.'),
-  mount_prefix: z
+  cwd: z
     .string()
-    .optional()
     .describe(
-      'Mount prefix whose workspace root is used as working directory. Falls back to the first mounted workspace.',
+      'Root directory the command should be executed in (e.g. "att", "wm84i", "apps/my-app").',
     ),
   timeout_ms: z
     .number()
@@ -675,8 +712,9 @@ export const executeShellCommandToolSchema = {
 export const allToolSchemas = {
   write: writeToolSchema,
   read: readToolSchema,
+  ls: lsToolSchema,
+  mkdir: mkdirToolSchema,
   copy: copyToolSchema,
-
   grepSearch: grepSearchToolSchema,
   glob: globToolSchema,
   multiEdit: multiEditToolSchema,

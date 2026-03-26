@@ -275,6 +275,54 @@ export function createReadToolPart(
 }
 
 /**
+ * Create a ls tool part
+ */
+export function createLsToolPart(
+  path: string,
+  state:
+    | 'input-streaming'
+    | 'input-available'
+    | 'output-available' = 'output-available',
+  options?: {
+    toolCallId?: string;
+  },
+): AgentToolUIPart {
+  const toolCallId = options?.toolCallId || generateId();
+
+  if (state === 'input-streaming') {
+    return {
+      type: 'tool-ls',
+      toolCallId,
+      state: 'input-streaming',
+      input: {
+        path: path,
+      },
+    } as AgentToolUIPart;
+  }
+
+  if (state === 'input-available') {
+    return {
+      type: 'tool-ls',
+      toolCallId,
+      state: 'input-available',
+      input: {
+        path: path,
+      },
+    } as AgentToolUIPart;
+  }
+
+  // state === 'output-available'
+  return {
+    type: 'tool-ls',
+    toolCallId,
+    state: 'output-available',
+    input: {
+      path: path,
+    },
+  } as unknown as AgentToolUIPart;
+}
+
+/**
  * Create an overwrite file tool part
  */
 export function createWriteToolPart(
@@ -405,6 +453,65 @@ export function createMultiEditToolPart(
       nonSerializableMetadata: {
         undoExecute: null,
       },
+    },
+  } as AgentToolUIPart;
+}
+
+/**
+ * Create a mkdir tool part
+ */
+export function createMkdirToolPart(
+  dirPath: string,
+  state:
+    | 'input-streaming'
+    | 'input-available'
+    | 'output-available'
+    | 'output-error' = 'output-available',
+  options?: {
+    toolCallId?: string;
+    errorText?: string;
+  },
+): AgentToolUIPart {
+  const toolCallId = options?.toolCallId || generateId();
+
+  if (state === 'input-streaming') {
+    return {
+      type: 'tool-mkdir',
+      toolCallId,
+      state: 'input-streaming',
+      input: { path: dirPath },
+    } as AgentToolUIPart;
+  }
+
+  if (state === 'input-available') {
+    return {
+      type: 'tool-mkdir',
+      toolCallId,
+      state: 'input-available',
+      input: { path: dirPath },
+    } as AgentToolUIPart;
+  }
+
+  if (state === 'output-error') {
+    return {
+      type: 'tool-mkdir',
+      toolCallId,
+      state: 'output-error',
+      input: { path: dirPath },
+      errorText:
+        options?.errorText ??
+        `A file already exists at ${dirPath}. Cannot create directory.`,
+    } as AgentToolUIPart;
+  }
+
+  // state === 'output-available'
+  return {
+    type: 'tool-mkdir',
+    toolCallId,
+    state: 'output-available',
+    input: { path: dirPath },
+    output: {
+      message: `Created directory: ${dirPath}`,
     },
   } as AgentToolUIPart;
 }

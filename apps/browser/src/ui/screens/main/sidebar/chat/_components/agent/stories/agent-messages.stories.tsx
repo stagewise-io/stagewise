@@ -8,6 +8,7 @@ import {
   createAssistantMessageWithText as createAssistantMessage,
   createReasoningPart as createThinkingPart,
   createReadToolPart,
+  createLsToolPart,
   createGlobToolPart,
   createGrepSearchToolPart,
   createWriteToolPart,
@@ -877,7 +878,7 @@ export const AssistantExploringMultiple: Story = {
           toolParts: [
             createGlobToolPart('**/*auth*', 8, 'output-available'),
             createGrepSearchToolPart('authentication', 12, 'output-available'),
-            createReadToolPart('src/auth', 'output-available'),
+            createLsToolPart('src/auth', 'output-available'),
             createReadToolPart('src/auth/middleware.ts', 'output-available'),
           ],
         },

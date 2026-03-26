@@ -23,8 +23,8 @@ import {
 import {
   renderFullEnvironmentContext,
   type ShellInfo,
-} from '../prompts/system/environment-renderer';
-import type { SkillInfo } from '../prompts/system/skills';
+} from '../prompts/utils/environment-renderer';
+import type { SkillInfo } from '../prompts/utils/skills';
 import { deepMergeProviderOptions } from '@/agents/model-provider';
 import {
   extractSlashIdsFromText,
@@ -99,7 +99,7 @@ export function stripUnderscoreProperties(
  *
  * **User messages** — everything merged into one message:
  * ```
- * <compressed-conversation-history>  (if present, always first)
+ * <memory>  (if present, always first)
  * <env-snapshot> or <env-changes>
  * attachments, mentions, selected elements
  * <user-msg>  (always last)
@@ -107,7 +107,7 @@ export function stripUnderscoreProperties(
  *
  * **Assistant messages** — synthetic user messages around the assistant:
  * ```
- * [synthetic user: <compressed-conversation-history>]  ← BEFORE
+ * [synthetic user: <memory>]  ← BEFORE
  * [assistant message]
  * [synthetic user: <env-snapshot> or <env-changes>]    ← AFTER
  * ```
@@ -611,7 +611,7 @@ function buildCompressedHistoryPart(
   return {
     type: 'text',
     text: xml({
-      'compressed-conversation-history': { _cdata: history },
+      memory: { _cdata: history },
     }),
   };
 }

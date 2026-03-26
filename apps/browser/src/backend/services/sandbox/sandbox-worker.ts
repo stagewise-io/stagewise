@@ -365,27 +365,27 @@ function getSandboxAPI(agentId: string) {
       ipc.send({ type: 'sandbox-output', agentId, output: str });
       timerResetCallbacks.get(agentId)?.();
     },
-    createAttachment(params: {
-      originalFileName: string;
-      data: Buffer | string;
-    }): Promise<string> {
+    createAttachment(
+      originalFileName: string,
+      data: Buffer | string,
+    ): Promise<string> {
       if (
-        !params ||
-        typeof params.originalFileName !== 'string' ||
-        (typeof params.data !== 'string' && !Buffer.isBuffer(params.data))
+        !originalFileName ||
+        typeof originalFileName !== 'string' ||
+        (typeof data !== 'string' && !Buffer.isBuffer(data))
       ) {
         throw new Error(
           'createAttachment requires { originalFileName: string, data: Buffer | string (base64) }',
         );
       }
       const id = `att_${appReqId++}`;
-      const rawData = Buffer.isBuffer(params.data)
-        ? params.data
-        : Buffer.from(params.data, 'base64');
+      const rawData = Buffer.isBuffer(data)
+        ? data
+        : Buffer.from(data, 'base64');
       return new Promise<string>((resolve, reject) => {
         pendingCreateAttachment.set(id, {
           agentId,
-          originalFileName: params.originalFileName,
+          originalFileName: originalFileName,
           resolve,
           reject,
         });
@@ -393,7 +393,7 @@ function getSandboxAPI(agentId: string) {
           type: 'create-attachment',
           id,
           agentId,
-          originalFileName: params.originalFileName,
+          originalFileName: originalFileName,
           data: rawData.toString('base64'),
         });
         timerResetCallbacks.get(agentId)?.();

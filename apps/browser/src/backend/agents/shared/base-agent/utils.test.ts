@@ -1086,16 +1086,12 @@ describe('convertAgentMessagesToModelMessages – compression boundary', () => {
       return texts.some((t) => t.includes('boundary'));
     })!;
     const texts = getUserMsgTexts(boundaryUser);
-    expect(
-      texts.some((t) => t.includes('<compressed-conversation-history')),
-    ).toBe(true);
+    expect(texts.some((t) => t.includes('<memory'))).toBe(true);
     expect(hasEnvSnapshot(boundaryUser)).toBe(true);
     expect(texts.some((t) => t.includes('<user-msg'))).toBe(true);
 
     // Ordering: compressed-history before env-snapshot before user-msg
-    const compIdx = texts.findIndex((t) =>
-      t.includes('<compressed-conversation-history'),
-    );
+    const compIdx = texts.findIndex((t) => t.includes('<memory'));
     const envIdx = texts.findIndex((t) => t.includes('<env-snapshot>'));
     const userIdx = texts.findIndex((t) => t.includes('<user-msg'));
     expect(compIdx).toBeLessThan(envIdx);
@@ -1188,9 +1184,7 @@ describe('convertAgentMessagesToModelMessages – compression boundary', () => {
     const compMsg = result[assistantIdx - 1];
     expect(compMsg.role).toBe('user');
     const texts = getUserMsgTexts(compMsg);
-    expect(
-      texts.some((t: string) => t.includes('<compressed-conversation-history')),
-    ).toBe(true);
+    expect(texts.some((t: string) => t.includes('<memory'))).toBe(true);
 
     // No synthetic assistant ack anywhere
     const ackMsg = result.find(

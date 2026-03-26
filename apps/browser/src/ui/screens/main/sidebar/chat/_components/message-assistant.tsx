@@ -17,6 +17,7 @@ import { ThinkingPart } from './message-part-ui/thinking';
 import { FilePart } from './message-part-ui/file';
 import { TextPart } from './message-part-ui/text';
 import { CopyToolPart } from './message-part-ui/tools/copy';
+import { MkdirToolPart } from './message-part-ui/tools/mkdir';
 import { DeleteFileToolPart } from './message-part-ui/tools/delete';
 import { UpdateWorkspaceMdToolPart } from './message-part-ui/tools/update-workspace-md';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
@@ -225,6 +226,8 @@ export const MessageAssistant = memo(
                       );
                     case 'tool-copy':
                       return <CopyToolPart key={stableKey} part={part} />;
+                    case 'tool-mkdir':
+                      return <MkdirToolPart key={stableKey} part={part} />;
                     case 'tool-delete':
                       return <DeleteFileToolPart key={stableKey} part={part} />;
                     case 'tool-updateWorkspaceMd':

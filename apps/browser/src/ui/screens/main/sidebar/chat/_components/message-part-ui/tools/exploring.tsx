@@ -18,6 +18,7 @@ import { GlobToolPart } from './glob';
 import { IconMagnifierOutline18 } from 'nucleo-ui-outline-18';
 import { GrepSearchToolPart } from './grep-search';
 import { ReadToolPart } from './read';
+import { LsToolPart } from './ls';
 import { UpdateWorkspaceMdToolPart } from './update-workspace-md';
 import { SearchInLibraryDocsToolPart } from './search-in-library-docs';
 import { ListLibraryDocsToolPart } from './list-library-docs';
@@ -65,6 +66,7 @@ export type ReadOnlyToolPart =
           | 'tool-glob'
           | 'tool-grepSearch'
           | 'tool-read'
+          | 'tool-ls'
           | 'tool-searchInLibraryDocs'
           | 'tool-listLibraryDocs'
           | 'tool-executeSandboxJs'
@@ -83,6 +85,7 @@ export function isReadOnlyToolPart(
     part.type === 'tool-glob' ||
     part.type === 'tool-grepSearch' ||
     part.type === 'tool-read' ||
+    part.type === 'tool-ls' ||
     part.type === 'tool-searchInLibraryDocs' ||
     part.type === 'tool-listLibraryDocs' ||
     part.type === 'tool-executeSandboxJs' ||
@@ -141,6 +144,15 @@ const PartContent = ({
     case 'tool-read':
       return (
         <ReadToolPart
+          minimal={minimal}
+          key={part.toolCallId}
+          part={part}
+          disableShimmer={disableShimmer}
+        />
+      );
+    case 'tool-ls':
+      return (
+        <LsToolPart
           minimal={minimal}
           key={part.toolCallId}
           part={part}
@@ -333,6 +345,11 @@ export const ExploringToolParts = ({
             enabledWorkspaceSkills.add(wsSkillMatch[1]);
             break;
           }
+          filesRead += 1;
+          hasUsedFileTools = true;
+          break;
+        }
+        case 'tool-ls': {
           filesRead += 1;
           hasUsedFileTools = true;
           break;
@@ -618,8 +635,10 @@ export const ExploringToolParts = ({
         }
         const wsMatch = path.match(WORKSPACE_SKILL_RE);
         if (wsMatch?.[1]) return `Enabling ${wsMatch[1]}...`;
-        return 'Exploring files...';
+        return 'Reading file...';
       }
+      case 'tool-ls':
+        return 'Listing directory...';
       case 'tool-glob':
       case 'tool-grepSearch':
         return 'Exploring files...';
