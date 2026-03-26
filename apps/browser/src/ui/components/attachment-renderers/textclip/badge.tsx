@@ -148,15 +148,16 @@ export function TextClipBadge(props: BadgeProps) {
 
   return (
     <InlineBadgeWrapper viewOnly={viewOnly} previewContent={previewContent}>
-      <span className="group/badge">
+      <span className="group/badge relative inline-flex items-center">
         <InlineBadge
           icon={<ClipboardPaste className="size-3 text-foreground" />}
           label={displayLabel}
           selected={selected ?? false}
           isEditable={isEditable}
           onDelete={onDelete ?? (() => {})}
+          className={canExpand ? 'pr-2' : undefined}
         />
-        {/* Expand button - absolutely positioned overlay, appears on hover */}
+        {/* Expand button - absolutely positioned inside badge, appears on hover */}
         {canExpand && (
           <Tooltip>
             <TooltipTrigger>
@@ -166,8 +167,7 @@ export function TextClipBadge(props: BadgeProps) {
                 onClick={handleExpandClick}
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'icon-xs' }),
-                  '-translate-y-1/2 absolute top-1/2 right-0.5 hidden group-hover/badge:flex',
+                  '-translate-y-1/2 absolute top-1/2 right-px flex size-4 cursor-pointer items-center justify-center rounded-r bg-surface-1 opacity-0 transition-opacity group-hover/badge:opacity-100',
                 )}
                 title="Use raw text"
               >
