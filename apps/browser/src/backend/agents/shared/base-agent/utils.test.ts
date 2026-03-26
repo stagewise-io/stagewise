@@ -365,6 +365,7 @@ describe('convertAgentMessagesToModelMessages – file injection via pathReferen
       undefined,
       noopLogger,
       undefined,
+      undefined,
       ctx.cache,
       ctx.mountPaths,
     );
@@ -417,6 +418,7 @@ describe('convertAgentMessagesToModelMessages – file injection via pathReferen
       undefined,
       undefined,
       noopLogger,
+      undefined,
       undefined,
       ctx.cache,
       ctx.mountPaths,
@@ -486,6 +488,7 @@ describe('convertAgentMessagesToModelMessages – file injection via pathReferen
       undefined,
       noopLogger,
       undefined,
+      undefined,
       ctx.cache,
       ctx.mountPaths,
     );
@@ -531,6 +534,7 @@ describe('convertAgentMessagesToModelMessages – file injection via pathReferen
       undefined,
       undefined,
       noopLogger,
+      undefined,
       undefined,
       ctx.cache,
       ctx.mountPaths,
@@ -611,6 +615,7 @@ describe('convertAgentMessagesToModelMessages – file injection via pathReferen
       undefined,
       noopLogger,
       undefined,
+      undefined,
       ctx.cache,
       ctx.mountPaths,
     );
@@ -654,6 +659,7 @@ describe('convertAgentMessagesToModelMessages – file injection via pathReferen
       undefined,
       noopLogger,
       undefined,
+      undefined,
       ctx.cache,
       ctx.mountPaths,
     );
@@ -689,6 +695,7 @@ describe('convertAgentMessagesToModelMessages – file injection via pathReferen
       undefined,
       undefined,
       noopLogger,
+      undefined,
       undefined,
       ctx.cache,
       ctx.mountPaths,
