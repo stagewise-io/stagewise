@@ -15,9 +15,14 @@ export {
 // Re-export prompt pieces so existing imports from this module keep working.
 import {
   COMPRESSION_SYSTEM_PROMPT,
+  COMPRESSION_TARGET_CHARS,
   buildCompressionUserMessage,
 } from './prompt';
-export { COMPRESSION_SYSTEM_PROMPT, buildCompressionUserMessage };
+export {
+  COMPRESSION_SYSTEM_PROMPT,
+  COMPRESSION_TARGET_CHARS,
+  buildCompressionUserMessage,
+};
 
 /**
  * Ordered list of model IDs to try for history compression.
@@ -43,6 +48,12 @@ export const generateSimpleCompressedHistory = async (
 ): Promise<string> => {
   const compactConvertedChatHistory =
     convertAgentMessagesToCompactMessageHistoryString(messages);
+
+  // Find the previous briefing length (if any) so we can inject a dynamic
+  // budget hint into the user message.
+  const previousBriefingChars =
+    [...messages].reverse().find((m) => m.metadata?.compressedHistory)?.metadata
+      ?.compressedHistory?.length ?? 0;
 
   let lastError: Error | undefined;
 
@@ -76,7 +87,10 @@ export const generateSimpleCompressedHistory = async (
             },
             {
               role: 'user',
-              content: buildCompressionUserMessage(compactConvertedChatHistory),
+              content: buildCompressionUserMessage(
+                compactConvertedChatHistory,
+                previousBriefingChars,
+              ),
             },
           ],
           temperature: 0.1,
