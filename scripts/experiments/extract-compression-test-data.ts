@@ -1,17 +1,28 @@
 #!/usr/bin/env npx tsx
 /**
  * Extracts history-compression test data from a stagewise prod/prerelease/dev
- * SQLite database, producing per-chat files suitable for pasting into LLM
- * playgrounds (Google AI Studio, Claude, etc.).
+ * SQLite database, producing per-compression files suitable for pasting into
+ * LLM playgrounds (Google AI Studio, Claude, etc.).
+ *
+ * For each chat that has at least one compression point, every compression is
+ * extracted — including the 1st (no previous briefing) through the Nth
+ * (compounding briefing). This lets you test the full compression chain.
  *
  * Usage:
  *   npx tsx scripts/experiments/extract-compression-test-data.ts [--channel release|prerelease|dev] [--min-messages 6]
  *
- * Output:  experiments-data/history-compression/<channel>/<sanitised-title>/
- *   system-prompt.md   — the static compression instruction
- *   user-message.md    — <chat-history>…</chat-history> wrapper
- *   compact-history.xml— raw XML from convertAgentMessagesToCompactMessageHistoryString
- *   metadata.json      — chat id, title, message counts, sizes
+ * Output:
+ *   experiments-data/history-compression/<channel>/<sanitised-title>/
+ *     compression-001/              # 1st compression (no previous history)
+ *       system-prompt.md            # static compression instruction
+ *       user-message.md             # buildCompressionUserMessage(compactHistory)
+ *       compact-history.xml         # raw serialized input
+ *       actual-output.md            # what the LLM actually produced (from DB)
+ *       metadata.json               # counts, sizes, indices
+ *     compression-002/              # 2nd compression (has <previous-chat-history>)
+ *       ...
+ *     compression-NNN/
+ *       ...
  */
 
 import { execSync } from 'node:child_process';
@@ -88,7 +99,7 @@ interface AgentMessage {
   metadata?: { compressedHistory?: string; [k: string]: unknown };
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function sanitizeTitle(title: string): string {
   return title
@@ -97,6 +108,34 @@ function sanitizeTitle(title: string): string {
     .toLowerCase()
     .slice(0, 80);
 }
+
+/**
+ * Finds all message indices that carry a compressedHistory in their metadata.
+ */
+function findCompressionPoints(messages: AgentMessage[]): number[] {
+  const points: number[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i].metadata?.compressedHistory !== undefined) {
+      points.push(i);
+    }
+  }
+  return points;
+}
+
+/**
+ * Finds the index of the previous compression point within a message slice,
+ * walking backward from the end. Returns -1 if none found.
+ */
+function findPreviousCompressionInSlice(messages: AgentMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].metadata?.compressedHistory !== undefined) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
 
 function main() {
   const { channel, minMessages } = parseArgs();
@@ -128,8 +167,9 @@ function main() {
   );
   fs.mkdirSync(outDir, { recursive: true });
 
-  let extracted = 0;
-  let skipped = 0;
+  let chatsExtracted = 0;
+  let chatsSkipped = 0;
+  let totalCompressions = 0;
 
   for (const line of lines) {
     let row: { id: string; title: string; history: string };
@@ -137,7 +177,7 @@ function main() {
       row = JSON.parse(line);
     } catch {
       console.warn('  ⚠ Could not parse row, skipping');
-      skipped++;
+      chatsSkipped++;
       continue;
     }
 
@@ -147,80 +187,132 @@ function main() {
       messages = superjson.parse<AgentMessage[]>(row.history);
     } catch {
       console.warn(`  ⚠ SuperJSON parse failed for "${row.title}", skipping`);
-      skipped++;
+      chatsSkipped++;
       continue;
-    }
-
-    const originalCount = messages.length;
-
-    // Truncate at first message with compressedHistory (exclude it and after)
-    const firstCompressedIdx = messages.findIndex(
-      (m) => m.metadata?.compressedHistory !== undefined,
-    );
-    if (firstCompressedIdx !== -1) {
-      messages = messages.slice(0, firstCompressedIdx);
-    }
-
-    // Also strip any compressedHistory from remaining messages (belt-and-suspenders)
-    for (const msg of messages) {
-      if (msg.metadata?.compressedHistory !== undefined) {
-        delete msg.metadata.compressedHistory;
-      }
     }
 
     if (messages.length < minMessages) {
-      skipped++;
+      chatsSkipped++;
       continue;
     }
 
-    // Generate the compact history string
-    const compactHistory =
-      convertAgentMessagesToCompactMessageHistoryString(messages);
-    const userMessage = buildCompressionUserMessage(compactHistory);
+    // Find all compression points
+    const compressionPoints = findCompressionPoints(messages);
+    if (compressionPoints.length === 0) {
+      chatsSkipped++;
+      continue;
+    }
 
-    // Write output files
     const chatDir = path.join(
       outDir,
-      `${String(extracted + 1).padStart(3, '0')}-${sanitizeTitle(row.title)}`,
-    );
-    fs.mkdirSync(chatDir, { recursive: true });
-
-    fs.writeFileSync(
-      path.join(chatDir, 'system-prompt.md'),
-      COMPRESSION_SYSTEM_PROMPT,
-    );
-    fs.writeFileSync(path.join(chatDir, 'user-message.md'), userMessage);
-    fs.writeFileSync(path.join(chatDir, 'compact-history.xml'), compactHistory);
-    fs.writeFileSync(
-      path.join(chatDir, 'metadata.json'),
-      JSON.stringify(
-        {
-          id: row.id,
-          title: row.title,
-          channel,
-          originalMessageCount: originalCount,
-          extractedMessageCount: messages.length,
-          truncatedAtCompression: firstCompressedIdx !== -1,
-          compactHistoryChars: compactHistory.length,
-          userMessageChars: userMessage.length,
-        },
-        null,
-        2,
-      ),
+      `${String(chatsExtracted + 1).padStart(3, '0')}-${sanitizeTitle(row.title)}`,
     );
 
-    extracted++;
-    const truncNote =
-      firstCompressedIdx !== -1
-        ? ` (truncated at msg ${firstCompressedIdx}/${originalCount})`
-        : '';
     console.log(
-      `  ✓ ${row.title} — ${messages.length} msgs, ${compactHistory.length} chars${truncNote}`,
+      `  ✓ ${row.title} — ${messages.length} msgs, ${compressionPoints.length} compressions`,
     );
+
+    // Extract each compression point
+    for (let cpIdx = 0; cpIdx < compressionPoints.length; cpIdx++) {
+      const boundaryIndex = compressionPoints[cpIdx];
+      const boundaryMessage = messages[boundaryIndex];
+      const actualOutput = boundaryMessage.metadata!.compressedHistory!;
+
+      // Reproduce what base-agent does: messagesToCompact = history[0..boundary)
+      // Keep compressedHistory on earlier messages so the serializer's backward
+      // walk naturally finds the previous compression and emits
+      // <previous-chat-history>.
+      const messagesToCompact = messages.slice(0, boundaryIndex);
+
+      // Find previous compression within the slice (for metadata)
+      const prevCompressionIndex =
+        findPreviousCompressionInSlice(messagesToCompact);
+      const prevCompressionSize =
+        prevCompressionIndex >= 0
+          ? messagesToCompact[prevCompressionIndex].metadata!.compressedHistory!
+              .length
+          : 0;
+      const serializedMessageCount =
+        prevCompressionIndex >= 0
+          ? messagesToCompact.length - prevCompressionIndex
+          : messagesToCompact.length;
+
+      // Generate the compact history — this is the exact input the
+      // compression LLM received.
+      const compactHistory =
+        convertAgentMessagesToCompactMessageHistoryString(messagesToCompact);
+      const userMessage = buildCompressionUserMessage(
+        compactHistory,
+        prevCompressionSize,
+      );
+
+      const compressionDir = path.join(
+        chatDir,
+        `compression-${String(cpIdx + 1).padStart(3, '0')}`,
+      );
+      fs.mkdirSync(compressionDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(compressionDir, 'system-prompt.md'),
+        COMPRESSION_SYSTEM_PROMPT,
+      );
+      fs.writeFileSync(
+        path.join(compressionDir, 'user-message.md'),
+        userMessage,
+      );
+      fs.writeFileSync(
+        path.join(compressionDir, 'compact-history.xml'),
+        compactHistory,
+      );
+      fs.writeFileSync(
+        path.join(compressionDir, 'actual-output.md'),
+        actualOutput,
+      );
+      fs.writeFileSync(
+        path.join(compressionDir, 'metadata.json'),
+        JSON.stringify(
+          {
+            chatId: row.id,
+            chatTitle: row.title,
+            channel,
+            compressionNumber: cpIdx + 1,
+            totalCompressions: compressionPoints.length,
+            totalChatMessages: messages.length,
+            boundaryMessageIndex: boundaryIndex,
+            boundaryMessageId: boundaryMessage.id,
+            totalMessagesInSlice: messagesToCompact.length,
+            serializedMessageCount,
+            previousCompressionIndex:
+              prevCompressionIndex >= 0 ? compressionPoints[cpIdx - 1] : null,
+            previousCompressionSize: prevCompressionSize || null,
+            compactHistoryChars: compactHistory.length,
+            userMessageChars: userMessage.length,
+            actualOutputChars: actualOutput.length,
+            actualOutputIncludesPreviousTag: actualOutput.includes(
+              '<previous-chat-history>',
+            ),
+          },
+          null,
+          2,
+        ),
+      );
+
+      totalCompressions++;
+
+      console.log(
+        `    compression-${String(cpIdx + 1).padStart(3, '0')}: boundary=${boundaryIndex}, ` +
+          `${serializedMessageCount} msgs serialized, ` +
+          `input=${compactHistory.length} chars, ` +
+          `output=${actualOutput.length} chars` +
+          (prevCompressionSize ? `, prev=${prevCompressionSize} chars` : ''),
+      );
+    }
+
+    chatsExtracted++;
   }
 
   console.log(
-    `\nDone: ${extracted} chats extracted, ${skipped} skipped → ${outDir}`,
+    `\nDone: ${chatsExtracted} chats, ${totalCompressions} compressions extracted, ${chatsSkipped} skipped → ${outDir}`,
   );
 }
 
