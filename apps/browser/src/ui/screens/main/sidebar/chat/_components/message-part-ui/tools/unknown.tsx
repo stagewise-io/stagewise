@@ -1,7 +1,7 @@
 import type { DynamicToolUIPart } from 'ai';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
-import { CircleQuestionMarkIcon } from 'lucide-react';
+import { IconGear2Outline18 } from 'nucleo-ui-outline-18';
 
 export const UnknownToolPart = ({
   part,
@@ -15,7 +15,7 @@ export const UnknownToolPart = ({
   return (
     <ToolPartUINotCollapsible
       part={part}
-      icon={<CircleQuestionMarkIcon className="size-3 shrink-0" />}
+      icon={<IconGear2Outline18 className="size-3 shrink-0" />}
       disableShimmer={!shimmer}
       minimal={true}
       streamingText={streamingText}

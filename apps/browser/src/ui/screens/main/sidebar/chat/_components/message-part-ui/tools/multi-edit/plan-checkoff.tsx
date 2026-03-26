@@ -14,7 +14,7 @@ import { IconClipboardContentOutline18 } from 'nucleo-ui-outline-18';
  *   "Completed 3 of 7 · Some task description…"
  */
 export const PlanCheckoffToolPart = ({ part }: { part: MultiEditPart }) => {
-  const relativePath = part.input?.relative_path ?? '';
+  const relativePath = part.input?.path ?? '';
   const filename = useMemo(
     () => getBaseName(stripMountPrefix(relativePath)),
     [relativePath],

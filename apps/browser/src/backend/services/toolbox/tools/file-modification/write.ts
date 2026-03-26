@@ -1,5 +1,5 @@
 import {
-  type writeToolInput,
+  type WriteToolInput,
   writeToolInputSchema,
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import { tool } from 'ai';
@@ -19,7 +19,7 @@ export const DESCRIPTION = `Write content to a file. Overrides existing file con
  * Note: Diff-history tracking is handled by the ToolboxService wrapper.
  */
 export async function writeToolExecute(
-  params: writeToolInput,
+  params: WriteToolInput,
   mountedRuntimes: MountedClientRuntimes,
 ) {
   const { clientRuntime, path } = resolveMountedRelativePath(

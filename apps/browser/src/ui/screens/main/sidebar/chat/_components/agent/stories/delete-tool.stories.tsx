@@ -365,6 +365,64 @@ export const DeleteDirectoryPermissionError: Story = {
 };
 
 /**
+ * Delete File vs Directory Comparison
+ *
+ * Side-by-side comparison of file delete (collapsible with diff) vs directory
+ * delete (simple flat row with folder icon). Shows how the two types look different.
+ */
+export const FileVsDirectoryComparison: Story = {
+  name: 'Delete/File-vs-Directory-Comparison',
+  parameters: {
+    mockKartonState: createStoryState([
+      createUserMessage(
+        'Delete the helpers.ts file and the old-tests directory',
+      ),
+      createAssistantMessage(
+        "I've deleted the file and directory as requested.",
+        {
+          thinkingPart: createThinkingPart(
+            'Deleting the file and directory...',
+            'done',
+          ),
+          toolParts: [
+            createDeleteFileToolPart('w1/src/helpers.ts', 'output-available', {
+              deletedContent: `export function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function truncate(s: string, len: number): string {
+  return s.length > len ? s.slice(0, len) + '...' : s;
+}`,
+            }),
+            {
+              type: 'tool-delete' as const,
+              toolCallId: 'delete-comparison-dir-1',
+              state: 'output-available' as const,
+              input: {
+                path: 'w1/src/old-tests',
+              },
+              output: {
+                message: 'Directory deleted successfully',
+                _diff: {
+                  before: null,
+                  after: null,
+                },
+                nonSerializableMetadata: {
+                  undoExecute: null as any,
+                },
+              },
+            },
+          ],
+        },
+      ),
+      createAssistantMessage(
+        'Done! Deleted `src/helpers.ts` (file with diff preview) and `src/old-tests/` (directory shown as flat row).',
+      ),
+    ]),
+  },
+};
+
+/**
  * Delete Multiple Files and Directory
  *
  * Agent deletes multiple items in sequence — files and a directory.

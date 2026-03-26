@@ -2,7 +2,7 @@ import { BaseAgent, type BaseAgentConfig } from '../shared/base-agent';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import type {
   StagewiseToolSet,
-  OverwriteFileToolInput,
+  WriteToolInput,
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import { isPlanPath } from '@shared/plan-ownership';
 import { buildChatSystemPrompt } from './system-prompt-builder/system-prompt-builder';
@@ -55,8 +55,8 @@ export class ChatAgent extends BaseAgent<never, undefined> {
     for (const tr of result.toolResults) {
       if (tr.toolName !== 'overwriteFile') continue;
 
-      const input = tr.input as OverwriteFileToolInput;
-      if (!isPlanPath(input.relative_path)) continue;
+      const input = tr.input as WriteToolInput;
+      if (!isPlanPath(input.path)) continue;
 
       // Plan was created or updated — stop so the UI can present it cleanly.
       return false;

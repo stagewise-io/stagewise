@@ -26,8 +26,8 @@ export const writeToolOutputSchema = z.object({
   message: z.string(),
 });
 
-export type writeToolInput = z.infer<typeof writeToolInputSchema>;
-export type writeToolOutput = z.infer<typeof writeToolOutputSchema>;
+export type WriteToolInput = z.infer<typeof writeToolInputSchema>;
+export type WriteToolOutput = z.infer<typeof writeToolOutputSchema>;
 
 /**
  * Schema definition for overwriteFile (without execute function)

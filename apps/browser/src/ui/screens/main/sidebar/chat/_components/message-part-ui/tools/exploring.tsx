@@ -15,7 +15,7 @@ import {
 import type { ReasoningUIPart } from 'ai';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { GlobToolPart } from './glob';
-import { SearchIcon } from 'lucide-react';
+import { IconMagnifierOutline18 } from 'nucleo-ui-outline-18';
 import { GrepSearchToolPart } from './grep-search';
 import { ReadToolPart } from './read';
 import { UpdateWorkspaceMdToolPart } from './update-workspace-md';
@@ -724,7 +724,7 @@ export const ExploringToolParts = ({
       trigger={
         <div className={cn(`flex flex-row items-center justify-start gap-2`)}>
           <div className="flex min-w-0 flex-1 flex-row items-center justify-start gap-1 text-xs">
-            <SearchIcon
+            <IconMagnifierOutline18
               className={cn(
                 'size-3 shrink-0',
                 isShimmering && 'text-primary-foreground',

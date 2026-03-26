@@ -17,10 +17,10 @@ import { ThinkingPart } from './message-part-ui/thinking';
 import { FilePart } from './message-part-ui/file';
 import { TextPart } from './message-part-ui/text';
 import { CopyToolPart } from './message-part-ui/tools/copy';
-import { DeleteFileToolPart } from './message-part-ui/tools/delete-file';
+import { DeleteFileToolPart } from './message-part-ui/tools/delete';
 import { UpdateWorkspaceMdToolPart } from './message-part-ui/tools/update-workspace-md';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
-import { WriteToolPart } from './message-part-ui/tools/overwrite-file';
+import { WriteToolPart } from './message-part-ui/tools/write';
 import {
   ExploringToolParts,
   isReadOnlyToolPart,

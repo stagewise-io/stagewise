@@ -8,11 +8,11 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import {
-  Loader2Icon,
-  XIcon,
-  ListChevronsDownUpIcon,
-  ListChevronsUpDownIcon,
-} from 'lucide-react';
+  IconXmarkOutline18,
+  IconChevronExpandYOutline18,
+  IconChevronReduceYOutline18,
+  IconLoader6Outline18,
+} from 'nucleo-ui-outline-18';
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { IdePickerPopover } from '@ui/components/ide-picker-popover';
@@ -161,9 +161,13 @@ export const GenericWriteToolPart = ({ part }: { part: WritePart }) => {
                 }}
               >
                 {codeDiffCollapsed ? (
-                  <ListChevronsUpDownIcon className={cn('size-3 shrink-0')} />
+                  <IconChevronExpandYOutline18
+                    className={cn('size-3 shrink-0')}
+                  />
                 ) : (
-                  <ListChevronsDownUpIcon className={cn('size-3 shrink-0')} />
+                  <IconChevronReduceYOutline18
+                    className={cn('size-3 shrink-0')}
+                  />
                 )}
               </Button>
             </TooltipTrigger>
@@ -261,7 +265,7 @@ const ErrorHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <XIcon className="size-3 shrink-0" />
+      <IconXmarkOutline18 className="size-3 shrink-0" />
       <Tooltip>
         <TooltipTrigger>
           <span className="min-w-0 flex-1 truncate text-xs">
@@ -349,7 +353,7 @@ const LoadingHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <Loader2Icon
+      <IconLoader6Outline18
         className={cn('size-3 shrink-0 animate-spin text-primary-foreground')}
       />
       {relativePath !== null ? (

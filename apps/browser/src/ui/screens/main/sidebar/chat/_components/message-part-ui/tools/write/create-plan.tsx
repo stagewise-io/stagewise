@@ -1,5 +1,8 @@
 import type { WritePart } from '.';
-import { IconClipboardContentOutline18 } from 'nucleo-ui-outline-18';
+import {
+  IconClipboardContentOutline18,
+  IconXmarkOutline18,
+} from 'nucleo-ui-outline-18';
 import {
   parsePlanContent,
   type PlanTask,
@@ -17,7 +20,6 @@ import { cn } from '@ui/utils';
 import { IconClipboardOutline18 } from 'nucleo-ui-outline-18';
 import { usePlanPhase } from '@ui/hooks/use-plan-phase';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
-import { XIcon } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -114,7 +116,7 @@ export const CreatePlanToolPart = ({ part }: { part: WritePart }) => {
     const errorText = part.errorText ?? 'Failed to create plan';
     return (
       <div className="flex max-w-full cursor-default items-center gap-1 text-muted-foreground text-xs hover:text-foreground">
-        <XIcon className="size-3 shrink-0" />
+        <IconXmarkOutline18 className="size-3 shrink-0" />
         <Tooltip>
           <TooltipTrigger>
             <span className="min-w-0 truncate text-xs">{errorText}</span>
