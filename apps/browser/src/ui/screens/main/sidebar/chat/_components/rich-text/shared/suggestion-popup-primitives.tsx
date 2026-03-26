@@ -68,8 +68,17 @@ export const SuggestionPopupContainer = forwardRef<
  */
 export const SuggestionSidePanel = forwardRef<
   HTMLDivElement,
-  { offset: number; children: React.ReactNode; className?: string }
->(function SuggestionSidePanel({ offset, children, className }, ref) {
+  {
+    offset: number;
+    children: React.ReactNode;
+    className?: string;
+    /** Skip the built-in OverlayScrollbar wrapper (for callers that manage their own scrolling). */
+    disableScroll?: boolean;
+  }
+>(function SuggestionSidePanel(
+  { offset, children, className, disableScroll },
+  ref,
+) {
   const viewportRef = useRef<HTMLElement | null>(null);
   const { maskStyle } = useScrollFadeMask(viewportRef, {
     axis: 'vertical',
@@ -86,16 +95,20 @@ export const SuggestionSidePanel = forwardRef<
       )}
       style={{ top: offset }}
     >
-      <OverlayScrollbar
-        className="mask-alpha max-h-52 p-2.5"
-        style={maskStyle}
-        defer={false}
-        onViewportRef={(el) => {
-          viewportRef.current = el;
-        }}
-      >
-        <div className="flex flex-col gap-2">{children}</div>
-      </OverlayScrollbar>
+      {disableScroll ? (
+        children
+      ) : (
+        <OverlayScrollbar
+          className="mask-alpha max-h-52 p-2.5"
+          style={maskStyle}
+          defer={false}
+          onViewportRef={(el) => {
+            viewportRef.current = el;
+          }}
+        >
+          <div className="flex flex-col gap-2">{children}</div>
+        </OverlayScrollbar>
+      )}
     </div>
   );
 });

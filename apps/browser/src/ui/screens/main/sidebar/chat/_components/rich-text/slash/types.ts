@@ -12,4 +12,8 @@ export interface SlashItem {
   label: string;
   description?: string;
   group: string;
+  /** When set, this is a synthetic "Show N more" trigger, not a real command. */
+  expandGroup?: string;
+  /** The truncated items hidden behind this "Show more" row. */
+  hiddenItems?: SlashItem[];
 }
