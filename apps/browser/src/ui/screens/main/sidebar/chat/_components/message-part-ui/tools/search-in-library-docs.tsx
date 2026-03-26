@@ -1,6 +1,6 @@
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
-import { FolderCode } from 'lucide-react';
+import { IconBookOpen5Outline18 } from 'nucleo-ui-outline-18';
 
 export const SearchInLibraryDocsToolPart = ({
   part,
@@ -29,7 +29,7 @@ export const SearchInLibraryDocsToolPart = ({
 
   return (
     <ToolPartUINotCollapsible
-      icon={<FolderCode className="size-3 shrink-0" />}
+      icon={<IconBookOpen5Outline18 className="size-3 shrink-0" />}
       part={part}
       minimal={minimal}
       disableShimmer={disableShimmer}

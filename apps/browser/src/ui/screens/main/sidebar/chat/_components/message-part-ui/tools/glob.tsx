@@ -1,6 +1,6 @@
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
-import { FileSearchIcon } from 'lucide-react';
+import { IconFileSearchOutline18 } from 'nucleo-ui-outline-18';
 
 export const GlobToolPart = ({
   part,
@@ -29,7 +29,7 @@ export const GlobToolPart = ({
 
   return (
     <ToolPartUINotCollapsible
-      icon={<FileSearchIcon className="size-3 shrink-0" />}
+      icon={<IconFileSearchOutline18 className="size-3 shrink-0" />}
       part={part}
       minimal={minimal}
       disableShimmer={disableShimmer}

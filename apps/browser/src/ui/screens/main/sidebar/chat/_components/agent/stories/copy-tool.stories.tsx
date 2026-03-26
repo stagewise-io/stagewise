@@ -448,6 +448,150 @@ export const MoveDirectoryError: Story = {
   },
 };
 
+// ============================================================================
+// Rename Stories (Move where only the final name differs)
+// ============================================================================
+
+/**
+ * Rename File Complete
+ *
+ * Move where source and destination share the same parent directory.
+ * The UI should show "Renamed" instead of "Moved".
+ */
+export const RenameFileComplete: Story = {
+  name: 'Rename/File-Complete',
+  parameters: {
+    mockKartonState: createStoryState([
+      createUserMessage('Rename utils.ts to helpers.ts'),
+      createAssistantMessage("I've renamed the file.", {
+        thinkingPart: createThinkingPart(
+          'I need to rename utils.ts to helpers.ts in the same directory...',
+          'done',
+        ),
+        toolParts: [
+          createCopyToolPart(
+            'w1/src/utils.ts',
+            'w1/src/helpers.ts',
+            true,
+            'output-available',
+          ),
+        ],
+      }),
+      createAssistantMessage(
+        'The file has been renamed from `src/utils.ts` to `src/helpers.ts`. Remember to update any imports.',
+      ),
+    ]),
+  },
+};
+
+/**
+ * Rename File Streaming
+ *
+ * Shows the "Renaming" label during streaming state.
+ */
+export const RenameFileStreaming: Story = {
+  name: 'Rename/File-Streaming',
+  parameters: {
+    mockKartonState: createStoryState([
+      createUserMessage('Rename config.json to settings.json'),
+      createAssistantMessage('Renaming the config file...', {
+        thinkingPart: createThinkingPart(
+          'I will rename config.json to settings.json...',
+          'done',
+        ),
+        toolParts: [
+          createCopyToolPart(
+            'w1/src/config.json',
+            'w1/src/settings.json',
+            true,
+            'input-streaming',
+          ),
+        ],
+      }),
+    ]),
+  },
+};
+
+/**
+ * Rename Directory Complete
+ *
+ * Renaming a directory (same parent, different name).
+ */
+export const RenameDirectoryComplete: Story = {
+  name: 'Rename/Directory-Complete',
+  parameters: {
+    mockKartonState: createStoryState([
+      createUserMessage('Rename the utils directory to lib'),
+      createAssistantMessage("I've renamed the directory.", {
+        thinkingPart: createThinkingPart(
+          'I can rename the directory by moving it to the new name...',
+          'done',
+        ),
+        toolParts: [
+          createCopyToolPart(
+            'w1/src/utils',
+            'w1/src/lib',
+            true,
+            'output-available',
+          ),
+        ],
+      }),
+      createAssistantMessage(
+        'The `src/utils` directory has been renamed to `src/lib`. Update any import paths accordingly.',
+      ),
+    ]),
+  },
+};
+
+/**
+ * Rename vs Move Comparison
+ *
+ * Side-by-side comparison: rename (same parent) shows "Renamed",
+ * move (different parent) shows "Moved", copy shows "Copied".
+ */
+export const RenameVsMoveComparison: Story = {
+  name: 'Comparison/Rename-vs-Move-vs-Copy',
+  parameters: {
+    mockKartonState: createStoryState([
+      createUserMessage(
+        'Rename Button.tsx to BaseButton.tsx, move Card.tsx to shared/, and copy Modal.tsx to backup/',
+      ),
+      createAssistantMessage('All operations completed.', {
+        thinkingPart: createThinkingPart(
+          'Three operations: rename, move, and copy...',
+          'done',
+        ),
+        toolParts: [
+          // Rename: same parent directory
+          createCopyToolPart(
+            'w1/src/components/Button.tsx',
+            'w1/src/components/BaseButton.tsx',
+            true,
+            'output-available',
+          ),
+          // Move: different parent directory
+          createCopyToolPart(
+            'w1/src/components/Card.tsx',
+            'w1/src/shared/Card.tsx',
+            true,
+            'output-available',
+          ),
+          // Copy: not a move at all
+          createCopyToolPart(
+            'w1/src/components/Modal.tsx',
+            'w1/backup/components/Modal.tsx',
+            false,
+            'output-available',
+          ),
+        ],
+      }),
+      createAssistantMessage(
+        'Done:\n\n- **Renamed** `Button.tsx` → `BaseButton.tsx` (same folder)\n- **Moved** `Card.tsx` → `shared/Card.tsx` (different folder)\n- **Copied** `Modal.tsx` → `backup/components/Modal.tsx`',
+      ),
+    ]),
+  },
+};
+
 /**
  * Copy and Move Combined
  *

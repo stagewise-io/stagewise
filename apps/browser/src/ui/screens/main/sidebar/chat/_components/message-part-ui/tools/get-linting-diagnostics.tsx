@@ -1,9 +1,10 @@
 import {
   IconTriangleWarningOutline18,
   IconCheck2Outline18,
+  IconLoader6Outline18,
+  IconXmarkOutline18,
 } from 'nucleo-ui-outline-18';
 import { useMemo } from 'react';
-import { Loader2Icon, XCircleIcon } from 'lucide-react';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { cn, stripMountPrefix } from '@ui/utils';
 import { useToolAutoExpand } from './shared/use-tool-auto-expand';
@@ -57,7 +58,7 @@ export const GetLintingDiagnosticsToolPart = ({
       <div className={cn('group/exploring-part block min-w-32 rounded-xl')}>
         <div className="flex h-6 cursor-default items-center gap-1 rounded-lg text-muted-foreground">
           <div className="flex w-full flex-row items-center justify-start gap-1">
-            <XCircleIcon className="size-3 shrink-0 text-muted-foreground" />
+            <IconXmarkOutline18 className="size-3 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
               {part.errorText ?? 'Error checking linting diagnostics'}
             </span>
@@ -139,7 +140,7 @@ const DiagnosticRow = ({ diagnostic }: { diagnostic: LintingDiagnostic }) => {
   return (
     <div className="flex flex-row items-start gap-1.5 text-xs">
       {isError ? (
-        <XCircleIcon className="mt-0.5 size-3 shrink-0 text-error-foreground" />
+        <IconXmarkOutline18 className="mt-0.5 size-3 shrink-0 text-error-foreground" />
       ) : (
         <IconTriangleWarningOutline18 className="mt-0.5 size-3 shrink-0 text-warning-foreground" />
       )}
@@ -195,7 +196,7 @@ const SuccessHeader = ({
 const LoadingHeader = ({ disableShimmer }: { disableShimmer?: boolean }) => {
   return (
     <div className="flex flex-row items-center justify-start gap-1 overflow-hidden">
-      <Loader2Icon
+      <IconLoader6Outline18
         className={cn(
           'size-3 shrink-0 animate-spin',
           disableShimmer ? '' : 'text-primary-foreground',

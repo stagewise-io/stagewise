@@ -331,7 +331,6 @@ export function ChatPanelFooter() {
 
       // Reset current draft state before restoring
       setFileAttachments([]);
-      setLocalSelectedElements([]);
 
       // Restore the user message's content into the chat input
       const textPart = nextUserMessage.parts.find((p) => p.type === 'text');
@@ -339,9 +338,6 @@ export function ChatPanelFooter() {
       const parsed = markdownToTipTapContent(text);
       const tiptapContent = enrichTipTapContent(parsed, {
         attachments: nextUserMessage.metadata?.attachments,
-        textClipAttachments: nextUserMessage.metadata?.textClipAttachments,
-        selectedPreviewElements: nextUserMessage.metadata
-          ?.selectedPreviewElements as SelectedElement[] | undefined,
       });
       updateChatInputState(tiptapContent);
       requestAnimationFrame(() => {
@@ -351,12 +347,6 @@ export function ChatPanelFooter() {
       // Restore file attachments if present
       if (nextUserMessage.metadata?.attachments?.length) {
         setFileAttachments(nextUserMessage.metadata.attachments);
-      }
-
-      // Restore selected elements if present
-      const elements = nextUserMessage.metadata?.selectedPreviewElements;
-      if (elements?.length) {
-        setLocalSelectedElements(elements as SelectedElement[]);
       }
     },
     [openAgent, revertToUserMessage, updateChatInputState, setFileAttachments],

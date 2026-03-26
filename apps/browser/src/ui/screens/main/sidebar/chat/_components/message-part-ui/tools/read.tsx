@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
-import { EyeIcon } from 'lucide-react';
+import { IconEyeOutline18 } from 'nucleo-ui-outline-18';
 import { IconBookOpenOutline18 } from 'nucleo-ui-outline-18';
 import { cn, resolveDisplayPath } from '@ui/utils';
 import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
@@ -61,7 +61,7 @@ export const ReadToolPart = ({
         dangerouslySetInnerHTML={{ __html: pluginMatch.logoSvg }}
       />
     ) : (
-      <EyeIcon className="size-3 shrink-0" />
+      <IconEyeOutline18 className="size-3 shrink-0" />
     );
 
     return (
@@ -117,7 +117,7 @@ export const ReadToolPart = ({
 
   return (
     <ToolPartUINotCollapsible
-      icon={<EyeIcon className="size-3 shrink-0" />}
+      icon={<IconEyeOutline18 className="size-3 shrink-0" />}
       part={part}
       minimal={minimal}
       disableShimmer={disableShimmer}

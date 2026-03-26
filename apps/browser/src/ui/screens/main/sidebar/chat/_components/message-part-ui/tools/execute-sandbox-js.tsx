@@ -1,4 +1,8 @@
-import { ChevronDownIcon, Loader2Icon, XIcon } from 'lucide-react';
+import {
+  IconChevronDownOutline18,
+  IconLoader6Outline18,
+  IconXmarkOutline18,
+} from 'nucleo-ui-outline-18';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconWindowPointerOutline18 } from 'nucleo-ui-outline-18';
 import {
@@ -201,7 +205,7 @@ export const ExecuteSandboxJsToolPart = ({
         setExpanded={handleUserSetExpanded}
         trigger={
           <>
-            <XIcon className="size-3 shrink-0" />
+            <IconXmarkOutline18 className="size-3 shrink-0" />
             <div className="flex min-w-0 flex-col items-start">
               <span className="truncate text-start font-medium text-xs">
                 {explanation
@@ -219,7 +223,7 @@ export const ExecuteSandboxJsToolPart = ({
                 onOpenChange={setScriptExpanded}
               >
                 <CollapsibleTrigger size="condensed" className="">
-                  <ChevronDownIcon
+                  <IconChevronDownOutline18
                     className={cn(
                       'size-3 transition-transform duration-150',
                       !scriptExpanded && '-rotate-90',
@@ -242,7 +246,7 @@ export const ExecuteSandboxJsToolPart = ({
                 onOpenChange={setResultExpanded}
               >
                 <CollapsibleTrigger size="condensed" className="">
-                  <ChevronDownIcon
+                  <IconChevronDownOutline18
                     className={cn(
                       'size-3 transition-transform duration-150',
                       !resultExpanded && '-rotate-90',
@@ -315,7 +319,7 @@ export const ExecuteSandboxJsToolPart = ({
                   onOpenChange={setScriptExpanded}
                 >
                   <CollapsibleTrigger size="condensed" className="">
-                    <ChevronDownIcon
+                    <IconChevronDownOutline18
                       className={cn(
                         'size-3 transition-transform duration-150',
                         !scriptExpanded && '-rotate-90',
@@ -338,7 +342,7 @@ export const ExecuteSandboxJsToolPart = ({
                   onOpenChange={setResultExpanded}
                 >
                   <CollapsibleTrigger size="condensed" className="">
-                    <ChevronDownIcon
+                    <IconChevronDownOutline18
                       className={cn(
                         'size-3 transition-transform duration-150',
                         !resultExpanded && '-rotate-90',
@@ -473,7 +477,7 @@ const LoadingHeader = ({
 }) => {
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <Loader2Icon
+      <IconLoader6Outline18
         className={cn(
           'size-3 shrink-0 animate-spin',
           disableShimmer ? '' : 'text-primary-foreground',

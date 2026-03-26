@@ -1,5 +1,8 @@
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
-import { XIcon, TerminalIcon } from 'lucide-react';
+import {
+  IconXmarkOutline18,
+  IconTerminalOutline18,
+} from 'nucleo-ui-outline-18';
 import { useMemo } from 'react';
 import {
   Tooltip,
@@ -91,7 +94,7 @@ export const ReadConsoleLogsToolPart = ({
       isShimmering={!disableShimmer && streaming}
       trigger={
         <>
-          {!streaming && <TerminalIcon className="size-3 shrink-0" />}
+          {!streaming && <IconTerminalOutline18 className="size-3 shrink-0" />}
           <div className={cn('flex flex-row items-center justify-start gap-1')}>
             {streaming ? (
               <LoadingHeader
@@ -142,7 +145,7 @@ const ErrorHeader = ({ errorText }: { errorText?: string }) => {
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <XIcon className="size-3 shrink-0" />
+      <IconXmarkOutline18 className="size-3 shrink-0" />
       <Tooltip>
         <TooltipTrigger>
           <span className="min-w-0 flex-1 truncate text-xs">
@@ -189,7 +192,7 @@ const LoadingHeader = ({
     : 'Reading console logs...';
   return (
     <div className="flex flex-row items-center justify-start gap-1 overflow-hidden">
-      <TerminalIcon
+      <IconTerminalOutline18
         className={cn(
           'size-3 shrink-0',
           disableShimmer ? '' : 'animate-icon-pulse text-primary-foreground',

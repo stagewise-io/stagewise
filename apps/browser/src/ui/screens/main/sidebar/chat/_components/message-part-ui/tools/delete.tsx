@@ -3,11 +3,12 @@ import { DiffPreview } from './shared/diff-preview';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { getBaseName } from '@shared/path-utils';
 import {
-  Loader2Icon,
-  XIcon,
-  ListChevronsDownUpIcon,
-  ListChevronsUpDownIcon,
-} from 'lucide-react';
+  IconLoader6Outline18,
+  IconXmarkOutline18,
+  IconChevronExpandYOutline18,
+  IconChevronReduceYOutline18,
+  IconFolder5Outline18,
+} from 'nucleo-ui-outline-18';
 import { FileIcon } from '@ui/components/file-icon';
 import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
@@ -33,6 +34,12 @@ export const DeleteFileToolPart = ({
   const { resolvePath } = useFileIDEHref();
 
   const outputWithDiff = part.output as WithDiff<{}> | undefined;
+
+  // Directory deletes have null before content (no file content to diff)
+  const isDirectory = useMemo(() => {
+    const diff = outputWithDiff?._diff;
+    return diff !== undefined && diff !== null && diff.before === null;
+  }, [outputWithDiff?._diff]);
 
   const diff = useMemo(
     () =>
@@ -93,6 +100,7 @@ export const DeleteFileToolPart = ({
           fullPath={part.input?.path ?? undefined}
           resolvePath={resolvePath}
           deletedLineCount={deletedLineCount}
+          isDirectory={isDirectory}
         />
       );
   }, [
@@ -103,11 +111,14 @@ export const DeleteFileToolPart = ({
     part.errorText,
     deletedLineCount,
     resolvePath,
+    isDirectory,
   ]);
 
   const content = useMemo(() => {
     if (state === 'error') return undefined;
-    else if (state === 'success' && diff)
+    // Directories have no diff content to show
+    if (isDirectory) return undefined;
+    if (state === 'success' && diff)
       return (
         <DiffPreview
           diff={diff}
@@ -115,10 +126,11 @@ export const DeleteFileToolPart = ({
           collapsed={collapsedDiffView}
         />
       );
-    else return undefined;
-  }, [state, diff, part.input?.path, collapsedDiffView]);
+    return undefined;
+  }, [state, diff, part.input?.path, collapsedDiffView, isDirectory]);
 
   const contentFooter = useMemo(() => {
+    if (isDirectory) return undefined;
     if (state === 'success' && diff)
       return (
         <div className="flex w-full flex-row items-center justify-start">
@@ -132,9 +144,9 @@ export const DeleteFileToolPart = ({
                 }}
               >
                 {collapsedDiffView ? (
-                  <ListChevronsUpDownIcon className={cn('size-3 shrink-0')} />
+                  <IconChevronExpandYOutline18 className="size-3 shrink-0" />
                 ) : (
-                  <ListChevronsDownUpIcon className={cn('size-3 shrink-0')} />
+                  <IconChevronReduceYOutline18 className="size-3 shrink-0" />
                 )}
               </Button>
             </TooltipTrigger>
@@ -145,7 +157,7 @@ export const DeleteFileToolPart = ({
         </div>
       );
     else return undefined;
-  }, [state, diff, collapsedDiffView, part.input?.path]);
+  }, [state, diff, collapsedDiffView, isDirectory]);
 
   return (
     <ToolPartUI
@@ -176,7 +188,7 @@ const ErrorHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <XIcon className="size-3 shrink-0" />
+      <IconXmarkOutline18 className="size-3 shrink-0" />
       <Tooltip>
         <TooltipTrigger>
           <span className="min-w-0 flex-1 truncate text-xs">
@@ -196,11 +208,13 @@ const SuccessHeader = ({
   fullPath,
   resolvePath,
   deletedLineCount,
+  isDirectory,
 }: {
   relativePath?: string;
   fullPath?: string;
   resolvePath: (path: string) => string | null;
   deletedLineCount?: number;
+  isDirectory?: boolean;
 }) => {
   const fileName = relativePath ? getBaseName(relativePath) : relativePath;
 
@@ -214,10 +228,14 @@ const SuccessHeader = ({
           <Tooltip>
             <TooltipTrigger>
               <div className="flex flex-row items-center justify-start gap-1">
-                <FileIcon
-                  filePath={relativePath ?? ''}
-                  className="-ml-1 size-4 shrink-0"
-                />
+                {isDirectory ? (
+                  <IconFolder5Outline18 className="size-3.5 shrink-0" />
+                ) : (
+                  <FileIcon
+                    filePath={relativePath ?? ''}
+                    className="-ml-1 size-4 shrink-0"
+                  />
+                )}
                 <span
                   className="min-w-0 truncate font-normal text-xs"
                   dir="rtl"
@@ -235,7 +253,7 @@ const SuccessHeader = ({
       <span className="shrink-0 text-error-foreground text-xs group-hover/trigger:text-hover-derived">
         (deleted)
       </span>
-      {(deletedLineCount ?? 0) > 0 && (
+      {!isDirectory && (deletedLineCount ?? 0) > 0 && (
         <span className="shrink-0 text-error-foreground text-xs group-hover/trigger:text-hover-derived">
           -{deletedLineCount}
         </span>
@@ -257,7 +275,7 @@ const LoadingHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <Loader2Icon className="size-3 shrink-0 animate-spin text-primary" />
+      <IconLoader6Outline18 className="size-3 shrink-0 animate-spin text-primary" />
       {relativePath !== null ? (
         <FileContextMenu
           relativePath={fullPath ?? relativePath ?? ''}
