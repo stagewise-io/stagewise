@@ -2171,7 +2171,18 @@ export abstract class BaseAgent<
     const lastMsg = history[targetIdx];
     if (!lastMsg || lastMsg.role !== 'assistant') return;
 
-    const mountedPaths = extractReadFilePathsFromAssistantMessage(lastMsg);
+    // Collect paths from readFile tool calls AND from attachments created
+    // via API.createAttachment(). Both should be tracked so their contents
+    // are automatically injected into model context on the next turn.
+    const pathsFromToolCalls =
+      extractReadFilePathsFromAssistantMessage(lastMsg);
+    const pathsFromAttachments = (lastMsg.metadata?.attachments ?? [])
+      .map((att) => att.path)
+      .filter((p): p is string => typeof p === 'string' && p.length > 0);
+
+    const mountedPaths = [
+      ...new Set([...pathsFromToolCalls, ...pathsFromAttachments]),
+    ];
     if (mountedPaths.length === 0) return;
 
     const mountPaths = this.toolbox.getMountedPathsForAgent(this.instanceId);

@@ -32,14 +32,6 @@ import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metad
 const ATTACHMENT_LINK_RE =
   /\[([^\]]*)\]\((path|tab|mention|slash):((?:[^()]|\([^()]*\))+)\)/g;
 
-/** Maps attachment link protocol to TipTap node type */
-const PROTOCOL_TO_NODE: Record<string, string> = {
-  path: 'attachment', // canonical path: protocol — only att/ sub-paths map to attachment nodes
-  element: 'elementAttachment',
-  mention: 'mention',
-  slash: 'slash',
-};
-
 /**
  * Parses a single line of text into TipTap inline content nodes.
  * Attachment links ([label](protocol:id)) become attachment nodes;

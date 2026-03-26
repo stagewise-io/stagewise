@@ -75,6 +75,11 @@ function getStatusText(history: AgentMessage[]): string {
       const fileName = getBaseName(stripped ?? '');
       return fileName ? `Reading ${fileName}...` : 'Reading file...';
     }
+    case 'tool-ls': {
+      const stripped = relativizePath(lastToolPart.input?.path);
+      const dirName = getBaseName(stripped ?? '');
+      return dirName ? `Listing ${dirName}...` : 'Listing directory...';
+    }
     case 'tool-glob': {
       const pattern = lastToolPart.input?.pattern;
       return pattern ? `Searching for ${pattern}...` : 'Searching files...';

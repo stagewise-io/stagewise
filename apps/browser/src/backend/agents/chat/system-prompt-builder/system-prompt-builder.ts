@@ -1,27 +1,23 @@
-import ApplicationInfo from '../../shared/prompts/system/application-info.md?raw';
-import Identity from '../../shared/prompts/system/identity.md?raw';
-import Behavior from '../../shared/prompts/system/behavior.md?raw';
-import MessageStructure from '../../shared/prompts/system/message-structure.md?raw';
-import SecurityAuthorityModel from '../../shared/prompts/system/security-authority-model.md?raw';
-import { skillsUsageInstructions } from '../../shared/prompts/system/skills';
+import Intro from '../../shared/prompts/system/intro.md?raw';
+import Soul from '../../shared/prompts/system/soul.md?raw';
+import Environment from '../../shared/prompts/system/environment.md?raw';
+import OutputStyle from '../../shared/prompts/system/output-style.md?raw';
+import Authorities from '../../shared/prompts/system/authorities.md?raw';
 
 /** Chat agent system prompt structure (fully static):
  *
- * 1. Identity
- * 2. Behavior rules (communication + operating constraints)
- * 3. Application environment info (browser, stagewise files, etc.)
- * 4. Message structure explanation (custom formatting etc.)
- * 5. Security authority model (prevent prompt injection etc.)
- * 6. Skills usage instructions (how to use skills, not which are available)
+ * 1. Soul (identity + behavior rules)
+ * 2. Environment info (file system, browser, stagewise files, skills, etc.)
+ * 3. Message structure explanation (custom formatting etc.)
+ * 4. Security authority model (prevent prompt injection etc.)
  */
 
 export function buildChatSystemPrompt(): string {
   return [
-    `<identity>${Identity}</identity>`,
-    `<behavior>${Behavior}</behavior>`,
-    `<application-environment-info>${ApplicationInfo}</application-environment-info>`,
-    `<message-structure>${MessageStructure}</message-structure>`,
-    `<security-authority-model>${SecurityAuthorityModel}</security-authority-model>`,
-    `<skills-usage>${skillsUsageInstructions}</skills-usage>`,
+    Intro,
+    `<soul>${Soul}</soul>`,
+    `<environment>${Environment}</environment>`,
+    `<output-style>${OutputStyle}</output-style>`,
+    `<authorities>${Authorities}</authorities>`,
   ].join('\n');
 }

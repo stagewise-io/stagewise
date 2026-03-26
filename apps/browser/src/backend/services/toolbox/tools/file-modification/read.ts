@@ -9,8 +9,8 @@ import {
 } from '../../utils';
 import { resolveMountedRelativePath } from '../../utils/path-mounting';
 
-export const DESCRIPTION = `Pull metadata and contents of files and directory trees into context. Intelligently loads different file types based on their format. File or directory content are returned in context after the tool call.
-If the file is not loaded into context after the tool call, this **ALWAYS** implies that the file has **NOT** changed since the last read!`;
+export const DESCRIPTION = `Read metadata and contents of a file. Equals \`cat\` / \`echo\` in bash. For directories, use \`ls\` instead.
+If the file is not in context after the tool call, this **ALWAYS** implies that the file has **NOT** changed since the last read that is already in your context!`;
 
 /**
  * Read tool

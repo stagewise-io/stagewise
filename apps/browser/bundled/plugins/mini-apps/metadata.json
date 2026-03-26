@@ -1,0 +1,4 @@
+{
+  "displayName": "Mini Apps",
+  "description": "Teaches the agent how to build custom interactive mini apps displayed in the chat sidebar, including scaffolding, iframe constraints, bidirectional messaging with the sandbox, and iteration workflows."
+}

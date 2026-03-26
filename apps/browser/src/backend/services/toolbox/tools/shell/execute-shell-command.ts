@@ -7,14 +7,7 @@ import { capToolOutput } from '../../utils';
 import type { ShellService } from '@/services/toolbox/services/shell';
 import { homedir } from 'node:os';
 
-export const DESCRIPTION = `Execute a shell command in the user's system shell.
-
-Parameters:
-- explanation (string, REQUIRED): Concise (max 5 words) human-readable description of what this command does. Examples: "Install dependencies", "Check git status", "List project files".
-- command (string, REQUIRED): The shell command to execute.
-- mount_prefix (string, OPTIONAL): Mount prefix whose workspace root is used as the working directory. Falls back to the first mounted workspace, or the user's home directory.
-- timeout_ms (number, OPTIONAL): Timeout in milliseconds. Defaults to 120000 (2 minutes).
-`;
+export const DESCRIPTION = `Execute a shell command in the user's system shell. You **MUST** define a symlinked path (NOT "."!) as initial cwd for the command to run in.`;
 
 type MountedPathsGetter = () => Map<string, string>;
 
@@ -51,7 +44,7 @@ export const executeShellCommand = (
       { toolCallId, abortSignal },
     ) => {
       try {
-        const cwd = resolveCwd(params.mount_prefix, getMountedPaths);
+        const cwd = resolveCwd(params.cwd, getMountedPaths);
         const result = await shellService.execute(agentInstanceId, toolCallId, {
           command: params.command,
           cwd,

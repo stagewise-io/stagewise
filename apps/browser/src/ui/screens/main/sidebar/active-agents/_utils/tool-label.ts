@@ -2,6 +2,7 @@ const TOOL_LABELS: Record<string, string> = {
   'tool-multiEdit': 'Editing files',
   'tool-write': 'Writing file',
   'tool-read': 'Reading file',
+  'tool-ls': 'Listing directory',
   'tool-grepSearch': 'Searching code',
   'tool-glob': 'Finding files',
   'tool-copy': 'Copying file',

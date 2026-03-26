@@ -41,6 +41,7 @@ import {
 } from './tools/file-modification/delete-file';
 import { glob as globTool } from './tools/file-modification/glob';
 import { readFile as readTool } from './tools/file-modification/read';
+import { ls as lsTool } from './tools/file-modification/ls';
 import { getLintingDiagnostics as getLintingDiagnosticsTool } from './tools/file-modification/get-linting-diagnostics';
 import { listLibraryDocs as listLibraryDocsTool } from './tools/research/list-library-docs';
 import { searchInLibraryDocs as searchInLibraryDocsTool } from './tools/research/search-in-library-docs';
@@ -56,6 +57,7 @@ import {
   copyToolExecute,
   DESCRIPTION as COPY_DESCRIPTION,
 } from './tools/file-modification/copy';
+import { mkdir as mkdirTool } from './tools/file-modification/mkdir';
 import { grepSearch as grepSearchTool } from './tools/file-modification/grep-search';
 import { executeSandboxJs as executeSandboxJsTool } from './tools/browser/execute-sandbox-js';
 import { executeShellCommand as executeShellCommandTool } from './tools/shell/execute-shell-command';
@@ -804,6 +806,9 @@ export class ToolboxService extends DisposableService {
       case 'read':
         if (mountedRuntimes.size === 0) return null;
         return readTool(mountedRuntimes);
+      case 'ls':
+        if (mountedRuntimes.size === 0) return null;
+        return lsTool(mountedRuntimes);
       case 'delete':
         if (mountedRuntimes.size === 0) return null;
         return this.wrapDeleteTool(agentInstanceId);
@@ -821,6 +826,9 @@ export class ToolboxService extends DisposableService {
           multiEditToolExecute,
           agentInstanceId,
         );
+      case 'mkdir':
+        if (mountedRuntimes.size === 0) return null;
+        return mkdirTool(mountedRuntimes);
       case 'copy':
         if (mountedRuntimes.size === 0) return null;
         return this.createCopyTool(agentInstanceId);
@@ -1385,9 +1393,17 @@ export class ToolboxService extends DisposableService {
   ): Map<MountedPrefix, MountedPath> {
     const mounts =
       this.mountManagerService?.getMountedPathsWithRuntimes(agentInstanceId);
-    if (!mounts) return new Map();
     const result = new Map<MountedPrefix, MountedPath>();
-    for (const mount of mounts) result.set(mount.prefix, mount.path);
+    if (mounts) {
+      for (const mount of mounts) result.set(mount.prefix, mount.path);
+    }
+
+    // Include always-available special mounts so that path references
+    // from plugin skill reads (plugins/), attachment blobs (att/), and
+    // agent apps (apps/) can be resolved during content injection.
+    result.set('plugins', getPluginsPath());
+    result.set('apps', getAgentAppsDir(agentInstanceId));
+    result.set('att', getAgentBlobDir(agentInstanceId));
 
     return result;
   }
