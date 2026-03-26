@@ -118,7 +118,10 @@ function deriveSidePanel(
 interface SuggestionPopupProps {
   items: ResolvedMentionItem[];
   selectedIndex: number;
+  selectionSource: 'keyboard' | 'mouse';
   onSelect: (item: ResolvedMentionItem) => void;
+  onHoverIndex: (index: number) => void;
+  onMouseMoved: () => void;
   clientRect: (() => DOMRect | null) | null;
   tabs: Record<string, TabState>;
   mounts: MountEntry[];
@@ -128,11 +131,13 @@ function SuggestionItem({
   item,
   isSelected,
   onSelect,
+  onMouseEnter,
   onRef,
 }: {
   item: ResolvedMentionItem;
   isSelected: boolean;
   onSelect: () => void;
+  onMouseEnter: () => void;
   onRef: (el: HTMLButtonElement | null) => void;
 }) {
   return (
@@ -141,11 +146,10 @@ function SuggestionItem({
       type="button"
       className={cn(
         'flex w-full cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-left text-xs outline-none transition-colors duration-150 ease-out',
-        isSelected
-          ? 'bg-surface-1 text-foreground'
-          : 'text-foreground hover:bg-surface-1',
+        isSelected ? 'bg-surface-1 text-foreground' : 'text-foreground',
       )}
       onClick={onSelect}
+      onMouseEnter={onMouseEnter}
       onMouseDown={(e) => e.preventDefault()}
     >
       <MentionIcon
@@ -173,7 +177,10 @@ function SuggestionItem({
 export function SuggestionPopup({
   items,
   selectedIndex,
+  selectionSource,
   onSelect,
+  onHoverIndex,
+  onMouseMoved,
   clientRect,
   tabs,
   mounts,
@@ -184,9 +191,10 @@ export function SuggestionPopup({
   const [sidePanelOffset, setSidePanelOffset] = useState(0);
 
   useEffect(() => {
+    if (selectionSource !== 'keyboard') return;
     const el = itemRefs.current.get(selectedIndex);
     el?.scrollIntoView({ block: 'nearest' });
-  }, [selectedIndex]);
+  }, [selectedIndex, selectionSource]);
 
   const selectedItem = items[selectedIndex] as ResolvedMentionItem | undefined;
   const sidePanel = useMemo(
@@ -228,6 +236,7 @@ export function SuggestionPopup({
     <SuggestionPopupContainer
       clientRect={clientRect}
       ref={containerRef}
+      onMouseMove={onMouseMoved}
       sidePanel={
         sidePanel ? (
           <SuggestionSidePanel ref={sidePanelRef} offset={sidePanelOffset}>
@@ -262,6 +271,7 @@ export function SuggestionPopup({
           item={item}
           isSelected={idx === selectedIndex}
           onSelect={() => onSelect(item)}
+          onMouseEnter={() => onHoverIndex(idx)}
           onRef={(el) => {
             itemRefs.current.set(idx, el);
           }}

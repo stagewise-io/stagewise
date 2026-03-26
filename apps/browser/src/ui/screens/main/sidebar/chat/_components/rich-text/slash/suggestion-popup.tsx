@@ -14,7 +14,10 @@ const COMMAND_ICONS: Record<string, ComponentType<{ className?: string }>> = {
 interface SlashSuggestionPopupProps {
   items: SlashItem[];
   selectedIndex: number;
+  selectionSource: 'keyboard' | 'mouse';
   onSelect: (item: SlashItem) => void;
+  onHoverIndex: (index: number) => void;
+  onMouseMoved: () => void;
   clientRect: (() => DOMRect | null) | null;
 }
 
@@ -22,11 +25,13 @@ function SlashSuggestionItem({
   item,
   isSelected,
   onSelect,
+  onMouseEnter,
   onRef,
 }: {
   item: SlashItem;
   isSelected: boolean;
   onSelect: () => void;
+  onMouseEnter: () => void;
   onRef: (el: HTMLButtonElement | null) => void;
 }) {
   const Icon = COMMAND_ICONS[item.id] ?? TerminalSquareIcon;
@@ -36,15 +41,16 @@ function SlashSuggestionItem({
       type="button"
       className={cn(
         'flex w-full cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-left text-xs outline-none transition-colors duration-150 ease-out',
-        isSelected
-          ? 'bg-surface-1 text-foreground'
-          : 'text-foreground hover:bg-surface-1',
+        isSelected ? 'bg-surface-1 text-foreground' : 'text-foreground',
       )}
       onClick={onSelect}
+      onMouseEnter={onMouseEnter}
       onMouseDown={(e) => e.preventDefault()}
     >
       <Icon className="size-3 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 shrink-0 font-medium">/{item.id}</span>
+      <span className="max-w-[60%] shrink-0 truncate font-medium">
+        /{item.id}
+      </span>
       {item.description && (
         <span className="min-w-0 truncate text-subtle-foreground text-xs">
           {item.description}
@@ -57,7 +63,10 @@ function SlashSuggestionItem({
 export function SlashSuggestionPopup({
   items,
   selectedIndex,
+  selectionSource,
   onSelect,
+  onHoverIndex,
+  onMouseMoved,
   clientRect,
 }: SlashSuggestionPopupProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,9 +75,10 @@ export function SlashSuggestionPopup({
   const [sidePanelOffset, setSidePanelOffset] = useState(0);
 
   useEffect(() => {
+    if (selectionSource !== 'keyboard') return;
     const el = itemRefs.current.get(selectedIndex);
     el?.scrollIntoView({ block: 'nearest' });
-  }, [selectedIndex]);
+  }, [selectedIndex, selectionSource]);
 
   const selectedItem = items[selectedIndex] as SlashItem | undefined;
 
@@ -106,6 +116,7 @@ export function SlashSuggestionPopup({
     <SuggestionPopupContainer
       clientRect={clientRect}
       ref={containerRef}
+      onMouseMove={onMouseMoved}
       sidePanel={
         selectedItem?.description ? (
           <SuggestionSidePanel ref={sidePanelRef} offset={sidePanelOffset}>
@@ -125,6 +136,7 @@ export function SlashSuggestionPopup({
           item={item}
           isSelected={idx === selectedIndex}
           onSelect={() => onSelect(item)}
+          onMouseEnter={() => onHoverIndex(idx)}
           onRef={(el) => {
             itemRefs.current.set(idx, el);
           }}

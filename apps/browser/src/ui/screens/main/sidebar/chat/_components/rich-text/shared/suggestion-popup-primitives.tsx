@@ -14,8 +14,12 @@ export const SuggestionPopupContainer = forwardRef<
     clientRect: (() => DOMRect | null) | null;
     children: React.ReactNode;
     sidePanel?: React.ReactNode;
+    onMouseMove?: () => void;
   }
->(function SuggestionPopupContainer({ clientRect, children, sidePanel }, ref) {
+>(function SuggestionPopupContainer(
+  { clientRect, children, sidePanel, onMouseMove },
+  ref,
+) {
   const rect = clientRect?.();
   if (!rect) return null;
 
@@ -32,6 +36,7 @@ export const SuggestionPopupContainer = forwardRef<
       ref={ref}
       className="fixed z-50 flex flex-row items-start gap-1"
       style={style}
+      onMouseMove={onMouseMove}
     >
       <div className="w-64 rounded-lg border border-derived bg-background p-1 shadow-lg">
         <OverlayScrollbar className="max-h-52" defer={false}>
@@ -49,14 +54,15 @@ export const SuggestionPopupContainer = forwardRef<
  */
 export const SuggestionSidePanel = forwardRef<
   HTMLDivElement,
-  { offset: number; children: React.ReactNode }
->(function SuggestionSidePanel({ offset, children }, ref) {
+  { offset: number; children: React.ReactNode; className?: string }
+>(function SuggestionSidePanel({ offset, children, className }, ref) {
   return (
     <div
       ref={ref}
       className={cn(
         'absolute left-full ml-1 flex w-56 flex-col gap-2 rounded-lg border border-derived bg-background p-2.5 text-foreground text-xs shadow-lg transition-[top] duration-100 ease-out',
         'fade-in-0 slide-in-from-left-1 animate-in duration-150',
+        className,
       )}
       style={{ top: offset }}
     >

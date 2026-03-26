@@ -1,6 +1,7 @@
 import { Select as SelectBase } from '@base-ui/react/select';
 import * as React from 'react';
 import { cn } from '../lib/utils';
+import { handleCtrlNavKeys } from '../lib/keyboard-nav';
 import { OverlayScrollbar } from './overlay-scrollbar';
 import {
   IconCheckFill18,
@@ -524,11 +525,12 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
               'flex origin-(--transform-origin) flex-col items-stretch gap-0.5',
               'rounded-lg border border-derived bg-background p-1 shadow-lg',
               'transition-[transform,scale,opacity] duration-150 ease-out',
-              'data-[ending-style]:scale-90 data-[ending-style]:opacity-0',
-              'data-[starting-style]:scale-90 data-[starting-style]:opacity-0',
+              'data-ending-style:scale-90 data-ending-style:opacity-0',
+              'data-starting-style:scale-90 data-starting-style:opacity-0',
               sizes.popup[size],
               popupClassName,
             )}
+            onKeyDown={handleCtrlNavKeys}
           >
             <SelectBase.ScrollUpArrow className="-ml-1 top-0 z-1 flex h-5 w-full shrink-0 items-center justify-center rounded-t-md bg-background text-muted-foreground">
               <IconChevronUpFill18 className="size-3" />
@@ -568,8 +570,8 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
                               'group/item',
                               'w-full min-w-36 shrink-0 cursor-default select-none rounded-md outline-none',
                               'text-foreground transition-colors duration-150 ease-out',
-                              'hover:bg-surface-1 data-[highlighted]:bg-surface-1',
-                              'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+                              'data-highlighted:bg-surface-1',
+                              'data-disabled:pointer-events-none data-disabled:opacity-50',
                               hasDescription ? 'items-start' : 'items-center',
                               sizes.item[size],
                               itemClassName,

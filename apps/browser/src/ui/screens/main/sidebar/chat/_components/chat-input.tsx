@@ -35,15 +35,10 @@ import {
 } from './rich-text/attachments';
 import {
   MentionExtension,
-  mentionSuggestionActive,
   mentionContextRef,
   type MentionContext,
 } from './rich-text/mentions';
-import {
-  SlashExtension,
-  slashSuggestionActive,
-  slashCommandsRef,
-} from './rich-text/slash';
+import { SlashExtension, slashCommandsRef } from './rich-text/slash';
 import type { CommandDefinitionUI } from '@shared/commands';
 import { useState, memo } from 'react';
 // Re-export types for convenience
@@ -223,8 +218,12 @@ export const ChatInput = ({
       handleKeyDown: (view, event) => {
         // Handle Enter without Shift for submit
         if (event.key === 'Enter' && !event.shiftKey) {
-          if (mentionSuggestionActive.current || slashSuggestionActive.current)
-            return false;
+          // Check DOM for actual popup presence — the boolean flags
+          // have timing gaps during TipTap's exit→re-detect cycle.
+          const hasSuggestionPopup = document.querySelector(
+            '.mention-suggestion-container, .slash-suggestion-container',
+          );
+          if (hasSuggestionPopup) return false;
           event.preventDefault();
           // If input is empty and there are queued messages, flush the queue
           const isEmpty = view.state.doc.textContent.trim().length === 0;
@@ -237,6 +236,17 @@ export const ChatInput = ({
         }
         // Handle Escape
         if (event.key === 'Escape') {
+          const hasSuggestionPopup = document.querySelector(
+            '.mention-suggestion-container, .slash-suggestion-container',
+          );
+          if (hasSuggestionPopup) {
+            // Let ProseMirror continue routing to the suggestion
+            // plugin (which handles popup dismissal), but stop the
+            // native event from bubbling to React handlers that
+            // would blur/deselect the input.
+            event.stopImmediatePropagation();
+            return false;
+          }
           event.preventDefault();
           onEscape?.();
           return true;

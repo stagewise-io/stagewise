@@ -1,8 +1,14 @@
 import { Combobox as ComboboxBase } from '@base-ui/react/combobox';
 import { CheckIcon, XIcon } from 'lucide-react';
 import { IconChevronDownFill18 } from 'nucleo-ui-fill-18';
-import { type ComponentProps, type ComponentRef, forwardRef } from 'react';
+import {
+  type ComponentProps,
+  type ComponentRef,
+  forwardRef,
+  useCallback,
+} from 'react';
 import { cn } from '../lib/utils';
+import { handleCtrlNavKeys } from '../lib/keyboard-nav';
 
 // ============================================================================
 // Types
@@ -70,17 +76,28 @@ export type ComboboxInputProps = Omit<
 export const ComboboxInput = forwardRef<
   ComponentRef<typeof ComboboxBase.Input>,
   ComboboxInputProps
->(({ className, size = 'sm', ...props }, ref) => (
-  <ComboboxBase.Input
-    ref={ref}
-    className={cn(
-      'w-full rounded-md bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none',
-      sizes.input[size],
-      className,
-    )}
-    {...props}
-  />
-));
+>(({ className, size = 'sm', onKeyDown, ...props }, ref) => {
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      handleCtrlNavKeys(event);
+      onKeyDown?.(event as typeof event & { preventBaseUIHandler: () => void });
+    },
+    [onKeyDown],
+  );
+
+  return (
+    <ComboboxBase.Input
+      ref={ref}
+      className={cn(
+        'w-full rounded-md bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none',
+        sizes.input[size],
+        className,
+      )}
+      onKeyDown={handleKeyDown}
+      {...props}
+    />
+  );
+});
 ComboboxInput.displayName = 'ComboboxInput';
 
 // --- ComboboxTrigger ---
@@ -217,7 +234,7 @@ export const ComboboxItem = forwardRef<
       'group/item grid w-full min-w-24 cursor-default items-center gap-2 rounded-md',
       'grid-cols-[0.75rem_1fr]',
       'text-foreground outline-none transition-colors duration-150 ease-out',
-      'hover:bg-hover-derived data-highlighted:bg-hover-derived',
+      'data-highlighted:bg-hover-derived',
       'data-disabled:pointer-events-none data-disabled:opacity-50',
       sizes.item[size],
       className,

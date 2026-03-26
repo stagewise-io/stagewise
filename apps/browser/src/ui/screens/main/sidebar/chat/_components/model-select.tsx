@@ -22,6 +22,7 @@ import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import {
   memo,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -201,8 +202,7 @@ export const ModelSelect = memo(function ModelSelect({
   }, [hoveredModel, itemCenterY]);
 
   const handleItemHover = useCallback(
-    (model: ModelOption, event: React.MouseEvent<HTMLDivElement>) => {
-      const target = event.currentTarget;
+    (model: ModelOption, element: HTMLElement) => {
       const container = containerRef.current;
       if (!container) {
         setHoveredModel(model);
@@ -210,7 +210,7 @@ export const ModelSelect = memo(function ModelSelect({
       }
 
       const containerRect = container.getBoundingClientRect();
-      const itemRect = target.getBoundingClientRect();
+      const itemRect = element.getBoundingClientRect();
       const centerY = itemRect.top + itemRect.height / 2 - containerRect.top;
 
       setItemCenterY(centerY);
@@ -302,7 +302,7 @@ export const ModelSelect = memo(function ModelSelect({
                           <ModelItem
                             key={model.modelId}
                             model={model}
-                            onHover={handleItemHover}
+                            onHighlight={handleItemHover}
                           />
                         ))}
                       </ComboboxGroup>
@@ -311,7 +311,7 @@ export const ModelSelect = memo(function ModelSelect({
                         <ModelItem
                           key={model.modelId}
                           model={model}
-                          onHover={handleItemHover}
+                          onHighlight={handleItemHover}
                         />
                       ))
                     ),
@@ -353,13 +353,10 @@ export const ModelSelect = memo(function ModelSelect({
 
 const ModelItem = memo(function ModelItem({
   model,
-  onHover,
+  onHighlight,
 }: {
   model: ModelOption;
-  onHover: (
-    model: ModelOption,
-    event: React.MouseEvent<HTMLDivElement>,
-  ) => void;
+  onHighlight: (model: ModelOption, element: HTMLElement) => void;
 }) {
   const PriceIcon =
     model.pricingMultiplier != null
@@ -369,12 +366,27 @@ const ModelItem = memo(function ModelItem({
           ? IconArrowUpOutline18
           : null
       : null;
+
+  const itemRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = itemRef.current;
+    if (!el) return;
+
+    const observer = new MutationObserver(() => {
+      if (el.hasAttribute('data-highlighted')) onHighlight(model, el);
+    });
+
+    observer.observe(el, {
+      attributes: true,
+      attributeFilter: ['data-highlighted'],
+    });
+
+    return () => observer.disconnect();
+  }, [model, onHighlight]);
+
   return (
-    <ComboboxItem
-      value={model.modelId}
-      size="xs"
-      onMouseEnter={(e) => onHover(model, e)}
-    >
+    <ComboboxItem ref={itemRef} value={model.modelId} size="xs">
       <ComboboxItemIndicator />
       <span className="col-start-2 flex min-w-0 flex-row items-center justify-between gap-4 text-xs">
         <div className="flex flex-row items-center gap-1.5">
