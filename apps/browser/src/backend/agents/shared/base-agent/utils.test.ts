@@ -1,5 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import sharp from 'sharp';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import os from 'node:os';
+import path from 'node:path';
+import nodeFs from 'node:fs/promises';
+import { randomUUID, createHash } from 'node:crypto';
 import type {
   EnvironmentSnapshot,
   FullEnvironmentSnapshot,
@@ -7,11 +10,11 @@ import type {
 import type { UserMessageMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { convertAgentMessagesToModelMessages } from './utils';
-import type { ModelCapabilities } from '@shared/karton-contracts/ui/shared-types';
 import {
   resolveEffectiveSnapshot,
   sparsifySnapshot,
 } from '../prompts/utils/environment-changes';
+import { FileReadCacheService } from '@/services/file-read-cache';
 
 function makeSnapshot(
   overrides: Partial<FullEnvironmentSnapshot> = {},
@@ -91,165 +94,6 @@ function hasEnvChanges(msg: any): boolean {
 }
 
 const noopBlobReader = async () => Buffer.alloc(0);
-
-// ---------------------------------------------------------------------------
-// Image helpers
-// ---------------------------------------------------------------------------
-
-async function makePng(width: number, height: number): Promise<Buffer> {
-  return sharp({
-    create: {
-      width,
-      height,
-      channels: 3,
-      background: { r: 100, g: 150, b: 200 },
-    },
-  })
-    .png()
-    .toBuffer();
-}
-
-async function makeWebp(width: number, height: number): Promise<Buffer> {
-  return sharp({
-    create: {
-      width,
-      height,
-      channels: 3,
-      background: { r: 200, g: 100, b: 50 },
-    },
-  })
-    .webp({ quality: 70 })
-    .toBuffer();
-}
-
-/** Minimal PDF magic bytes — enough for isImageMime to return false. */
-function makeFakePdf(): Buffer {
-  return Buffer.from('%PDF-1.4 fake content');
-}
-
-// ---------------------------------------------------------------------------
-// ModelCapabilities fixtures
-// ---------------------------------------------------------------------------
-
-function makeVisionCapabilities(
-  overrides: Partial<ModelCapabilities['inputConstraints']> = {},
-): ModelCapabilities {
-  return {
-    inputModalities: {
-      text: true,
-      image: true,
-      file: false,
-      audio: false,
-      video: false,
-    },
-    outputModalities: {
-      text: true,
-      image: false,
-      file: false,
-      audio: false,
-      video: false,
-    },
-    toolCalling: true,
-    inputConstraints: {
-      image: {
-        mimeTypes: ['image/webp', 'image/png', 'image/jpeg'],
-        maxBytes: 5_242_880,
-        maxWidthPx: 2048,
-        maxHeightPx: 2048,
-        maxTotalPixels: 1_572_864,
-      },
-      ...overrides,
-    },
-  };
-}
-
-function makeTextOnlyCapabilities(): ModelCapabilities {
-  return {
-    inputModalities: {
-      text: true,
-      image: false,
-      file: false,
-      audio: false,
-      video: false,
-    },
-    outputModalities: {
-      text: true,
-      image: false,
-      file: false,
-      audio: false,
-      video: false,
-    },
-    toolCalling: true,
-  };
-}
-
-function makeFileCapabilities(): ModelCapabilities {
-  return {
-    inputModalities: {
-      text: true,
-      image: false,
-      file: true,
-      audio: false,
-      video: false,
-    },
-    outputModalities: {
-      text: true,
-      image: false,
-      file: false,
-      audio: false,
-      video: false,
-    },
-    toolCalling: true,
-    inputConstraints: {
-      file: {
-        mimeTypes: ['application/pdf'],
-        maxBytes: 20_971_520,
-      },
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Helpers to extract parts from model messages
-// ---------------------------------------------------------------------------
-
-function getImageParts(msg: any): any[] {
-  const content = Array.isArray(msg.content) ? msg.content : [];
-  return content.filter((p: any) => p.type === 'image');
-}
-
-function getFileParts(msg: any): any[] {
-  const content = Array.isArray(msg.content) ? msg.content : [];
-  return content.filter((p: any) => p.type === 'file');
-}
-
-function makeUserMsgWithAttachment(
-  id: string,
-  text: string,
-  attachment: {
-    id: string;
-    mediaType: string;
-    sizeBytes: number;
-    fileName: string;
-  },
-): AgentMessage & { role: 'user' } {
-  return {
-    id,
-    role: 'user',
-    parts: [{ type: 'text', text }],
-    metadata: {
-      createdAt: new Date(),
-      partsMetadata: [],
-      environmentSnapshot: undefined,
-      attachments: [
-        {
-          path: `att/${attachment.fileName}`,
-          originalFileName: attachment.fileName,
-        },
-      ],
-    },
-  } as any;
-}
 
 describe('convertAgentMessagesToModelMessages – env context injection', () => {
   const agentId = 'agent-1';
@@ -413,6 +257,446 @@ describe('convertAgentMessagesToModelMessages – env context injection', () => 
     const userMessages = result.filter((m) => m.role === 'user');
     expect(hasEnvSnapshot(userMessages[0])).toBe(false);
     expect(hasEnvChanges(userMessages[0])).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// File injection integration tests (Issue 10)
+// ---------------------------------------------------------------------------
+
+const noopLogger = {
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  log: () => {},
+  verboseMode: false,
+} as any;
+
+function sha256(content: string | Buffer): string {
+  return createHash('sha256')
+    .update(typeof content === 'string' ? Buffer.from(content) : content)
+    .digest('hex');
+}
+
+interface FileInjectionTestContext {
+  cache: FileReadCacheService;
+  workDir: string;
+  mountPrefix: string;
+  mountPaths: Map<string, string>;
+  agentId: string;
+  blobReader: (agentId: string, mountedPath: string) => Promise<Buffer>;
+}
+
+async function setupFileInjection(): Promise<FileInjectionTestContext> {
+  const id = randomUUID().slice(0, 8);
+  const workDir = path.join(os.tmpdir(), 'utils-fi-tests', id);
+  await nodeFs.mkdir(workDir, { recursive: true });
+
+  const mountPrefix = `w${id.slice(0, 3)}`;
+  const agentId = `agent-${id}`;
+
+  const cache = await FileReadCacheService.createWithUrl(
+    `file:${path.join(os.tmpdir(), 'utils-fi-tests', `${id}.sqlite`)}`,
+    noopLogger,
+  );
+
+  const mountPaths = new Map([[mountPrefix, workDir]]);
+
+  const blobReader = async (
+    _agentId: string,
+    mountedPath: string,
+  ): Promise<Buffer> => {
+    const slashIdx = mountedPath.indexOf('/');
+    if (slashIdx <= 0) throw new Error(`Invalid path: ${mountedPath}`);
+    const prefix = mountedPath.slice(0, slashIdx);
+    const relative = mountedPath.slice(slashIdx + 1);
+    const root = mountPaths.get(prefix);
+    if (!root) throw new Error(`Unknown mount: ${prefix}`);
+    return nodeFs.readFile(path.join(root, relative));
+  };
+
+  return { cache, workDir, mountPrefix, mountPaths, agentId, blobReader };
+}
+
+async function teardownFileInjection(
+  ctx: FileInjectionTestContext,
+): Promise<void> {
+  await ctx.cache.teardown();
+}
+
+describe('convertAgentMessagesToModelMessages – file injection via pathReferences', () => {
+  let ctx: FileInjectionTestContext;
+
+  beforeEach(async () => {
+    ctx = await setupFileInjection();
+  });
+  afterEach(async () => {
+    await teardownFileInjection(ctx);
+  });
+
+  it('injects file content from user message pathReferences', async () => {
+    const content = 'export const foo = 42;\n';
+    const filePath = path.join(ctx.workDir, 'foo.ts');
+    await nodeFs.writeFile(filePath, content);
+    const hash = sha256(content);
+
+    const snap = makeSnapshot();
+    const messages: AgentMessage[] = [
+      {
+        ...makeUserMsg('u1', 'check this file', snap),
+        metadata: {
+          ...makeMetadata(snap),
+          pathReferences: {
+            [`${ctx.mountPrefix}/foo.ts`]: hash,
+          },
+        },
+      } as AgentMessage,
+    ];
+
+    const result = await convertAgentMessagesToModelMessages(
+      messages,
+      'system prompt',
+      {},
+      ctx.agentId,
+      ctx.blobReader,
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+      undefined,
+      ctx.cache,
+      ctx.mountPaths,
+    );
+
+    const userMsg = result.find((m) => m.role === 'user')!;
+    const texts = getUserMsgTexts(userMsg);
+    const allText = texts.join('');
+    // File content should be injected wrapped in <file> XML
+    expect(allText).toContain('<file path=');
+    expect(allText).toContain('foo.ts');
+    expect(allText).toContain(content);
+    // File content should appear BEFORE user-msg
+    const fileIdx = allText.indexOf('<file path=');
+    const userMsgIdx = allText.indexOf('<user-msg');
+    expect(fileIdx).toBeLessThan(userMsgIdx);
+  });
+
+  it('deduplicates identical (path, hash) across messages', async () => {
+    const content = 'export const bar = 1;\n';
+    await nodeFs.writeFile(path.join(ctx.workDir, 'bar.ts'), content);
+    const hash = sha256(content);
+    const refKey = `${ctx.mountPrefix}/bar.ts`;
+
+    const snap = makeSnapshot();
+    const messages: AgentMessage[] = [
+      {
+        ...makeUserMsg('u1', 'first', snap),
+        metadata: {
+          ...makeMetadata(snap),
+          pathReferences: { [refKey]: hash },
+        },
+      } as AgentMessage,
+      makeAssistantMsg('a1', 'ok', snap),
+      {
+        ...makeUserMsg('u2', 'again', snap),
+        metadata: {
+          ...makeMetadata(snap),
+          pathReferences: { [refKey]: hash },
+        },
+      } as AgentMessage,
+    ];
+
+    const result = await convertAgentMessagesToModelMessages(
+      messages,
+      'sys',
+      {},
+      ctx.agentId,
+      ctx.blobReader,
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+      undefined,
+      ctx.cache,
+      ctx.mountPaths,
+    );
+
+    // Count <file> occurrences — should appear only once (first user message)
+    const allTexts = result.flatMap((m) =>
+      m.role === 'user' ? getUserMsgTexts(m) : [],
+    );
+    const fileOccurrences = allTexts.filter((t) =>
+      t.includes(`<file path=`),
+    ).length;
+    expect(fileOccurrences).toBe(1);
+  });
+
+  it('re-injects file when hash changes between messages', async () => {
+    const content1 = 'version 1';
+    const content2 = 'version 2';
+    const filePath = path.join(ctx.workDir, 'changing.ts');
+    await nodeFs.writeFile(filePath, content2); // current disk state is v2
+    const hash1 = sha256(content1);
+    const hash2 = sha256(content2);
+    const refKey = `${ctx.mountPrefix}/changing.ts`;
+
+    // Pre-populate cache with v1 content so the mismatch path returns it
+    const { serializeTransformResult } = await import(
+      './file-read-transformer/serialization'
+    );
+    const ext = '.ts';
+    const cacheKey1 = FileReadCacheService.buildCacheKey(hash1, ext);
+    await ctx.cache.set(
+      cacheKey1,
+      serializeTransformResult({
+        metadata: { size: '9B' },
+        parts: [{ type: 'text', text: content1 }],
+      }),
+      content1.length,
+    );
+
+    const snap = makeSnapshot();
+    const messages: AgentMessage[] = [
+      {
+        ...makeUserMsg('u1', 'first version', snap),
+        metadata: {
+          ...makeMetadata(snap),
+          pathReferences: { [refKey]: hash1 },
+        },
+      } as AgentMessage,
+      makeAssistantMsg('a1', 'ok', snap),
+      {
+        ...makeUserMsg('u2', 'updated version', snap),
+        metadata: {
+          ...makeMetadata(snap),
+          pathReferences: { [refKey]: hash2 },
+        },
+      } as AgentMessage,
+    ];
+
+    const result = await convertAgentMessagesToModelMessages(
+      messages,
+      'sys',
+      {},
+      ctx.agentId,
+      ctx.blobReader,
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+      undefined,
+      ctx.cache,
+      ctx.mountPaths,
+    );
+
+    // Both versions should be injected (different hashes = different content)
+    const allTexts = result.flatMap((m) =>
+      m.role === 'user' ? getUserMsgTexts(m) : [],
+    );
+    const fileOccurrences = allTexts.filter((t) =>
+      t.includes(`<file path=`),
+    ).length;
+    expect(fileOccurrences).toBe(2);
+  });
+
+  it('injects file content from assistant message pathReferences as synthetic user message', async () => {
+    const content = 'assistant read this';
+    await nodeFs.writeFile(path.join(ctx.workDir, 'read.txt'), content);
+    const hash = sha256(content);
+    const refKey = `${ctx.mountPrefix}/read.txt`;
+
+    const snap = makeSnapshot();
+    const assistantMsg: AgentMessage = {
+      ...makeAssistantMsg('a1', 'reading file', snap),
+      metadata: {
+        ...makeMetadata(snap),
+        pathReferences: { [refKey]: hash },
+      },
+    } as AgentMessage;
+
+    const messages: AgentMessage[] = [
+      makeUserMsg('u1', 'read that file', snap),
+      assistantMsg,
+      makeUserMsg('u2', 'what did you find?', snap),
+    ];
+
+    const result = await convertAgentMessagesToModelMessages(
+      messages,
+      'sys',
+      {},
+      ctx.agentId,
+      ctx.blobReader,
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+      undefined,
+      ctx.cache,
+      ctx.mountPaths,
+    );
+
+    // Find the assistant message index
+    let assistantIdx = -1;
+    for (let i = 0; i < result.length; i++) {
+      if (result[i].role === 'assistant') {
+        assistantIdx = i;
+        break;
+      }
+    }
+    expect(assistantIdx).toBeGreaterThan(-1);
+
+    // After the assistant, there should be a synthetic user message
+    // containing the file content
+    const afterAssistant = result[assistantIdx + 1];
+    expect(afterAssistant.role).toBe('user');
+    const texts = getUserMsgTexts(afterAssistant);
+    const allText = texts.join('');
+    expect(allText).toContain('<file path=');
+    expect(allText).toContain('read.txt');
+    expect(allText).toContain(content);
+  });
+
+  it('gracefully no-ops when fileReadCache or mountPaths not provided', async () => {
+    const snap = makeSnapshot();
+    const messages: AgentMessage[] = [
+      {
+        ...makeUserMsg('u1', 'hello', snap),
+        metadata: {
+          ...makeMetadata(snap),
+          pathReferences: { 'w1/file.ts': 'somehash' },
+        },
+      } as AgentMessage,
+    ];
+
+    // Call without fileReadCache and mountPaths
+    const result = await convertAgentMessagesToModelMessages(
+      messages,
+      'sys',
+      {},
+      'agent-1',
+      noopBlobReader,
+    );
+
+    // Should still produce a user message with just user-msg
+    const userMsg = result.find((m) => m.role === 'user')!;
+    const texts = getUserMsgTexts(userMsg);
+    // No <file> injection since the pipeline is disabled
+    expect(texts.join('').includes('<file path=')).toBe(false);
+    expect(texts.some((t) => t.includes('hello'))).toBe(true);
+  });
+
+  it('emits error placeholder when file cannot be read', async () => {
+    const snap = makeSnapshot();
+    const messages: AgentMessage[] = [
+      {
+        ...makeUserMsg('u1', 'check missing file', snap),
+        metadata: {
+          ...makeMetadata(snap),
+          pathReferences: {
+            [`${ctx.mountPrefix}/nonexistent.ts`]: 'fakehash',
+          },
+        },
+      } as AgentMessage,
+    ];
+
+    const result = await convertAgentMessagesToModelMessages(
+      messages,
+      'sys',
+      {},
+      ctx.agentId,
+      ctx.blobReader,
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+      undefined,
+      ctx.cache,
+      ctx.mountPaths,
+    );
+
+    const userMsg = result.find((m) => m.role === 'user')!;
+    const texts = getUserMsgTexts(userMsg);
+    const allText = texts.join('');
+    // Should contain an error placeholder
+    expect(allText).toContain('error');
+    expect(allText).toContain('nonexistent.ts');
+  });
+
+  it('handles multiple files in a single user message', async () => {
+    const content1 = 'file one content';
+    const content2 = 'file two content';
+    await nodeFs.writeFile(path.join(ctx.workDir, 'one.ts'), content1);
+    await nodeFs.writeFile(path.join(ctx.workDir, 'two.ts'), content2);
+
+    const snap = makeSnapshot();
+    const messages: AgentMessage[] = [
+      {
+        ...makeUserMsg('u1', 'review these files', snap),
+        metadata: {
+          ...makeMetadata(snap),
+          pathReferences: {
+            [`${ctx.mountPrefix}/one.ts`]: sha256(content1),
+            [`${ctx.mountPrefix}/two.ts`]: sha256(content2),
+          },
+        },
+      } as AgentMessage,
+    ];
+
+    const result = await convertAgentMessagesToModelMessages(
+      messages,
+      'sys',
+      {},
+      ctx.agentId,
+      ctx.blobReader,
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+      undefined,
+      ctx.cache,
+      ctx.mountPaths,
+    );
+
+    const userMsg = result.find((m) => m.role === 'user')!;
+    const texts = getUserMsgTexts(userMsg);
+    const allText = texts.join('');
+    expect(allText).toContain('one.ts');
+    expect(allText).toContain(content1);
+    expect(allText).toContain('two.ts');
+    expect(allText).toContain(content2);
+  });
+
+  it('does not inject when pathReferences is empty', async () => {
+    const snap = makeSnapshot();
+    const messages: AgentMessage[] = [
+      {
+        ...makeUserMsg('u1', 'no refs', snap),
+        metadata: {
+          ...makeMetadata(snap),
+          pathReferences: {},
+        },
+      } as AgentMessage,
+    ];
+
+    const result = await convertAgentMessagesToModelMessages(
+      messages,
+      'sys',
+      {},
+      ctx.agentId,
+      ctx.blobReader,
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+      undefined,
+      ctx.cache,
+      ctx.mountPaths,
+    );
+
+    const userMsg = result.find((m) => m.role === 'user')!;
+    const texts = getUserMsgTexts(userMsg);
+    expect(texts.join('').includes('<file path=')).toBe(false);
   });
 });
 
@@ -1346,539 +1630,5 @@ describe('convertAgentMessagesToModelMessages – multi-mount workspaces', () =>
     expect(changesText).toContain('agents-md-updated');
     expect(changesText).toContain('w1');
     expect(changesText).toContain('w2');
-  });
-});
-
-// =============================================================================
-// Image attachment pipeline — convertUserMessage path
-// =============================================================================
-
-describe('image attachment pipeline — user-attached images (convertUserMessage)', () => {
-  const agentId = 'agent-1';
-
-  it('PNG image is processed to WebP and emitted as ImagePart', async () => {
-    const rawBuf = await makePng(200, 200);
-    const msg = makeUserMsgWithAttachment('u1', 'look at this', {
-      id: 'att-1',
-      mediaType: 'image/png',
-      sizeBytes: rawBuf.length,
-      fileName: 'photo.png',
-    });
-
-    const blobReader = async () => rawBuf;
-    const caps = makeVisionCapabilities();
-
-    const result = await convertAgentMessagesToModelMessages(
-      [msg],
-      '',
-      {},
-      agentId,
-      blobReader,
-      caps,
-    );
-
-    const userMsg = result.find((m) => m.role === 'user')!;
-    const imgs = getImageParts(userMsg);
-    expect(imgs).toHaveLength(1);
-    expect(imgs[0].mediaType).toBe('image/webp');
-    expect(imgs[0].image).toBeInstanceOf(Uint8Array);
-    expect(imgs[0].image.length).toBeGreaterThan(0);
-  });
-
-  it('WebP image that is already optimal is returned unchanged', async () => {
-    const rawBuf = await makeWebp(100, 100);
-    const msg = makeUserMsgWithAttachment('u1', 'hi', {
-      id: 'att-1',
-      mediaType: 'image/webp',
-      sizeBytes: rawBuf.length,
-      fileName: 'img.webp',
-    });
-
-    const blobReader = async () => rawBuf;
-    const caps = makeVisionCapabilities();
-
-    const result = await convertAgentMessagesToModelMessages(
-      [msg],
-      '',
-      {},
-      agentId,
-      blobReader,
-      caps,
-    );
-
-    const userMsg = result.find((m) => m.role === 'user')!;
-    const imgs = getImageParts(userMsg);
-    expect(imgs).toHaveLength(1);
-    expect(imgs[0].mediaType).toBe('image/webp');
-  });
-
-  it('image uses cache on second call (cache.get returns hit)', async () => {
-    const rawBuf = await makePng(200, 200);
-    const processedBuf = await makeWebp(200, 200);
-
-    const mockCache = {
-      get: vi
-        .fn()
-        .mockResolvedValue({ buf: processedBuf, mediaType: 'image/webp' }),
-      set: vi.fn().mockResolvedValue(undefined),
-    } as any;
-
-    const msg = makeUserMsgWithAttachment('u1', 'cached', {
-      id: 'att-1',
-      mediaType: 'image/png',
-      sizeBytes: rawBuf.length,
-      fileName: 'photo.png',
-    });
-
-    const blobReader = async () => rawBuf;
-    const caps = makeVisionCapabilities();
-
-    const result = await convertAgentMessagesToModelMessages(
-      [msg],
-      '',
-      {},
-      agentId,
-      blobReader,
-      caps,
-      undefined, // onBlobError
-      undefined, // currentModelId
-      undefined, // shellInfo
-      undefined, // skillDetails
-      undefined, // logger
-      mockCache,
-    );
-
-    const userMsg = result.find((m) => m.role === 'user')!;
-    const imgs = getImageParts(userMsg);
-    expect(imgs).toHaveLength(1);
-    expect(imgs[0].mediaType).toBe('image/webp');
-    // cache.get was called; cache.set was NOT (it was a hit)
-    expect(mockCache.get).toHaveBeenCalledOnce();
-    expect(mockCache.set).not.toHaveBeenCalled();
-  });
-
-  it('image is not emitted when model has no image modality', async () => {
-    const rawBuf = await makePng(200, 200);
-    const msg = makeUserMsgWithAttachment('u1', 'no vision', {
-      id: 'att-1',
-      mediaType: 'image/png',
-      sizeBytes: rawBuf.length,
-      fileName: 'photo.png',
-    });
-
-    const blobReader = async () => rawBuf;
-    const caps = makeTextOnlyCapabilities();
-
-    const result = await convertAgentMessagesToModelMessages(
-      [msg],
-      '',
-      {},
-      agentId,
-      blobReader,
-      caps,
-    );
-
-    const userMsg = result.find((m) => m.role === 'user')!;
-    // No ImagePart emitted
-    expect(getImageParts(userMsg)).toHaveLength(0);
-    // But an XML hint text part IS present describing the attachment
-    const texts = getUserMsgTexts(userMsg);
-    expect(texts.some((t) => t.includes('photo.png'))).toBe(true);
-  });
-
-  it('corrupt image buffer emits error hint instead of ImagePart', async () => {
-    const corruptBuf = Buffer.from('not-an-image');
-    const msg = makeUserMsgWithAttachment('u1', 'bad image', {
-      id: 'att-1',
-      mediaType: 'image/png',
-      sizeBytes: corruptBuf.length,
-      fileName: 'bad.png',
-    });
-
-    const blobReader = async () => corruptBuf;
-    const caps = makeVisionCapabilities();
-
-    const result = await convertAgentMessagesToModelMessages(
-      [msg],
-      '',
-      {},
-      agentId,
-      blobReader,
-      caps,
-    );
-
-    const userMsg = result.find((m) => m.role === 'user')!;
-    expect(getImageParts(userMsg)).toHaveLength(0);
-    const texts = getUserMsgTexts(userMsg);
-    expect(
-      texts.some(
-        (t) =>
-          t.toLowerCase().includes('could not be processed') ||
-          t.includes('bad.png'),
-      ),
-    ).toBe(true);
-  });
-
-  it('non-image file (PDF) becomes FilePart, not ImagePart', async () => {
-    const pdfBuf = makeFakePdf();
-    const msg = makeUserMsgWithAttachment('u1', 'doc attached', {
-      id: 'att-1',
-      mediaType: 'application/pdf',
-      sizeBytes: pdfBuf.length,
-      fileName: 'doc.pdf',
-    });
-
-    const blobReader = async () => pdfBuf;
-    const caps = makeFileCapabilities();
-
-    const result = await convertAgentMessagesToModelMessages(
-      [msg],
-      '',
-      {},
-      agentId,
-      blobReader,
-      caps,
-    );
-
-    const userMsg = result.find((m) => m.role === 'user')!;
-    expect(getImageParts(userMsg)).toHaveLength(0);
-    expect(getFileParts(userMsg)).toHaveLength(1);
-    expect(getFileParts(userMsg)[0].mediaType).toBe('application/pdf');
-  });
-
-  it('large image (>2048px) is downscaled before being emitted', async () => {
-    const rawBuf = await makePng(3000, 3000);
-    const msg = makeUserMsgWithAttachment('u1', 'big image', {
-      id: 'att-1',
-      mediaType: 'image/png',
-      sizeBytes: rawBuf.length,
-      fileName: 'big.png',
-    });
-
-    const blobReader = async () => rawBuf;
-    const caps = makeVisionCapabilities();
-
-    const result = await convertAgentMessagesToModelMessages(
-      [msg],
-      '',
-      {},
-      agentId,
-      blobReader,
-      caps,
-    );
-
-    const userMsg = result.find((m) => m.role === 'user')!;
-    const imgs = getImageParts(userMsg);
-    expect(imgs).toHaveLength(1);
-    // Verify it was actually compressed (output smaller than a 3000×3000 raw PNG)
-    const outBuf = Buffer.from(imgs[0].image);
-    expect(outBuf.length).toBeLessThan(rawBuf.length);
-    // And it is valid WebP
-    const meta = await sharp(outBuf).metadata();
-    expect(meta.format).toBe('webp');
-    expect(meta.width).toBeLessThanOrEqual(2048);
-    expect(meta.height).toBeLessThanOrEqual(2048);
-  });
-});
-
-// =============================================================================
-// Image attachment pipeline — sandbox-produced attachments (after assistant turn)
-// =============================================================================
-
-function makeAssistantMsgWithSandboxAttachment(
-  id: string,
-  text: string,
-  attachment: {
-    id: string;
-    mediaType: string;
-    sizeBytes: number;
-    fileName: string;
-  },
-  snapshot?: any,
-): AgentMessage {
-  return {
-    id,
-    role: 'assistant',
-    // Attachments are now stored in metadata.attachments on the assistant message
-    // (populated by drainSandboxAttachments after the step completes).
-    parts: [
-      { type: 'text', text, state: 'done' },
-      {
-        type: 'tool-result',
-        toolCallId: 'tc-1',
-        toolName: 'execute_script',
-        output: {
-          result: 'ok',
-        },
-        state: 'output-available',
-      },
-    ],
-    metadata: {
-      createdAt: new Date(),
-      partsMetadata: [],
-      environmentSnapshot: snapshot,
-      attachments: [
-        {
-          path: `att/${attachment.fileName}`,
-          originalFileName: attachment.fileName,
-        },
-      ],
-    },
-  } as any;
-}
-
-describe('image attachment pipeline — sandbox-produced attachments (buildSyntheticUserMessageForAttachments)', () => {
-  const agentId = 'agent-1';
-
-  it('sandbox PNG image is processed to WebP and emitted as ImagePart in synthetic message', async () => {
-    const rawBuf = await makePng(200, 200);
-    const snap = makeSnapshot();
-    const messages: AgentMessage[] = [
-      makeUserMsg('u1', 'run something', snap),
-      makeAssistantMsgWithSandboxAttachment(
-        'a1',
-        'done',
-        {
-          id: 'sb-1',
-          mediaType: 'image/png',
-          sizeBytes: rawBuf.length,
-          fileName: 'result.png',
-        },
-        snap,
-      ),
-    ];
-
-    const blobReader = async () => rawBuf;
-    const caps = makeVisionCapabilities();
-
-    const result = await convertAgentMessagesToModelMessages(
-      messages,
-      '',
-      {},
-      agentId,
-      blobReader,
-      caps,
-    );
-
-    // The synthetic user message is injected AFTER all assistant/tool messages
-    // for that turn. Find the last user message in the result.
-    const syntheticMsg = [...result].reverse().find((m) => m.role === 'user')!;
-    expect(syntheticMsg).toBeDefined();
-    expect(syntheticMsg.role).toBe('user');
-
-    const imgs = getImageParts(syntheticMsg);
-    expect(imgs).toHaveLength(1);
-    expect(imgs[0].mediaType).toBe('image/webp');
-  });
-
-  it('sandbox image uses cache on second call', async () => {
-    const rawBuf = await makePng(200, 200);
-    const processedBuf = await makeWebp(200, 200);
-    const snap = makeSnapshot();
-
-    const mockCache = {
-      get: vi
-        .fn()
-        .mockResolvedValue({ buf: processedBuf, mediaType: 'image/webp' }),
-      set: vi.fn().mockResolvedValue(undefined),
-    } as any;
-
-    const messages: AgentMessage[] = [
-      makeUserMsg('u1', 'go', snap),
-      makeAssistantMsgWithSandboxAttachment(
-        'a1',
-        'done',
-        {
-          id: 'sb-1',
-          mediaType: 'image/png',
-          sizeBytes: rawBuf.length,
-          fileName: 'out.png',
-        },
-        snap,
-      ),
-    ];
-
-    const blobReader = async () => rawBuf;
-    const caps = makeVisionCapabilities();
-
-    const result = await convertAgentMessagesToModelMessages(
-      messages,
-      '',
-      {},
-      agentId,
-      blobReader,
-      caps,
-      undefined, // onBlobError
-      undefined, // currentModelId
-      undefined, // shellInfo
-      undefined, // skillDetails
-      undefined, // logger
-      mockCache,
-    );
-
-    const syntheticMsg = [...result].reverse().find((m) => m.role === 'user')!;
-    expect(syntheticMsg).toBeDefined();
-    const imgs = getImageParts(syntheticMsg);
-    expect(imgs).toHaveLength(1);
-    expect(mockCache.get).toHaveBeenCalledOnce();
-    expect(mockCache.set).not.toHaveBeenCalled();
-  });
-
-  it('sandbox image not emitted when model has no image modality', async () => {
-    const rawBuf = await makePng(100, 100);
-    const snap = makeSnapshot();
-
-    const messages: AgentMessage[] = [
-      makeUserMsg('u1', 'go', snap),
-      makeAssistantMsgWithSandboxAttachment(
-        'a1',
-        'done',
-        {
-          id: 'sb-1',
-          mediaType: 'image/png',
-          sizeBytes: rawBuf.length,
-          fileName: 'out.png',
-        },
-        snap,
-      ),
-    ];
-
-    const blobReader = async () => rawBuf;
-    const caps = makeTextOnlyCapabilities();
-
-    const result = await convertAgentMessagesToModelMessages(
-      messages,
-      '',
-      {},
-      agentId,
-      blobReader,
-      caps,
-    );
-
-    const syntheticMsg = [...result].reverse().find((m) => m.role === 'user')!;
-    expect(syntheticMsg).toBeDefined();
-    expect(getImageParts(syntheticMsg)).toHaveLength(0);
-    // XML hint text part still present
-    const texts = getUserMsgTexts(syntheticMsg);
-    expect(texts.some((t) => t.includes('out.png'))).toBe(true);
-  });
-});
-
-// =============================================================================
-// canModelConsumeAttachment / effectiveMimeAndSize — pure logic
-// =============================================================================
-
-// These are not exported so we exercise them via convertAgentMessagesToModelMessages.
-// The observable effect is whether an inline part appears in the output.
-
-describe('image attachment — constraint gating behaviour', () => {
-  const agentId = 'agent-1';
-
-  it('image modality disabled: no ImagePart even when MIME matches', async () => {
-    const rawBuf = await makePng(100, 100);
-    const msg = makeUserMsgWithAttachment('u1', 'hi', {
-      id: 'att-1',
-      mediaType: 'image/png',
-      sizeBytes: rawBuf.length,
-      fileName: 'photo.png',
-    });
-
-    // Vision explicitly disabled
-    const caps: ModelCapabilities = {
-      inputModalities: {
-        text: true,
-        image: false,
-        file: false,
-        audio: false,
-        video: false,
-      },
-      outputModalities: {
-        text: true,
-        image: false,
-        file: false,
-        audio: false,
-        video: false,
-      },
-      toolCalling: true,
-      inputConstraints: {
-        image: { mimeTypes: ['image/webp', 'image/png'], maxBytes: 5_242_880 },
-      },
-    };
-
-    const result = await convertAgentMessagesToModelMessages(
-      [msg],
-      '',
-      {},
-      agentId,
-      async () => rawBuf,
-      caps,
-    );
-    const userMsg = result.find((m) => m.role === 'user')!;
-    expect(getImageParts(userMsg)).toHaveLength(0);
-  });
-
-  it('model with no capabilities at all: no inline part emitted', async () => {
-    const rawBuf = await makePng(100, 100);
-    const msg = makeUserMsgWithAttachment('u1', 'hi', {
-      id: 'att-1',
-      mediaType: 'image/png',
-      sizeBytes: rawBuf.length,
-      fileName: 'photo.png',
-    });
-
-    const result = await convertAgentMessagesToModelMessages(
-      [msg],
-      '',
-      {},
-      agentId,
-      async () => rawBuf,
-      undefined, // no capabilities
-    );
-    const userMsg = result.find((m) => m.role === 'user')!;
-    expect(getImageParts(userMsg)).toHaveLength(0);
-  });
-
-  it('image passed without imageConstraint falls through as-is (no constraint fallback)', async () => {
-    // Model supports images but has no inputConstraints defined
-    const rawBuf = await makePng(100, 100);
-    const msg = makeUserMsgWithAttachment('u1', 'hi', {
-      id: 'att-1',
-      mediaType: 'image/png',
-      sizeBytes: rawBuf.length,
-      fileName: 'photo.png',
-    });
-
-    const caps: ModelCapabilities = {
-      inputModalities: {
-        text: true,
-        image: true,
-        file: false,
-        audio: false,
-        video: false,
-      },
-      outputModalities: {
-        text: true,
-        image: false,
-        file: false,
-        audio: false,
-        video: false,
-      },
-      toolCalling: true,
-      // No inputConstraints — processImageForModel won't run, raw buffer used
-    };
-
-    const result = await convertAgentMessagesToModelMessages(
-      [msg],
-      '',
-      {},
-      agentId,
-      async () => rawBuf,
-      caps,
-    );
-    const userMsg = result.find((m) => m.role === 'user')!;
-    const imgs = getImageParts(userMsg);
-    // Raw PNG still emitted as-is (no constraint = no processor)
-    expect(imgs).toHaveLength(1);
-    expect(imgs[0].mediaType).toBe('image/png');
   });
 });

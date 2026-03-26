@@ -80,11 +80,11 @@ async function doGetLintingDiagnostics(
   await Promise.all(
     paths.map(async (mountedPath) => {
       try {
-        const { lspService, relativePath } = resolveMountedLspService(
+        const { lspService, path } = resolveMountedLspService(
           mountedLspServices,
           mountedPath,
         );
-        await lspService.touchFile(relativePath, true);
+        await lspService.touchFile(path, true);
       } catch {
         // Silently skip -- we still attempt to collect diagnostics below
       }
@@ -100,13 +100,13 @@ async function doGetLintingDiagnostics(
 
   for (const mountedPath of paths) {
     try {
-      const { lspService, relativePath } = resolveMountedLspService(
+      const { lspService, path } = resolveMountedLspService(
         mountedLspServices,
         mountedPath,
       );
 
       const aggregatedDiagnostics =
-        await lspService.getDiagnosticsForFile(relativePath);
+        await lspService.getDiagnosticsForFile(path);
 
       if (aggregatedDiagnostics.length === 0) continue;
 

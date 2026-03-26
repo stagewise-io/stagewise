@@ -34,7 +34,6 @@
     "@tiptap/extension-task-item": "^3.20.4",
     "@tiptap/extension-task-list": "^3.20.4",
     "@tiptap/markdown": "^3.20.0",
-
     "chokidar": "^4.0.3",
     "electron-squirrel-startup": "^1.0.1",
     "electron-unhandled": "^5.0.0",
@@ -42,11 +41,13 @@
     "fzy.js": "^0.4.1",
     "gray-matter": "^4.0.3",
     "immer": "^10.2.0",
-    "prosemirror-highlight": "^0.15.0",
     "mime-types": "^3.0.2",
+    "pdfjs-dist": "^5.5.207",
+    "prosemirror-highlight": "^0.15.0",
     "react-virtuoso": "^4.18.1",
     "sharp": "^0.34.5",
-    "tiptap-markdown": "^0.9.0"
+    "tiptap-markdown": "^0.9.0",
+    "yauzl": "^3.2.0"
   },
   "devDependencies": {
     "@ai-sdk/amazon-bedrock": "^4.0.77",
@@ -104,6 +105,7 @@
     "@types/react-window-infinite-loader": "^2.0.0",
     "@types/three": "^0.180.0",
     "@types/xml": "^1.0.11",
+    "@types/yauzl": "^2.10.3",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^4.6.0",

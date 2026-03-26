@@ -11,7 +11,7 @@ import {
   createAssistantMessage,
   createReasoningPart,
   createTextPart,
-  createReadFileToolPart,
+  createReadToolPart,
   REALISTIC_TIMING,
   getRandomDuration,
   DEFAULT_STORY_AGENT_ID,
@@ -229,7 +229,7 @@ function buildFileReadingTimeline(
     messageId: assistantMessageId,
     partIndex: 1,
     updater: () =>
-      createReadFileToolPart(config.targetFile, '', 'input-streaming', {
+      createReadToolPart(config.targetFile, 'input-streaming', {
         toolCallId,
       }),
   });
@@ -243,7 +243,7 @@ function buildFileReadingTimeline(
     toolCallId,
     newState: 'input-available',
     input: {
-      relative_path: config.targetFile,
+      path: config.targetFile,
     },
   });
 

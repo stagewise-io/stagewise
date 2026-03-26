@@ -11,10 +11,9 @@ import {
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import type { SkillDefinition } from '@shared/skills';
 import type {
-  Attachment,
   FullEnvironmentSnapshot,
+  TabMentionMeta,
 } from '@shared/karton-contracts/ui/agent/metadata';
-import { inferMimeType } from '@shared/mime-utils';
 
 import {
   computeAllEnvironmentChanges,
@@ -27,21 +26,24 @@ import {
 } from '../prompts/system/environment-renderer';
 import type { SkillInfo } from '../prompts/system/skills';
 import { deepMergeProviderOptions } from '@/agents/model-provider';
-
-import { mentionToContextSnippet } from '../prompts/utils/metadata-converter/mentions';
 import {
   extractSlashIdsFromText,
   inlineSlashLinksAsText,
   resolveSlashSkill,
   renderSlashCommandXml,
 } from '../prompts/utils/metadata-converter/slash-items';
+import { tabMentionToContextSnippet } from '../prompts/utils/metadata-converter/mentions';
 import xml from 'xml';
-import specialTokens from '../prompts/utils/special-tokens';
 import type { ModelCapabilities } from '@shared/karton-contracts/ui/shared-types';
-import { findModelsAcceptingMime } from '@shared/available-models';
-import { processImageForModel } from './image-processor';
 import type { Logger } from '@/services/logger';
+import type { FileReadCacheService } from '@/services/file-read-cache';
 import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
+import {
+  fileReadTransformer,
+  type ReadParams,
+  SeenFilesTracker,
+} from './file-read-transformer';
+import { processImageForModel } from './image-processor';
 
 /**
  * Reads a file by its full mount-prefixed path.
@@ -54,231 +56,6 @@ import type { ProcessedImageCacheService } from '@/services/processed-image-cach
  */
 export type BlobReader = (agentId: string, path: string) => Promise<Buffer>;
 
-export type BlobErrorReporter = (
-  error: unknown,
-  context: { operation: string; attachmentId: string },
-) => void;
-
-import type { ModalityConstraint } from '@shared/karton-contracts/ui/shared-types';
-
-const IMAGE_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-]);
-
-function isImageMime(mediaType: string): boolean {
-  return IMAGE_MIME_TYPES.has(mediaType.toLowerCase());
-}
-
-const DEFAULT_IMAGE_CONSTRAINT: ModalityConstraint = {
-  mimeTypes: [...IMAGE_MIME_TYPES],
-  maxBytes: 5_242_880, // 5 MB — conservative fallback
-};
-
-const DEFAULT_FILE_CONSTRAINT: ModalityConstraint = {
-  mimeTypes: ['application/pdf'],
-  maxBytes: 20_971_520, // 20 MB — conservative fallback
-};
-
-function formatMB(bytes: number): string {
-  return `${(bytes / 1_048_576).toFixed(1)} MB`;
-}
-
-/**
- * Read a text-based blob attachment and return it as an XML-wrapped TextPart.
- * Used for `.textclip` and `.swdomelement` files — both are UTF-8 text stored
- * as blobs that need to be read and inlined in the prompt.
- *
- * Shared by both `buildAttachmentContextMessage` and `convertUserMessage`.
- */
-async function readTextBlobAsTextPart(
-  agentInstanceId: string,
-  blobReader: BlobReader,
-  filePath: string,
-  onBlobError?: BlobErrorReporter,
-): Promise<TextPart | null> {
-  let textContent: string | undefined;
-  try {
-    const buf = await blobReader(agentInstanceId, filePath);
-    textContent = buf?.toString('utf-8');
-  } catch (err) {
-    onBlobError?.(err, {
-      operation: 'readAttachmentBlob',
-      attachmentId: filePath,
-    });
-  }
-  if (!textContent) return null;
-  return {
-    type: 'text',
-    text: xml({
-      [specialTokens.userMsgAttachmentXmlTag]: {
-        _attr: { filePath: filePath },
-        _cdata: textContent,
-      },
-    }),
-  };
-}
-
-type ConstraintMatch =
-  | { mime: true; size: true }
-  | { mime: true; size: false; maxBytes: number }
-  | { mime: false };
-
-function checkConstraint(
-  constraint: ModalityConstraint,
-  mime: string,
-  sizeBytes: number,
-): ConstraintMatch {
-  if (!constraint.mimeTypes.includes(mime)) return { mime: false };
-  // maxBytes is a raw-byte limit (see ModalityConstraint JSDoc — the image
-  // processor compares raw buffer length directly). Base64 encoding overhead
-  // is a transport concern handled by the AI SDK, not by this gate check.
-  if (sizeBytes <= constraint.maxBytes) return { mime: true, size: true };
-  return { mime: true, size: false, maxBytes: constraint.maxBytes };
-}
-
-/**
- * Determine the MIME type and byte count that the image will have *after*
- * the image processor runs. For images the processor can always output WebP,
- * so we check against WebP being in the constraint's mimeTypes and assume
- * the processor will bring the size within limits (it falls back to ok:false
- * if it cannot, handled at the call site).
- *
- * Returns the effective values to use for the `canModelConsumeAttachment` check.
- */
-function effectiveMimeAndSize(
-  capabilities: ModelCapabilities | undefined,
-  mediaType: string,
-  sizeBytes: number,
-): { mime: string; size: number } {
-  if (!capabilities) return { mime: mediaType.toLowerCase(), size: sizeBytes };
-  const mime = mediaType.toLowerCase();
-
-  // If it's an image and the model accepts WebP, the processor will convert
-  // to WebP and compress — treat the mime as WebP and size as 0 (will fit
-  // after processing) for the gate check.
-  if (isImageMime(mime)) {
-    const constraint = capabilities.inputConstraints?.image;
-    if (constraint?.mimeTypes.includes('image/webp')) {
-      // The processor will handle size/resolution — skip the size gate here
-      // by reporting 0 bytes so canModelConsumeAttachment only checks modality.
-      return { mime: 'image/webp', size: 0 };
-    }
-  }
-
-  return { mime, size: sizeBytes };
-}
-
-type AttachmentCheck =
-  | { canConsume: true }
-  | { canConsume: false; reason: string };
-
-/**
- * Runtime check: can the current model consume this attachment as an
- * inline part?
- *
- * For images: the processor will handle MIME conversion, resize, and
- * compression before this ever reaches the model — so we only gate on
- * whether the model supports the image modality at all (using the
- * post-processing effective MIME). Actual size/resolution enforcement is
- * delegated to `processImageForModel`.
- *
- * For non-image files (PDF, video, audio): checked as before — no
- * processor exists for those types.
- *
- * Returns a rejection reason when the attachment cannot be consumed.
- */
-function canModelConsumeAttachment(
-  capabilities: ModelCapabilities | undefined,
-  mediaType: string,
-  sizeBytes: number,
-  currentModelId?: string,
-): AttachmentCheck {
-  if (!capabilities)
-    return { canConsume: false, reason: 'Model capabilities unknown.' };
-
-  // For images: derive the effective MIME/size that will exist *after* the
-  // image processor runs (converter + resize + WebP compression). This way
-  // we only block on "model doesn't support images at all" rather than on
-  // the pre-processing size or MIME. The processor itself handles the rest
-  // and falls back to ok:false when it can't fit the image.
-  const { mime, size: effectiveSize } = effectiveMimeAndSize(
-    capabilities,
-    mediaType,
-    sizeBytes,
-  );
-
-  const constraints = capabilities.inputConstraints;
-
-  const modalityChecks: {
-    name: string;
-    enabled: boolean;
-    constraint: ModalityConstraint | undefined;
-  }[] = [
-    {
-      name: 'image',
-      enabled: capabilities.inputModalities.image,
-      constraint: constraints?.image ?? DEFAULT_IMAGE_CONSTRAINT,
-    },
-    {
-      name: 'file',
-      enabled: capabilities.inputModalities.file,
-      constraint: constraints?.file ?? DEFAULT_FILE_CONSTRAINT,
-    },
-    {
-      name: 'video',
-      enabled: capabilities.inputModalities.video,
-      constraint: constraints?.video,
-    },
-    {
-      name: 'audio',
-      enabled: capabilities.inputModalities.audio,
-      constraint: constraints?.audio,
-    },
-  ];
-
-  let sizeExceeded: { name: string; maxBytes: number } | undefined;
-
-  for (const m of modalityChecks) {
-    if (!m.enabled || !m.constraint) continue;
-    const result = checkConstraint(m.constraint, mime, effectiveSize);
-    if ('size' in result && result.size) return { canConsume: true };
-    if ('size' in result && !result.size && !sizeExceeded)
-      sizeExceeded = { name: m.name, maxBytes: result.maxBytes };
-  }
-
-  if (sizeExceeded) {
-    return {
-      canConsume: false,
-      reason: `File too large for inline ${sizeExceeded.name} input (${formatMB(sizeBytes)} exceeds ${formatMB(sizeExceeded.maxBytes)} limit).`,
-    };
-  }
-
-  const alternatives = findModelsAcceptingMime(mime, currentModelId);
-  const altSuffix =
-    alternatives.length > 0
-      ? ` Models supporting ${mime}: ${alternatives.join(', ')}.`
-      : '';
-
-  const allSupported = modalityChecks
-    .filter((m) => m.enabled && m.constraint)
-    .flatMap((m) => m.constraint!.mimeTypes);
-
-  if (allSupported.length > 0) {
-    return {
-      canConsume: false,
-      reason: `This model doesn't support ${mime} inline.${altSuffix}`,
-    };
-  }
-
-  return {
-    canConsume: false,
-    reason: `This model has no inline file input support.${altSuffix}`,
-  };
-}
-
 /**
  * Strip all underscore-prefixed properties from a tool output object.
  * This allows tool implementations to attach UI-only metadata (e.g. `_diff`)
@@ -290,133 +67,6 @@ export function stripUnderscoreProperties(
   return Object.fromEntries(
     Object.entries(output).filter(([key]) => !key.startsWith('_')),
   );
-}
-
-/**
- * Build a synthetic `UserModelMessage` carrying multimodal file/image parts
- * for attachments on an assistant message (e.g. created by API.createAttachment()).
- * Injected after the assistant turn so the LLM can see the files inline.
- * Binary content is read via the blobReader.
- */
-async function buildAttachmentContextMessage(
-  attachments: Attachment[],
-  agentInstanceId: string,
-  blobReader: BlobReader,
-  capabilities?: ModelCapabilities,
-  onBlobError?: BlobErrorReporter,
-  currentModelId?: string,
-  logger?: Logger,
-  imageCache?: ProcessedImageCacheService,
-): Promise<(TextPart | ImagePart | FilePart)[]> {
-  const parts: (TextPart | ImagePart | FilePart)[] = [];
-
-  for (const f of attachments) {
-    const displayName = f.originalFileName ?? f.path.split('/').pop() ?? f.path;
-    const mimeType = inferMimeType(displayName);
-
-    // Text-based blob attachments (textclip, swdomelement) — read and
-    // inline as CDATA-wrapped XML. No modality check needed.
-    if (
-      mimeType === 'text/x-textclip' ||
-      mimeType === 'application/x-swdomelement'
-    ) {
-      const part = await readTextBlobAsTextPart(
-        agentInstanceId,
-        blobReader,
-        f.path,
-        onBlobError,
-      );
-      if (part) parts.push(part);
-      continue;
-    }
-
-    let rawBuf: Buffer | undefined;
-    try {
-      rawBuf = await blobReader(agentInstanceId, f.path);
-    } catch (err) {
-      onBlobError?.(err, {
-        operation: 'readAttachmentBlob',
-        attachmentId: f.path,
-      });
-    }
-
-    const sizeBytes = rawBuf?.length ?? 0;
-    const check = canModelConsumeAttachment(
-      capabilities,
-      mimeType,
-      sizeBytes,
-      currentModelId,
-    );
-    const hint = check.canConsume
-      ? 'Agent-created attachment. See next part for inline content.'
-      : `${check.reason} Access via fs.readFile('${f.path}') in the sandbox.`;
-
-    parts.push({
-      type: 'text',
-      text: xml({
-        [specialTokens.userMsgAttachmentXmlTag]: {
-          _attr: { type: 'file', filename: displayName, id: f.path, hint },
-        },
-      }),
-    });
-
-    if (check.canConsume && rawBuf) {
-      if (isImageMime(mimeType)) {
-        const imageConstraint = capabilities?.inputConstraints?.image;
-        const processed = imageConstraint
-          ? await processImageForModel(
-              rawBuf,
-              mimeType,
-              imageConstraint,
-              logger,
-              imageCache,
-            )
-          : {
-              ok: true as const,
-              buf: rawBuf,
-              mediaType: mimeType,
-              transformed: false,
-            };
-        if (processed.ok) {
-          parts.push({
-            type: 'image',
-            image: new Uint8Array(processed.buf),
-            mediaType: processed.mediaType,
-          } satisfies ImagePart);
-        } else {
-          const failReason =
-            processed.error instanceof Error
-              ? processed.error.message
-              : 'Image processing failed.';
-          const last = parts[parts.length - 1];
-          if (last?.type === 'text') {
-            parts[parts.length - 1] = {
-              type: 'text',
-              text: xml({
-                [specialTokens.userMsgAttachmentXmlTag]: {
-                  _attr: {
-                    type: 'file',
-                    filename: displayName,
-                    id: f.path,
-                    hint: `Image could not be processed: ${failReason} Access via fs.readFile('${f.path}') in the sandbox.`,
-                  },
-                },
-              }),
-            };
-          }
-        }
-      } else {
-        parts.push({
-          type: 'file',
-          data: new Uint8Array(rawBuf),
-          mediaType: mimeType,
-          filename: displayName,
-        } satisfies FilePart);
-      }
-    }
-  }
-
-  return parts;
 }
 
 /**
@@ -489,13 +139,13 @@ export const convertAgentMessagesToModelMessages = async (
   agentInstanceId: string,
   blobReader: BlobReader,
   modelCapabilities?: ModelCapabilities,
-  onBlobError?: BlobErrorReporter,
-  currentModelId?: string,
   shellInfo?: ShellInfo | null,
   skillDetails?: Map<string, SkillInfo>,
   logger?: Logger,
   imageCache?: ProcessedImageCacheService,
   skills?: ReadonlyArray<SkillDefinition>,
+  fileReadCache?: FileReadCacheService,
+  mountPaths?: Map<string, string>,
 ): Promise<ModelMessage[]> => {
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
@@ -504,6 +154,13 @@ export const convertAgentMessagesToModelMessages = async (
   // ─── Step 2: Forward pass — convert messages to model format ────────
 
   const modelMessages: ModelMessage[] = [];
+
+  // Tracks which files (by path + hash + read params) have been injected
+  // into the conversation context. Uses range-aware coverage checks so
+  // that e.g. a full-file read is not re-injected when its content is
+  // already covered by a previous injection, while a new line/page range
+  // that extends beyond the existing coverage *is* injected.
+  const seenFiles = new SeenFilesTracker();
 
   if (systemPrompt) {
     modelMessages.push({ role: 'system', content: systemPrompt });
@@ -542,10 +199,6 @@ export const convertAgentMessagesToModelMessages = async (
       const userMsg = await convertUserMessage(
         message,
         agentInstanceId,
-        blobReader,
-        modelCapabilities,
-        onBlobError,
-        currentModelId,
         logger,
         imageCache,
         skills,
@@ -553,10 +206,32 @@ export const convertAgentMessagesToModelMessages = async (
       // convertUserMessage always returns content as an array of parts
       const content = userMsg.content as (TextPart | ImagePart | FilePart)[];
 
-      // compressed-history → env-context → [original content with user-msg]
+      // Inject file contents from pathReferences (before user-msg content).
+      // User-mentioned files default to preview mode — full content is
+      // loaded only when the agent explicitly calls the readFile tool.
+      const rawFileParts = await injectFileReferences(
+        message.metadata?.pathReferences,
+        seenFiles,
+        agentInstanceId,
+        blobReader,
+        fileReadCache,
+        mountPaths,
+        logger,
+        { preview: true },
+      );
+      // Adapt images to the current model's constraints (resize/compress).
+      const fileParts = await adaptImagePartsForModel(
+        rawFileParts,
+        modelCapabilities,
+        logger,
+        imageCache,
+      );
+
+      // compressed-history → env-context → file-refs → [original content with user-msg]
       const merged: (TextPart | ImagePart | FilePart)[] = [];
       if (compressedPart) merged.push(compressedPart);
       merged.push(...(envParts.parts as (TextPart | ImagePart | FilePart)[]));
+      merged.push(...fileParts);
       merged.push(...content);
       modelMessages.push({ role: 'user', content: merged });
     } else {
@@ -574,28 +249,33 @@ export const convertAgentMessagesToModelMessages = async (
       const assistantMsgs = await convertAssistantMessage(message, tools);
       modelMessages.push(...assistantMsgs);
 
+      // Inject file contents from pathReferences (from readFile tool calls).
+      // Assistant-side references come from explicit readFile calls — use
+      // default (full) read params, not preview.
+      const rawFileParts = await injectFileReferences(
+        message.metadata?.pathReferences,
+        seenFiles,
+        agentInstanceId,
+        blobReader,
+        fileReadCache,
+        mountPaths,
+        logger,
+      );
+      // Adapt images to the current model's constraints (resize/compress).
+      const fileParts = await adaptImagePartsForModel(
+        rawFileParts,
+        modelCapabilities,
+        logger,
+        imageCache,
+      );
+
       // Build a single synthetic user message after the assistant turn for:
       // 1. Env-changes (state after this step's tool calls)
-      // 2. Agent-created attachments (from API.createAttachment() calls)
-      // Both are consolidated to avoid unnecessary turn boundaries.
-      const assistantAttachments = message.metadata?.attachments ?? [];
-      const attachmentParts =
-        assistantAttachments.length > 0
-          ? await buildAttachmentContextMessage(
-              assistantAttachments,
-              agentInstanceId,
-              blobReader,
-              modelCapabilities,
-              onBlobError,
-              currentModelId,
-              logger,
-              imageCache,
-            )
-          : [];
-
+      // 2. File contents from readFile pathReferences
+      // All are consolidated to avoid unnecessary turn boundaries.
       const syntheticParts = [
         ...(envParts.parts as (TextPart | ImagePart | FilePart)[]),
-        ...attachmentParts,
+        ...fileParts,
       ];
       if (syntheticParts.length > 0) {
         modelMessages.push({ role: 'user', content: syntheticParts });
@@ -627,6 +307,232 @@ function findCompressionBoundary(messages: AgentMessage[]): number {
     }
   }
   return 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: inject file contents from pathReferences
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Process `pathReferences` on a message and return model-ready content parts
+ * for each file that hasn't been seen yet in this conversation window.
+ *
+ * Deduplication: a `(path, hash)` pair is only injected once. If the same
+ * path appears later with a *different* hash, the file is re-injected with
+ * updated content.
+ *
+ * Gracefully no-ops when `fileReadCache` or `mountPaths` are not provided
+ * (the feature is disabled) or when `pathReferences` is empty/undefined.
+ */
+/**
+ * Resolve the effective `ReadParams` for a referenced path.
+ *
+ * Heuristics (in priority order):
+ *
+ * 1. **User-uploaded attachments** (`att/` prefix) — always loaded in full.
+ *    Attachments are explicit user-provided context; truncating them would
+ *    lose intent. No `preview` flag, no line/page range.
+ *
+ * 2. **Workspace files mentioned by the user** — loaded in `preview` mode
+ *    by default (the caller passes `{ preview: true }` as
+ *    `defaultReadParams`). The agent can later request the full content
+ *    via the `readFile` tool.
+ *
+ * 3. **Files from assistant tool-calls** (readFile results) — the caller
+ *    omits `defaultReadParams`, so the transformer receives `{}` which
+ *    means full content with whatever line/page range the tool specified.
+ */
+function resolveReadParams(
+  path: string,
+  defaultReadParams?: ReadParams,
+): ReadParams | undefined {
+  // Attachments are always full — override any caller default.
+  if (path.startsWith('att/')) return undefined;
+  return defaultReadParams;
+}
+
+async function injectFileReferences(
+  pathReferences: Record<string, string> | undefined,
+  seenFiles: SeenFilesTracker,
+  agentInstanceId: string,
+  blobReader: BlobReader,
+  fileReadCache?: FileReadCacheService,
+  mountPaths?: Map<string, string>,
+  logger?: Logger,
+  defaultReadParams?: ReadParams,
+): Promise<(TextPart | ImagePart | FilePart)[]> {
+  if (!pathReferences || !fileReadCache || !mountPaths || !logger) return [];
+
+  const entries = Object.entries(pathReferences);
+  if (entries.length === 0) return [];
+
+  const allParts: (TextPart | ImagePart | FilePart)[] = [];
+
+  for (const [path, hash] of entries) {
+    const requestedParams = resolveReadParams(path, defaultReadParams) ?? {};
+
+    // Coverage-aware dedup: skip if any previously injected entry for
+    // this (path, hash) already covers the requested read params.
+    if (seenFiles.isCovered(path, hash, requestedParams)) continue;
+
+    try {
+      const result = await fileReadTransformer({
+        mountedPath: path,
+        expectedHash: hash,
+        blobReader,
+        cache: fileReadCache,
+        logger,
+        agentId: agentInstanceId,
+        mountPaths,
+        readParams: requestedParams,
+      });
+
+      // Record what was *actually* delivered, not what was requested.
+      // If the transformer truncated (e.g. capped a 500-line file at
+      // 300 lines), effectiveReadParams will be narrower than the
+      // request, so future reads of the remaining lines won't be
+      // falsely skipped.
+      seenFiles.record(
+        path,
+        hash,
+        result.effectiveReadParams ?? requestedParams,
+      );
+
+      allParts.push(...result.parts);
+    } catch (err) {
+      logger?.warn(`[injectFileReferences] Failed to transform ${path}`, err);
+      // On failure, emit an error placeholder so the model knows the
+      // file was referenced but couldn't be loaded.
+      allParts.push({
+        type: 'text',
+        text:
+          `<file path="${path}">\n` +
+          '<metadata>error:true</metadata>\n' +
+          '<content>\n' +
+          `File could not be loaded: ${err instanceof Error ? err.message : String(err)}` +
+          '\n</content>\n</file>',
+      });
+    }
+  }
+
+  return allParts;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: per-model image post-processing
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Post-process `ImagePart`s to fit the active model's constraints.
+ *
+ * ## Two-pass design
+ *
+ * The file attachment pipeline is intentionally split into two passes:
+ *
+ * 1. **Transform pass** (`fileReadTransformer` / `imageTransformer`):
+ *    Produces a model-agnostic, compact representation (WebP q80).
+ *    This result is cached by content hash so it can be reused across
+ *    models and steps without re-reading the file.
+ *
+ * 2. **Adapt pass** (this function):
+ *    Runs *after* caching, applying model-specific constraints
+ *    (max bytes, max dimensions, supported MIME types) via
+ *    `processImageForModel`. This pass is NOT cached because the
+ *    constraints vary per model.
+ *
+ * This separation means image data may be re-encoded twice (once in
+ * the transformer, once here), but it ensures the cache remains
+ * model-independent while still respecting each model's limits.
+ * Currently only images require adaptation; other modalities (text,
+ * PDF, directory listings) pass through unchanged.
+ *
+ * Non-image parts are passed through unchanged. If processing fails
+ * for an image, it is replaced with a text fallback.
+ *
+ * Mutates nothing — returns a new array.
+ */
+async function adaptImagePartsForModel(
+  parts: (TextPart | ImagePart | FilePart)[],
+  modelCapabilities?: ModelCapabilities,
+  logger?: Logger,
+  imageCache?: ProcessedImageCacheService,
+): Promise<(TextPart | ImagePart | FilePart)[]> {
+  // If the model doesn't accept image input at all, strip all ImageParts
+  // and replace with a text fallback.
+  if (modelCapabilities && !modelCapabilities.inputModalities?.image) {
+    return parts.map((part) =>
+      part.type === 'image'
+        ? ({
+            type: 'text',
+            text: '[Image content not available to this model]',
+          } satisfies TextPart)
+        : part,
+    );
+  }
+
+  const imageConstraint = modelCapabilities?.inputConstraints?.image;
+  if (!imageConstraint) return parts;
+
+  const result: (TextPart | ImagePart | FilePart)[] = [];
+
+  for (const part of parts) {
+    if (part.type !== 'image') {
+      result.push(part);
+      continue;
+    }
+
+    // Convert image data back to Buffer for processImageForModel.
+    // ImagePart.image is `DataContent | URL` where DataContent =
+    // string (base64) | Uint8Array | ArrayBuffer | Buffer.
+    // The file-read pipeline always produces Uint8Array, but handle
+    // all cases defensively. Skip URL-based images.
+    if (part.image instanceof URL) {
+      result.push(part);
+      continue;
+    }
+    let buf: Buffer;
+    if (typeof part.image === 'string') {
+      // Base64-encoded image data.
+      buf = Buffer.from(part.image, 'base64');
+    } else if (part.image instanceof ArrayBuffer) {
+      buf = Buffer.from(new Uint8Array(part.image));
+    } else {
+      buf = Buffer.from(part.image);
+    }
+    const mediaType = (part.mediaType as string) ?? 'image/webp';
+
+    const processed = await processImageForModel(
+      buf,
+      mediaType,
+      imageConstraint,
+      logger,
+      imageCache,
+    );
+
+    if (processed.ok) {
+      result.push({
+        type: 'image',
+        image: new Uint8Array(processed.buf),
+        mediaType: processed.mediaType,
+      } satisfies ImagePart);
+    } else {
+      // Processing failed — replace with a text fallback so the model
+      // knows an image was here but couldn't be delivered.
+      const reason =
+        processed.error instanceof Error
+          ? processed.error.message
+          : 'Image processing failed.';
+      logger?.warn(
+        `[adaptImagePartsForModel] Image could not be adapted: ${reason}`,
+      );
+      result.push({
+        type: 'text',
+        text: `[Image could not be processed for this model: ${reason}]`,
+      });
+    }
+  }
+
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -768,16 +674,14 @@ async function convertAssistantMessage(
 
 /**
  * Convert a user UI message into a single `UserModelMessage`.
- * Wraps user text in `<user-msg>`, converts file attachments, mentions,
- * selected elements, and text clips into content parts.
+ *
+ * Wraps user text in `<user-msg>`. File attachments and file/workspace
+ * mentions are handled by the `pathReferences` pipeline; only tab
+ * mentions are still rendered here.
  */
 async function convertUserMessage(
   message: AgentMessage,
   agentInstanceId: string,
-  blobReader: BlobReader,
-  modelCapabilities?: ModelCapabilities,
-  onBlobError?: BlobErrorReporter,
-  currentModelId?: string,
   logger?: Logger,
   imageCache?: ProcessedImageCacheService,
   skills?: ReadonlyArray<SkillDefinition>,
@@ -812,149 +716,6 @@ async function convertUserMessage(
     return { ...part };
   });
 
-  // File parts that carry raw buffer data cannot go through convertToModelMessages
-  // because FileUIPart only accepts url: string (http/https). We collect them
-  // separately and splice them directly into converted.content as FilePart/ImagePart objects.
-  const directParts: (FilePart | ImagePart)[] = [];
-
-  if ((message.metadata?.attachments?.length || 0) > 0) {
-    for (const f of message.metadata!.attachments!) {
-      // Display name: originalFileName for att/ blobs, basename for workspace paths.
-      const displayName =
-        f.originalFileName ?? f.path.split('/').pop() ?? f.path;
-
-      const mimeType = inferMimeType(displayName);
-
-      // Text-based blob attachments (textclip, swdomelement) — read and
-      // inline as CDATA-wrapped XML. No modality check needed.
-      if (
-        mimeType === 'text/x-textclip' ||
-        mimeType === 'application/x-swdomelement'
-      ) {
-        const part = await readTextBlobAsTextPart(
-          agentInstanceId,
-          blobReader,
-          f.path,
-          onBlobError,
-        );
-        if (part) parts.push(part);
-        continue;
-      }
-
-      // Read the buffer first so we can derive sizeBytes for the modality check.
-      // Pass the raw path — the blobReader resolves att/ vs workspace routing.
-      let rawBuf: Buffer | undefined;
-      try {
-        rawBuf = await blobReader(agentInstanceId, f.path);
-      } catch (err) {
-        onBlobError?.(err, {
-          operation: 'readAttachmentBlob',
-          attachmentId: f.path,
-        });
-      }
-
-      const sizeBytes = rawBuf?.length ?? 0;
-      const check = canModelConsumeAttachment(
-        modelCapabilities,
-        mimeType,
-        sizeBytes,
-        currentModelId,
-      );
-
-      // NOTE: Attachments are always sent as inline data (Uint8Array), never
-      // as URLs. The Vercel AI gateway may route requests to upstream providers
-      // (AWS Bedrock, Vertex AI, etc.) that reject URL-based image/file parts.
-      if (check.canConsume && rawBuf) {
-        // Build XML hint and inline part together so the hint can reflect
-        // the actual processing outcome (e.g. processor failure).
-        let hint = 'User-attached file. See next part for inline content.';
-        let pushedInlinePart = false;
-
-        if (isImageMime(mimeType)) {
-          // Run the image through the pre-processing pipeline to ensure it
-          // meets the model's resolution and byte-size constraints.
-          const imageConstraint = modelCapabilities?.inputConstraints?.image;
-          const processed = imageConstraint
-            ? await processImageForModel(
-                rawBuf,
-                mimeType,
-                imageConstraint,
-                logger,
-                imageCache,
-              )
-            : {
-                ok: true as const,
-                buf: rawBuf,
-                mediaType: mimeType,
-                transformed: false,
-              };
-
-          if (processed.ok) {
-            directParts.push({
-              type: 'image',
-              image: new Uint8Array(processed.buf),
-              mediaType: processed.mediaType,
-            } satisfies ImagePart);
-            pushedInlinePart = true;
-          } else {
-            // Processor failed — fall back to description-only.
-            const failReason =
-              processed.error instanceof Error
-                ? processed.error.message
-                : 'Image processing failed.';
-            hint = `Image could not be processed for inline delivery: ${failReason} Access via fs.readFile('${f.path}') in the sandbox.`;
-          }
-        } else {
-          directParts.push({
-            type: 'file',
-            data: new Uint8Array(rawBuf),
-            mediaType: mimeType,
-            filename: displayName,
-          } satisfies FilePart);
-          pushedInlinePart = true;
-        }
-
-        if (!pushedInlinePart) {
-          hint = `Attachment could not be delivered inline. Access via fs.readFile('${f.path}') in the sandbox.`;
-        }
-
-        parts.push({
-          type: 'text',
-          text: xml({
-            [specialTokens.userMsgAttachmentXmlTag]: {
-              _attr: {
-                type: 'file',
-                filename: displayName,
-                id: f.path,
-                hint,
-              },
-            },
-          }),
-        });
-      } else {
-        // Model cannot consume this attachment or read failed — describe as text only.
-        const reason = !rawBuf
-          ? 'Attachment could not be read.'
-          : !check.canConsume
-            ? check.reason
-            : 'Unknown error.';
-        parts.push({
-          type: 'text',
-          text: xml({
-            [specialTokens.userMsgAttachmentXmlTag]: {
-              _attr: {
-                type: 'file',
-                filename: displayName,
-                id: f.path,
-                hint: `${reason} Access via fs.readFile('${f.path}') in the sandbox.`,
-              },
-            },
-          }),
-        });
-      }
-    }
-  }
-
   const converted = (
     await convertToModelMessages([{ ...message, parts }])
   )[0]! as UserModelMessage;
@@ -972,26 +733,23 @@ async function convertUserMessage(
     ];
   }
 
-  // Splice buffer-backed file/image parts directly into the model-level content.
-  if (directParts.length > 0) {
-    const existing: (TextPart | ImagePart | FilePart)[] =
-      typeof converted.content === 'string'
-        ? [{ type: 'text', text: converted.content }]
-        : (converted.content as (TextPart | ImagePart | FilePart)[]);
-    converted.content = [...existing, ...directParts];
+  // Only tab mentions are rendered here — file and workspace mentions
+  // are now handled by the pathReferences pipeline.
+  const tabMentionParts: string[] = [];
+  if (message.metadata?.mentions && message.metadata.mentions.length > 0) {
+    for (const mention of message.metadata.mentions) {
+      if (mention.providerType === 'tab') {
+        tabMentionParts.push(
+          tabMentionToContextSnippet(mention as TabMentionMeta),
+        );
+      }
+    }
   }
 
-  const attachmentParts: string[] = [];
-
-  if (message.metadata?.mentions && message.metadata.mentions.length > 0)
-    message.metadata.mentions.forEach((mention) => {
-      attachmentParts.push(mentionToContextSnippet(mention));
-    });
-
-  if (attachmentParts.length > 0) {
+  if (tabMentionParts.length > 0) {
     (converted.content as (TextPart | ImagePart | FilePart)[]).push({
       type: 'text',
-      text: attachmentParts.join('\n'),
+      text: tabMentionParts.join('\n'),
     });
   }
 

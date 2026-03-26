@@ -488,27 +488,8 @@ export const ParallelExploration: Story = {
           },
         },
       },
-      listFilesPath: 'src/components',
-      listFilesResult: [
-        {
-          relativePath: 'src/components/Button.tsx',
-          name: 'Button.tsx',
-          type: 'file' as const,
-          depth: 0,
-        },
-        {
-          relativePath: 'src/components/IconButton.tsx',
-          name: 'IconButton.tsx',
-          type: 'file' as const,
-          depth: 0,
-        },
-        {
-          relativePath: 'src/components/LinkButton.tsx',
-          name: 'LinkButton.tsx',
-          type: 'file' as const,
-          depth: 0,
-        },
-      ],
+      readDirectoryPath: 'src/components',
+      readDirectoryContent: 'Button.tsx\nIconButton.tsx\nLinkButton.tsx',
       globPattern: '**/*Button*.tsx',
       globResult: [
         'src/components/Button.tsx',

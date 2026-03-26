@@ -239,7 +239,7 @@ function buildDeleteFileTimeline(
     timestamp: currentTime,
     messageId: assistantMessageId,
     toolCallId,
-    fieldPath: 'input.relative_path',
+    fieldPath: 'input.path',
     targetContent: config.targetFile,
     chunkStrategy: 'char',
     intervalMs: REALISTIC_TIMING.toolInputStreaming.intervalMs,
@@ -255,7 +255,7 @@ function buildDeleteFileTimeline(
     toolCallId,
     newState: 'input-available',
     input: {
-      relative_path: config.targetFile,
+      path: config.targetFile,
     },
   });
 

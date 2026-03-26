@@ -1,6 +1,6 @@
 import {
-  type OverwriteFileToolInput,
-  overwriteFileToolInputSchema,
+  type writeToolInput,
+  writeToolInputSchema,
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import { tool } from 'ai';
 import {
@@ -9,16 +9,7 @@ import {
 } from '../../utils';
 import { resolveMountedRelativePath } from '../../utils/path-mounting';
 
-/* Due to an issue in zod schema conversion in the ai sdk,
-   the schema descriptions are not properly used for the prompts -
-   thus, we include them in the descriptions as well. */
-export const DESCRIPTION = `Overwrite entire file content, creating the file if it does not exist.
-
-Parameters:
-- relative_path (string, REQUIRED): Relative file path to overwrite or create. Must include a mount prefix, e.g. "w1/src/app.ts" or "apps/my-app/index.html".
-- content (string, REQUIRED): New content for the file. Leading/trailing markdown code block markers (\`\`\`) are automatically removed.
-
-Behavior: Creates parent directories if needed. No size limit on file write itself.`;
+export const DESCRIPTION = `Write content to a file. Overrides existing file contents. Creates parent directories if needed.`;
 
 /**
  * Overwrite file content tool
@@ -27,21 +18,24 @@ Behavior: Creates parent directories if needed. No size limit on file write itse
  *
  * Note: Diff-history tracking is handled by the ToolboxService wrapper.
  */
-export async function overwriteFileToolExecute(
-  params: OverwriteFileToolInput,
+export async function writeToolExecute(
+  params: writeToolInput,
   mountedRuntimes: MountedClientRuntimes,
 ) {
-  const { clientRuntime, relativePath: relative_path } =
-    resolveMountedRelativePath(mountedRuntimes, params.relative_path);
+  const { clientRuntime, path } = resolveMountedRelativePath(
+    mountedRuntimes,
+    params.path,
+  );
   const { content } = params;
 
   try {
-    const absolutePath = clientRuntime.fileSystem.resolvePath(relative_path);
+    const absolutePath = clientRuntime.fileSystem.resolvePath(path);
 
     // Check if file exists (for message)
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
 
     // Clean up content - remove markdown code blocks if present
+    // TODO: Do we still need this or are llm smart enough to handle this now?
     let cleanContent = content;
     if (cleanContent.startsWith('```')) {
       const lines = cleanContent.split('\n');
@@ -71,12 +65,12 @@ export async function overwriteFileToolExecute(
     );
     if (!writeResult.success)
       throw new Error(
-        `Failed to write file: ${relative_path} - ${writeResult.message} - ${writeResult.error || ''}`,
+        `Failed to write file: ${path} - ${writeResult.message} - ${writeResult.error || ''}`,
       );
 
     // Build success message
     const action = fileExists ? 'updated' : 'created';
-    let message = `Successfully ${action} file: ${relative_path}`;
+    let message = `Successfully ${action} file: ${path}`;
 
     // Add a recommendation when file content is large to help prevent
     // future output-token-limit issues with overwriteFile tool calls.
@@ -95,12 +89,12 @@ export async function overwriteFileToolExecute(
   }
 }
 
-export const overwriteFile = (mountedRuntimes: MountedClientRuntimes) =>
+export const write = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
-    inputSchema: overwriteFileToolInputSchema,
+    inputSchema: writeToolInputSchema,
     strict: true,
     execute: async (args) => {
-      return overwriteFileToolExecute(args, mountedRuntimes);
+      return writeToolExecute(args, mountedRuntimes);
     },
   });

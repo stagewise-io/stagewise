@@ -11,11 +11,10 @@ import {
   createAssistantMessage,
   createReasoningPart,
   createTextPart,
-  createListFilesToolPart,
   createGlobToolPart,
-  createReadFileToolPart,
+  createReadToolPart,
   createMultiEditToolPart,
-  createOverwriteFileToolPart,
+  createWriteToolPart,
   createGrepSearchToolPart,
   REALISTIC_TIMING,
   getRandomDuration,
@@ -32,19 +31,14 @@ export interface ExplorationScenarioConfig {
   thinkingText: string;
   /** Initial solo tool call (optional) - runs before parallel operations */
   initialTool?: {
-    type: 'grep' | 'list-files';
-    path?: string; // for list-files
+    type: 'grep' | 'read';
+    path?: string; // for read
     query?: string; // for grep
     result: any;
   };
-  /** List files configuration */
-  listFilesPath: string;
-  listFilesResult: Array<{
-    relativePath: string;
-    name: string;
-    type: 'file' | 'directory';
-    depth: number;
-  }>;
+  /** Read directory configuration */
+  readDirectoryPath: string;
+  readDirectoryContent: string;
   /** Glob configuration */
   globPattern: string;
   globResult: string[];
@@ -70,7 +64,7 @@ export interface ExplorationScenarioConfig {
  *
  * Simulates complex exploration and editing flow:
  * 1. User asks → Agent thinks
- * 2. Agent calls list-files + glob in parallel → both complete
+ * 2. Agent calls read (directory) + glob in parallel → both complete
  * 3. Agent calls 3x read-file in parallel → all complete
  * 4. Agent responds (e.g., "I will now edit file xyz")
  * 5. Agent performs multi-edit + overwrite-file in parallel
@@ -83,8 +77,8 @@ export interface ExplorationScenarioConfig {
  *     explorationScenario: {
  *       userMessage: 'Find and fix all button components',
  *       thinkingText: 'Let me explore the codebase...',
- *       listFilesPath: 'src/components',
- *       listFilesResult: [...],
+ *       readDirectoryPath: 'src/components',
+ *       readDirectoryContent: 'Button.tsx\nIconButton.tsx\nLinkButton.tsx',
  *       globPattern: '**\/ *.tsx',
  *       globResult: ['Button.tsx', 'IconButton.tsx'],
  *       filesToRead: [
@@ -272,9 +266,8 @@ function buildExplorationTimeline(
         messageId: assistantMessageId,
         partIndex: initialToolPartIndex,
         updater: () =>
-          createListFilesToolPart(
+          createReadToolPart(
             config.initialTool!.path || 'src',
-            [],
             'input-streaming',
             { toolCallId: initialToolId },
           ),
@@ -303,12 +296,12 @@ function buildExplorationTimeline(
     });
   }
 
-  // 6. PHASE 1: List files + Glob in parallel
+  // 6. PHASE 1: Read directory + Glob in parallel
   currentTime += 200;
   const phase1StartTime = currentTime;
-  const listFilesToolId = 'list-files-tool-1';
+  const readDirToolId = 'read-dir-tool-1';
   const globToolId = 'glob-tool-1';
-  const listFilesPartIndex = partIndex++;
+  const readDirPartIndex = partIndex++;
   const globPartIndex = partIndex++;
 
   // Add both tools in input-streaming
@@ -316,10 +309,10 @@ function buildExplorationTimeline(
     type: 'update-message-part',
     timestamp: phase1StartTime,
     messageId: assistantMessageId,
-    partIndex: listFilesPartIndex,
+    partIndex: readDirPartIndex,
     updater: () =>
-      createListFilesToolPart(config.listFilesPath, [], 'input-streaming', {
-        toolCallId: listFilesToolId,
+      createReadToolPart(config.readDirectoryPath, 'input-streaming', {
+        toolCallId: readDirToolId,
       }),
   });
 
@@ -340,7 +333,7 @@ function buildExplorationTimeline(
     type: 'update-tool-state',
     timestamp: currentTime,
     messageId: assistantMessageId,
-    toolCallId: listFilesToolId,
+    toolCallId: readDirToolId,
     newState: 'input-available',
   });
 
@@ -361,19 +354,18 @@ function buildExplorationTimeline(
     type: 'update-tool-state',
     timestamp: currentTime,
     messageId: assistantMessageId,
-    toolCallId: listFilesToolId,
+    toolCallId: readDirToolId,
     newState: 'output-available',
     output: {
-      message: `Successfully listed ${config.listFilesResult.length} items`,
+      success: true,
+      message: 'File read successfully',
       result: {
-        files: config.listFilesResult,
-        totalFiles: config.listFilesResult.filter((f) => f.type === 'file')
-          .length,
-        totalDirectories: config.listFilesResult.filter(
-          (f) => f.type === 'directory',
-        ).length,
+        content: config.readDirectoryContent,
+        totalLines: config.readDirectoryContent.split('\n').length,
+        linesRead: config.readDirectoryContent.split('\n').length,
         truncated: false,
-        itemsRemoved: 0,
+        originalSize: config.readDirectoryContent.length,
+        cappedSize: config.readDirectoryContent.length,
       },
     },
   });
@@ -414,7 +406,7 @@ function buildExplorationTimeline(
       messageId: assistantMessageId,
       partIndex: pIndex,
       updater: () =>
-        createReadFileToolPart(file.path, '', 'input-streaming', {
+        createReadToolPart(file.path, 'input-streaming', {
           toolCallId: toolId,
         }),
     });
@@ -508,7 +500,7 @@ function buildExplorationTimeline(
               toolCallId: toolId,
               oldContent: edit.beforeContent,
             })
-          : createOverwriteFileToolPart(edit.path, '', 'input-streaming', {
+          : createWriteToolPart(edit.path, '', 'input-streaming', {
               toolCallId: toolId,
               oldContent: edit.beforeContent,
             }),
@@ -550,7 +542,7 @@ function buildExplorationTimeline(
       newState: 'input-available',
       input: edit.useMultiEdit
         ? {
-            relative_path: edit.path,
+            path: edit.path,
             edits: [
               {
                 old_string: edit.beforeContent,
@@ -559,7 +551,7 @@ function buildExplorationTimeline(
             ],
           }
         : {
-            relative_path: edit.path,
+            path: edit.path,
             content: edit.afterContent,
           },
     });

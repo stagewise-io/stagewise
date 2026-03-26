@@ -12,7 +12,7 @@ import { normalizePath } from '@shared/path-utils';
 export function resolveMountedRelativePath(
   mountedRuntimes: MountedClientRuntimes,
   relativePathWithMountPrefix: string,
-): { clientRuntime: ClientRuntimeNode; relativePath: string } {
+): { clientRuntime: ClientRuntimeNode; path: string } {
   const normalized = normalizePath(relativePathWithMountPrefix);
   const [mountPrefix, ...pathParts] = normalized.split('/');
   const clientRuntime = mountedRuntimes.get(mountPrefix);
@@ -20,13 +20,13 @@ export function resolveMountedRelativePath(
     throw new Error(
       `Mount ${mountPrefix} not found. Available mounts: ${Array.from(mountedRuntimes.keys()).join(', ')}`,
     );
-  return { clientRuntime, relativePath: pathParts.join('/') };
+  return { clientRuntime, path: pathParts.join('/') };
 }
 
 export function resolveMountedLspService(
   mountedLspServices: MountedLspServices,
   relativePathWithMountPrefix: string,
-): { lspService: LspService; relativePath: string } {
+): { lspService: LspService; path: string } {
   const normalized = normalizePath(relativePathWithMountPrefix);
   const [mountPrefix, ...pathParts] = normalized.split('/');
   const lspService = mountedLspServices.get(mountPrefix);
@@ -34,5 +34,5 @@ export function resolveMountedLspService(
     throw new Error(
       `Mount ${mountPrefix} not found. Available mounts: ${Array.from(mountedLspServices.keys()).join(', ')}`,
     );
-  return { lspService, relativePath: pathParts.join('/') };
+  return { lspService, path: pathParts.join('/') };
 }

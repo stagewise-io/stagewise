@@ -33,7 +33,10 @@ import {
 import type { HistoryService } from '../history';
 import type { FaviconService } from '../favicon';
 import type { ThumbnailService } from '../thumbnail';
-import { canBrowserHandleUrl } from './protocol-utils';
+import {
+  canBrowserHandleUrl,
+  openFolderFirstFileInIde,
+} from './protocol-utils';
 import { ContextMenuWebContent } from './utils/context-menu-web-content';
 import {
   type NavigationTarget,
@@ -1310,6 +1313,11 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         shell.showItemInFolder(filePath);
         return;
       }
+      if (url.startsWith('stagewise://open-folder-in-ide/')) {
+        event.preventDefault();
+        void openFolderFirstFileInIde(url, this.logger);
+        return;
+      }
 
       if (!canBrowserHandleUrl(url)) {
         event.preventDefault();
@@ -1557,6 +1565,13 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
           `[TabController] Revealing file in folder: ${filePath}`,
         );
         shell.showItemInFolder(filePath);
+        return { action: 'deny' };
+      }
+
+      // Intercept stagewise://open-folder-in-ide/ — find first file in
+      // the directory and open it in the IDE, or reveal in Finder/Explorer.
+      if (details.url.startsWith('stagewise://open-folder-in-ide/')) {
+        void openFolderFirstFileInIde(details.url, this.logger);
         return { action: 'deny' };
       }
 

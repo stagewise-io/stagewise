@@ -3,24 +3,25 @@ import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
 import { EyeIcon } from 'lucide-react';
 import { IconBookOpenOutline18 } from 'nucleo-ui-outline-18';
-import { cn, stripMountPrefix } from '@ui/utils';
+import { cn, resolveDisplayPath } from '@ui/utils';
+import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
 import { useKartonState } from '@ui/hooks/use-karton';
 
 const PLUGIN_SKILL_RE = /^plugins\/([^/]+)\/SKILL\.md$/;
 const WORKSPACE_SKILL_RE =
   /^[^/]+\/\.(?:stagewise|agents)\/skills\/([^/]+)\/SKILL\.md$/;
 
-export const ReadFileToolPart = ({
+export const ReadToolPart = ({
   part,
   disableShimmer = false,
   minimal = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-readFile' }>;
+  part: Extract<AgentToolUIPart, { type: 'tool-read' }>;
   disableShimmer?: boolean;
   minimal?: boolean;
 }) => {
   const plugins = useKartonState((s) => s.plugins);
-  const relativePath = part.input?.relative_path ?? '';
+  const relativePath = part.input?.path ?? '';
 
   const pluginMatch = useMemo(() => {
     const match = relativePath.match(PLUGIN_SKILL_RE);
@@ -34,7 +35,10 @@ export const ReadFileToolPart = ({
     return match?.[1] ?? null;
   }, [relativePath]);
 
-  const displayPath = relativePath ? stripMountPrefix(relativePath) : undefined;
+  const attachmentMetadata = useAttachmentMetadata();
+  const displayPath = relativePath
+    ? resolveDisplayPath(relativePath, attachmentMetadata)
+    : undefined;
 
   if (pluginMatch) {
     const streamingText = `Enabling ${pluginMatch.displayName}...`;
@@ -107,9 +111,6 @@ export const ReadFileToolPart = ({
         <span className="shrink-0 truncate font-medium">Read </span>
         <span className="truncate font-normal opacity-75">
           {displayPath ?? ''}
-          {part.output?.result?.linesRead && (
-            <> ({part.output?.result?.linesRead} lines)</>
-          )}
         </span>
       </span>
     ) : undefined;

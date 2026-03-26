@@ -1,4 +1,4 @@
-import type { OverwriteFilePart } from '.';
+import type { WritePart } from '.';
 import type { WithDiff } from '@shared/karton-contracts/ui/agent/tools/types';
 import { FileIcon } from '@ui/components/file-icon';
 import { getBaseName } from '@shared/path-utils';
@@ -31,11 +31,7 @@ import {
   getLanguageFromPath,
 } from '@ui/components/ui/streaming-code-block';
 
-export const GenericOverwriteFileToolPart = ({
-  part,
-}: {
-  part: OverwriteFilePart;
-}) => {
+export const GenericWriteToolPart = ({ part }: { part: WritePart }) => {
   const [codeDiffCollapsed, setCodeDiffCollapsed] = useState(true);
   const [expanded, setExpanded] = useState(true);
   const { getFileIDEHref, needsIdePicker, pickIdeAndOpen, resolvePath } =
@@ -85,9 +81,9 @@ export const GenericOverwriteFileToolPart = ({
   }, [part.state, streaming]);
 
   const path = useMemo(() => {
-    if (!part.input?.relative_path) return null;
-    return stripMountPrefix(part.input.relative_path);
-  }, [part.input?.relative_path]);
+    if (!part.input?.path) return null;
+    return stripMountPrefix(part.input.path);
+  }, [part.input?.path]);
 
   const effectiveExpanded = useMemo(() => {
     return state === 'error' ? false : expanded;
@@ -105,7 +101,7 @@ export const GenericOverwriteFileToolPart = ({
       return (
         <LoadingHeader
           relativePath={path ?? undefined}
-          fullPath={part.input?.relative_path ?? undefined}
+          fullPath={part.input?.path ?? undefined}
           resolvePath={resolvePath}
         />
       );
@@ -113,7 +109,7 @@ export const GenericOverwriteFileToolPart = ({
       return (
         <SuccessHeader
           relativePath={path ?? undefined}
-          fullPath={part.input?.relative_path ?? undefined}
+          fullPath={part.input?.path ?? undefined}
           resolvePath={resolvePath}
           newLineCount={newLineCount}
           deletedLineCount={deletedLineCount}
@@ -124,7 +120,7 @@ export const GenericOverwriteFileToolPart = ({
     state,
     streaming,
     path,
-    part.input?.relative_path,
+    part.input?.path,
     newLineCount,
     deletedLineCount,
     outputWithDiff?._diff?.before,
@@ -137,7 +133,7 @@ export const GenericOverwriteFileToolPart = ({
       return (
         <DiffPreview
           diff={diff}
-          filePath={part.input?.relative_path ?? ''}
+          filePath={part.input?.path ?? ''}
           collapsed={codeDiffCollapsed}
         />
       );
@@ -145,11 +141,11 @@ export const GenericOverwriteFileToolPart = ({
       return (
         <StreamingCodeBlock
           code={part.input?.content ?? ''}
-          language={getLanguageFromPath(part.input?.relative_path)}
+          language={getLanguageFromPath(part.input?.path)}
         />
       );
     else return undefined;
-  }, [state, diff, part.input?.content, part.input?.relative_path, streaming]);
+  }, [state, diff, part.input?.content, part.input?.path, streaming]);
 
   const contentFooter = useMemo(() => {
     if (state === 'success' && diff)
@@ -176,7 +172,7 @@ export const GenericOverwriteFileToolPart = ({
             </TooltipContent>
           </Tooltip>
           {(() => {
-            const relPath = part.input?.relative_path ?? '';
+            const relPath = part.input?.path ?? '';
             const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
             const anchor = (
               <a
@@ -229,7 +225,7 @@ export const GenericOverwriteFileToolPart = ({
   }, [
     state,
     codeDiffCollapsed,
-    part.input?.relative_path,
+    part.input?.path,
     openInIdeSelection,
     needsIdePicker,
     getFileIDEHref,
