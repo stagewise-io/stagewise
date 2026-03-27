@@ -13,43 +13,35 @@ import type { InferUITools, Tool } from 'ai';
  * tool calls and their outputs.
  */
 
-export const overwriteFileToolInputSchema = z.object({
-  relative_path: z
+export const writeToolInputSchema = z.object({
+  path: z
     .string()
     .describe(
-      'Relative file path to overwrite or create. Must include a valid mount prefix. e.g. "ws1/path/to/file.ts" or "apps/my-app/index.html"',
+      'File path to write to. Must include a valid mount prefix. (e.g. "ws1/path/to/file.ts", "apps/my-app/index.html")',
     ),
-  content: z
-    .string()
-    .describe(
-      'New content for the file. Leading/trailing markdown code block markers (```) are automatically removed.',
-    ),
+  content: z.string().describe('New content for the file'),
 });
 
-export const overwriteFileToolOutputSchema = z.object({
+export const writeToolOutputSchema = z.object({
   message: z.string(),
 });
 
-export type OverwriteFileToolInput = z.infer<
-  typeof overwriteFileToolInputSchema
->;
-export type OverwriteFileToolOutput = z.infer<
-  typeof overwriteFileToolOutputSchema
->;
+export type WriteToolInput = z.infer<typeof writeToolInputSchema>;
+export type WriteToolOutput = z.infer<typeof writeToolOutputSchema>;
 
 /**
  * Schema definition for overwriteFile (without execute function)
  */
-export const overwriteFileToolSchema = {
-  inputSchema: overwriteFileToolInputSchema,
-  outputSchema: overwriteFileToolOutputSchema,
+export const writeToolSchema = {
+  inputSchema: writeToolInputSchema,
+  outputSchema: writeToolOutputSchema,
 } as const;
 
-export const readFileToolInputSchema = z.object({
-  relative_path: z
+export const readToolInputSchema = z.object({
+  path: z
     .string()
     .describe(
-      'Relative path of file to read. File must exist. Must include a valid mount prefix. e.g. "ws1/path/to/file.ts" or "apps/my-app/index.html"',
+      'Path of file to read. Must include a valid mount prefix (e.g. "ws1/path/to/file.ts", "apps/my-app/index.html", "att/screens-j8943f.webp"). For directories, use ls instead.',
     ),
   start_line: z
     .number()
@@ -57,7 +49,7 @@ export const readFileToolInputSchema = z.object({
     .min(1)
     .optional()
     .describe(
-      'Starting line number (1-indexed, INCLUSIVE). Must be >= 1. Omit to read from beginning.',
+      'Starting line number (1-indexed, INCLUSIVE). Must be >= 1. Omit to read from beginning. Ignored in binary-format files.',
     ),
   end_line: z
     .number()
@@ -65,90 +57,66 @@ export const readFileToolInputSchema = z.object({
     .min(1)
     .optional()
     .describe(
-      'Ending line number (1-indexed, INCLUSIVE). Must be >= start_line. Omit to read to end.',
+      'Ending line number (1-indexed, INCLUSIVE). Must be >= start_line. Omit to read to end. Ignored in binary-format files.',
+    ),
+  start_page: z
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe(
+      'Starting page number (1-indexed, INCLUSIVE). Must be >= 1. Omit to read from beginning. Ignored in non-paginated content.',
+    ),
+  end_page: z
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe(
+      'Ending page number (1-indexed, INCLUSIVE). Must be >= start_page. Omit to read to end. Ignored in non-paginated content.',
+    ),
+  preview: z
+    .boolean()
+    .default(false)
+    .optional()
+    .describe(
+      'Only request a short preview of the file structure and heavily truncated content instead of full content.',
     ),
 });
 
-export const readFileToolOutputSchema = z.object({
-  success: z.literal(true),
-  message: z.string(),
-  result: z.object({
-    content: z.string().optional(),
-    totalLines: z.number().optional(),
-    linesRead: z.number(),
-    truncated: z.boolean(),
-    originalSize: z.number(),
-    cappedSize: z.number(),
-  }),
-});
-
-export type ReadFileToolInput = z.infer<typeof readFileToolInputSchema>;
-export type ReadFileToolOutput = z.infer<typeof readFileToolOutputSchema>;
+export type readToolInput = z.infer<typeof readToolInputSchema>;
 
 /**
  * Schema definition for readFile (without execute function)
  */
-export const readFileToolSchema = {
-  inputSchema: readFileToolInputSchema,
-  outputSchema: readFileToolOutputSchema,
+export const readToolSchema = {
+  inputSchema: readToolInputSchema,
+  outputSchema: z.void(),
 } as const;
 
-export const listFilesToolInputSchema = z.object({
-  relative_path: z
+export const lsToolInputSchema = z.object({
+  path: z
     .string()
     .describe(
-      'Path to list. Must include a valid mount prefix. e.g. "/ws1/path/to/list"',
+      'Path of directory to list. Must include a valid mount prefix (e.g. "ws1/src", "apps/my-app"). For reading file contents, use read instead.',
     ),
-  recursive: z
-    .boolean()
-    .optional()
-    .describe('Whether to list recursively. Defaults to false.'),
-  maxDepth: z
+  depth: z
     .number()
     .min(0)
     .optional()
     .describe(
-      'Maximum recursion depth (must be >= 0). Defaults to unlimited. Depth is 0-indexed from starting directory.',
-    ),
-  pattern: z
-    .string()
-    .optional()
-    .describe(
-      "File extension or glob pattern to filter results. Examples: '.ts', '*.js'.",
-    ),
-  includeDirectories: z
-    .boolean()
-    .optional()
-    .describe('Include directories in results. Defaults to true.'),
-  includeFiles: z
-    .boolean()
-    .optional()
-    .describe('Include files in results. Defaults to true.'),
-  include_gitignored: z
-    .boolean()
-    .optional()
-    .describe(
-      'If true, includes files from gitignored paths (e.g. node_modules, dist). Defaults to false.',
+      'Maximum directory depth to list. Defaults to 0 (immediate children only).',
     ),
 });
 
-export const listFilesToolOutputSchema = z.object({
-  message: z.string(),
-  result: z.object({
-    files: z.array(z.any()),
-    totalFiles: z.number().optional(),
-    totalDirectories: z.number().optional(),
-    truncated: z.boolean(),
-    itemsRemoved: z.number().optional(),
-  }),
-});
+export type LsToolInput = z.infer<typeof lsToolInputSchema>;
 
-export type ListFilesToolInput = z.infer<typeof listFilesToolInputSchema>;
-export type ListFilesToolOutput = z.infer<typeof listFilesToolOutputSchema>;
-
-export const listFilesToolSchema = {
-  inputSchema: listFilesToolInputSchema,
-  outputSchema: listFilesToolOutputSchema,
+/**
+ * Schema definition for ls (without execute function)
+ */
+export const lsToolSchema = {
+  inputSchema: lsToolInputSchema,
+  outputSchema: z.void(),
 } as const;
 
 export const grepSearchToolInputSchema = z.object({
@@ -254,10 +222,10 @@ const editSchema = z.object({
 });
 
 export const multiEditToolInputSchema = z.object({
-  relative_path: z
+  path: z
     .string()
     .describe(
-      'Relative file path to edit. File must exist. Must include a valid mount prefix. e.g. "ws1/path/to/file.ts" or "apps/my-app/index.html"',
+      'Path to file to be edited. Must include a valid mount prefix. (e.g. "ws1/path/to/file.ts", "apps/my-app/index.html")',
     ),
   edits: z
     .array(editSchema)
@@ -280,24 +248,19 @@ export const multiEditToolSchema = {
   outputSchema: multiEditToolOutputSchema,
 } as const;
 
-export const deleteFileToolInputSchema = z.object({
-  relative_path: z
+export const deleteToolInputSchema = z.object({
+  path: z
     .string()
     .describe(
-      'Relative file path to delete. Must be an existing file. Must include a valid mount prefix. e.g. "ws1/path/to/file.ts" or "apps/my-app/index.html"',
+      'File/Directory to delete. Must include a valid mount prefix. (e.g. "ws1/path/to/file.ts", "apps/my-app/index.html")',
     ),
 });
 
-export const deleteFileToolOutputSchema = z.object({
-  message: z.string(),
-});
+export type DeleteToolInput = z.infer<typeof deleteToolInputSchema>;
 
-export type DeleteFileToolInput = z.infer<typeof deleteFileToolInputSchema>;
-export type DeleteFileToolOutput = z.infer<typeof deleteFileToolOutputSchema>;
-
-export const deleteFileToolSchema = {
-  inputSchema: deleteFileToolInputSchema,
-  outputSchema: deleteFileToolOutputSchema,
+export const deleteToolSchema = {
+  inputSchema: deleteToolInputSchema,
+  outputSchema: z.void(),
 } as const;
 
 export const getLintingDiagnosticsToolInputSchema = z.object({
@@ -647,6 +610,60 @@ export const askUserQuestionsToolSchema = {
   outputSchema: askUserQuestionsToolOutputSchema,
 } as const;
 
+// ============================================================================
+// Copy Tool
+// ============================================================================
+
+export const mkdirToolInputSchema = z.object({
+  path: z
+    .string()
+    .describe(
+      'Directory path to create. Must include a valid mount prefix. (e.g. "w1/src/components/new-dir", "apps/my-app/assets"). Parent directories are created automatically.',
+    ),
+});
+
+export const mkdirToolOutputSchema = z.object({
+  message: z.string(),
+});
+
+export type MkdirToolInput = z.infer<typeof mkdirToolInputSchema>;
+export type MkdirToolOutput = z.infer<typeof mkdirToolOutputSchema>;
+
+export const mkdirToolSchema = {
+  inputSchema: mkdirToolInputSchema,
+  outputSchema: mkdirToolOutputSchema,
+} as const;
+
+export const copyToolInputSchema = z.object({
+  input_path: z
+    .string()
+    .describe(
+      'Source file or directory path to copy/move. Must include a valid mount prefix (e.g. "w1/src/utils.ts", "w1/src/components").',
+    ),
+  output_path: z
+    .string()
+    .describe(
+      'Target file or directory path. Must include a valid mount prefix (e.g. "w1/src/lib/utils.ts", "w1/src/new-components"). Cannot copy a directory into a file.',
+    ),
+  move: z
+    .boolean()
+    .describe(
+      'If true, moves the file/directory instead of copying it (deletes the source after copying).',
+    ),
+});
+
+export const copyToolOutputSchema = z.object({
+  message: z.string(),
+});
+
+export type CopyToolInput = z.infer<typeof copyToolInputSchema>;
+export type CopyToolOutput = z.infer<typeof copyToolOutputSchema>;
+
+export const copyToolSchema = {
+  inputSchema: copyToolInputSchema,
+  outputSchema: copyToolOutputSchema,
+} as const;
+
 export const executeShellCommandToolInputSchema = z.object({
   explanation: z
     .string()
@@ -654,11 +671,10 @@ export const executeShellCommandToolInputSchema = z.object({
       'Concise (max 5 words) explanation of what this command does. Examples: "Install dependencies", "Check git status", "List project files", "Run test suite", "Build the project"',
     ),
   command: z.string().describe('Shell command to execute.'),
-  mount_prefix: z
+  cwd: z
     .string()
-    .optional()
     .describe(
-      'Mount prefix whose workspace root is used as working directory. Falls back to the first mounted workspace.',
+      'Root directory the command should be executed in (e.g. "att", "wm84i", "apps/my-app").',
     ),
   timeout_ms: z
     .number()
@@ -694,13 +710,15 @@ export const executeShellCommandToolSchema = {
  * Used with InferUITools to derive TypeScript types.
  */
 export const allToolSchemas = {
-  overwriteFile: overwriteFileToolSchema,
-  readFile: readFileToolSchema,
-  listFiles: listFilesToolSchema,
+  write: writeToolSchema,
+  read: readToolSchema,
+  ls: lsToolSchema,
+  mkdir: mkdirToolSchema,
+  copy: copyToolSchema,
   grepSearch: grepSearchToolSchema,
   glob: globToolSchema,
   multiEdit: multiEditToolSchema,
-  deleteFile: deleteFileToolSchema,
+  delete: deleteToolSchema,
   getLintingDiagnostics: getLintingDiagnosticsToolSchema,
   updateWorkspaceMd: updateWorkspaceMdToolSchema,
   executeSandboxJs: executeSandboxJsToolSchema,

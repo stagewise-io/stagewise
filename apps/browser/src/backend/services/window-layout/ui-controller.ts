@@ -12,67 +12,21 @@ import type { ColorScheme } from '@shared/karton-contracts/ui';
 import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import type { SelectedElement } from '@shared/selected-elements';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { canBrowserHandleUrl } from './protocol-utils';
+import {
+  canBrowserHandleUrl,
+  openFolderFirstFileInIde,
+} from './protocol-utils';
 import {
   default as installExtension,
   REACT_DEVELOPER_TOOLS,
 } from 'electron-devtools-installer';
 import fsSync from 'node:fs';
 import { getBlobPath, blobExists } from '@/utils/attachment-blobs';
-import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { inferMimeType } from '@shared/mime-utils';
 import { getAgentAppsDir } from '@/utils/paths';
 import { getPluginsPath } from '@/utils/paths';
 
 const UI_SESSION_PARTITION = 'persist:stagewise-ui';
-
-/**
- * Search user message metadata for a matching file attachment.
- * Returns the mediaType if found, undefined otherwise.
- */
-function findMediaTypeInUserAttachments(
-  history: AgentMessage[],
-  attachmentId: string,
-): string | undefined {
-  for (const msg of history) {
-    const att = msg.metadata?.fileAttachments?.find(
-      (f) => f.id === attachmentId,
-    );
-    if (att) return att.mediaType;
-  }
-  return undefined;
-}
-
-/**
- * Search sandbox tool outputs (`_customFileAttachments`) for a matching
- * attachment. Returns the mediaType if found, undefined otherwise.
- */
-function findMediaTypeInSandboxOutputs(
-  history: AgentMessage[],
-  attachmentId: string,
-): string | undefined {
-  for (const msg of history) {
-    if (msg.role === 'user') continue;
-    for (const part of msg.parts) {
-      if (!('output' in part) || !part.output) continue;
-      if (typeof part.output !== 'object') continue;
-
-      const customs = (part.output as Record<string, unknown>)
-        ._customFileAttachments;
-      if (!Array.isArray(customs)) continue;
-
-      const found = customs.find(
-        (c: unknown): c is { id: string; mediaType: string } =>
-          typeof c === 'object' &&
-          c !== null &&
-          'id' in c &&
-          (c as { id: unknown }).id === attachmentId,
-      );
-      if (found) return found.mediaType;
-    }
-  }
-  return undefined;
-}
 
 /**
  * Returns the on-disk cache path that electron-devtools-installer uses for an
@@ -274,6 +228,19 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     backendNodeId: number,
     frameId: string,
   ) => Promise<boolean>;
+  private captureAndStoreElementScreenshotHandler?: (
+    agentId: string,
+    tabId: string,
+    boundingRect: {
+      top: number;
+      left: number;
+      width: number;
+      height: number;
+    },
+    isMainFrame: boolean,
+    frameId: string | undefined,
+    screenshotFileName: string,
+  ) => Promise<string | null>;
 
   /**
    * Creates a new UIController instance with React DevTools installed.
@@ -328,10 +295,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
           return new Response('Attachment not found', { status: 404 });
         }
 
-        const mediaType = this.resolveAttachmentMediaType(
-          agentId,
-          attachmentId,
-        );
+        const mediaType = inferMimeType(attachmentId);
 
         const filePath = getBlobPath(agentId, attachmentId);
         const fileUrl = pathToFileURL(filePath).href;
@@ -483,26 +447,6 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
   }
 
   /**
-   * Resolve the MIME type for an attachment by searching the agent's
-   * chat history. Checks user-uploaded attachments first, then
-   * sandbox-produced tool output attachments.
-   */
-  private resolveAttachmentMediaType(
-    agentId: string,
-    attachmentId: string,
-  ): string {
-    const history =
-      this.uiKarton.state.agents.instances[agentId]?.state.history;
-    if (!history) return 'application/octet-stream';
-
-    return (
-      findMediaTypeInUserAttachments(history, attachmentId) ??
-      findMediaTypeInSandboxOutputs(history, attachmentId) ??
-      'application/octet-stream'
-    );
-  }
-
-  /**
    * Creates a new WebContentsView for the UI with all event handlers attached.
    * Used both during initial construction and crash recovery.
    */
@@ -530,6 +474,11 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
           `[UIController] Revealing file in folder: ${filePath}`,
         );
         shell.showItemInFolder(filePath);
+        return;
+      }
+      if (url.startsWith('stagewise://open-folder-in-ide/')) {
+        event.preventDefault();
+        void openFolderFirstFileInIde(url, this.logger);
       }
     });
 
@@ -543,6 +492,13 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
           `[UIController] Revealing file in folder: ${filePath}`,
         );
         shell.showItemInFolder(filePath);
+        return { action: 'deny' };
+      }
+
+      // Intercept stagewise://open-folder-in-ide/ — find first file in
+      // the directory and open it in the IDE, or reveal in Finder/Explorer.
+      if (details.url.startsWith('stagewise://open-folder-in-ide/')) {
+        void openFolderFirstFileInIde(details.url, this.logger);
         return { action: 'deny' };
       }
 
@@ -862,6 +818,35 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'browser.contextSelection.captureAndStoreElementScreenshot',
+      async (
+        _callingClientId: string,
+        agentId: string,
+        tabId: string,
+        boundingRect: {
+          top: number;
+          left: number;
+          width: number;
+          height: number;
+        },
+        isMainFrame: boolean,
+        frameId: string | undefined,
+        screenshotFileName: string,
+      ) => {
+        if (this.captureAndStoreElementScreenshotHandler) {
+          return await this.captureAndStoreElementScreenshotHandler(
+            agentId,
+            tabId,
+            boundingRect,
+            isMainFrame,
+            frameId,
+            screenshotFileName,
+          );
+        }
+        return null;
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.scrollToElement',
       async (
         _callingClientId: string,
@@ -1056,6 +1041,24 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.checkElementExistsHandler = handler;
   }
 
+  public setCaptureAndStoreElementScreenshotHandler(
+    handler: (
+      agentId: string,
+      tabId: string,
+      boundingRect: {
+        top: number;
+        left: number;
+        width: number;
+        height: number;
+      },
+      isMainFrame: boolean,
+      frameId: string | undefined,
+      screenshotFileName: string,
+    ) => Promise<string | null>,
+  ) {
+    this.captureAndStoreElementScreenshotHandler = handler;
+  }
+
   public unregisterKartonProcedures() {
     this.uiKarton.removeServerProcedureHandler('browser.createTab');
     this.uiKarton.removeServerProcedureHandler('browser.closeTab');
@@ -1096,6 +1099,9 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
     this.uiKarton.removeServerProcedureHandler(
       'browser.contextSelection.clearElements',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'browser.contextSelection.captureAndStoreElementScreenshot',
     );
     // Note: Removing handlers by reference is tricky if we use arrow functions or inline handlers.
     // The karton service implementation likely matches by name or needs exact reference.

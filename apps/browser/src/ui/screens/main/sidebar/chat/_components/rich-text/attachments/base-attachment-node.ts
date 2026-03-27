@@ -31,7 +31,7 @@ export interface CreateAttachmentNodeConfig<TAttrs extends object = object> {
   name: string;
   /** The data attribute used to identify this node type in HTML (e.g., 'data-file-attachment') */
   dataTag: string;
-  /** The markdown protocol prefix (e.g., 'att', 'element', 'text-clip') */
+  /** The markdown protocol prefix (e.g., 'path') */
   markdownProtocol: string;
   /** Additional attributes specific to this attachment type */
   additionalAttributes?: {
@@ -50,6 +50,19 @@ export interface CreateAttachmentNodeConfig<TAttrs extends object = object> {
    * Defaults to `@${node.attrs.id}` if not provided.
    */
   renderText?: (params: { node: { attrs: BaseAttrs & TAttrs } }) => string;
+  /**
+   * Optional override for converting a markdown token back into a ProseMirror
+   * node. Defaults to storing `token.id` directly on `attrs.id`.
+   */
+  parseMarkdown?: (token: any) => {
+    type: string;
+    attrs: Record<string, unknown>;
+  };
+  /**
+   * Optional override for serializing a ProseMirror node back to a markdown
+   * link. Defaults to `[](markdownProtocol:node.attrs.id)`.
+   */
+  renderMarkdown?: (node: any) => string;
 }
 
 /**
@@ -74,6 +87,8 @@ export function createAttachmentNode<TAttrs extends object = object>(
     additionalAttributes = {},
     NodeView,
     renderText: customRenderText,
+    parseMarkdown: customParseMarkdown,
+    renderMarkdown: customRenderMarkdown,
   } = config;
 
   return Node.create<AttachmentNodeOptions>({
@@ -174,6 +189,7 @@ export function createAttachmentNode<TAttrs extends object = object>(
 
     // Parse the custom token created by our tokenizer
     parseMarkdown(token: any) {
+      if (customParseMarkdown) return customParseMarkdown(token);
       return {
         type: name,
         attrs: {
@@ -185,6 +201,7 @@ export function createAttachmentNode<TAttrs extends object = object>(
 
     // Markdown support: serialize attachment nodes back to markdown links
     renderMarkdown(node: any) {
+      if (customRenderMarkdown) return customRenderMarkdown(node);
       return `[](${markdownProtocol}:${node.attrs.id})`;
     },
 
@@ -213,14 +230,21 @@ export function createAttachmentNode<TAttrs extends object = object>(
 
             // Collect attachment nodes from old and new states
             // We track ALL attachment node types to properly detect deletions
-            const oldNodes = new Map<string, AttachmentType>();
+            const oldNodes = new Map<
+              string,
+              { type: AttachmentType; attrs: Record<string, unknown> }
+            >();
             oldState.doc.descendants((node) => {
               if (ALL_ATTACHMENT_NODE_NAMES.includes(node.type.name as never)) {
                 const type =
                   NODE_NAME_TO_TYPE[
                     node.type.name as keyof typeof NODE_NAME_TO_TYPE
                   ];
-                if (type) oldNodes.set(node.attrs.id, type);
+                if (type)
+                  oldNodes.set(node.attrs.id, {
+                    type,
+                    attrs: node.attrs as Record<string, unknown>,
+                  });
               }
             });
 
@@ -233,8 +257,8 @@ export function createAttachmentNode<TAttrs extends object = object>(
             // Fire callback for nodes that existed in old state but not in new state
             // Only fire once per deletion (use thisNodeName to ensure single callback)
             if (thisNodeName === ALL_ATTACHMENT_NODE_NAMES[0])
-              oldNodes.forEach((type, id) => {
-                if (!newNodeIds.has(id)) onNodeDeleted(id, type);
+              oldNodes.forEach(({ type, attrs }, id) => {
+                if (!newNodeIds.has(id)) onNodeDeleted(id, type, attrs);
               });
 
             return null; // Don't modify the transaction

@@ -1,6 +1,6 @@
 /**
  * Mock implementations of hooks for Storybook.
- * This file REPLACES @/hooks/use-karton and @/hooks/use-chat-state via path aliases.
+ * This file REPLACES @ui/hooks/use-karton and @ui/hooks/use-open-chat via path aliases.
  *
  * The MockKartonProvider provides complete default state including:
  * - globalConfig.openFilesInIde: 'vscode' (for IDE file links)

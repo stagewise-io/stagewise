@@ -16,10 +16,12 @@ import { useMemo, memo, useState, useCallback } from 'react';
 import { ThinkingPart } from './message-part-ui/thinking';
 import { FilePart } from './message-part-ui/file';
 import { TextPart } from './message-part-ui/text';
-import { DeleteFileToolPart } from './message-part-ui/tools/delete-file';
+import { CopyToolPart } from './message-part-ui/tools/copy';
+import { MkdirToolPart } from './message-part-ui/tools/mkdir';
+import { DeleteFileToolPart } from './message-part-ui/tools/delete';
 import { UpdateWorkspaceMdToolPart } from './message-part-ui/tools/update-workspace-md';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
-import { OverwriteFileToolPart } from './message-part-ui/tools/overwrite-file';
+import { WriteToolPart } from './message-part-ui/tools/write';
 import {
   ExploringToolParts,
   isReadOnlyToolPart,
@@ -174,6 +176,7 @@ export const MessageAssistant = memo(
                         originalIndices={item.parts.map((p) => p.originalIndex)}
                         isAutoExpanded={isLastPart}
                         isShimmering={isWorking && isLastPart && isLastMessage}
+                        messageAttachments={msg.metadata?.attachments}
                       />
                     );
                   }
@@ -221,7 +224,11 @@ export const MessageAssistant = memo(
                       return (
                         <FilePart key={stableKey} part={part as FileUIPart} />
                       );
-                    case 'tool-deleteFile':
+                    case 'tool-copy':
+                      return <CopyToolPart key={stableKey} part={part} />;
+                    case 'tool-mkdir':
+                      return <MkdirToolPart key={stableKey} part={part} />;
+                    case 'tool-delete':
                       return <DeleteFileToolPart key={stableKey} part={part} />;
                     case 'tool-updateWorkspaceMd':
                       return (
@@ -238,6 +245,7 @@ export const MessageAssistant = memo(
                           key={stableKey}
                           part={part}
                           isLastPart={isLastPart}
+                          messageAttachments={msg.metadata?.attachments}
                         />
                       );
                     case 'tool-readConsoleLogs':
@@ -248,10 +256,8 @@ export const MessageAssistant = memo(
                           isLastPart={isLastPart}
                         />
                       );
-                    case 'tool-overwriteFile':
-                      return (
-                        <OverwriteFileToolPart key={stableKey} part={part} />
-                      );
+                    case 'tool-write':
+                      return <WriteToolPart key={stableKey} part={part} />;
                     case 'tool-askUserQuestions':
                       return (
                         <AskUserQuestionsToolPart key={stableKey} part={part} />

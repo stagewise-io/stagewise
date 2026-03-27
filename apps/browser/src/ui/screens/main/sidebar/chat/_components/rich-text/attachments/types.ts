@@ -2,27 +2,26 @@ import type { BaseNodeAttrs } from '../shared/types';
 
 /**
  * Attributes for file attachments (unified node).
- * mediaType drives renderer selection via the attachment registry.
  */
-export interface AttachmentAttrs extends BaseNodeAttrs {
-  mediaType: string;
-}
+export interface AttachmentAttrs extends BaseNodeAttrs {}
 
 /**
  * Attributes for selected element attachments.
  */
-export interface ElementAttachmentAttrs extends BaseNodeAttrs {}
-
-/**
- * Attributes for text clip attachments (collapsed long text).
- */
-export interface TextClipAttachmentAttrs extends BaseNodeAttrs {
+export interface ElementAttachmentAttrs extends BaseNodeAttrs {
+  /** Truncated inner text of the element (first ~60 chars) for display */
+  innerText?: string;
+  /** Blob key for the element screenshot (stored in att/) */
+  screenshotBlobKey?: string;
+  /** The tag name of the element (e.g. 'div', 'button') */
+  tagName?: string;
   /**
-   * The full pasted text content.
-   * Optional in stored content (stripped to avoid duplication), required at runtime.
-   * When rendering/editing, look up from textClipAttachments if not present.
+   * Full `att/<blobKey>` path to the stored `.swdomelement` file.
+   * Set asynchronously after the blob is written. When present,
+   * `renderText` emits `[](path:<blobPath>)` so the model and
+   * streamdown layer can locate the element data.
    */
-  content?: string;
+  blobPath?: string;
 }
 
 /**
@@ -31,8 +30,7 @@ export interface TextClipAttachmentAttrs extends BaseNodeAttrs {
  */
 export type AttachmentAttributes =
   | (AttachmentAttrs & { type: 'attachment' })
-  | (ElementAttachmentAttrs & { type: 'element' })
-  | (TextClipAttachmentAttrs & { type: 'textClip' });
+  | (ElementAttachmentAttrs & { type: 'element' });
 
 export type AttachmentType = AttachmentAttributes['type'];
 
@@ -43,7 +41,6 @@ export type AttachmentType = AttachmentAttributes['type'];
 export const ATTACHMENT_NODE_NAMES = {
   attachment: 'attachment',
   element: 'elementAttachment',
-  textClip: 'textClipAttachment',
 } as const;
 
 /**
@@ -58,7 +55,6 @@ export type AttachmentNodeName =
 export const NODE_NAME_TO_TYPE: Record<AttachmentNodeName, AttachmentType> = {
   attachment: 'attachment',
   elementAttachment: 'element',
-  textClipAttachment: 'textClip',
 };
 
 /**
@@ -73,5 +69,9 @@ export const ALL_ATTACHMENT_NODE_NAMES = Object.values(
  */
 export interface AttachmentNodeOptions {
   /** Called when an attachment node is removed from the document */
-  onNodeDeleted?: (id: string, type: AttachmentType) => void;
+  onNodeDeleted?: (
+    id: string,
+    type: AttachmentType,
+    attrs?: Record<string, unknown>,
+  ) => void;
 }

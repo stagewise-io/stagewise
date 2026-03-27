@@ -108,7 +108,7 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
     expect(result).not.toContain('Old response');
   });
 
-  it('serializes tool-readFile parts as compact one-liners', () => {
+  it('serializes tool-read parts as compact one-liners', () => {
     const messages: AgentMessage[] = [
       {
         id: 'msg-0',
@@ -121,10 +121,10 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
         role: 'assistant',
         parts: [
           {
-            type: 'tool-readFile',
+            type: 'tool-read',
             toolCallId: 'tc-1',
             state: 'output-available',
-            input: { relative_path: 'w1/src/index.ts' },
+            input: { path: 'w1/src/index.ts' },
             output: { content: 'file contents here' },
           },
           { type: 'text', text: 'I read the file.' },
@@ -155,7 +155,7 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
             toolCallId: 'tc-2',
             state: 'output-available',
             input: {
-              relative_path: 'w1/src/utils.ts',
+              path: 'w1/src/utils.ts',
               edits: [
                 { old_string: 'a', new_string: 'b' },
                 { old_string: 'c', new_string: 'd' },
@@ -172,7 +172,7 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
     expect(result).toContain('[edited: w1/src/utils.ts (2 edits)]');
   });
 
-  it('serializes tool-overwriteFile, tool-deleteFile, and tool-executeShellCommand', () => {
+  it('serializes tool-write, tool-delete, and tool-executeShellCommand', () => {
     const messages: AgentMessage[] = [
       {
         id: 'msg-0',
@@ -185,17 +185,17 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
         role: 'assistant',
         parts: [
           {
-            type: 'tool-overwriteFile',
+            type: 'tool-write',
             toolCallId: 'tc-3',
             state: 'output-available',
-            input: { relative_path: 'w1/new-file.ts', content: '// new' },
+            input: { path: 'w1/new-file.ts', content: '// new' },
             output: {},
           },
           {
-            type: 'tool-deleteFile',
+            type: 'tool-delete',
             toolCallId: 'tc-4',
             state: 'output-available',
-            input: { relative_path: 'w1/old-file.ts' },
+            input: { path: 'w1/old-file.ts' },
             output: {},
           },
           {
@@ -316,12 +316,10 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
         metadata: {
           createdAt: new Date(),
           partsMetadata: [],
-          fileAttachments: [
+          attachments: [
             {
-              id: 'att-1',
-              fileName: 'screenshot.png',
-              mediaType: 'image/png',
-              sizeBytes: 1024,
+              path: 'att/screenshot.png',
+              originalFileName: 'screenshot.png',
             },
           ],
           mentions: [
@@ -368,17 +366,17 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
         role: 'assistant',
         parts: [
           {
-            type: 'tool-readFile',
+            type: 'tool-read',
             toolCallId: 'tc-1',
             state: 'output-available',
-            input: { relative_path: 'w1/a.ts' },
+            input: { path: 'w1/a.ts' },
             output: {},
           },
           {
-            type: 'tool-readFile',
+            type: 'tool-read',
             toolCallId: 'tc-2',
             state: 'output-available',
-            input: { relative_path: 'w1/b.ts' },
+            input: { path: 'w1/b.ts' },
             output: {},
           },
         ],
@@ -626,17 +624,17 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
         role: 'assistant',
         parts: [
           {
-            type: 'tool-overwriteFile',
+            type: 'tool-write',
             toolCallId: 'tc-create',
             state: 'output-available',
-            input: { relative_path: 'w1/new.ts', content: '// new' },
+            input: { path: 'w1/new.ts', content: '// new' },
             output: { message: 'Successfully created file: new.ts' },
           },
           {
-            type: 'tool-overwriteFile',
+            type: 'tool-write',
             toolCallId: 'tc-update',
             state: 'output-available',
-            input: { relative_path: 'w1/existing.ts', content: '// updated' },
+            input: { path: 'w1/existing.ts', content: '// updated' },
             output: { message: 'Successfully updated file: existing.ts' },
           },
         ],
@@ -662,17 +660,17 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
         role: 'assistant',
         parts: [
           {
-            type: 'tool-readFile',
+            type: 'tool-read',
             toolCallId: 'tc-err',
             state: 'output-error',
-            input: { relative_path: 'w1/missing.ts' },
+            input: { path: 'w1/missing.ts' },
             errorText: 'File not found: w1/missing.ts',
           },
           {
             type: 'tool-multiEdit',
             toolCallId: 'tc-err2',
             state: 'output-error',
-            input: { relative_path: 'w1/locked.ts', edits: [] },
+            input: { path: 'w1/locked.ts', edits: [] },
             errorText: 'Permission denied',
           },
         ],
@@ -771,13 +769,13 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
         role: 'assistant',
         parts: [
           // Totally wrong shape — no input, random properties
-          { type: 'tool-readFile', garbage: true },
-          // Input exists but relative_path is a number
-          { type: 'tool-readFile', input: { relative_path: 123 } },
+          { type: 'tool-read', garbage: true },
+          // Input exists but path is a number
+          { type: 'tool-read', input: { path: 123 } },
           // A normal part that should still serialize
           {
-            type: 'tool-readFile',
-            input: { relative_path: 'w1/good.ts' },
+            type: 'tool-read',
+            input: { path: 'w1/good.ts' },
           },
         ],
         metadata: { createdAt: new Date(), partsMetadata: [] },
@@ -787,7 +785,7 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
     const result = convertAgentMessagesToCompactMessageHistoryString(messages);
     // The good part should survive
     expect(result).toContain('[read: w1/good.ts]');
-    // The one with input but wrong type for relative_path should still
+    // The one with input but wrong type for path should still
     // produce something (string interpolation → "123")
     expect(result).toContain('[read: 123]');
   });
@@ -801,7 +799,11 @@ describe('convertAgentMessagesToCompactMessageHistoryString', () => {
         metadata: {
           createdAt: new Date(),
           partsMetadata: [],
-          fileAttachments: [null, { fileName: 'a.png' }, undefined],
+          attachments: [
+            null,
+            { path: 'att/a.png', originalFileName: 'a.png' },
+            undefined,
+          ],
           mentions: [
             null,
             { providerType: 'file', mountedPath: 'w1/foo.ts' },
@@ -1255,15 +1257,15 @@ describe('estimateMessageTokens', () => {
   });
 
   it('estimates assistant message with text and tool call', () => {
-    const toolInput = { relative_path: 'src/index.ts' };
+    const toolInput = { path: 'src/index.ts' };
     const msg = {
       id: 'a1',
       role: 'assistant',
       parts: [
         { type: 'text', text: 'Let me read that file.' },
         {
-          type: 'tool-readFile',
-          toolName: 'readFile',
+          type: 'tool-read',
+          toolName: 'read',
           input: toolInput,
           output: { content: 'file contents here' },
           state: 'output-available',
@@ -1275,7 +1277,7 @@ describe('estimateMessageTokens', () => {
     // Should include text + toolName + serialised input + serialised output + metadata overhead
     const expectedChars =
       'Let me read that file.'.length +
-      'readFile'.length +
+      'read'.length +
       JSON.stringify(toolInput).length +
       JSON.stringify({ content: 'file contents here' }).length +
       400; // metadata overhead

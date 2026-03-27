@@ -11,10 +11,17 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 
+const MAX_BADGE_LABEL = 24;
+
 /**
- * Truncates a label for display, preserving file extensions.
- * If the label is longer than 20 characters, it truncates the base name
- * while keeping the extension visible.
+ * Truncates a label for inline badge display, preserving file extensions.
+ *
+ * For path-style labels (containing `/`) only the last segment (filename) is
+ * kept and, if still too long, mid-truncated so the extension stays visible.
+ * For plain labels the same mid-truncation applies.
+ *
+ * The result is guaranteed to be short enough that CSS `truncate` on
+ * `InlineBadge` never clips the end of the filename.
  *
  * @param label - The label to truncate
  * @param fallbackId - Fallback value if label is empty
@@ -25,16 +32,22 @@ export function truncateLabel(
   fallbackId: string,
 ): string {
   if (!label) return fallbackId;
-  if (label.length > 20) {
-    const lastDot = label.lastIndexOf('.');
-    const base = lastDot > 0 ? label.substring(0, lastDot) : label;
-    const ext = lastDot > 0 ? label.substring(lastDot) : '';
 
-    if (base.length > 15) return `${base.substring(0, 15)}...${ext}`;
+  // For path-style labels, keep only the filename.
+  const slashIdx = label.lastIndexOf('/');
+  const display = slashIdx >= 0 ? label.slice(slashIdx + 1) : label;
 
-    return `${base}${ext}`;
-  }
-  return label;
+  if (!display) return fallbackId;
+  if (display.length <= MAX_BADGE_LABEL) return display;
+
+  // Mid-truncate, preserving the extension.
+  const dotIdx = display.lastIndexOf('.');
+  const base = dotIdx > 0 ? display.substring(0, dotIdx) : display;
+  const ext = dotIdx > 0 ? display.substring(dotIdx) : '';
+  const keep = MAX_BADGE_LABEL - ext.length - 1; // 1 char for …
+
+  if (keep <= 0) return `…${ext}`;
+  return `${base.substring(0, keep)}…${ext}`;
 }
 
 export interface BadgeContainerProps
@@ -138,7 +151,7 @@ export const InlineBadge = forwardRef<HTMLSpanElement, InlineBadgeProps>(
           <span className="text-foreground">{icon}</span>
         )}
 
-        <span className="max-w-24 truncate font-medium text-xs leading-none">
+        <span className="max-w-48 truncate font-medium text-xs leading-none">
           {label}
         </span>
       </BadgeContainer>

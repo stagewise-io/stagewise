@@ -1,6 +1,6 @@
 import {
-  type DeleteFileToolInput,
-  deleteFileToolInputSchema,
+  type DeleteToolInput,
+  deleteToolInputSchema,
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import { tool } from 'ai';
 import {
@@ -8,62 +8,77 @@ import {
   type MountedClientRuntimes,
 } from '../../utils';
 import { resolveMountedRelativePath } from '../../utils/path-mounting';
+import fs from 'node:fs/promises';
+import nodePath from 'node:path';
 
-/* Due to an issue in zod schema conversion in the ai sdk,
-   the schema descriptions are not properly used for the prompts -
-   thus, we include them in the descriptions as well. */
-export const DESCRIPTION = `Delete a file from the file system with undo capability.
+export const DESCRIPTION = `Delete a file or directory from the file system with undo capability.
 
 Parameters:
-- relative_path (string, REQUIRED): Relative file path to delete. Must be an existing file. Must include a mount prefix, e.g. "w1/src/app.ts" or "apps/my-app/index.html".
+- path (string, REQUIRED): Relative file or directory path to delete. Must be an existing file or directory. Must include a mount prefix, e.g. "w1/src/app.ts" or "apps/my-app/index.html".
 
-Behavior: Respects .gitignore. Throws error if file doesn't exist.`;
+Behavior: Respects .gitignore. Throws error if file/directory doesn't exist. When deleting a directory, all files and subdirectories inside it are removed recursively.`;
 
 /**
- * Delete file tool
- * Removes a file from the file system.
- * Returns an error if the file doesn't exist or cannot be deleted.
+ * Delete file/directory tool
+ * Removes a file or directory from the file system.
+ * Returns an error if the target doesn't exist or cannot be deleted.
  *
  * Note: Diff-history tracking is handled by the ToolboxService wrapper.
  */
-export async function deleteFileToolExecute(
-  params: DeleteFileToolInput,
+export async function deleteToolExecute(
+  params: DeleteToolInput,
   mountedRuntimes: MountedClientRuntimes,
 ) {
-  const { clientRuntime, relativePath } = resolveMountedRelativePath(
+  const { clientRuntime, path } = resolveMountedRelativePath(
     mountedRuntimes,
-    params.relative_path,
+    params.path,
   );
 
   try {
-    const absolutePath = clientRuntime.fileSystem.resolvePath(relativePath);
+    const absolutePath = clientRuntime.fileSystem.resolvePath(path);
+    const mountRoot = nodePath.resolve(
+      clientRuntime.fileSystem.getCurrentWorkingDirectory(),
+    );
+    const resolved = nodePath.resolve(absolutePath);
+    if (
+      resolved !== mountRoot &&
+      !resolved.startsWith(mountRoot + nodePath.sep)
+    ) {
+      throw new Error('Path traversal not allowed');
+    }
 
-    // Check if file exists
+    // Check if target exists
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
-    if (!fileExists) throw new Error(`File not found: ${relativePath}`);
+    const isDir = await clientRuntime.fileSystem.isDirectory(absolutePath);
 
-    // Delete the file
+    if (!fileExists && !isDir) throw new Error(`File or directory not found`);
+
+    if (isDir) {
+      // Delete the entire directory recursively
+      await fs.rm(absolutePath, { recursive: true, force: true });
+      return;
+    }
+
+    // Single file deletion
     const deleteResult =
       await clientRuntime.fileSystem.deleteFile(absolutePath);
     if (!deleteResult.success)
       throw new Error(
-        `Failed to delete file: ${relativePath} - ${deleteResult.message} - ${deleteResult.error || ''}`,
+        `Failed to delete file: ${deleteResult.message} - ${deleteResult.error || ''}`,
       );
 
-    return {
-      message: `Successfully deleted file: ${relativePath}`,
-    };
+    return;
   } catch (e) {
     rethrowCappedToolOutputError(e);
   }
 }
 
-export const deleteFile = (mountedRuntimes: MountedClientRuntimes) =>
+export const deleteTool = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
-    inputSchema: deleteFileToolInputSchema,
+    inputSchema: deleteToolInputSchema,
     strict: true,
     execute: async (args) => {
-      return deleteFileToolExecute(args, mountedRuntimes);
+      return deleteToolExecute(args, mountedRuntimes);
     },
   });

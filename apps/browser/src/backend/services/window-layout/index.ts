@@ -40,6 +40,9 @@ import {
   readPersistedDataSync,
   writePersistedDataSync,
 } from '@/utils/persisted-data';
+import { writeBlob } from '@/utils/attachment-blobs';
+import { generateAttachmentFilename } from '@shared/utils/attachment-filename';
+import sharp from 'sharp';
 
 const windowStateSchema = z.object({
   width: z.number(),
@@ -170,6 +173,9 @@ export class WindowLayoutService extends DisposableService {
     );
     this.uiController.setCheckElementExistsHandler(
       this.handleCheckElementExists.bind(this),
+    );
+    this.uiController.setCaptureAndStoreElementScreenshotHandler(
+      this.handleCaptureAndStoreElementScreenshot.bind(this),
     );
 
     const savedState = this.loadWindowState();
@@ -1522,6 +1528,72 @@ export class WindowLayoutService extends DisposableService {
       return await tab.checkElementExists(backendNodeId, frameId);
     }
     return false;
+  };
+
+  /**
+   * Captures an element screenshot, converts it to WebP, and stores it
+   * as an agent attachment blob.
+   */
+  private handleCaptureAndStoreElementScreenshot = async (
+    agentId: string,
+    tabId: string,
+    boundingRect: {
+      top: number;
+      left: number;
+      width: number;
+      height: number;
+    },
+    isMainFrame: boolean,
+    frameId: string | undefined,
+    screenshotFileName: string,
+  ): Promise<string | null> => {
+    const tab = this.tabs[tabId];
+    if (!tab) {
+      this.logger.warn(
+        `[WindowLayout] captureAndStoreElementScreenshot: tab ${tabId} not found`,
+      );
+      return null;
+    }
+
+    try {
+      // Capture the element screenshot (returns a JPEG data URL)
+      const dataUrl = await tab.captureElementScreenshot(
+        boundingRect,
+        20,
+        isMainFrame,
+        frameId,
+      );
+      if (!dataUrl) {
+        this.logger.debug(
+          '[WindowLayout] captureAndStoreElementScreenshot: capture returned null',
+        );
+        return null;
+      }
+
+      // Extract the base64 data from the data URL
+      const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+      const jpegBuffer = Buffer.from(base64Data, 'base64');
+
+      // Convert JPEG to WebP using sharp
+      const webpBuffer = await sharp(jpegBuffer)
+        .webp({ quality: 80 })
+        .toBuffer();
+
+      // Store as an agent attachment blob
+      const blobKey = generateAttachmentFilename(screenshotFileName);
+      await writeBlob(agentId, blobKey, webpBuffer);
+
+      this.logger.debug(
+        `[WindowLayout] Stored element screenshot: ${blobKey} (${Math.round(webpBuffer.length / 1024)}KB WebP)`,
+      );
+
+      return blobKey;
+    } catch (err) {
+      this.logger.warn(
+        `[WindowLayout] captureAndStoreElementScreenshot error: ${err}`,
+      );
+      return null;
+    }
   };
 
   private handleRemoveElement = (elementId: string) => {

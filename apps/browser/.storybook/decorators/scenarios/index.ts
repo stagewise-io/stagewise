@@ -49,11 +49,11 @@ export {
   createFilePart,
   createUserMessage,
   createAssistantMessage,
-  createReadFileToolPart,
-  createOverwriteFileToolPart,
+  createReadToolPart,
+  createWriteToolPart,
   createMultiEditToolPart,
+  createCopyToolPart,
   createDeleteFileToolPart,
-  createListFilesToolPart,
   createGlobToolPart,
   createGrepSearchToolPart,
   updateMessageInAgentState,
@@ -88,9 +88,6 @@ export type { ComplexRefactoringScenarioConfig } from './with-complex-refactorin
 
 export { withDeleteFileScenario } from './with-delete-file-scenario';
 export type { DeleteFileScenarioConfig } from './with-delete-file-scenario';
-
-export { withListFilesScenario } from './with-list-files-scenario';
-export type { ListFilesScenarioConfig } from './with-list-files-scenario';
 
 export { withGlobScenario } from './with-glob-scenario';
 export type { GlobScenarioConfig } from './with-glob-scenario';

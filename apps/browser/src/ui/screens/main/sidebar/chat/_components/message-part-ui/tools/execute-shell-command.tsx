@@ -1,4 +1,8 @@
-import { Loader2Icon, TerminalIcon, XIcon } from 'lucide-react';
+import {
+  IconLoader6Outline18,
+  IconTerminalOutline18,
+  IconXmarkOutline18,
+} from 'nucleo-ui-outline-18';
 import { useCallback, useMemo, useRef } from 'react';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { useToolAutoExpand } from './shared/use-tool-auto-expand';
@@ -115,7 +119,7 @@ export const ExecuteShellCommandToolPart = ({
     if (state === 'approval' || state === 'approval-responded') {
       return (
         <div className="flex flex-row items-center justify-start gap-1">
-          <TerminalIcon className="size-3 shrink-0 text-warning" />
+          <IconTerminalOutline18 className="size-3 shrink-0 text-warning" />
           <span className="flex min-w-0 gap-1 text-xs">
             <span className="shrink-0 font-medium">
               {explanation || 'Run command'}
@@ -128,7 +132,7 @@ export const ExecuteShellCommandToolPart = ({
     if (state === 'denied') {
       return (
         <div className="flex flex-row items-center justify-start gap-1">
-          <TerminalIcon className="size-3 shrink-0" />
+          <IconTerminalOutline18 className="size-3 shrink-0" />
           <span className="flex min-w-0 gap-1 text-xs">
             <span className="shrink-0 font-medium">
               {explanation || 'Skipped command'}
@@ -142,7 +146,7 @@ export const ExecuteShellCommandToolPart = ({
     if (state === 'error') {
       return (
         <div className="flex flex-row items-center justify-start gap-1">
-          <XIcon className="size-3 shrink-0" />
+          <IconXmarkOutline18 className="size-3 shrink-0" />
           <TruncatedCommandText
             text={part.errorText ?? `Error running: ${command}`}
             className="text-xs"
@@ -154,7 +158,7 @@ export const ExecuteShellCommandToolPart = ({
     if (state === 'streaming') {
       return (
         <div className="flex w-full flex-row items-center justify-start gap-1">
-          <Loader2Icon className="size-3 shrink-0 animate-spin text-primary-foreground" />
+          <IconLoader6Outline18 className="size-3 shrink-0 animate-spin text-primary-foreground" />
           <span className="flex min-w-0 gap-1 text-xs">
             <TruncatedCommandText
               text={explanation || `Running ${command}` || '...'}
@@ -184,7 +188,7 @@ export const ExecuteShellCommandToolPart = ({
     if (!aborted && !timedOut) {
       return (
         <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
-          <TerminalIcon className="size-3 shrink-0" />
+          <IconTerminalOutline18 className="size-3 shrink-0" />
           <span className="flex min-w-0 gap-1 text-xs">
             {exitCode === 0 ? (
               <span className="shrink-0 font-medium">
@@ -211,7 +215,7 @@ export const ExecuteShellCommandToolPart = ({
 
     return (
       <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
-        <TerminalIcon className="size-3 shrink-0" />
+        <IconTerminalOutline18 className="size-3 shrink-0" />
         <span className="flex min-w-0 gap-1 text-xs">
           <span className="shrink-0 font-medium">
             {explanation || `Command ${statusLabel}`}
@@ -280,7 +284,7 @@ export const ExecuteShellCommandToolPart = ({
             disabled={state === 'approval-responded'}
           >
             {state === 'approval-responded' && (
-              <Loader2Icon className="size-3 shrink-0 animate-spin" />
+              <IconLoader6Outline18 className="size-3 shrink-0 animate-spin" />
             )}
             Allow
           </Button>

@@ -6,6 +6,7 @@ import type {
   UserMessageMetadata,
   MountPermission,
   MentionFileCandidate,
+  AttachmentMetadata,
 } from './agent/metadata';
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
@@ -493,15 +494,7 @@ export type AppState = {
       editSummary: FileDiff[];
       pendingUserQuestion: PendingUserQuestion | null;
       pendingSandboxOutputs?: Record<string, string[]>;
-      pendingSandboxAttachments?: Record<
-        string,
-        Array<{
-          id: string;
-          mediaType: string;
-          fileName?: string;
-          sizeBytes: number;
-        }>
-      >;
+      pendingSandboxAttachments?: Record<string, AttachmentMetadata[]>;
       pendingShellOutputs?: Record<string, string[]>;
       activeApp?: {
         appId: string;
@@ -701,20 +694,14 @@ export type KartonContract = {
       setActiveModelId: (agentId: string, modelId: ModelId) => Promise<void>;
       storeAttachment: (
         agentId: string,
-        attachmentId: string,
-        mediaType: string,
-        fileName: string,
-        sizeBytes: number,
+        originalFileName: string,
         data: string,
-      ) => Promise<void>;
+      ) => Promise<string>;
       storeAttachmentByPath: (
         agentId: string,
-        attachmentId: string,
-        mediaType: string,
-        fileName: string,
-        sizeBytes: number,
+        originalFileName: string,
         filePath: string,
-      ) => Promise<void>;
+      ) => Promise<string>;
     };
     toolbox: {
       acceptHunks: (hunkIds: string[]) => Promise<void>;
@@ -914,6 +901,23 @@ export type KartonContract = {
         clearPendingScreenshots: () => Promise<void>; // Clears pending element screenshots after UI has picked them up
         /** Restore selected elements directly (used when restoring aborted message to input) */
         restoreElements: (elements: SelectedElement[]) => Promise<void>;
+        /**
+         * Capture an element screenshot, convert to WebP, and store as an agent attachment.
+         * Returns the blob key of the stored screenshot file, or null if capture fails.
+         */
+        captureAndStoreElementScreenshot: (
+          agentId: string,
+          tabId: string,
+          boundingRect: {
+            top: number;
+            left: number;
+            width: number;
+            height: number;
+          },
+          isMainFrame: boolean,
+          frameId: string | undefined,
+          screenshotFileName: string,
+        ) => Promise<string | null>;
       };
       scrollToElement: (
         tabId: string,

@@ -4,11 +4,11 @@ import { DiffPreview } from '../shared/diff-preview';
 import { FileIcon } from '@ui/components/file-icon';
 import { getBaseName } from '@shared/path-utils';
 import {
-  Loader2Icon,
-  XIcon,
-  ListChevronsDownUpIcon,
-  ListChevronsUpDownIcon,
-} from 'lucide-react';
+  IconXmarkOutline18,
+  IconChevronExpandYOutline18,
+  IconChevronReduceYOutline18,
+  IconLoader6Outline18,
+} from 'nucleo-ui-outline-18';
 import { cn, IDE_SELECTION_ITEMS, stripMountPrefix } from '@ui/utils';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { IdePickerPopover } from '@ui/components/ide-picker-popover';
@@ -83,9 +83,9 @@ export const GenericMultiEditToolPart = ({
   }, [state, expanded]);
 
   const path = useMemo(() => {
-    if (!part.input?.relative_path) return null;
-    return stripMountPrefix(part.input.relative_path);
-  }, [part.input?.relative_path]);
+    if (!part.input?.path) return null;
+    return stripMountPrefix(part.input.path);
+  }, [part.input?.path]);
 
   const firstLineNumberEdited = useMemo(() => {
     let startLine = 1;
@@ -121,7 +121,7 @@ export const GenericMultiEditToolPart = ({
       return (
         <LoadingHeader
           relativePath={path ?? undefined}
-          fullPath={part.input?.relative_path ?? undefined}
+          fullPath={part.input?.path ?? undefined}
           resolvePath={resolvePath}
         />
       );
@@ -129,7 +129,7 @@ export const GenericMultiEditToolPart = ({
       return (
         <SuccessHeader
           relativePath={path ?? undefined}
-          fullPath={part.input?.relative_path ?? undefined}
+          fullPath={part.input?.path ?? undefined}
           resolvePath={resolvePath}
           newLineCount={newLineCount}
           deletedLineCount={deletedLineCount}
@@ -139,7 +139,7 @@ export const GenericMultiEditToolPart = ({
     state,
     streaming,
     path,
-    part.input?.relative_path,
+    part.input?.path,
     newLineCount,
     deletedLineCount,
     part.errorText,
@@ -152,7 +152,7 @@ export const GenericMultiEditToolPart = ({
       return (
         <DiffPreview
           diff={diff}
-          filePath={part.input?.relative_path ?? ''}
+          filePath={part.input?.path ?? ''}
           collapsed={collapsedDiffView}
         />
       );
@@ -166,7 +166,7 @@ export const GenericMultiEditToolPart = ({
                   .join('\n\n')
               : '') ?? ''
           }
-          language={getLanguageFromPath(part.input?.relative_path)}
+          language={getLanguageFromPath(part.input?.path)}
         />
       );
     else return undefined;
@@ -174,7 +174,7 @@ export const GenericMultiEditToolPart = ({
     state,
     diff,
     part.input?.edits,
-    part.input?.relative_path,
+    part.input?.path,
     streaming,
     hasNewContent,
     collapsedDiffView,
@@ -201,9 +201,13 @@ export const GenericMultiEditToolPart = ({
                   }}
                 >
                   {collapsedDiffView ? (
-                    <ListChevronsUpDownIcon className={cn('size-3 shrink-0')} />
+                    <IconChevronExpandYOutline18
+                      className={cn('size-3 shrink-0')}
+                    />
                   ) : (
-                    <ListChevronsDownUpIcon className={cn('size-3 shrink-0')} />
+                    <IconChevronReduceYOutline18
+                      className={cn('size-3 shrink-0')}
+                    />
                   )}
                 </Button>
               </TooltipTrigger>
@@ -212,7 +216,7 @@ export const GenericMultiEditToolPart = ({
               </TooltipContent>
             </Tooltip>
             {(() => {
-              const relPath = part.input?.relative_path ?? '';
+              const relPath = part.input?.path ?? '';
               const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
               const anchor = (
                 <a
@@ -290,7 +294,7 @@ const ErrorHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <XIcon className="size-3 shrink-0" />
+      <IconXmarkOutline18 className="size-3 shrink-0" />
       <Tooltip>
         <TooltipTrigger>
           <span className="min-w-0 flex-1 truncate text-xs">
@@ -373,7 +377,7 @@ const LoadingHeader = ({
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <Loader2Icon className="size-3 shrink-0 animate-spin text-primary-foreground" />
+      <IconLoader6Outline18 className="size-3 shrink-0 animate-spin text-primary-foreground" />
       {relativePath !== null ? (
         <FileContextMenu
           relativePath={fullPath ?? relativePath ?? ''}

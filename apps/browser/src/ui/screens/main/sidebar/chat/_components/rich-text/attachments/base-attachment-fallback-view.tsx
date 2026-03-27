@@ -20,13 +20,20 @@ export function AttachmentNodeView(props: InlineNodeViewProps) {
   const attrs = props.node.attrs as BaseNodeAttrs;
   const isEditable = !('viewOnly' in props);
 
-  const { fileAttachments } = useMessageAttachments();
+  const { attachments } = useMessageAttachments();
   const attachment = useMemo(
-    () => fileAttachments.find((f) => f.id === attrs.id),
-    [fileAttachments, attrs.id],
+    () => attachments.find((a) => a.path === attrs.id),
+    [attachments, attrs.id],
   );
 
-  const label = attachment?.fileName ?? attrs.label;
+  // Display name: originalFileName for att/ blobs, basename for workspace paths,
+  // or the attrs.label set at insertion time as final fallback.
+  const label =
+    attachment?.originalFileName ??
+    (attachment
+      ? (attachment.path.split('/').pop() ?? attachment.path)
+      : null) ??
+    attrs.label;
 
   const displayLabel = useMemo(
     () => truncateLabel(label, attrs.id),

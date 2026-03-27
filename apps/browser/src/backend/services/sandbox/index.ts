@@ -11,6 +11,9 @@ import {
   type WorkerToMainMessage,
 } from './ipc';
 import type { KartonService } from '@/services/karton';
+import { generateAttachmentFilename } from '@shared/utils/attachment-filename';
+import { writeBlob } from '@/utils/attachment-blobs';
+import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 
 /**
  * Callback type for handling file diff notifications from the sandbox worker.
@@ -73,13 +76,6 @@ interface PendingRequest {
   agentId: string;
 }
 
-interface SandboxAttachmentMeta {
-  id: string;
-  mediaType: string;
-  fileName?: string;
-  sizeBytes: number;
-}
-
 export class SandboxService extends DisposableService {
   private readonly windowLayoutService: WindowLayoutService;
   private readonly logger: Logger;
@@ -96,7 +92,7 @@ export class SandboxService extends DisposableService {
   private reqId = 0;
 
   private outputBuffers = new Map<string, string[]>();
-  private attachmentBuffers = new Map<string, SandboxAttachmentMeta[]>();
+  private attachmentBuffers = new Map<string, Attachment[]>();
   private outputFlushTimers = new Map<string, NodeJS.Timeout>();
   private outputMaxIntervalTimers = new Map<string, NodeJS.Timeout>();
 
@@ -283,12 +279,6 @@ export class SandboxService extends DisposableService {
   ): Promise<{
     value: any;
     outputs: string[];
-    customFileAttachments: Array<{
-      id: string;
-      mediaType: string;
-      fileName?: string;
-      sizeBytes: number;
-    }>;
   }> {
     // Lazily create agent context on first execution
     if (!this.agentToWorker.has(agentId)) this.createAgent(agentId);
@@ -350,7 +340,6 @@ export class SandboxService extends DisposableService {
           pending.resolve({
             value: msg.value,
             outputs: msg.outputs ?? [],
-            customFileAttachments: msg.customFileAttachments ?? [],
           });
         }
         break;
@@ -392,14 +381,35 @@ export class SandboxService extends DisposableService {
         this.scheduleFlush(msg.agentId, toolCallId);
         break;
       }
-      case 'sandbox-output-attachment': {
-        const toolCallId = this.agentToolCallIds.get(msg.agentId);
-        if (!toolCallId || !this.kartonService) return;
-        if (!this.attachmentBuffers.has(toolCallId)) {
-          this.attachmentBuffers.set(toolCallId, []);
+      case 'create-attachment': {
+        try {
+          const fileName = generateAttachmentFilename(msg.originalFileName);
+          const data = Buffer.from(msg.data, 'base64');
+          await writeBlob(msg.agentId, fileName, data);
+          // Stream attachment preview immediately so the UI can show it mid-execution
+          const toolCallId = this.agentToolCallIds.get(msg.agentId);
+          if (toolCallId && this.kartonService) {
+            if (!this.attachmentBuffers.has(toolCallId)) {
+              this.attachmentBuffers.set(toolCallId, []);
+            }
+            this.attachmentBuffers.get(toolCallId)!.push({
+              path: `att/${fileName}`,
+              originalFileName: msg.originalFileName,
+            });
+            this.scheduleFlush(msg.agentId, toolCallId);
+          }
+          this.safeSend(worker, {
+            type: 'create-attachment-result',
+            id: msg.id,
+            fileName,
+          });
+        } catch (err) {
+          this.safeSend(worker, {
+            type: 'create-attachment-result',
+            id: msg.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
-        this.attachmentBuffers.get(toolCallId)!.push(msg.attachment);
-        this.scheduleFlush(msg.agentId, toolCallId);
         break;
       }
       case 'resolve-credential': {
@@ -673,6 +683,35 @@ export class SandboxService extends DisposableService {
   }
 
   clearPendingOutputs(agentId: string, toolCallId: string) {
+    // Flush any remaining attachment buffers to Karton state so
+    // drainSandboxAttachments (called later in handlePostStep) sees them.
+    const remainingAttachments = this.attachmentBuffers.get(toolCallId);
+    if (
+      remainingAttachments &&
+      remainingAttachments.length > 0 &&
+      this.kartonService
+    ) {
+      const snapshot = [...remainingAttachments];
+      this.kartonService.setState((draft) => {
+        if (!draft.toolbox[agentId]) {
+          draft.toolbox[agentId] = {
+            workspace: { mounts: [] },
+            pendingFileDiffs: [],
+            editSummary: [],
+            pendingUserQuestion: null,
+          };
+        }
+        if (!draft.toolbox[agentId].pendingSandboxAttachments)
+          draft.toolbox[agentId].pendingSandboxAttachments = {};
+        const existing =
+          draft.toolbox[agentId].pendingSandboxAttachments![toolCallId] ?? [];
+        draft.toolbox[agentId].pendingSandboxAttachments![toolCallId] = [
+          ...existing,
+          ...snapshot,
+        ];
+      });
+    }
+
     this.outputBuffers.delete(toolCallId);
     this.attachmentBuffers.delete(toolCallId);
 
@@ -687,25 +726,44 @@ export class SandboxService extends DisposableService {
       this.outputMaxIntervalTimers.delete(toolCallId);
     }
 
+    // Only clear streaming outputs from Karton state. Attachments are
+    // intentionally preserved — they are consumed later by
+    // drainSandboxAttachments() in handlePostStep.
     if (!this.kartonService) return;
     const agentToolbox = this.kartonService.state.toolbox[agentId];
     if (!agentToolbox) return;
 
-    const hasOutputs =
-      agentToolbox.pendingSandboxOutputs?.[toolCallId] !== undefined;
-    const hasAttachments =
-      agentToolbox.pendingSandboxAttachments?.[toolCallId] !== undefined;
-    if (!hasOutputs && !hasAttachments) return;
+    if (agentToolbox.pendingSandboxOutputs?.[toolCallId] === undefined) return;
 
     this.kartonService.setState((draft) => {
       const tb = draft.toolbox[agentId];
       if (!tb) return;
       if (tb.pendingSandboxOutputs?.[toolCallId])
         delete tb.pendingSandboxOutputs[toolCallId];
-
-      if (tb.pendingSandboxAttachments?.[toolCallId])
-        delete tb.pendingSandboxAttachments[toolCallId];
     });
+  }
+
+  /**
+   * Drains all pending sandbox attachments for the given agent from Karton
+   * state and returns them as a flat array. Called by the toolbox after a step
+   * completes so they can be written into the assistant message metadata.
+   * Clears the Karton state entries as a side effect.
+   */
+  public drainPendingAttachments(agentId: string): Attachment[] {
+    if (!this.kartonService) return [];
+    const pending =
+      this.kartonService.state.toolbox[agentId]?.pendingSandboxAttachments;
+    if (!pending || Object.keys(pending).length === 0) return [];
+
+    const result: Attachment[] = Object.values(pending).flat();
+
+    this.kartonService.setState((draft) => {
+      if (draft.toolbox[agentId]?.pendingSandboxAttachments) {
+        draft.toolbox[agentId].pendingSandboxAttachments = {};
+      }
+    });
+
+    return result;
   }
 
   private handleWorkerCrash(crashed: WorkerInfo, code: number | null) {

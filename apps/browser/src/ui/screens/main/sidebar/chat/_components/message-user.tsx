@@ -1,8 +1,8 @@
 import posthog from 'posthog-js';
 import { selectedElementToAttachmentAttributes } from '@ui/utils/attachment-conversions';
 import {
-  enrichTipTapContent,
   markdownToTipTapContent,
+  enrichTipTapContent,
 } from '@ui/utils/tiptap-content-utils';
 import { cn, collectUserMessageMetadata } from '@ui/utils';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
@@ -35,6 +35,8 @@ import { ChatInputViewOnly } from './chat-input-view-only';
 import { generateId } from 'ai';
 import type { AttachmentType } from './rich-text/attachments';
 import type { MentionContext } from './rich-text/mentions';
+import type { FileMentionItem } from './rich-text/mentions/types';
+import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import type { Content } from '@tiptap/core';
 import { IconMagicWandSparkle } from 'nucleo-micro-bold';
@@ -62,11 +64,11 @@ export const MessageUser = memo(
 
     // File attachments via shared hook
     const {
-      fileAttachments: editedFileAttachments,
+      attachments: editedFileAttachments,
       addFileAttachment,
-      removeFileAttachment,
-      clearFileAttachments,
-      setFileAttachments: setEditedFileAttachments,
+      removeAttachment: removeFileAttachment,
+      clearAttachments: clearFileAttachments,
+      setAttachments: setEditedFileAttachments,
     } = useFileAttachments({
       chatInputRef: chatInputRef as RefObject<ChatInputHandle>,
       insertIntoEditor: true,
@@ -144,11 +146,14 @@ export const MessageUser = memo(
       return textPart?.type === 'text' ? textPart.text : '';
     }, [msg.parts]);
 
-    // Convert markdown to TipTap JSON for view mode (memoized to avoid re-conversion on every render)
-    const viewModeTipTapContent = useMemo(
-      () => markdownToTipTapContent(markdownText),
-      [markdownText],
-    );
+    // Convert markdown to TipTap JSON for view mode (memoized to avoid re-conversion on every render).
+    // Enrich with attachment metadata so element badges show proper labels/screenshots.
+    const viewModeTipTapContent = useMemo(() => {
+      const parsed = markdownToTipTapContent(markdownText);
+      return enrichTipTapContent(parsed, {
+        attachments: msg.metadata?.attachments,
+      });
+    }, [markdownText, msg.metadata?.attachments]);
 
     // Start editing - initialize the editor with message content
     const handleStartEditing = useCallback(() => {
@@ -161,39 +166,27 @@ export const MessageUser = memo(
         }),
       );
 
-      msg.metadata?.selectedPreviewElements?.forEach((element) => {
-        setSelectedElementsFromEditor((prev) => [
-          ...prev,
-          element as SelectedElement,
-        ]);
-      });
-
       // Clear Karton state for new element selections
       clearSelectedElements();
 
       // Use file attachments directly from message metadata (preserves original IDs)
-      // Note: msg.parts only contains text, files are stored in metadata.fileAttachments
-      const existingFileAttachments = msg.metadata?.fileAttachments ?? [];
+      // Note: msg.parts only contains text, attachments are stored in metadata.attachments
+      const existingAttachments = msg.metadata?.attachments ?? [];
 
-      setEditedFileAttachments(existingFileAttachments);
+      setEditedFileAttachments(existingAttachments);
 
       setIsEditing(true);
 
-      // Convert markdown text to TipTap JSON, then inject full attachment data
-      // from the message metadata so clip content is available in the editor nodes
+      // Convert markdown text back to TipTap JSON for editing
       const tiptapContent = markdownToTipTapContent(markdownText);
-      const enrichedContent = enrichTipTapContent(tiptapContent, {
-        textClipAttachments: msg.metadata?.textClipAttachments,
-      });
-      setPendingTiptapContent(enrichedContent);
+      setPendingTiptapContent(tiptapContent);
 
       // Focus the editor (will be available after state update triggers re-render)
       setTimeout(() => chatInputRef.current?.focus(), 0);
     }, [
       canEdit,
       editMessageId,
-      msg.metadata?.fileAttachments,
-      msg.metadata?.textClipAttachments,
+      msg.metadata?.attachments,
       clearSelectedElements,
       markdownText,
     ]);
@@ -220,46 +213,21 @@ export const MessageUser = memo(
         const newMessageId = generateId();
 
         try {
-          const combinedSelectedElements = [
-            ...selectedElementsFromWebcontents,
-            ...selectedElementsFromEditor,
-          ];
-
-          // Collect metadata for selected elements
-          // Note: textClipAttachments from extractTextClipsFromTiptapContent will have empty content
-          // because the TipTap JSON only stores IDs (content is looked up from context at render time)
-          const metadata = collectUserMessageMetadata(
-            combinedSelectedElements,
-            pendingTiptapContent,
-          );
-
-          // Merge text clip attachments from two sources:
-          // 1. Preserved originals: clips from the original message metadata that
-          //    are still referenced in the edited content (have full content)
-          // 2. Newly pasted clips: freshly pasted during editing (have full content
-          //    from the paste plugin, content.length > 0)
-          // Re-parsed clips from markdown round-trip have content === '' and are excluded.
-          const originalTextClips = msg.metadata?.textClipAttachments ?? [];
-          const extractedClips = metadata.textClipAttachments ?? [];
-          const textClipIdsInContent = new Set(
-            extractedClips.map((tc) => tc.id),
-          );
-          const preservedTextClips = originalTextClips.filter((tc) =>
-            textClipIdsInContent.has(tc.id),
-          );
-          const preservedClipIds = new Set(
-            preservedTextClips.map((tc) => tc.id),
-          );
-          const newlyPastedClips = extractedClips.filter(
-            (tc) => !preservedClipIds.has(tc.id) && tc.content.length > 0,
-          );
-          const mergedTextClips = [...preservedTextClips, ...newlyPastedClips];
+          // Collect metadata for mentions.
+          const metadata = collectUserMessageMetadata(pendingTiptapContent);
 
           if (!chatInputRef.current) {
             return;
           }
 
           const markdownText = chatInputRef.current.getTextContent().trim();
+
+          // File mentions are converted to FileAttachment entries at
+          // selection time. Strip them from mentions so the backend doesn't
+          // receive duplicate context.
+          const filteredMentions = metadata.mentions?.filter(
+            (m) => m.providerType !== 'file',
+          );
 
           // Build the new message object
           const newMessage: AgentMessage & { role: 'user' } = {
@@ -273,9 +241,11 @@ export const MessageUser = memo(
             role: 'user',
             metadata: {
               ...metadata,
-              fileAttachments: editedFileAttachments,
-              textClipAttachments:
-                mergedTextClips.length > 0 ? mergedTextClips : undefined,
+              attachments: editedFileAttachments,
+              mentions:
+                filteredMentions && filteredMentions.length > 0
+                  ? filteredMentions
+                  : undefined,
             },
           };
 
@@ -470,6 +440,24 @@ export const MessageUser = memo(
       },
     );
 
+    // Handle textclip-expand during edit mode: replace the attachment node
+    // with inline text and remove the file attachment from local state.
+    // The blob file is intentionally NOT deleted — the user may cancel the edit.
+    useEffect(() => {
+      if (!isEditing) return;
+
+      const handler = (e: Event) => {
+        const { attachmentId, content } = (e as CustomEvent).detail as {
+          attachmentId: string;
+          content: string;
+        };
+        chatInputRef.current?.replaceAttachmentWithText(attachmentId, content);
+        removeFileAttachment(attachmentId);
+      };
+      window.addEventListener('textclip-expand', handler);
+      return () => window.removeEventListener('textclip-expand', handler);
+    }, [isEditing, chatInputRef, removeFileAttachment]);
+
     // Register/unregister edit mode for drop event routing
     useEffect(() => {
       if (isEditing && editMessageId) {
@@ -507,6 +495,19 @@ export const MessageUser = memo(
         : EMPTY_MOUNTS,
     );
 
+    const setEditedFileAttachmentsRef = useRef(setEditedFileAttachments);
+    setEditedFileAttachmentsRef.current = setEditedFileAttachments;
+
+    const onFileMentionSelected = useCallback((item: FileMentionItem) => {
+      const attachment: AttachmentMetadata = {
+        path: item.meta.mountedPath,
+      };
+      setEditedFileAttachmentsRef.current((prev) => {
+        if (prev.some((a) => a.path === attachment.path)) return prev;
+        return [...prev, attachment];
+      });
+    }, []);
+
     const mentionContext = useMemo<MentionContext>(
       () => ({
         agentInstanceId: openAgent,
@@ -514,24 +515,28 @@ export const MessageUser = memo(
         tabs,
         activeTabId,
         mounts: mentionMounts,
+        onFileMentionSelected,
       }),
-      [openAgent, searchMentionFiles, tabs, activeTabId, mentionMounts],
+      [
+        openAgent,
+        searchMentionFiles,
+        tabs,
+        activeTabId,
+        mentionMounts,
+        onFileMentionSelected,
+      ],
     );
 
     // Count total attachments for display
     const totalAttachments =
       editedFileAttachments.length + selectedElementsFromWebcontents.length;
 
-    // Combine all available elements for the preview card to access
-    // In view mode: from message metadata
-    // In edit mode: from local state + Karton state
+    // Combine all available elements for the preview card to access.
+    // In edit mode: from local state + Karton state.
+    // In view mode: empty (element data lives in .swdomelement file attachments).
     const allAvailableElements = useMemo(() => {
-      const metadataElements =
-        (msg.metadata?.selectedPreviewElements as SelectedElement[]) ?? [];
       if (isEditing) {
-        // During editing, combine all sources (deduped by stagewiseId)
         const combined = [
-          ...metadataElements,
           ...selectedElementsFromEditor,
           ...selectedElementsFromWebcontents,
         ];
@@ -543,25 +548,20 @@ export const MessageUser = memo(
           return true;
         });
       }
-      // In view mode, just use metadata
-      return metadataElements;
+      return [];
     }, [
-      msg.metadata?.selectedPreviewElements,
       isEditing,
       selectedElementsFromEditor,
       selectedElementsFromWebcontents,
     ]);
 
-    // File attachments: use edited state during editing, otherwise from metadata
+    // Attachments: use edited state during editing, otherwise from metadata
     const allFileAttachments = useMemo(() => {
       if (isEditing) {
         return editedFileAttachments;
       }
-      return msg.metadata?.fileAttachments ?? [];
-    }, [isEditing, editedFileAttachments, msg.metadata?.fileAttachments]);
-
-    // Text clip attachments: always from metadata (not editable separately)
-    const allTextClipAttachments = msg.metadata?.textClipAttachments;
+      return msg.metadata?.attachments ?? [];
+    }, [isEditing, editedFileAttachments, msg.metadata?.attachments]);
 
     // Implement command messages get a custom card instead of a text bubble
     const hasImplementCommand = msg.parts.some(
@@ -577,8 +577,7 @@ export const MessageUser = memo(
     return (
       <MessageAttachmentsProvider
         elements={allAvailableElements}
-        fileAttachments={allFileAttachments}
-        textClipAttachments={allTextClipAttachments}
+        attachments={allFileAttachments}
       >
         <div
           className={cn('flex w-full flex-col gap-1')}

@@ -89,25 +89,30 @@ const serializeToolPart = (
   const err = getErrorSuffix(part);
 
   switch (part.type) {
-    case 'tool-readFile':
-      if (err) return `[read: ${part.input.relative_path}${err}]`;
-      return `[read: ${part.input.relative_path}]`;
+    case 'tool-read':
+      if (err) return `[read: ${part.input.path}${err}]`;
+      return `[read: ${part.input.path}]`;
 
     case 'tool-multiEdit':
-      if (err) return `[edited: ${part.input.relative_path}${err}]`;
-      return `[edited: ${part.input.relative_path} (${Array.isArray(part.input.edits) ? part.input.edits.length : '?'} edits)]`;
+      if (err) return `[edited: ${part.input.path}${err}]`;
+      return `[edited: ${part.input.path} (${Array.isArray(part.input.edits) ? part.input.edits.length : '?'} edits)]`;
 
-    case 'tool-overwriteFile': {
-      if (err) return `[wrote: ${part.input.relative_path}${err}]`;
+    case 'tool-write': {
+      if (err) return `[wrote: ${part.input.path}${err}]`;
       // Distinguish create vs update when output.message is available
       const owMsg = part.output?.message;
       if (typeof owMsg === 'string' && owMsg.includes('created'))
-        return `[created: ${part.input.relative_path}]`;
-      return `[wrote: ${part.input.relative_path}]`;
+        return `[created: ${part.input.path}]`;
+      return `[wrote: ${part.input.path}]`;
     }
 
-    case 'tool-deleteFile':
-      return `[deleted: ${part.input.relative_path}${err ?? ''}]`;
+    case 'tool-copy': {
+      const action = part.input.move ? 'moved' : 'copied';
+      return `[${action}: ${part.input.input_path} → ${part.input.output_path}${err ?? ''}]`;
+    }
+
+    case 'tool-delete':
+      return `[deleted: ${part.input.path}${err ?? ''}]`;
 
     case 'tool-executeShellCommand': {
       const label = String(
@@ -133,9 +138,6 @@ const serializeToolPart = (
 
     case 'tool-glob':
       return `[glob: ${part.input.pattern}${err ?? ''}]`;
-
-    case 'tool-listFiles':
-      return `[listed: ${part.input.relative_path}${err ?? ''}]`;
 
     case 'tool-getLintingDiagnostics': {
       const paths = Array.isArray(part.input.paths)
@@ -200,7 +202,7 @@ type MentionLike = {
   title?: string;
   name?: string;
 };
-type AttachmentLike = { fileName?: string; id?: string };
+type AttachmentLike = { path?: string; originalFileName?: string };
 
 const serializeUserMetadataAnnotations = (
   metadata: AgentMessage['metadata'],
@@ -210,13 +212,13 @@ const serializeUserMetadataAnnotations = (
 
   try {
     // File / image attachments
-    const attachments = (metadata as Record<string, unknown>).fileAttachments as
+    const attachments = (metadata as Record<string, unknown>).attachments as
       | AttachmentLike[]
       | undefined;
     if (Array.isArray(attachments) && attachments.length) {
       const names = attachments
         .filter((a) => a != null)
-        .map((a) => a.fileName ?? a.id ?? 'file');
+        .map((a) => a.originalFileName ?? a.path?.split('/').pop() ?? 'file');
       annotations.push(`[attached: ${names.join(', ')}]`);
     }
 
@@ -328,27 +330,15 @@ const estimateMetadataChars = (
       chars += metadata.compressedHistory.length;
     }
 
-    // Text clip attachments
-    if (metadata.textClipAttachments) {
-      for (const clip of metadata.textClipAttachments) {
-        chars += (clip.content?.length ?? 0) + (clip.label?.length ?? 0);
-      }
-    }
-
     // @-mentions
     if (metadata.mentions) {
       chars += safeStringifyLength(metadata.mentions);
     }
 
-    // Selected DOM elements
-    if (metadata.selectedPreviewElements) {
-      chars += safeStringifyLength(metadata.selectedPreviewElements);
-    }
-
     // File attachment metadata (not the binary content, just the XML hints)
-    if (metadata.fileAttachments) {
+    if (metadata.attachments) {
       // ~100 chars per attachment for the XML hint tag
-      chars += metadata.fileAttachments.length * 100;
+      chars += metadata.attachments.length * 100;
     }
   } catch {
     // Malformed metadata — add a conservative fallback

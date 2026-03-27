@@ -280,7 +280,7 @@ function buildMultiFileEditTimeline(
       toolCallId,
       newState: 'input-available',
       input: {
-        relative_path: file.path,
+        path: file.path,
         edits: [
           {
             old_string: file.beforeContent,

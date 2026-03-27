@@ -10,7 +10,9 @@ import type { KartonService } from '@/services/karton';
 
 export const DESCRIPTION = `Ask the user structured questions via a multi-step form.
 
-Prefer this tool over asking questions in plain text when you need structured, unambiguous answers. The form blocks execution until the user submits or cancels.
+User this tool instead of asking questions in plain text when you need structured, unambiguous answers. The form blocks execution until the user submits or cancels.
+
+**NEVER** MAKE MULTIPLE CALLS TO THIS TOOL AT ONCE. Put all questions into one call with individual steps instead.
 
 Radio groups always include an "Other" free-text option; custom answers are prefixed with \`__other__:\`.
 If the user dismisses the form by typing a message, the tool returns with completed=false, any partial answers, and a notice. The user's message arrives as a normal user message immediately after this tool result.

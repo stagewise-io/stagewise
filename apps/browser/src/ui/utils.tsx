@@ -1,7 +1,6 @@
 import posthog from 'posthog-js';
 import type { UserMessageMetadata } from '@shared/karton-contracts/ui';
-import type { SelectedElement } from '@shared/selected-elements';
-import { extractTextClipsFromTiptapContent } from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
+
 import { extractMentionsFromTiptapContent } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions';
 
 import { clsx, type ClassValue } from 'clsx';
@@ -51,18 +50,13 @@ export async function fileToDataUrl(file: File): Promise<string> {
 }
 
 export const collectUserMessageMetadata = (
-  selectedElements: SelectedElement[],
   tiptapContent?: Content,
 ): UserMessageMetadata => {
-  const textClipAttachments = extractTextClipsFromTiptapContent(tiptapContent);
   const mentions = extractMentionsFromTiptapContent(tiptapContent);
 
   return {
     createdAt: new Date(),
     partsMetadata: [],
-    selectedPreviewElements: selectedElements,
-    textClipAttachments:
-      textClipAttachments.length > 0 ? textClipAttachments : undefined,
     mentions: mentions.length > 0 ? mentions : undefined,
   };
 };
@@ -152,16 +146,54 @@ export const openFileUrl = async (url: string, filename?: string) => {
   }
 };
 
-const MOUNT_PREFIX_RE = /^w[a-f0-9]+\//;
+/**
+ * Well-known non-workspace mount prefixes.
+ * These are stripped as-is (e.g. "att/foo" → "foo").
+ */
+const NON_WORKSPACE_PREFIXES = ['att/', 'plugins/', 'apps/'] as const;
 
 /**
- * Strip a mount prefix (e.g. "w1a2b/" or "w1/") from a workspace-relative path
- * so it can be displayed without the internal addressing scheme.
+ * Workspace mount prefixes are generated as `w` + 4 hex chars (SHA-256
+ * of the workspace path, see `mountPrefixForPath`).
+ * This regex matches that pattern at the start of a path.
+ */
+const WORKSPACE_PREFIX_RE = /^w[0-9a-f]{1,8}\//;
+
+/**
+ * Strip a mount prefix (e.g. "wda51/", "att/", "plugins/") from a
+ * workspace-relative path so it can be displayed without the internal
+ * addressing scheme.
  */
 export function stripMountPrefix(rawPath: string): string {
   const path = rawPath.replace(/\\/g, '/');
-  if (!path.includes('/')) return '';
-  return path.replace(MOUNT_PREFIX_RE, '');
+
+  for (const prefix of NON_WORKSPACE_PREFIXES) {
+    if (path.startsWith(prefix)) return path.slice(prefix.length);
+  }
+
+  return path.replace(WORKSPACE_PREFIX_RE, '');
+}
+
+/**
+ * Resolve a mount-prefixed path to a human-readable display string.
+ *
+ * For `att/` paths, looks up `originalFileName` in the provided
+ * attachment metadata and returns it when available. For all other
+ * paths (and when no metadata match exists), falls back to
+ * {@link stripMountPrefix}.
+ */
+export function resolveDisplayPath(
+  rawPath: string,
+  attachmentMetadata?: Record<
+    string,
+    import('@shared/karton-contracts/ui/agent/metadata').AttachmentMetadata
+  >,
+): string {
+  if (attachmentMetadata && rawPath.startsWith('att/')) {
+    const meta = attachmentMetadata[rawPath];
+    if (meta?.originalFileName) return meta.originalFileName;
+  }
+  return stripMountPrefix(rawPath);
 }
 
 export const getTruncatedFileUrl = (

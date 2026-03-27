@@ -1,0 +1,4 @@
+{
+  "displayName": "JavaScript Sandbox",
+  "description": "Best practices for using the stagewise built-in JavaScript sandbox. Explains how to access APIs for browser debugging/interaction, use external dependencies, file system access, etc."
+}

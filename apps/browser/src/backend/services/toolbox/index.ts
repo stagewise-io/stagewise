@@ -11,13 +11,13 @@ import type { UserExperienceService } from '@/services/experience';
 import { SandboxService } from '../sandbox';
 import { ShellService, detectShell, resolveShellEnv } from './services/shell';
 import {
-  APPEND_ONLY_PERMISSIONS,
   FULL_PERMISSIONS,
   NON_WORKSPACE_PREFIXES,
   READ_ONLY_PERMISSIONS,
   type MountDescriptor,
 } from '../sandbox/ipc';
 import type { WorkspaceAgentSettings } from '@shared/karton-contracts/ui/shared-types';
+import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import type { KartonService } from '@/services/karton';
 import type { GlobalConfigService } from '@/services/global-config';
 import { DisposableService } from '@/services/disposable';
@@ -33,25 +33,31 @@ import { createFileDiffHandler } from './utils/sandbox-callbacks';
 import { deleteAgentBlobs, getAgentBlobDir } from '@/utils/attachment-blobs';
 import { getDataRoot, getPlansDir, getTempRoot } from '@/utils/paths';
 import { mkdirSync } from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import type { ApiClient } from '@stagewise/api-client';
 import {
-  deleteFileToolExecute,
+  deleteToolExecute,
   DESCRIPTION as DELETE_FILE_DESCRIPTION,
 } from './tools/file-modification/delete-file';
 import { glob as globTool } from './tools/file-modification/glob';
-import { readFile as readFileTool } from './tools/file-modification/read-file';
+import { readFile as readTool } from './tools/file-modification/read';
+import { ls as lsTool } from './tools/file-modification/ls';
 import { getLintingDiagnostics as getLintingDiagnosticsTool } from './tools/file-modification/get-linting-diagnostics';
 import { listLibraryDocs as listLibraryDocsTool } from './tools/research/list-library-docs';
 import { searchInLibraryDocs as searchInLibraryDocsTool } from './tools/research/search-in-library-docs';
 import {
-  overwriteFileToolExecute,
-  DESCRIPTION as OVERWRITE_FILE_DESCRIPTION,
-} from './tools/file-modification/overwrite-file';
-import { listFiles as listFilesTool } from './tools/file-modification/list-files';
+  writeToolExecute,
+  DESCRIPTION as WRITE_DESCRIPTION,
+} from './tools/file-modification/write';
 import {
   multiEditToolExecute,
   DESCRIPTION as MULTI_EDIT_DESCRIPTION,
 } from './tools/file-modification/multi-edit';
+import {
+  copyToolExecute,
+  DESCRIPTION as COPY_DESCRIPTION,
+} from './tools/file-modification/copy';
+import { mkdir as mkdirTool } from './tools/file-modification/mkdir';
 import { grepSearch as grepSearchTool } from './tools/file-modification/grep-search';
 import { executeSandboxJs as executeSandboxJsTool } from './tools/browser/execute-sandbox-js';
 import { executeShellCommand as executeShellCommandTool } from './tools/shell/execute-shell-command';
@@ -73,9 +79,11 @@ import {
 import path from 'node:path';
 import type { z } from 'zod';
 import {
-  deleteFileToolInputSchema,
+  deleteToolInputSchema,
   multiEditToolInputSchema,
-  overwriteFileToolInputSchema,
+  writeToolInputSchema,
+  copyToolInputSchema,
+  type CopyToolInput,
   type StagewiseToolSet,
   type QuestionAnswerValue,
 } from '@shared/karton-contracts/ui/agent/tools/types';
@@ -126,6 +134,7 @@ export class ToolboxService extends DisposableService {
   private shellService: ShellService | null = null;
   private pluginsRuntime: ClientRuntimeNode | null = null;
   private appsRuntimes = new Map<string, ClientRuntimeNode>();
+  private attRuntimes = new Map<string, ClientRuntimeNode>();
 
   private mountManagerService: MountManagerService | null = null;
   private unsubPreferenceSync: (() => void) | null = null;
@@ -139,7 +148,8 @@ export class ToolboxService extends DisposableService {
 
   /**
    * Returns the mounted runtimes for the agent, including the
-   * read-only plugins runtime and the per-agent apps runtime.
+   * read-only plugins runtime, the per-agent apps runtime,
+   * and the per-agent attachment blob runtime.
    */
   private getAllMountedRuntimes(
     agentInstanceId: string,
@@ -150,6 +160,7 @@ export class ToolboxService extends DisposableService {
     if (this.pluginsRuntime) runtimes.set('plugins', this.pluginsRuntime);
     runtimes.set('apps', this.getOrCreateAppsRuntime(agentInstanceId));
     runtimes.set(PLANS_PREFIX, this.getOrCreatePlansRuntime());
+    runtimes.set('att', this.getOrCreateAttRuntime(agentInstanceId));
     return runtimes;
   }
 
@@ -181,6 +192,19 @@ export class ToolboxService extends DisposableService {
       rgBinaryBasePath: getRipgrepBasePath(),
     });
     this.appsRuntimes.set(agentInstanceId, runtime);
+    return runtime;
+  }
+
+  private getOrCreateAttRuntime(agentInstanceId: string): ClientRuntimeNode {
+    const existing = this.attRuntimes.get(agentInstanceId);
+    if (existing) return existing;
+    const attDir = getAgentBlobDir(agentInstanceId);
+    mkdirSync(attDir, { recursive: true });
+    const runtime = new ClientRuntimeNode({
+      workingDirectory: attDir,
+      rgBinaryBasePath: getRipgrepBasePath(),
+    });
+    this.attRuntimes.set(agentInstanceId, runtime);
     return runtime;
   }
 
@@ -258,12 +282,12 @@ export class ToolboxService extends DisposableService {
    * Wraps a file-modifying tool to capture before/after state and register with diff-history.
    *
    * @param description - Tool description for AI SDK
-   * @param inputSchema - Zod schema for tool input (must have relative_path field)
+   * @param inputSchema - Zod schema for tool input (must have path field)
    * @param executeFn - The actual tool execute function
    * @param agentInstanceId - The agent instance ID for diff-history attribution
    * @returns A wrapped tool that registers edits with diff-history
    */
-  private wrapFileModifyingTool<TParams extends { relative_path: string }>(
+  private wrapFileModifyingTool<TParams extends { path: string }>(
     description: string,
     inputSchema: z.ZodType<TParams>,
     executeFn: (
@@ -282,16 +306,16 @@ export class ToolboxService extends DisposableService {
         const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
         if (!mountedRuntimes) throw new Error('No mounted workspaces found');
 
-        const mountPrefix = normalizePath(params.relative_path).split('/')[0];
+        const mountPrefix = normalizePath(params.path).split('/')[0];
         if (NON_WORKSPACE_PREFIXES.has(mountPrefix))
           return executeFn(params, mountedRuntimes);
 
-        const { clientRuntime, relativePath } = resolveMountedRelativePath(
+        const { clientRuntime, path } = resolveMountedRelativePath(
           mountedRuntimes,
-          params.relative_path,
+          params.path,
         );
         const { toolCallId } = options as { toolCallId: string };
-        const absolutePath = clientRuntime.fileSystem.resolvePath(relativePath);
+        const absolutePath = clientRuntime.fileSystem.resolvePath(path);
 
         const beforeState = await captureFileState(absolutePath, this.tempDir);
         this.diffHistoryService.ignoreFileForWatcher(absolutePath);
@@ -365,6 +389,380 @@ export class ToolboxService extends DisposableService {
     });
   }
 
+  /**
+   * Wraps the delete tool with special handling for directory deletions.
+   * For single files, behaves like wrapFileModifyingTool.
+   * For directories, captures before-state for all files inside, deletes them,
+   * and registers individual diff-history entries for each file.
+   */
+  private wrapDeleteTool(agentInstanceId: string) {
+    return tool({
+      description: DELETE_FILE_DESCRIPTION,
+      inputSchema: deleteToolInputSchema as z.ZodType<{ path: string }>,
+      strict: true,
+      execute: async (params, options) => {
+        const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
+        if (!mountedRuntimes) throw new Error('No mounted workspaces found');
+
+        const mountPrefix = normalizePath(params.path).split('/')[0];
+        if (NON_WORKSPACE_PREFIXES.has(mountPrefix))
+          return deleteToolExecute(params, mountedRuntimes);
+
+        const { clientRuntime, path: resolvedPath } =
+          resolveMountedRelativePath(mountedRuntimes, params.path);
+        const { toolCallId } = options as { toolCallId: string };
+        const absolutePath = clientRuntime.fileSystem.resolvePath(resolvedPath);
+
+        // Check if target is a directory
+        const isDir = await clientRuntime.fileSystem.isDirectory(absolutePath);
+
+        if (!isDir) {
+          // Single file deletion — same logic as wrapFileModifyingTool
+          const beforeState = await captureFileState(
+            absolutePath,
+            this.tempDir,
+          );
+          this.diffHistoryService.ignoreFileForWatcher(absolutePath);
+
+          await deleteToolExecute(params, mountedRuntimes);
+          const afterState = await captureFileState(absolutePath, this.tempDir);
+
+          try {
+            const { editContent, tempFilesToCleanup } =
+              await buildAgentFileEditContent(
+                beforeState,
+                afterState,
+                this.tempDir,
+              );
+
+            if (!editContent.isExternal && editContent.contentBefore !== null)
+              void this.mountManagerService?.syncFileCloseWithLsp(
+                agentInstanceId,
+                absolutePath,
+              );
+
+            await this.diffHistoryService.registerAgentEdit({
+              agentInstanceId,
+              path: absolutePath,
+              toolCallId,
+              ...editContent,
+            });
+
+            for (const tempFile of tempFilesToCleanup)
+              void cleanupTempFile(tempFile);
+          } catch (error) {
+            this.logger.error(
+              '[ToolboxService] Failed to register agent edit',
+              { error, path: absolutePath, toolCallId },
+            );
+            this.report(error as Error, 'registerAgentEdit', {
+              path: absolutePath,
+              toolCallId,
+            });
+          } finally {
+            setTimeout(
+              () =>
+                this.diffHistoryService.unignoreFileForWatcher(absolutePath),
+              500,
+            );
+          }
+
+          const _diff =
+            !beforeState.isExternal && !afterState.isExternal
+              ? { before: beforeState.content, after: afterState.content }
+              : null;
+
+          return { _diff };
+        }
+
+        // Directory deletion — capture before-state for all files
+        const filePaths = await this.collectAllFiles(absolutePath);
+
+        // Capture before-state for each file and ignore them in watcher
+        const beforeStates = new Map<
+          string,
+          Awaited<ReturnType<typeof captureFileState>>
+        >();
+        for (const filePath of filePaths) {
+          beforeStates.set(
+            filePath,
+            await captureFileState(filePath, this.tempDir),
+          );
+          this.diffHistoryService.ignoreFileForWatcher(filePath);
+        }
+
+        // Execute the directory deletion
+        await deleteToolExecute(params, mountedRuntimes);
+
+        // Register diff-history for each deleted file
+        try {
+          for (const filePath of filePaths) {
+            const beforeState = beforeStates.get(filePath);
+            if (!beforeState) continue;
+
+            // After deletion, file doesn't exist
+            const afterState = await captureFileState(filePath, this.tempDir);
+
+            const { editContent, tempFilesToCleanup } =
+              await buildAgentFileEditContent(
+                beforeState,
+                afterState,
+                this.tempDir,
+              );
+
+            // Close in LSP to clear diagnostics
+            if (!editContent.isExternal && editContent.contentBefore !== null)
+              void this.mountManagerService?.syncFileCloseWithLsp(
+                agentInstanceId,
+                filePath,
+              );
+
+            await this.diffHistoryService.registerAgentEdit({
+              agentInstanceId,
+              path: filePath,
+              toolCallId,
+              ...editContent,
+            });
+
+            for (const tempFile of tempFilesToCleanup)
+              void cleanupTempFile(tempFile);
+          }
+        } catch (error) {
+          this.logger.error(
+            '[ToolboxService] Failed to register agent edit for directory deletion',
+            { error, path: absolutePath, toolCallId },
+          );
+          this.report(error as Error, 'registerAgentEdit', {
+            path: absolutePath,
+            toolCallId,
+          });
+        } finally {
+          for (const filePath of filePaths) {
+            setTimeout(
+              () => this.diffHistoryService.unignoreFileForWatcher(filePath),
+              500,
+            );
+          }
+        }
+
+        // For directory deletions, _diff is null (no single-file diff to show)
+        return { _diff: null };
+      },
+    });
+  }
+
+  /**
+   * Recursively collect all file paths in a directory.
+   */
+  private async collectAllFiles(dirPath: string): Promise<string[]> {
+    const files: string[] = [];
+    const entries = await fsPromises.readdir(dirPath, {
+      withFileTypes: true,
+    });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        const subFiles = await this.collectAllFiles(fullPath);
+        files.push(...subFiles);
+      } else {
+        files.push(fullPath);
+      }
+    }
+    return files;
+  }
+
+  /**
+   * Creates the copy/move tool with custom diff-history tracking.
+   * Unlike wrapFileModifyingTool, this handles two paths (input + output)
+   * and for moves also registers the source deletion.
+   */
+  private createCopyTool(agentInstanceId: string) {
+    return tool({
+      description: COPY_DESCRIPTION,
+      inputSchema: copyToolInputSchema,
+      strict: true,
+      execute: async (params: CopyToolInput, options) => {
+        const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
+        if (!mountedRuntimes) throw new Error('No mounted workspaces found');
+
+        const { toolCallId } = options as { toolCallId: string };
+        const { input_path, output_path, move } = params;
+
+        const srcMountPrefix = normalizePath(input_path).split('/')[0];
+        const destMountPrefix = normalizePath(output_path).split('/')[0];
+
+        // Block moves from read-only mounts (att, plugins)
+        if (move && NON_WORKSPACE_PREFIXES.has(srcMountPrefix)) {
+          throw new Error(
+            `Cannot move from read-only mount '${srcMountPrefix}'. Use copy instead.`,
+          );
+        }
+
+        // Block writes into read-only mounts
+        if (NON_WORKSPACE_PREFIXES.has(destMountPrefix)) {
+          throw new Error(
+            `Cannot copy/move into read-only mount '${destMountPrefix}'.`,
+          );
+        }
+
+        // Resolve both paths
+        const { clientRuntime: srcRuntime, path: srcRelative } =
+          resolveMountedRelativePath(mountedRuntimes, input_path);
+        const { clientRuntime: destRuntime, path: destRelative } =
+          resolveMountedRelativePath(mountedRuntimes, output_path);
+
+        const srcAbsolute = srcRuntime.fileSystem.resolvePath(srcRelative);
+        const destAbsolute = destRuntime.fileSystem.resolvePath(destRelative);
+        const srcIsDir = await srcRuntime.fileSystem.isDirectory(srcAbsolute);
+
+        // Collect all affected output files for diff-history
+        // For a directory copy, we need to track every file that gets created
+        let destFilePaths: string[];
+        let srcFilePaths: string[];
+
+        if (srcIsDir) {
+          srcFilePaths = await this.collectAllFiles(srcAbsolute);
+          // Map source file paths to their destination equivalents
+          destFilePaths = srcFilePaths.map((srcFile) => {
+            const relative = path.relative(srcAbsolute, srcFile);
+            return path.join(destAbsolute, relative);
+          });
+        } else {
+          // Single file — check if dest is a directory
+          const destIsDir =
+            await destRuntime.fileSystem.isDirectory(destAbsolute);
+          const finalDest = destIsDir
+            ? path.join(destAbsolute, path.basename(srcAbsolute))
+            : destAbsolute;
+          srcFilePaths = [srcAbsolute];
+          destFilePaths = [finalDest];
+        }
+
+        // Capture before-state for destination files
+        const destBeforeStates = new Map<
+          string,
+          Awaited<ReturnType<typeof captureFileState>>
+        >();
+        for (const destFile of destFilePaths) {
+          destBeforeStates.set(
+            destFile,
+            await captureFileState(destFile, this.tempDir),
+          );
+          this.diffHistoryService.ignoreFileForWatcher(destFile);
+        }
+
+        // For moves, also capture before-state for source files
+        const srcBeforeStates = new Map<
+          string,
+          Awaited<ReturnType<typeof captureFileState>>
+        >();
+        if (move) {
+          for (const srcFile of srcFilePaths) {
+            srcBeforeStates.set(
+              srcFile,
+              await captureFileState(srcFile, this.tempDir),
+            );
+            this.diffHistoryService.ignoreFileForWatcher(srcFile);
+          }
+        }
+
+        // Execute the copy/move
+        const result = await copyToolExecute(params, mountedRuntimes);
+
+        // Register diff-history for destination files (created/overwritten)
+        try {
+          for (const destFile of destFilePaths) {
+            const beforeState = destBeforeStates.get(destFile);
+            if (!beforeState) continue;
+
+            const afterState = await captureFileState(destFile, this.tempDir);
+            const { editContent, tempFilesToCleanup } =
+              await buildAgentFileEditContent(
+                beforeState,
+                afterState,
+                this.tempDir,
+              );
+
+            if (!editContent.isExternal && editContent.contentAfter !== null)
+              void this.mountManagerService?.syncFileWithLsp(
+                agentInstanceId,
+                destFile,
+                editContent.contentAfter,
+              );
+
+            await this.diffHistoryService.registerAgentEdit({
+              agentInstanceId,
+              path: destFile,
+              toolCallId,
+              ...editContent,
+            });
+
+            for (const tempFile of tempFilesToCleanup)
+              void cleanupTempFile(tempFile);
+          }
+
+          // For moves, register source file deletions
+          if (move) {
+            for (const srcFile of srcFilePaths) {
+              const beforeState = srcBeforeStates.get(srcFile);
+              if (!beforeState) continue;
+
+              const afterState = await captureFileState(srcFile, this.tempDir);
+              const { editContent, tempFilesToCleanup } =
+                await buildAgentFileEditContent(
+                  beforeState,
+                  afterState,
+                  this.tempDir,
+                );
+
+              if (!editContent.isExternal && editContent.contentBefore !== null)
+                void this.mountManagerService?.syncFileCloseWithLsp(
+                  agentInstanceId,
+                  srcFile,
+                );
+
+              await this.diffHistoryService.registerAgentEdit({
+                agentInstanceId,
+                path: srcFile,
+                toolCallId,
+                ...editContent,
+              });
+
+              for (const tempFile of tempFilesToCleanup)
+                void cleanupTempFile(tempFile);
+            }
+          }
+        } catch (error) {
+          this.logger.error(
+            '[ToolboxService] Failed to register agent edit for copy/move',
+            { error, input_path, output_path, toolCallId },
+          );
+          this.report(error as Error, 'registerAgentEdit', {
+            path: output_path,
+            toolCallId,
+          });
+        } finally {
+          for (const destFile of destFilePaths) {
+            setTimeout(
+              () => this.diffHistoryService.unignoreFileForWatcher(destFile),
+              500,
+            );
+          }
+          if (move) {
+            for (const srcFile of srcFilePaths) {
+              setTimeout(
+                () => this.diffHistoryService.unignoreFileForWatcher(srcFile),
+                500,
+              );
+            }
+          }
+        }
+
+        return { ...(result as object), _diff: null };
+      },
+    });
+  }
+
   public async getTool<TToolName extends keyof StagewiseToolSet>(
     tool: TToolName,
     agentInstanceId: string,
@@ -397,23 +795,29 @@ export class ToolboxService extends DisposableService {
     if (!mountedLspServices) return null;
 
     switch (tool) {
-      case 'deleteFile':
+      case 'write':
         if (mountedRuntimes.size === 0) return null;
         return this.wrapFileModifyingTool(
-          DELETE_FILE_DESCRIPTION,
-          deleteFileToolInputSchema,
-          deleteFileToolExecute,
+          WRITE_DESCRIPTION,
+          writeToolInputSchema,
+          writeToolExecute,
           agentInstanceId,
         );
+      case 'read':
+        if (mountedRuntimes.size === 0) return null;
+        return readTool(mountedRuntimes);
+      case 'ls':
+        if (mountedRuntimes.size === 0) return null;
+        return lsTool(mountedRuntimes);
+      case 'delete':
+        if (mountedRuntimes.size === 0) return null;
+        return this.wrapDeleteTool(agentInstanceId);
       case 'glob':
         if (mountedRuntimes.size === 0) return null;
         return globTool(mountedRuntimes);
       case 'grepSearch':
         if (mountedRuntimes.size === 0) return null;
         return grepSearchTool(mountedRuntimes);
-      case 'listFiles':
-        if (mountedRuntimes.size === 0) return null;
-        return listFilesTool(mountedRuntimes);
       case 'multiEdit':
         if (mountedRuntimes.size === 0) return null;
         return this.wrapFileModifyingTool(
@@ -422,17 +826,12 @@ export class ToolboxService extends DisposableService {
           multiEditToolExecute,
           agentInstanceId,
         );
-      case 'overwriteFile':
+      case 'mkdir':
         if (mountedRuntimes.size === 0) return null;
-        return this.wrapFileModifyingTool(
-          OVERWRITE_FILE_DESCRIPTION,
-          overwriteFileToolInputSchema,
-          overwriteFileToolExecute,
-          agentInstanceId,
-        );
-      case 'readFile':
+        return mkdirTool(mountedRuntimes);
+      case 'copy':
         if (mountedRuntimes.size === 0) return null;
-        return readFileTool(mountedRuntimes);
+        return this.createCopyTool(agentInstanceId);
       case 'listLibraryDocs':
         if (!this.apiClient) return null;
         return listLibraryDocsTool(this.apiClient);
@@ -527,7 +926,7 @@ export class ToolboxService extends DisposableService {
     mounts.push({
       prefix: 'att',
       absolutePath: attDir,
-      permissions: APPEND_ONLY_PERMISSIONS,
+      permissions: READ_ONLY_PERMISSIONS,
     });
 
     mounts.push({
@@ -633,7 +1032,7 @@ export class ToolboxService extends DisposableService {
       {
         prefix: 'att',
         path: getAgentBlobDir(agentInstanceId),
-        permissions: [...APPEND_ONLY_PERMISSIONS] as MountPermission[],
+        permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
       },
       {
         prefix: 'plugins',
@@ -979,14 +1378,33 @@ export class ToolboxService extends DisposableService {
     return this.apiClient;
   }
 
+  /**
+   * Drains all pending sandbox attachments (created via API.createAttachment()
+   * during this step) for the given agent and returns them as a flat array.
+   * Clears the pending buffers as a side effect.
+   */
+  public drainSandboxAttachments(agentInstanceId: string): Attachment[] {
+    if (!this.sandboxService) return [];
+    return this.sandboxService.drainPendingAttachments(agentInstanceId);
+  }
+
   public getMountedPathsForAgent(
     agentInstanceId: string,
   ): Map<MountedPrefix, MountedPath> {
     const mounts =
       this.mountManagerService?.getMountedPathsWithRuntimes(agentInstanceId);
-    if (!mounts) return new Map();
     const result = new Map<MountedPrefix, MountedPath>();
-    for (const mount of mounts) result.set(mount.prefix, mount.path);
+    if (mounts) {
+      for (const mount of mounts) result.set(mount.prefix, mount.path);
+    }
+
+    // Include always-available special mounts so that path references
+    // from plugin skill reads (plugins/), attachment blobs (att/), and
+    // agent apps (apps/) can be resolved during content injection.
+    result.set('plugins', getPluginsPath());
+    result.set('apps', getAgentAppsDir(agentInstanceId));
+    result.set('att', getAgentBlobDir(agentInstanceId));
+    result.set(PLANS_PREFIX, getPlansDir());
 
     return result;
   }

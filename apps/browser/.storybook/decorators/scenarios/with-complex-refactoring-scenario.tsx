@@ -11,7 +11,7 @@ import {
   createAssistantMessage,
   createReasoningPart,
   createTextPart,
-  createReadFileToolPart,
+  createReadToolPart,
   createMultiEditToolPart,
   REALISTIC_TIMING,
   getRandomDuration,
@@ -257,7 +257,7 @@ function buildComplexRefactoringTimeline(
       messageId: assistantMessageId,
       partIndex: pIndex,
       updater: () =>
-        createReadFileToolPart(file.path, '', 'input-streaming', {
+        createReadToolPart(file.path, 'input-streaming', {
           toolCallId: toolId,
         }),
     });
@@ -385,7 +385,7 @@ function buildComplexRefactoringTimeline(
       toolCallId: editToolIds[index]!,
       newState: 'input-available',
       input: {
-        relative_path: edit.path,
+        path: edit.path,
         edits: [
           {
             old_string: edit.beforeContent,
@@ -489,7 +489,7 @@ function buildComplexRefactoringTimeline(
     toolCallId: finalToolId,
     newState: 'input-available',
     input: {
-      relative_path: finalEdit.path,
+      path: finalEdit.path,
       edits: [
         {
           old_string: finalEdit.beforeContent,

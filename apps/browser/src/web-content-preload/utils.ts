@@ -441,18 +441,27 @@ const getComputedStyles = (
 };
 
 /**
- * Get text content of an element, excluding content from <style> and <script> tags.
- * This prevents CSS and JavaScript code from appearing in textContent.
+ * Get the visible (rendered) text of an element.
+ *
+ * Uses `innerText` which respects CSS visibility and layout — hidden
+ * elements, `<script>`, `<style>`, and `display:none` content are
+ * automatically excluded.  Falls back to a cleaned `textContent` for
+ * elements that don't support `innerText` (e.g. SVG).
  */
 const getCleanTextContent = (element: Element): string => {
-  // Clone the element to avoid modifying the original
+  // Prefer innerText: returns rendered text, excludes hidden content,
+  // <script>/<style>, and respects CSS layout.
+  if (
+    'innerText' in element &&
+    typeof (element as HTMLElement).innerText === 'string'
+  ) {
+    return (element as HTMLElement).innerText;
+  }
+
+  // Fallback for non-HTML elements (SVG, MathML, etc.): clone and strip
+  // script/style nodes manually.
   const clone = element.cloneNode(true) as Element;
-
-  // Remove all <style> and <script> elements from the clone
-  const styleAndScriptElements = clone.querySelectorAll('style, script');
-  styleAndScriptElements.forEach((el) => el.remove());
-
-  // Get textContent from the cleaned clone
+  clone.querySelectorAll('style, script').forEach((el) => el.remove());
   return clone.textContent || '';
 };
 
@@ -808,7 +817,7 @@ const serializeElementRecursive = (
       width: boundingRect.width,
       height: boundingRect.height,
     },
-    textContent: truncateString(getCleanTextContent(element), 512) ?? 'unknown',
+    innerText: truncateString(getCleanTextContent(element), 512) ?? 'unknown',
     parent: parent ?? undefined,
     siblings,
     children,
