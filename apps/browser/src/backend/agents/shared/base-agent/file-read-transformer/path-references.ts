@@ -66,8 +66,8 @@ export function extractPathLinksFromMessage(message: AgentMessage): string[] {
  * Extracts all unique file paths from completed `readFile` tool-call parts
  * on an assistant message.
  *
- * Only considers parts that have reached a terminal state (`output-available`
- * or `output-error`) — pending/in-progress calls are ignored.
+ * Only considers parts that have successfully completed (`output-available`) —
+ * pending, in-progress, and failed (`output-error`) calls are ignored.
  *
  * @returns Deduplicated array of mount-prefixed paths.
  */
@@ -82,9 +82,9 @@ export function extractReadFilePathsFromAssistantMessage(
     if (part.type !== 'tool-read') continue;
     if (!('input' in part) || !part.input) continue;
 
-    // Only extract from completed tool calls
+    // Only extract from successfully completed tool calls
     const state = 'state' in part ? part.state : undefined;
-    if (state !== 'output-available' && state !== 'output-error') continue;
+    if (state !== 'output-available') continue;
 
     const relativePath = part.input.path;
     if (typeof relativePath === 'string' && relativePath.length > 0) {

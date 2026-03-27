@@ -1404,6 +1404,7 @@ export class ToolboxService extends DisposableService {
     result.set('plugins', getPluginsPath());
     result.set('apps', getAgentAppsDir(agentInstanceId));
     result.set('att', getAgentBlobDir(agentInstanceId));
+    result.set(PLANS_PREFIX, getPlansDir());
 
     return result;
   }

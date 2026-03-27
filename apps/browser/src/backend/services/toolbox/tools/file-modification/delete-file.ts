@@ -9,6 +9,7 @@ import {
 } from '../../utils';
 import { resolveMountedRelativePath } from '../../utils/path-mounting';
 import fs from 'node:fs/promises';
+import nodePath from 'node:path';
 
 export const DESCRIPTION = `Delete a file or directory from the file system with undo capability.
 
@@ -35,6 +36,16 @@ export async function deleteToolExecute(
 
   try {
     const absolutePath = clientRuntime.fileSystem.resolvePath(path);
+    const mountRoot = nodePath.resolve(
+      clientRuntime.fileSystem.getCurrentWorkingDirectory(),
+    );
+    const resolved = nodePath.resolve(absolutePath);
+    if (
+      resolved !== mountRoot &&
+      !resolved.startsWith(mountRoot + nodePath.sep)
+    ) {
+      throw new Error('Path traversal not allowed');
+    }
 
     // Check if target exists
     const fileExists = await clientRuntime.fileSystem.fileExists(absolutePath);
