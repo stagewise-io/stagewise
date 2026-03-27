@@ -1016,9 +1016,19 @@ export abstract class BaseAgent<
     const capabilities = getModelCapabilities(activeModelId);
 
     const shellInfo = this.toolbox.getShellInfo();
-    const skillsList = await this.toolbox.getSkillsList(this.instanceId);
-    const skillDetails = new Map(skillsList.map((s) => [s.path, s]));
     const commands = await this.toolbox.getCommandsList(this.instanceId);
+    const skillDetails = new Map(
+      commands
+        .filter((c) => c.agentInvocable !== false && c.skillPath)
+        .map((c) => [
+          c.skillPath!,
+          {
+            name: c.displayName,
+            description: c.description,
+            path: c.skillPath!,
+          },
+        ]),
+    );
 
     return convertAgentMessagesToModelMessages(
       messages,

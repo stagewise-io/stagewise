@@ -1,6 +1,6 @@
 /**
  * Source of a slash command.
- * - `builtin` — shipped with the app (bundled/commands/)
+ * - `builtin` — shipped with the app (bundled/skills/)
  * - `workspace` — discovered from a mounted workspace skill
  * - `plugin` — discovered from a bundled plugin skill
  */
@@ -17,8 +17,17 @@ export type CommandDefinition = {
   source: CommandSource;
   /** Absolute path to the content file — resolved lazily at injection time. */
   contentPath: string;
-  /** When true, the command is available to the agent but hidden from the slash-command UI. */
-  hidden?: boolean;
+  /**
+   * Agent-facing path used in the env-snapshot skills list.
+   * Mount-prefixed for workspace skills (e.g. `w1/.stagewise/skills/foo`),
+   * `plugins/{id}/SKILL.md` for plugin skills.
+   * Absent for builtins.
+   */
+  skillPath?: string;
+  /** Whether this item appears in the slash-command popup. Defaults to `true` when absent. */
+  userInvocable?: boolean;
+  /** Whether this item appears in the system prompt for the agent. Defaults to `true` when absent. */
+  agentInvocable?: boolean;
   /**
    * Mount prefix of the workspace that owns this command.
    * Only set when `source === 'workspace'`.

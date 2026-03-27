@@ -4,6 +4,7 @@ import {
   getRipgrepBasePath,
   getAgentAppsDir,
 } from '@/utils/paths';
+import { syncDerivedState } from '@/utils/sync-derived-state';
 import { MountManagerService } from './services/mount-manager';
 import type { FilePickerService } from '@/services/file-picker';
 import type { UserExperienceService } from '@/services/experience';
@@ -96,7 +97,6 @@ import type { ContextFilesResult } from '@shared/karton-contracts/pages-api/type
 import {
   getSkills,
   discoverSkills,
-  type Skill,
 } from '@/agents/shared/prompts/utils/get-skills';
 import type { CommandDefinition } from '@shared/commands';
 import { toCommandDefinitionUI } from '@shared/commands';
@@ -128,6 +128,7 @@ export class ToolboxService extends DisposableService {
   private appsRuntimes = new Map<string, ClientRuntimeNode>();
 
   private mountManagerService: MountManagerService | null = null;
+  private unsubPreferenceSync: (() => void) | null = null;
 
   /** Cached API client - recreated when auth changes */
   private apiClient: ApiClient | null = null;
@@ -651,11 +652,11 @@ export class ToolboxService extends DisposableService {
       },
     ];
 
-    const [agentsMdEntries, workspaceMdEntries, skills, planEntries] =
+    const [agentsMdEntries, workspaceMdEntries, commands, planEntries] =
       await Promise.all([
         this.getAllAgentsMdEntries(agentInstanceId),
         this.getWorkspaceMd(agentInstanceId),
-        this.getSkillsList(agentInstanceId),
+        this.getCommandsList(agentInstanceId),
         this.getPlansList(agentInstanceId),
       ]);
 
@@ -717,7 +718,9 @@ export class ToolboxService extends DisposableService {
         })),
       },
       enabledSkills: {
-        paths: skills.map((s) => s.path),
+        paths: commands
+          .filter((c) => c.agentInvocable !== false && c.skillPath)
+          .map((c) => c.skillPath!),
       },
       browserSessionId: getBrowserSessionId(),
       plans: {
@@ -726,50 +729,6 @@ export class ToolboxService extends DisposableService {
     };
 
     return snapshot;
-  }
-
-  public async getSkillsList(agentInstanceId: string): Promise<Skill[]> {
-    const result: Skill[] = [];
-
-    const mounts =
-      this.mountManagerService?.getMountedPathsWithRuntimes(agentInstanceId);
-    if (mounts) {
-      for (const mount of mounts) {
-        const settings = this.uiKarton.state.preferences?.agent
-          ?.workspaceSettings?.[mount.path] ?? {
-          respectAgentsMd: false,
-          disabledSkills: [],
-        };
-        const disabled = new Set(settings.disabledSkills);
-        const skills = await getSkills(mount.clientRuntime);
-        const wsRoot =
-          mount.clientRuntime.fileSystem.getCurrentWorkingDirectory();
-
-        for (const skill of skills) {
-          if (disabled.has(skill.name)) continue;
-          const relativePath = path.relative(wsRoot, skill.path);
-          result.push({
-            ...skill,
-            path: `${mount.prefix}/${relativePath}`,
-          });
-        }
-      }
-    }
-
-    const disabledPlugins = new Set(
-      this.uiKarton.state.preferences?.agent?.disabledPluginIds ?? [],
-    );
-    const pluginSkills = await discoverSkills(getPluginsPath());
-    for (const skill of pluginSkills) {
-      const pluginId = path.basename(skill.path);
-      if (disabledPlugins.has(pluginId)) continue;
-      result.push({
-        ...skill,
-        path: `plugins/${pluginId}/SKILL.md`,
-      });
-    }
-
-    return result;
   }
 
   /**
@@ -792,7 +751,9 @@ export class ToolboxService extends DisposableService {
   private async rebuildCommandsList(agentInstanceId: string): Promise<void> {
     const commands = await this.getCommandsList(agentInstanceId);
     this.uiKarton.setState((draft) => {
-      draft.commands = commands.map(toCommandDefinitionUI);
+      draft.commands = commands
+        .filter((c) => c.userInvocable !== false)
+        .map(toCommandDefinitionUI);
     });
   }
 
@@ -825,13 +786,17 @@ export class ToolboxService extends DisposableService {
           const id = `skill:${skill.name}`;
           if (seen.has(id)) continue;
           seen.add(id);
+          const relativePath = path.relative(mount.path, skill.path);
           result.push({
             id,
             displayName: skill.name,
             description: skill.description,
             source: 'workspace',
             contentPath: path.resolve(skill.path, 'SKILL.md'),
+            skillPath: `${mount.prefix}/${relativePath}`,
             workspacePrefix: mount.prefix,
+            userInvocable: skill.userInvocable,
+            agentInvocable: skill.agentInvocable,
           });
         }
       }
@@ -854,7 +819,10 @@ export class ToolboxService extends DisposableService {
         description: skill.description,
         source: 'plugin',
         contentPath: path.resolve(skill.path, 'SKILL.md'),
+        skillPath: `plugins/${pluginId}/SKILL.md`,
         pluginId,
+        userInvocable: skill.userInvocable,
+        agentInvocable: skill.agentInvocable,
       });
     }
 
@@ -1144,6 +1112,20 @@ export class ToolboxService extends DisposableService {
       void this.rebuildCommandsList(agentInstanceId);
     });
 
+    // Rebuild the slash-command list whenever skill/plugin preferences change
+    // so toggles in Agent Settings take effect immediately.
+    this.unsubPreferenceSync = syncDerivedState(
+      this.uiKarton,
+      (state) => ({
+        ws: state.preferences?.agent?.workspaceSettings,
+        plugins: state.preferences?.agent?.disabledPluginIds,
+      }),
+      () => {
+        const activeIds = Object.keys(this.uiKarton.state.agents.instances);
+        for (const id of activeIds) void this.rebuildCommandsList(id);
+      },
+    );
+
     // Start watching the global plans directory
     this.startPlansWatcher();
 
@@ -1352,6 +1334,9 @@ export class ToolboxService extends DisposableService {
   }
 
   protected onTeardown(): Promise<void> | void {
+    this.unsubPreferenceSync?.();
+    this.unsubPreferenceSync = null;
+
     this.apiClient = null;
 
     this.stopPlansWatcher();

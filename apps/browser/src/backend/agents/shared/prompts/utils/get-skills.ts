@@ -8,11 +8,17 @@ export interface Skill {
   name: string;
   description: string;
   path: string;
+  /** Whether this skill appears in the slash-command popup. Defaults to `true`. */
+  userInvocable: boolean;
+  /** Whether this skill appears in the system prompt for the agent. Defaults to `true`. */
+  agentInvocable: boolean;
 }
 
 export function parseFrontmatter(content: string): {
   name?: string;
   description?: string;
+  userInvocable?: boolean;
+  agentInvocable?: boolean;
 } {
   try {
     const { data } = matter(content);
@@ -20,6 +26,14 @@ export function parseFrontmatter(content: string): {
       name: typeof data.name === 'string' ? data.name : undefined,
       description:
         typeof data.description === 'string' ? data.description : undefined,
+      userInvocable:
+        typeof data['user-invocable'] === 'boolean'
+          ? data['user-invocable']
+          : undefined,
+      agentInvocable:
+        typeof data['agent-invocable'] === 'boolean'
+          ? data['agent-invocable']
+          : undefined,
     };
   } catch {
     return {};
@@ -46,6 +60,8 @@ export async function discoverSkills(skillsDir: string): Promise<Skill[]> {
       name: meta.name,
       description: meta.description,
       path: skillPath,
+      userInvocable: meta.userInvocable ?? true,
+      agentInvocable: meta.agentInvocable ?? true,
     });
   }
 

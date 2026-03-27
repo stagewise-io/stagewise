@@ -1,6 +1,8 @@
 ---
-displayName: Plan
+name: Plan
 description: Create a structured implementation plan before coding
+user-invocable: true
+agent-invocable: false
 ---
 
 You must create a structured implementation plan. Follow these instructions:

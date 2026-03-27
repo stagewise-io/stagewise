@@ -38,12 +38,13 @@ import { wirePagesHandlers } from './wiring/pages-handler-wiring';
 import {
   ensureDataDirectories,
   getPluginsPath,
-  getBuiltinCommandsPath,
+  getBuiltinSkillsPath,
   getRipgrepBasePath,
 } from './utils/paths';
 import { migrateLegacyPaths } from './utils/migrate-legacy-paths';
 import { discoverPlugins } from './utils/discover-plugins';
-import { discoverCommands } from './utils/discover-commands';
+import { discoverSkills } from './agents/shared/prompts/utils/get-skills';
+import type { CommandDefinition } from '@shared/commands';
 import { AssetCacheService } from './services/asset-cache';
 import { ProcessedImageCacheService } from './services/processed-image-cache';
 
@@ -303,11 +304,20 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 
   // Push bundled slash command definitions via the toolbox so it can
   // merge them with workspace/plugin skills on mount changes.
-  discoverCommands(getBuiltinCommandsPath()).then((commands) => {
+  discoverSkills(getBuiltinSkillsPath()).then((skills) => {
+    const commands: CommandDefinition[] = skills.map((s) => ({
+      id: `command:${s.name.toLowerCase()}`,
+      displayName: s.name,
+      description: s.description,
+      source: 'builtin' as const,
+      contentPath: `${s.path}/SKILL.md`,
+      userInvocable: s.userInvocable,
+      agentInvocable: s.agentInvocable,
+    }));
     toolboxService.setBuiltinCommands(commands);
     if (verbose)
       logger.debug(
-        `[Main] Pushed ${commands.length} bundled commands to UI karton`,
+        `[Main] Pushed ${commands.length} bundled skills to UI karton`,
       );
   });
 

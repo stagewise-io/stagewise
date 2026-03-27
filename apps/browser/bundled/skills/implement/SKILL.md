@@ -1,7 +1,8 @@
 ---
-displayName: Implement
+name: Implement
 description: Implement the most recent plan
-hidden: true
+user-invocable: false
+agent-invocable: false
 ---
 
 Implement the most recently created plan. 

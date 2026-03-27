@@ -40,10 +40,9 @@ export function querySlashItems(query: string): SlashItem[] {
   const all = slashCommandsRef.current
     .filter(
       (cmd) =>
-        !cmd.hidden &&
-        (cmd.id.toLowerCase().includes(q) ||
-          cmd.displayName.toLowerCase().includes(q) ||
-          cmd.description.toLowerCase().includes(q)),
+        cmd.id.toLowerCase().includes(q) ||
+        cmd.displayName.toLowerCase().includes(q) ||
+        cmd.description.toLowerCase().includes(q),
     )
     .map(
       (cmd): SlashItem => ({

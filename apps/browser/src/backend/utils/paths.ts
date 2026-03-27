@@ -87,8 +87,8 @@ export const getPluginsPath = (): string => {
   return path.join(app.getAppPath(), 'bundled', 'plugins');
 };
 
-export const getBuiltinCommandsPath = (): string => {
+export const getBuiltinSkillsPath = (): string => {
   if (app.isPackaged)
-    return path.join(process.resourcesPath, 'bundled', 'commands');
-  return path.join(app.getAppPath(), 'bundled', 'commands');
+    return path.join(process.resourcesPath, 'bundled', 'skills');
+  return path.join(app.getAppPath(), 'bundled', 'skills');
 };
