@@ -175,8 +175,8 @@ export const ExploreAndEdit: Story = {
     explorationScenario: {
       userMessage: 'Find and fix all button components',
       thinkingText: 'Let me explore the component structure...',
-      lsPath: 'src/components',
-      lsResult: [
+      readDriectoryPath: 'src/components',
+      readDirectoryContent: [
         { relativePath: 'Button.tsx', name: 'Button.tsx', type: 'file', depth: 0 },
         { relativePath: 'IconButton.tsx', name: 'IconButton.tsx', type: 'file', depth: 0 },
       ],

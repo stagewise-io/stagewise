@@ -9,11 +9,13 @@ Prompt patterns for tool-using, multi-step, and long-running AI agent systems.
 Models may suggest changes instead of implementing them. Direct language fixes this.
 
 **Passive (model may only suggest):**
+
 ```
 Can you help fix this bug?
 ```
 
 **Active (model will act):**
+
 ```
 Find and fix the bug in this function. Edit the file directly.
 ```
@@ -77,7 +79,7 @@ Extended thinking adds latency. Only use it for problems requiring multi-step
 reasoning. When in doubt, respond directly.
 ```
 
-### Manual chain-of-thought (when thinking is off)
+### Manual chain-of-thought (use when thinking is off of model doesnt support thinking natively)
 
 Use structured tags to separate reasoning from output:
 

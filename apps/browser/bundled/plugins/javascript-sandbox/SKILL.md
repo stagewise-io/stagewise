@@ -55,8 +55,7 @@ Sandboxed `fs` and `fsPromises` globals are available directly (also via `requir
 - All standard `fs` methods available (callback, sync, and promise APIs).
 - **`att/`** — read-only access to attachments. Create with `API.createAttachment()`.
 - **`plugins/`** — read-only access to plugin files.
-- For editing workspace files, **prefer native file tools** (`multiEdit`, `overwriteFile`) over sandbox `fs`.
-- Use sandbox `fs` only for binary operations or cross-mount copies.
+- Sandbox `fs` is well-suited for binary operations and cross-mount copies.
 
 ---
 
@@ -90,7 +89,7 @@ Mini apps are interactive web UIs rendered in the chat sidebar. Use `API.openApp
 - Use `fetch` for all network requests.
 - Implement error handling with fallbacks and sensible retries.
 - Split multi-step scripts into separate invocations.
-- **Do NOT** use the sandbox to write mini app files — use native file tools, then the sandbox only for `API.openApp` and messaging.
+- After writing or updating mini app files, use `API.openApp` to reload the app and `API.sendMessage` / `API.onMessage` for messaging.
 
 ## References
 

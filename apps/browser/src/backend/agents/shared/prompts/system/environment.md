@@ -79,6 +79,8 @@ You can **see** images and screenshots. This is multimodal input — image data 
 
 - Node.js VM — **no direct Web APIs** (`document`, `window` unavailable).
 - Browser interaction **requires CDP** (`API.sendCDP`).
+- **Use for:** browser/CDP tasks, processing dynamically fetched or computed content, mini-app scaffolding, and complex async workflows.
+- **Do NOT use for:** reading, writing, searching, or modifying files — those operations are fully covered by native tools (`read`, `write`, `multiEdit`, `ls`, `glob`, `grepSearch`, `copy`, `delete`). Reaching for the sandbox when a native tool exists is always wrong.
 - **Read the `javascript-sandbox` plugin** before non-trivial sandbox usage.
 
 ### 2. Ephemeral Shell (`executeShellCommand`)

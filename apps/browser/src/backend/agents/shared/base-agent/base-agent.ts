@@ -1102,7 +1102,15 @@ export abstract class BaseAgent<
         const mountRoot = mountPaths.get(prefix);
         if (!mountRoot)
           throw new Error(`Mount "${prefix}" not found for agent ${agentId}`);
-        return fs.readFile(nodePath.join(mountRoot, relative));
+        const resolved = nodePath.resolve(nodePath.join(mountRoot, relative));
+        const mountRootNormalized = nodePath.resolve(mountRoot);
+        if (
+          resolved !== mountRootNormalized &&
+          !resolved.startsWith(mountRootNormalized + nodePath.sep)
+        ) {
+          throw new Error('Path traversal outside mount root');
+        }
+        return fs.readFile(resolved);
       },
       capabilities,
       shellInfo,

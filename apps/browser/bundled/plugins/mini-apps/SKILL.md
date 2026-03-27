@@ -24,12 +24,7 @@ apps/{appId}/
 
 ## Writing App Files
 
-**Always use native file tools** (`overwriteFile`, `multiEdit`) to create and edit app files. Do NOT use the JavaScript sandbox for writing app content.
-
-- **Initial scaffolding:** Use `overwriteFile` to create each file (`index.html`, `styles.css`, `script.js`).
-- **Updating:** Use `multiEdit` for targeted changes, then reload via sandbox with `await API.openApp("appId")`.
-
-Native file tools integrate with diff-history and undo, and allow incremental edits without rewriting entire files.
+Create and edit app files (`index.html`, `styles.css`, `script.js`), then reload via the sandbox with `await API.openApp("appId")`.
 
 ---
 
@@ -64,6 +59,7 @@ Apps and the sandbox communicate via `postMessage`.
 **App → Sandbox:** `API.onMessage(appId, callback, opts?)` — registers a listener for messages the app sends via `window.parent.postMessage(data, "*")`. Returns an unsubscribe function. Listeners persist across IIFE executions; use `globalThis` to accumulate messages.
 
 **Inside the app (HTML/JS):**
+
 - Receive: `window.addEventListener("message", (e) => { /* e.data */ })`
 - Send: `window.parent.postMessage({ action: "clicked", id: 1 }, "*")`
 
@@ -71,7 +67,7 @@ Apps and the sandbox communicate via `postMessage`.
 
 ## Best Practices
 
-- **Use native file tools for all file writes.** Sandbox only for `openApp`, `sendMessage`, `onMessage`.
+- **Sandbox usage:** Use the sandbox only for `openApp`, `sendMessage`, and `onMessage`.
 - **Responsive design:** Design for 300–500px width. Use `max-width: 100%`, `overflow-x: hidden`, `box-sizing: border-box`.
 - **Viewport meta tag:** Always include `<meta name="viewport" content="width=device-width, initial-scale=1">`.
 - **File organization:** `index.html` as entry point. Split CSS and JS into separate files for maintainability.
@@ -83,4 +79,5 @@ Apps and the sandbox communicate via `postMessage`.
 ## References
 
 For detailed examples, see:
+
 - `references/examples.md` — Full mini app examples (minimal app, multi-file app, interactive picker with messaging)
