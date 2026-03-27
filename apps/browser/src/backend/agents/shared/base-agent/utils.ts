@@ -9,7 +9,7 @@ import {
   type FilePart,
 } from 'ai';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
-import type { CommandDefinition } from '@shared/commands';
+import type { SkillDefinition } from '@shared/skills';
 import type { FullEnvironmentSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
 import type { SelectedElement } from '@shared/selected-elements';
 import {
@@ -32,7 +32,7 @@ import { mentionToContextSnippet } from '../prompts/utils/metadata-converter/men
 import {
   extractSlashIdsFromText,
   inlineSlashLinksAsText,
-  resolveSlashCommand,
+  resolveSlashSkill,
   renderSlashCommandXml,
 } from '../prompts/utils/metadata-converter/slash-items';
 import xml from 'xml';
@@ -487,7 +487,7 @@ export const convertAgentMessagesToModelMessages = async (
   skillDetails?: Map<string, SkillInfo>,
   logger?: Logger,
   imageCache?: ProcessedImageCacheService,
-  commands?: ReadonlyArray<CommandDefinition>,
+  skills?: ReadonlyArray<SkillDefinition>,
 ): Promise<ModelMessage[]> => {
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
@@ -540,7 +540,7 @@ export const convertAgentMessagesToModelMessages = async (
         currentModelId,
         logger,
         imageCache,
-        commands,
+        skills,
       );
       // convertUserMessage always returns content as an array of parts
       const content = userMsg.content as (TextPart | ImagePart | FilePart)[];
@@ -781,10 +781,10 @@ async function convertUserMessage(
   currentModelId?: string,
   logger?: Logger,
   imageCache?: ProcessedImageCacheService,
-  commands?: ReadonlyArray<CommandDefinition>,
+  skills?: ReadonlyArray<SkillDefinition>,
 ): Promise<UserModelMessage> {
-  // ── Resolve slash commands ──────────────────────────────────────────
-  // Extract slash command IDs from the raw text, resolve their content
+  // ── Resolve slash-invoked skills ────────────────────────────────────
+  // Extract slash skill IDs from the raw text, resolve their content
   // from disk, and replace `[label](slash:id)` links with the
   // human-readable label (e.g. `/plan`). Resolved content is prepended
   // as XML-wrapped parts *before* the <user-msg> so the LLM reads the
@@ -792,7 +792,7 @@ async function convertUserMessage(
   const slashIds = extractSlashIdsFromText(message.parts);
   const slashContentParts: TextPart[] = [];
   for (const id of slashIds) {
-    const cmd = await resolveSlashCommand(id, commands ?? []);
+    const cmd = await resolveSlashSkill(id, skills ?? []);
     if (cmd)
       slashContentParts.push({
         type: 'text',

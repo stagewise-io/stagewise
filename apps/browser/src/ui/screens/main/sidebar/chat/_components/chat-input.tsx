@@ -38,8 +38,8 @@ import {
   mentionContextRef,
   type MentionContext,
 } from './rich-text/mentions';
-import { SlashExtension, slashCommandsRef } from './rich-text/slash';
-import type { CommandDefinitionUI } from '@shared/commands';
+import { SlashExtension, slashSkillsRef } from './rich-text/slash';
+import type { SkillDefinitionUI } from '@shared/skills';
 import { useState, memo } from 'react';
 // Re-export types for convenience
 export type { AttachmentAttributes, AttachmentType };
@@ -89,7 +89,7 @@ export interface ChatInputProps {
   mentionContext?: MentionContext;
 
   // Slash command definitions (from Karton state)
-  slashCommands?: CommandDefinitionUI[];
+  slashCommands?: SkillDefinitionUI[];
 
   // Styling
   className?: string;
@@ -301,8 +301,8 @@ export const ChatInput = ({
   // so the TipTap suggestion `items` callback always has current data.
   if (mentionContext) mentionContextRef.current = mentionContext;
 
-  // Sync slash commands to the module-level ref synchronously during render.
-  if (slashCommands) slashCommandsRef.current = slashCommands;
+  // Sync slash skills to the module-level ref synchronously during render.
+  if (slashCommands) slashSkillsRef.current = slashCommands;
 
   const canSendMessage = useMemo(() => {
     return !disabled && textContent.trim().length > 2;

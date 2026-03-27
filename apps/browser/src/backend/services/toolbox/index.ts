@@ -98,8 +98,8 @@ import {
   getSkills,
   discoverSkills,
 } from '@/agents/shared/prompts/utils/get-skills';
-import type { CommandDefinition } from '@shared/commands';
-import { toCommandDefinitionUI } from '@shared/commands';
+import type { SkillDefinition } from '@shared/skills';
+import { toSkillDefinitionUI } from '@shared/skills';
 import { readPlans } from '@/agents/shared/prompts/utils/read-plans';
 import { PLANS_PREFIX, getAgentOwnedPlanPaths } from '@shared/plan-ownership';
 import { resolveMountedRelativePath } from './utils/path-mounting';
@@ -154,7 +154,7 @@ export class ToolboxService extends DisposableService {
   }
 
   /** Builtin commands discovered at startup — stored for refresh merging. */
-  private builtinCommands: CommandDefinition[] = [];
+  private builtinSkills: SkillDefinition[] = [];
 
   private plansRuntime: ClientRuntimeNode | null = null;
   private plansWatcher: FSWatcher | null = null;
@@ -656,7 +656,7 @@ export class ToolboxService extends DisposableService {
       await Promise.all([
         this.getAllAgentsMdEntries(agentInstanceId),
         this.getWorkspaceMd(agentInstanceId),
-        this.getCommandsList(agentInstanceId),
+        this.getSkillsList(agentInstanceId),
         this.getPlansList(agentInstanceId),
       ]);
 
@@ -735,11 +735,11 @@ export class ToolboxService extends DisposableService {
    * Store the builtin commands discovered at startup and push the
    * initial commands list to Karton state.
    */
-  public setBuiltinCommands(cmds: CommandDefinition[]): void {
-    this.builtinCommands = cmds;
+  public setBuiltinSkills(cmds: SkillDefinition[]): void {
+    this.builtinSkills = cmds;
     // Push builtins immediately (no workspace skills yet).
     this.uiKarton.setState((draft) => {
-      draft.commands = cmds.map(toCommandDefinitionUI);
+      draft.skills = cmds.map(toSkillDefinitionUI);
     });
   }
 
@@ -748,24 +748,24 @@ export class ToolboxService extends DisposableService {
    * plugin skills) for a given agent and push it to Karton state.
    * Called on mount/unmount to keep the slash-command list in sync.
    */
-  private async rebuildCommandsList(agentInstanceId: string): Promise<void> {
-    const commands = await this.getCommandsList(agentInstanceId);
+  private async rebuildSkillsList(agentInstanceId: string): Promise<void> {
+    const commands = await this.getSkillsList(agentInstanceId);
     this.uiKarton.setState((draft) => {
-      draft.commands = commands
+      draft.skills = commands
         .filter((c) => c.userInvocable !== false)
-        .map(toCommandDefinitionUI);
+        .map(toSkillDefinitionUI);
     });
   }
 
   /**
-   * Returns the full `CommandDefinition[]` (with `contentPath`) for
-   * the given agent. Used at inference time by `resolveSlashCommand`
+   * Returns the full `SkillDefinition[]` (with `contentPath`) for
+   * the given agent. Used at inference time by `resolveSlashSkill`
    * to read command/skill content from the correct disk path.
    */
-  public async getCommandsList(
+  public async getSkillsList(
     agentInstanceId: string,
-  ): Promise<CommandDefinition[]> {
-    const result: CommandDefinition[] = [...this.builtinCommands];
+  ): Promise<SkillDefinition[]> {
+    const result: SkillDefinition[] = [...this.builtinSkills];
     const seen = new Set(result.map((c) => c.id));
 
     // Workspace skills
@@ -1109,7 +1109,7 @@ export class ToolboxService extends DisposableService {
 
     this.mountManagerService.setOnMountsChanged((agentInstanceId) => {
       this.pushMountsToSandbox(agentInstanceId);
-      void this.rebuildCommandsList(agentInstanceId);
+      void this.rebuildSkillsList(agentInstanceId);
     });
 
     // Rebuild the slash-command list whenever skill/plugin preferences change
@@ -1122,7 +1122,7 @@ export class ToolboxService extends DisposableService {
       }),
       () => {
         const activeIds = Object.keys(this.uiKarton.state.agents.instances);
-        for (const id of activeIds) void this.rebuildCommandsList(id);
+        for (const id of activeIds) void this.rebuildSkillsList(id);
       },
     );
 

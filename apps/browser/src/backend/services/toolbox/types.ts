@@ -1,4 +1,3 @@
-import type { ToolboxService } from '.';
 import type { MountPermission } from '@shared/karton-contracts/ui/agent/metadata';
 
 /**
@@ -30,21 +29,3 @@ export type WorkspaceSnapshot = {
     permissions?: MountPermission[];
   }>;
 };
-
-/**
- * Narrowed type that only exposes the context-providing getters
- * from the Toolbox. Used by prompt/context builders to avoid pulling
- * in the complex `AllToolsUnion` generic when only data access is
- * needed.
- */
-export type ToolboxContextProvider = Pick<
-  ToolboxService,
-  | 'getWorkspaceSnapshot'
-  | 'getWorkspaceInfo'
-  | 'getBrowserSnapshot'
-  | 'getShellInfo'
-  | 'captureEnvironmentSnapshot'
-  | 'getWorkspaceMd'
-  | 'getCommandsList'
-  | 'globalDataPath'
->;

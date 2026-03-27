@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import matter from 'gray-matter';
-import type { CommandDefinition } from '@shared/commands';
+import type { SkillDefinition } from '@shared/skills';
 import xml from 'xml';
 import specialTokens from '../special-tokens';
 
@@ -48,18 +48,18 @@ export interface ResolvedSlashCommand {
 }
 
 /**
- * Resolves a slash command from disk and returns its metadata + body
+ * Resolves a slash-invoked skill from disk and returns its metadata + body
  * content (frontmatter stripped), or null if not found.
  *
- * The command is looked up by `id` in the provided `commands` list
+ * The skill is looked up by `id` in the provided `skills` list
  * and its `contentPath` is used for disk resolution. This supports
  * builtin, workspace-skill, and plugin-skill sources.
  */
-export async function resolveSlashCommand(
+export async function resolveSlashSkill(
   id: string,
-  commands: ReadonlyArray<CommandDefinition>,
+  skills: ReadonlyArray<SkillDefinition>,
 ): Promise<ResolvedSlashCommand | null> {
-  const cmd = commands.find((c) => c.id === id);
+  const cmd = skills.find((c) => c.id === id);
   if (!cmd) return null;
 
   const filePath = cmd.contentPath;

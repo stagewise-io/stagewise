@@ -1016,9 +1016,9 @@ export abstract class BaseAgent<
     const capabilities = getModelCapabilities(activeModelId);
 
     const shellInfo = this.toolbox.getShellInfo();
-    const commands = await this.toolbox.getCommandsList(this.instanceId);
+    const skills = await this.toolbox.getSkillsList(this.instanceId);
     const skillDetails = new Map(
-      commands
+      skills
         .filter((c) => c.agentInvocable !== false && c.skillPath)
         .map((c) => [
           c.skillPath!,
@@ -1048,7 +1048,7 @@ export abstract class BaseAgent<
       skillDetails,
       this.logger,
       this.processedImageCacheService,
-      commands,
+      skills,
     );
   }
 

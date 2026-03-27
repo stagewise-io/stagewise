@@ -1,15 +1,15 @@
-import type { CommandDefinitionUI } from '@shared/commands';
+import type { SkillDefinitionUI } from '@shared/skills';
 import type { SlashItem } from './types';
 
 const MAX_COLLAPSED = 3;
 
 /**
- * Module-level ref holding the current list of available commands.
+ * Module-level ref holding the current list of available skills.
  * Written synchronously by panel-footer during render (same pattern
  * as mentionContextRef) so the TipTap suggestion `items` callback
  * always sees current data.
  */
-export const slashCommandsRef: { current: CommandDefinitionUI[] } = {
+export const slashSkillsRef: { current: SkillDefinitionUI[] } = {
   current: [],
 };
 
@@ -37,7 +37,7 @@ const GROUP_ORDER: readonly string[] = ['builtin', 'workspace', 'plugin'];
  */
 export function querySlashItems(query: string): SlashItem[] {
   const q = query.toLowerCase();
-  const all = slashCommandsRef.current
+  const all = slashSkillsRef.current
     .filter(
       (cmd) =>
         cmd.id.toLowerCase().includes(q) ||

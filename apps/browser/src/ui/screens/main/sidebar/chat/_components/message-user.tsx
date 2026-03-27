@@ -89,7 +89,7 @@ export const MessageUser = memo(
 
     // Element selector state and procedures
     // Check if THIS input's element selection is active (not just global mode)
-    const slashCommands = useKartonState((s) => s.commands);
+    const slashCommands = useKartonState((s) => s.skills);
 
     const elementSelectionActive = useKartonState(
       (s) => s.browser.contextSelectionMode,

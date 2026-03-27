@@ -44,7 +44,7 @@ import {
 import { migrateLegacyPaths } from './utils/migrate-legacy-paths';
 import { discoverPlugins } from './utils/discover-plugins';
 import { discoverSkills } from './agents/shared/prompts/utils/get-skills';
-import type { CommandDefinition } from '@shared/commands';
+import type { SkillDefinition } from '@shared/skills';
 import { AssetCacheService } from './services/asset-cache';
 import { ProcessedImageCacheService } from './services/processed-image-cache';
 
@@ -302,10 +302,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     credentialsService,
   );
 
-  // Push bundled slash command definitions via the toolbox so it can
+  // Push bundled skill definitions via the toolbox so it can
   // merge them with workspace/plugin skills on mount changes.
   discoverSkills(getBuiltinSkillsPath()).then((skills) => {
-    const commands: CommandDefinition[] = skills.map((s) => ({
+    const builtins: SkillDefinition[] = skills.map((s) => ({
       id: `command:${s.name.toLowerCase()}`,
       displayName: s.name,
       description: s.description,
@@ -314,10 +314,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       userInvocable: s.userInvocable,
       agentInvocable: s.agentInvocable,
     }));
-    toolboxService.setBuiltinCommands(commands);
+    toolboxService.setBuiltinSkills(builtins);
     if (verbose)
       logger.debug(
-        `[Main] Pushed ${commands.length} bundled skills to UI karton`,
+        `[Main] Pushed ${builtins.length} bundled skills to UI karton`,
       );
   });
 

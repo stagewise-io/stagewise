@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ModelId } from '@shared/available-models';
 import type { PluginDefinition } from '@shared/plugins';
-import type { CommandDefinitionUI } from '@shared/commands';
+import type { SkillDefinitionUI } from '@shared/skills';
 import type {
   UserMessageMetadata,
   MountPermission,
@@ -625,8 +625,8 @@ export type AppState = {
   /** Bundled plugin definitions (static, pushed once at startup) */
   plugins: PluginDefinition[];
 
-  /** Bundled slash command definitions (static, pushed once at startup) */
-  commands: CommandDefinitionUI[];
+  /** Skill definitions (builtins, workspace skills, plugin skills) */
+  skills: SkillDefinitionUI[];
 
   /** Global plans (workspace-independent, from user-data/plans/) */
   plans: PlanEntry[];
@@ -1090,6 +1090,6 @@ export const defaultState: KartonContract['state'] = {
   searchEngines: [],
   systemTheme: 'light', // Will be set correctly by backend on init
   plugins: [],
-  commands: [],
+  skills: [],
   plans: [],
 };

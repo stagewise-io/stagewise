@@ -1,20 +1,20 @@
 /**
- * Source of a slash command.
+ * Source of a skill definition.
  * - `builtin` — shipped with the app (bundled/skills/)
  * - `workspace` — discovered from a mounted workspace skill
  * - `plugin` — discovered from a bundled plugin skill
  */
-export type CommandSource = 'builtin' | 'workspace' | 'plugin';
+export type SkillSource = 'builtin' | 'workspace' | 'plugin';
 
 /**
- * Full command definition used by the backend.
+ * Full skill definition used by the backend.
  * Includes `contentPath` for lazy content loading at inference time.
  */
-export type CommandDefinition = {
+export type SkillDefinition = {
   id: string;
   displayName: string;
   description: string;
-  source: CommandSource;
+  source: SkillSource;
   /** Absolute path to the content file — resolved lazily at injection time. */
   contentPath: string;
   /**
@@ -29,30 +29,28 @@ export type CommandDefinition = {
   /** Whether this item appears in the system prompt for the agent. Defaults to `true` when absent. */
   agentInvocable?: boolean;
   /**
-   * Mount prefix of the workspace that owns this command.
+   * Mount prefix of the workspace that owns this skill.
    * Only set when `source === 'workspace'`.
    */
   workspacePrefix?: string;
   /**
-   * Plugin identifier that owns this command.
+   * Plugin identifier that owns this skill.
    * Only set when `source === 'plugin'`.
    */
   pluginId?: string;
 };
 
 /**
- * UI-facing command definition (excludes backend-only fields like `contentPath`).
+ * UI-facing skill definition (excludes backend-only fields like `contentPath`).
  * Pushed to Karton state and consumed by the suggestion popup.
  */
-export type CommandDefinitionUI = Omit<CommandDefinition, 'contentPath'>;
+export type SkillDefinitionUI = Omit<SkillDefinition, 'contentPath'>;
 
 /**
- * Strip backend-only fields from a `CommandDefinition` to produce
- * a `CommandDefinitionUI` suitable for Karton state.
+ * Strip backend-only fields from a `SkillDefinition` to produce
+ * a `SkillDefinitionUI` suitable for Karton state.
  */
-export function toCommandDefinitionUI(
-  cmd: CommandDefinition,
-): CommandDefinitionUI {
+export function toSkillDefinitionUI(cmd: SkillDefinition): SkillDefinitionUI {
   const { contentPath: _, ...ui } = cmd;
   return ui;
 }

@@ -205,7 +205,7 @@ export function ChatPanelFooter() {
       ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
       : EMPTY_MOUNTS,
   );
-  const slashCommands = useKartonState((s) => s.commands);
+  const slashCommands = useKartonState((s) => s.skills);
   const mentionContext = useMemo<MentionContext>(
     () => ({
       agentInstanceId: openAgent,
