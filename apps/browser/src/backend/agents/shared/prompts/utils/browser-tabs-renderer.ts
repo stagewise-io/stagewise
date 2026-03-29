@@ -34,10 +34,7 @@ export function renderBrowserTabsXml(browser: BrowserSnapshot): string {
 }
 
 export function formatTimestamp(epochMs: number): string {
-  const d = new Date(epochMs);
-  const pad2 = (n: number) => String(n).padStart(2, '0');
-  const pad3 = (n: number) => String(n).padStart(3, '0');
-  return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${String(d.getFullYear()).slice(2)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}.${pad3(d.getMilliseconds())}`;
+  return new Date(epochMs).toISOString();
 }
 
 export function esc(s: string): string {
