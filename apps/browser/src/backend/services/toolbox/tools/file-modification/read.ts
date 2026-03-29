@@ -10,7 +10,8 @@ import {
 import { resolveMountedRelativePath } from '../../utils/path-mounting';
 
 export const DESCRIPTION = `Read metadata and contents of a file. Equals \`cat\` / \`echo\` in bash. For directories, use \`ls\` instead.
-If the file is not in context after the tool call, this **ALWAYS** implies that the file has **NOT** changed since the last read that is already in your context!`;
+If the file is not in context after the tool call, this **ALWAYS** implies that the file has **NOT** changed since the last read that is already in your context!
+Large files are truncated to a dynamic token budget. To read a large file efficiently, issue multiple parallel read calls with non-overlapping \`start_line\`/\`end_line\` ranges.`;
 
 /**
  * Read tool
@@ -51,8 +52,9 @@ export async function readToolExecute(
 
     // File is valid and within limits. Actual content is injected into
     // model context by the pathReferences pipeline at the next step
-    // boundary — we only return a confirmation here.
-    return;
+    // boundary — we return a confirmation so the agent knows the
+    // read was accepted.
+    return { message: 'File opened and loaded into context.' };
   } catch (error) {
     rethrowCappedToolOutputError(error);
   }

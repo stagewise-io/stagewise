@@ -9,6 +9,7 @@
  */
 
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
+import type { ReadParams } from './types';
 
 // ---------------------------------------------------------------------------
 // Path link extraction
@@ -93,4 +94,66 @@ export function extractReadFilePathsFromAssistantMessage(
   }
 
   return [...paths];
+}
+
+/**
+ * Represents a single read-file request with its path and read params.
+ *
+ * Multiple entries can share the same path when the agent reads
+ * different ranges of the same file within one assistant turn.
+ */
+export interface ReadFileRequest {
+  path: string;
+  readParams: ReadParams;
+}
+
+/**
+ * Extracts per-call read params from completed `readFile` tool-call parts
+ * on an assistant message.
+ *
+ * Unlike `extractReadFilePathsFromAssistantMessage` (which deduplicates
+ * by path), this function returns **one entry per tool call** so that
+ * different line/page ranges for the same file are preserved.
+ *
+ * Only considers parts that have successfully completed (`output-available`).
+ *
+ * @returns Array of `{ path, readParams }` — one per completed tool call.
+ */
+export function extractReadFileRequestsFromAssistantMessage(
+  message: AgentMessage,
+): ReadFileRequest[] {
+  if (message.role !== 'assistant') return [];
+
+  const requests: ReadFileRequest[] = [];
+
+  for (const part of message.parts) {
+    if (part.type !== 'tool-read') continue;
+    if (!('input' in part) || !part.input) continue;
+
+    const state = 'state' in part ? part.state : undefined;
+    if (state !== 'output-available') continue;
+
+    const input = part.input as {
+      path?: string;
+      start_line?: number;
+      end_line?: number;
+      start_page?: number;
+      end_page?: number;
+      preview?: boolean;
+    };
+
+    const relativePath = input.path;
+    if (typeof relativePath !== 'string' || relativePath.length === 0) continue;
+
+    const readParams: ReadParams = {};
+    if (input.start_line !== undefined) readParams.startLine = input.start_line;
+    if (input.end_line !== undefined) readParams.endLine = input.end_line;
+    if (input.start_page !== undefined) readParams.startPage = input.start_page;
+    if (input.end_page !== undefined) readParams.endPage = input.end_page;
+    if (input.preview) readParams.preview = true;
+
+    requests.push({ path: relativePath, readParams });
+  }
+
+  return requests;
 }

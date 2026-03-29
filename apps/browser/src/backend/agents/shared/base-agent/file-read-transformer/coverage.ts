@@ -17,7 +17,9 @@
  *
  * 3. **Bounded ranges are compared inclusively.** `[existStart, existEnd]`
  *    covers `[reqStart, reqEnd]` iff `existStart <= reqStart` and
- *    `existEnd >= reqEnd`.
+ *    `existEnd >= reqEnd`.  When no single entry covers the request,
+ *    overlapping and contiguous line-range entries are **merged** and
+ *    checked as a union (e.g. [1,500] + [501,1000] covers [200,800]).
  *
  * 4. **Line and page axes are independent.** Both must be covered for the
  *    request to be considered redundant.
@@ -161,6 +163,102 @@ export function isReadParamsCoveredBy(
 }
 
 // ---------------------------------------------------------------------------
+// Merged-interval coverage
+// ---------------------------------------------------------------------------
+
+/**
+ * Given a list of `[start, end]` inclusive intervals, merge
+ * overlapping/contiguous ones and return the sorted result.
+ */
+function mergeIntervals(
+  intervals: Array<[number, number]>,
+): Array<[number, number]> {
+  if (intervals.length === 0) return [];
+  const sorted = [...intervals].sort((a, b) => a[0] - b[0]);
+  const merged: Array<[number, number]> = [sorted[0]];
+  for (let i = 1; i < sorted.length; i++) {
+    const [curStart, curEnd] = sorted[i];
+    const last = merged[merged.length - 1];
+    // +1 because ranges are inclusive, so [1,10] and [11,20] are contiguous.
+    if (curStart <= last[1] + 1) {
+      last[1] = Math.max(last[1], curEnd);
+    } else {
+      merged.push([curStart, curEnd]);
+    }
+  }
+  return merged;
+}
+
+/**
+ * Check whether the **union** of all `existing` entries covers
+ * `requested` on the line-range axis.
+ *
+ * Only entries whose page-range and depth axes are compatible with the
+ * request are considered — we can only merge line intervals when the
+ * other axes already satisfy the request.
+ *
+ * Falls back to `false` if:
+ *   - The request is preview (preview is a different representation)
+ *   - The request has no bounded line range (full-file read)
+ *   - Any existing entry that would contribute has mismatched page/depth
+ */
+function isCoveredByMergedEntries(
+  requested: ReadParams,
+  entries: ReadParams[],
+): boolean {
+  // Preview requests are never satisfied by merging ranges.
+  if (requested.preview) return false;
+
+  // Unbounded line-range requests (full file) cannot be satisfied by
+  // merging bounded entries.
+  if (requested.startLine === undefined && requested.endLine === undefined) {
+    return false;
+  }
+
+  const reqStart = requested.startLine ?? 1;
+  const reqEnd = requested.endLine ?? Number.MAX_SAFE_INTEGER;
+
+  // Collect line intervals from entries whose page + depth axes cover
+  // the request. Preview entries are skipped.
+  const intervals: Array<[number, number]> = [];
+  for (const ex of entries) {
+    if (ex.preview) continue;
+
+    // Page axis must cover.
+    if (
+      !isRangeCoveredBy(
+        requested.startPage,
+        requested.endPage,
+        ex.startPage,
+        ex.endPage,
+      )
+    ) {
+      continue;
+    }
+
+    // Depth axis must cover.
+    if (!isDepthCoveredBy(requested.depth, ex.depth)) continue;
+
+    // Line axis: if this entry is unbounded → it alone covers any line
+    // range. Short-circuit.
+    if (ex.startLine === undefined && ex.endLine === undefined) return true;
+
+    const exStart = ex.startLine ?? 1;
+    const exEnd = ex.endLine ?? Number.MAX_SAFE_INTEGER;
+    intervals.push([exStart, exEnd]);
+  }
+
+  if (intervals.length === 0) return false;
+
+  const merged = mergeIntervals(intervals);
+  // Check if any merged interval fully contains [reqStart, reqEnd].
+  for (const [mStart, mEnd] of merged) {
+    if (mStart <= reqStart && mEnd >= reqEnd) return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // SeenFilesTracker
 // ---------------------------------------------------------------------------
 
@@ -210,12 +308,16 @@ export class SeenFilesTracker {
     const existing = this.entries.get(key);
     if (!existing) return false;
 
+    // Fast path: check if any single entry fully covers the request.
     for (const prev of existing) {
       if (isReadParamsCoveredBy(params, prev)) {
         return true;
       }
     }
-    return false;
+
+    // Slow path: merge overlapping/contiguous line intervals across
+    // entries and check if the union covers the requested line range.
+    return isCoveredByMergedEntries(params, existing);
   }
 
   /**

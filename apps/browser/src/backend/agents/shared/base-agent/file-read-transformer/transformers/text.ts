@@ -26,9 +26,9 @@ import {
   baseMetadata,
   inferLanguage,
   prefixLineNumbers,
-  getMaxReadLines,
   getMaxPreviewLines,
   isBinaryBuffer,
+  truncateTextContent,
 } from '../format-utils';
 
 export const textTransformer: FileTransformer = async (
@@ -54,7 +54,7 @@ export const textTransformer: FileTransformer = async (
     metadata.lines = String(totalLines);
     metadata.chars = String(text.length);
 
-    const { startLine, endLine, preview } = ctx.readParams;
+    const { preview } = ctx.readParams;
 
     // ── Preview mode ─────────────────────────────────────────────
     if (preview) {
@@ -82,49 +82,17 @@ export const textTransformer: FileTransformer = async (
       };
     }
 
-    // ── Line-range slicing ───────────────────────────────────────
-    if (startLine !== undefined || endLine !== undefined) {
-      const maxLines = getMaxReadLines();
-      const sl = Math.max(1, startLine ?? 1);
-      const requestedEnd = Math.min(totalLines, endLine ?? totalLines);
-      const el = Math.min(requestedEnd, sl + maxLines - 1);
-      const truncated = el < requestedEnd;
-      const slice = allLines.slice(sl - 1, el);
-      let numbered = prefixLineNumbers(slice.join('\n'), sl);
+    // ── Line-range and full content (via shared helper) ──────────
+    const { output, effectiveReadParams } = truncateTextContent(
+      allLines,
+      ctx.readParams,
+    );
 
-      if (truncated) {
-        numbered += `\n… (truncated at ${maxLines} lines, ${requestedEnd - el} more lines until line ${requestedEnd})`;
-      }
-
-      const effectiveReadParams: ReadParams = {
-        startLine: sl,
-        endLine: el,
-      };
-
-      return {
-        metadata,
-        parts: [{ type: 'text', text: numbered }],
-        effectiveReadParams,
-      };
-    }
-
-    // ── Full content (capped) ───────────────────────────────────────
-    const maxLines = getMaxReadLines();
-    const cappedEnd = Math.min(totalLines, maxLines);
-    const truncated = cappedEnd < totalLines;
-    const outputLines = truncated ? allLines.slice(0, cappedEnd) : allLines;
-    let numbered = prefixLineNumbers(outputLines.join('\n'));
-
-    if (truncated) {
-      numbered += `\n… (truncated at ${maxLines} lines, ${totalLines - cappedEnd} more lines remaining)`;
-      return {
-        metadata,
-        parts: [{ type: 'text', text: numbered }],
-        effectiveReadParams: { startLine: 1, endLine: cappedEnd },
-      };
-    }
-
-    return { metadata, parts: [{ type: 'text', text: numbered }] };
+    return {
+      metadata,
+      parts: [{ type: 'text', text: output }],
+      effectiveReadParams,
+    };
   }
 
   // Binary file — can't inline (no line-number prefix for this message).

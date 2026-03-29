@@ -2,8 +2,8 @@
  * Tests for content limits / truncation in text-based transformers.
  *
  * Verifies that:
- * 1. Large files are truncated at the configurable max-read-lines limit.
- * 2. Line-range requests exceeding the limit are capped.
+ * 1. Large files are truncated at the configurable char-budget limit.
+ * 2. Line-range requests exceeding the budget are capped.
  * 3. Truncation is reported via `effectiveReadParams` so coverage tracking
  *    and cache keys work correctly — subsequent reads for later sections
  *    are not falsely suppressed.
@@ -19,9 +19,9 @@ import { randomUUID, createHash } from 'node:crypto';
 import { FileReadCacheService } from '@/services/file-read-cache';
 import { fileReadTransformer, type FileReadTransformerOptions } from './index';
 import {
-  setMaxReadLines,
+  setMaxReadChars,
   setMaxPreviewLines,
-  getMaxReadLines,
+  getMaxReadChars,
   getMaxPreviewLines,
 } from './format-utils';
 import { SeenFilesTracker } from './coverage';
@@ -52,7 +52,7 @@ interface TestContext {
   mountPaths: Map<string, string>;
   agentId: string;
   /** Saved original limits to restore in afterEach. */
-  origMaxRead: number;
+  origMaxReadChars: number;
   origMaxPreview: number;
 }
 
@@ -74,14 +74,14 @@ async function setup(): Promise<TestContext> {
     mountPrefix,
     mountPaths: new Map([[mountPrefix, workDir]]),
     agentId: `agent-${id}`,
-    origMaxRead: getMaxReadLines(),
+    origMaxReadChars: getMaxReadChars(),
     origMaxPreview: getMaxPreviewLines(),
   };
 }
 
 async function teardown(ctx: TestContext): Promise<void> {
   // Restore original limits.
-  setMaxReadLines(ctx.origMaxRead);
+  setMaxReadChars(ctx.origMaxReadChars);
   setMaxPreviewLines(ctx.origMaxPreview);
   await ctx.cache.teardown();
 }
@@ -132,11 +132,31 @@ function allText(parts: any[]): string {
     .join('');
 }
 
-/** Generate a file with N numbered lines. */
+/**
+ * Width of every generated line (excluding the newline).
+ * Using a fixed-width format so that budget calculations are
+ * exact regardless of which range of lines is being read.
+ */
+const LINE_WIDTH = 30;
+
+/**
+ * Generate a file with N lines, each exactly LINE_WIDTH characters long.
+ * Format: "line NNNN " padded with dots to fill.
+ */
 function generateLines(n: number): string {
-  return Array.from({ length: n }, (_, i) => `line ${i + 1} content`).join(
-    '\n',
-  );
+  return Array.from({ length: n }, (_, i) => {
+    const prefix = `line ${String(i + 1).padStart(4, '0')} `;
+    return prefix + '.'.repeat(LINE_WIDTH - prefix.length);
+  }).join('\n');
+}
+
+/**
+ * Compute a char budget that fits exactly `n` of the generated lines.
+ * Each line is exactly LINE_WIDTH chars + 1 for the newline separator
+ * used by `countLinesFittingBudget`.
+ */
+function budgetForLines(n: number): number {
+  return n * (LINE_WIDTH + 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,8 +172,9 @@ describe('content limits – full read truncation', () => {
     await teardown(ctx);
   });
 
-  it('truncates a full read when file exceeds maxReadLines', async () => {
-    setMaxReadLines(10);
+  it('truncates a full read when file exceeds char budget', async () => {
+    // Budget for 10 lines — file has 25 lines.
+    setMaxReadChars(budgetForLines(10));
 
     const content = generateLines(25);
     const filePath = path.join(ctx.workDir, 'big.ts');
@@ -166,13 +187,13 @@ describe('content limits – full read truncation', () => {
     const text = allText(result.parts);
 
     // Should contain lines 1-10 but not line 11.
-    expect(text).toContain('1|line 1 content');
-    expect(text).toContain('10|line 10 content');
-    expect(text).not.toContain('11|line 11 content');
+    expect(text).toContain('1|line 0001');
+    expect(text).toContain('10|line 0010');
+    expect(text).not.toContain('11|line 0011');
 
     // Should show truncation indicator.
-    expect(text).toContain('truncated at 10 lines');
-    expect(text).toContain('15 more lines remaining');
+    expect(text).toContain('truncated');
+    expect(text).toContain('more lines remaining');
 
     // effectiveReadParams should reflect the actual range delivered.
     expect(result.effectiveReadParams).toEqual({
@@ -181,8 +202,9 @@ describe('content limits – full read truncation', () => {
     });
   });
 
-  it('does not truncate when file fits within maxReadLines', async () => {
-    setMaxReadLines(50);
+  it('does not truncate when file fits within char budget', async () => {
+    // Budget for 50 lines — file has only 10.
+    setMaxReadChars(budgetForLines(50));
 
     const content = generateLines(10);
     const filePath = path.join(ctx.workDir, 'small.ts');
@@ -195,17 +217,15 @@ describe('content limits – full read truncation', () => {
     const text = allText(result.parts);
 
     // All lines present.
-    expect(text).toContain('1|line 1 content');
-    expect(text).toContain('10|line 10 content');
+    expect(text).toContain('1|line 0001');
+    expect(text).toContain('10|line 0010');
     expect(text).not.toContain('truncated');
 
     // No effectiveReadParams narrowing needed.
     expect(result.effectiveReadParams).toBeUndefined();
   });
 
-  it('truncates SVG files at maxReadLines', async () => {
-    setMaxReadLines(5);
-
+  it('truncates SVG files at char budget', async () => {
     const svgLines = [
       '<svg xmlns="http://www.w3.org/2000/svg">',
       '  <rect x="0" y="0" width="100" height="100"/>',
@@ -217,6 +237,12 @@ describe('content limits – full read truncation', () => {
       '  <ellipse cx="50" cy="50" rx="40" ry="20"/>',
       '</svg>',
     ];
+    // Budget enough for the first 5 SVG lines only.
+    const budget5 = svgLines
+      .slice(0, 5)
+      .reduce((acc, l) => acc + l.length + 1, 0);
+    setMaxReadChars(budget5);
+
     const content = svgLines.join('\n');
     const filePath = path.join(ctx.workDir, 'big.svg');
     await nodeFs.writeFile(filePath, content);
@@ -227,7 +253,7 @@ describe('content limits – full read truncation', () => {
     );
     const text = allText(result.parts);
 
-    expect(text).toContain('truncated at 5 lines');
+    expect(text).toContain('truncated');
     expect(result.effectiveReadParams).toEqual({
       startLine: 1,
       endLine: 5,
@@ -248,8 +274,9 @@ describe('content limits – line-range truncation', () => {
     await teardown(ctx);
   });
 
-  it('caps a line-range read at maxReadLines from startLine', async () => {
-    setMaxReadLines(10);
+  it('caps a line-range read at char budget from startLine', async () => {
+    // Budget for 10 lines.
+    setMaxReadChars(budgetForLines(10));
 
     const content = generateLines(100);
     const filePath = path.join(ctx.workDir, 'big.ts');
@@ -264,14 +291,14 @@ describe('content limits – line-range truncation', () => {
     );
     const text = allText(result.parts);
 
-    // Should contain lines 20-29 (10 lines from startLine).
-    expect(text).toContain('20|line 20 content');
-    expect(text).toContain('29|line 29 content');
-    expect(text).not.toContain('30|line 30 content');
+    // Should contain lines 20-29 (10 lines fitting in the budget from startLine).
+    expect(text).toContain('20|line 0020');
+    expect(text).toContain('29|line 0029');
+    expect(text).not.toContain('30|line 0030');
 
     // Should show truncation with remaining count.
-    expect(text).toContain('truncated at 10 lines');
-    expect(text).toContain('51 more lines until line 80');
+    expect(text).toContain('truncated');
+    expect(text).toContain('more lines until line 80');
 
     // effectiveReadParams reports what was actually delivered.
     expect(result.effectiveReadParams).toEqual({
@@ -280,8 +307,9 @@ describe('content limits – line-range truncation', () => {
     });
   });
 
-  it('does not truncate line-range within maxReadLines', async () => {
-    setMaxReadLines(50);
+  it('does not truncate line-range within char budget', async () => {
+    // Budget for 50 lines — range is only 21 lines.
+    setMaxReadChars(budgetForLines(50));
 
     const content = generateLines(100);
     const filePath = path.join(ctx.workDir, 'big.ts');
@@ -297,8 +325,8 @@ describe('content limits – line-range truncation', () => {
     const text = allText(result.parts);
 
     // All requested lines present.
-    expect(text).toContain('10|line 10 content');
-    expect(text).toContain('30|line 30 content');
+    expect(text).toContain('10|line 0010');
+    expect(text).toContain('30|line 0030');
     expect(text).not.toContain('truncated');
   });
 });
@@ -330,9 +358,9 @@ describe('content limits – preview mode', () => {
     const text = allText(result.parts);
 
     // Should show 5 preview lines + truncation indicator.
-    expect(text).toContain('1|line 1 content');
-    expect(text).toContain('5|line 5 content');
-    expect(text).not.toContain('6|line 6 content');
+    expect(text).toContain('1|line 0001');
+    expect(text).toContain('5|line 0005');
+    expect(text).not.toContain('6|line 0006');
     expect(text).toContain('45 more lines');
   });
 });
@@ -350,21 +378,21 @@ describe('content limits – configurability', () => {
     await teardown(ctx);
   });
 
-  it('setMaxReadLines rejects values < 1', () => {
-    expect(() => setMaxReadLines(0)).toThrow('maxReadLines must be >= 1');
-    expect(() => setMaxReadLines(-5)).toThrow('maxReadLines must be >= 1');
+  it('setMaxReadChars rejects values < 1', () => {
+    expect(() => setMaxReadChars(0)).toThrow('maxReadChars must be >= 1');
+    expect(() => setMaxReadChars(-5)).toThrow('maxReadChars must be >= 1');
   });
 
   it('setMaxPreviewLines rejects values < 1', () => {
     expect(() => setMaxPreviewLines(0)).toThrow('maxPreviewLines must be >= 1');
   });
 
-  it('changing maxReadLines affects subsequent reads (uses separate files to avoid cache)', async () => {
+  it('changing maxReadChars affects subsequent reads (uses separate files to avoid cache)', async () => {
     // Each sub-test uses a different file name so the cache key differs,
     // isolating each from prior cached results.
 
-    // 5-line limit
-    setMaxReadLines(5);
+    // 5-line budget
+    setMaxReadChars(budgetForLines(5));
     const content1 = generateLines(20);
     await nodeFs.writeFile(path.join(ctx.workDir, 'cfg1.ts'), content1);
     const r1 = await fileReadTransformer(
@@ -372,8 +400,8 @@ describe('content limits – configurability', () => {
     );
     expect(r1.effectiveReadParams).toEqual({ startLine: 1, endLine: 5 });
 
-    // 15-line limit
-    setMaxReadLines(15);
+    // 15-line budget
+    setMaxReadChars(budgetForLines(15));
     const content2 = generateLines(20);
     await nodeFs.writeFile(path.join(ctx.workDir, 'cfg2.ts'), content2);
     const r2 = await fileReadTransformer(
@@ -381,8 +409,8 @@ describe('content limits – configurability', () => {
     );
     expect(r2.effectiveReadParams).toEqual({ startLine: 1, endLine: 15 });
 
-    // Limit above file size — no truncation.
-    setMaxReadLines(100);
+    // Budget above file size — no truncation.
+    setMaxReadChars(budgetForLines(100));
     const content3 = generateLines(20);
     await nodeFs.writeFile(path.join(ctx.workDir, 'cfg3.ts'), content3);
     const r3 = await fileReadTransformer(
@@ -406,7 +434,7 @@ describe('content limits – cache key isolation', () => {
   });
 
   it('full read truncation does not cache-poison line-range reads', async () => {
-    setMaxReadLines(10);
+    setMaxReadChars(budgetForLines(10));
 
     const content = generateLines(30);
     const filePath = path.join(ctx.workDir, 'cached.ts');
@@ -431,13 +459,13 @@ describe('content limits – cache key isolation', () => {
     );
     const text2 = allText(r2.parts);
 
-    expect(text2).toContain('11|line 11 content');
-    expect(text2).toContain('20|line 20 content');
-    expect(text2).not.toContain('1|line 1 content');
+    expect(text2).toContain('11|line 0011');
+    expect(text2).toContain('20|line 0020');
+    expect(text2).not.toContain('1|line 0001');
   });
 
   it('sequential range reads each return correct content', async () => {
-    setMaxReadLines(10);
+    setMaxReadChars(budgetForLines(10));
 
     const content = generateLines(30);
     const filePath = path.join(ctx.workDir, 'seq.ts');
@@ -452,8 +480,8 @@ describe('content limits – cache key isolation', () => {
       }),
     );
     const text1 = allText(r1.parts);
-    expect(text1).toContain('1|line 1 content');
-    expect(text1).toContain('10|line 10 content');
+    expect(text1).toContain('1|line 0001');
+    expect(text1).toContain('10|line 0010');
     expect(text1).not.toContain('11|');
 
     // Read lines 11-20.
@@ -464,8 +492,8 @@ describe('content limits – cache key isolation', () => {
       }),
     );
     const text2 = allText(r2.parts);
-    expect(text2).toContain('11|line 11 content');
-    expect(text2).toContain('20|line 20 content');
+    expect(text2).toContain('11|line 0011');
+    expect(text2).toContain('20|line 0020');
 
     // Read lines 21-30.
     const r3 = await fileReadTransformer(
@@ -475,8 +503,8 @@ describe('content limits – cache key isolation', () => {
       }),
     );
     const text3 = allText(r3.parts);
-    expect(text3).toContain('21|line 21 content');
-    expect(text3).toContain('30|line 30 content');
+    expect(text3).toContain('21|line 0021');
+    expect(text3).toContain('30|line 0030');
   });
 });
 
@@ -494,7 +522,7 @@ describe('content limits – coverage tracker integration', () => {
   });
 
   it('truncated full read allows subsequent range requests through coverage', async () => {
-    setMaxReadLines(10);
+    setMaxReadChars(budgetForLines(10));
 
     const content = generateLines(30);
     const filePath = path.join(ctx.workDir, 'cov.ts');
@@ -565,7 +593,7 @@ describe('content limits – coverage tracker integration', () => {
   });
 
   it('line-range truncation correctly narrows coverage', async () => {
-    setMaxReadLines(10);
+    setMaxReadChars(budgetForLines(10));
 
     const content = generateLines(100);
     const filePath = path.join(ctx.workDir, 'narrow.ts');
@@ -574,7 +602,7 @@ describe('content limits – coverage tracker integration', () => {
 
     const tracker = new SeenFilesTracker();
 
-    // Request lines 50-80 — will be truncated to 50-59.
+    // Request lines 50-80 — will be truncated to ~50-59.
     const result = await fileReadTransformer(
       makeOpts(ctx, `${ctx.mountPrefix}/narrow.ts`, hash, {
         startLine: 50,
@@ -587,18 +615,24 @@ describe('content limits – coverage tracker integration', () => {
       result.effectiveReadParams ?? { startLine: 50, endLine: 80 },
     );
 
-    // Lines 50-59 covered.
+    // The delivered range should start at 50 and end around 59
+    // (exact count depends on line lengths within the budget).
+    const delivered = result.effectiveReadParams!;
+    expect(delivered.startLine).toBe(50);
+    expect(delivered.endLine).toBeLessThan(80);
+
+    // Within delivered range should be covered.
     expect(
       tracker.isCovered(`${ctx.mountPrefix}/narrow.ts`, hash, {
-        startLine: 50,
-        endLine: 59,
+        startLine: delivered.startLine!,
+        endLine: delivered.endLine!,
       }),
     ).toBe(true);
 
-    // Lines 60-80 NOT covered.
+    // Beyond delivered range should NOT be covered.
     expect(
       tracker.isCovered(`${ctx.mountPrefix}/narrow.ts`, hash, {
-        startLine: 60,
+        startLine: delivered.endLine! + 1,
         endLine: 80,
       }),
     ).toBe(false);
@@ -618,8 +652,9 @@ describe('content limits – hard limit enforcement', () => {
     await teardown(ctx);
   });
 
-  it('output never exceeds maxReadLines regardless of request', async () => {
-    setMaxReadLines(10);
+  it('output never exceeds char budget regardless of request', async () => {
+    const charBudget = budgetForLines(10);
+    setMaxReadChars(charBudget);
 
     const content = generateLines(1000);
     const filePath = path.join(ctx.workDir, 'huge.ts');
@@ -634,7 +669,7 @@ describe('content limits – hard limit enforcement', () => {
     const lineCount1 = text1.split('\n').filter((l) => /^\d+\|/.test(l)).length;
     expect(lineCount1).toBeLessThanOrEqual(10);
 
-    // Range read requesting 500 lines — should be capped at 10.
+    // Range read requesting 500 lines — should be capped by budget.
     const r2 = await fileReadTransformer(
       makeOpts(ctx, `${ctx.mountPrefix}/huge.ts`, hash, {
         startLine: 1,

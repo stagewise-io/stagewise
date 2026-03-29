@@ -21,9 +21,9 @@ import type {
 import {
   baseMetadata,
   prefixLineNumbers,
-  getMaxReadLines,
   getMaxPreviewLines,
   isBinaryBuffer,
+  truncateTextContent,
 } from '../format-utils';
 
 /** Known blob extensions → human-readable type name. */
@@ -60,7 +60,7 @@ export const textBlobTransformer: FileTransformer = async (
   metadata.lines = String(totalLines);
   metadata.chars = String(text.length);
 
-  const { startLine, endLine, preview } = ctx.readParams;
+  const { preview } = ctx.readParams;
 
   // ── Preview mode ─────────────────────────────────────────────────
   if (preview) {
@@ -88,53 +88,15 @@ export const textBlobTransformer: FileTransformer = async (
     };
   }
 
-  // ── Line-range slicing ───────────────────────────────────────────
-  if (startLine !== undefined || endLine !== undefined) {
-    const maxLines = getMaxReadLines();
-    const sl = Math.max(1, startLine ?? 1);
-    const requestedEnd = Math.min(totalLines, endLine ?? totalLines);
-    const el = Math.min(requestedEnd, sl + maxLines - 1);
-    const truncated = el < requestedEnd;
-    const slice = allLines.slice(sl - 1, el);
-    let numbered = prefixLineNumbers(slice.join('\n'), sl);
-
-    if (truncated) {
-      numbered += `\n… (truncated at ${maxLines} lines, ${requestedEnd - el} more lines until line ${requestedEnd})`;
-    }
-
-    const effectiveReadParams: ReadParams = {
-      startLine: sl,
-      endLine: el,
-    };
-
-    return {
-      metadata,
-      parts: [{ type: 'text', text: numbered }],
-      effectiveReadParams,
-    };
-  }
-
-  // ── Full content (capped) ────────────────────────────────────────
-  const maxLines = getMaxReadLines();
-  const cappedEnd = Math.min(totalLines, maxLines);
-  const truncated = cappedEnd < totalLines;
-  const outputLines = truncated ? allLines.slice(0, cappedEnd) : allLines;
-  let numbered = prefixLineNumbers(outputLines.join('\n'));
-
-  if (truncated) {
-    numbered += `\n… (truncated at ${maxLines} lines, ${totalLines - cappedEnd} more lines remaining)`;
-  }
-
-  if (truncated) {
-    return {
-      metadata,
-      parts: [{ type: 'text', text: numbered }],
-      effectiveReadParams: { startLine: 1, endLine: cappedEnd },
-    };
-  }
+  // ── Line-range and full content (via shared helper) ───────────────
+  const { output, effectiveReadParams } = truncateTextContent(
+    allLines,
+    ctx.readParams,
+  );
 
   return {
     metadata,
-    parts: [{ type: 'text', text: numbered }],
+    parts: [{ type: 'text', text: output }],
+    effectiveReadParams,
   };
 };

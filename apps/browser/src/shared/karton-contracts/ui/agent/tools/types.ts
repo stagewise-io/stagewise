@@ -86,12 +86,18 @@ export const readToolInputSchema = z.object({
 
 export type readToolInput = z.infer<typeof readToolInputSchema>;
 
+export const readToolOutputSchema = z.object({
+  message: z.string(),
+});
+
+export type ReadToolOutput = z.infer<typeof readToolOutputSchema>;
+
 /**
  * Schema definition for readFile (without execute function)
  */
 export const readToolSchema = {
   inputSchema: readToolInputSchema,
-  outputSchema: z.void(),
+  outputSchema: readToolOutputSchema,
 } as const;
 
 export const lsToolInputSchema = z.object({

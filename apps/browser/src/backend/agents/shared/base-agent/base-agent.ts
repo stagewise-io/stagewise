@@ -54,9 +54,11 @@ import {
   sparsifySnapshot,
 } from '../prompts/utils/environment-changes';
 import { populatePathReferences } from './file-read-transformer/populate-path-references';
+import { MessageCacheAnalyzer } from './message-cache-analyzer';
 import { extractReadFilePathsFromAssistantMessage } from './file-read-transformer/path-references';
 import { resolveMountedPath } from './file-read-transformer/resolve-path';
 import { hashPath } from './file-read-transformer/hash';
+import { setMaxReadCharsFromContextWindow } from './file-read-transformer/format-utils';
 import type { StagewiseToolSet } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { AgentsMap } from '../../agents-map';
@@ -371,6 +373,9 @@ export abstract class BaseAgent<
    */
   private _isCompressingHistory = false;
 
+  /** Debug utility: tracks model messages per step to report cache stability. */
+  private readonly _cacheAnalyzer: MessageCacheAnalyzer;
+
   /**
    * Monotonically increasing counter that identifies the "current" step.
    * Stream callbacks (onAbort, onFinish, onError) capture this value when
@@ -474,6 +479,7 @@ export abstract class BaseAgent<
     this.finishToolErrorHandler = finishToolErrorHandler;
     this.assetCacheService = assetCacheService;
     this.processedImageCacheService = processedImageCacheService;
+    this._cacheAnalyzer = new MessageCacheAnalyzer(instanceId, logger);
 
     this.state.set((draft) => {
       draft.title =
@@ -1398,6 +1404,11 @@ export abstract class BaseAgent<
       return;
     }
 
+    // Set the per-read character budget based on the model's context window.
+    // This replaces the former static 500-line cap with a dynamic limit:
+    // ~10 % of the context window (measured in estimated tokens, ≈ chars/4).
+    setMaxReadCharsFromContextWindow(modelWithOptions.contextWindowSize);
+
     let modelMessages: Awaited<
       ReturnType<typeof this.generateContextForNewStep>
     >;
@@ -1433,6 +1444,9 @@ export abstract class BaseAgent<
 
     if (isApprovalContinuation)
       modelMessages = this.ensureToolApprovalResponseIsLast(modelMessages);
+
+    // Debug: analyse cache stability of the final model messages before the LLM call.
+    this._cacheAnalyzer.trackStep(modelMessages);
 
     this.logger.debug(`[BaseAgent:${this.instanceId}] Running step`);
 

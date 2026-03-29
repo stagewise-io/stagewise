@@ -127,28 +127,69 @@ export function isBinaryBuffer(buf: Buffer): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Hard maximum number of lines a text-based transformer may return in
- * a single read (full or line-range). Prevents unbounded context-window
- * consumption for very large files.
+ * Maximum character budget for a single file read, derived from the
+ * model's context-window size.  The budget targets ~10 % of the context
+ * window: `contextWindowTokens * 0.10 * 4` chars (≈ 4 chars/token).
  *
- * When the output exceeds this limit, transformers **must** truncate and
- * report the truncation via `effectiveReadParams` so the coverage tracker
- * knows the true extent of delivered content — allowing the agent to
- * request subsequent ranges without false cache/coverage hits.
+ * When the output exceeds this budget, transformers **must** truncate
+ * and report the truncation via `effectiveReadParams` so the coverage
+ * tracker knows the true extent of delivered content — allowing the
+ * agent to request subsequent ranges without false cache/coverage hits.
  *
- * Configurable at import time for testing via `setMaxReadLines()`.
+ * Configurable via `setMaxReadChars()`.  A convenience setter
+ * `setMaxReadCharsFromContextWindow()` derives the budget from a token
+ * count.
+ *
  */
-let _maxReadLines = 500;
+let _maxReadChars = 500 * 80; // sensible default ≈ 500 lines × 80 chars
 
-/** Maximum lines returned in a single full/range read. */
-export function getMaxReadLines(): number {
-  return _maxReadLines;
+/** Maximum characters returned in a single full/range read. */
+export function getMaxReadChars(): number {
+  return _maxReadChars;
 }
 
-/** Override the max-read-lines limit (for testing or configuration). */
-export function setMaxReadLines(n: number): void {
-  if (n < 1) throw new RangeError('maxReadLines must be >= 1');
-  _maxReadLines = n;
+/** Override the max-read-chars limit directly. */
+export function setMaxReadChars(n: number): void {
+  if (n < 1) throw new RangeError('maxReadChars must be >= 1');
+  _maxReadChars = n;
+}
+
+/**
+ * Derive and set the char budget from a context-window size (in tokens).
+ *
+ * Formula: `contextWindowTokens * 0.10 * 4`  (10 % of the window, ≈ 4
+ * chars per token).  Result is floored with a minimum of 4 000 chars
+ * (~50 lines) so very small windows don't become unusable.
+ */
+export function setMaxReadCharsFromContextWindow(
+  contextWindowTokens: number,
+): void {
+  const budget = Math.max(4_000, Math.floor(contextWindowTokens * 0.1 * 4));
+  setMaxReadChars(budget);
+}
+
+/**
+ * Given an array of text lines, determine how many can be included
+ * within the current `maxReadChars` budget, starting from index 0.
+ *
+ * Returns the number of lines that fit.  Each line's length plus 1
+ * (for the newline separator) is accumulated until the budget is
+ * exhausted.  At least 1 line is always returned when `lines` is
+ * non-empty.
+ */
+export function countLinesFittingBudget(
+  lines: readonly string[],
+  budget: number = _maxReadChars,
+): number {
+  if (lines.length === 0) return 0;
+  let chars = 0;
+  for (let i = 0; i < lines.length; i++) {
+    // +1 for the newline separator (or the line-number prefix overhead)
+    const lineCost = lines[i].length + 1;
+    if (chars + lineCost > budget && i > 0) return i;
+    chars += lineCost;
+  }
+  return lines.length;
 }
 
 /**
@@ -166,6 +207,76 @@ export function getMaxPreviewLines(): number {
 export function setMaxPreviewLines(n: number): void {
   if (n < 1) throw new RangeError('maxPreviewLines must be >= 1');
   _maxPreviewLines = n;
+}
+
+// ---------------------------------------------------------------------------
+// Shared text truncation
+// ---------------------------------------------------------------------------
+
+import type { ReadParams } from './types';
+
+/**
+ * Shared truncation logic for text-based transformers.
+ *
+ * Handles both **line-range** and **full-content** reads with
+ * character-budget enforcement. Returns the line-numbered output text,
+ * the effective read params (reflecting any truncation), and metadata
+ * fields (`lines`, `chars`).
+ *
+ * Transformers should call this for any non-preview, non-binary text
+ * read. Preview mode is intentionally excluded because each transformer
+ * implements its own preview logic (e.g. markdown heading outline,
+ * text-blob type label, etc.).
+ */
+export function truncateTextContent(
+  allLines: readonly string[],
+  readParams: ReadParams,
+): {
+  output: string;
+  effectiveReadParams?: ReadParams;
+} {
+  const totalLines = allLines.length;
+  const { startLine, endLine } = readParams;
+
+  // ── Line-range slicing ───────────────────────────────────────────
+  if (startLine !== undefined || endLine !== undefined) {
+    const budget = getMaxReadChars();
+    const sl = Math.max(1, startLine ?? 1);
+    const requestedEnd = Math.min(totalLines, endLine ?? totalLines);
+    const rangeLines = allLines.slice(sl - 1, requestedEnd);
+    const fitCount = countLinesFittingBudget(rangeLines, budget);
+    const el = sl + fitCount - 1;
+    const truncated = el < requestedEnd;
+    const slice = allLines.slice(sl - 1, el);
+    let numbered = prefixLineNumbers(slice.join('\n'), sl);
+
+    if (truncated) {
+      numbered += `\n… (truncated — token budget reached, ${requestedEnd - el} more lines until line ${requestedEnd})`;
+    }
+
+    return {
+      output: numbered,
+      effectiveReadParams: { startLine: sl, endLine: el },
+    };
+  }
+
+  // ── Full content (capped by char budget) ──────────────────────────
+  const budget = getMaxReadChars();
+  const fitCount = countLinesFittingBudget(allLines as string[], budget);
+  const cappedEnd = Math.min(totalLines, fitCount);
+  const truncated = cappedEnd < totalLines;
+  const outputLines = truncated ? allLines.slice(0, cappedEnd) : allLines;
+  let numbered = prefixLineNumbers((outputLines as string[]).join('\n'));
+
+  if (truncated) {
+    numbered += `\n… (truncated — token budget reached, ${totalLines - cappedEnd} more lines remaining)`;
+    return {
+      output: numbered,
+      effectiveReadParams: { startLine: 1, endLine: cappedEnd },
+    };
+  }
+
+  return { output: numbered };
 }
 
 // ---------------------------------------------------------------------------

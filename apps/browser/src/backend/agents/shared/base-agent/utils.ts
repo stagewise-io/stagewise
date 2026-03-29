@@ -43,6 +43,10 @@ import {
   type ReadParams,
   SeenFilesTracker,
 } from './file-read-transformer';
+import {
+  extractReadFileRequestsFromAssistantMessage,
+  type ReadFileRequest,
+} from './file-read-transformer/path-references';
 import { processImageForModel } from './image-processor';
 
 /**
@@ -250,8 +254,11 @@ export const convertAgentMessagesToModelMessages = async (
       modelMessages.push(...assistantMsgs);
 
       // Inject file contents from pathReferences (from readFile tool calls).
-      // Assistant-side references come from explicit readFile calls — use
-      // default (full) read params, not preview.
+      // Extract per-call read params (start_line, end_line, etc.) from the
+      // tool-call parts so that line/page ranges are correctly forwarded
+      // to the transformer pipeline.
+      const readFileRequests =
+        extractReadFileRequestsFromAssistantMessage(message);
       const rawFileParts = await injectFileReferences(
         message.metadata?.pathReferences,
         seenFiles,
@@ -260,6 +267,8 @@ export const convertAgentMessagesToModelMessages = async (
         fileReadCache,
         mountPaths,
         logger,
+        undefined,
+        readFileRequests,
       );
       // Adapt images to the current model's constraints (resize/compress).
       const fileParts = await adaptImagePartsForModel(
@@ -321,6 +330,12 @@ function findCompressionBoundary(messages: AgentMessage[]): number {
  * path appears later with a *different* hash, the file is re-injected with
  * updated content.
  *
+ * When `readFileRequests` is provided (assistant-side references from
+ * readFile tool calls), each tool call's read params (start_line, end_line,
+ * etc.) are forwarded to the transformer so that line/page-range slicing
+ * works correctly. Without this, all assistant-side reads would be treated
+ * as full-file requests and dedup would suppress subsequent range reads.
+ *
  * Gracefully no-ops when `fileReadCache` or `mountPaths` are not provided
  * (the feature is disabled) or when `pathReferences` is empty/undefined.
  */
@@ -338,9 +353,8 @@ function findCompressionBoundary(messages: AgentMessage[]): number {
  *    `defaultReadParams`). The agent can later request the full content
  *    via the `readFile` tool.
  *
- * 3. **Files from assistant tool-calls** (readFile results) — the caller
- *    omits `defaultReadParams`, so the transformer receives `{}` which
- *    means full content with whatever line/page range the tool specified.
+ * 3. **Files from assistant tool-calls** (readFile results) — read params
+ *    are extracted from the tool-call parts via `readFileRequests`.
  */
 function resolveReadParams(
   path: string,
@@ -360,13 +374,111 @@ async function injectFileReferences(
   mountPaths?: Map<string, string>,
   logger?: Logger,
   defaultReadParams?: ReadParams,
+  readFileRequests?: ReadFileRequest[],
 ): Promise<(TextPart | ImagePart | FilePart)[]> {
   if (!pathReferences || !fileReadCache || !mountPaths || !logger) return [];
 
+  const allParts: (TextPart | ImagePart | FilePart)[] = [];
+
+  // When per-call read params are available (assistant-side references),
+  // iterate the individual tool-call requests so that each call's
+  // start_line/end_line/etc. is correctly forwarded to the transformer.
+  // This also handles the case where the same file is read multiple
+  // times with different ranges in the same assistant turn.
+  if (readFileRequests && readFileRequests.length > 0) {
+    for (const { path, readParams } of readFileRequests) {
+      const hash = pathReferences[path];
+      if (!hash) continue;
+
+      // Attachments are always full — ignore tool-call params.
+      const requestedParams = path.startsWith('att/') ? {} : readParams;
+
+      if (seenFiles.isCovered(path, hash, requestedParams)) continue;
+
+      try {
+        const result = await fileReadTransformer({
+          mountedPath: path,
+          expectedHash: hash,
+          blobReader,
+          cache: fileReadCache,
+          logger,
+          agentId: agentInstanceId,
+          mountPaths,
+          readParams: requestedParams,
+        });
+
+        seenFiles.record(
+          path,
+          hash,
+          result.effectiveReadParams ?? requestedParams,
+        );
+
+        allParts.push(...result.parts);
+      } catch (err) {
+        logger?.warn(`[injectFileReferences] Failed to transform ${path}`, err);
+        allParts.push({
+          type: 'text',
+          text:
+            `<file path="${path}">\n` +
+            '<metadata>error:true</metadata>\n' +
+            '<content>\n' +
+            `File could not be loaded: ${err instanceof Error ? err.message : String(err)}` +
+            '\n</content>\n</file>',
+        });
+      }
+    }
+
+    // Also inject any pathReferences entries that did NOT come from
+    // tool-read calls (e.g. sandbox-created attachments). These don't
+    // have per-call read params and use the default (full content).
+    const toolReadPaths = new Set(readFileRequests.map((r) => r.path));
+    for (const [path, hash] of Object.entries(pathReferences)) {
+      if (toolReadPaths.has(path)) continue;
+
+      const requestedParams = resolveReadParams(path, defaultReadParams) ?? {};
+
+      if (seenFiles.isCovered(path, hash, requestedParams)) continue;
+
+      try {
+        const result = await fileReadTransformer({
+          mountedPath: path,
+          expectedHash: hash,
+          blobReader,
+          cache: fileReadCache,
+          logger,
+          agentId: agentInstanceId,
+          mountPaths,
+          readParams: requestedParams,
+        });
+
+        seenFiles.record(
+          path,
+          hash,
+          result.effectiveReadParams ?? requestedParams,
+        );
+
+        allParts.push(...result.parts);
+      } catch (err) {
+        logger?.warn(`[injectFileReferences] Failed to transform ${path}`, err);
+        allParts.push({
+          type: 'text',
+          text:
+            `<file path="${path}">\n` +
+            '<metadata>error:true</metadata>\n' +
+            '<content>\n' +
+            `File could not be loaded: ${err instanceof Error ? err.message : String(err)}` +
+            '\n</content>\n</file>',
+        });
+      }
+    }
+
+    return allParts;
+  }
+
+  // Fallback: no per-call requests — iterate pathReferences entries
+  // with the default read params (used for user-side references).
   const entries = Object.entries(pathReferences);
   if (entries.length === 0) return [];
-
-  const allParts: (TextPart | ImagePart | FilePart)[] = [];
 
   for (const [path, hash] of entries) {
     const requestedParams = resolveReadParams(path, defaultReadParams) ?? {};
@@ -681,9 +793,9 @@ async function convertAssistantMessage(
  */
 async function convertUserMessage(
   message: AgentMessage,
-  agentInstanceId: string,
-  logger?: Logger,
-  imageCache?: ProcessedImageCacheService,
+  _agentInstanceId: string,
+  _logger?: Logger,
+  _imageCache?: ProcessedImageCacheService,
   skills?: ReadonlyArray<SkillDefinition>,
 ): Promise<UserModelMessage> {
   // ── Resolve slash-invoked skills ────────────────────────────────────

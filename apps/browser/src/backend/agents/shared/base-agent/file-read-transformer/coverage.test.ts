@@ -596,10 +596,14 @@ describe('SeenFilesTracker', () => {
         tracker.isCovered('w1/a.ts', 'h1', { startLine: 40, endLine: 70 }),
       ).toBe(true);
 
-      // Lines 1-100 → covered? No! No single entry covers it.
-      // Entry 1 covers [1,50], Entry 2 covers [40,100], but neither covers [1,100].
+      // Lines 1-100 → now covered by merged union of [1,50] ∪ [40,100] = [1,100].
       expect(
         tracker.isCovered('w1/a.ts', 'h1', { startLine: 1, endLine: 100 }),
+      ).toBe(true);
+
+      // Lines 1-101 → NOT covered (extends past recorded range).
+      expect(
+        tracker.isCovered('w1/a.ts', 'h1', { startLine: 1, endLine: 101 }),
       ).toBe(false);
     });
   });
@@ -608,13 +612,13 @@ describe('SeenFilesTracker', () => {
   // Multi-entry coverage (no merging — each entry checked independently)
   // -----------------------------------------------------------------------
 
-  describe('multi-entry coverage (no range merging)', () => {
-    it('two non-overlapping entries do not merge to cover the union', () => {
+  describe('multi-entry coverage (with range merging)', () => {
+    it('two non-overlapping entries with a gap do not cover the gap', () => {
       const tracker = new SeenFilesTracker();
       tracker.record('w1/a.ts', 'h1', { startLine: 1, endLine: 20 });
       tracker.record('w1/a.ts', 'h1', { startLine: 50, endLine: 80 });
 
-      // Request that spans the gap → not covered by any single entry
+      // Request that spans the gap → not covered even after merging
       expect(
         tracker.isCovered('w1/a.ts', 'h1', { startLine: 1, endLine: 80 }),
       ).toBe(false);
@@ -628,7 +632,49 @@ describe('SeenFilesTracker', () => {
       ).toBe(true);
     });
 
-    it('three entries: request covered if any one entry covers it', () => {
+    it('two contiguous entries cover a request spanning their boundary', () => {
+      const tracker = new SeenFilesTracker();
+      tracker.record('w1/a.ts', 'h1', { startLine: 500, endLine: 999 });
+      tracker.record('w1/a.ts', 'h1', { startLine: 1000, endLine: 1499 });
+
+      // Spans the boundary — covered by merged union.
+      expect(
+        tracker.isCovered('w1/a.ts', 'h1', { startLine: 700, endLine: 1100 }),
+      ).toBe(true);
+
+      // Fully within first entry.
+      expect(
+        tracker.isCovered('w1/a.ts', 'h1', { startLine: 500, endLine: 999 }),
+      ).toBe(true);
+
+      // Fully within second entry.
+      expect(
+        tracker.isCovered('w1/a.ts', 'h1', { startLine: 1000, endLine: 1499 }),
+      ).toBe(true);
+
+      // Beyond both entries.
+      expect(
+        tracker.isCovered('w1/a.ts', 'h1', { startLine: 700, endLine: 1500 }),
+      ).toBe(false);
+    });
+
+    it('two overlapping entries cover a request within their union', () => {
+      const tracker = new SeenFilesTracker();
+      tracker.record('w1/a.ts', 'h1', { startLine: 1, endLine: 60 });
+      tracker.record('w1/a.ts', 'h1', { startLine: 40, endLine: 100 });
+
+      // Spans the overlap — covered by merged [1, 100].
+      expect(
+        tracker.isCovered('w1/a.ts', 'h1', { startLine: 30, endLine: 80 }),
+      ).toBe(true);
+
+      // Full union.
+      expect(
+        tracker.isCovered('w1/a.ts', 'h1', { startLine: 1, endLine: 100 }),
+      ).toBe(true);
+    });
+
+    it('three entries with gaps: merge covers contiguous pairs only', () => {
       const tracker = new SeenFilesTracker();
       tracker.record('w1/a.ts', 'h1', { startLine: 1, endLine: 10 });
       tracker.record('w1/a.ts', 'h1', { startLine: 20, endLine: 30 });
@@ -647,6 +693,33 @@ describe('SeenFilesTracker', () => {
       ).toBe(false); // spans gap between first and second
     });
 
+    it('many contiguous entries cover the full union', () => {
+      const tracker = new SeenFilesTracker();
+      // Simulate reading a large file in 500-line chunks.
+      for (let i = 0; i < 10; i++) {
+        tracker.record('w1/a.ts', 'h1', {
+          startLine: i * 500 + 1,
+          endLine: (i + 1) * 500,
+        });
+      }
+
+      // Request spanning multiple chunks.
+      expect(
+        tracker.isCovered('w1/a.ts', 'h1', {
+          startLine: 250,
+          endLine: 3700,
+        }),
+      ).toBe(true);
+
+      // Beyond the recorded range.
+      expect(
+        tracker.isCovered('w1/a.ts', 'h1', {
+          startLine: 4500,
+          endLine: 5500,
+        }),
+      ).toBe(false);
+    });
+
     it('preview entry + full entry: both are independently available', () => {
       const tracker = new SeenFilesTracker();
       tracker.record('w1/a.ts', 'h1', { preview: true });
@@ -657,6 +730,43 @@ describe('SeenFilesTracker', () => {
         tracker.isCovered('w1/a.ts', 'h1', { startLine: 10, endLine: 30 }),
       ).toBe(true);
       // Unbounded still not covered (bounded entry only goes to 50)
+      expect(tracker.isCovered('w1/a.ts', 'h1', {})).toBe(false);
+    });
+
+    it('merged coverage respects page axis — incompatible pages are excluded', () => {
+      const tracker = new SeenFilesTracker();
+      // Two contiguous line ranges but with different page constraints.
+      tracker.record('w1/a.ts', 'h1', {
+        startLine: 1,
+        endLine: 50,
+        startPage: 1,
+        endPage: 2,
+      });
+      tracker.record('w1/a.ts', 'h1', {
+        startLine: 51,
+        endLine: 100,
+        startPage: 3,
+        endPage: 4,
+      });
+
+      // Request with page range covered by first entry only → line merge
+      // excludes second entry, so lines 51-100 aren't included.
+      expect(
+        tracker.isCovered('w1/a.ts', 'h1', {
+          startLine: 25,
+          endLine: 75,
+          startPage: 1,
+          endPage: 2,
+        }),
+      ).toBe(false);
+    });
+
+    it('unbounded line-range request is not satisfied by merged bounded entries', () => {
+      const tracker = new SeenFilesTracker();
+      tracker.record('w1/a.ts', 'h1', { startLine: 1, endLine: 500 });
+      tracker.record('w1/a.ts', 'h1', { startLine: 501, endLine: 1000 });
+
+      // Full-file request (no bounds) — cannot be satisfied by bounded entries.
       expect(tracker.isCovered('w1/a.ts', 'h1', {})).toBe(false);
     });
   });
@@ -934,9 +1044,14 @@ describe('SeenFilesTracker', () => {
         tracker.isCovered('w1/huge.ts', 'h1', { startLine: 400, endLine: 450 }),
       ).toBe(true);
 
-      // Lines 1-500 → still NOT covered (no single entry)
+      // Lines 1-500 → now covered by merged contiguous entries
       expect(
         tracker.isCovered('w1/huge.ts', 'h1', { startLine: 1, endLine: 500 }),
+      ).toBe(true);
+
+      // Lines 1-501 → NOT covered (extends past recorded range)
+      expect(
+        tracker.isCovered('w1/huge.ts', 'h1', { startLine: 1, endLine: 501 }),
       ).toBe(false);
     });
   });

@@ -31,6 +31,8 @@ All dynamic/changing symlinks are listed in the env-snapshot. All static paths a
 
 Read/write access to multiple directories via tools, bash, or the JS sandbox. File contents arrive in `<file>` tags; directory listings in `<dir>` tags. Raw text lines are formatted as `<line_number>|text`.
 
+Large files are dynamically truncated based on the model's context window. When a file is truncated, you can issue **multiple parallel `read` calls** with non-overlapping `start_line`/`end_line` ranges to load different sections of the same file simultaneously.
+
 ### Home Directory Structure
 
 The directory consist of symlinks to folders in the users machine

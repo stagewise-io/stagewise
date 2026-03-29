@@ -12,7 +12,7 @@ import nodeFs from 'node:fs/promises';
 import { randomUUID, createHash } from 'node:crypto';
 import { FileReadCacheService } from '@/services/file-read-cache';
 import { fileReadTransformer, type FileReadTransformerOptions } from './index';
-import { getMaxReadLines } from './format-utils';
+import { getMaxReadChars } from './format-utils';
 import { serializeTransformResult } from './serialization';
 
 // ---------------------------------------------------------------------------
@@ -417,7 +417,7 @@ describe('fileReadTransformer – cache integration (hash match)', () => {
     const cacheKey = FileReadCacheService.buildCacheKey(
       hash,
       '.txt',
-      `mrl=${getMaxReadLines()}`,
+      `mrc=${getMaxReadChars()}`,
     );
     const cached = await ctx.cache.get(cacheKey);
     expect(cached).not.toBeNull();
@@ -438,7 +438,7 @@ describe('fileReadTransformer – cache integration (hash match)', () => {
     const cacheKey = FileReadCacheService.buildCacheKey(
       hash,
       '.txt',
-      `mrl=${getMaxReadLines()}`,
+      `mrc=${getMaxReadChars()}`,
     );
     await ctx.cache.set(cacheKey, 'not valid json {{{{', content.length);
 
@@ -479,7 +479,7 @@ describe('fileReadTransformer – hash mismatch', () => {
     const oldCacheKey = FileReadCacheService.buildCacheKey(
       oldHash,
       '.txt',
-      `mrl=${getMaxReadLines()}`,
+      `mrc=${getMaxReadChars()}`,
     );
     await ctx.cache.set(
       oldCacheKey,

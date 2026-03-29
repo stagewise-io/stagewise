@@ -34,7 +34,7 @@ import {
 } from './serialization';
 import {
   baseMetadata,
-  getMaxReadLines,
+  getMaxReadChars,
   getMaxPreviewLines,
 } from './format-utils';
 import type {
@@ -695,7 +695,7 @@ function buildReadParamsSuffix(params: ReadParams): string {
   // Include the runtime content-limit settings so that changing them
   // invalidates cached results (the same read params can produce
   // different output when the cap is different).
-  parts.push(`mrl=${getMaxReadLines()}`);
+  parts.push(`mrc=${getMaxReadChars()}`);
   if (params.preview) parts.push(`mpl=${getMaxPreviewLines()}`);
 
   return parts.join(',');
