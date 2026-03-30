@@ -159,11 +159,10 @@ export const convertAgentMessagesToModelMessages = async (
 
   const modelMessages: ModelMessage[] = [];
 
-  // Tracks which files (by path + hash + read params) have been injected
-  // into the conversation context. Uses range-aware coverage checks so
-  // that e.g. a full-file read is not re-injected when its content is
-  // already covered by a previous injection, while a new line/page range
-  // that extends beyond the existing coverage *is* injected.
+  // Tracks which (path, hash) pairs have been injected into the context
+  // this conversation window. Used to deduplicate user mentions and
+  // sandbox attachments — agent readFile calls bypass this check entirely
+  // and are always injected.
   const seenFiles = new SeenFilesTracker();
 
   if (systemPrompt) {
@@ -333,8 +332,8 @@ function findCompressionBoundary(messages: AgentMessage[]): number {
  * When `readFileRequests` is provided (assistant-side references from
  * readFile tool calls), each tool call's read params (start_line, end_line,
  * etc.) are forwarded to the transformer so that line/page-range slicing
- * works correctly. Without this, all assistant-side reads would be treated
- * as full-file requests and dedup would suppress subsequent range reads.
+ * works correctly. This also handles the case where the same file is read
+ * multiple times with different ranges in the same assistant turn.
  *
  * Gracefully no-ops when `fileReadCache` or `mountPaths` are not provided
  * (the feature is disabled) or when `pathReferences` is empty/undefined.
@@ -393,8 +392,9 @@ async function injectFileReferences(
       // Attachments are always full — ignore tool-call params.
       const requestedParams = path.startsWith('att/') ? {} : readParams;
 
-      if (seenFiles.isCovered(path, hash, requestedParams)) continue;
-
+      // Agent readFile calls are always injected — no dedup check.
+      // The agent decides what to re-read. FileReadCacheService still
+      // caches transformations so repeated identical reads are cheap.
       try {
         const result = await fileReadTransformer({
           mountedPath: path,
@@ -407,11 +407,8 @@ async function injectFileReferences(
           readParams: requestedParams,
         });
 
-        seenFiles.record(
-          path,
-          hash,
-          result.effectiveReadParams ?? requestedParams,
-        );
+        // Still record so user-mention dedup stays aware of injected files.
+        seenFiles.record(path, hash);
 
         allParts.push(...result.parts);
       } catch (err) {
@@ -437,7 +434,7 @@ async function injectFileReferences(
 
       const requestedParams = resolveReadParams(path, defaultReadParams) ?? {};
 
-      if (seenFiles.isCovered(path, hash, requestedParams)) continue;
+      if (seenFiles.isCovered(path, hash)) continue;
 
       try {
         const result = await fileReadTransformer({
@@ -451,11 +448,7 @@ async function injectFileReferences(
           readParams: requestedParams,
         });
 
-        seenFiles.record(
-          path,
-          hash,
-          result.effectiveReadParams ?? requestedParams,
-        );
+        seenFiles.record(path, hash);
 
         allParts.push(...result.parts);
       } catch (err) {
@@ -483,9 +476,8 @@ async function injectFileReferences(
   for (const [path, hash] of entries) {
     const requestedParams = resolveReadParams(path, defaultReadParams) ?? {};
 
-    // Coverage-aware dedup: skip if any previously injected entry for
-    // this (path, hash) already covers the requested read params.
-    if (seenFiles.isCovered(path, hash, requestedParams)) continue;
+    // Dedup: skip if this (path, hash) was already injected this window.
+    if (seenFiles.isCovered(path, hash)) continue;
 
     try {
       const result = await fileReadTransformer({
@@ -499,16 +491,7 @@ async function injectFileReferences(
         readParams: requestedParams,
       });
 
-      // Record what was *actually* delivered, not what was requested.
-      // If the transformer truncated (e.g. capped a 500-line file at
-      // 300 lines), effectiveReadParams will be narrower than the
-      // request, so future reads of the remaining lines won't be
-      // falsely skipped.
-      seenFiles.record(
-        path,
-        hash,
-        result.effectiveReadParams ?? requestedParams,
-      );
+      seenFiles.record(path, hash);
 
       allParts.push(...result.parts);
     } catch (err) {

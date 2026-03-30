@@ -3,6 +3,11 @@
  *
  * Uses a real temp directory for files and a real SQLite cache DB per test
  * for full pipeline coverage (read → hash → cache → transform → XML wrap).
+ *
+ * Note on deduplication: agent `readFile` calls are NOT deduplicated at the
+ * pipeline level — that is the responsibility of the caller. The transformer
+ * always produces output. Tests in the "no deduplication" section assert this
+ * contract explicitly.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -567,5 +572,72 @@ describe('fileReadTransformer – metadata formatting', () => {
     const text = allText(result.parts);
     // Should contain an ISO date string (YYYY-MM-DD).
     expect(text).toMatch(/modified:\d{4}-\d{2}-\d{2}T/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: No deduplication — agent reads always produce output
+// ---------------------------------------------------------------------------
+
+describe('fileReadTransformer – no deduplication', () => {
+  let ctx: TestContext;
+  beforeEach(async () => {
+    ctx = await setup();
+  });
+  afterEach(async () => {
+    await teardown(ctx);
+  });
+
+  it('calling the transformer twice for the same file produces two identical results', async () => {
+    // The transformer itself has no dedup gate — it always returns content.
+    // The caller (injectFileReferences) is responsible for any dedup policy;
+    // for agent readFile calls the caller intentionally skips that gate.
+    const content = 'export const x = 1;\n';
+    const filePath = path.join(ctx.workDir, 'dup.ts');
+    await nodeFs.writeFile(filePath, content);
+    const hash = sha256(content);
+
+    const opts = makeOpts(ctx, `${ctx.mountPrefix}/dup.ts`, hash);
+
+    const r1 = await fileReadTransformer(opts);
+    const r2 = await fileReadTransformer(opts);
+
+    // Both calls must return non-empty parts.
+    expect(r1.parts.length).toBeGreaterThan(0);
+    expect(r2.parts.length).toBeGreaterThan(0);
+
+    // Content must be identical (second call is a cache hit).
+    expect(allText(r1.parts)).toBe(allText(r2.parts));
+
+    // Crucially: both calls return a result — neither is suppressed.
+    // The surrounding test verifies there is no internal skip/undefined path.
+    expect(allText(r1.parts)).toContain('export const x = 1;');
+    expect(allText(r2.parts)).toContain('export const x = 1;');
+  });
+
+  it('two calls with different readParams both produce output', async () => {
+    const lines = `${Array.from({ length: 20 }, (_, i) => `line ${String(i + 1).padStart(2, '0')}`).join('\n')}\n`;
+    const filePath = path.join(ctx.workDir, 'multi.ts');
+    await nodeFs.writeFile(filePath, lines);
+    const hash = sha256(lines);
+
+    const r1 = await fileReadTransformer(
+      makeOpts(ctx, `${ctx.mountPrefix}/multi.ts`, hash, undefined, {
+        startLine: 1,
+        endLine: 5,
+      }),
+    );
+    const r2 = await fileReadTransformer(
+      makeOpts(ctx, `${ctx.mountPrefix}/multi.ts`, hash, undefined, {
+        startLine: 10,
+        endLine: 15,
+      }),
+    );
+
+    expect(allText(r1.parts)).toContain('line 01');
+    expect(allText(r1.parts)).not.toContain('line 10');
+
+    expect(allText(r2.parts)).toContain('line 10');
+    expect(allText(r2.parts)).not.toContain('line 01');
   });
 });

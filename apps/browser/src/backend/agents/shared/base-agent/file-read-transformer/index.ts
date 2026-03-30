@@ -17,7 +17,7 @@
  *   - Transformer output (content slicing / preview generation)
  *   - Cache key (different params produce separate cache entries)
  *   - XML envelope (read-param attributes on `<file>` tags)
- *   - Deduplication (coverage-aware via `SeenFilesTracker`)
+ *   - Deduplication (path+hash via `SeenFilesTracker` — user mentions/attachments only)
  *
  * See `README.md` in this directory for the full architecture documentation.
  */
@@ -297,9 +297,8 @@ export interface FileReadTransformerResult {
    * delivered**. Falls back to the requested `readParams` when the
    * transformer did not report truncation.
    *
-   * Used by `SeenFilesTracker.record()` to ensure the coverage tracker
-   * knows the true extent of content injected into the context — so
-   * that truncated reads don't falsely suppress future range requests.
+   * Used by the XML envelope (`truncated="true"` attribute) to inform
+   * the model when the full requested range was not delivered.
    */
   effectiveReadParams?: ReadParams;
 }
@@ -715,4 +714,4 @@ export {
   serializeTransformResult,
   deserializeTransformResult,
 } from './serialization';
-export { SeenFilesTracker, isReadParamsCoveredBy } from './coverage';
+export { SeenFilesTracker } from './coverage';

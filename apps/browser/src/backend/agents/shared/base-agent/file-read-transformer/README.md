@@ -134,74 +134,29 @@ different default `ReadParams`:
 
 ---
 
-## Coverage-Aware Deduplication
+## Deduplication
 
-Previous versions used a simple `Set<"path:hash">` to avoid injecting the
-same file twice. This is insufficient when:
+Deduplication policy is split by file origin:
 
-- A file was first injected as a **preview**, then the agent requests the
-  **full content** — the full read must still be injected.
-- A file was first read at **lines 1–20**, then the agent requests
-  **lines 50–80** — the new range must be injected.
-- A file was read in **full**, then the agent requests **lines 10–20** —
-  this is redundant and should be skipped.
-- A directory was read at **depth 1**, then the agent requests **depth 4**
-  — the deeper listing must be injected.
+| Origin | Dedup rule |
+|--------|------------|
+| **User mentions** | Deduplicated by `(path, hash)`. Same hash = same preview output → re-injection adds no value. |
+| **Attachments (`att/`)** | Deduplicated by `(path, hash)`. Same hash = same full-content output. |
+| **Agent `readFile` calls** | **Never deduplicated.** The agent explicitly decided to read the file. The pipeline always produces output. |
 
 ### `SeenFilesTracker` (coverage.ts)
 
-Replaces `Set<string>`. Tracks `(path, hash, ReadParams)` tuples.
+Tracks which `(path, hash)` pairs have already been injected within the
+current conversation window. Implemented as a plain `Set<"path:hash">`.
 
-**Two-phase API** — `isCovered()` + `record()`:
+**API:**
 
-1. Call `isCovered(path, hash, requestedParams)` to check redundancy.
-2. If not covered → run the transformer.
-3. Call `record(path, hash, effectiveParams)` with what was **actually
-   delivered** (not what was requested).
+- `isCovered(path, hash)` — returns `true` if this pair was already injected.
+- `record(path, hash)` — records that this pair was injected.
 
-This split is critical for **truncation safety**: if a transformer caps a
-500-line file at 300 lines, the tracker records `{ startLine: 1, endLine: 300 }`
-rather than unbounded — so a later request for lines 301–400 is correctly
-identified as uncovered.
-
-**Decision flow per file reference:**
-
-1. Build key = `"${path}:${hash}"`.
-2. If `isCovered()` returns true → **skip** (redundant).
-3. Otherwise → run transformer → `record()` effective params.
-
-### `isReadParamsCoveredBy()` (coverage.ts)
-
-Determines whether an existing `ReadParams` entry fully covers a new
-request. All axes must be independently satisfied:
-
-| Axis | Rule |
-|------|------|
-| **preview** | Preview and non-preview are different representations. A preview never covers a full read and vice-versa. Two previews for the same hash are always equivalent. |
-| **Line range** | Unbounded covers any bounded range. Bounded `[a,b]` covers `[c,d]` iff `a ≤ c` and `b ≥ d`. |
-| **Page range** | Same semantics as line range. |
-| **Depth** | `undefined` (transformer default) covers any specific depth. Specific `N` covers specific `M` iff `N ≥ M`. Specific never covers `undefined` (the default could be larger). |
-
-All axes are checked independently — a request is only covered when
-**every** axis is satisfied.
-
-### Depth coverage semantics
-
-The `depth` parameter uses slightly different coverage logic than ranges:
-
-```
-existing=undefined, requested=5       → ✅ covered (default is always used)
-existing=5,         requested=undefined → ❌ not covered (default might be > 5)
-existing=4,         requested=2       → ✅ covered (deeper subsumes shallower)
-existing=2,         requested=4       → ❌ not covered
-existing=3,         requested=3       → ✅ covered
-```
-
-This is conservative: when the existing read used the transformer's
-default depth (`undefined`), we assume it covered everything the default
-provides. When the existing read used a specific depth, we cannot assume
-it covers an `undefined` (default) request because the default might be
-deeper.
+User mentions are always `preview` mode — the same hash always produces the
+same output, so a simple equality check is sufficient. Agent reads bypass
+this tracker entirely (no `isCovered()` call in that branch).
 
 ---
 
@@ -416,27 +371,13 @@ files at a maximum line count). The pipeline handles this via
 2. **Serialized into cache** — `SerializedTransformResult` includes
    `effectiveReadParams` so cache hits preserve truncation info.
 
-3. **Used by `SeenFilesTracker.record()`** — Stores the effective params
-   as the ground truth for coverage. Future `isCovered()` calls use these
-   to decide whether a new request is redundant.
+3. **XML envelope** — `effectiveReadParams` drives the `truncated="true"`
+   attribute on `<file>` tags, informing the model when its request was
+   not fully delivered.
 
 4. **Fallback** — When the transformer does not set `effectiveReadParams`
    (i.e. delivered everything asked for), the originally requested params
    are used as the effective params.
-
-**Example flow:**
-
-```
-Agent requests: {} (full file, 500 lines)
-Transformer caps at 300 lines → effectiveReadParams = { startLine: 1, endLine: 300 }
-Tracker records: { startLine: 1, endLine: 300 }
-
-Agent later requests: { startLine: 400, endLine: 450 }
-Tracker checks: not covered by [1, 300] → ✅ inject
-```
-
-Without effective params, the tracker would record `{}` (unbounded),
-falsely believing lines 400–450 were already covered.
 
 ---
 
@@ -451,10 +392,11 @@ The `buildModelMessages()` function in `utils.ts` is the consumer:
    `defaultReadParams` (full content).
 4. Inside `injectFileReferences()`:
    - `resolveReadParams()` overrides per path (e.g. `att/` → full).
-   - `seenFiles.isCovered()` checks if the request is redundant.
-   - `fileReadTransformer()` runs the pipeline if not covered.
-   - `seenFiles.record()` stores the **effective** params from the
-     transformer result (handles truncation correctly).
+   - **Agent reads:** `fileReadTransformer()` is called unconditionally —
+     no `isCovered()` gate. `seenFiles.record(path, hash)` is called after
+     so user-mention dedup is aware of what was injected.
+   - **User mentions / attachments:** `seenFiles.isCovered(path, hash)` is
+     checked first; skipped if already seen. `seenFiles.record()` on inject.
 
 ### `resolveReadParams()` heuristic
 
@@ -486,15 +428,14 @@ paths from completed `readFile` tool-call parts (state `output-available` or
 |------|------|
 | `index.ts` | Central entry point — `fileReadTransformer()`, XML wrapping, cache key building, extension→transformer routing |
 | `types.ts` | Core types: `ReadParams`, `TransformerContext`, `FileTransformResult`, `FileTransformer`, serialization types |
-| `coverage.ts` | `SeenFilesTracker`, `isReadParamsCoveredBy()`, `isDepthCoveredBy()`, `isRangeCoveredBy()` — dedup logic |
-| `coverage.test.ts` | Tests for coverage/dedup (37 cases: preview, line/page ranges, depth, truncation safety) |
+| `coverage.ts` | `SeenFilesTracker` — `(path, hash)` dedup for user mentions and attachments |
 | `path-references.ts` | Extract referenced paths from user/assistant messages (`path:` links, `readFile` tool-call parts) |
 | `populate-path-references.ts` | Hash files and populate `pathReferences` on message metadata |
 | `hash.ts` | SHA-256 hashing for files (content) and directories (child names+sizes) |
 | `resolve-path.ts` | Mount-prefix → absolute path resolution |
 | `serialization.ts` | Cache (de)serialization for `FileTransformResult` (including `effectiveReadParams`) |
 | `serialization.test.ts` | Tests for serialization round-tripping (17 cases) |
-| `file-read-transformer.test.ts` | Integration tests for the full pipeline (19 cases) |
+| `file-read-transformer.test.ts` | Integration tests for the full pipeline (21 cases, including no-dedup regression tests) |
 | `format-utils.ts` | Human-readable size formatting (`formatBytes`), language inference from extension |
 | `format-directory-tree.ts` | Generic tree formatter — used by directory, archive, and disk-image transformers |
 | `transformers/` | Per-type transformer implementations (10 files) |

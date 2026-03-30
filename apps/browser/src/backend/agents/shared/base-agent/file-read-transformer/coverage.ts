@@ -1,341 +1,53 @@
 /**
- * Read-params coverage logic for file injection deduplication.
+ * File injection deduplication for user mentions and attachments.
  *
- * When the model context already contains a file at a given hash, we need
- * to decide whether a new read request adds value or is redundant.
+ * Agent `readFile` calls are **never** deduplicated — the agent decides
+ * what to re-read. Only user-mentioned files and sandbox attachments use
+ * this tracker to avoid re-injecting the same (path, hash) pair within a
+ * single conversation window.
  *
- * ## Heuristics
- *
- * 1. **Preview vs full are different representations.** A preview is a
- *    structural overview; it never covers a full read and vice-versa.
- *    Two preview requests for the same hash are always considered
- *    equivalent (preview output is deterministic for a given hash).
- *
- * 2. **Unbounded ranges cover everything.** If an existing entry has no
- *    `startLine`/`endLine` (or `startPage`/`endPage`), it represents the
- *    full content on that axis and covers any bounded sub-range.
- *
- * 3. **Bounded ranges are compared inclusively.** `[existStart, existEnd]`
- *    covers `[reqStart, reqEnd]` iff `existStart <= reqStart` and
- *    `existEnd >= reqEnd`.  When no single entry covers the request,
- *    overlapping and contiguous line-range entries are **merged** and
- *    checked as a union (e.g. [1,500] + [501,1000] covers [200,800]).
- *
- * 4. **Line and page axes are independent.** Both must be covered for the
- *    request to be considered redundant.
- *
- * 5. **Depth coverage.** An existing depth covers a requested depth when
- *    the existing depth is >= the requested depth (deeper listing subsumes
- *    shallower). Unbounded depth (undefined) covers any specific depth.
- *    A specific depth never covers unbounded (meaning "use default") since
- *    the default could be larger.
- *
- * 6. **Hash changes always trigger re-injection.** If the file content
- *    hash differs from any previously seen entry for the same path, the
- *    coverage check is not even attempted — the file is re-injected.
+ * A `(path, hash)` pair is considered "covered" if it has already been
+ * injected with any read params. Since user mentions are always previews
+ * (deterministic per hash), the same hash always produces the same output
+ * and re-injection adds no value.
  */
-
-import type { ReadParams } from './types';
-
-// ---------------------------------------------------------------------------
-// Range coverage
-// ---------------------------------------------------------------------------
-
-/**
- * Check whether an existing range `[exStart, exEnd]` fully contains the
- * requested range `[reqStart, reqEnd]`.
- *
- * `undefined` bounds have directional meaning:
- *   - `undefined` start → beginning of file (treated as 1)
- *   - `undefined` end   → end of file (treated as +∞)
- *
- * If the existing range is fully unbounded it covers any request.
- * If the requested range is fully unbounded it can only be covered by
- * another fully unbounded range (i.e. the full axis was already loaded).
- */
-function isRangeCoveredBy(
-  reqStart: number | undefined,
-  reqEnd: number | undefined,
-  exStart: number | undefined,
-  exEnd: number | undefined,
-): boolean {
-  // Existing is unbounded on both sides → covers everything.
-  if (exStart === undefined && exEnd === undefined) return true;
-
-  // Existing has bounds but requested is unbounded → not covered.
-  if (reqStart === undefined && reqEnd === undefined) return false;
-
-  // Remaining cases: at least one side is bounded on either existing or
-  // requested (or both). Normalise to concrete numbers for comparison.
-  // Single-sided unbounded ranges are handled correctly here because the
-  // undefined side maps to the extremum (1 or +∞), so e.g.
-  //   existing = [5, ∞) vs requested = [1, ∞) → 5 > 1 → not covered ✓
-  //   existing = [1, 50] vs requested = [1, ∞) → 50 < ∞ → not covered ✓
-  const effReqStart = reqStart ?? 1;
-  const effReqEnd = reqEnd ?? Number.MAX_SAFE_INTEGER;
-  const effExStart = exStart ?? 1;
-  const effExEnd = exEnd ?? Number.MAX_SAFE_INTEGER;
-
-  return effExStart <= effReqStart && effExEnd >= effReqEnd;
-}
-
-// ---------------------------------------------------------------------------
-// Depth coverage
-// ---------------------------------------------------------------------------
-
-/**
- * Check whether an existing depth fully covers the requested depth.
- *
- * - `undefined` means "use transformer default" — treated as unbounded
- *   for coverage purposes (the default could be any value).
- * - An existing `undefined` (default) covers any specific requested depth
- *   because the default was used and delivered whatever it delivered.
- * - A specific existing depth covers a request only if `existing >= requested`.
- * - A specific existing depth does NOT cover an `undefined` request because
- *   the default might be deeper.
- */
-function isDepthCoveredBy(
-  reqDepth: number | undefined,
-  exDepth: number | undefined,
-): boolean {
-  // Existing used default → it delivered the transformer's default depth.
-  // Covers any specific request ≤ that default, but since we don't know
-  // the default, we conservatively say it covers only another default or
-  // any specific depth (the default is always the transformer's max).
-  if (exDepth === undefined) return true;
-
-  // Existing is specific but requested is default → not safe to assume covered.
-  if (reqDepth === undefined) return false;
-
-  // Both specific → existing must be at least as deep.
-  return exDepth >= reqDepth;
-}
-
-// ---------------------------------------------------------------------------
-// ReadParams coverage
-// ---------------------------------------------------------------------------
-
-/**
- * Returns `true` if `existing` already fully covers what `requested` asks
- * for — meaning re-injecting the file would be redundant.
- *
- * Both params objects are assumed to belong to the **same path + hash**.
- */
-export function isReadParamsCoveredBy(
-  requested: ReadParams,
-  existing: ReadParams,
-): boolean {
-  const reqPreview = requested.preview ?? false;
-  const exPreview = existing.preview ?? false;
-
-  // Preview and non-preview are fundamentally different representations.
-  // A preview never satisfies a full-content request and vice-versa.
-  if (reqPreview !== exPreview) return false;
-
-  // Both preview → deterministic output for the same hash; always covered.
-  if (reqPreview && exPreview) return true;
-
-  // Both non-preview → check line and page ranges independently.
-  if (
-    !isRangeCoveredBy(
-      requested.startLine,
-      requested.endLine,
-      existing.startLine,
-      existing.endLine,
-    )
-  )
-    return false;
-
-  if (
-    !isRangeCoveredBy(
-      requested.startPage,
-      requested.endPage,
-      existing.startPage,
-      existing.endPage,
-    )
-  )
-    return false;
-
-  // Depth coverage: a deeper (or equal) existing depth covers a shallower request.
-  if (!isDepthCoveredBy(requested.depth, existing.depth)) return false;
-
-  return true;
-}
-
-// ---------------------------------------------------------------------------
-// Merged-interval coverage
-// ---------------------------------------------------------------------------
-
-/**
- * Given a list of `[start, end]` inclusive intervals, merge
- * overlapping/contiguous ones and return the sorted result.
- */
-function mergeIntervals(
-  intervals: Array<[number, number]>,
-): Array<[number, number]> {
-  if (intervals.length === 0) return [];
-  const sorted = [...intervals].sort((a, b) => a[0] - b[0]);
-  const merged: Array<[number, number]> = [sorted[0]];
-  for (let i = 1; i < sorted.length; i++) {
-    const [curStart, curEnd] = sorted[i];
-    const last = merged[merged.length - 1];
-    // +1 because ranges are inclusive, so [1,10] and [11,20] are contiguous.
-    if (curStart <= last[1] + 1) {
-      last[1] = Math.max(last[1], curEnd);
-    } else {
-      merged.push([curStart, curEnd]);
-    }
-  }
-  return merged;
-}
-
-/**
- * Check whether the **union** of all `existing` entries covers
- * `requested` on the line-range axis.
- *
- * Only entries whose page-range and depth axes are compatible with the
- * request are considered — we can only merge line intervals when the
- * other axes already satisfy the request.
- *
- * Falls back to `false` if:
- *   - The request is preview (preview is a different representation)
- *   - The request has no bounded line range (full-file read)
- *   - Any existing entry that would contribute has mismatched page/depth
- */
-function isCoveredByMergedEntries(
-  requested: ReadParams,
-  entries: ReadParams[],
-): boolean {
-  // Preview requests are never satisfied by merging ranges.
-  if (requested.preview) return false;
-
-  // Unbounded line-range requests (full file) cannot be satisfied by
-  // merging bounded entries.
-  if (requested.startLine === undefined && requested.endLine === undefined) {
-    return false;
-  }
-
-  const reqStart = requested.startLine ?? 1;
-  const reqEnd = requested.endLine ?? Number.MAX_SAFE_INTEGER;
-
-  // Collect line intervals from entries whose page + depth axes cover
-  // the request. Preview entries are skipped.
-  const intervals: Array<[number, number]> = [];
-  for (const ex of entries) {
-    if (ex.preview) continue;
-
-    // Page axis must cover.
-    if (
-      !isRangeCoveredBy(
-        requested.startPage,
-        requested.endPage,
-        ex.startPage,
-        ex.endPage,
-      )
-    ) {
-      continue;
-    }
-
-    // Depth axis must cover.
-    if (!isDepthCoveredBy(requested.depth, ex.depth)) continue;
-
-    // Line axis: if this entry is unbounded → it alone covers any line
-    // range. Short-circuit.
-    if (ex.startLine === undefined && ex.endLine === undefined) return true;
-
-    const exStart = ex.startLine ?? 1;
-    const exEnd = ex.endLine ?? Number.MAX_SAFE_INTEGER;
-    intervals.push([exStart, exEnd]);
-  }
-
-  if (intervals.length === 0) return false;
-
-  const merged = mergeIntervals(intervals);
-  // Check if any merged interval fully contains [reqStart, reqEnd].
-  for (const [mStart, mEnd] of merged) {
-    if (mStart <= reqStart && mEnd >= reqEnd) return true;
-  }
-  return false;
-}
 
 // ---------------------------------------------------------------------------
 // SeenFilesTracker
 // ---------------------------------------------------------------------------
 
 /**
- * Tracks which files (by path + content hash) have already been injected
- * into the model context, **including the read parameters used**.
+ * Tracks which (path, hash) pairs have already been injected into the
+ * model context within the current conversation window.
  *
- * Replaces the former `Set<string>` approach which only tracked
- * `${path}:${hash}` and could not distinguish between a preview read
- * and a full read, or between different line/page ranges.
+ * Replaces the former coverage-aware implementation that tracked
+ * `ReadParams` ranges. The simplified contract is:
+ *   - User mentions are always `preview` mode — same hash = same output.
+ *   - Attachments are always full — same hash = same output.
+ *   - Agent reads bypass this tracker entirely (no dedup).
  *
- * ### Decision flow (per file reference)
- *
- * 1. Build key = `${path}:${hash}`.
- * 2. Call `isCovered()` — returns `true` if any previously recorded
- *    entry fully covers the current request.
- * 3. If not covered, run the transformer, then call `record()` with
- *    the **effective** params (what was actually delivered, which may
- *    be narrower than requested if the transformer truncated).
- *
- * This two-phase API ensures the tracker stores what the model *actually*
- * received, not what was requested — preventing false coverage when
- * transformers truncate large files.
+ * Therefore a plain `Set<"path:hash">` is sufficient.
  */
 export class SeenFilesTracker {
-  /**
-   * Key: `${mountedPath}:${contentHash}`
-   * Value: list of `ReadParams` that have been injected for that key.
-   */
-  private readonly entries = new Map<string, ReadParams[]>();
+  private readonly seen = new Set<string>();
 
   private static buildKey(path: string, hash: string): string {
     return `${path}:${hash}`;
   }
 
   /**
-   * Check whether injecting this file with the given params would be
-   * redundant because a previous injection already covers the request.
-   *
-   * **Does not modify internal state.** Call `record()` separately after
-   * the transformer has run.
-   *
-   * @returns `true` if the file should be **skipped** (already covered).
+   * Returns `true` if this `(path, hash)` pair was already injected —
+   * i.e. injection would be redundant.
    */
-  isCovered(path: string, hash: string, params: ReadParams): boolean {
-    const key = SeenFilesTracker.buildKey(path, hash);
-    const existing = this.entries.get(key);
-    if (!existing) return false;
-
-    // Fast path: check if any single entry fully covers the request.
-    for (const prev of existing) {
-      if (isReadParamsCoveredBy(params, prev)) {
-        return true;
-      }
-    }
-
-    // Slow path: merge overlapping/contiguous line intervals across
-    // entries and check if the union covers the requested line range.
-    return isCoveredByMergedEntries(params, existing);
+  isCovered(path: string, hash: string): boolean {
+    return this.seen.has(SeenFilesTracker.buildKey(path, hash));
   }
 
   /**
-   * Record that a file was injected with the given **effective** params
-   * (what the transformer actually delivered). Future `isCovered()` calls
-   * will consider this entry.
-   *
-   * @param effectiveParams — The params describing the content that was
-   *   actually delivered. Use `FileTransformResult.effectiveReadParams`
-   *   when available; fall back to the originally requested params.
+   * Record that `(path, hash)` was injected into the model context.
+   * Future `isCovered()` calls for the same pair will return `true`.
    */
-  record(path: string, hash: string, effectiveParams: ReadParams): void {
-    const key = SeenFilesTracker.buildKey(path, hash);
-    const existing = this.entries.get(key);
-    if (existing) {
-      existing.push(effectiveParams);
-    } else {
-      this.entries.set(key, [effectiveParams]);
-    }
+  record(path: string, hash: string): void {
+    this.seen.add(SeenFilesTracker.buildKey(path, hash));
   }
 }
