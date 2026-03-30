@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0-alpha.45 (2026-03-30)
+
+### Bug Fixes
+
+* apply max-w- to chat-input (8752d87)
+* improve plan instructions on TODOs (14d583b)
+
+### Other Changes
+
+* update onboarding steps and feature images and explain the product (3e63d64)
+* rename 'commands' to 'skills' in types and functions (8f289de)
+* turn 'commands' into 'skills' with frontmatter properties (474b1ff)
+
 ## 1.0.0-alpha.44 (2026-03-26)
 
 ### Features
