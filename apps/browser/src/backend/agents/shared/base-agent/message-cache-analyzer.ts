@@ -208,6 +208,8 @@ export class MessageCacheAnalyzer {
    * deferred via `setImmediate` so it never blocks step execution.
    */
   trackStep(messages: ModelMessage[]): void {
+    if (!this.logger.isDebugEnabled) return;
+
     const stepNum = ++this.stepCount;
     const prevSnapshots = this.prevSnapshots;
     const newChunks = splitIntoChunks(messages);
@@ -223,13 +225,7 @@ export class MessageCacheAnalyzer {
     this.prevSnapshots = newSnapshots;
 
     setImmediate(() => {
-      this._logAnalysis(
-        stepNum,
-        prevSnapshots,
-        newSnapshots,
-        newChunks,
-        messages.length,
-      );
+      this._logAnalysis(stepNum, prevSnapshots, newSnapshots, messages.length);
     });
   }
 
@@ -241,15 +237,13 @@ export class MessageCacheAnalyzer {
     stepNum: number,
     prevSnapshots: ChunkSnapshot[] | null,
     newSnapshots: ChunkSnapshot[],
-    /** Raw chunks kept only for `describeFirstDiff` on misses — read-only. */
-    newChunks: ModelMessage[][],
     totalMessages: number,
   ): void {
     const tag = `[CacheAnalyzer:${this.instanceId}] step=${stepNum}`;
 
     if (prevSnapshots === null) {
       this.logger.debug(
-        `${tag} | messages=${totalMessages} chunks=${newChunks.length} | first step — no prior state to compare`,
+        `${tag} | messages=${totalMessages} chunks=${newSnapshots.length} | first step — no prior state to compare`,
       );
       return;
     }
@@ -298,7 +292,7 @@ export class MessageCacheAnalyzer {
     const dropped = results.filter((r) => r.status === 'dropped').length;
 
     this.logger.debug(
-      `${tag} | messages=${totalMessages} chunks=${newChunks.length} ` +
+      `${tag} | messages=${totalMessages} chunks=${newSnapshots.length} ` +
         `| hits=${hits} misses=${misses} new=${newChunkCount} dropped=${dropped}`,
     );
 
@@ -320,13 +314,15 @@ export class MessageCacheAnalyzer {
           );
           break;
         case 'miss': {
-          // For the diff description we need the raw new messages; the prev
-          // baseline is re-parsed from its snapshot strings so we never touch
-          // live object references.
+          // Reconstruct both sides from snapshot strings so we never
+          // touch live object references (which may have mutated since
+          // trackStep returned).
           const prevC = prevSnapshots![r.chunkIndex].map(
             (s) => JSON.parse(s) as ModelMessage,
           );
-          const newC = newChunks[r.chunkIndex];
+          const newC = newSnapshots[r.chunkIndex].map(
+            (s) => JSON.parse(s) as ModelMessage,
+          );
           const diff = describeFirstDiff(prevC, newC);
           this.logger.debug(
             `${tag} | chunk[${r.chunkIndex}] ✗ MISS ${sizeLabel} | first diff: ${diff}`,

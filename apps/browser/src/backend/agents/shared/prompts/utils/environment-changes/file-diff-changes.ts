@@ -61,6 +61,12 @@ function formatFileChange(
       .map((c) => formatContributor(c, agentInstanceId))
       .join(',');
   }
+  if (change.editsGone) {
+    attrs.editsGone = 'true';
+  }
+  if (change.editsPartiallyRemoved) {
+    attrs.editsPartiallyRemoved = 'true';
+  }
   return { type: 'file-diffs-changed', attributes: attrs };
 }
 

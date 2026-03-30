@@ -136,6 +136,17 @@ export interface TransformerContext {
    * Defaults to `{}` (no constraints — full content).
    */
   readParams: ReadParams;
+  /**
+   * Per-request character budget for a single file read.
+   *
+   * Transformers **must** truncate output that exceeds this budget and
+   * report the truncation via `effectiveReadParams`.
+   */
+  maxReadChars: number;
+  /**
+   * Per-request maximum number of lines returned in preview mode.
+   */
+  maxPreviewLines: number;
 }
 
 // ---------------------------------------------------------------------------

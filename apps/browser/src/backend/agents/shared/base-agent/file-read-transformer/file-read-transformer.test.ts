@@ -124,6 +124,25 @@ function allText(parts: any[]): string {
     .join('');
 }
 
+/**
+ * Poll the cache until an entry appears or the deadline expires.
+ * Used to deterministically wait for fire-and-forget cache writes.
+ */
+async function waitForCache(
+  cache: FileReadCacheService,
+  key: string,
+  timeoutMs = 2000,
+  intervalMs = 10,
+): Promise<Awaited<ReturnType<FileReadCacheService['get']>>> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const entry = await cache.get(key);
+    if (entry) return entry;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Tests: XML envelope structure
 // ---------------------------------------------------------------------------
@@ -415,16 +434,13 @@ describe('fileReadTransformer – cache integration (hash match)', () => {
     const text1 = allText(r1.parts);
     expect(text1).toContain(content);
 
-    // Give fire-and-forget cache.set a moment to complete.
-    await new Promise((r) => setTimeout(r, 50));
-
-    // Verify cache was populated (key includes extension + content-limit suffix).
+    // Wait for the fire-and-forget cache.set to complete.
     const cacheKey = FileReadCacheService.buildCacheKey(
       hash,
       '.txt',
       `mrc=${getMaxReadChars()}`,
     );
-    const cached = await ctx.cache.get(cacheKey);
+    const cached = await waitForCache(ctx.cache, cacheKey);
     expect(cached).not.toBeNull();
 
     // Second call — should use cache (same result).

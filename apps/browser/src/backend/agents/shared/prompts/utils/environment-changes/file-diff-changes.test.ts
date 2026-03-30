@@ -26,10 +26,35 @@ function makeEnv(
   return { pending, summary };
 }
 
+/**
+ * Reconstruct human-readable summaries from the attributes-based entries
+ * so existing assertions continue to work against the new format.
+ */
 function summaries(
   entries: ReturnType<typeof computeFileDiffChanges>,
 ): (string | undefined)[] {
-  return entries.map((e) => e.summary);
+  return entries.map((e) => {
+    const attrs = e.attributes;
+    if (!attrs?.path) return e.summary;
+
+    const p = attrs.path;
+    const changedBy = attrs.changedBy;
+    const editsGone = attrs.editsGone === 'true';
+    const editsPartiallyRemoved = attrs.editsPartiallyRemoved === 'true';
+
+    let suffix = '';
+    if (editsGone) suffix = ' (your edits no longer present)';
+    else if (editsPartiallyRemoved)
+      suffix = ' (some of your edits were removed)';
+
+    if (changedBy) {
+      return `${p} modified by: [${changedBy}]${suffix}`;
+    }
+    if (editsGone) {
+      return `${p}: your edits no longer present`;
+    }
+    return e.summary;
+  });
 }
 
 const AGENT_ID = '1';

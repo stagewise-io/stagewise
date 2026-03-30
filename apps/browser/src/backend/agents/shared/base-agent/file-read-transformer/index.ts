@@ -37,6 +37,10 @@ import {
   getMaxReadChars,
   getMaxPreviewLines,
 } from './format-utils';
+
+/** Default content limits used when callers don't supply explicit values. */
+const DEFAULT_MAX_READ_CHARS = 500 * 80;
+const DEFAULT_MAX_PREVIEW_LINES = 30;
 import type {
   FileTransformResult,
   FileTransformer,
@@ -278,6 +282,18 @@ export interface FileReadTransformerOptions {
    * slices of the same file are cached independently.
    */
   readParams?: ReadParams;
+  /**
+   * Per-request character budget for a single file read.
+   *
+   * When omitted, falls back to the module-level default.
+   */
+  maxReadChars?: number;
+  /**
+   * Per-request maximum number of lines returned in preview mode.
+   *
+   * When omitted, falls back to the module-level default.
+   */
+  maxPreviewLines?: number;
 }
 
 /**
@@ -321,6 +337,8 @@ export async function fileReadTransformer(
     mountPaths,
     originalFileName,
     readParams,
+    maxReadChars = getMaxReadChars() || DEFAULT_MAX_READ_CHARS,
+    maxPreviewLines = getMaxPreviewLines() || DEFAULT_MAX_PREVIEW_LINES,
   } = opts;
 
   // Normalise readParams — strip undefined values so an empty object
@@ -384,7 +402,11 @@ export async function fileReadTransformer(
   // cache entries — their metadata (language, format) differs.
   const nameForExt = originalFileName ?? mountedPath;
   const ext = isDirectory ? '' : nodePath.extname(nameForExt).toLowerCase();
-  const readParamsSuffix = buildReadParamsSuffix(effectiveReadParams);
+  const readParamsSuffix = buildReadParamsSuffix(
+    effectiveReadParams,
+    maxReadChars,
+    maxPreviewLines,
+  );
   const currentCacheKey = FileReadCacheService.buildCacheKey(
     currentHash,
     ext,
@@ -401,15 +423,22 @@ export async function fileReadTransformer(
 
   if (hashMatches) {
     // 4a. Hash matches — try cache first.
-    const cached = await cache.get(currentCacheKey);
-    if (cached) {
-      const deserialized = deserializeTransformResult(cached.content);
-      if (deserialized) {
-        logger.debug(
-          `[fileReadTransformer] Cache hit for ${mountedPath} (hash match)`,
-        );
-        return wrapResult(mountedPath, deserialized, effectiveReadParams);
+    try {
+      const cached = await cache.get(currentCacheKey);
+      if (cached) {
+        const deserialized = deserializeTransformResult(cached.content);
+        if (deserialized) {
+          logger.debug(
+            `[fileReadTransformer] Cache hit for ${mountedPath} (hash match)`,
+          );
+          return wrapResult(mountedPath, deserialized, effectiveReadParams);
+        }
       }
+    } catch (e: unknown) {
+      logger.warn(
+        `[fileReadTransformer] Cache read failed for ${mountedPath}, treating as miss`,
+        e,
+      );
     }
 
     // Cache miss — run transformer.
@@ -418,7 +447,15 @@ export async function fileReadTransformer(
       mountedPath,
       stat,
       isDirectory,
-      { agentId, mountPaths, cache, logger, readParams: effectiveReadParams },
+      {
+        agentId,
+        mountPaths,
+        cache,
+        logger,
+        readParams: effectiveReadParams,
+        maxReadChars,
+        maxPreviewLines,
+      },
       originalFileName,
     );
 
@@ -434,15 +471,22 @@ export async function fileReadTransformer(
 
   // 4b. Hash mismatch — file changed since pathReferences were recorded.
   //     Check cache for the *expected* hash (we may still have the old version).
-  const cachedOld = await cache.get(expectedCacheKey);
-  if (cachedOld) {
-    const deserialized = deserializeTransformResult(cachedOld.content);
-    if (deserialized) {
-      logger.debug(
-        `[fileReadTransformer] Cache hit for ${mountedPath} (old hash, file changed)`,
-      );
-      return wrapResult(mountedPath, deserialized, effectiveReadParams);
+  try {
+    const cachedOld = await cache.get(expectedCacheKey);
+    if (cachedOld) {
+      const deserialized = deserializeTransformResult(cachedOld.content);
+      if (deserialized) {
+        logger.debug(
+          `[fileReadTransformer] Cache hit for ${mountedPath} (old hash, file changed)`,
+        );
+        return wrapResult(mountedPath, deserialized, effectiveReadParams);
+      }
     }
+  } catch (e: unknown) {
+    logger.warn(
+      `[fileReadTransformer] Cache read failed for ${mountedPath} (old hash), treating as miss`,
+      e,
+    );
   }
 
   // No cached old version — return a version-unavailable fallback.
@@ -682,7 +726,11 @@ function escapeXmlAttr(s: string): string {
  *
  * Example: `sl=1,el=50,d=3`
  */
-function buildReadParamsSuffix(params: ReadParams): string {
+function buildReadParamsSuffix(
+  params: ReadParams,
+  maxReadChars: number,
+  maxPreviewLines: number,
+): string {
   const parts: string[] = [];
   if (params.startLine !== undefined) parts.push(`sl=${params.startLine}`);
   if (params.endLine !== undefined) parts.push(`el=${params.endLine}`);
@@ -694,8 +742,8 @@ function buildReadParamsSuffix(params: ReadParams): string {
   // Include the runtime content-limit settings so that changing them
   // invalidates cached results (the same read params can produce
   // different output when the cap is different).
-  parts.push(`mrc=${getMaxReadChars()}`);
-  if (params.preview) parts.push(`mpl=${getMaxPreviewLines()}`);
+  parts.push(`mrc=${maxReadChars}`);
+  if (params.preview) parts.push(`mpl=${maxPreviewLines}`);
 
   return parts.join(',');
 }

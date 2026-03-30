@@ -34,6 +34,7 @@ import {
 import {
   convertAgentMessagesToModelMessages,
   capitalizeFirstLetter,
+  type ContentLimits,
 } from './utils';
 import { generateSimpleTitle } from './title-generation';
 import {
@@ -58,7 +59,7 @@ import { MessageCacheAnalyzer } from './message-cache-analyzer';
 import { extractReadFilePathsFromAssistantMessage } from './file-read-transformer/path-references';
 import { resolveMountedPath } from './file-read-transformer/resolve-path';
 import { hashPath } from './file-read-transformer/hash';
-import { setMaxReadCharsFromContextWindow } from './file-read-transformer/format-utils';
+import { deriveMaxReadChars } from './file-read-transformer/format-utils';
 import type { StagewiseToolSet } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { AgentsMap } from '../../agents-map';
@@ -1071,6 +1072,23 @@ export abstract class BaseAgent<
     const fileReadCache = await this.getFileReadCache();
     const capabilities = getModelCapabilities(activeModelId);
 
+    // Derive per-request content limits from the model's context window
+    // so the transformer pipeline uses explicit values instead of
+    // module-level globals.
+    let contentLimits: ContentLimits | undefined;
+    try {
+      const { contextWindowSize } =
+        this.modelProviderService.getModelWithOptions(activeModelId, '');
+      contentLimits = {
+        maxReadChars: deriveMaxReadChars(contextWindowSize),
+        maxPreviewLines: 30,
+      };
+    } catch {
+      // Model lookup can fail when the provider is misconfigured.
+      // Fall through — undefined contentLimits lets transformers use
+      // their built-in defaults.
+    }
+
     const shellInfo = this.toolbox.getShellInfo();
     const skills = await this.toolbox.getSkillsList(this.instanceId);
     const skillDetails = new Map(
@@ -1126,6 +1144,7 @@ export abstract class BaseAgent<
       skills,
       fileReadCache,
       this.toolbox.getMountedPathsForAgent(this.instanceId),
+      contentLimits,
     );
   }
 
@@ -1403,11 +1422,6 @@ export abstract class BaseAgent<
       });
       return;
     }
-
-    // Set the per-read character budget based on the model's context window.
-    // This replaces the former static 500-line cap with a dynamic limit:
-    // ~10 % of the context window (measured in estimated tokens, ≈ chars/4).
-    setMaxReadCharsFromContextWindow(modelWithOptions.contextWindowSize);
 
     let modelMessages: Awaited<
       ReturnType<typeof this.generateContextForNewStep>

@@ -110,6 +110,10 @@ function makeOpts(
   mountedPath: string,
   expectedHash: string,
   readParams?: FileReadTransformerOptions['readParams'],
+  overrides?: Pick<
+    FileReadTransformerOptions,
+    'maxReadChars' | 'maxPreviewLines'
+  >,
 ): FileReadTransformerOptions {
   return {
     mountedPath,
@@ -120,6 +124,7 @@ function makeOpts(
     agentId: ctx.agentId,
     mountPaths: ctx.mountPaths,
     readParams,
+    ...overrides,
   };
 }
 
@@ -504,6 +509,133 @@ describe('content limits – cache key isolation', () => {
     const text3 = allText(r3.parts);
     expect(text3).toContain('21|line 0021');
     expect(text3).toContain('30|line 0030');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: Hard limit enforcement
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Tests: Per-request limits via FileReadTransformerOptions
+// ---------------------------------------------------------------------------
+
+describe('content limits – per-request options override globals', () => {
+  let ctx: TestContext;
+  beforeEach(async () => {
+    ctx = await setup();
+  });
+  afterEach(async () => {
+    await teardown(ctx);
+  });
+
+  it('maxReadChars on options overrides global setter', async () => {
+    // Set global to a very large budget so it would NOT truncate.
+    setMaxReadChars(budgetForLines(500));
+
+    const content = generateLines(25);
+    const filePath = path.join(ctx.workDir, 'per-req.ts');
+    await nodeFs.writeFile(filePath, content);
+    const hash = sha256(content);
+
+    // Pass a tight per-request budget that fits only 8 lines.
+    const result = await fileReadTransformer(
+      makeOpts(ctx, `${ctx.mountPrefix}/per-req.ts`, hash, undefined, {
+        maxReadChars: budgetForLines(8),
+      }),
+    );
+    const text = allText(result.parts);
+
+    // Should truncate at 8 lines despite the global allowing 500.
+    expect(text).toContain('1|line 0001');
+    expect(text).toContain('8|line 0008');
+    expect(text).not.toContain('9|line 0009');
+    expect(text).toContain('truncated');
+    expect(result.effectiveReadParams).toEqual({
+      startLine: 1,
+      endLine: 8,
+    });
+  });
+
+  it('maxPreviewLines on options overrides global setter', async () => {
+    // Set global preview limit high so it would NOT truncate.
+    setMaxPreviewLines(200);
+
+    const content = generateLines(50);
+    const filePath = path.join(ctx.workDir, 'per-req-preview.ts');
+    await nodeFs.writeFile(filePath, content);
+    const hash = sha256(content);
+
+    // Pass a tight per-request preview limit.
+    const result = await fileReadTransformer(
+      makeOpts(
+        ctx,
+        `${ctx.mountPrefix}/per-req-preview.ts`,
+        hash,
+        { preview: true },
+        { maxPreviewLines: 7 },
+      ),
+    );
+    const text = allText(result.parts);
+
+    expect(text).toContain('1|line 0001');
+    expect(text).toContain('7|line 0007');
+    expect(text).not.toContain('8|line 0008');
+    expect(text).toContain('43 more lines');
+  });
+
+  it('per-request maxReadChars affects line-range reads', async () => {
+    // Global allows everything.
+    setMaxReadChars(budgetForLines(500));
+
+    const content = generateLines(100);
+    const filePath = path.join(ctx.workDir, 'per-req-range.ts');
+    await nodeFs.writeFile(filePath, content);
+    const hash = sha256(content);
+
+    // Request lines 20-80 but per-request budget only fits 10 lines.
+    const result = await fileReadTransformer(
+      makeOpts(
+        ctx,
+        `${ctx.mountPrefix}/per-req-range.ts`,
+        hash,
+        { startLine: 20, endLine: 80 },
+        { maxReadChars: budgetForLines(10) },
+      ),
+    );
+    const text = allText(result.parts);
+
+    expect(text).toContain('20|line 0020');
+    expect(text).toContain('29|line 0029');
+    expect(text).not.toContain('30|line 0030');
+    expect(text).toContain('truncated');
+    expect(result.effectiveReadParams).toEqual({
+      startLine: 20,
+      endLine: 29,
+    });
+  });
+
+  it('omitted per-request limits fall back to global', async () => {
+    // Set global to a tight budget.
+    setMaxReadChars(budgetForLines(6));
+
+    const content = generateLines(20);
+    const filePath = path.join(ctx.workDir, 'fallback.ts');
+    await nodeFs.writeFile(filePath, content);
+    const hash = sha256(content);
+
+    // No per-request override — should use global.
+    const result = await fileReadTransformer(
+      makeOpts(ctx, `${ctx.mountPrefix}/fallback.ts`, hash),
+    );
+    const text = allText(result.parts);
+
+    expect(text).toContain('6|line 0006');
+    expect(text).not.toContain('7|line 0007');
+    expect(result.effectiveReadParams).toEqual({
+      startLine: 1,
+      endLine: 6,
+    });
   });
 });
 

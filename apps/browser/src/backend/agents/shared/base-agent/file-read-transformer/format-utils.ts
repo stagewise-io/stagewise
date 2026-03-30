@@ -160,12 +160,29 @@ export function setMaxReadChars(n: number): void {
  * Formula: `contextWindowTokens * 0.10 * 4`  (10 % of the window, ≈ 4
  * chars per token).  Result is floored with a minimum of 4 000 chars
  * (~50 lines) so very small windows don't become unusable.
+ *
+ * @deprecated Prefer `deriveMaxReadChars()` + passing the budget
+ *   explicitly via `TransformerContext.maxReadChars`.
  */
 export function setMaxReadCharsFromContextWindow(
   contextWindowTokens: number,
 ): void {
-  const budget = Math.max(4_000, Math.floor(contextWindowTokens * 0.1 * 4));
+  const budget = deriveMaxReadChars(contextWindowTokens);
   setMaxReadChars(budget);
+}
+
+/**
+ * Pure function that derives a per-read character budget from a
+ * context-window size (in tokens).
+ *
+ * Formula: `contextWindowTokens * 0.10 * 4` (10% of window, ≈4 chars/token).
+ * Result is floored with a minimum of 4 000 chars (~50 lines).
+ *
+ * Use this to obtain a budget value that can be threaded through the
+ * pipeline without mutating module-level state.
+ */
+export function deriveMaxReadChars(contextWindowTokens: number): number {
+  return Math.max(4_000, Math.floor(contextWindowTokens * 0.1 * 4));
 }
 
 /**
@@ -231,16 +248,17 @@ import type { ReadParams } from './types';
 export function truncateTextContent(
   allLines: readonly string[],
   readParams: ReadParams,
+  explicitBudget?: number,
 ): {
   output: string;
   effectiveReadParams?: ReadParams;
 } {
   const totalLines = allLines.length;
   const { startLine, endLine } = readParams;
+  const budget = explicitBudget ?? getMaxReadChars();
 
   // ── Line-range slicing ───────────────────────────────────────────
   if (startLine !== undefined || endLine !== undefined) {
-    const budget = getMaxReadChars();
     const sl = Math.max(1, startLine ?? 1);
     const requestedEnd = Math.min(totalLines, endLine ?? totalLines);
     const rangeLines = allLines.slice(sl - 1, requestedEnd);
@@ -261,7 +279,6 @@ export function truncateTextContent(
   }
 
   // ── Full content (capped by char budget) ──────────────────────────
-  const budget = getMaxReadChars();
   const fitCount = countLinesFittingBudget(allLines as string[], budget);
   const cappedEnd = Math.min(totalLines, fitCount);
   const truncated = cappedEnd < totalLines;

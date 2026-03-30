@@ -323,6 +323,9 @@ async function teardownFileInjection(
   ctx: FileInjectionTestContext,
 ): Promise<void> {
   await ctx.cache.teardown();
+  await nodeFs
+    .rm(ctx.workDir, { recursive: true, force: true })
+    .catch(() => {});
 }
 
 describe('convertAgentMessagesToModelMessages – file injection via pathReferences', () => {

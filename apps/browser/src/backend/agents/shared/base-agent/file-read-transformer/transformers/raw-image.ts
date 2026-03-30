@@ -104,9 +104,12 @@ function parseExifFields(
     const read32 = isBE
       ? (o: number) => tiffBuf.readUInt32BE(o)
       : (o: number) => tiffBuf.readUInt32LE(o);
+    const readS32 = isBE
+      ? (o: number) => tiffBuf.readInt32BE(o)
+      : (o: number) => tiffBuf.readInt32LE(o);
 
     const ifd0Offset = read32(4);
-    readIFD(tiffBuf, ifd0Offset, read16, read32, fields);
+    readIFD(tiffBuf, ifd0Offset, read16, read32, readS32, fields);
   } catch {
     // Best-effort parsing.
   }
@@ -120,6 +123,7 @@ function readIFD(
   offset: number,
   read16: (o: number) => number,
   read32: (o: number) => number,
+  readS32: (o: number) => number,
   fields: Record<string, string>,
 ): void {
   if (offset + 2 > buf.length) return;
@@ -142,6 +146,7 @@ function readIFD(
         pos + 8,
         read16,
         read32,
+        readS32,
       );
       if (value !== undefined) {
         fields[tagName] = String(value);
@@ -150,7 +155,7 @@ function readIFD(
 
     // Follow SubIFD pointers (EXIF IFD, GPS IFD).
     if (tag === 0x8769 || tag === 0x8825) {
-      readIFD(buf, valueOffset, read16, read32, fields);
+      readIFD(buf, valueOffset, read16, read32, readS32, fields);
     }
 
     pos += 12;
@@ -165,6 +170,7 @@ function readTagValue(
   inlineOffset: number,
   read16: (o: number) => number,
   read32: (o: number) => number,
+  readS32: (o: number) => number,
 ): string | number | undefined {
   // For values that fit in 4 bytes, the value is stored inline.
   const dataOffset = valueSize(type, count) <= 4 ? inlineOffset : valueOffset;
@@ -188,8 +194,8 @@ function readTagValue(
     }
     case 10: {
       // SRATIONAL (signed)
-      const snum = read32(dataOffset);
-      const sden = read32(dataOffset + 4);
+      const snum = readS32(dataOffset);
+      const sden = readS32(dataOffset + 4);
       return sden ? `${snum}/${sden}` : String(snum);
     }
     default:

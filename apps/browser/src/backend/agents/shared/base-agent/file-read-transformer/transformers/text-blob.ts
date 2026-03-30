@@ -21,7 +21,6 @@ import type {
 import {
   baseMetadata,
   prefixLineNumbers,
-  getMaxPreviewLines,
   isBinaryBuffer,
   truncateTextContent,
 } from '../format-utils';
@@ -64,7 +63,7 @@ export const textBlobTransformer: FileTransformer = async (
 
   // ── Preview mode ─────────────────────────────────────────────────
   if (preview) {
-    const maxPreview = getMaxPreviewLines();
+    const maxPreview = ctx.maxPreviewLines;
     const previewEnd = Math.min(maxPreview, totalLines);
     const slice = allLines.slice(0, previewEnd);
     let output = prefixLineNumbers(slice.join('\n'), 1);
@@ -92,6 +91,7 @@ export const textBlobTransformer: FileTransformer = async (
   const { output, effectiveReadParams } = truncateTextContent(
     allLines,
     ctx.readParams,
+    ctx.maxReadChars,
   );
 
   return {

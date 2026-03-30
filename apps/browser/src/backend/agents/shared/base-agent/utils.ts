@@ -43,6 +43,12 @@ import {
   type ReadParams,
   SeenFilesTracker,
 } from './file-read-transformer';
+
+/** Per-request content limits threaded through the pipeline. */
+export interface ContentLimits {
+  maxReadChars: number;
+  maxPreviewLines: number;
+}
 import {
   extractReadFileRequestsFromAssistantMessage,
   type ReadFileRequest,
@@ -150,6 +156,7 @@ export const convertAgentMessagesToModelMessages = async (
   skills?: ReadonlyArray<SkillDefinition>,
   fileReadCache?: FileReadCacheService,
   mountPaths?: Map<string, string>,
+  contentLimits?: ContentLimits,
 ): Promise<ModelMessage[]> => {
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
@@ -221,6 +228,8 @@ export const convertAgentMessagesToModelMessages = async (
         mountPaths,
         logger,
         { preview: true },
+        undefined,
+        contentLimits,
       );
       // Adapt images to the current model's constraints (resize/compress).
       const fileParts = await adaptImagePartsForModel(
@@ -268,6 +277,7 @@ export const convertAgentMessagesToModelMessages = async (
         logger,
         undefined,
         readFileRequests,
+        contentLimits,
       );
       // Adapt images to the current model's constraints (resize/compress).
       const fileParts = await adaptImagePartsForModel(
@@ -374,6 +384,7 @@ async function injectFileReferences(
   logger?: Logger,
   defaultReadParams?: ReadParams,
   readFileRequests?: ReadFileRequest[],
+  contentLimits?: ContentLimits,
 ): Promise<(TextPart | ImagePart | FilePart)[]> {
   if (!pathReferences || !fileReadCache || !mountPaths || !logger) return [];
 
@@ -405,6 +416,8 @@ async function injectFileReferences(
           agentId: agentInstanceId,
           mountPaths,
           readParams: requestedParams,
+          maxReadChars: contentLimits?.maxReadChars,
+          maxPreviewLines: contentLimits?.maxPreviewLines,
         });
 
         // Still record so user-mention dedup stays aware of injected files.
@@ -446,6 +459,8 @@ async function injectFileReferences(
           agentId: agentInstanceId,
           mountPaths,
           readParams: requestedParams,
+          maxReadChars: contentLimits?.maxReadChars,
+          maxPreviewLines: contentLimits?.maxPreviewLines,
         });
 
         seenFiles.record(path, hash);
@@ -489,6 +504,8 @@ async function injectFileReferences(
         agentId: agentInstanceId,
         mountPaths,
         readParams: requestedParams,
+        maxReadChars: contentLimits?.maxReadChars,
+        maxPreviewLines: contentLimits?.maxPreviewLines,
       });
 
       seenFiles.record(path, hash);

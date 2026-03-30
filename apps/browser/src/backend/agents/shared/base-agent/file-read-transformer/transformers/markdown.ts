@@ -197,6 +197,7 @@ export const markdownTransformer: FileTransformer = async (
   const { output, effectiveReadParams } = truncateTextContent(
     allLines,
     ctx.readParams,
+    ctx.maxReadChars,
   );
 
   return {
