@@ -122,9 +122,11 @@ export function ChatPanel() {
           <ChatHistory />
         )}
       </OpenAgentContext.Provider>
-      <InternalAppFrame />
-      <UsageWarningBadge />
-      <ChatPanelFooter key={openAgent} />
+      <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col items-stretch">
+        <InternalAppFrame />
+        <UsageWarningBadge />
+        <ChatPanelFooter key={openAgent} />
+      </div>
     </div>
   );
 }

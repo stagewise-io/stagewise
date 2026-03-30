@@ -796,7 +796,7 @@ export const ChatHistory = () => {
   // Empty state component for suggestions
   const EmptyPlaceholder = useCallback(() => {
     return (
-      <div className="flex w-full flex-col items-center justify-center gap-1 px-4 pb-[calc(8px+var(--status-card-height,0px))] text-sm">
+      <div className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center gap-1 px-4 pb-[calc(8px+var(--status-card-height,0px))] text-sm">
         {visibleSuggestions.map((suggestion) => (
           <ChatSuggestion
             key={suggestion.id}
