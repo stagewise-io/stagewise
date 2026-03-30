@@ -17,6 +17,9 @@ export type EventProperties = {
     suggestion_id?: string;
     telemetry_level: TelemetryLevel;
   };
+  'onboarding-demo-slide-clicked': {
+    slide_name: string;
+  };
 
   // Workspace
   'workspace-mounted': { agent_type: string };

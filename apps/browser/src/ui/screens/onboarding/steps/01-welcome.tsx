@@ -32,12 +32,12 @@ export function StepWelcome({
       hasStarted.current = true;
       onAnimationStart?.();
       setShowText(true);
-    }, 1000);
+    }, 750);
     return () => clearTimeout(timer);
   }, [windowFocused, onAnimationStart]);
 
   const handleFirstLineComplete = useCallback(() => {
-    const timer = setTimeout(() => setShowSecondLine(true), 1500);
+    const timer = setTimeout(() => setShowSecondLine(true), 1100);
     return () => clearTimeout(timer);
   }, []);
 
@@ -50,17 +50,17 @@ export function StepWelcome({
       <Logo className="mb-4 size-16" />
       <div className="relative w-full text-center">
         <span className="invisible font-normal text-foreground text-lg">
-          Welcome to a new way to interact with the internet.
+          Welcome to the coding agent built for the web.
         </span>
         {showText && (
           <div className="absolute inset-0 flex items-center justify-center">
             <SplitText
-              text="Welcome to a new way to interact with the internet."
+              text="Welcome to the coding agent built for the web."
               className="font-normal text-foreground text-lg"
-              delay={30}
-              duration={0.4}
+              delay={10}
+              duration={0.25}
               ease="power3.out"
-              splitType="words"
+              splitType="chars"
               from={{ opacity: 0, y: 20 }}
               to={{ opacity: 1, y: 0 }}
               threshold={0.1}
@@ -81,10 +81,10 @@ export function StepWelcome({
             <SplitText
               text="Welcome to stagewise."
               className={cn('font-normal text-base text-primary-foreground')}
-              delay={40}
-              duration={0.6}
+              delay={12}
+              duration={0.25}
               ease="power3.out"
-              splitType="words"
+              splitType="chars"
               from={{ opacity: 0, y: 20 }}
               to={{ opacity: 1, y: 0 }}
               threshold={0.1}

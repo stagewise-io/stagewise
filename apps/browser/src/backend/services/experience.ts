@@ -147,12 +147,8 @@ export class UserExperienceService extends DisposableService {
     );
     this.uiKarton.registerServerProcedureHandler(
       'userExperience.setHasSeenOnboardingFlow',
-      async (
-        _callingClientId: string,
-        value: boolean,
-        suggestion?: { id: string; url: string; prompt: string },
-      ) => {
-        await this.setHasSeenOnboardingFlow(value, suggestion);
+      async (_callingClientId: string, value: boolean) => {
+        await this.setHasSeenOnboardingFlow(value);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -437,17 +433,13 @@ export class UserExperienceService extends DisposableService {
     };
   }
 
-  public async setHasSeenOnboardingFlow(
-    value: boolean,
-    suggestion?: { id: string; url: string; prompt: string },
-  ) {
+  public async setHasSeenOnboardingFlow(value: boolean) {
     try {
       await this.writeOnboardingState(value);
       // Update UI state with combined data
       const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
         draft.userExperience.storedExperienceData = storedData;
-        draft.userExperience.pendingOnboardingSuggestion = suggestion ?? null;
       });
       // Sync to pages API
       this.syncHomePageStateToPagesService();
@@ -456,8 +448,7 @@ export class UserExperienceService extends DisposableService {
       );
       if (value) {
         this.telemetryService.capture('onboarding-completed', {
-          skipped: !suggestion,
-          suggestion_id: suggestion?.id,
+          skipped: false,
           telemetry_level: this.telemetryService.telemetryLevel,
         });
       }
