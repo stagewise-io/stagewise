@@ -1,8 +1,8 @@
 import type { FullEnvironmentSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
 import { renderBrowserTabsXml, esc } from './browser-tabs-renderer';
-import { renderAvailableSkillsList } from './skills';
 import type { SkillInfo } from './skills';
 import { PLANS_PREFIX } from '@shared/plan-ownership';
+import { prefixLineNumbers } from '../../base-agent/file-read-transformer/format-utils';
 
 export interface ShellInfo {
   type: string;
@@ -26,83 +26,85 @@ export function renderFullEnvironmentContext(
 
   // Browser tabs
   const { browser } = snapshot;
-  sections.push(`# Browser Tabs\n${renderBrowserTabsXml(browser)}`);
+  sections.push(renderBrowserTabsXml(browser));
 
-  // Mounted workspaces
+  // All symlinks — user workspaces + always-available — in one table
   const { workspace } = snapshot;
+  const systemPrefixes = new Set(['att', 'plugins', 'apps']);
   const userMounts = workspace.mounts.filter(
-    (m) => !['att', 'plugins', 'apps'].includes(m.prefix),
+    (m) => !systemPrefixes.has(m.prefix),
   );
   const systemMounts = workspace.mounts.filter((m) =>
-    ['att', 'plugins', 'apps'].includes(m.prefix),
+    systemPrefixes.has(m.prefix),
   );
+  const allMounts = [...userMounts, ...systemMounts];
 
-  if (userMounts.length > 0) {
-    const mountLines = userMounts.map(
-      (m) =>
-        `- ${m.prefix}: ${m.path} (use '${m.prefix}/...' to address files)${m.permissions ? ` [${m.permissions.join(', ')}]` : ''}`,
-    );
-    sections.push(`# Mounted Workspaces\n${mountLines.join('\n')}`);
+  if (allMounts.length > 0) {
+    const rows = allMounts.map((m) => {
+      const isUser = !systemPrefixes.has(m.prefix);
+      const addr = isUser ? `use '${m.prefix}/...' to address files` : '';
+      const perms = m.permissions ? m.permissions.join(', ') : '';
+      return `| ${m.prefix} | ${m.path} | ${addr} | ${perms} |`;
+    });
+    const table = [
+      '| prefix | path | notes | permissions |',
+      '|--------|------|-------|-------------|',
+      ...rows,
+    ].join('\n');
+    sections.push(`<symlinks>\n${table}\n</symlinks>`);
   } else {
-    sections.push('# Mounted Workspaces\nNo workspaces connected.');
-  }
-
-  if (systemMounts.length > 0) {
-    const sysLines = systemMounts.map(
-      (m) =>
-        `- ${m.prefix}/: ${m.path}${m.permissions ? ` [${m.permissions.join(', ')}]` : ''}`,
-    );
-    sections.push(`## Always-Available Mounts\n${sysLines.join('\n')}`);
+    sections.push('<symlinks>No symlinks available.</symlinks>');
   }
 
   // Shell environment
   if (shellInfo) {
     sections.push(
-      `# Shell Environment\nPlatform: ${process.platform}\nShell: ${shellInfo.type} (${shellInfo.path})`,
+      `<shell>\nPlatform: ${process.platform}\nShell: ${shellInfo.type} (${shellInfo.path})\n</shell>`,
     );
   }
 
   // Available skills
   const { enabledSkills } = snapshot;
-  if (enabledSkills.paths.length > 0 && skillDetails) {
+  if (enabledSkills.paths.length > 0) {
     const skillInfos: SkillInfo[] = enabledSkills.paths.map((p) => {
-      const detail = skillDetails.get(p);
+      const detail = skillDetails?.get(p);
       return detail ?? { name: p, description: '', path: p };
     });
-    sections.push(
-      `# Available Skills\n${renderAvailableSkillsList(skillInfos)}`,
-    );
-  } else if (enabledSkills.paths.length > 0) {
-    const pathList = enabledSkills.paths
-      .map((p) => `  <skill path="${esc(p)}" />`)
+    const skillFiles = skillInfos
+      .map(
+        (s) =>
+          `<skill name="${esc(s.name)}" description="${esc(s.description)}" path="${esc(s.path)}" />`,
+      )
       .join('\n');
-    sections.push(
-      `# Available Skills\n<available_skills>\n${pathList}\n</available_skills>`,
-    );
+    sections.push(`<available_skills>\n${skillFiles}\n</available_skills>`);
   }
 
   // AGENTS.md files
   const { agentsMd } = snapshot;
+  const wsFileBlocks: string[] = [];
   if (agentsMd.entries.length > 0) {
-    const agentsFiles = agentsMd.entries.map((entry) => {
+    for (const entry of agentsMd.entries) {
       const respected = agentsMd.respectedMounts.includes(entry.mountPrefix);
-      return `<file path="${esc(entry.mountPrefix)}/AGENTS.md" respected="${respected}">${entry.content}</file>`;
-    });
-    sections.push(`# Workspace Files\n${agentsFiles.join('\n')}`);
+      const body = prefixLineNumbers(entry.content);
+      wsFileBlocks.push(
+        `<file path="${esc(entry.mountPrefix)}/AGENTS.md" respected="${respected}">\n<metadata>language:markdown</metadata>\n<content>\n${body}\n</content>\n</file>`,
+      );
+    }
   }
 
   // WORKSPACE.md files
   const { workspaceMd } = snapshot;
   if (workspaceMd.entries.length > 0) {
-    const wsFiles = workspaceMd.entries.map(
-      (entry) =>
-        `<file path="${esc(entry.mountPrefix)}/.stagewise/WORKSPACE.md">${entry.content}</file>`,
-    );
-    if (agentsMd.entries.length === 0) {
-      sections.push(`# Workspace Files\n${wsFiles.join('\n')}`);
-    } else {
-      sections.push(wsFiles.join('\n'));
+    for (const entry of workspaceMd.entries) {
+      const body = prefixLineNumbers(entry.content);
+      wsFileBlocks.push(
+        `<file path="${esc(entry.mountPrefix)}/.stagewise/WORKSPACE.md">\n<metadata>language:markdown</metadata>\n<content>\n${body}\n</content>\n</file>`,
+      );
     }
+  }
+
+  if (wsFileBlocks.length > 0) {
+    sections.push(wsFileBlocks.join('\n'));
   }
 
   // Active plans
@@ -130,19 +132,19 @@ export function renderFullEnvironmentContext(
         : '\n  All tasks complete.';
       return `- **${p.name}** (${progress})${desc}\n  File: \`${file}\`${next}`;
     });
-    sections.push(`# Active Plans\n${planLines.join('\n')}`);
+    sections.push(`<active_plans>\n${planLines.join('\n')}\n</active_plans>`);
   }
 
   // Active app
   if (snapshot.activeApp) {
     sections.push(
-      `# Active App\nApp: ${snapshot.activeApp.appId}${snapshot.activeApp.pluginId ? ` (plugin: ${snapshot.activeApp.pluginId})` : ''}`,
+      `<active_app id="${esc(snapshot.activeApp.appId)}"${snapshot.activeApp.pluginId ? ` plugin="${esc(snapshot.activeApp.pluginId)}"` : ''} />`,
     );
   }
 
   // Sandbox session
   if (snapshot.sandboxSessionId) {
-    sections.push(`# Sandbox\nSession: ${snapshot.sandboxSessionId}`);
+    sections.push(`<sandbox session="${esc(snapshot.sandboxSessionId)}" />`);
   }
 
   return `<env-snapshot>\n${sections.join('\n\n')}\n</env-snapshot>`;
