@@ -51,27 +51,17 @@ function formatFileChange(
   agentInstanceId: string,
 ): EnvironmentChangeEntry | null {
   const hasModifiers = change.modifiers.length > 0;
-  const formatted = change.modifiers.map((c) =>
-    formatContributor(c, agentInstanceId),
-  );
+  const hasSignal =
+    hasModifiers || change.editsGone || change.editsPartiallyRemoved;
+  if (!hasSignal) return null;
 
-  let summary: string | null = null;
-  if (hasModifiers && change.editsGone)
-    summary = `${path} modified by: [${formatted.join(', ')}] (your edits no longer present)`;
-  else if (hasModifiers && change.editsPartiallyRemoved)
-    summary = `${path} modified by: [${formatted.join(', ')}] (some of your edits were removed)`;
-  else if (hasModifiers)
-    summary = `${path} modified by: [${formatted.join(', ')}]`;
-  else if (change.editsGone) summary = `${path}: your edits no longer present`;
-  else if (change.editsPartiallyRemoved)
-    summary = `${path}: some of your edits were removed`;
-
-  if (!summary) return null;
-  return {
-    type: 'file-diffs-changed',
-    summary,
-    attributes: { path },
-  };
+  const attrs: Record<string, string> = { path };
+  if (hasModifiers) {
+    attrs.changedBy = change.modifiers
+      .map((c) => formatContributor(c, agentInstanceId))
+      .join(',');
+  }
+  return { type: 'file-diffs-changed', attributes: attrs };
 }
 
 /**
