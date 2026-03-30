@@ -1,19 +1,23 @@
-import AgentIdeIntegrationDark from './agent-ide-integration-dark.png';
-import AgentIdeIntegrationLight from './agent-ide-integration-light.png';
-import DebuggerAccessDark from './debugger-access-dark.png';
-import DebuggerAccessLight from './debugger-access-light.png';
-import ExperimentsDark from './experiments-dark.png';
-import ExperimentsLight from './experiments-light.png';
-import ReverseEngineeringDark from './reverse-engineering-dark.png';
-import ReverseEngineeringLight from './reverse-engineering-light.png';
+import WorkspacesDark from './workspaces-dark.png';
+import WorkspacesLight from './workspaces-light.png';
+import DesignPreviewDark from './design-preview-dark.png';
+import DesignPreviewLight from './design-preview-light.png';
+import PluginsDark from './plugins-dark.png';
+import PluginsLight from './plugins-light.png';
+import MentionsDark from './mentions-dark.png';
+import MentionsLight from './mentions-light.png';
+import CommandsAndSkillsDark from './commands-and-skills-dark.png';
+import CommandsAndSkillsLight from './commands-and-skills-light.png';
 
 export {
-  AgentIdeIntegrationDark,
-  AgentIdeIntegrationLight,
-  DebuggerAccessDark,
-  DebuggerAccessLight,
-  ExperimentsDark,
-  ExperimentsLight,
-  ReverseEngineeringDark,
-  ReverseEngineeringLight,
+  WorkspacesDark,
+  WorkspacesLight,
+  DesignPreviewDark,
+  DesignPreviewLight,
+  PluginsDark,
+  PluginsLight,
+  MentionsDark,
+  MentionsLight,
+  CommandsAndSkillsDark,
+  CommandsAndSkillsLight,
 };

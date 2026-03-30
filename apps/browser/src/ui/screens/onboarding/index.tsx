@@ -7,14 +7,11 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { IconArrowLeftFill18, IconArrowRightFill18 } from 'nucleo-ui-fill-18';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
-import { useTrack } from '@ui/hooks/use-track';
 import { cn } from '@ui/utils';
 import { StepWelcome } from './steps/01-welcome';
 import { StepAuth } from './steps/02-auth';
 import { StepDemo } from './steps/03-demo';
-import { StepSuggestions } from './steps/04-suggestions';
-
-const stepIds = ['welcome', 'auth', 'demo', 'suggestions'];
+const stepIds = ['welcome', 'auth', 'demo'];
 
 export type StepValidityCallback = (
   canProceed: boolean,
@@ -25,11 +22,9 @@ export function OnboardingWizard() {
   const [currentStep, setCurrentStep] = useState(0);
   const [canProceed, setCanProceed] = useState(false);
   const [blockReason, setBlockReason] = useState<string | null>(null);
-  const [fading, setFading] = useState(false);
   const setHasSeenOnboardingFlow = useKartonProcedure(
     (p) => p.userExperience.setHasSeenOnboardingFlow,
   );
-  const track = useTrack();
 
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === stepIds.length - 1;
@@ -64,25 +59,10 @@ export function OnboardingWizard() {
     setHasSeenOnboardingFlow(true);
   }, [setHasSeenOnboardingFlow]);
 
-  const handleSuggestionClick = useCallback(
-    (suggestion: { id: string; url: string; prompt: string }) => {
-      track('suggestion-clicked', {
-        suggestion_id: suggestion.id,
-        context: 'onboarding',
-      });
-      setFading(true);
-      setTimeout(() => {
-        setHasSeenOnboardingFlow(true, suggestion);
-      }, 300);
-    },
-    [setHasSeenOnboardingFlow, track],
-  );
-
   return (
     <div
       className={cn(
         'app-drag fixed inset-0 flex flex-col bg-background transition-opacity duration-300',
-        fading && 'opacity-0',
       )}
     >
       {/* Title bar drag region */}
@@ -109,11 +89,6 @@ export function OnboardingWizard() {
           />
         </div>
         {currentStep === 2 && <StepDemo />}
-        <div
-          className={cn('flex flex-1 flex-col', currentStep !== 3 && 'hidden')}
-        >
-          <StepSuggestions onSuggestionClick={handleSuggestionClick} />
-        </div>
       </div>
 
       {/* Bottom navigation — flex-1 on left/right ensures dots stay centered */}
@@ -156,8 +131,9 @@ export function OnboardingWizard() {
                 size="sm"
                 onClick={complete}
                 disabled={!canProceed}
+                className="text-primary-foreground! hover:text-hover-derived! active:text-active-derived!"
               >
-                Skip
+                Finish
                 <IconArrowRightFill18 className="size-4" />
               </Button>
             </NextButtonTooltip>
