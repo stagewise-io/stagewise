@@ -30,7 +30,10 @@ import {
 } from './chat-input';
 import type { AttachmentType } from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
 import type { MentionContext } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions';
+import type { FileMentionItem } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/types';
+import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 import { selectedElementToAttachmentAttributes } from '@ui/utils/attachment-conversions';
+import { selectedElementToSwDomElement } from '@shared/selected-elements/swdomelement';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -124,28 +127,19 @@ export function ChatPanelFooter() {
     [openAgent, setChatInputState],
   );
 
-  const [localSelectedElements, setLocalSelectedElements] = useState<
-    SelectedElement[]
-  >([]);
-
   // File attachments via shared hook
   const {
-    fileAttachments,
+    attachments: fileAttachments,
     addFileAttachment,
-    removeFileAttachment,
-    clearFileAttachments,
-    setFileAttachments,
+    removeAttachment: removeFileAttachment,
+    clearAttachments: clearFileAttachments,
+    setAttachments: setFileAttachments,
   } = useFileAttachments({
     chatInputRef: chatInputRef as RefObject<ChatInputHandle>,
     agentId: openAgent,
   });
 
   const { activeEditMessageId, setMainDropHandler } = useMessageEditState();
-
-  // Restore draft when activeChat changes (after switch or create)
-  useEffect(() => {
-    setLocalSelectedElements([]);
-  }, [openAgent]);
 
   // Focus input and recalculate send-button state when agent changes.
   // ChatInput has key={openAgent} so it fully re-mounts on switch —
@@ -194,6 +188,10 @@ export function ChatPanelFooter() {
   const removeSelectedElementProc = useKartonProcedure(
     (p) => p.browser.contextSelection.removeElement,
   );
+  const storeAttachment = useKartonProcedure((p) => p.agents.storeAttachment);
+  const captureAndStoreElementScreenshot = useKartonProcedure(
+    (p) => p.browser.contextSelection.captureAndStoreElementScreenshot,
+  );
 
   const searchMentionFiles = useKartonProcedure(
     (p) => p.toolbox.searchMentionFiles,
@@ -206,6 +204,24 @@ export function ChatPanelFooter() {
       : EMPTY_MOUNTS,
   );
   const slashCommands = useKartonState((s) => s.skills);
+  // Stable ref so the mention command handler (configured once by TipTap)
+  // always sees the latest setFileAttachments without re-creating the context.
+  const setFileAttachmentsRef = useRef(setFileAttachments);
+  setFileAttachmentsRef.current = setFileAttachments;
+
+  const onFileMentionSelected = useCallback((item: FileMentionItem) => {
+    const attachment: AttachmentMetadata = {
+      // mountedPath is the agent-facing path (e.g. "w1/src/button.tsx")
+      path: item.meta.mountedPath,
+      // No originalFileName for workspace paths — basename is derived from path
+    };
+    setFileAttachmentsRef.current((prev) => {
+      // Deduplicate by path
+      if (prev.some((a) => a.path === attachment.path)) return prev;
+      return [...prev, attachment];
+    });
+  }, []);
+
   const mentionContext = useMemo<MentionContext>(
     () => ({
       agentInstanceId: openAgent,
@@ -213,6 +229,7 @@ export function ChatPanelFooter() {
       tabs: mentionTabs,
       activeTabId: mentionActiveTabId,
       mounts: mentionMounts,
+      onFileMentionSelected,
     }),
     [
       openAgent,
@@ -220,6 +237,7 @@ export function ChatPanelFooter() {
       mentionTabs,
       mentionActiveTabId,
       mentionMounts,
+      onFileMentionSelected,
     ],
   );
 
@@ -229,7 +247,6 @@ export function ChatPanelFooter() {
   const clearAll = useCallback(() => {
     clearFileAttachments();
     clearSelectedElementsProc();
-    setLocalSelectedElements([]);
   }, [clearFileAttachments, clearSelectedElementsProc]);
 
   // Element selector helper functions
@@ -263,11 +280,7 @@ export function ChatPanelFooter() {
       if (text) {
         const parsed = markdownToTipTapContent(text);
         const tiptapContent = enrichTipTapContent(parsed, {
-          fileAttachments: message.metadata?.fileAttachments,
-          textClipAttachments: message.metadata?.textClipAttachments,
-          selectedPreviewElements: message.metadata?.selectedPreviewElements as
-            | SelectedElement[]
-            | undefined,
+          attachments: message.metadata?.attachments,
         });
         updateChatInputState(tiptapContent);
         requestAnimationFrame(() => {
@@ -275,15 +288,9 @@ export function ChatPanelFooter() {
         });
       }
 
-      // Restore file attachments state (used by handleSubmit for the message)
-      if (message.metadata?.fileAttachments?.length) {
-        setFileAttachments(message.metadata.fileAttachments);
-      }
-
-      // Restore selected elements state
-      const elements = message.metadata?.selectedPreviewElements;
-      if (elements?.length) {
-        setLocalSelectedElements(elements as SelectedElement[]);
+      // Restore attachments state (used by handleSubmit for the message)
+      if (message.metadata?.attachments?.length) {
+        setFileAttachments(message.metadata.attachments);
       }
     }
   }, [
@@ -324,17 +331,13 @@ export function ChatPanelFooter() {
 
       // Reset current draft state before restoring
       setFileAttachments([]);
-      setLocalSelectedElements([]);
 
       // Restore the user message's content into the chat input
       const textPart = nextUserMessage.parts.find((p) => p.type === 'text');
       const text = textPart?.type === 'text' ? textPart.text : '';
       const parsed = markdownToTipTapContent(text);
       const tiptapContent = enrichTipTapContent(parsed, {
-        fileAttachments: nextUserMessage.metadata?.fileAttachments,
-        textClipAttachments: nextUserMessage.metadata?.textClipAttachments,
-        selectedPreviewElements: nextUserMessage.metadata
-          ?.selectedPreviewElements as SelectedElement[] | undefined,
+        attachments: nextUserMessage.metadata?.attachments,
       });
       updateChatInputState(tiptapContent);
       requestAnimationFrame(() => {
@@ -342,14 +345,8 @@ export function ChatPanelFooter() {
       });
 
       // Restore file attachments if present
-      if (nextUserMessage.metadata?.fileAttachments?.length) {
-        setFileAttachments(nextUserMessage.metadata.fileAttachments);
-      }
-
-      // Restore selected elements if present
-      const elements = nextUserMessage.metadata?.selectedPreviewElements;
-      if (elements?.length) {
-        setLocalSelectedElements(elements as SelectedElement[]);
+      if (nextUserMessage.metadata?.attachments?.length) {
+        setFileAttachments(nextUserMessage.metadata.attachments);
       }
     },
     [openAgent, revertToUserMessage, updateChatInputState, setFileAttachments],
@@ -465,7 +462,7 @@ export function ChatPanelFooter() {
 
   // Refs for values read at call time inside handleSubmit.
   // This keeps handleSubmit's dependency array stable (no localInputState,
-  // fileAttachments, localSelectedElements, canSendMessage) which in turn
+  // fileAttachments, canSendMessage) which in turn
   // keeps the onSubmit prop passed to ChatInputActions referentially stable
   // across keystrokes and streaming updates.
   const localInputStateRef = useRef(localInputState);
@@ -473,9 +470,6 @@ export function ChatPanelFooter() {
 
   const fileAttachmentsRef = useRef(fileAttachments);
   fileAttachmentsRef.current = fileAttachments;
-
-  const localSelectedElementsRef = useRef(localSelectedElements);
-  localSelectedElementsRef.current = localSelectedElements;
 
   const canSendMessageRef = useRef(effectiveCanSendMessage);
   canSendMessageRef.current = effectiveCanSendMessage;
@@ -496,15 +490,18 @@ export function ChatPanelFooter() {
     // Read frequently-changing values from refs at call time
     const currentLocalInputState = localInputStateRef.current;
     const currentFileAttachments = fileAttachmentsRef.current;
-    const currentSelectedElements = localSelectedElementsRef.current;
 
     // Snapshot pending question ID — used for the atomic interrupt call below.
     const currentPendingQuestionId = pendingQuestionIdRef.current;
 
-    // Collect metadata for selected elements and text clips
-    const metadata = collectUserMessageMetadata(
-      currentSelectedElements,
-      currentLocalInputState,
+    // Collect metadata for mentions.
+    const metadata = collectUserMessageMetadata(currentLocalInputState);
+
+    // File mentions are converted to FileAttachment entries at selection time
+    // (via onFileMentionSelected). Strip them from the mentions array so the
+    // backend doesn't see duplicate context.
+    const filteredMentions = metadata.mentions?.filter(
+      (m) => m.providerType !== 'file',
     );
 
     const markdownText = chatInputRef.current!.getTextContent();
@@ -518,7 +515,11 @@ export function ChatPanelFooter() {
       role: 'user',
       metadata: {
         ...metadata,
-        fileAttachments: currentFileAttachments,
+        attachments: currentFileAttachments,
+        mentions:
+          filteredMentions && filteredMentions.length > 0
+            ? filteredMentions
+            : undefined,
       },
     };
 
@@ -803,13 +804,14 @@ export function ChatPanelFooter() {
    * Handle attachment removal when badge is deleted from editor
    */
   const handleAttachmentRemoved = useCallback(
-    (id: string, type: AttachmentType) => {
-      if (type === 'attachment') removeFileAttachment(id);
-      else if (type === 'element') {
+    (id: string, type: AttachmentType, attrs?: Record<string, unknown>) => {
+      if (type === 'attachment') {
+        removeFileAttachment(id); // id is the path
+      } else if (type === 'element') {
         removeSelectedElementProc(id);
-        setLocalSelectedElements((prev) =>
-          prev.filter((el) => el.stagewiseId !== id),
-        );
+        // Also remove the file attachment that was stored for this element
+        const blobPath = attrs?.blobPath as string | undefined;
+        if (blobPath) removeFileAttachment(blobPath);
       }
     },
     [removeFileAttachment, removeSelectedElementProc],
@@ -827,16 +829,138 @@ export function ChatPanelFooter() {
     setMainDropHandler(dragHandlers.onDrop);
   }, [setMainDropHandler, dragHandlers.onDrop]);
 
-  // Watch for selected elements via shared hook
+  // Handle textclip-expand: replace the attachment node with inline text and
+  // remove the file attachment.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { attachmentId, content } = (e as CustomEvent).detail as {
+        attachmentId: string;
+        content: string;
+      };
+      chatInputRef.current?.replaceAttachmentWithText(attachmentId, content);
+      removeFileAttachment(attachmentId);
+    };
+    window.addEventListener('textclip-expand', handler);
+    return () => window.removeEventListener('textclip-expand', handler);
+  }, [chatInputRef, removeFileAttachment]);
+
+  // Watch for selected elements via shared hook.
+  // When a new element is selected we:
+  // 1. Insert an elementAttachment node in the editor (for UI display)
+  // 2. Serialize to `.swdomelement` JSON and store as a file attachment so the
+  //    backend can read it from `att/` just like any other attachment file.
   useElementSelectionWatcher({
     isActive: elementSelectionActive,
     onNewElement: useCallback(
       (element: SelectedElement) => {
-        setLocalSelectedElements((prev) => [...prev, element]);
         const attrs = selectedElementToAttachmentAttributes(element);
-        chatInputRef.current?.insertAttachment(attrs);
+        // Defer insertion to avoid flushSync inside a React lifecycle
+        // (the watcher callback fires during a state update).
+        queueMicrotask(() => {
+          chatInputRef.current?.insertAttachment(attrs);
+        });
+
+        // Fire-and-forget: serialize the element to a .swdomelement file and
+        // store it in the blob directory. We store directly via the
+        // storeAttachment procedure and update the attachments state
+        // manually — we must NOT use addFileAttachment here because it would
+        // insert a second (regular) attachment node into the editor.
+        const tabId = element.tabId;
+        const url = tabId
+          ? ((
+              document.querySelector<HTMLElement>(
+                `[data-tab-id="${tabId}"]`,
+              ) as any
+            )?.dataset?.url ?? undefined)
+          : undefined;
+        const swdom = selectedElementToSwDomElement(element, {
+          tabId,
+          url,
+        });
+        const tagName = (
+          element.nodeType ||
+          element.tagName ||
+          'element'
+        ).toLowerCase();
+        const domId = element.attributes?.id
+          ? `_${element.attributes.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 20)}`
+          : '';
+        const fileName = `${tagName}${domId}.swdomelement`;
+        const screenshotFileName = `${tagName}${domId}.screenshot.webp`;
+
+        if (openAgent) {
+          // Capture screenshot in parallel with building the swdom JSON.
+          // The screenshot is stored as a separate WebP blob; its blob key
+          // is written into the .swdomelement JSON so the backend can
+          // locate the image when constructing multimodal prompts.
+          const screenshotPromise =
+            element.boundingClientRect && tabId
+              ? captureAndStoreElementScreenshot(
+                  openAgent,
+                  tabId,
+                  {
+                    top: element.boundingClientRect.top,
+                    left: element.boundingClientRect.left,
+                    width: element.boundingClientRect.width,
+                    height: element.boundingClientRect.height,
+                  },
+                  element.isMainFrame ?? true,
+                  element.frameId,
+                  screenshotFileName,
+                ).catch((err: unknown) => {
+                  console.warn(
+                    '[panel-footer] Screenshot capture failed (non-fatal):',
+                    err,
+                  );
+                  return null;
+                })
+              : Promise.resolve(null);
+
+          screenshotPromise
+            .then((screenshotBlobKey) => {
+              // Set screenshot blob key on the swdom before serializing
+              if (screenshotBlobKey) {
+                swdom.screenshot = screenshotBlobKey;
+                // Update the TipTap node so the badge can show the thumbnail
+                chatInputRef.current?.updateAttachmentAttrs(attrs.id, {
+                  screenshotBlobKey,
+                });
+              }
+              const json = JSON.stringify(swdom);
+              const base64 = btoa(
+                new TextEncoder()
+                  .encode(json)
+                  .reduce((s, b) => s + String.fromCharCode(b), ''),
+              );
+              return storeAttachment(openAgent, fileName, base64);
+            })
+            .then((blobKey: string) => {
+              const blobPath = `att/${blobKey}`;
+              setFileAttachments((prev) => [
+                ...prev,
+                { path: blobPath, originalFileName: fileName },
+              ]);
+              // Update the TipTap node with the blob path so renderText
+              // can emit the correct `[](path:att/<blobKey>)` link.
+              chatInputRef.current?.updateAttachmentAttrs(attrs.id, {
+                blobPath,
+              });
+            })
+            .catch((err: unknown) => {
+              console.error(
+                '[panel-footer] Failed to store .swdomelement blob:',
+                err,
+              );
+            });
+        }
       },
-      [chatInputRef],
+      [
+        chatInputRef,
+        openAgent,
+        storeAttachment,
+        captureAndStoreElementScreenshot,
+        setFileAttachments,
+      ],
     ),
   });
 
@@ -890,9 +1014,7 @@ export function ChatPanelFooter() {
           placeholder={
             hasPendingQuestion ? 'Write a message instead' : undefined
           }
-          attachmentCount={
-            fileAttachments.length + localSelectedElements.length
-          }
+          attachmentCount={fileAttachments.length}
           showModelSelect
           onModelChange={() => chatInputRef.current?.focus()}
           showContextUsageRing={

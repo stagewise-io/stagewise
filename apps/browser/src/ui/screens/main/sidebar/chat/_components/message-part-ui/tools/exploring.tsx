@@ -1,5 +1,8 @@
 import { useKartonState } from '@ui/hooks/use-karton';
-import type { UserMessageMetadata } from '@shared/karton-contracts/ui/agent/metadata';
+import type {
+  UserMessageMetadata,
+  AttachmentMetadata,
+} from '@shared/karton-contracts/ui/agent/metadata';
 import {
   useMemo,
   useState,
@@ -12,10 +15,10 @@ import {
 import type { ReasoningUIPart } from 'ai';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { GlobToolPart } from './glob';
-import { SearchIcon } from 'lucide-react';
+import { IconMagnifierOutline18 } from 'nucleo-ui-outline-18';
 import { GrepSearchToolPart } from './grep-search';
-import { ListFilesToolPart } from './list-files';
-import { ReadFileToolPart } from './read-file';
+import { ReadToolPart } from './read';
+import { LsToolPart } from './ls';
 import { UpdateWorkspaceMdToolPart } from './update-workspace-md';
 import { SearchInLibraryDocsToolPart } from './search-in-library-docs';
 import { ListLibraryDocsToolPart } from './list-library-docs';
@@ -62,8 +65,8 @@ export type ReadOnlyToolPart =
         type:
           | 'tool-glob'
           | 'tool-grepSearch'
-          | 'tool-listFiles'
-          | 'tool-readFile'
+          | 'tool-read'
+          | 'tool-ls'
           | 'tool-searchInLibraryDocs'
           | 'tool-listLibraryDocs'
           | 'tool-executeSandboxJs'
@@ -81,8 +84,8 @@ export function isReadOnlyToolPart(
     part.type === 'reasoning' ||
     part.type === 'tool-glob' ||
     part.type === 'tool-grepSearch' ||
-    part.type === 'tool-listFiles' ||
-    part.type === 'tool-readFile' ||
+    part.type === 'tool-read' ||
+    part.type === 'tool-ls' ||
     part.type === 'tool-searchInLibraryDocs' ||
     part.type === 'tool-listLibraryDocs' ||
     part.type === 'tool-executeSandboxJs' ||
@@ -99,6 +102,7 @@ const PartContent = ({
   thinkingDuration,
   isLastPart = false,
   capMaxHeight = false,
+  messageAttachments,
 }: {
   part: ReadOnlyToolPart;
   minimal?: boolean;
@@ -106,6 +110,7 @@ const PartContent = ({
   thinkingDuration?: number;
   isLastPart?: boolean;
   capMaxHeight?: boolean;
+  messageAttachments?: AttachmentMetadata[];
 }) => {
   switch (part.type) {
     case 'reasoning':
@@ -136,18 +141,18 @@ const PartContent = ({
           disableShimmer={disableShimmer}
         />
       );
-    case 'tool-listFiles':
+    case 'tool-read':
       return (
-        <ListFilesToolPart
-          key={part.toolCallId}
+        <ReadToolPart
           minimal={minimal}
+          key={part.toolCallId}
           part={part}
           disableShimmer={disableShimmer}
         />
       );
-    case 'tool-readFile':
+    case 'tool-ls':
       return (
-        <ReadFileToolPart
+        <LsToolPart
           minimal={minimal}
           key={part.toolCallId}
           part={part}
@@ -181,6 +186,7 @@ const PartContent = ({
           disableShimmer={disableShimmer}
           isLastPart={isLastPart}
           capMaxHeight={capMaxHeight}
+          messageAttachments={messageAttachments}
         />
       );
     case 'tool-readConsoleLogs':
@@ -227,6 +233,7 @@ export const ExploringToolParts = ({
   isShimmering,
   partsMetadata,
   originalIndices,
+  messageAttachments,
 }: {
   parts: ReadOnlyToolPart[];
   isAutoExpanded: boolean;
@@ -234,6 +241,8 @@ export const ExploringToolParts = ({
   partsMetadata: UserMessageMetadata['partsMetadata'];
   /** Original indices in msg.parts for each part, used for correct metadata lookup */
   originalIndices: number[];
+  /** Attachments from the parent assistant message metadata */
+  messageAttachments?: AttachmentMetadata[];
 }) => {
   const [expanded, setExpanded] = useState(isAutoExpanded);
   const [expandedChildren, setExpandedChildren] = useState<Set<string>>(
@@ -281,6 +290,7 @@ export const ExploringToolParts = ({
           minimal={true}
           disableShimmer
           isLastPart={isLastPart}
+          messageAttachments={messageAttachments}
           thinkingDuration={
             part.type === 'reasoning' && originalIndex !== undefined
               ? (partsMetadata?.[originalIndex]?.endedAt?.getTime() ?? 0) -
@@ -295,7 +305,7 @@ export const ExploringToolParts = ({
   const explorationMetadata = useMemo(() => {
     let filesRead = 0;
     let filesFound = 0;
-    let linesRead = 0;
+    const linesRead = 0;
     let docsRead = 0;
     let consoleLogsRead = 0;
     let hasUsedContext7Tools = false;
@@ -320,8 +330,8 @@ export const ExploringToolParts = ({
     );
     finishedParts.forEach((part) => {
       switch (part.type) {
-        case 'tool-readFile': {
-          const path = part.input?.relative_path ?? '';
+        case 'tool-read': {
+          const path = part.input?.path ?? '';
           const pluginSkillMatch = path.match(PLUGIN_SKILL_RE);
           if (pluginSkillMatch) {
             const plugin = plugins.find((p) => p.id === pluginSkillMatch[1]);
@@ -336,17 +346,17 @@ export const ExploringToolParts = ({
             break;
           }
           filesRead += 1;
-          linesRead += part.output?.result?.totalLines ?? 0;
+          hasUsedFileTools = true;
+          break;
+        }
+        case 'tool-ls': {
+          filesRead += 1;
           hasUsedFileTools = true;
           break;
         }
         case 'tool-glob':
         case 'tool-grepSearch':
           filesFound += part.output?.result?.totalMatches ?? 0;
-          hasUsedFileTools = true;
-          break;
-        case 'tool-listFiles':
-          filesFound += part.output?.result?.totalFiles ?? 0;
           hasUsedFileTools = true;
           break;
         case 'tool-searchInLibraryDocs':
@@ -361,22 +371,8 @@ export const ExploringToolParts = ({
           const multimodalCalls = parseOutputAttachmentCalls(script);
 
           if (multimodalCalls.length > 0) {
-            const customAtts = (part.output as any)?._customFileAttachments as
-              | { mediaType?: string }[]
-              | undefined;
-            if (Array.isArray(customAtts))
-              for (const att of customAtts)
-                attachmentLabels.push(getAttachmentLabel(att.mediaType));
-            else
-              for (const call of multimodalCalls)
-                attachmentLabels.push(getAttachmentLabel(call.mediaType));
-          } else {
-            const customAtts = (part.output as any)?._customFileAttachments as
-              | { mediaType?: string }[]
-              | undefined;
-            if (Array.isArray(customAtts))
-              for (const att of customAtts)
-                attachmentLabels.push(getAttachmentLabel(att.mediaType));
+            for (let i = 0; i < multimodalCalls.length; i++)
+              attachmentLabels.push(getAttachmentLabel(undefined));
           }
 
           if (readAttCalls.length > 0)
@@ -626,12 +622,12 @@ export const ExploringToolParts = ({
       .filter((part) => part.type !== 'reasoning')
       .at(-1);
     switch (lastNonReasoningPart?.type || '') {
-      case 'tool-readFile': {
+      case 'tool-read': {
         const p = lastNonReasoningPart as Extract<
           AgentToolUIPart,
-          { type: 'tool-readFile' }
+          { type: 'tool-read' }
         >;
-        const path = p.input?.relative_path ?? '';
+        const path = p.input?.path ?? '';
         const pluginMatch = path.match(PLUGIN_SKILL_RE);
         if (pluginMatch) {
           const plugin = plugins.find((pl) => pl.id === pluginMatch[1]);
@@ -639,11 +635,12 @@ export const ExploringToolParts = ({
         }
         const wsMatch = path.match(WORKSPACE_SKILL_RE);
         if (wsMatch?.[1]) return `Enabling ${wsMatch[1]}...`;
-        return 'Exploring files...';
+        return 'Reading file...';
       }
+      case 'tool-ls':
+        return 'Listing directory...';
       case 'tool-glob':
       case 'tool-grepSearch':
-      case 'tool-listFiles':
         return 'Exploring files...';
       case 'tool-searchInLibraryDocs': {
         const p = lastNonReasoningPart as Extract<
@@ -723,6 +720,7 @@ export const ExploringToolParts = ({
         part={parts[0]!}
         minimal={true}
         disableShimmer={!isShimmering}
+        messageAttachments={messageAttachments}
         thinkingDuration={
           originalIndex !== undefined
             ? (partsMetadata?.[originalIndex]?.endedAt?.getTime() ?? 0) -
@@ -745,7 +743,7 @@ export const ExploringToolParts = ({
       trigger={
         <div className={cn(`flex flex-row items-center justify-start gap-2`)}>
           <div className="flex min-w-0 flex-1 flex-row items-center justify-start gap-1 text-xs">
-            <SearchIcon
+            <IconMagnifierOutline18
               className={cn(
                 'size-3 shrink-0',
                 isShimmering && 'text-primary-foreground',

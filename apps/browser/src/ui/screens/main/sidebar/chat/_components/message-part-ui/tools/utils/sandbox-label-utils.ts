@@ -24,12 +24,10 @@ export interface ParsedReadAttachmentCall {
 }
 
 /**
- * Indicates an outputAttachment call was found in a sandbox script,
- * optionally with its mediaType extracted.
+ * Indicates a createAttachment call was found in a sandbox script.
  */
 export interface ParsedMultimodalAttachmentCall {
   found: true;
-  mediaType?: string;
 }
 
 /**
@@ -220,28 +218,15 @@ export function parseReadAttachmentCalls(
 }
 
 /**
- * Parses a sandbox script to extract outputAttachment calls.
- * Matches patterns like: API.outputAttachment({...})
+ * Parses a sandbox script to extract createAttachment calls.
+ * Matches patterns like: API.createAttachment({...})
  */
 export function parseOutputAttachmentCalls(
   script: string,
 ): ParsedMultimodalAttachmentCall[] {
-  const regex =
-    /API\.outputAttachment\s*\(\s*\{[^}]*mediaType\s*:\s*["']([^"']+)["'][^}]*\}/g;
+  const regex = /API\.createAttachment\s*\(/g;
   const calls: ParsedMultimodalAttachmentCall[] = [];
-
-  let match = regex.exec(script);
-  while (match !== null) {
-    calls.push({ found: true, mediaType: match[1] });
-    match = regex.exec(script);
-  }
-
-  if (calls.length > 0) return calls;
-
-  // Fallback: count calls without extracting mediaType
-  const fallbackRegex = /API\.outputAttachment\s*\(/g;
-  while (fallbackRegex.exec(script) !== null) calls.push({ found: true });
-
+  while (regex.exec(script) !== null) calls.push({ found: true });
   return calls;
 }
 
@@ -366,20 +351,14 @@ export function getSandboxLabel(
   )
     return isInProgress ? 'Running a script...' : 'Ran a script';
 
-  // 1. API.outputAttachment always wins (user sees visual output)
+  // 1. API.createAttachment always wins (user sees visual output)
   if (multimodalAttachmentCalls.length > 0) {
-    const label = getAttachmentLabel(multimodalAttachmentCalls[0]!.mediaType);
-    const allSameType = multimodalAttachmentCalls.every(
-      (c) => getAttachmentLabel(c?.mediaType) === label,
-    );
-
     if (multimodalAttachmentCalls.length === 1)
-      return isInProgress ? `Parsing ${label}...` : `Parsed ${label}`;
+      return isInProgress ? 'Parsing attachment...' : 'Parsed attachment';
 
-    const noun = allSameType ? `${label}s` : 'attachments';
     return isInProgress
-      ? `Parsing ${multimodalAttachmentCalls.length} ${noun}...`
-      : `Parsed ${multimodalAttachmentCalls.length} ${noun}`;
+      ? `Parsing ${multimodalAttachmentCalls.length} attachments...`
+      : `Parsed ${multimodalAttachmentCalls.length} attachments`;
   }
 
   // 2. att/ writes only (preparing data for visual output)

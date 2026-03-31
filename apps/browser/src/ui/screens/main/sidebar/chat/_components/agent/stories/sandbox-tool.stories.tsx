@@ -186,8 +186,8 @@ Make sure the selector is correct and the element exists on the page.`,
 /**
  * Sandbox With 2 Image Attachments
  *
- * Script that uses API.outputAttachment() twice to produce two PNG screenshots.
- * The output includes _customFileAttachments with the image data.
+ * Script that uses API.createAttachment() twice to produce two PNG screenshots.
+ * The script uses API.createAttachment() to produce two PNG screenshots.
  */
 export const SandboxWith2ImageAttachments: Story = {
   name: 'Sandbox/With-2-Image-Attachments',
@@ -207,7 +207,7 @@ export const SandboxWith2ImageAttachments: Story = {
   format: "png",
   clip: { x: 0, y: 0, width: 1280, height: 80, scale: 1 }
 });
-API.outputAttachment({
+API.createAttachment({
   id: "header-screenshot",
   mediaType: "image/png",
   fileName: "header.png",
@@ -218,7 +218,7 @@ const footerScreenshot = await API.sendCDP("t_1", "Page.captureScreenshot", {
   format: "png",
   clip: { x: 0, y: 900, width: 1280, height: 120, scale: 1 }
 });
-API.outputAttachment({
+API.createAttachment({
   id: "footer-screenshot",
   mediaType: "image/png",
   fileName: "footer.png",
@@ -232,20 +232,6 @@ return JSON.stringify({ headerCaptured: true, footerCaptured: true });`,
                   headerCaptured: true,
                   footerCaptured: true,
                 }),
-                customFileAttachments: [
-                  {
-                    id: 'header-screenshot',
-                    mediaType: 'image/png',
-                    fileName: 'header.png',
-                    sizeBytes: 1024,
-                  },
-                  {
-                    id: 'footer-screenshot',
-                    mediaType: 'image/png',
-                    fileName: 'footer.png',
-                    sizeBytes: 1024,
-                  },
-                ],
               },
             ),
           ],
@@ -261,7 +247,7 @@ return JSON.stringify({ headerCaptured: true, footerCaptured: true });`,
 /**
  * Sandbox With 3 Mixed Attachments
  *
- * Script with 3 outputAttachment calls producing mixed media types:
+ * Script with 3 createAttachment calls producing mixed media types:
  * a PNG screenshot, an SVG diagram, and an HTML snippet.
  * Tests the "Parsed 3 attachments" label in the exploring summary.
  */
@@ -285,7 +271,7 @@ export const SandboxWith3MixedAttachments: Story = {
   format: "png",
   clip: { x: 0, y: 0, width: 1280, height: 600, scale: 1 }
 });
-API.outputAttachment({
+API.createAttachment({
   id: "hero-screenshot",
   mediaType: "image/png",
   fileName: "hero-section.png",
@@ -301,7 +287,7 @@ const svgHtml = await API.sendCDP("t_1", "DOM.getOuterHTML", {
   nodeId: svgNode.nodeId
 });
 const svgB64 = Buffer.from(svgHtml.outerHTML).toString("base64");
-API.outputAttachment({
+API.createAttachment({
   id: "hero-logo-svg",
   mediaType: "image/svg+xml",
   fileName: "hero-logo.svg",
@@ -316,7 +302,7 @@ const heroHtml = await API.sendCDP("t_1", "DOM.getOuterHTML", {
   nodeId: heroNode.nodeId
 });
 const htmlB64 = Buffer.from(heroHtml.outerHTML).toString("base64");
-API.outputAttachment({
+API.createAttachment({
   id: "hero-html",
   mediaType: "text/html",
   fileName: "hero-section.html",
@@ -335,26 +321,6 @@ return JSON.stringify({
                   svgFound: true,
                   htmlLength: 2847,
                 }),
-                customFileAttachments: [
-                  {
-                    id: 'hero-screenshot',
-                    mediaType: 'image/png',
-                    fileName: 'hero-section.png',
-                    sizeBytes: 1024,
-                  },
-                  {
-                    id: 'hero-logo-svg',
-                    mediaType: 'image/svg+xml',
-                    fileName: 'hero-logo.svg',
-                    sizeBytes: 512,
-                  },
-                  {
-                    id: 'hero-html',
-                    mediaType: 'text/html',
-                    fileName: 'hero-section.html',
-                    sizeBytes: 256,
-                  },
-                ],
               },
             ),
           ],
@@ -370,7 +336,7 @@ return JSON.stringify({
 /**
  * Sandbox Attachments Mixed Types
  *
- * Script with 2 outputAttachment calls with different media types.
+ * Script with 2 createAttachment calls with different media types.
  * Tests how the UI handles mixed attachment types.
  */
 export const SandboxAttachmentsWithValidationError: Story = {
@@ -392,7 +358,7 @@ export const SandboxAttachmentsWithValidationError: Story = {
               `const screenshot = await API.sendCDP("t_1", "Page.captureScreenshot", {
   format: "png"
 });
-API.outputAttachment({
+API.createAttachment({
   id: "page-screenshot",
   mediaType: "image/png",
   fileName: "page.png",
@@ -407,7 +373,7 @@ const video = await API.sendCDP("t_1", "DOM.querySelector", {
 const videoSrc = await API.sendCDP("t_1", "Runtime.evaluate", {
   expression: "document.querySelector('video source').src"
 });
-API.outputAttachment({
+API.createAttachment({
   id: "video-source",
   mediaType: "video/mp4",
   fileName: "background-video.mp4",
@@ -421,20 +387,6 @@ return JSON.stringify({ screenshotCaptured: true, videoExtracted: true });`,
                   screenshotCaptured: true,
                   videoExtracted: true,
                 }),
-                customFileAttachments: [
-                  {
-                    id: 'page-screenshot',
-                    mediaType: 'image/png',
-                    fileName: 'page.png',
-                    sizeBytes: 1024,
-                  },
-                  {
-                    id: 'video-source',
-                    mediaType: 'video/mp4',
-                    fileName: 'background-video.mp4',
-                    sizeBytes: 10240,
-                  },
-                ],
               },
             ),
           ],

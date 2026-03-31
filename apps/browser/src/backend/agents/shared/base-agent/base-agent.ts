@@ -34,6 +34,7 @@ import {
 import {
   convertAgentMessagesToModelMessages,
   capitalizeFirstLetter,
+  type ContentLimits,
 } from './utils';
 import { generateSimpleTitle } from './title-generation';
 import {
@@ -42,13 +43,23 @@ import {
 } from './history-compression';
 import { readBlob } from '@/utils/attachment-blobs';
 import { capToolOutput } from '@/services/toolbox/utils';
+import fs from 'node:fs/promises';
+import nodePath from 'node:path';
 import type { AssetCacheService } from '@/services/asset-cache';
 import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
+import { FileReadCacheService } from '@/services/file-read-cache';
+import { getAgentDir } from '@/utils/paths';
 import { randomUUID } from 'node:crypto';
 import {
   resolveEffectiveSnapshot,
   sparsifySnapshot,
 } from '../prompts/utils/environment-changes';
+import { populatePathReferences } from './file-read-transformer/populate-path-references';
+import { MessageCacheAnalyzer } from './message-cache-analyzer';
+import { extractReadFilePathsFromAssistantMessage } from './file-read-transformer/path-references';
+import { resolveMountedPath } from './file-read-transformer/resolve-path';
+import { hashPath } from './file-read-transformer/hash';
+import { deriveMaxReadChars } from './file-read-transformer/format-utils';
 import type { StagewiseToolSet } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { AgentsMap } from '../../agents-map';
@@ -349,6 +360,8 @@ export abstract class BaseAgent<
    */
   protected readonly assetCacheService?: AssetCacheService;
   protected readonly processedImageCacheService?: ProcessedImageCacheService;
+  protected fileReadCacheService?: FileReadCacheService;
+  private _fileReadCacheInitPromise?: Promise<FileReadCacheService>;
 
   // Internal state
   private stepAbortController: AbortController | null = null;
@@ -360,6 +373,9 @@ export abstract class BaseAgent<
    * out immediately while a compression is in progress.
    */
   private _isCompressingHistory = false;
+
+  /** Debug utility: tracks model messages per step to report cache stability. */
+  private readonly _cacheAnalyzer: MessageCacheAnalyzer;
 
   /**
    * Monotonically increasing counter that identifies the "current" step.
@@ -464,6 +480,7 @@ export abstract class BaseAgent<
     this.finishToolErrorHandler = finishToolErrorHandler;
     this.assetCacheService = assetCacheService;
     this.processedImageCacheService = processedImageCacheService;
+    this._cacheAnalyzer = new MessageCacheAnalyzer(instanceId, logger);
 
     this.state.set((draft) => {
       draft.title =
@@ -1002,6 +1019,45 @@ export abstract class BaseAgent<
    *
    * @note Also applies compacted conversation
    *
+   * Lazily initialises the per-agent `FileReadCacheService`.
+   *
+   * The DB is stored inside the agent's data directory so each agent
+   * instance has its own isolated cache. Initialisation is deduped —
+   * concurrent calls share the same promise.
+   */
+  private getFileReadCache(): Promise<FileReadCacheService> {
+    if (this.fileReadCacheService) {
+      return Promise.resolve(this.fileReadCacheService);
+    }
+    if (!this._fileReadCacheInitPromise) {
+      this._fileReadCacheInitPromise = (async () => {
+        try {
+          const dbDir = getAgentDir(this.instanceId);
+          const url = `file:${dbDir}/file-read-cache.sqlite`;
+          this.fileReadCacheService = await FileReadCacheService.createWithUrl(
+            url,
+            this.logger,
+          );
+          return this.fileReadCacheService;
+        } catch (err) {
+          // Clear the cached promise so a subsequent step can retry if
+          // the failure was transient (e.g. disk temporarily full).
+          this._fileReadCacheInitPromise = undefined;
+
+          const message = err instanceof Error ? err.message : String(err);
+          throw new Error(
+            `File read cache could not be initialised. ` +
+              `The agent cannot operate without it. ` +
+              `Please check disk permissions and available space. ` +
+              `(${message})`,
+          );
+        }
+      })();
+    }
+    return this._fileReadCacheInitPromise;
+  }
+
+  /**
    * @note Can be overriden by the inheriting class to transform the messages differently.
    *
    * @note If transformed model messages should simply be customized, override `transformModelMessagesBeforeStep` instead.
@@ -1013,7 +1069,25 @@ export abstract class BaseAgent<
     systemPrompt: string,
   ): Promise<ModelMessage[]> {
     const activeModelId = this.state.get().activeModelId;
+    const fileReadCache = await this.getFileReadCache();
     const capabilities = getModelCapabilities(activeModelId);
+
+    // Derive per-request content limits from the model's context window
+    // so the transformer pipeline uses explicit values instead of
+    // module-level globals.
+    let contentLimits: ContentLimits | undefined;
+    try {
+      const { contextWindowSize } =
+        this.modelProviderService.getModelWithOptions(activeModelId, '');
+      contentLimits = {
+        maxReadChars: deriveMaxReadChars(contextWindowSize),
+        maxPreviewLines: 30,
+      };
+    } catch {
+      // Model lookup can fail when the provider is misconfigured.
+      // Fall through — undefined contentLimits lets transformers use
+      // their built-in defaults.
+    }
 
     const shellInfo = this.toolbox.getShellInfo();
     const skills = await this.toolbox.getSkillsList(this.instanceId);
@@ -1035,20 +1109,42 @@ export abstract class BaseAgent<
       systemPrompt,
       await this.getToolsForStep(),
       this.instanceId,
-      (agentId, attachmentId) => readBlob(agentId, attachmentId),
-      capabilities,
-      (err, ctx) => {
-        const error = err instanceof Error ? err : new Error(String(err));
-        this.report(error, ctx.operation, {
-          attachmentId: ctx.attachmentId,
-        });
+      async (agentId, path) => {
+        // path is always a full mount-prefixed path:
+        //   "att/<key>"          — agent data-attachment blob
+        //   "w{prefix}/<rel>"    — file inside an open workspace mount
+        if (path.startsWith('att/')) {
+          return readBlob(agentId, path.slice(4));
+        }
+        // Workspace path — resolve prefix via mount registry.
+        const slashIdx = path.indexOf('/');
+        if (slashIdx <= 0)
+          throw new Error(`Unrecognised attachment path format: "${path}"`);
+        const prefix = path.slice(0, slashIdx);
+        const relative = path.slice(slashIdx + 1);
+        const mountPaths = this.toolbox.getMountedPathsForAgent(agentId);
+        const mountRoot = mountPaths.get(prefix);
+        if (!mountRoot)
+          throw new Error(`Mount "${prefix}" not found for agent ${agentId}`);
+        const resolved = nodePath.resolve(nodePath.join(mountRoot, relative));
+        const mountRootNormalized = nodePath.resolve(mountRoot);
+        if (
+          resolved !== mountRootNormalized &&
+          !resolved.startsWith(mountRootNormalized + nodePath.sep)
+        ) {
+          throw new Error('Path traversal outside mount root');
+        }
+        return fs.readFile(resolved);
       },
-      activeModelId,
+      capabilities,
       shellInfo,
       skillDetails,
       this.logger,
       this.processedImageCacheService,
       skills,
+      fileReadCache,
+      this.toolbox.getMountedPathsForAgent(this.instanceId),
+      contentLimits,
     );
   }
 
@@ -1362,6 +1458,9 @@ export abstract class BaseAgent<
 
     if (isApprovalContinuation)
       modelMessages = this.ensureToolApprovalResponseIsLast(modelMessages);
+
+    // Debug: analyse cache stability of the final model messages before the LLM call.
+    this._cacheAnalyzer.trackStep(modelMessages);
 
     this.logger.debug(`[BaseAgent:${this.instanceId}] Running step`);
 
@@ -1866,6 +1965,27 @@ export abstract class BaseAgent<
     // Save the agent state for recovery
     await this.saveState();
 
+    // Drain sandbox-produced attachments (from API.createAttachment() calls during
+    // this step) into metadata.attachments on the current assistant message.
+    // pendingSandboxAttachments is keyed by toolCallId; merge all into one array.
+    const sandboxAtts = this.toolbox.drainSandboxAttachments(this.instanceId);
+    if (sandboxAtts.length > 0) {
+      this.state.set((draft) => {
+        const last = draft.history[draft.history.length - 1];
+        if (last?.role === 'assistant') {
+          last.metadata ??= { createdAt: new Date(), partsMetadata: [] };
+          last.metadata.attachments = [
+            ...(last.metadata.attachments ?? []),
+            ...sandboxAtts,
+          ];
+        }
+      });
+    }
+
+    // ─── Populate pathReferences on the assistant message ───────────
+    // Extract paths from completed readFile tool calls and hash them.
+    await this.populatePathReferencesOnAssistantMessage();
+
     this.telemetryService.capture('agent-step-completed', {
       agent_type: this.agentType,
       model_id: this.state.get().activeModelId,
@@ -1966,6 +2086,12 @@ export abstract class BaseAgent<
       );
     });
 
+    // ─── Populate pathReferences on the last user message ─────────────
+    // Extracts path: links, attachment paths, and mention paths, then
+    // hashes each file/directory so the conversion pipeline can track
+    // content state and deduplicate injections.
+    await this.populatePathReferencesOnUserMessages();
+
     // ─── Build model messages from history ────────────────────────────
     const messages = this.state.get().history;
 
@@ -1983,6 +2109,157 @@ export abstract class BaseAgent<
       await this.transformModelMessagesBeforeStep(modelMessages);
 
     return finalModelMessages;
+  }
+
+  /**
+   * Populate `pathReferences` on all user messages in history that don't
+   * already have them.
+   *
+   * The last user message is always (re-)populated so its hashes reflect
+   * the current file state at step start. Earlier user messages that were
+   * never populated (e.g. messages sent while a step was in-flight) are
+   * also processed so their file content is injected during conversion.
+   */
+  private async populatePathReferencesOnUserMessages(): Promise<void> {
+    const history = this.state.get().history;
+    const mountPaths = this.toolbox.getMountedPathsForAgent(this.instanceId);
+
+    // Collect indices of user messages that need (re-)population:
+    // - All user messages without pathReferences (never populated)
+    // - The last user message (always re-populate for fresh hashes)
+    //
+    // We iterate backward and stop as soon as we encounter a user message
+    // that already has pathReferences (other than the last user message,
+    // which is always re-populated). Reverted/re-sent messages are removed
+    // from history before re-sending, so a populated message is a reliable
+    // boundary — everything before it has been populated in a prior step.
+    let lastUserIdx = -1;
+    const indicesToPopulate: number[] = [];
+
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i]!.role !== 'user') continue;
+      if (lastUserIdx < 0) {
+        lastUserIdx = i;
+        // Always re-populate the last user message for fresh hashes.
+        indicesToPopulate.push(i);
+        continue;
+      }
+      if (history[i]!.metadata?.pathReferences) {
+        // Already populated — all earlier messages must also be populated.
+        break;
+      }
+      indicesToPopulate.push(i);
+    }
+
+    if (indicesToPopulate.length === 0) return;
+
+    // Process all target messages concurrently
+    const results = await Promise.all(
+      indicesToPopulate.map(async (idx) => {
+        const message = history[idx]!;
+        const messageCopy = {
+          ...message,
+          metadata: message.metadata
+            ? { ...message.metadata }
+            : { createdAt: new Date(), partsMetadata: [] },
+        };
+
+        await populatePathReferences(
+          messageCopy,
+          this.instanceId,
+          mountPaths,
+          this.logger,
+        );
+
+        return { idx, pathReferences: messageCopy.metadata?.pathReferences };
+      }),
+    );
+
+    // Write back all populated pathReferences in a single state update
+    const populated = results.filter((r) => r.pathReferences);
+    if (populated.length === 0) return;
+
+    this.state.set((draft) => {
+      for (const { idx, pathReferences } of populated) {
+        const target = draft.history[idx];
+        if (!target) continue;
+        target.metadata ??= {
+          createdAt: new Date(),
+          partsMetadata: [],
+        };
+        target.metadata.pathReferences = pathReferences;
+      }
+    });
+  }
+
+  /**
+   * Populate `pathReferences` on the last assistant message by extracting
+   * paths from completed `readFile` tool-call parts, resolving them, and
+   * hashing the files.
+   *
+   * Called in `handlePostStep` after each step completes.
+   */
+  private async populatePathReferencesOnAssistantMessage(): Promise<void> {
+    const history = this.state.get().history;
+    // Capture the index at read-time so the write targets the same message
+    // even if history grows concurrently (e.g. a new message appended).
+    const targetIdx = history.length - 1;
+    const lastMsg = history[targetIdx];
+    if (!lastMsg || lastMsg.role !== 'assistant') return;
+
+    // Collect paths from readFile tool calls AND from attachments created
+    // via API.createAttachment(). Both should be tracked so their contents
+    // are automatically injected into model context on the next turn.
+    const pathsFromToolCalls =
+      extractReadFilePathsFromAssistantMessage(lastMsg);
+    const pathsFromAttachments = (lastMsg.metadata?.attachments ?? [])
+      .map((att) => att.path)
+      .filter((p): p is string => typeof p === 'string' && p.length > 0);
+
+    const mountedPaths = [
+      ...new Set([...pathsFromToolCalls, ...pathsFromAttachments]),
+    ];
+    if (mountedPaths.length === 0) return;
+
+    const mountPaths = this.toolbox.getMountedPathsForAgent(this.instanceId);
+    const references: Record<string, string> = {};
+
+    await Promise.all(
+      mountedPaths.map(async (mountedPath) => {
+        const absolutePath = resolveMountedPath(
+          mountedPath,
+          this.instanceId,
+          mountPaths,
+        );
+        if (!absolutePath) return;
+
+        try {
+          const hash = await hashPath(absolutePath);
+          references[mountedPath] = hash;
+        } catch (err) {
+          this.logger.debug(
+            `[populatePathReferences:assistant] Failed to hash "${mountedPath}": ${err instanceof Error ? err.message : err}`,
+          );
+        }
+      }),
+    );
+
+    if (Object.keys(references).length > 0) {
+      this.state.set((draft) => {
+        const target = draft.history[targetIdx];
+        if (!target || target.role !== 'assistant') return;
+        target.metadata ??= {
+          createdAt: new Date(),
+          partsMetadata: [],
+        };
+        // Merge with any existing pathReferences from prior steps
+        // (multi-step continuations append to the same assistant message)
+        target.metadata.pathReferences = {
+          ...(target.metadata.pathReferences ?? {}),
+          ...references,
+        };
+      });
+    }
   }
 
   /**
@@ -2564,5 +2841,8 @@ export abstract class BaseAgent<
    */
   public onTeardown(): Promise<void> | void {
     void this.toolbox.clearAgentTracking(this.instanceId);
+    if (this.fileReadCacheService) {
+      void this.fileReadCacheService.teardown();
+    }
   }
 }

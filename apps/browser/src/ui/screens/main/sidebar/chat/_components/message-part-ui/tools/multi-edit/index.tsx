@@ -67,7 +67,7 @@ function isPureCheckboxToggle(
 }
 
 export const MultiEditToolPart = ({ part }: { part: MultiEditPart }) => {
-  const relativePath = part.input?.relative_path ?? '';
+  const relativePath = part.input?.path ?? '';
 
   // Route to compact plan-checkoff UI when:
   // 1. The file is a plan

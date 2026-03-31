@@ -7,11 +7,11 @@ import {
   createUserMessage,
   createAssistantMessageWithText as createAssistantMessage,
   createReasoningPart as createThinkingPart,
-  createReadFileToolPart,
+  createReadToolPart,
+  createLsToolPart,
   createGlobToolPart,
   createGrepSearchToolPart,
-  createListFilesToolPart,
-  createOverwriteFileToolPart,
+  createWriteToolPart,
   createMultiEditToolPart,
   createDefaultAgentState,
 } from '@sb/decorators/scenarios/shared-utilities';
@@ -85,7 +85,7 @@ export const UserSimpleText: Story = {
  * Demonstrates: User ask → Agent think → Read file tool (output-available) → Agent explain
  */
 export const AssistantReadFileComplete: Story = {
-  name: 'Assistant/Tool-ReadFile-Complete',
+  name: 'Assistant/Tool-Read-Complete',
   parameters: {
     mockKartonState: createStoryState([
       createUserMessage('What does the Button component do?'),
@@ -97,35 +97,7 @@ export const AssistantReadFileComplete: Story = {
             'done',
           ),
           toolParts: [
-            createReadFileToolPart(
-              'src/components/Button.tsx',
-              `export interface ButtonProps {
-  children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
-  onClick?: () => void;
-  isLoading?: boolean;
-}
-
-export const Button = ({
-  children,
-  variant = 'primary',
-  size = 'md',
-  onClick,
-  isLoking = false
-}: ButtonProps) => {
-  return (
-    <button
-      className={\`btn btn-\${variant} btn-\${size}\`}
-      onClick={onClick}
-      disabled={isLoading}
-    >
-      {isLoading ? 'Loading...' : children}
-    </button>
-  );
-};`,
-              'output-available',
-            ),
+            createReadToolPart('src/components/Button.tsx', 'output-available'),
           ],
         },
       ),
@@ -143,7 +115,7 @@ export const Button = ({
  * Demonstrates: User ask → Agent think → Read file (input-streaming)
  */
 export const AssistantReadFileStreaming: Story = {
-  name: 'Assistant/Tool-ReadFile-Streaming',
+  name: 'Assistant/Tool-Read-Streaming',
   parameters: {
     mockKartonState: createStoryState([
       createUserMessage('Read the App.tsx file'),
@@ -152,9 +124,7 @@ export const AssistantReadFileStreaming: Story = {
           'I will read the App.tsx file...',
           'done',
         ),
-        toolParts: [
-          createReadFileToolPart('src/App.tsx', '', 'input-streaming'),
-        ],
+        toolParts: [createReadToolPart('src/App.tsx', 'input-streaming')],
       }),
     ]),
   },
@@ -221,7 +191,7 @@ export const Button = ({ children, variant = 'primary', onClick, disabled }: But
  * Demonstrates: User ask → Agent attempt → Tool fails (output-error) → Agent explain recovery
  */
 export const AssistantToolErrorRecovery: Story = {
-  name: 'Assistant/Tool-ReadFile-Error',
+  name: 'Assistant/Tool-Read-Error',
   parameters: {
     mockKartonState: createStoryState([
       createUserMessage('Can you read the Config.tsx file?'),
@@ -232,11 +202,11 @@ export const AssistantToolErrorRecovery: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-readFile' as const,
+            type: 'tool-read' as const,
             toolCallId: 'read-1',
             state: 'output-error' as const,
             input: {
-              relative_path: 'src/components/Config.tsx',
+              path: 'src/components/Config.tsx',
               explanation: 'Reading Config.tsx',
             },
             errorText:
@@ -258,7 +228,7 @@ export const AssistantToolErrorRecovery: Story = {
  * Demonstrates: User ask → Agent think → Delete file tool (output-available) → Agent confirm
  */
 export const AssistantDeleteFileComplete: Story = {
-  name: 'Assistant/Tool-DeleteFile-Complete',
+  name: 'Assistant/Tool-Delete-Complete',
   parameters: {
     mockKartonState: createStoryState([
       createUserMessage('Delete the old Button.test.tsx file'),
@@ -269,11 +239,11 @@ export const AssistantDeleteFileComplete: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-deleteFile' as const,
+            type: 'tool-delete' as const,
             toolCallId: 'delete-1',
             state: 'output-available' as const,
             input: {
-              relative_path: 'src/components/Button.test.tsx',
+              path: 'src/components/Button.test.tsx',
             },
             output: {
               message: 'File deleted successfully',
@@ -323,7 +293,7 @@ describe('Button', () => {
  * Tool states: input-streaming → input-available → output-available
  */
 export const AssistantDeleteFileStreaming: Story = {
-  name: 'Assistant/Tool-DeleteFile-Streaming',
+  name: 'Assistant/Tool-Delete-Streaming',
   parameters: {
     mockKartonState: createStoryState([
       createUserMessage('Remove the deprecated utils.ts file'),
@@ -334,11 +304,11 @@ export const AssistantDeleteFileStreaming: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-deleteFile' as const,
+            type: 'tool-delete' as const,
             toolCallId: 'delete-2',
             state: 'output-available' as const,
             input: {
-              relative_path: 'src/utils/utils.ts',
+              path: 'src/utils/utils.ts',
             },
             output: {
               message: 'File deleted successfully',
@@ -393,7 +363,7 @@ export function debounce<T extends (...args: any[]) => any>(
  * Demonstrates: User ask → Agent attempt → Tool fails (output-error) → Agent explain issue
  */
 export const AssistantDeleteFileError: Story = {
-  name: 'Assistant/Tool-DeleteFile-Error',
+  name: 'Assistant/Tool-Delete-Error',
   parameters: {
     mockKartonState: createStoryState([
       createUserMessage('Delete the Config.tsx file'),
@@ -404,11 +374,11 @@ export const AssistantDeleteFileError: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-deleteFile' as const,
+            type: 'tool-delete' as const,
             toolCallId: 'delete-3',
             state: 'output-error' as const,
             input: {
-              relative_path: 'src/components/Config.tsx',
+              path: 'src/components/Config.tsx',
             },
             errorText:
               "ENOENT: no such file or directory, unlink 'src/components/Config.tsx'",
@@ -608,144 +578,13 @@ export const AssistantGrepSearchError: Story = {
 };
 
 /**
- * Assistant ListFiles Complete
- *
- * Shows agent successfully listing files in a directory.
- * Demonstrates: User ask → Agent think → List files (output-available) → Agent explain results
- */
-export const AssistantListFilesComplete: Story = {
-  name: 'Assistant/Tool-ListFiles-Complete',
-  parameters: {
-    mockKartonState: createStoryState([
-      createUserMessage('Show me what files are in the components directory'),
-      createAssistantMessage(
-        'Let me list the files in the components directory.',
-        {
-          thinkingPart: createThinkingPart(
-            'I will list all files in src/components...',
-            'done',
-          ),
-          toolParts: [
-            createListFilesToolPart(
-              'src/components',
-              [
-                {
-                  relativePath: 'src/components/Button.tsx',
-                  name: 'Button.tsx',
-                  type: 'file',
-                  size: 1245,
-                  depth: 0,
-                },
-                {
-                  relativePath: 'src/components/Card.tsx',
-                  name: 'Card.tsx',
-                  type: 'file',
-                  size: 987,
-                  depth: 0,
-                },
-                {
-                  relativePath: 'src/components/Header.tsx',
-                  name: 'Header.tsx',
-                  type: 'file',
-                  size: 2103,
-                  depth: 0,
-                },
-                {
-                  relativePath: 'src/components/forms',
-                  name: 'forms',
-                  type: 'directory',
-                  depth: 0,
-                },
-                {
-                  relativePath: 'src/components/layout',
-                  name: 'layout',
-                  type: 'directory',
-                  depth: 0,
-                },
-              ],
-              'output-available',
-            ),
-          ],
-        },
-      ),
-      createAssistantMessage(
-        'I found 5 items in the components directory:\n\n**Files (3):**\n- Button.tsx (1.2 KB)\n- Card.tsx (987 B)\n- Header.tsx (2.1 KB)\n\n**Subdirectories (2):**\n- forms/\n- layout/\n\nWould you like me to explore any of these files or directories?',
-      ),
-    ]),
-  },
-};
-
-/**
- * Assistant ListFiles Streaming
- *
- * Shows agent listing files in streaming state.
- * Demonstrates: User ask → Agent think → List files (input-streaming)
- */
-export const AssistantListFilesStreaming: Story = {
-  name: 'Assistant/Tool-ListFiles-Streaming',
-  parameters: {
-    mockKartonState: createStoryState([
-      createUserMessage('List all files in the src directory recursively'),
-      createAssistantMessage('Listing files recursively...', {
-        thinkingPart: createThinkingPart(
-          'I will recursively list all files in the src directory...',
-          'done',
-        ),
-        toolParts: [
-          createListFilesToolPart('src', [], 'input-streaming', {
-            recursive: true,
-          }),
-        ],
-      }),
-    ]),
-  },
-};
-
-/**
- * Assistant ListFiles Error
- *
- * Shows error handling when directory doesn't exist.
- * Demonstrates: User ask → Agent attempt → List files fails (output-error) → Agent explain
- */
-export const AssistantListFilesError: Story = {
-  name: 'Assistant/Tool-ListFiles-Error',
-  parameters: {
-    mockKartonState: createStoryState([
-      createUserMessage('List files in the nonexistent directory'),
-      createAssistantMessage('Let me list those files.', {
-        thinkingPart: createThinkingPart(
-          'I will list files in the specified directory...',
-          'done',
-        ),
-        toolParts: [
-          {
-            type: 'tool-listFiles' as const,
-            toolCallId: 'list-1',
-            state: 'output-error' as const,
-            input: {
-              relative_path: 'nonexistent',
-              recursive: false,
-            },
-            errorText:
-              "ENOENT: no such file or directory, scandir 'nonexistent'",
-          },
-        ],
-      }),
-      createAssistantMessage(
-        "I encountered an error: the directory 'nonexistent' doesn't exist in your project.\n\nPossible solutions:\n1. Check if the directory path is correct\n2. The directory might have been moved or renamed\n3. You may need to create the directory first\n\nWould you like me to list the available directories in the project root?",
-      ),
-    ]),
-  },
-};
-
-/**
  * Assistant OverwriteFile Complete
  *
  * Shows agent successfully overwriting an entire file.
  * Demonstrates: User ask → Agent think → Overwrite file (output-available) → Agent confirm
  */
 export const AssistantOverwriteFileComplete: Story = {
-  name: 'Assistant/Tool-OverwriteFile-Complete',
+  name: 'Assistant/Tool-Write-Complete',
   parameters: {
     mockKartonState: createStoryState([
       createUserMessage('Rewrite the constants file to use uppercase naming'),
@@ -757,7 +596,7 @@ export const AssistantOverwriteFileComplete: Story = {
             'done',
           ),
           toolParts: [
-            createOverwriteFileToolPart(
+            createWriteToolPart(
               'src/config/constants.ts',
               `export const API_BASE_URL = 'https://api.example.com';
 export const MAX_RETRIES = 3;
@@ -788,7 +627,7 @@ export const defaultLocale = 'en-US';`,
  * Demonstrates: User ask → Agent think → Overwrite file (input-streaming)
  */
 export const AssistantOverwriteFileStreaming: Story = {
-  name: 'Assistant/Tool-OverwriteFile-Streaming',
+  name: 'Assistant/Tool-Write-Streaming',
   parameters: {
     mockKartonState: createStoryState([
       createUserMessage(
@@ -800,7 +639,7 @@ export const AssistantOverwriteFileStreaming: Story = {
           'done',
         ),
         toolParts: [
-          createOverwriteFileToolPart(
+          createWriteToolPart(
             'src/types/user.ts',
             `export interface User {
   id: string;
@@ -822,7 +661,7 @@ export const AssistantOverwriteFileStreaming: Story = {
  * Demonstrates: User ask → Agent attempt → Overwrite fails (output-error) → Agent explain
  */
 export const AssistantOverwriteFileError: Story = {
-  name: 'Assistant/Tool-OverwriteFile-Error',
+  name: 'Assistant/Tool-Write-Error',
   parameters: {
     mockKartonState: createStoryState([
       createUserMessage('Rewrite the missing-file.ts'),
@@ -833,12 +672,12 @@ export const AssistantOverwriteFileError: Story = {
         ),
         toolParts: [
           {
-            type: 'tool-overwriteFile' as const,
+            type: 'tool-write' as const,
             toolCallId: 'overwrite-error-1',
             state: 'output-error' as const,
             input: {
-              relative_path: 'src/missing-file.ts',
-              file_content: 'export const NEW_CONTENT = true;',
+              path: 'src/missing-file.ts',
+              content: 'export const NEW_CONTENT = true;',
             },
             errorText:
               "ENOENT: no such file or directory, open 'src/missing-file.ts'",
@@ -859,7 +698,7 @@ export const AssistantOverwriteFileError: Story = {
  * Demonstrates: User ask → Agent think → Create file (output-available, diff.before === null) → Agent confirm
  */
 export const AssistantOverwriteFileCreate: Story = {
-  name: 'Assistant/Tool-OverwriteFile-Create',
+  name: 'Assistant/Tool-Write-Create',
   parameters: {
     mockKartonState: createStoryState([
       createUserMessage('Create a new types file for user authentication'),
@@ -871,7 +710,7 @@ export const AssistantOverwriteFileCreate: Story = {
             'done',
           ),
           toolParts: [
-            createOverwriteFileToolPart(
+            createWriteToolPart(
               'src/types/auth.ts',
               `export interface User {
   id: string;
@@ -1002,7 +841,7 @@ export const AssistantMultiEditError: Story = {
             toolCallId: 'multi-edit-error-1',
             state: 'output-error' as const,
             input: {
-              relative_path: 'src/nonexistent.ts',
+              path: 'src/nonexistent.ts',
               edits: [],
             },
             errorText:
@@ -1039,45 +878,8 @@ export const AssistantExploringMultiple: Story = {
           toolParts: [
             createGlobToolPart('**/*auth*', 8, 'output-available'),
             createGrepSearchToolPart('authentication', 12, 'output-available'),
-            createListFilesToolPart(
-              'src/auth',
-              [
-                {
-                  relativePath: 'src/auth/login.ts',
-                  name: 'login.ts',
-                  type: 'file',
-                  size: 2456,
-                  depth: 0,
-                },
-                {
-                  relativePath: 'src/auth/register.ts',
-                  name: 'register.ts',
-                  type: 'file',
-                  size: 3102,
-                  depth: 0,
-                },
-                {
-                  relativePath: 'src/auth/middleware.ts',
-                  name: 'middleware.ts',
-                  type: 'file',
-                  size: 1876,
-                  depth: 0,
-                },
-              ],
-              'output-available',
-            ),
-            createReadFileToolPart(
-              'src/auth/middleware.ts',
-              `export const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization;
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  // Verify token...
-  next();
-};`,
-              'output-available',
-            ),
+            createLsToolPart('src/auth', 'output-available'),
+            createReadToolPart('src/auth/middleware.ts', 'output-available'),
           ],
         },
       ),

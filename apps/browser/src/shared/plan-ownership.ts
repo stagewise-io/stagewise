@@ -1,7 +1,7 @@
 /**
  * Determines which plan files an agent has written to by scanning
- * its message history for overwriteFile / multiEdit tool calls
- * whose `relative_path` targets `plans/*.md`.
+ * its message history for write / multiEdit tool calls
+ * whose `path` targets `plans/*.md`.
  *
  * Pure function — no Node.js or browser dependencies. Usable from
  * both the backend (ToolboxService) and the UI (React components).
@@ -36,8 +36,8 @@ export interface OwnershipScanMessage {
  * Scan an agent's message history and return the set of
  * mount-prefixed plan file paths it has written to.
  *
- * Matches tool parts of type `tool-overwriteFile` and
- * `tool-multiEdit` whose `relative_path` starts with
+ * Matches tool parts of type `tool-write` and
+ * `tool-multiEdit` whose `path` starts with
  * `plans/` and ends with `.md`.
  */
 export function getAgentOwnedPlanPaths(
@@ -48,15 +48,12 @@ export function getAgentOwnedPlanPaths(
   for (const msg of history) {
     if (msg.role !== 'assistant') continue;
     for (const part of msg.parts) {
-      if (part.type !== 'tool-overwriteFile' && part.type !== 'tool-multiEdit')
+      if (part.type !== 'tool-write' && part.type !== 'tool-multiEdit')
         continue;
 
-      const input = part.input as { relative_path?: string } | undefined;
-      if (
-        typeof input?.relative_path === 'string' &&
-        isPlanPath(input.relative_path)
-      )
-        ownedPaths.add(input.relative_path);
+      const input = part.input as { path?: string } | undefined;
+      if (typeof input?.path === 'string' && isPlanPath(input.path))
+        ownedPaths.add(input.path);
     }
   }
 
@@ -82,15 +79,12 @@ export function getLastOwnedPlanPath(
     // Scan parts in reverse so the last tool call in the message wins
     for (let j = msg.parts.length - 1; j >= 0; j--) {
       const part = msg.parts[j]!;
-      if (part.type !== 'tool-overwriteFile' && part.type !== 'tool-multiEdit')
+      if (part.type !== 'tool-write' && part.type !== 'tool-multiEdit')
         continue;
 
-      const input = part.input as { relative_path?: string } | undefined;
-      if (
-        typeof input?.relative_path === 'string' &&
-        isPlanPath(input.relative_path)
-      )
-        return input.relative_path;
+      const input = part.input as { path?: string } | undefined;
+      if (typeof input?.path === 'string' && isPlanPath(input.path))
+        return input.path;
     }
   }
 

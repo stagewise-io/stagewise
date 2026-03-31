@@ -91,7 +91,6 @@ export class NodeFileSystemProvider {
         );
         return {
           success: true,
-          message: `Successfully read lines ${options.startLine}-${effectiveEndLine}`,
           content: selectedLines.join('\n'),
           totalLines,
         };
@@ -99,7 +98,6 @@ export class NodeFileSystemProvider {
 
       return {
         success: true,
-        message: 'Successfully read file',
         content,
         totalLines,
       };

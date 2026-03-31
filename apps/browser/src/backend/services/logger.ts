@@ -52,6 +52,10 @@ export class Logger {
     return this.logger.debug.bind(this.logger);
   }
 
+  get isDebugEnabled(): boolean {
+    return this.logger.isLevelEnabled('debug');
+  }
+
   set verboseMode(verbose: boolean) {
     this.logger.level = verbose ? 'debug' : 'info';
   }

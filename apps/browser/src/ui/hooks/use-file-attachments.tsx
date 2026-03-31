@@ -5,11 +5,16 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import { generateId } from '@ui/utils';
-import { fileAttachmentToAttachmentAttributes } from '@ui/utils/attachment-conversions';
-import type { FileAttachment } from '@shared/karton-contracts/ui/agent/metadata';
+import { attachmentToAttachmentAttributes } from '@ui/utils/attachment-conversions';
+import type {
+  AttachmentMetadata,
+  Mount,
+} from '@shared/karton-contracts/ui/agent/metadata';
 import type { ChatInputHandle } from '@ui/screens/main/sidebar/chat/_components/chat-input';
-import { useKartonProcedure } from '@ui/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { mimeToDefaultName } from '@shared/utils/mime-to-default-name';
+import { normalizePath } from '@shared/path-utils';
 import posthog from 'posthog-js';
 
 const MAX_BASE64_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
@@ -25,6 +30,26 @@ function getFilePath(file: File): string {
   } catch {
     return '';
   }
+}
+
+/**
+ * If `absolutePath` falls inside one of the workspace mounts, return the
+ * mount-prefixed relative path (e.g. `"w1/src/index.ts"`).  Otherwise `null`.
+ */
+function tryResolveWorkspacePath(
+  absolutePath: string,
+  mounts: Mount[],
+): string | null {
+  const normalized = normalizePath(absolutePath);
+  for (const mount of mounts) {
+    const mountRoot = normalizePath(mount.path);
+    // Ensure we match a directory boundary (trailing slash).
+    const prefix = mountRoot.endsWith('/') ? mountRoot : `${mountRoot}/`;
+    if (normalized.startsWith(prefix)) {
+      return `${mount.prefix}/${normalized.slice(prefix.length)}`;
+    }
+  }
+  return null;
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -50,104 +75,135 @@ export interface UseFileAttachmentsOptions {
 }
 
 export interface UseFileAttachmentsReturn {
-  /** Current file attachments */
-  fileAttachments: FileAttachment[];
+  /** Current attachments */
+  attachments: AttachmentMetadata[];
   /** Add a file attachment, returns the created attachment */
-  addFileAttachment: (file: File) => Promise<FileAttachment>;
-  /** Remove a file attachment by ID */
-  removeFileAttachment: (id: string) => void;
-  /** Clear all file attachments */
-  clearFileAttachments: () => void;
+  addFileAttachment: (file: File) => Promise<AttachmentMetadata>;
+  /** Remove an attachment by path */
+  removeAttachment: (path: string) => void;
+  /** Clear all attachments */
+  clearAttachments: () => void;
   /** Direct state setter for advanced use cases (e.g., restoring from message) */
-  setFileAttachments: Dispatch<SetStateAction<FileAttachment[]>>;
+  setAttachments: Dispatch<SetStateAction<AttachmentMetadata[]>>;
 }
 
 /**
- * Hook for managing file attachment state.
+ * Hook for managing attachment state.
  * Each consumer gets their own independent state instance.
  *
- * File content is stored on disk via the `agents.storeAttachment` procedure.
- * Only lightweight metadata is kept in React state and Karton state.
+ * For external files (not in any open workspace), content is stored on disk
+ * via the `agents.storeAttachment` procedure and the path becomes `att/<key>`.
+ * For workspace files, the path is the mount-prefixed path directly.
+ * Only lightweight metadata is kept in React state.
  */
 export function useFileAttachments(
   options: UseFileAttachmentsOptions = {},
 ): UseFileAttachmentsReturn {
   const { chatInputRef, insertIntoEditor = true, agentId } = options;
 
-  const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentMetadata[]>([]);
   const storeAttachment = useKartonProcedure((p) => p.agents.storeAttachment);
   const storeAttachmentByPath = useKartonProcedure(
     (p) => p.agents.storeAttachmentByPath,
   );
+  const [openAgentId] = useOpenAgent();
+  const mounts = useKartonState((s) =>
+    openAgentId ? (s.toolbox[openAgentId]?.workspace?.mounts ?? []) : [],
+  );
 
   const addFileAttachment = useCallback(
-    async (file: File): Promise<FileAttachment> => {
-      const id = generateId();
+    async (file: File): Promise<AttachmentMetadata> => {
       const mediaType = file.type || 'application/octet-stream';
-      const fileName = file.name || `file-${id}`;
-      const sizeBytes = file.size;
+      // Only store a meaningful originalFileName. Clipboard pastes in Electron
+      // produce a generic name like "image.png" or "blob"; fall back to a
+      // mime-derived default in that case so the UI has something readable.
+      const rawName = file.name?.trim();
+      const BROWSER_PLACEHOLDER_RE =
+        /^(blob|image\.png|image\.jpeg|image\.jpg|image\.gif|image\.bmp|image\.webp)$/i;
+      const originalFileName: string =
+        rawName && !BROWSER_PLACEHOLDER_RE.test(rawName)
+          ? rawName
+          : mimeToDefaultName(mediaType);
 
-      const attachment: FileAttachment = {
-        id,
-        fileName,
-        mediaType,
-        sizeBytes,
-      };
-
-      setFileAttachments((prev) => [...prev, attachment]);
-
-      if (insertIntoEditor && chatInputRef?.current) {
-        const attrs = fileAttachmentToAttachmentAttributes(attachment);
-        chatInputRef.current.insertAttachment(attrs);
-      }
-
-      if (agentId) {
-        const filePath = getFilePath(file);
-        let storePromise: Promise<void>;
-        if (filePath) {
-          storePromise = storeAttachmentByPath(
-            agentId,
-            id,
-            mediaType,
-            fileName,
-            sizeBytes,
-            filePath,
-          );
-        } else if (sizeBytes > MAX_BASE64_FILE_SIZE) {
-          storePromise = Promise.reject(
-            new Error(
-              `File "${fileName}" (${(sizeBytes / 1024 / 1024).toFixed(0)} MB) is too large for in-memory transfer. ` +
-                'Drop the file from Finder to use zero-copy transfer.',
-            ),
-          );
-        } else {
-          storePromise = fileToBase64(file).then((base64) =>
-            storeAttachment(
-              agentId,
-              id,
-              mediaType,
-              fileName,
-              sizeBytes,
-              base64,
-            ),
+      if (!agentId) {
+        // No agent yet — create a placeholder. path is set to the original name
+        // as a best-effort key; the file is not stored on disk.
+        // This path is uncommon; callers should always provide agentId.
+        const placeholder: AttachmentMetadata = {
+          path: originalFileName,
+          originalFileName,
+        };
+        setAttachments((prev) => [...prev, placeholder]);
+        if (insertIntoEditor && chatInputRef?.current) {
+          chatInputRef.current.insertAttachment(
+            attachmentToAttachmentAttributes(placeholder),
           );
         }
+        return placeholder;
+      }
 
-        storePromise.catch((err: unknown) => {
-          console.error(
-            '[useFileAttachments] Failed to store attachment blob:',
-            err,
+      const filePath = getFilePath(file);
+
+      // If the file lives inside a mounted workspace, reference it directly
+      // instead of copying it into the blob store.
+      if (filePath) {
+        const wsPath = tryResolveWorkspacePath(filePath, mounts);
+        if (wsPath) {
+          const attachment: AttachmentMetadata = { path: wsPath };
+          setAttachments((prev) => [...prev, attachment]);
+          if (insertIntoEditor && chatInputRef?.current) {
+            chatInputRef.current.insertAttachment(
+              attachmentToAttachmentAttributes(attachment),
+            );
+          }
+          return attachment;
+        }
+      }
+
+      if (!filePath && file.size > MAX_BASE64_FILE_SIZE) {
+        return Promise.reject(
+          new Error(
+            `File "${originalFileName}" (${(file.size / 1024 / 1024).toFixed(0)} MB) is too large for in-memory transfer. ` +
+              'Drop the file from Finder to use zero-copy transfer.',
+          ),
+        );
+      }
+
+      // Send to backend — it generates the canonical filename and returns it.
+      const storePromise: Promise<string> = filePath
+        ? storeAttachmentByPath(agentId, originalFileName, filePath)
+        : fileToBase64(file).then((base64) =>
+            storeAttachment(agentId, originalFileName, base64),
           );
-          posthog.captureException(
-            err instanceof Error ? err : new Error(String(err)),
-            {
-              source: 'renderer',
-              operation: 'storeAttachmentBlob',
-              attachmentId: id,
-              agentId,
-            },
-          );
-        });
+
+      const blobKey = await storePromise.catch((err: unknown) => {
+        console.error(
+          '[useFileAttachments] Failed to store attachment blob:',
+          err,
+        );
+        posthog.captureException(
+          err instanceof Error ? err : new Error(String(err)),
+          {
+            source: 'renderer',
+            operation: 'storeAttachmentBlob',
+            originalFileName,
+            agentId,
+          },
+        );
+        return originalFileName;
+      });
+
+      const attachment: AttachmentMetadata = {
+        path: `att/${blobKey}`,
+        originalFileName,
+      };
+
+      setAttachments((prev) => [...prev, attachment]);
+
+      if (insertIntoEditor && chatInputRef?.current) {
+        chatInputRef.current.insertAttachment(
+          attachmentToAttachmentAttributes(attachment),
+        );
       }
 
       return attachment;
@@ -156,24 +212,25 @@ export function useFileAttachments(
       chatInputRef,
       insertIntoEditor,
       agentId,
+      mounts,
       storeAttachment,
       storeAttachmentByPath,
     ],
   );
 
-  const removeFileAttachment = useCallback((id: string) => {
-    setFileAttachments((prev) => prev.filter((a) => a.id !== id));
+  const removeAttachment = useCallback((path: string) => {
+    setAttachments((prev) => prev.filter((a) => a.path !== path));
   }, []);
 
-  const clearFileAttachments = useCallback(() => {
-    setFileAttachments([]);
+  const clearAttachments = useCallback(() => {
+    setAttachments([]);
   }, []);
 
   return {
-    fileAttachments,
+    attachments,
     addFileAttachment,
-    removeFileAttachment,
-    clearFileAttachments,
-    setFileAttachments,
+    removeAttachment,
+    clearAttachments,
+    setAttachments,
   };
 }

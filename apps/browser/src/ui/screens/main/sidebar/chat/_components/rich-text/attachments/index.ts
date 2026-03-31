@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { Attachment } from './nodes/attachment';
 import { ElementAttachment } from './nodes/element-attachment';
-import { TextClipAttachment } from './nodes/text-clip-attachment';
+
 import {
   type AttachmentAttributes,
   type AttachmentNodeOptions,
@@ -15,7 +15,6 @@ export type {
   AttachmentNodeOptions,
   AttachmentAttrs,
   ElementAttachmentAttrs,
-  TextClipAttachmentAttrs,
   AttachmentNodeName,
 } from './types';
 
@@ -28,33 +27,21 @@ export {
 // Individual nodes
 export { Attachment } from './nodes/attachment';
 export { ElementAttachment } from './nodes/element-attachment';
-export {
-  TextClipAttachment,
-  extractTextClipsFromTiptapContent,
-} from './nodes/text-clip-attachment';
 
 // Node view components (used by TipTap and view-only renderer)
 export { AttachmentRegistryNodeView } from './nodes/attachment-view';
 export { ElementAttachmentView } from './nodes/element-attachment-view';
-export { TextClipAttachmentView } from './nodes/text-clip-attachment-view';
 
 /**
  * Array of all attachment node extensions.
  * Use this to register all attachment types with the editor.
  */
-export const AllAttachmentExtensions = [
-  Attachment,
-  ElementAttachment,
-  TextClipAttachment,
-] as const;
+export const AllAttachmentExtensions = [Attachment, ElementAttachment] as const;
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     attachmentCommands: {
       insertAttachment: (attrs: AttachmentAttributes) => ReturnType;
-    };
-    textClipAttachment: {
-      resolveTextClip: (id: string) => ReturnType;
     };
   }
 }
@@ -98,7 +85,6 @@ export function configureAttachmentExtensions(options: AttachmentNodeOptions) {
   return [
     Attachment.configure(options),
     ElementAttachment.configure(options),
-    TextClipAttachment.configure(options),
     AttachmentCommands,
   ];
 }

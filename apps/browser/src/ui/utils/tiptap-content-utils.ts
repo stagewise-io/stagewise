@@ -1,9 +1,5 @@
 import type { JSONContent } from '@tiptap/core';
-import type {
-  FileAttachment,
-  TextClipAttachment,
-} from '@shared/karton-contracts/ui/agent/metadata';
-import type { SelectedElement } from '@shared/selected-elements';
+import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 
 // Why a custom parser instead of TipTap's MarkdownManager?
 //
@@ -22,27 +18,19 @@ import type { SelectedElement } from '@shared/selected-elements';
 // No third-party markdown library, no risk of standard rules leaking through.
 //
 // Trade-off: the attachment link regex is duplicated here and in each
-// extension's markdownTokenizer. The patterns are trivial, and PROTOCOL_TO_NODE
-// makes it obvious where to update if a new protocol is added.
+// extension's markdownTokenizer. The patterns are trivial.
 
 /**
  * Regex matching attachment link syntax: [optional label](protocol:id)
- * Protocols: att, element, text-clip, mention, slash
+ * Protocols: path, slash
  * The label in brackets is optional — empty brackets [] are fine.
- * For att: protocol, the id may contain query params (e.g. att:id?display=expanded).
- * For mention: protocol, the id contains providerType:id (e.g. mention:file:src/foo.ts).
+ * For path:att/ sub-paths, the id may contain query params.
+ * For path: protocol, the id is the path remainder (att/<id>, or mount/file, or mount).
+ * For tab: protocol, the id is the tab identifier.
+ * For mention: legacy protocol, the id contains providerType:id (e.g. mention:file:src/foo.ts).
  */
 const ATTACHMENT_LINK_RE =
-  /\[([^\]]*)\]\((att|element|text-clip|mention|slash):((?:[^()]|\([^()]*\))+)\)/g;
-
-/** Maps attachment link protocol to TipTap node type */
-const PROTOCOL_TO_NODE: Record<string, string> = {
-  att: 'attachment',
-  element: 'elementAttachment',
-  'text-clip': 'textClipAttachment',
-  mention: 'mention',
-  slash: 'slash',
-};
+  /\[([^\]]*)\]\((path|tab|mention|slash):((?:[^()]|\([^()]*\))+)\)/g;
 
 /**
  * Parses a single line of text into TipTap inline content nodes.
@@ -64,28 +52,55 @@ function parseLineToInlineContent(line: string): JSONContent[] {
     }
 
     const [, bracketLabel, protocol, rawId] = match;
-    const nodeType = PROTOCOL_TO_NODE[protocol!];
-    if (nodeType) {
-      if (nodeType === 'slash') {
-        const id = rawId;
-        const label = bracketLabel || `/${id}`;
-        nodes.push({
-          type: nodeType,
-          attrs: { id, label },
-        });
-      } else if (nodeType === 'mention') {
-        const colonIdx = rawId!.indexOf(':');
-        const providerType = colonIdx >= 0 ? rawId!.slice(0, colonIdx) : 'file';
-        const id = colonIdx >= 0 ? rawId!.slice(colonIdx + 1) : rawId;
-        const label = bracketLabel || id;
-        nodes.push({
-          type: nodeType,
-          attrs: { id, label, providerType },
-        });
+
+    if (protocol === 'slash') {
+      const id = rawId;
+      const label = bracketLabel || `/${id}`;
+      nodes.push({
+        type: 'slash',
+        attrs: { id, label },
+      });
+    } else if (protocol === 'path') {
+      const qIdx = rawId!.indexOf('?');
+      const cleanId = qIdx >= 0 ? rawId!.slice(0, qIdx) : rawId!;
+
+      if (cleanId.startsWith('att/')) {
+        // att/ sub-paths are attachment or elementAttachment nodes.
+        const label = cleanId.split('/').pop() ?? cleanId;
+        if (cleanId.endsWith('.swdomelement')) {
+          nodes.push({
+            type: 'elementAttachment',
+            attrs: { id: cleanId, label, blobPath: cleanId },
+          });
+        } else {
+          nodes.push({ type: 'attachment', attrs: { id: cleanId, label } });
+        }
       } else {
-        const qIdx = rawId!.indexOf('?');
-        const id = qIdx >= 0 ? rawId!.slice(0, qIdx) : rawId;
-        nodes.push({ type: nodeType, attrs: { id, label: id } });
+        // Non-att path: workspace file or workspace root — mention node.
+        // Determine providerType: paths with `/` are file mentions,
+        // bare prefixes (no `/`) are workspace mentions.
+        const providerType = cleanId.includes('/') ? 'file' : 'workspace';
+        nodes.push({
+          type: 'mention',
+          attrs: { id: cleanId, label: cleanId, providerType },
+        });
+      }
+    } else if (protocol === 'tab') {
+      // tab: protocol — tab mention node.
+      nodes.push({
+        type: 'mention',
+        attrs: { id: rawId, label: rawId, providerType: 'tab' },
+      });
+    } else if (protocol === 'mention') {
+      // Legacy mention:providerType:id — parse providerType from id.
+      const colonIdx = rawId!.indexOf(':');
+      if (colonIdx > 0) {
+        const providerType = rawId!.slice(0, colonIdx);
+        const id = rawId!.slice(colonIdx + 1);
+        nodes.push({
+          type: 'mention',
+          attrs: { id, label: id, providerType },
+        });
       }
     }
 
@@ -163,20 +178,10 @@ export function markdownToTipTapContent(text: string): JSONContent {
 export function enrichTipTapContent(
   content: JSONContent,
   metadata: {
-    fileAttachments?: FileAttachment[];
-    textClipAttachments?: TextClipAttachment[];
-    selectedPreviewElements?: SelectedElement[];
+    attachments?: AttachmentMetadata[];
   },
 ): JSONContent {
-  const fileMap = new Map(
-    (metadata.fileAttachments ?? []).map((f) => [f.id, f]),
-  );
-  const clipMap = new Map(
-    (metadata.textClipAttachments ?? []).map((c) => [c.id, c]),
-  );
-  const elementMap = new Map(
-    (metadata.selectedPreviewElements ?? []).map((e) => [e.stagewiseId, e]),
-  );
+  const fileMap = new Map((metadata.attachments ?? []).map((f) => [f.path, f]));
 
   function walk(node: JSONContent): JSONContent {
     const id = node.attrs?.id as string | undefined;
@@ -184,41 +189,40 @@ export function enrichTipTapContent(
     if (node.type === 'attachment' && id) {
       const file = fileMap.get(id);
       if (file) {
+        const displayName =
+          file.originalFileName ??
+          file.path.split('/').pop() ??
+          node.attrs?.label;
         return {
           ...node,
           attrs: {
             ...node.attrs,
-            label: file.fileName ?? node.attrs?.label,
-            mediaType: file.mediaType,
-          },
-        };
-      }
-    }
-
-    if (node.type === 'textClipAttachment' && id) {
-      const clip = clipMap.get(id);
-      if (clip) {
-        return {
-          ...node,
-          attrs: {
-            ...node.attrs,
-            label: clip.label,
-            content: clip.content,
+            label: displayName,
           },
         };
       }
     }
 
     if (node.type === 'elementAttachment' && id) {
-      const el = elementMap.get(id);
-      if (el) {
-        const tagName = (el.nodeType || el.tagName).toLowerCase();
-        const domId = el.attributes?.id ? `#${el.attributes.id}` : '';
+      const file = fileMap.get(id);
+      if (file) {
+        // Extract tag name from originalFileName (e.g. "div_header.swdomelement" → "div")
+        const baseName = (file.originalFileName ?? '').replace(
+          /\.swdomelement$/,
+          '',
+        );
+        const tagName = baseName.split('_')[0] || undefined;
         return {
           ...node,
           attrs: {
             ...node.attrs,
-            label: `${tagName}${domId}`,
+            tagName: node.attrs?.tagName ?? tagName,
+            label:
+              node.attrs?.label !== id.split('/').pop()
+                ? node.attrs?.label
+                : tagName
+                  ? `<${tagName}>`
+                  : node.attrs?.label,
           },
         };
       }

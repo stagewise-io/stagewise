@@ -23,7 +23,7 @@ export interface ToolStreamingPhase {
     | 'output-error';
   /** Optional: Configuration for progressive content streaming within this phase */
   streamingConfig?: {
-    /** Nested field path to stream (e.g., 'input.content', 'input.relative_path') */
+    /** Nested field path to stream (e.g., 'input.content', 'input.path') */
     field: string;
     /** Target content to progressively stream to */
     targetContent: string;

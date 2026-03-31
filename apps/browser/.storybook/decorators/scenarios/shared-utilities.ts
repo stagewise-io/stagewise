@@ -175,7 +175,6 @@ export function createUserMessage(
     metadata: {
       createdAt: new Date(),
       partsMetadata: [],
-      selectedPreviewElements: options?.selectedElements || [],
     },
   };
 }
@@ -228,11 +227,10 @@ export function createAssistantMessageWithText(
 }
 
 /**
- * Create a read file tool part
+ * Create a read tool part
  */
-export function createReadFileToolPart(
-  relativePath: string,
-  content: string,
+export function createReadToolPart(
+  path: string,
   state:
     | 'input-streaming'
     | 'input-available'
@@ -245,54 +243,90 @@ export function createReadFileToolPart(
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-readFile',
+      type: 'tool-read',
       toolCallId,
       state: 'input-streaming',
       input: {
-        relative_path: relativePath,
+        path: path,
       },
     } as AgentToolUIPart;
   }
 
   if (state === 'input-available') {
     return {
-      type: 'tool-readFile',
+      type: 'tool-read',
       toolCallId,
       state: 'input-available',
       input: {
-        relative_path: relativePath,
+        path: path,
       },
     } as AgentToolUIPart;
   }
 
   // state === 'output-available'
   return {
-    type: 'tool-readFile',
+    type: 'tool-read',
     toolCallId,
     state: 'output-available',
     input: {
-      relative_path: relativePath,
+      path: path,
     },
-    output: {
-      success: true,
-      message: 'File read successfully',
-      result: {
-        content,
-        totalLines: content.split('\n').length,
-        linesRead: content.split('\n').length,
-        truncated: false,
-        originalSize: content.length,
-        cappedSize: content.length,
+  } as unknown as AgentToolUIPart;
+}
+
+/**
+ * Create a ls tool part
+ */
+export function createLsToolPart(
+  path: string,
+  state:
+    | 'input-streaming'
+    | 'input-available'
+    | 'output-available' = 'output-available',
+  options?: {
+    toolCallId?: string;
+  },
+): AgentToolUIPart {
+  const toolCallId = options?.toolCallId || generateId();
+
+  if (state === 'input-streaming') {
+    return {
+      type: 'tool-ls',
+      toolCallId,
+      state: 'input-streaming',
+      input: {
+        path: path,
       },
+    } as AgentToolUIPart;
+  }
+
+  if (state === 'input-available') {
+    return {
+      type: 'tool-ls',
+      toolCallId,
+      state: 'input-available',
+      input: {
+        path: path,
+      },
+    } as AgentToolUIPart;
+  }
+
+  // state === 'output-available'
+  return {
+    type: 'tool-ls',
+    toolCallId,
+    state: 'output-available',
+    input: {
+      path: path,
     },
-  } as AgentToolUIPart;
+  } as unknown as AgentToolUIPart;
 }
 
 /**
  * Create an overwrite file tool part
  */
-export function createOverwriteFileToolPart(
-  relativePath: string,
+export function createWriteToolPart(
+  path: string,
   content: string,
   state:
     | 'input-streaming'
@@ -306,15 +340,15 @@ export function createOverwriteFileToolPart(
   const toolCallId = options?.toolCallId || generateId();
   const beforeContent =
     options?.oldContent ||
-    `// Old content of ${relativePath}\nexport const OldComponent = () => null;`;
+    `// Old content of ${path}\nexport const OldComponent = () => null;`;
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-overwriteFile',
+      type: 'tool-write',
       toolCallId,
       state: 'input-streaming',
       input: {
-        relative_path: relativePath,
+        path: path,
         content,
       },
     } as AgentToolUIPart;
@@ -322,11 +356,11 @@ export function createOverwriteFileToolPart(
 
   if (state === 'input-available') {
     return {
-      type: 'tool-overwriteFile',
+      type: 'tool-write',
       toolCallId,
       state: 'input-available',
       input: {
-        relative_path: relativePath,
+        path: path,
         content,
       },
     } as AgentToolUIPart;
@@ -334,11 +368,11 @@ export function createOverwriteFileToolPart(
 
   // state === 'output-available'
   return {
-    type: 'tool-overwriteFile',
+    type: 'tool-write',
     toolCallId,
     state: 'output-available',
     input: {
-      relative_path: relativePath,
+      path: path,
       content,
     },
     output: {
@@ -358,7 +392,7 @@ export function createOverwriteFileToolPart(
  * Create a multi-edit tool part
  */
 export function createMultiEditToolPart(
-  relativePath: string,
+  path: string,
   newContent: string,
   state:
     | 'input-streaming'
@@ -372,7 +406,7 @@ export function createMultiEditToolPart(
   const toolCallId = options?.toolCallId || generateId();
   const beforeContent =
     options?.oldContent ||
-    `// Old content of ${relativePath}\nexport const OldComponent = () => null;`;
+    `// Old content of ${path}\nexport const OldComponent = () => null;`;
 
   if (state === 'input-streaming') {
     return {
@@ -380,7 +414,7 @@ export function createMultiEditToolPart(
       toolCallId,
       state: 'input-streaming',
       input: {
-        relative_path: relativePath,
+        path: path,
         edits: [{ old_string: beforeContent, new_string: newContent }],
       },
     } as AgentToolUIPart;
@@ -392,7 +426,7 @@ export function createMultiEditToolPart(
       toolCallId,
       state: 'input-available',
       input: {
-        relative_path: relativePath,
+        path: path,
         edits: [{ old_string: beforeContent, new_string: newContent }],
       },
     } as AgentToolUIPart;
@@ -404,7 +438,7 @@ export function createMultiEditToolPart(
     toolCallId,
     state: 'output-available',
     input: {
-      relative_path: relativePath,
+      path: path,
       edits: [{ old_string: beforeContent, new_string: newContent }],
     },
     output: {
@@ -424,10 +458,129 @@ export function createMultiEditToolPart(
 }
 
 /**
+ * Create a mkdir tool part
+ */
+export function createMkdirToolPart(
+  dirPath: string,
+  state:
+    | 'input-streaming'
+    | 'input-available'
+    | 'output-available'
+    | 'output-error' = 'output-available',
+  options?: {
+    toolCallId?: string;
+    errorText?: string;
+  },
+): AgentToolUIPart {
+  const toolCallId = options?.toolCallId || generateId();
+
+  if (state === 'input-streaming') {
+    return {
+      type: 'tool-mkdir',
+      toolCallId,
+      state: 'input-streaming',
+      input: { path: dirPath },
+    } as AgentToolUIPart;
+  }
+
+  if (state === 'input-available') {
+    return {
+      type: 'tool-mkdir',
+      toolCallId,
+      state: 'input-available',
+      input: { path: dirPath },
+    } as AgentToolUIPart;
+  }
+
+  if (state === 'output-error') {
+    return {
+      type: 'tool-mkdir',
+      toolCallId,
+      state: 'output-error',
+      input: { path: dirPath },
+      errorText:
+        options?.errorText ??
+        `A file already exists at ${dirPath}. Cannot create directory.`,
+    } as AgentToolUIPart;
+  }
+
+  // state === 'output-available'
+  return {
+    type: 'tool-mkdir',
+    toolCallId,
+    state: 'output-available',
+    input: { path: dirPath },
+    output: {
+      message: `Created directory: ${dirPath}`,
+    },
+  } as AgentToolUIPart;
+}
+
+/**
+ * Create a copy/move tool part
+ */
+export function createCopyToolPart(
+  inputPath: string,
+  outputPath: string,
+  move: boolean,
+  state:
+    | 'input-streaming'
+    | 'input-available'
+    | 'output-available' = 'output-available',
+  options?: {
+    toolCallId?: string;
+  },
+): AgentToolUIPart {
+  const toolCallId = options?.toolCallId || generateId();
+  const action = move ? 'Moved' : 'Copied';
+
+  if (state === 'input-streaming') {
+    return {
+      type: 'tool-copy',
+      toolCallId,
+      state: 'input-streaming',
+      input: {
+        input_path: inputPath,
+        output_path: outputPath,
+        move,
+      },
+    } as AgentToolUIPart;
+  }
+
+  if (state === 'input-available') {
+    return {
+      type: 'tool-copy',
+      toolCallId,
+      state: 'input-available',
+      input: {
+        input_path: inputPath,
+        output_path: outputPath,
+        move,
+      },
+    } as AgentToolUIPart;
+  }
+
+  // state === 'output-available'
+  return {
+    type: 'tool-copy',
+    toolCallId,
+    state: 'output-available',
+    input: {
+      input_path: inputPath,
+      output_path: outputPath,
+      move,
+    },
+    output: {
+      message: `${action} file: ${inputPath} → ${outputPath}`,
+    },
+  } as AgentToolUIPart;
+}
+
+/**
  * Create a delete file tool part
  */
 export function createDeleteFileToolPart(
-  relativePath: string,
+  path: string,
   state:
     | 'input-streaming'
     | 'input-available'
@@ -440,37 +593,37 @@ export function createDeleteFileToolPart(
   const toolCallId = options?.toolCallId || generateId();
   const fileContent =
     options?.deletedContent ||
-    `// Content of ${relativePath}\nexport const Component = () => null;`;
+    `// Content of ${path}\nexport const Component = () => null;`;
 
   if (state === 'input-streaming') {
     return {
-      type: 'tool-deleteFile',
+      type: 'tool-delete',
       toolCallId,
       state: 'input-streaming',
       input: {
-        relative_path: relativePath,
+        path: path,
       },
     } as AgentToolUIPart;
   }
 
   if (state === 'input-available') {
     return {
-      type: 'tool-deleteFile',
+      type: 'tool-delete',
       toolCallId,
       state: 'input-available',
       input: {
-        relative_path: relativePath,
+        path: path,
       },
     } as AgentToolUIPart;
   }
 
   // state === 'output-available'
   return {
-    type: 'tool-deleteFile',
+    type: 'tool-delete',
     toolCallId,
     state: 'output-available',
     input: {
-      relative_path: relativePath,
+      path: path,
     },
     output: {
       message: 'File deleted successfully',
@@ -479,95 +632,7 @@ export function createDeleteFileToolPart(
         after: null, // null indicates file was deleted
       },
     },
-  } as AgentToolUIPart;
-}
-
-/**
- * Create a list files tool part
- */
-export function createListFilesToolPart(
-  relativePath: string,
-  files: Array<{
-    relativePath: string;
-    name: string;
-    type: 'file' | 'directory';
-    size?: number;
-    depth: number;
-  }>,
-  state:
-    | 'input-streaming'
-    | 'input-available'
-    | 'output-available' = 'output-available',
-  options?: {
-    toolCallId?: string;
-    recursive?: boolean;
-    pattern?: string;
-    maxDepth?: number;
-  },
-): AgentToolUIPart {
-  const toolCallId = options?.toolCallId || generateId();
-  const totalFiles = files.filter((f) => f.type === 'file').length;
-  const totalDirectories = files.filter((f) => f.type === 'directory').length;
-
-  if (state === 'input-streaming') {
-    return {
-      type: 'tool-listFiles',
-      toolCallId,
-      state: 'input-streaming',
-      input: {
-        relative_path: relativePath,
-        recursive: options?.recursive ?? false,
-        pattern: options?.pattern,
-        maxDepth: options?.maxDepth,
-      },
-    } as AgentToolUIPart;
-  }
-
-  if (state === 'input-available') {
-    return {
-      type: 'tool-listFiles',
-      toolCallId,
-      state: 'input-available',
-      input: {
-        relative_path: relativePath,
-        recursive: options?.recursive ?? false,
-        pattern: options?.pattern,
-        maxDepth: options?.maxDepth,
-      },
-    } as AgentToolUIPart;
-  }
-
-  // state === 'output-available'
-  let message = `Successfully listed ${files.length} items in: ${relativePath}`;
-  if (options?.recursive) {
-    message += ` (recursive${options?.maxDepth !== undefined ? `, max depth ${options.maxDepth}` : ''})`;
-  }
-  if (options?.pattern) {
-    message += ` (filtered by pattern: ${options.pattern})`;
-  }
-  message += ` - ${totalFiles} files, ${totalDirectories} directories`;
-
-  return {
-    type: 'tool-listFiles',
-    toolCallId,
-    state: 'output-available',
-    input: {
-      relative_path: relativePath,
-      recursive: options?.recursive ?? false,
-      pattern: options?.pattern,
-      maxDepth: options?.maxDepth,
-    },
-    output: {
-      message,
-      result: {
-        files,
-        totalFiles,
-        totalDirectories,
-        truncated: false,
-        itemsRemoved: 0,
-      },
-    },
-  } as AgentToolUIPart;
+  } as unknown as AgentToolUIPart;
 }
 
 /**
@@ -582,7 +647,7 @@ export function createGlobToolPart(
     | 'output-available' = 'output-available',
   options?: {
     toolCallId?: string;
-    relativePath?: string;
+    path?: string;
     matchedPaths?: string[];
   },
 ): AgentToolUIPart {
@@ -595,7 +660,7 @@ export function createGlobToolPart(
       state: 'input-streaming',
       input: {
         pattern,
-        relative_path: options?.relativePath,
+        path: options?.path,
       },
     } as AgentToolUIPart;
   }
@@ -712,12 +777,6 @@ export function createExecuteSandboxJsToolPart(
     toolCallId?: string;
     result?: string;
     errorText?: string;
-    customFileAttachments?: Array<{
-      id: string;
-      mediaType: string;
-      fileName?: string;
-      sizeBytes: number;
-    }>;
   },
 ): AgentToolUIPart {
   const toolCallId = options?.toolCallId || generateId();
@@ -759,9 +818,6 @@ export function createExecuteSandboxJsToolPart(
     output: {
       message: 'Successfully executed sandbox JavaScript',
       result: { result: options?.result ?? '{}' },
-      ...(options?.customFileAttachments && {
-        _customFileAttachments: options.customFileAttachments,
-      }),
     },
   } as AgentToolUIPart;
 }

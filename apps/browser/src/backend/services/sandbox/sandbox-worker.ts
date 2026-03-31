@@ -6,6 +6,7 @@ import {
   createCredentialFetch,
   type SecretMapEntry,
 } from './utils/credential-fetch';
+import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 
 const contexts = new Map<string, vm.Context>();
 /** Per-agent cache of URL-imported modules (resolved via data: URL imports). */
@@ -14,6 +15,21 @@ const pendingCdp = new Map<
   string,
   { resolve: (value: unknown) => void; reject: (reason: unknown) => void }
 >();
+
+/**
+ * Pending API.createAttachment() requests waiting for main-process blob-write.
+ * Key = request id.
+ */
+const pendingCreateAttachment = new Map<
+  string,
+  {
+    agentId: string;
+    originalFileName: string;
+    resolve: (fileName: string) => void;
+    reject: (reason: unknown) => void;
+  }
+>();
+
 const pendingCredential = new Map<
   string,
   {
@@ -40,19 +56,12 @@ const agentIsolatedFs = new Map<
   { fs: Record<string, any>; fsPromises: Record<string, any> }
 >();
 
-interface SandboxFileAttachment {
-  id: string;
-  mediaType: string;
-  fileName?: string;
-  sizeBytes: number;
-}
-
 /**
  * Per-agent collection of file attachments accumulated during the current
- * script execution via `API.outputAttachment()`.
+ * script execution via `API.createAttachment()`.
  * Cleared before each execution and drained into the IPC result message.
  */
-const pendingMultimodalAttachments = new Map<string, SandboxFileAttachment[]>();
+const pendingMultimodalAttachments = new Map<string, Attachment[]>();
 
 /**
  * Per-agent collection of stringified outputs accumulated during the current
@@ -63,7 +72,7 @@ const pendingOutputs = new Map<string, string[]>();
 
 /**
  * Per-agent callback to reset the soft async timeout.
- * Set before each execution, invoked by `API.output()` / `API.outputAttachment()`,
+ * Set before each execution, invoked by `API.output()` / `API.createAttachment()`,
  * and cleared when execution finishes.
  */
 const timerResetCallbacks = new Map<string, () => void>();
@@ -356,42 +365,39 @@ function getSandboxAPI(agentId: string) {
       ipc.send({ type: 'sandbox-output', agentId, output: str });
       timerResetCallbacks.get(agentId)?.();
     },
-    outputAttachment(attachment: {
-      id: string;
-      mediaType: string;
-      fileName?: string;
-      sizeBytes: number;
-    }): void {
+    createAttachment(
+      originalFileName: string,
+      data: Buffer | string,
+    ): Promise<string> {
       if (
-        !attachment ||
-        typeof attachment.id !== 'string' ||
-        typeof attachment.mediaType !== 'string' ||
-        typeof attachment.sizeBytes !== 'number'
+        !originalFileName ||
+        typeof originalFileName !== 'string' ||
+        (typeof data !== 'string' && !Buffer.isBuffer(data))
       ) {
         throw new Error(
-          'outputAttachment requires { id: string, mediaType: string, sizeBytes: number, fileName?: string }',
+          'createAttachment requires { originalFileName: string, data: Buffer | string (base64) }',
         );
       }
-      const collection = pendingMultimodalAttachments.get(agentId);
-      if (collection) {
-        collection.push({
-          id: attachment.id,
-          mediaType: attachment.mediaType,
-          fileName: attachment.fileName,
-          sizeBytes: attachment.sizeBytes,
+      const id = `att_${appReqId++}`;
+      const rawData = Buffer.isBuffer(data)
+        ? data
+        : Buffer.from(data, 'base64');
+      return new Promise<string>((resolve, reject) => {
+        pendingCreateAttachment.set(id, {
+          agentId,
+          originalFileName: originalFileName,
+          resolve,
+          reject,
         });
-      }
-      ipc.send({
-        type: 'sandbox-output-attachment',
-        agentId,
-        attachment: {
-          id: attachment.id,
-          mediaType: attachment.mediaType,
-          fileName: attachment.fileName,
-          sizeBytes: attachment.sizeBytes,
-        },
+        ipc.send({
+          type: 'create-attachment',
+          id,
+          agentId,
+          originalFileName: originalFileName,
+          data: rawData.toString('base64'),
+        });
+        timerResetCallbacks.get(agentId)?.();
       });
-      timerResetCallbacks.get(agentId)?.();
     },
     openApp(
       appId: string,
@@ -652,7 +658,7 @@ ipc.onMessage(async (msg) => {
         // Sync timeout (30s) catches infinite synchronous loops (e.g. while(true){}).
         scriptPromise = script.runInContext(ctx, { timeout: 30_000 });
 
-        // Soft async timeout: resets on every API.output() / API.outputAttachment() call.
+        // Soft async timeout: resets on every API.output() / API.createAttachment() call.
         let softReject: ((reason: Error) => void) | undefined;
         const softTimeoutPromise = new Promise<never>((_, reject) => {
           softReject = reject;
@@ -696,8 +702,8 @@ ipc.onMessage(async (msg) => {
         clearTimeout(hardTimeoutId);
         timerResetCallbacks.delete(msg.agentId);
 
-        const customFileAttachments =
-          pendingMultimodalAttachments.get(msg.agentId) ?? [];
+        // Attachments are drained server-side via drainPendingAttachments
+        // after the step completes — no need to send them in the IPC result.
         pendingMultimodalAttachments.delete(msg.agentId);
         const outputs = pendingOutputs.get(msg.agentId) ?? [];
         pendingOutputs.delete(msg.agentId);
@@ -707,10 +713,6 @@ ipc.onMessage(async (msg) => {
           id: msg.id,
           value,
           outputs: outputs.length > 0 ? outputs : undefined,
-          customFileAttachments:
-            customFileAttachments.length > 0
-              ? customFileAttachments
-              : undefined,
         });
       } catch (err) {
         if (softTimeoutId !== undefined) clearTimeout(softTimeoutId);
@@ -765,6 +767,27 @@ ipc.onMessage(async (msg) => {
             secrets.set(placeholder, { value: real, allowedOrigins });
         }
         p.resolve(msg.data);
+      }
+      break;
+    }
+    case 'create-attachment-result': {
+      const p = pendingCreateAttachment.get(msg.id);
+      if (!p) return;
+      pendingCreateAttachment.delete(msg.id);
+      if (msg.error) {
+        p.reject(new Error(msg.error));
+      } else if (msg.fileName) {
+        // Register in the per-agent pending collection so the result message includes it
+        const collection = pendingMultimodalAttachments.get(p.agentId);
+        if (collection) {
+          collection.push({
+            path: `att/${msg.fileName}`,
+            originalFileName: p.originalFileName,
+          });
+        }
+        p.resolve(msg.fileName);
+      } else {
+        p.reject(new Error('createAttachment: no fileName returned'));
       }
       break;
     }

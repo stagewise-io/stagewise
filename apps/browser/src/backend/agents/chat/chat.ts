@@ -2,7 +2,7 @@ import { BaseAgent, type BaseAgentConfig } from '../shared/base-agent';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import type {
   StagewiseToolSet,
-  OverwriteFileToolInput,
+  WriteToolInput,
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import { isPlanPath } from '@shared/plan-ownership';
 import { buildChatSystemPrompt } from './system-prompt-builder/system-prompt-builder';
@@ -55,8 +55,8 @@ export class ChatAgent extends BaseAgent<never, undefined> {
     for (const tr of result.toolResults) {
       if (tr.toolName !== 'overwriteFile') continue;
 
-      const input = tr.input as OverwriteFileToolInput;
-      if (!isPlanPath(input.relative_path)) continue;
+      const input = tr.input as WriteToolInput;
+      if (!isPlanPath(input.path)) continue;
 
       // Plan was created or updated — stop so the UI can present it cleanly.
       return false;
@@ -73,12 +73,12 @@ export class ChatAgent extends BaseAgent<never, undefined> {
       listLibraryDocs: await box.getTool('listLibraryDocs', id),
       searchInLibraryDocs: await box.getTool('searchInLibraryDocs', id),
       getLintingDiagnostics: await box.getTool('getLintingDiagnostics', id),
-      deleteFile: await box.getTool('deleteFile', id),
-      overwriteFile: await box.getTool('overwriteFile', id),
-      readFile: await box.getTool('readFile', id),
-      listFiles: await box.getTool('listFiles', id),
-      glob: await box.getTool('glob', id),
+      write: await box.getTool('write', id),
+      read: await box.getTool('read', id),
+      copy: await box.getTool('copy', id),
       multiEdit: await box.getTool('multiEdit', id),
+      delete: await box.getTool('delete', id),
+      glob: await box.getTool('glob', id),
       grepSearch: await box.getTool('grepSearch', id),
       readConsoleLogs: await box.getTool('readConsoleLogs', id),
       askUserQuestions: await box.getTool('askUserQuestions', id),

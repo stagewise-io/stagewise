@@ -14,6 +14,7 @@ export type DbName =
   | 'history'
   | 'thumbnails'
   | 'asset-cache'
+  | 'file-read-cache'
   | 'processed-image-cache';
 
 export const getDbPath = (name: DbName): string =>

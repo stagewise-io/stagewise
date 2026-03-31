@@ -11,7 +11,7 @@ import {
   createAssistantMessage,
   createReasoningPart,
   createTextPart,
-  createOverwriteFileToolPart,
+  createWriteToolPart,
   REALISTIC_TIMING,
   getRandomDuration,
   DEFAULT_STORY_AGENT_ID,
@@ -239,7 +239,7 @@ function buildErrorRecoveryTimeline(
     messageId: assistantMessageId,
     partIndex: 1,
     updater: () =>
-      createOverwriteFileToolPart(config.attemptedFile, '', 'input-streaming', {
+      createWriteToolPart(config.attemptedFile, '', 'input-streaming', {
         toolCallId,
       }),
   });
@@ -268,7 +268,7 @@ function buildErrorRecoveryTimeline(
     toolCallId,
     newState: 'input-available',
     input: {
-      relative_path: config.attemptedFile,
+      path: config.attemptedFile,
       content: config.attemptedContent,
     },
   });

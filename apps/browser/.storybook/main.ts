@@ -29,19 +29,19 @@ const config: StorybookConfig = {
           // More specific aliases must come first
           // Catch absolute imports with @ prefix
           {
-            find: /^@\/hooks\/use-karton$/,
+            find: /^@(ui)?\/hooks\/use-karton$/,
             replacement: path.resolve(__dirname, './mocks/mock-hooks.tsx'),
           },
           {
-            find: /^@\/hooks\/use-chat-state$/,
+            find: /^@(ui)?\/hooks\/use-chat-state$/,
             replacement: path.resolve(__dirname, './mocks/mock-hooks.tsx'),
           },
           {
-            find: /^@\/hooks\/use-context-chip-hover$/,
+            find: /^@(ui)?\/hooks\/use-context-chip-hover$/,
             replacement: path.resolve(__dirname, './mocks/mock-hooks.tsx'),
           },
           {
-            find: /^@\/hooks\/use-open-chat$/,
+            find: /^@(ui)?\/hooks\/use-open-chat$/,
             replacement: path.resolve(__dirname, './mocks/mock-hooks.tsx'),
           },
           // Catch relative imports (safety net)

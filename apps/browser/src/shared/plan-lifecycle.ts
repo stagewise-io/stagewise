@@ -110,7 +110,7 @@ function isImplementMessage(msg: PhaseScanMessage): boolean {
  * Derive the UI phase for a specific plan file.
  *
  * Scans the message history to find:
- * 1. The assistant message that created/updated this plan (overwriteFile).
+ * 1. The assistant message that created/updated this plan (write).
  * 2. Whether any user message follows that creation point.
  * 3. Whether any user message contains an `/implement` slash command.
  *
@@ -152,12 +152,9 @@ export function getPlanUIPhase(
     // lifecycle correctly.
     if (msg.role === 'assistant') {
       for (const part of msg.parts) {
-        if (part.type !== 'tool-overwriteFile') continue;
-        const input = part.input as { relative_path?: string } | undefined;
-        if (
-          typeof input?.relative_path === 'string' &&
-          input.relative_path === planToolPath
-        ) {
+        if (part.type !== 'tool-write') continue;
+        const input = part.input as { path?: string } | undefined;
+        if (typeof input?.path === 'string' && input.path === planToolPath) {
           planCreationIndex = i;
           // Reset downstream flags since we found a newer write
           hasUserMessageAfterCreation = false;
@@ -240,9 +237,9 @@ export function getPlanUIPhases(
 
     if (msg.role === 'assistant') {
       for (const part of msg.parts) {
-        if (part.type !== 'tool-overwriteFile') continue;
-        const input = part.input as { relative_path?: string } | undefined;
-        const path = input?.relative_path;
+        if (part.type !== 'tool-write') continue;
+        const input = part.input as { path?: string } | undefined;
+        const path = input?.path;
         if (typeof path === 'string' && creationIndex.has(path)) {
           creationIndex.set(path, i);
           hasUserAfter.set(path, false);

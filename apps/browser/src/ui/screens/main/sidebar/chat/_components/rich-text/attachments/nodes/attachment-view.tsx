@@ -1,14 +1,17 @@
 import { useMemo } from 'react';
 import type { InlineNodeViewProps } from '../../shared/types';
-import { getRenderer } from '@ui/components/attachment-renderers';
+import {
+  getRenderer,
+  resolveAttachmentBlobUrl,
+} from '@ui/components/attachment-renderers';
 import type { BadgeProps } from '@ui/components/attachment-renderers';
 import { useMessageAttachments } from '@ui/hooks/use-message-elements';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { inferMimeType } from '@shared/mime-utils';
 
 interface AttachmentAttrs {
   id: string;
   label: string;
-  mediaType: string;
 }
 
 export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
@@ -16,24 +19,34 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
   const isEditable = !('viewOnly' in props);
   const [openAgent] = useOpenAgent();
 
-  const { fileAttachments } = useMessageAttachments();
+  const { attachments } = useMessageAttachments();
   const attachment = useMemo(
-    () => fileAttachments.find((f) => f.id === attrs.id),
-    [fileAttachments, attrs.id],
+    () => attachments.find((a) => a.path === attrs.id),
+    [attachments, attrs.id],
   );
 
-  const mediaType = attachment?.mediaType ?? attrs.mediaType;
-  const fileName = attachment?.fileName ?? attrs.label;
-  const sizeBytes = attachment?.sizeBytes ?? 0;
-  const blobUrl = openAgent ? `attachment://${openAgent}/${attrs.id}` : '';
+  // attrs.id is the path (set at insertion time via attachmentToAttachmentAttributes).
+  // attrs.label is the display name set at insertion time — used as fallback
+  // when the attachment isn't in context yet (e.g. freshly added in composer).
+  // Prefer originalFileName from the attachment registry, then the label set
+  // at insertion time (which carries the original filename). Only fall back to
+  // extracting from the raw path when neither is available.
+  const displayName =
+    attachment?.originalFileName ??
+    attrs.label ??
+    (attrs.id.startsWith('att/')
+      ? (attrs.id.slice(4).split('/').pop() ?? attrs.id)
+      : (attrs.id.split('/').pop() ?? attrs.id));
+  const mediaType = inferMimeType(displayName);
+  const blobUrl = resolveAttachmentBlobUrl(attrs.id, openAgent);
 
   const renderer = getRenderer(mediaType);
 
   const badgeProps: BadgeProps = {
     attachmentId: attrs.id,
     mediaType,
-    fileName,
-    sizeBytes,
+    fileName: displayName,
+    sizeBytes: 0,
     blobUrl,
     params: {},
     viewOnly: !isEditable,

@@ -104,9 +104,9 @@ const state = createDefaultAgentState({
 ### Tool Part Builders
 
 - `createOverwriteFileToolPart(path, content, state?, oldContent?)` - File overwrite tool with diff support
-- `createReadFileToolPart(path, content, state?)` - File read tool
+- `createReadToolPart(path, content, state?)` - File read tool
 - `createMultiEditToolPart(path, newContent, state?, oldContent?)` - Multi-edit tool with diff support
-- `createListFilesToolPart(path, result, state?)` - List files tool
+- `createLsToolPart(path, result, state?)` - List files tool
 - `createGlobToolPart(pattern, result, state?)` - Glob pattern search tool
 - `createGrepSearchToolPart(query, result, state?)` - Grep search tool
 - `createDeleteFileToolPart(path, state?)` - Delete file tool
@@ -114,6 +114,7 @@ const state = createDefaultAgentState({
 ### States
 
 Tool calls can be in different states:
+
 - `'input-streaming'` - Tool input being generated
 - `'input-available'` - Tool input complete, awaiting execution
 - `'output-available'` - Tool executed successfully
@@ -184,6 +185,7 @@ parameters: {
 ### Examples
 
 See streaming examples in:
+
 - `ChatBubble.stories.tsx` - `StreamingSimulation`, `StreamingLongResponse`, `StreamingFastCharacters`
 
 ## Mock Hooks
@@ -226,6 +228,7 @@ See the existing stories for examples:
 ```
 
 The mock system works by:
+
 1. `MockKartonProvider` creates a React context that mimics the real Karton context
 2. Mock hooks read from this context instead of WebSocket connections
 3. Stories pass state via parameters, which the provider uses

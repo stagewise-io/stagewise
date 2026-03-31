@@ -69,8 +69,8 @@ function isReadOnlyToolPart(part: MessagePart): boolean {
     part.type === 'reasoning' ||
     part.type === 'tool-glob' ||
     part.type === 'tool-grepSearch' ||
-    part.type === 'tool-listFiles' ||
-    part.type === 'tool-readFile' ||
+    part.type === 'tool-read' ||
+    part.type === 'tool-ls' ||
     part.type === 'tool-searchInLibraryDocs' ||
     part.type === 'tool-listLibraryDocs' ||
     part.type === 'tool-executeSandboxJs' ||
@@ -282,8 +282,9 @@ function estimateAssistantMessageHeight(
         }
 
         case 'tool-multiEdit':
-        case 'tool-overwriteFile':
-        case 'tool-deleteFile': {
+        case 'tool-write':
+        case 'tool-copy':
+        case 'tool-delete': {
           partHeight = estimateWriteToolHeight(
             part as ToolUIPart<UIAgentTools>,
           );

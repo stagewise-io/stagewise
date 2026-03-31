@@ -54,22 +54,9 @@ import { resolveLinkAlias } from './link-aliases';
 
 type AttachmentData =
   | {
-      displayText: string;
-      type: 'fileLink';
+      type: 'path';
       filePath: string;
       lineNumber?: string;
-    }
-  | {
-      type: 'element';
-      id: string;
-    }
-  | {
-      type: 'att';
-      id: string;
-    }
-  | {
-      type: 'textClip';
-      id: string;
     }
   | {
       type: 'color';
@@ -78,16 +65,10 @@ type AttachmentData =
 
 export function getAttachmentAnchorText(data: AttachmentData): string {
   switch (data.type) {
-    case 'fileLink': {
+    case 'path': {
       const link = `${data.filePath}${data.lineNumber ? `:${data.lineNumber}` : ''}`;
-      return `[${data.displayText}](${link})`;
+      return `[](${link})`;
     }
-    case 'element':
-      return `[](element:${data.id})`;
-    case 'att':
-      return `[](att:${data.id})`;
-    case 'textClip':
-      return `[](text-clip:${data.id})`;
     case 'color':
       return `[](color:${data.color})`;
   }
@@ -196,9 +177,9 @@ const encodeColorLinksForMarkdown = (markdown: string): string => {
 
 /**
  * Preprocesses markdown to handle incomplete attachment links during streaming.
- * Converts incomplete markdown like [](wsfile:/path without closing ) to valid markdown.
+ * Converts incomplete markdown like [](path:w1/src/foo without closing ) to valid markdown.
  *
- * Handles all attachment link types: wsfile:, element:, att:, text-clip:, color:
+ * Handles all attachment link types: path:, wsfile:, att:, color:
  *
  * Note: This runs on every render because it's called in JSX. However, once
  * the markdown is complete with a closing ), the regex won't match anymore, so the
@@ -210,14 +191,21 @@ const preprocessMarkdown = (markdown: string): string => {
 
   // Detect incomplete attachment links at the end of the string
   // Pattern: [any-text](prefix:... without closing )
-  // Supports: wsfile:, element:, att:, text-clip:, color:
+  // Supports: path:, wsfile:, att:, color:
   const incompleteAttachmentLinkRegex =
-    /\[([^\]]*)\]\((wsfile|element|att|text-clip|color):([^)]*?)$/;
+    /\[([^\]]*)\]\((path|wsfile|att|color):([^)]*?)$/;
 
   processed = processed.replace(
     incompleteAttachmentLinkRegex,
     (_match, linkText, prefix, partialContent) => {
-      // For wsfile links, add incomplete marker for special handling
+      // For path: links that look like workspace files, add incomplete marker
+      if (prefix === 'path') {
+        // Only add incomplete marker if this is a file path (has or will have a slash)
+        // For att/ and workspace-only forms, close them as-is
+        const displayText = linkText || '...';
+        return `[${displayText}](path:incomplete:${partialContent})`;
+      }
+      // For legacy wsfile links, add incomplete marker for special handling
       if (prefix === 'wsfile') {
         const displayText = linkText || '...';
         return `[${displayText}](wsfile:incomplete:${partialContent})`;
@@ -490,7 +478,7 @@ const AnchorComponent = ({
   ExtraProps) => {
   const [openAgent] = useOpenAgent();
 
-  // Parse href for attachment links (element:, att:, text-clip:, wsfile:, color:)
+  // Parse href for attachment links (path:, att:, wsfile:, color:)
   const attachmentLink = useMemo(() => parseAttachmentLink(href), [href]);
 
   // Resolve link aliases (report-agent-issue, socials-discord, etc.)

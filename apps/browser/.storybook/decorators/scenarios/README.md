@@ -29,6 +29,7 @@ export const SimpleQuery: Story = {
 ```
 
 **Configuration**:
+
 - `userMessage`: User's question/request
 - `thinkingText`: Agent's reasoning text
 - `responseText`: Agent's final response
@@ -59,6 +60,7 @@ export const ReadFile: Story = {
 ```
 
 **Configuration**:
+
 - `userMessage`: User's question/request
 - `thinkingText`: Agent's reasoning
 - `targetFile`: Path of file to read
@@ -92,6 +94,7 @@ export const EditFile: Story = {
 ```
 
 **Configuration**:
+
 - `userMessage`: User's edit request
 - `thinkingText`: Agent's planning
 - `targetFile`: File to edit
@@ -140,6 +143,7 @@ export const EditMultipleFiles: Story = {
 ```
 
 **Configuration**:
+
 - `userMessage`: User's request
 - `thinkingText`: Agent's plan
 - `files`: Array of file edit operations
@@ -171,8 +175,8 @@ export const ExploreAndEdit: Story = {
     explorationScenario: {
       userMessage: 'Find and fix all button components',
       thinkingText: 'Let me explore the component structure...',
-      listFilesPath: 'src/components',
-      listFilesResult: [
+      readDriectoryPath: 'src/components',
+      readDirectoryContent: [
         { relativePath: 'Button.tsx', name: 'Button.tsx', type: 'file', depth: 0 },
         { relativePath: 'IconButton.tsx', name: 'IconButton.tsx', type: 'file', depth: 0 },
       ],
@@ -204,6 +208,7 @@ export const ExploreAndEdit: Story = {
 ```
 
 **Configuration**:
+
 - `userMessage`: User's request
 - `thinkingText`: Initial reasoning
 - `listFilesPath`: Directory to list
@@ -242,6 +247,7 @@ export const HandleError: Story = {
 ```
 
 **Configuration**:
+
 - `userMessage`: User's request
 - `thinkingText`: Agent's planning
 - `attemptedFile`: File agent tries to modify
@@ -302,6 +308,7 @@ export const ComplexRefactor: Story = {
 ```
 
 **Configuration**:
+
 - `userMessage`: User's request
 - `phase1`: Initial exploration
   - `thinkingText`: Reasoning
@@ -384,7 +391,8 @@ export const MyStory: Story = {
 
 If using `withStreamingMessage` or `withToolStreaming`:
 
-### Before:
+### Before
+
 ```tsx
 export const OldStory: Story = {
   decorators: [withStreamingMessage, withToolStreaming, withMockKarton],
@@ -396,7 +404,8 @@ export const OldStory: Story = {
 };
 ```
 
-### After:
+### After
+
 ```tsx
 export const NewStory: Story = {
   decorators: [withFileEditScenario], // Single decorator!
@@ -415,6 +424,7 @@ export const NewStory: Story = {
 ```
 
 Benefits:
+
 - ✅ Single decorator (easier to use)
 - ✅ Realistic timing automatic
 - ✅ Full lifecycle simulation
@@ -453,17 +463,21 @@ executor.start();
 ## Troubleshooting
 
 **Issue**: Timeline doesn't start
+
 - ✅ Ensure `mockKartonState` has `agentChat` structure
 - ✅ Check browser console for errors
 
 **Issue**: Timing feels wrong
+
 - ✅ Adjust `thinkingDuration` for specific scenarios
 - ✅ Remember: realistic timing means 2-3 seconds for thinking
 
 **Issue**: Loop doesn't restart
+
 - ✅ Verify `loop: true` in scenario config
 - ✅ Check that scenario completes successfully
 
 **Issue**: Content not streaming
+
 - ✅ Ensure text/code content is non-empty
 - ✅ Check that intervalMs is reasonable (50ms for text, 30ms for code)

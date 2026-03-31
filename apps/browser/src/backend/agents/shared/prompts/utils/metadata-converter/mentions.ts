@@ -1,42 +1,24 @@
-import type { MentionMeta } from '@shared/karton-contracts/ui/agent/metadata.js';
+import type { TabMentionMeta } from '@shared/karton-contracts/ui/agent/metadata.js';
 import xml from 'xml';
 import specialTokens from '../special-tokens.js';
 
-export function mentionToContextSnippet(mention: MentionMeta): string {
-  if (mention.providerType === 'file') {
-    return xml({
-      [specialTokens.userMsgAttachmentXmlTag]: {
-        _attr: {
-          type: 'file-mention',
-          path: mention.relativePath,
-          'mounted-path': mention.mountedPath,
-          filename: mention.fileName,
-          ...(mention.isDirectory ? { 'is-directory': 'true' } : {}),
-        },
-      },
-    });
-  }
-
-  if (mention.providerType === 'tab') {
-    return xml({
-      [specialTokens.userMsgAttachmentXmlTag]: {
-        _attr: {
-          type: 'tab-mention',
-          'tab-id': mention.tabId,
-          url: mention.url,
-          title: mention.title,
-        },
-      },
-    });
-  }
-
+/**
+ * Render a tab mention as an `<attach>` XML snippet for model context.
+ *
+ * File and workspace mentions are handled by the `pathReferences`
+ * pipeline (file-read-transformer) and no longer need context snippets.
+ * Only tab mentions still need an inline XML attachment because the
+ * environment snapshot already lists all open tabs — the mention simply
+ * re-emphasises which tab the user is referring to.
+ */
+export function tabMentionToContextSnippet(mention: TabMentionMeta): string {
   return xml({
     [specialTokens.userMsgAttachmentXmlTag]: {
       _attr: {
-        type: 'workspace-mention',
-        prefix: mention.prefix,
-        name: mention.name,
-        path: mention.path,
+        type: 'tab-mention',
+        'tab-id': mention.tabId,
+        url: mention.url,
+        title: mention.title,
       },
     },
   });

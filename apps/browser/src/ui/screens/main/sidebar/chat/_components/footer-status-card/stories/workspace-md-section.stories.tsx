@@ -125,8 +125,8 @@ export const RunningReadingFiles: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-readFile', {
-        relative_path: 'src/components/Button.tsx',
+      createMockToolMessage('tool-read', {
+        path: 'src/components/Button.tsx',
       }),
     ],
   },
@@ -143,8 +143,8 @@ export const RunningListingFiles: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-listFiles', {
-        relative_path: 'src/components',
+      createMockToolMessage('tool-read', {
+        path: 'src/components',
       }),
     ],
   },
@@ -196,7 +196,7 @@ export const RunningWritingFile: Story = {
   name: 'Running / Writing ',
   args: {
     status: 'running',
-    history: [createMockToolMessage('tool-overwriteFile', {})],
+    history: [createMockToolMessage('tool-write', {})],
   },
 };
 
@@ -211,9 +211,9 @@ export const RunningMultipleToolCalls: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-listFiles', { relative_path: 'src' }),
-      createMockToolMessage('tool-readFile', {
-        relative_path: 'package.json',
+      createMockToolMessage('tool-read', { path: 'src' }),
+      createMockToolMessage('tool-read', {
+        path: 'package.json',
       }),
       createMockToolMessage('tool-grepSearch', { query: 'dependencies' }),
     ],
@@ -231,8 +231,8 @@ export const RunningAbsolutePathNoMounts: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-listFiles', {
-        relative_path: '/Users/user/projects/my-app/src/components',
+      createMockToolMessage('tool-read', {
+        path: '/Users/user/projects/my-app/src/components',
       }),
     ],
   },
@@ -250,8 +250,8 @@ export const RunningAbsolutePathWithMounts: Story = {
   args: {
     status: 'running',
     history: [
-      createMockToolMessage('tool-listFiles', {
-        relative_path: '/Users/user/projects/my-app/src/components',
+      createMockToolMessage('tool-read', {
+        path: '/Users/user/projects/my-app/src/components',
       }),
     ],
   },

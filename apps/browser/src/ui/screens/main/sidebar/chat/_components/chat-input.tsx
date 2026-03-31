@@ -44,6 +44,9 @@ import { useState, memo } from 'react';
 // Re-export types for convenience
 export type { AttachmentAttributes, AttachmentType };
 
+/** Minimum paste length to auto-convert into a `.textclip` file attachment */
+const TEXT_CLIP_THRESHOLD = 100;
+
 export interface ChatInputProps {
   // Core controlled input
   value?: Content; // TipTap JSON content string
@@ -83,7 +86,11 @@ export interface ChatInputProps {
   onPasteFiles?: (files: File[]) => void;
 
   // Attachment removal callback (when badges are deleted from editor)
-  onAttachmentRemoved?: (id: string, type: AttachmentType) => void;
+  onAttachmentRemoved?: (
+    id: string,
+    type: AttachmentType,
+    attrs?: Record<string, unknown>,
+  ) => void;
 
   // Mention provider context (Karton state bridge)
   mentionContext?: MentionContext;
@@ -107,6 +114,13 @@ export interface ChatInputHandle {
   getJsonContent: () => string;
   /** Clear all editor content */
   clear: () => void;
+  /** Replace an attachment node (by id) with plain text */
+  replaceAttachmentWithText: (attachmentId: string, text: string) => void;
+  /** Update attributes on an existing attachment node (by id) */
+  updateAttachmentAttrs: (
+    attachmentId: string,
+    attrs: Record<string, unknown>,
+  ) => void;
 }
 
 export const ChatInput = ({
@@ -269,6 +283,31 @@ export const ChatInput = ({
         if (files.length > 0) {
           event.preventDefault();
           onPasteFiles(files);
+          return true;
+        }
+
+        // Convert long text pastes into .textclip file attachments
+        const text = event.clipboardData?.getData('text/plain') || '';
+        const html = event.clipboardData?.getData('text/html') || '';
+        if (
+          text.length >= TEXT_CLIP_THRESHOLD &&
+          !html.includes('data-attachment') &&
+          !html.includes('data-element-attachment')
+        ) {
+          event.preventDefault();
+          // Build a filename from the first 32 characters of the pasted text
+          const prefix = text
+            .substring(0, 32)
+            .trim()
+            .replace(/[^a-zA-Z0-9 _-]/g, '')
+            .replace(/\s+/g, '_')
+            .substring(0, 32);
+          const fileName = `${prefix || 'pasted_text'}.textclip`;
+          const blob = new Blob([text], { type: 'text/x-textclip' });
+          const file = new File([blob], fileName, {
+            type: 'text/x-textclip',
+          });
+          onPasteFiles([file]);
           return true;
         }
 
@@ -439,6 +478,50 @@ export const ChatInput = ({
     clear: () => {
       editor?.commands.clearContent();
     },
+    replaceAttachmentWithText: (attachmentId: string, text: string) => {
+      if (!editor) return;
+      isInternalChangeRef.current = true;
+      const { doc, tr } = editor.state;
+      let replaced = false;
+      doc.descendants((node, pos) => {
+        if (replaced) return false;
+        if (node.attrs.id === attachmentId) {
+          // Replace the attachment node with a text node
+          tr.replaceWith(
+            pos,
+            pos + node.nodeSize,
+            editor.state.schema.text(text),
+          );
+          replaced = true;
+          return false;
+        }
+        return true;
+      });
+      if (replaced) {
+        editor.view.dispatch(tr);
+      }
+    },
+    updateAttachmentAttrs: (
+      attachmentId: string,
+      attrs: Record<string, unknown>,
+    ) => {
+      if (!editor) return;
+      isInternalChangeRef.current = true;
+      const { doc, tr } = editor.state;
+      let updated = false;
+      doc.descendants((node, pos) => {
+        if (updated) return false;
+        if (node.attrs.id === attachmentId) {
+          tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs });
+          updated = true;
+          return false;
+        }
+        return true;
+      });
+      if (updated) {
+        editor.view.dispatch(tr);
+      }
+    },
   }));
 
   return (
@@ -483,11 +566,7 @@ export const ChatInput = ({
             '[&_.react-renderer.node-elementAttachment]:before:w-0.5 [&_.react-renderer.node-elementAttachment]:after:w-0.5',
             '[&_.react-renderer.node-elementAttachment]:before:h-[1em] [&_.react-renderer.node-elementAttachment]:after:h-[1em]',
             '[&_.react-renderer.node-elementAttachment]:before:align-middle [&_.react-renderer.node-elementAttachment]:after:align-middle',
-            '[&_.react-renderer.node-textClipAttachment]:before:content-[""] [&_.react-renderer.node-textClipAttachment]:after:content-[""]',
-            '[&_.react-renderer.node-textClipAttachment]:before:inline-block [&_.react-renderer.node-textClipAttachment]:after:inline-block',
-            '[&_.react-renderer.node-textClipAttachment]:before:w-0.5 [&_.react-renderer.node-textClipAttachment]:after:w-0.5',
-            '[&_.react-renderer.node-textClipAttachment]:before:h-[1em] [&_.react-renderer.node-textClipAttachment]:after:h-[1em]',
-            '[&_.react-renderer.node-textClipAttachment]:before:align-middle [&_.react-renderer.node-textClipAttachment]:after:align-middle',
+
             '[&_.react-renderer.node-mention]:before:content-[""] [&_.react-renderer.node-mention]:after:content-[""]',
             '[&_.react-renderer.node-mention]:before:inline-block [&_.react-renderer.node-mention]:after:inline-block',
             '[&_.react-renderer.node-mention]:before:w-0.5 [&_.react-renderer.node-mention]:after:w-0.5',

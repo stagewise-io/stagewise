@@ -1,4 +1,8 @@
-import { ChevronDownIcon, Loader2Icon, XIcon } from 'lucide-react';
+import {
+  IconChevronDownOutline18,
+  IconLoader6Outline18,
+  IconXmarkOutline18,
+} from 'nucleo-ui-outline-18';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconWindowPointerOutline18 } from 'nucleo-ui-outline-18';
 import {
@@ -13,11 +17,14 @@ import { cn } from '@ui/utils';
 import { useToolAutoExpand } from './shared/use-tool-auto-expand';
 import { useKartonState } from '@ui/hooks/use-karton';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
+import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
+import { inferMimeType } from '@shared/mime-utils';
 
 import { getSandboxLabel } from './utils/sandbox-label-utils';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import {
   getRenderer,
+  resolveAttachmentBlobUrl,
   type RendererProps,
 } from '@ui/components/attachment-renderers';
 import { Suspense } from 'react';
@@ -29,12 +36,15 @@ export const ExecuteSandboxJsToolPart = ({
   showBorder = false,
   disableShimmer = false,
   isLastPart = false,
+  messageAttachments,
 }: {
   part: Extract<AgentToolUIPart, { type: 'tool-executeSandboxJs' }>;
   capMaxHeight?: boolean;
   showBorder?: boolean;
   disableShimmer?: boolean;
   isLastPart?: boolean;
+  /** Attachments from the parent message metadata — populated after the step completes. */
+  messageAttachments?: AttachmentMetadata[];
 }) => {
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const [resultExpanded, setResultExpanded] = useState(true);
@@ -50,6 +60,8 @@ export const ExecuteSandboxJsToolPart = ({
       ? s.toolbox[openAgentId]?.pendingSandboxOutputs?.[part.toolCallId]
       : undefined,
   );
+  // During streaming: show live pending attachments from Karton state.
+  // After completion: use attachments from the parent message metadata.
   const pendingAttachments = useKartonState((s) =>
     openAgentId
       ? s.toolbox[openAgentId]?.pendingSandboxAttachments?.[part.toolCallId]
@@ -57,20 +69,15 @@ export const ExecuteSandboxJsToolPart = ({
   );
 
   const retainedOutputsRef = useRef<string[] | null>(null);
-  const retainedAttachmentsRef = useRef<SandboxAttachment[] | null>(null);
 
   if (pendingOutputs && pendingOutputs.length > 0)
     retainedOutputsRef.current = pendingOutputs;
-
-  if (pendingAttachments && pendingAttachments.length > 0)
-    retainedAttachmentsRef.current = pendingAttachments;
 
   const finished =
     part.state === 'output-available' || part.state === 'output-error';
   const prevFinishedRef = useRef(finished);
   if (finished && !prevFinishedRef.current) {
     retainedOutputsRef.current = null;
-    retainedAttachmentsRef.current = null;
   }
   prevFinishedRef.current = finished;
 
@@ -118,17 +125,17 @@ export const ExecuteSandboxJsToolPart = ({
     }
   }, [part.output?.result?.result]);
 
-  const customAttachments = useMemo(() => {
-    const raw = (part.output as Record<string, unknown> | undefined)
-      ?._customFileAttachments;
-    if (!Array.isArray(raw) || raw.length === 0) return null;
-    return raw as SandboxAttachment[];
-  }, [part.output]);
+  // Resolved attachments: message metadata (post-step) > live pending (streaming)
+  const effectiveAttachments = useMemo(() => {
+    if (finished && messageAttachments && messageAttachments.length > 0)
+      return messageAttachments;
+    if (pendingAttachments && pendingAttachments.length > 0)
+      return pendingAttachments as AttachmentMetadata[];
+    return null;
+  }, [finished, messageAttachments, pendingAttachments]);
 
   const effectiveOutputText =
     formattedResult ?? retainedOutputsRef.current?.join('\n') ?? null;
-  const effectiveAttachments =
-    customAttachments ?? retainedAttachmentsRef.current ?? null;
   const hasAnyResult = !!effectiveOutputText || !!effectiveAttachments;
 
   const resultRef = useRef<HTMLDivElement>(null);
@@ -198,7 +205,7 @@ export const ExecuteSandboxJsToolPart = ({
         setExpanded={handleUserSetExpanded}
         trigger={
           <>
-            <XIcon className="size-3 shrink-0" />
+            <IconXmarkOutline18 className="size-3 shrink-0" />
             <div className="flex min-w-0 flex-col items-start">
               <span className="truncate text-start font-medium text-xs">
                 {explanation
@@ -216,7 +223,7 @@ export const ExecuteSandboxJsToolPart = ({
                 onOpenChange={setScriptExpanded}
               >
                 <CollapsibleTrigger size="condensed" className="">
-                  <ChevronDownIcon
+                  <IconChevronDownOutline18
                     className={cn(
                       'size-3 transition-transform duration-150',
                       !scriptExpanded && '-rotate-90',
@@ -239,7 +246,7 @@ export const ExecuteSandboxJsToolPart = ({
                 onOpenChange={setResultExpanded}
               >
                 <CollapsibleTrigger size="condensed" className="">
-                  <ChevronDownIcon
+                  <IconChevronDownOutline18
                     className={cn(
                       'size-3 transition-transform duration-150',
                       !resultExpanded && '-rotate-90',
@@ -312,7 +319,7 @@ export const ExecuteSandboxJsToolPart = ({
                   onOpenChange={setScriptExpanded}
                 >
                   <CollapsibleTrigger size="condensed" className="">
-                    <ChevronDownIcon
+                    <IconChevronDownOutline18
                       className={cn(
                         'size-3 transition-transform duration-150',
                         !scriptExpanded && '-rotate-90',
@@ -335,7 +342,7 @@ export const ExecuteSandboxJsToolPart = ({
                   onOpenChange={setResultExpanded}
                 >
                   <CollapsibleTrigger size="condensed" className="">
-                    <ChevronDownIcon
+                    <IconChevronDownOutline18
                       className={cn(
                         'size-3 transition-transform duration-150',
                         !resultExpanded && '-rotate-90',
@@ -392,31 +399,28 @@ export const ExecuteSandboxJsToolPart = ({
   );
 };
 
-interface SandboxAttachment {
-  id: string;
-  mediaType: string;
-  fileName?: string;
-  sizeBytes?: number;
-}
-
 const AttachmentPreviewCards = ({
   attachments,
 }: {
-  attachments: SandboxAttachment[];
+  attachments: AttachmentMetadata[];
 }) => {
   const [openAgentId] = useOpenAgent();
   return (
     <div className="scrollbar-hover-only flex flex-row gap-2 overflow-x-auto px-1 py-2 [&_embed]:max-h-38 [&_img]:max-h-38 [&_video]:max-h-38">
       {attachments.map((att) => {
-        const renderer = getRenderer(att.mediaType);
-        const blobUrl = openAgentId
-          ? `attachment://${openAgentId}/${att.id}`
-          : '';
+        const blobKey = att.path.startsWith('att/')
+          ? att.path.slice(4)
+          : att.path;
+        const displayName =
+          att.originalFileName ?? blobKey.split('/').pop() ?? blobKey;
+        const mediaType = inferMimeType(displayName);
+        const renderer = getRenderer(mediaType);
+        const blobUrl = resolveAttachmentBlobUrl(att.path, openAgentId);
         const rendererProps: RendererProps = {
-          attachmentId: att.id,
-          mediaType: att.mediaType,
-          fileName: att.fileName ?? att.id,
-          sizeBytes: att.sizeBytes ?? 0,
+          attachmentId: blobKey,
+          mediaType,
+          fileName: displayName,
+          sizeBytes: 0,
           blobUrl,
           params: {},
         };
@@ -424,7 +428,7 @@ const AttachmentPreviewCards = ({
         if (renderer.Expanded) {
           return (
             <Suspense
-              key={att.id}
+              key={att.path}
               fallback={
                 <ExpandedShell fileName={rendererProps.fileName}>
                   <span className="text-muted-foreground text-xs">
@@ -438,7 +442,7 @@ const AttachmentPreviewCards = ({
           );
         }
 
-        return <renderer.Badge key={att.id} {...rendererProps} viewOnly />;
+        return <renderer.Badge key={att.path} {...rendererProps} viewOnly />;
       })}
     </div>
   );
@@ -473,7 +477,7 @@ const LoadingHeader = ({
 }) => {
   return (
     <div className="flex flex-row items-center justify-start gap-1">
-      <Loader2Icon
+      <IconLoader6Outline18
         className={cn(
           'size-3 shrink-0 animate-spin',
           disableShimmer ? '' : 'text-primary-foreground',
