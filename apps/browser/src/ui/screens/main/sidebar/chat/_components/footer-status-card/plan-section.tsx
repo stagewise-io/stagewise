@@ -118,7 +118,7 @@ export function buildPlanSections({
 
     return {
       key: `plan-${plan.filename}`,
-      defaultOpen: true,
+      defaultOpen: false,
       scrollable: true,
       contentClassName: 'px-0',
       trigger: (isOpen: boolean) => (
