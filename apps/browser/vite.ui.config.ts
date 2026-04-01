@@ -29,6 +29,9 @@ export default defineConfig({
     conditions: ['module', 'import', 'browser'],
     preserveSymlinks: false,
   },
+  worker: {
+    format: 'es',
+  },
   build: {
     outDir: path.resolve(__dirname, '.vite/renderer/main_window'),
     sourcemap: 'hidden',

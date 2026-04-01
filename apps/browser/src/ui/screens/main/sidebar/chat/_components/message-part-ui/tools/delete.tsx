@@ -1,12 +1,9 @@
 import type { WithDiff } from '@shared/karton-contracts/ui/agent/tools/types';
-import { DiffPreview } from './shared/diff-preview';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { getBaseName } from '@shared/path-utils';
 import {
   IconLoader6Outline18,
   IconXmarkOutline18,
-  IconChevronExpandYOutline18,
-  IconChevronReduceYOutline18,
   IconFolder5Outline18,
 } from 'nucleo-ui-outline-18';
 import { FileIcon } from '@ui/components/file-icon';
@@ -17,9 +14,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
-import { diffLines } from 'diff';
 import { cn, stripMountPrefix } from '@ui/utils';
-import { Button } from '@stagewise/stage-ui/components/button';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { FileContextMenu } from '@ui/components/file-context-menu';
@@ -30,32 +25,16 @@ export const DeleteFileToolPart = ({
   part: Extract<AgentToolUIPart, { type: 'tool-delete' }>;
 }) => {
   const [expanded, setExpanded] = useState(true);
-  const [collapsedDiffView, setCollapsedDiffView] = useState(true);
   const { resolvePath } = useFileIDEHref();
 
-  const outputWithDiff = part.output as WithDiff<{}> | undefined;
+  const outputWithDiff = part.output as
+    | WithDiff<Record<string, never>>
+    | undefined;
 
-  // Directory deletes have null before content (no file content to diff)
   const isDirectory = useMemo(() => {
     const diff = outputWithDiff?._diff;
     return diff !== undefined && diff !== null && diff.before === null;
   }, [outputWithDiff?._diff]);
-
-  const diff = useMemo(
-    () =>
-      outputWithDiff?._diff
-        ? diffLines(outputWithDiff._diff.before ?? '', '')
-        : null,
-    [outputWithDiff?._diff],
-  );
-
-  const deletedLineCount = useMemo(
-    () =>
-      diff
-        ?.filter((line) => line.removed)
-        .reduce((acc, line) => acc + (line.count ?? 0), 0) ?? 0,
-    [diff],
-  );
 
   const streaming = useMemo(() => {
     return part.state === 'input-streaming' || part.state === 'input-available';
@@ -72,7 +51,6 @@ export const DeleteFileToolPart = ({
     return stripMountPrefix(part.input.path);
   }, [part.input?.path]);
 
-  // Force expanded to false when in error state
   useEffect(() => {
     if (state === 'error') setExpanded(false);
   }, [state]);
@@ -85,7 +63,7 @@ export const DeleteFileToolPart = ({
           errorText={part.errorText ?? undefined}
         />
       );
-    else if (streaming)
+    if (streaming)
       return (
         <LoadingHeader
           relativePath={path ?? undefined}
@@ -93,71 +71,23 @@ export const DeleteFileToolPart = ({
           resolvePath={resolvePath}
         />
       );
-    else
-      return (
-        <SuccessHeader
-          relativePath={path ?? undefined}
-          fullPath={part.input?.path ?? undefined}
-          resolvePath={resolvePath}
-          deletedLineCount={deletedLineCount}
-          isDirectory={isDirectory}
-        />
-      );
+    return (
+      <SuccessHeader
+        relativePath={path ?? undefined}
+        fullPath={part.input?.path ?? undefined}
+        resolvePath={resolvePath}
+        isDirectory={isDirectory}
+      />
+    );
   }, [
     state,
     streaming,
     path,
     part.input?.path,
     part.errorText,
-    deletedLineCount,
     resolvePath,
     isDirectory,
   ]);
-
-  const content = useMemo(() => {
-    if (state === 'error') return undefined;
-    // Directories have no diff content to show
-    if (isDirectory) return undefined;
-    if (state === 'success' && diff)
-      return (
-        <DiffPreview
-          diff={diff}
-          filePath={part.input?.path ?? ''}
-          collapsed={collapsedDiffView}
-        />
-      );
-    return undefined;
-  }, [state, diff, part.input?.path, collapsedDiffView, isDirectory]);
-
-  const contentFooter = useMemo(() => {
-    if (isDirectory) return undefined;
-    if (state === 'success' && diff)
-      return (
-        <div className="flex w-full flex-row items-center justify-start">
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => {
-                  setCollapsedDiffView(!collapsedDiffView);
-                }}
-              >
-                {collapsedDiffView ? (
-                  <IconChevronExpandYOutline18 className="size-3 shrink-0" />
-                ) : (
-                  <IconChevronReduceYOutline18 className="size-3 shrink-0" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {collapsedDiffView ? 'Expand code diff' : 'Collapse code diff'}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      );
-    else return undefined;
-  }, [state, diff, collapsedDiffView, isDirectory]);
 
   return (
     <ToolPartUI
@@ -165,10 +95,7 @@ export const DeleteFileToolPart = ({
       expanded={expanded}
       setExpanded={setExpanded}
       trigger={trigger}
-      content={content}
       contentClassName={cn(streaming ? 'max-h-24' : 'max-h-56')}
-      contentFooter={contentFooter}
-      contentFooterClassName="px-0"
     />
   );
 };
@@ -207,13 +134,11 @@ const SuccessHeader = ({
   relativePath,
   fullPath,
   resolvePath,
-  deletedLineCount,
   isDirectory,
 }: {
   relativePath?: string;
   fullPath?: string;
   resolvePath: (path: string) => string | null;
-  deletedLineCount?: number;
   isDirectory?: boolean;
 }) => {
   const fileName = relativePath ? getBaseName(relativePath) : relativePath;
@@ -253,11 +178,6 @@ const SuccessHeader = ({
       <span className="shrink-0 text-error-foreground text-xs group-hover/trigger:text-hover-derived">
         (deleted)
       </span>
-      {!isDirectory && (deletedLineCount ?? 0) > 0 && (
-        <span className="shrink-0 text-error-foreground text-xs group-hover/trigger:text-hover-derived">
-          -{deletedLineCount}
-        </span>
-      )}
     </div>
   );
 };

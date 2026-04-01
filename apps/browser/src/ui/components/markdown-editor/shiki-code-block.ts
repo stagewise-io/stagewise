@@ -8,7 +8,8 @@ import {
   bundledLanguages,
   createHighlighter,
 } from 'shiki';
-import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
+import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
+import shikiWasm from 'shiki/wasm';
 import CodeBlockLightTheme from '../ui/code-block-light-theme.json';
 import CodeBlockDarkTheme from '../ui/code-block-dark-theme.json';
 import { CodeBlockNodeView } from './code-block-node-view';
@@ -18,7 +19,7 @@ let highlighterPromise: Promise<void> | undefined;
 const loadedLanguages = new Set<string>();
 
 async function loadHighlighter(): Promise<void> {
-  const engine = createJavaScriptRegexEngine({ forgiving: true });
+  const engine = createOnigurumaEngine(shikiWasm);
   highlighter = await createHighlighter({
     themes: [
       CodeBlockLightTheme as ThemeRegistrationAny,

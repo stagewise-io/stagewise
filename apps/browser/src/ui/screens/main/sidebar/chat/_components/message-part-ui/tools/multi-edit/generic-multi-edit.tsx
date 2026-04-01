@@ -13,7 +13,7 @@ import { cn, IDE_SELECTION_ITEMS, stripMountPrefix } from '@ui/utils';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { IdePickerPopover } from '@ui/components/ide-picker-popover';
 import { FileContextMenu } from '@ui/components/file-context-menu';
-import { diffLines } from 'diff';
+import { useDiffLines } from '@ui/hooks/use-diff-lines';
 import { useMemo, useState } from 'react';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { useKartonState } from '@ui/hooks/use-karton';
@@ -42,15 +42,9 @@ export const GenericMultiEditToolPart = ({
     | WithDiff<typeof part.output>
     | undefined;
 
-  const diff = useMemo(
-    () =>
-      outputWithDiff?._diff
-        ? diffLines(
-            outputWithDiff._diff.before ?? '',
-            outputWithDiff._diff.after ?? '',
-          )
-        : null,
-    [outputWithDiff?._diff],
+  const diff = useDiffLines(
+    outputWithDiff?._diff ? (outputWithDiff._diff.before ?? '') : undefined,
+    outputWithDiff?._diff ? (outputWithDiff._diff.after ?? '') : undefined,
   );
 
   const newLineCount = useMemo(
@@ -148,7 +142,7 @@ export const GenericMultiEditToolPart = ({
 
   const content = useMemo(() => {
     if (state === 'error') return undefined;
-    else if (state === 'success' && diff)
+    if (diff)
       return (
         <DiffPreview
           diff={diff}
@@ -156,7 +150,7 @@ export const GenericMultiEditToolPart = ({
           collapsed={collapsedDiffView}
         />
       );
-    else if (hasNewContent && streaming && !diff)
+    if (hasNewContent && streaming)
       return (
         <StreamingCodeBlock
           code={
@@ -169,14 +163,14 @@ export const GenericMultiEditToolPart = ({
           language={getLanguageFromPath(part.input?.path)}
         />
       );
-    else return undefined;
+    return undefined;
   }, [
     state,
     diff,
     part.input?.edits,
     part.input?.path,
-    streaming,
     hasNewContent,
+    streaming,
     collapsedDiffView,
   ]);
 
@@ -189,7 +183,7 @@ export const GenericMultiEditToolPart = ({
       content={content}
       contentClassName={cn(streaming ? 'max-h-24' : 'max-h-56')}
       contentFooter={
-        state === 'success' ? (
+        state === 'success' && diff ? (
           <div className="flex w-full flex-row items-center justify-between">
             <Tooltip>
               <TooltipTrigger>
