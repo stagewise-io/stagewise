@@ -28,7 +28,7 @@ export function useSendImplement(): () => void {
       parts: [
         {
           type: 'text',
-          text: '[/implement](slash:implement)',
+          text: '[/implement](slash:command:implement)',
         },
       ],
       metadata: {
