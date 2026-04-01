@@ -179,7 +179,7 @@ const encodeColorLinksForMarkdown = (markdown: string): string => {
  * Preprocesses markdown to handle incomplete attachment links during streaming.
  * Converts incomplete markdown like [](path:w1/src/foo without closing ) to valid markdown.
  *
- * Handles all attachment link types: path:, wsfile:, att:, color:
+ * Handles all attachment link types: path:, color:, tab:
  *
  * Note: This runs on every render because it's called in JSX. However, once
  * the markdown is complete with a closing ), the regex won't match anymore, so the
@@ -191,9 +191,9 @@ const preprocessMarkdown = (markdown: string): string => {
 
   // Detect incomplete attachment links at the end of the string
   // Pattern: [any-text](prefix:... without closing )
-  // Supports: path:, wsfile:, att:, color:
+  // Supports: path:, color:, tab:
   const incompleteAttachmentLinkRegex =
-    /\[([^\]]*)\]\((path|wsfile|att|color):([^)]*?)$/;
+    /\[([^\]]*)\]\((path|color|tab):([^)]*?)$/;
 
   processed = processed.replace(
     incompleteAttachmentLinkRegex,
@@ -204,11 +204,6 @@ const preprocessMarkdown = (markdown: string): string => {
         // For att/ and workspace-only forms, close them as-is
         const displayText = linkText || '...';
         return `[${displayText}](path:incomplete:${partialContent})`;
-      }
-      // For legacy wsfile links, add incomplete marker for special handling
-      if (prefix === 'wsfile') {
-        const displayText = linkText || '...';
-        return `[${displayText}](wsfile:incomplete:${partialContent})`;
       }
       // For other attachment links, just close them properly
       // The content might be incomplete but the parser will handle partial IDs gracefully
@@ -478,7 +473,7 @@ const AnchorComponent = ({
   ExtraProps) => {
   const [openAgent] = useOpenAgent();
 
-  // Parse href for attachment links (path:, att:, wsfile:, color:)
+  // Parse href for attachment links (path:, color:, tab:)
   const attachmentLink = useMemo(() => parseAttachmentLink(href), [href]);
 
   // Resolve link aliases (report-agent-issue, socials-discord, etc.)

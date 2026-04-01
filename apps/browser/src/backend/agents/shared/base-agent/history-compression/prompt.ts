@@ -34,7 +34,7 @@ The chat history uses XML-like tags:
 - The current state: what is done, what is in progress, and what is still open or unresolved
 
 ## What to preserve verbatim
-- File paths: use [](wsfile:{mount-prefixed-path}) markdown links (e.g. [](wsfile:weba9/apps/browser/src/foo.ts)). Convert plain paths from tool annotations to this format. Preserve existing wsfile: links as-is.
+- File paths: use [](path:{mount-prefixed-path}) markdown links (e.g. [](path:weba9/apps/browser/src/foo.ts)). Convert plain paths from tool annotations to this format. Preserve existing path: links as-is. Legacy wsfile: links from older history should be converted to path: links.
 - Markdown links from the input — copy them as-is.
 - User decisions, stated preferences, constraints, and explicit rules.
 - Color values, directory structures, configuration details.
@@ -47,7 +47,7 @@ If a \`<previous-chat-history>\` block is present in the input, it contains an e
 Condensation rules (when shortening is needed):
 - **Keep every \`##\` heading from the previous briefing.** Never merge or drop sections.
 - Shorten the **oldest** sections first. Reduce their paragraphs — fewer sentences, less granular detail — but keep the same structure.
-- Preserve all [](wsfile:...) links, user decisions, and outcomes even in shortened sections.
+- Preserve all [](path:...) links, user decisions, and outcomes even in shortened sections.
 - Recent/active sections stay at full detail — do not touch them.
 - A shortened section should still be 2–4 sentences minimum, never a single throwaway line.
 
@@ -62,7 +62,7 @@ Condensation rules (when shortening is needed):
 - **NEVER** include XML tags in your output. Do not emit \`<previous-chat-history>\`, \`</previous-chat-history>\`, \`<chat-history>\`, or any other XML wrapper tags. Output plain markdown only.
 - Use \`##\` headings for topic separation. No other formatting (no bullets, no tables, no code blocks).
 - Preserve markdown links verbatim from the input.
-- Reference workspace files as [](wsfile:{mount-prefixed-path}) e.g. [](wsfile:w4ba9/src/foo.ts), not as inline code or plain text.
+- Reference workspace files as [](path:{mount-prefixed-path}) e.g. [](path:w4ba9/src/foo.ts), not as inline code or plain text.
 - Use your full output budget — do not cut short. The target size is a goal to aim for, not a ceiling. Longer is always better than losing detail.`;
 
 /**

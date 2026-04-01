@@ -742,7 +742,7 @@ export interface AuthResponse {
         },
       ),
       createAssistantMessage(
-        "I've created a new authentication types file at [src/types/auth.ts](wsfile:/src/types/auth.ts) with the following interfaces:\n\n- `User` - User profile information\n- `AuthState` - Authentication state management\n- `LoginCredentials` - Login form data\n- `AuthResponse` - API authentication response\n\nThe file is ready to be imported and used in your authentication logic.",
+        "I've created a new authentication types file at [](path:src/types/auth.ts) with the following interfaces:\n\n- `User` - User profile information\n- `AuthState` - Authentication state management\n- `LoginCredentials` - Login form data\n- `AuthResponse` - API authentication response\n\nThe file is ready to be imported and used in your authentication logic.",
       ),
     ]),
   },
