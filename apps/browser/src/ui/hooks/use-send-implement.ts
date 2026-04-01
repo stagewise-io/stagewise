@@ -9,7 +9,7 @@ import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
  * slash-command message to the currently open agent.
  *
  * Handles:
- * - Building the `AgentMessage` with the `[/implement](slash:implement)` link
+ * - Building the `AgentMessage` with the `[/implement](slash:command:implement)` link
  * - Dispatching `chat-message-sent` for optimistic rendering + auto-scroll
  * - Calling `sendUserMessage` on the Karton procedure
  *

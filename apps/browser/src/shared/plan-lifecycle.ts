@@ -87,13 +87,13 @@ function hasPendingApproval(history: readonly PhaseScanMessage[]): boolean {
   return false;
 }
 
-/** Regex to detect `[…](slash:implement)` in message text. */
-const IMPLEMENT_LINK_RE = /\(slash:implement\)/;
+/** Regex to detect `[…](slash:command:implement)` in message text. */
+const IMPLEMENT_LINK_RE = /\(slash:command:implement\)/;
 
 /**
  * Check whether a user message is an "implement" action.
  *
- * Detects the `[/implement](slash:implement)` link in the message text.
+ * Detects the `[/implement](slash:command:implement)` link in the message text.
  * Untargeted — applies to any plan owned by the agent.
  */
 function isImplementMessage(msg: PhaseScanMessage): boolean {

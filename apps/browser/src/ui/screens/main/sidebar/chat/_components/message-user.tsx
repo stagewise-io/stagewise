@@ -568,7 +568,7 @@ export const MessageUser = memo(
       (p) =>
         p.type === 'text' &&
         typeof p.text === 'string' &&
-        /\(slash:implement\)/.test(p.text),
+        /\(slash:command:implement\)/.test(p.text),
     );
 
     if (isEmptyMessage && !hasImplementCommand && !isLastMessage) return null;
