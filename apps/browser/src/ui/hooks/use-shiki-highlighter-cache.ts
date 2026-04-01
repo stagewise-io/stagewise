@@ -2,197 +2,94 @@
  * Shiki Highlighter Cache
  *
  * Two-tier cache for Shiki syntax highlighting HTML:
- * 1. In-memory Map for fast O(1) lookups
- * 2. localStorage for persistence across page refreshes
+ * 1. In-memory Map for fast synchronous O(1) lookups (hot path for Virtuoso scroll)
+ * 2. IndexedDB for persistence across page refreshes (written by the Shiki web worker)
  *
  * Features:
  * - LRU eviction when cache size exceeds limits
- * - Debounced localStorage writes to avoid performance issues
- * - Graceful degradation if localStorage is unavailable
+ * - Zero main-thread persistence cost (all IDB writes happen in the worker)
+ * - Async IDB hydration on startup via requestIdleCallback
+ * - Graceful degradation if IDB is unavailable
  * - HMR survival via window global
  */
 
-/**
- * Configuration for deferred syntax highlighting and caching.
- * Tuned for smooth scrolling in virtualized lists.
- */
+import {
+  generateCacheKey,
+  MAX_CACHE_SIZE,
+  IDB_STORE_NAME,
+  openHighlightDB,
+} from '@ui/components/ui/highlight-cache-key';
+
+export { generateCacheKey };
+
 export const HIGHLIGHT_CONFIG = {
   /** Maximum cache entries (LRU eviction when exceeded) */
-  MAX_CACHE_SIZE: 200,
-  /** Debounce delay for localStorage writes (ms) */
-  STORAGE_DEBOUNCE_MS: 1500,
-  /** localStorage key for the cache */
-  STORAGE_KEY: 'stagewise_highlight_cache',
-  /** Cache version for migrations */
-  CACHE_VERSION: 1,
+  MAX_CACHE_SIZE,
 } as const;
 
 export type CacheEntry = {
-  lightHtml: string;
-  darkHtml: string;
+  html: string;
   accessTime: number;
 };
 
-type StorageData = {
-  version: number;
-  entries: Record<string, CacheEntry>;
-};
-
 /**
- * LRU cache for highlighted HTML with localStorage persistence.
+ * LRU cache for highlighted HTML with IndexedDB persistence.
  * Keyed by a hash of (code, language, preClassName, compactDiff).
+ *
+ * Reads are always synchronous against the in-memory Map.
+ * Writes to IDB are handled by the Shiki web worker — this class
+ * only reads from IDB during startup hydration.
  */
 export class HighlightCache {
   private cache = new Map<string, CacheEntry>();
   private maxSize: number;
-  private storageDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isHydrated = false;
-  private storageAvailable: boolean | null = null;
 
   constructor(maxSize: number = HIGHLIGHT_CONFIG.MAX_CACHE_SIZE) {
     this.maxSize = maxSize;
   }
 
   /**
-   * Generates a cache key from highlighting parameters.
-   * For long code, uses a substring + length to avoid huge keys.
+   * Asynchronously hydrates the in-memory cache from IndexedDB.
+   * Called once during startup via requestIdleCallback.
+   * On any IDB error, logs a warning and continues (cache starts cold).
    */
-  private generateKey(
-    code: string,
-    language: string,
-    preClassName?: string,
-    compactDiff?: boolean,
-  ): string {
-    const codeHash =
-      code.length > 200
-        ? `${code.slice(0, 100)}...${code.slice(-50)}:${code.length}`
-        : code;
-    return `${language}|${preClassName ?? ''}|${compactDiff ?? false}|${codeHash}`;
-  }
-
-  /**
-   * Checks if localStorage is available (handles private browsing, quota, etc.)
-   */
-  private checkStorageAvailable(): boolean {
-    if (this.storageAvailable !== null) return this.storageAvailable;
-
-    try {
-      const testKey = '__stagewise_test__';
-      localStorage.setItem(testKey, 'test');
-      localStorage.removeItem(testKey);
-      this.storageAvailable = true;
-    } catch {
-      this.storageAvailable = false;
-    }
-    return this.storageAvailable;
-  }
-
-  /**
-   * Lazily hydrates the in-memory cache from localStorage on first access.
-   */
-  private hydrateFromStorage(): void {
+  async hydrateFromIDB(): Promise<void> {
     if (this.isHydrated) return;
     this.isHydrated = true;
 
-    if (typeof window === 'undefined' || !this.checkStorageAvailable()) return;
+    // One-time migration: clean up old localStorage data
+    try {
+      const oldKey = 'stagewise_highlight_cache';
+      if (localStorage.getItem(oldKey) !== null) {
+        localStorage.removeItem(oldKey);
+      }
+    } catch {
+      // localStorage unavailable — ignore
+    }
 
     try {
-      const raw = localStorage.getItem(HIGHLIGHT_CONFIG.STORAGE_KEY);
-      if (!raw) return;
+      const db = await openHighlightDB();
+      const entries = await new Promise<CacheEntry[]>((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE_NAME, 'readonly');
+        const store = tx.objectStore(IDB_STORE_NAME);
+        const req = store.getAll();
+        req.onsuccess = () =>
+          resolve(req.result as (CacheEntry & { key: string })[]);
+        req.onerror = () => reject(req.error);
+      });
 
-      const data: StorageData = JSON.parse(raw);
-
-      // Version check - clear cache if version mismatch
-      if (data.version !== HIGHLIGHT_CONFIG.CACHE_VERSION) {
-        localStorage.removeItem(HIGHLIGHT_CONFIG.STORAGE_KEY);
-        return;
+      for (const entry of entries as (CacheEntry & { key: string })[]) {
+        this.cache.set(entry.key, {
+          html: entry.html,
+          accessTime: entry.accessTime,
+        });
       }
-
-      // Load entries into memory
-      for (const [key, entry] of Object.entries(data.entries))
-        this.cache.set(key, entry);
 
       // Evict if we loaded more than max size
       while (this.cache.size > this.maxSize) this.evictOldest();
     } catch (error) {
-      console.warn(
-        'HighlightCache: Failed to hydrate from localStorage',
-        error,
-      );
-      // Clear corrupted data
-      try {
-        localStorage.removeItem(HIGHLIGHT_CONFIG.STORAGE_KEY);
-      } catch {
-        // Ignore
-      }
-    }
-  }
-
-  /**
-   * Schedules a debounced write to localStorage.
-   */
-  private schedulePersistence(): void {
-    if (typeof window === 'undefined' || !this.checkStorageAvailable()) return;
-
-    // Clear existing timer
-    if (this.storageDebounceTimer !== null)
-      clearTimeout(this.storageDebounceTimer);
-
-    // Schedule new write
-    this.storageDebounceTimer = setTimeout(() => {
-      this.storageDebounceTimer = null;
-      this.persistToStorage();
-    }, HIGHLIGHT_CONFIG.STORAGE_DEBOUNCE_MS);
-  }
-
-  /**
-   * Persists the current cache state to localStorage.
-   */
-  private persistToStorage(): void {
-    if (typeof window === 'undefined' || !this.checkStorageAvailable()) return;
-
-    try {
-      const data: StorageData = {
-        version: HIGHLIGHT_CONFIG.CACHE_VERSION,
-        entries: Object.fromEntries(this.cache.entries()),
-      };
-      localStorage.setItem(HIGHLIGHT_CONFIG.STORAGE_KEY, JSON.stringify(data));
-    } catch (error) {
-      // Handle quota exceeded - evict entries and retry
-      if (
-        error instanceof DOMException &&
-        (error.name === 'QuotaExceededError' ||
-          error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
-      ) {
-        console.warn(
-          'HighlightCache: localStorage quota exceeded, evicting entries',
-        );
-        // Evict half the entries
-        const entriesToEvict = Math.ceil(this.cache.size / 2);
-        for (let i = 0; i < entriesToEvict; i++) this.evictOldest();
-
-        // Retry persistence
-        try {
-          const data: StorageData = {
-            version: HIGHLIGHT_CONFIG.CACHE_VERSION,
-            entries: Object.fromEntries(this.cache.entries()),
-          };
-          localStorage.setItem(
-            HIGHLIGHT_CONFIG.STORAGE_KEY,
-            JSON.stringify(data),
-          );
-        } catch {
-          console.warn(
-            'HighlightCache: Failed to persist after eviction, disabling storage',
-          );
-          this.storageAvailable = false;
-        }
-      } else {
-        console.warn(
-          'HighlightCache: Failed to persist to localStorage',
-          error,
-        );
-      }
+      console.warn('HighlightCache: Failed to hydrate from IndexedDB', error);
     }
   }
 
@@ -216,6 +113,7 @@ export class HighlightCache {
 
   /**
    * Gets a cached entry, updating its access time for LRU tracking.
+   * Purely synchronous — reads only from the in-memory Map.
    */
   get(
     code: string,
@@ -223,79 +121,66 @@ export class HighlightCache {
     preClassName?: string,
     compactDiff?: boolean,
   ): CacheEntry | undefined {
-    // Lazy hydration on first access
-    this.hydrateFromStorage();
-
-    const key = this.generateKey(code, language, preClassName, compactDiff);
+    const key = generateCacheKey(code, language, preClassName, compactDiff);
     const entry = this.cache.get(key);
     if (entry) entry.accessTime = Date.now();
-
     return entry;
   }
 
   /**
-   * Sets a cache entry and schedules persistence.
+   * Sets a cache entry in the in-memory Map.
+   * Does NOT trigger persistence — the Shiki worker writes to IDB independently.
    */
   set(
     code: string,
     language: string,
     preClassName: string | undefined,
     compactDiff: boolean | undefined,
-    lightHtml: string,
-    darkHtml: string,
+    html: string,
   ): void {
-    // Ensure hydration before writing (to not lose existing entries)
-    this.hydrateFromStorage();
-
-    const key = this.generateKey(code, language, preClassName, compactDiff);
+    const key = generateCacheKey(code, language, preClassName, compactDiff);
 
     // Evict oldest entries if at capacity
     if (this.cache.size >= this.maxSize && !this.cache.has(key))
       this.evictOldest();
 
     this.cache.set(key, {
-      lightHtml,
-      darkHtml,
+      html,
       accessTime: Date.now(),
     });
-
-    // Schedule debounced persistence
-    this.schedulePersistence();
   }
 
   /**
-   * Clears all cached entries from memory and storage.
+   * Clears all cached entries from memory and IDB.
    */
   clear(): void {
     this.cache.clear();
-    if (this.storageDebounceTimer !== null) {
-      clearTimeout(this.storageDebounceTimer);
-      this.storageDebounceTimer = null;
-    }
 
-    if (typeof window === 'undefined' || !this.checkStorageAvailable()) return;
-    try {
-      localStorage.removeItem(HIGHLIGHT_CONFIG.STORAGE_KEY);
-    } catch {
-      // Ignore
-    }
+    // Fire-and-forget IDB clear
+    openHighlightDB()
+      .then((db) => {
+        const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
+        tx.objectStore(IDB_STORE_NAME).clear();
+      })
+      .catch(() => {
+        // Ignore
+      });
   }
 
   /**
    * Returns the current number of cached entries.
    */
   get size(): number {
-    this.hydrateFromStorage();
     return this.cache.size;
   }
 
   /**
-   * Proactively hydrates the cache from localStorage.
-   * Call this during idle time to avoid the ~26ms synchronous JSON.parse
-   * blocking the first code block render.
+   * Proactively hydrates the cache from IndexedDB.
+   * Call this during idle time to pre-populate the in-memory Map
+   * before the first code block scroll.
    */
   warmup(): void {
-    this.hydrateFromStorage();
+    void this.hydrateFromIDB();
   }
 }
 
@@ -311,13 +196,14 @@ declare global {
  * The instance survives HMR during development via window global.
  *
  * On first creation, schedules an idle-time warmup to hydrate the cache
+ * from IndexedDB asynchronously.
  */
 export function getHighlightCache(): HighlightCache {
   if (!window.__stagewise_highlight_cache) {
     window.__stagewise_highlight_cache = new HighlightCache();
 
-    // FIX 6: Proactively hydrate cache during idle time instead of
-    // lazily on first code block render (which blocks for ~26ms).
+    // Proactively hydrate cache during idle time instead of
+    // lazily on first code block render.
     const cache = window.__stagewise_highlight_cache;
     if (typeof requestIdleCallback === 'function')
       requestIdleCallback(() => cache.warmup());

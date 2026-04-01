@@ -19,9 +19,9 @@ import { IdePickerPopover } from '@ui/components/ide-picker-popover';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 import { DiffPreview } from '../shared/diff-preview';
 import { cn, IDE_SELECTION_ITEMS, stripMountPrefix } from '@ui/utils';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, memo } from 'react';
 import { ToolPartUI } from '../shared/tool-part-ui';
-import { diffLines } from 'diff';
+import { useDiffLines } from '@ui/hooks/use-diff-lines';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 
 import { useKartonState } from '@ui/hooks/use-karton';
@@ -31,224 +31,236 @@ import {
   getLanguageFromPath,
 } from '@ui/components/ui/streaming-code-block';
 
-export const GenericWriteToolPart = ({ part }: { part: WritePart }) => {
-  const [codeDiffCollapsed, setCodeDiffCollapsed] = useState(true);
-  const [expanded, setExpanded] = useState(true);
-  const { getFileIDEHref, needsIdePicker, pickIdeAndOpen, resolvePath } =
-    useFileIDEHref();
-  const outputWithDiff = part.output as
-    | WithDiff<typeof part.output>
-    | undefined;
+export const GenericWriteToolPart = memo(
+  function GenericWriteToolPart({ part }: { part: WritePart }) {
+    const [codeDiffCollapsed, setCodeDiffCollapsed] = useState(true);
+    const [expanded, setExpanded] = useState(true);
+    const { getFileIDEHref, needsIdePicker, pickIdeAndOpen, resolvePath } =
+      useFileIDEHref();
+    const outputWithDiff = part.output as
+      | WithDiff<typeof part.output>
+      | undefined;
 
-  const diff = useMemo(
-    () =>
-      outputWithDiff?._diff
-        ? diffLines(
-            outputWithDiff._diff.before ?? '',
-            outputWithDiff._diff.after ?? '',
-          )
-        : null,
-    [outputWithDiff?._diff],
-  );
+    const diff = useDiffLines(
+      outputWithDiff?._diff ? (outputWithDiff._diff.before ?? '') : undefined,
+      outputWithDiff?._diff ? (outputWithDiff._diff.after ?? '') : undefined,
+    );
 
-  const newLineCount = useMemo(
-    () =>
-      diff
-        ?.filter((line) => line.added)
-        .reduce((acc, line) => acc + (line.count ?? 0), 0) ?? 0,
-    [diff],
-  );
-  const deletedLineCount = useMemo(
-    () =>
-      diff
-        ?.filter((line) => line.removed)
-        .reduce((acc, line) => acc + (line.count ?? 0), 0) ?? 0,
-    [diff],
-  );
+    const newLineCount = useMemo(
+      () =>
+        diff
+          ?.filter((line) => line.added)
+          .reduce((acc, line) => acc + (line.count ?? 0), 0) ?? 0,
+      [diff],
+    );
+    const deletedLineCount = useMemo(
+      () =>
+        diff
+          ?.filter((line) => line.removed)
+          .reduce((acc, line) => acc + (line.count ?? 0), 0) ?? 0,
+      [diff],
+    );
 
-  const openInIdeSelection = useKartonState(
-    (s) => s.globalConfig.openFilesInIde,
-  );
+    const openInIdeSelection = useKartonState(
+      (s) => s.globalConfig.openFilesInIde,
+    );
 
-  const streaming = useMemo(() => {
-    return part.state === 'input-streaming' || part.state === 'input-available';
-  }, [part.state]);
-
-  const state = useMemo(() => {
-    if (streaming) return 'streaming';
-    if (part.state === 'output-error') return 'error';
-    return 'success';
-  }, [part.state, streaming]);
-
-  const path = useMemo(() => {
-    if (!part.input?.path) return null;
-    return stripMountPrefix(part.input.path);
-  }, [part.input?.path]);
-
-  const effectiveExpanded = useMemo(() => {
-    return state === 'error' ? false : expanded;
-  }, [state, expanded]);
-
-  const trigger = useMemo(() => {
-    if (state === 'error')
+    const streaming = useMemo(() => {
       return (
-        <ErrorHeader
-          relativePath={path ?? undefined}
-          errorText={part.errorText ?? undefined}
-        />
+        part.state === 'input-streaming' || part.state === 'input-available'
       );
-    else if (streaming)
-      return (
-        <LoadingHeader
-          relativePath={path ?? undefined}
-          fullPath={part.input?.path ?? undefined}
-          resolvePath={resolvePath}
-        />
-      );
-    else
-      return (
-        <SuccessHeader
-          relativePath={path ?? undefined}
-          fullPath={part.input?.path ?? undefined}
-          resolvePath={resolvePath}
-          newLineCount={newLineCount}
-          deletedLineCount={deletedLineCount}
-          fileWasCreated={outputWithDiff?._diff?.before === null}
-        />
-      );
-  }, [
-    state,
-    streaming,
-    path,
-    part.input?.path,
-    newLineCount,
-    deletedLineCount,
-    outputWithDiff?._diff?.before,
-    resolvePath,
-  ]);
+    }, [part.state]);
 
-  const content = useMemo(() => {
-    if (state === 'error') return undefined;
-    else if (state === 'success' && diff)
-      return (
-        <DiffPreview
-          diff={diff}
-          filePath={part.input?.path ?? ''}
-          collapsed={codeDiffCollapsed}
-        />
-      );
-    else if (streaming && part.input?.content && !diff)
-      return (
-        <StreamingCodeBlock
-          code={part.input?.content ?? ''}
-          language={getLanguageFromPath(part.input?.path)}
-        />
-      );
-    else return undefined;
-  }, [state, diff, part.input?.content, part.input?.path, streaming]);
+    const state = useMemo(() => {
+      if (streaming) return 'streaming';
+      if (part.state === 'output-error') return 'error';
+      return 'success';
+    }, [part.state, streaming]);
 
-  const contentFooter = useMemo(() => {
-    if (state === 'success' && diff)
-      return (
-        <div className="flex w-full flex-row items-center justify-between">
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => {
-                  setCodeDiffCollapsed(!codeDiffCollapsed);
-                }}
-              >
-                {codeDiffCollapsed ? (
-                  <IconChevronExpandYOutline18
-                    className={cn('size-3 shrink-0')}
-                  />
-                ) : (
-                  <IconChevronReduceYOutline18
-                    className={cn('size-3 shrink-0')}
-                  />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {codeDiffCollapsed ? 'Expand code diff' : 'Collapse code diff'}
-            </TooltipContent>
-          </Tooltip>
-          {(() => {
-            const relPath = part.input?.path ?? '';
-            const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
-            const anchor = (
-              <a
-                href={needsIdePicker ? '#' : getFileIDEHref(relPath)}
-                target={needsIdePicker ? undefined : '_blank'}
-                rel="noopener noreferrer"
-                onClick={needsIdePicker ? (e) => e.preventDefault() : undefined}
-                className={cn(
-                  buttonVariants({ size: 'xs', variant: 'ghost' }),
-                  'shrink-0',
-                )}
-              >
-                <div className="flex flex-row items-center justify-center gap-1">
-                  <IdeLogo
-                    ide={openInIdeSelection}
-                    className="size-3 shrink-0"
-                  />
-                  <span className="text-xs">Open file</span>
-                </div>
-              </a>
-            );
-            if (needsIdePicker) {
-              return (
-                <IdePickerPopover
-                  onSelect={(ide) => pickIdeAndOpen(ide, relPath)}
+    const path = useMemo(() => {
+      if (!part.input?.path) return null;
+      return stripMountPrefix(part.input.path);
+    }, [part.input?.path]);
+
+    const effectiveExpanded = useMemo(() => {
+      return state === 'error' ? false : expanded;
+    }, [state, expanded]);
+
+    const trigger = useMemo(() => {
+      if (state === 'error')
+        return (
+          <ErrorHeader
+            relativePath={path ?? undefined}
+            errorText={part.errorText ?? undefined}
+          />
+        );
+      else if (streaming)
+        return (
+          <LoadingHeader
+            relativePath={path ?? undefined}
+            fullPath={part.input?.path ?? undefined}
+            resolvePath={resolvePath}
+          />
+        );
+      else
+        return (
+          <SuccessHeader
+            relativePath={path ?? undefined}
+            fullPath={part.input?.path ?? undefined}
+            resolvePath={resolvePath}
+            newLineCount={newLineCount}
+            deletedLineCount={deletedLineCount}
+            fileWasCreated={outputWithDiff?._diff?.before === null}
+          />
+        );
+    }, [
+      state,
+      streaming,
+      path,
+      part.input?.path,
+      part.errorText,
+      newLineCount,
+      deletedLineCount,
+      outputWithDiff?._diff?.before,
+      resolvePath,
+    ]);
+
+    const content = useMemo(() => {
+      if (state === 'error') return undefined;
+      if (diff)
+        return (
+          <DiffPreview
+            diff={diff}
+            filePath={part.input?.path ?? ''}
+            collapsed={codeDiffCollapsed}
+          />
+        );
+      if (streaming && part.input?.content)
+        return (
+          <StreamingCodeBlock
+            code={part.input?.content ?? ''}
+            language={getLanguageFromPath(part.input?.path)}
+          />
+        );
+      return undefined;
+    }, [
+      state,
+      diff,
+      part.input?.content,
+      part.input?.path,
+      streaming,
+      codeDiffCollapsed,
+    ]);
+
+    const contentFooter = useMemo(() => {
+      if (state === 'success' && diff)
+        return (
+          <div className="flex w-full flex-row items-center justify-between">
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    setCodeDiffCollapsed(!codeDiffCollapsed);
+                  }}
                 >
-                  {anchor}
-                </IdePickerPopover>
-              );
-            }
-            return (
-              <Tooltip>
-                <TooltipTrigger>{anchor}</TooltipTrigger>
-                <TooltipContent>
-                  <div className="flex max-w-96 flex-col gap-1">
-                    <div className="break-all font-mono text-xs">
-                      {stripMountPrefix(relPath)}
-                    </div>
-                    <div className="text-muted-foreground text-xs">
-                      Click to open in {ideName}
-                    </div>
+                  {codeDiffCollapsed ? (
+                    <IconChevronExpandYOutline18
+                      className={cn('size-3 shrink-0')}
+                    />
+                  ) : (
+                    <IconChevronReduceYOutline18
+                      className={cn('size-3 shrink-0')}
+                    />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {codeDiffCollapsed ? 'Expand code diff' : 'Collapse code diff'}
+              </TooltipContent>
+            </Tooltip>
+            {(() => {
+              const relPath = part.input?.path ?? '';
+              const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
+              const anchor = (
+                <a
+                  href={needsIdePicker ? '#' : getFileIDEHref(relPath)}
+                  target={needsIdePicker ? undefined : '_blank'}
+                  rel="noopener noreferrer"
+                  onClick={
+                    needsIdePicker ? (e) => e.preventDefault() : undefined
+                  }
+                  className={cn(
+                    buttonVariants({ size: 'xs', variant: 'ghost' }),
+                    'shrink-0',
+                  )}
+                >
+                  <div className="flex flex-row items-center justify-center gap-1">
+                    <IdeLogo
+                      ide={openInIdeSelection}
+                      className="size-3 shrink-0"
+                    />
+                    <span className="text-xs">Open file</span>
                   </div>
-                </TooltipContent>
-              </Tooltip>
-            );
-          })()}
-        </div>
-      );
-    else return undefined;
-  }, [
-    state,
-    codeDiffCollapsed,
-    part.input?.path,
-    openInIdeSelection,
-    needsIdePicker,
-    getFileIDEHref,
-    pickIdeAndOpen,
-  ]);
+                </a>
+              );
+              if (needsIdePicker) {
+                return (
+                  <IdePickerPopover
+                    onSelect={(ide) => pickIdeAndOpen(ide, relPath)}
+                  >
+                    {anchor}
+                  </IdePickerPopover>
+                );
+              }
+              return (
+                <Tooltip>
+                  <TooltipTrigger>{anchor}</TooltipTrigger>
+                  <TooltipContent>
+                    <div className="flex max-w-96 flex-col gap-1">
+                      <div className="break-all font-mono text-xs">
+                        {stripMountPrefix(relPath)}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        Click to open in {ideName}
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })()}
+          </div>
+        );
+      else return undefined;
+    }, [
+      state,
+      diff,
+      codeDiffCollapsed,
+      part.input?.path,
+      openInIdeSelection,
+      needsIdePicker,
+      getFileIDEHref,
+      pickIdeAndOpen,
+    ]);
 
-  return (
-    <ToolPartUI
-      showBorder={true}
-      expanded={effectiveExpanded}
-      setExpanded={setExpanded}
-      trigger={trigger}
-      content={content}
-      contentClassName={cn(streaming ? 'max-h-24' : 'max-h-56')}
-      contentFooter={contentFooter}
-      contentFooterClassName="px-0"
-    />
-  );
-};
+    return (
+      <ToolPartUI
+        showBorder={true}
+        expanded={effectiveExpanded}
+        setExpanded={setExpanded}
+        trigger={trigger}
+        content={content}
+        contentClassName={cn(streaming ? 'max-h-24' : 'max-h-56')}
+        contentFooter={contentFooter}
+        contentFooterClassName="px-0"
+      />
+    );
+  },
+  // Immer structural sharing keeps settled tool-part references stable.
+  // Only the actively streaming part gets a new reference per chunk.
+  (prev, next) => prev.part === next.part,
+);
 
 const ErrorHeader = ({
   relativePath,

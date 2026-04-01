@@ -236,3 +236,45 @@
     --syntax-bracket-highlight-foreground6: var(--color-syntax-blue-dark);
   }
 }
+
+/* --------------------------------------------------------------------------
+   Shiki dual-theme CSS variable activation
+   
+   When using Shiki's multi-theme mode (themes: { light, dark }), the light
+   theme colors are applied via inline styles while dark theme colors are
+   stored in --shiki-dark-* CSS variables on each <span>. These rules
+   activate the dark variables in the appropriate contexts.
+
+   1. System dark mode (matches how all other stage-ui dark styles work)
+   2. User message bubbles (always render code in dark theme)
+   -------------------------------------------------------------------------- */
+@layer base {
+  /* Dark mode: override inline light colors with --shiki-dark variables.
+     !important is required because defaultColor:'light' sets inline style="color:...".
+     - background-color only on .shiki (the <pre>), NOT on spans — preserves diff highlights.
+     - color/font overrides only on .shiki code span — skips .line-number spans. */
+  @media (prefers-color-scheme: dark) {
+    .shiki {
+      color: var(--shiki-dark) !important;
+      background-color: var(--shiki-dark-bg) !important;
+    }
+    .shiki code span {
+      color: var(--shiki-dark) !important;
+      font-style: var(--shiki-dark-font-style) !important;
+      font-weight: var(--shiki-dark-font-weight) !important;
+      text-decoration: var(--shiki-dark-text-decoration) !important;
+    }
+  }
+
+  /* User messages always use dark theme for code blocks */
+  .group\/chat-message-user .shiki {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+  }
+  .group\/chat-message-user .shiki code span {
+    color: var(--shiki-dark) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+}
