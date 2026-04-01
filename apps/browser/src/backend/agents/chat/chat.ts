@@ -46,14 +46,14 @@ export class ChatAgent extends BaseAgent<never, undefined> {
   /**
    * Stop generation after the agent creates a new plan file.
    *
-   * When the step contains an `overwriteFile` tool result whose path matches `plans/*.md`
+   * When the step contains a `write` tool result whose path matches `plans/*.md`
    * (i.e. the file was just created, not updated), we return `false`
    * so the agent goes idle and the plan-creation tool part is the
    * last visible element in the chat.
    */
   protected onStepFinished(result: StepResult<StagewiseToolSet>): boolean {
     for (const tr of result.toolResults) {
-      if (tr.toolName !== 'overwriteFile') continue;
+      if (tr.toolName !== 'write') continue;
 
       const input = tr.input as WriteToolInput;
       if (!isPlanPath(input.path)) continue;

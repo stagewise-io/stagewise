@@ -30,7 +30,7 @@ export type WriteToolInput = z.infer<typeof writeToolInputSchema>;
 export type WriteToolOutput = z.infer<typeof writeToolOutputSchema>;
 
 /**
- * Schema definition for overwriteFile (without execute function)
+ * Schema definition for write (without execute function)
  */
 export const writeToolSchema = {
   inputSchema: writeToolInputSchema,
