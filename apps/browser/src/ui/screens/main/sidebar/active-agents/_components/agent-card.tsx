@@ -39,120 +39,136 @@ export function AgentCardSkeleton() {
   );
 }
 
-export const AgentCard = memo(function AgentCard({
-  id,
-  title,
-  isActive,
-  isWorking,
-  isWaitingForUser,
-  hasError,
-  hasUnseen,
-  activityText,
-  activityIsUserInput,
-  lastMessageAt,
-  onClick,
-  onArchive,
-  onDelete,
-}: AgentCardProps) {
-  const subtitle = hasError ? 'Error' : activityText;
+export const AgentCard = memo(
+  function AgentCard({
+    id,
+    title,
+    isActive,
+    isWorking,
+    isWaitingForUser,
+    hasError,
+    hasUnseen,
+    activityText,
+    activityIsUserInput,
+    lastMessageAt,
+    onClick,
+    onArchive,
+    onDelete,
+  }: AgentCardProps) {
+    const subtitle = hasError ? 'Error' : activityText;
 
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      data-agent-id={id}
-      onClick={() => onClick(id)}
-      onKeyDown={(e) => {
-        // Only handle keyboard interaction when the card itself is focused.
-        // Otherwise, nested buttons (archive/delete) would also trigger this.
-        if (e.currentTarget !== e.target) return;
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        data-agent-id={id}
+        onClick={() => onClick(id)}
+        onKeyDown={(e) => {
+          // Only handle keyboard interaction when the card itself is focused.
+          // Otherwise, nested buttons (archive/delete) would also trigger this.
+          if (e.currentTarget !== e.target) return;
 
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick(id);
-        }
-      }}
-      className={cn(
-        'group/card relative flex min-w-0 shrink-0 cursor-pointer flex-col gap-0.5 rounded-md bg-surface-1 px-2 py-1.5 text-left transition-colors hover:bg-surface-2',
-        isActive && 'bg-surface-2 ring-2 ring-derived-subtle ring-inset',
-        hasUnseen && 'animate-ring-pulse-primary',
-      )}
-    >
-      <Tooltip>
-        <TooltipTrigger delay={500}>
-          <button
-            type="button"
-            tabIndex={-1}
-            className="block w-full overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
-          >
-            {title}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">
-          <span>{title}</span>
-        </TooltipContent>
-      </Tooltip>
-      <div className="flex w-full items-baseline gap-2">
-        <span
-          className={cn(
-            'min-w-0 flex-1 overflow-x-clip text-ellipsis whitespace-nowrap text-muted-foreground text-xs leading-normal',
-            isWorking &&
-              !isWaitingForUser &&
-              'shimmer-text-primary font-medium',
-            hasError && 'text-error-foreground',
-            activityIsUserInput && 'italic',
-          )}
-        >
-          {subtitle || '\u00A0'}
-        </span>
-        {lastMessageAt > 0 && (
-          <span className="shrink-0 whitespace-nowrap text-subtle-foreground text-xs leading-normal">
-            {timeAgo.format(lastMessageAt)}
-          </span>
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick(id);
+          }
+        }}
+        className={cn(
+          'group/card relative flex min-w-0 shrink-0 cursor-pointer flex-col gap-0.5 rounded-md bg-surface-1 px-2 py-1.5 text-left transition-colors hover:bg-surface-2',
+          isActive && 'bg-surface-2 ring-2 ring-derived-subtle ring-inset',
+          hasUnseen && 'animate-ring-pulse-primary',
         )}
-      </div>
-
-      <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 rounded-r-[calc(var(--radius-md)-2px)] bg-linear-to-r from-transparent to-[20px] to-surface-2 pr-2 pl-6 opacity-0 transition-opacity group-hover/card:opacity-100">
+      >
         <Tooltip>
           <TooltipTrigger delay={500}>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="archive-btn text-muted-foreground hover:text-foreground"
-              aria-label="Suspend agent"
-              onClick={(e) => {
-                e.stopPropagation();
-                onArchive(id);
-              }}
+            <button
+              type="button"
+              tabIndex={-1}
+              className="block w-full overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
             >
-              <IconSleepingTimeOutline18 className="size-4 cursor-pointer" />
-            </Button>
+              {title}
+            </button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <span>Suspend agent (can be recovered)</span>
+            <span>{title}</span>
           </TooltipContent>
         </Tooltip>
+        <div className="flex w-full items-baseline gap-2">
+          <span
+            className={cn(
+              'min-w-0 flex-1 overflow-x-clip text-ellipsis whitespace-nowrap text-muted-foreground text-xs leading-normal',
+              isWorking &&
+                !isWaitingForUser &&
+                'shimmer-text-primary font-medium',
+              hasError && 'text-error-foreground',
+              activityIsUserInput && 'italic',
+            )}
+          >
+            {subtitle || '\u00A0'}
+          </span>
+          {lastMessageAt > 0 && (
+            <span className="shrink-0 whitespace-nowrap text-subtle-foreground text-xs leading-normal">
+              {timeAgo.format(lastMessageAt)}
+            </span>
+          )}
+        </div>
 
-        <Tooltip>
-          <TooltipTrigger delay={500}>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="delete-btn text-muted-foreground hover:text-foreground"
-              aria-label="Delete agent permanently"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(id);
-              }}
-            >
-              <IconTrash2Outline24 className="size-4 cursor-pointer" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <span>Delete agent permanently</span>
-          </TooltipContent>
-        </Tooltip>
+        <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 rounded-r-[calc(var(--radius-md)-2px)] bg-linear-to-r from-transparent to-[20px] to-surface-2 pr-2 pl-6 opacity-0 transition-opacity group-hover/card:opacity-100">
+          <Tooltip>
+            <TooltipTrigger delay={500}>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="archive-btn text-muted-foreground hover:text-foreground"
+                aria-label="Suspend agent"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onArchive(id);
+                }}
+              >
+                <IconSleepingTimeOutline18 className="size-4 cursor-pointer" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <span>Suspend agent (can be recovered)</span>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger delay={500}>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="delete-btn text-muted-foreground hover:text-foreground"
+                aria-label="Delete agent permanently"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(id);
+                }}
+              >
+                <IconTrash2Outline24 className="size-4 cursor-pointer" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <span>Delete agent permanently</span>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
-    </div>
-  );
-});
+    );
+  },
+  // Skip onClick/onArchive/onDelete in comparison — their behavior is
+  // stable (always call the same RPC with the card's `id`) but identity
+  // changes every render due to upstream useKartonProcedure selectors.
+  (prev, next) =>
+    prev.id === next.id &&
+    prev.title === next.title &&
+    prev.isActive === next.isActive &&
+    prev.isWorking === next.isWorking &&
+    prev.isWaitingForUser === next.isWaitingForUser &&
+    prev.hasError === next.hasError &&
+    prev.hasUnseen === next.hasUnseen &&
+    prev.activityText === next.activityText &&
+    prev.activityIsUserInput === next.activityIsUserInput &&
+    prev.lastMessageAt === next.lastMessageAt,
+);

@@ -46,6 +46,40 @@ import { RevertConfirmPopover } from './revert-confirm-popover';
 
 type AssistantMessage = AgentMessage & { role: 'assistant' };
 
+/**
+ * Fast deep equality optimised for streaming tool parts.
+ * Short-circuits on string-length differences (O(1) for growing content)
+ * instead of JSON.stringify which is O(n) and allocates a full copy.
+ */
+function cheapDeepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (typeof a !== typeof b) return false;
+  if (typeof a === 'string')
+    return a.length === (b as string).length && a === b;
+  if (typeof a === 'number' || typeof a === 'boolean') return false;
+  if (a instanceof Date && b instanceof Date)
+    return a.getTime() === (b as Date).getTime();
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!cheapDeepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (typeof a === 'object' && typeof b === 'object') {
+    const aObj = a as Record<string, unknown>;
+    const bObj = b as Record<string, unknown>;
+    const aKeys = Object.keys(aObj);
+    if (aKeys.length !== Object.keys(bObj).length) return false;
+    for (const key of aKeys) {
+      if (!cheapDeepEqual(aObj[key], bObj[key])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
 /** Part with its original index in msg.parts for correct metadata lookup */
 type PartWithOriginalIndex =
   | {
@@ -55,6 +89,133 @@ type PartWithOriginalIndex =
   | {
       parts: { part: ReadOnlyToolPart; originalIndex: number }[];
     };
+
+/** Memoized renderer for a single (non-grouped) part inside a message. */
+const SinglePartRenderer = memo(
+  function SinglePartRenderer({
+    item,
+    stableKey,
+    isLastPart,
+    isWorking,
+    isLastMessage,
+    msg,
+  }: {
+    item: {
+      part: UIMessagePart<UIDataTypes, UIAgentTools>;
+      originalIndex: number;
+    };
+    stableKey: string;
+    isLastPart: boolean;
+    isWorking: boolean;
+    isLastMessage: boolean;
+    msg: AssistantMessage;
+  }) {
+    const { part, originalIndex } = item;
+
+    switch (part.type) {
+      case 'text':
+        if ((part as TextUIPart).text.trim() === '') return null;
+        return (
+          <TextPart
+            key={stableKey}
+            part={part as TextUIPart}
+            messageRole="assistant"
+          />
+        );
+      case 'reasoning':
+        if (part.text.trim() === '') return null;
+        return (
+          <ThinkingPart
+            key={stableKey}
+            thinkingDuration={
+              (msg.metadata?.partsMetadata?.[
+                originalIndex
+              ]?.endedAt?.getTime() ?? 0) -
+              (msg.metadata?.partsMetadata?.[
+                originalIndex
+              ]?.startedAt?.getTime() ?? 0)
+            }
+            part={part as ReasoningUIPart}
+            isLastPart={isLastPart}
+            isShimmering={
+              isWorking &&
+              part.state === 'streaming' &&
+              isLastPart &&
+              isLastMessage
+            }
+          />
+        );
+      case 'file':
+        return <FilePart key={stableKey} part={part as FileUIPart} />;
+      case 'tool-copy':
+        return <CopyToolPart key={stableKey} part={part} />;
+      case 'tool-mkdir':
+        return <MkdirToolPart key={stableKey} part={part} />;
+      case 'tool-delete':
+        return <DeleteFileToolPart key={stableKey} part={part} />;
+      case 'tool-updateWorkspaceMd':
+        return <UpdateWorkspaceMdToolPart key={stableKey} part={part} />;
+      case 'tool-multiEdit':
+        return <MultiEditToolPart key={stableKey} part={part} />;
+      case 'tool-executeSandboxJs':
+        return (
+          <ExecuteSandboxJsToolPart
+            key={stableKey}
+            part={part}
+            isLastPart={isLastPart}
+            messageAttachments={msg.metadata?.attachments}
+          />
+        );
+      case 'tool-readConsoleLogs':
+        return (
+          <ReadConsoleLogsToolPart
+            key={stableKey}
+            part={part}
+            isLastPart={isLastPart}
+          />
+        );
+      case 'tool-write':
+        return <WriteToolPart key={stableKey} part={part} />;
+      case 'tool-askUserQuestions':
+        return <AskUserQuestionsToolPart key={stableKey} part={part} />;
+      case 'tool-executeShellCommand':
+        return (
+          <ExecuteShellCommandToolPart
+            key={stableKey}
+            part={part}
+            isLastPart={isLastPart}
+          />
+        );
+      default:
+        return (
+          <UnknownToolPart
+            shimmer={isWorking && isLastPart && isLastMessage}
+            key={stableKey}
+            part={part as AgentToolUIPart | DynamicToolUIPart}
+          />
+        );
+    }
+  },
+  (prev, next) => {
+    // Bail out if the part object reference is the same (Immer structural
+    // sharing keeps settled parts stable) and positional flags match.
+    if (prev.item.part !== next.item.part) return false;
+    if (prev.isLastPart !== next.isLastPart) return false;
+    if (prev.isLastMessage !== next.isLastMessage) return false;
+    // Only compare isWorking when it matters (last part of last message)
+    if (prev.isLastPart && prev.isLastMessage) {
+      if (prev.isWorking !== next.isWorking) return false;
+    }
+    // partsMetadata for reasoning duration
+    if (prev.item.part.type === 'reasoning') {
+      const pMeta = prev.msg.metadata?.partsMetadata?.[prev.item.originalIndex];
+      const nMeta = next.msg.metadata?.partsMetadata?.[next.item.originalIndex];
+      if (pMeta?.endedAt !== nMeta?.endedAt) return false;
+      if (pMeta?.startedAt !== nMeta?.startedAt) return false;
+    }
+    return true;
+  },
+);
 
 export const MessageAssistant = memo(
   function MessageAssistant({
@@ -171,9 +332,8 @@ export const MessageAssistant = memo(
                     return (
                       <ExploringToolParts
                         key={stableKey}
-                        parts={item.parts.map((p) => p.part)}
+                        items={item.parts}
                         partsMetadata={msg.metadata?.partsMetadata ?? []}
-                        originalIndices={item.parts.map((p) => p.originalIndex)}
                         isAutoExpanded={isLastPart}
                         isShimmering={isWorking && isLastPart && isLastMessage}
                         messageAttachments={msg.metadata?.attachments}
@@ -181,108 +341,28 @@ export const MessageAssistant = memo(
                     );
                   }
 
-                  // Handle single parts
-                  const { part, originalIndex } = item;
+                  // Handle single parts — delegate to memoized renderer
+                  const { part } = item;
                   const currentTypeIndex = typeCounters[part.type] ?? 0;
                   typeCounters[part.type] = currentTypeIndex + 1;
                   const stableKey = `${msg.id}:${part.type}:${currentTypeIndex}`;
 
-                  switch (part.type) {
-                    case 'text':
-                      if ((part as TextUIPart).text.trim() === '') return null;
-                      return (
-                        <TextPart
-                          key={stableKey}
-                          part={part as TextUIPart}
-                          messageRole="assistant"
-                        />
-                      );
-                    case 'reasoning':
-                      if (part.text.trim() === '') return null;
-                      return (
-                        <ThinkingPart
-                          key={stableKey}
-                          thinkingDuration={
-                            (msg.metadata?.partsMetadata?.[
-                              originalIndex
-                            ]?.endedAt?.getTime() ?? 0) -
-                            (msg.metadata?.partsMetadata?.[
-                              originalIndex
-                            ]?.startedAt?.getTime() ?? 0)
-                          }
-                          part={part as ReasoningUIPart}
-                          isLastPart={isLastPart}
-                          isShimmering={
-                            isWorking &&
-                            part.state === 'streaming' &&
-                            isLastPart &&
-                            isLastMessage
-                          }
-                        />
-                      );
-                    case 'file':
-                      return (
-                        <FilePart key={stableKey} part={part as FileUIPart} />
-                      );
-                    case 'tool-copy':
-                      return <CopyToolPart key={stableKey} part={part} />;
-                    case 'tool-mkdir':
-                      return <MkdirToolPart key={stableKey} part={part} />;
-                    case 'tool-delete':
-                      return <DeleteFileToolPart key={stableKey} part={part} />;
-                    case 'tool-updateWorkspaceMd':
-                      return (
-                        <UpdateWorkspaceMdToolPart
-                          key={stableKey}
-                          part={part}
-                        />
-                      );
-                    case 'tool-multiEdit':
-                      return <MultiEditToolPart key={stableKey} part={part} />;
-                    case 'tool-executeSandboxJs':
-                      return (
-                        <ExecuteSandboxJsToolPart
-                          key={stableKey}
-                          part={part}
-                          isLastPart={isLastPart}
-                          messageAttachments={msg.metadata?.attachments}
-                        />
-                      );
-                    case 'tool-readConsoleLogs':
-                      return (
-                        <ReadConsoleLogsToolPart
-                          key={stableKey}
-                          part={part}
-                          isLastPart={isLastPart}
-                        />
-                      );
-                    case 'tool-write':
-                      return <WriteToolPart key={stableKey} part={part} />;
-                    case 'tool-askUserQuestions':
-                      return (
-                        <AskUserQuestionsToolPart key={stableKey} part={part} />
-                      );
-                    case 'tool-executeShellCommand':
-                      return (
-                        <ExecuteShellCommandToolPart
-                          key={stableKey}
-                          part={part}
-                          isLastPart={isLastPart}
-                        />
-                      );
-                    default:
-                      return (
-                        <UnknownToolPart
-                          shimmer={
-                            isWorking &&
-                            index === partsWithIndices.length - 1 &&
-                            isLastMessage
-                          }
-                          key={stableKey}
-                          part={part as AgentToolUIPart | DynamicToolUIPart}
-                        />
-                      );
-                  }
+                  return (
+                    <SinglePartRenderer
+                      key={stableKey}
+                      item={
+                        item as {
+                          part: UIMessagePart<UIDataTypes, UIAgentTools>;
+                          originalIndex: number;
+                        }
+                      }
+                      stableKey={stableKey}
+                      isLastPart={isLastPart}
+                      isWorking={isWorking}
+                      isLastMessage={isLastMessage}
+                      msg={msg}
+                    />
+                  );
                 });
               })()}
               {showBetweenStepsIndicator && <MessageBetweenSteps />}
@@ -367,7 +447,9 @@ export const MessageAssistant = memo(
         if (prevPart.text !== nextPart.text) return false;
         if (prevPart.state !== nextPart.state) return false;
       }
-      // For tool parts, compare state, input, and output to allow streaming updates
+      // For tool parts, compare state, input, and output to allow streaming updates.
+      // Uses cheapDeepEqual instead of JSON.stringify to avoid O(n) serialisation
+      // on every comparison — critical during high-frequency streaming bursts.
       if (
         prevPart.type.startsWith('tool-') ||
         prevPart.type === 'dynamic-tool'
@@ -375,14 +457,10 @@ export const MessageAssistant = memo(
         const prevState = (prevPart as any).state;
         const nextState = (nextPart as any).state;
         if (prevState !== nextState) return false;
-        // Compare input by JSON stringification for deep equality
-        const prevInput = JSON.stringify((prevPart as any).input);
-        const nextInput = JSON.stringify((nextPart as any).input);
-        if (prevInput !== nextInput) return false;
-        // Compare output so completed tool results trigger re-render
-        const prevOutput = JSON.stringify((prevPart as any).output);
-        const nextOutput = JSON.stringify((nextPart as any).output);
-        if (prevOutput !== nextOutput) return false;
+        if (!cheapDeepEqual((prevPart as any).input, (nextPart as any).input))
+          return false;
+        if (!cheapDeepEqual((prevPart as any).output, (nextPart as any).output))
+          return false;
       }
     }
 

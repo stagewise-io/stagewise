@@ -1,4 +1,10 @@
-import { type ReactNode, createContext, useContext, useMemo } from 'react';
+import {
+  type ReactNode,
+  createContext,
+  useContext,
+  useMemo,
+  useRef,
+} from 'react';
 
 import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 export type { AttachmentMetadata };
@@ -23,6 +29,8 @@ export const AttachmentMetadataProvider = ({
   children,
   messages,
 }: AttachmentMetadataProviderProps) => {
+  const prevRef = useRef<Record<AttachmentId, AttachmentMetadata>>({});
+
   const attachmentMetadata = useMemo(() => {
     const record: Record<AttachmentId, AttachmentMetadata> = {};
 
@@ -33,6 +41,20 @@ export const AttachmentMetadataProvider = ({
       });
     }
 
+    // Stabilize: reuse previous reference when the record contents
+    // haven't changed. Attachments are set once per message and never
+    // mutate during streaming, so this short-circuits on every chunk.
+    const prev = prevRef.current;
+    const newKeys = Object.keys(record);
+    const prevKeys = Object.keys(prev);
+    if (
+      newKeys.length === prevKeys.length &&
+      newKeys.every((k) => prev[k] === record[k])
+    ) {
+      return prev;
+    }
+
+    prevRef.current = record;
     return record;
   }, [messages]);
 

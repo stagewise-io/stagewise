@@ -13,6 +13,7 @@ import {
   useState,
   useEffect,
   useRef,
+  memo,
   type RefObject,
 } from 'react';
 import {
@@ -49,7 +50,7 @@ import { getCurrentDraftAnswers } from './footer-status-card/user-question-secti
 // Stable empty arrays to avoid new-reference re-renders
 const EMPTY_HISTORY: AgentMessage[] = [];
 const EMPTY_QUEUE: (AgentMessage & { role: 'user' })[] = [];
-export function ChatPanelFooter() {
+export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const { registerDraftGetter } = useChatDraft();
 
@@ -69,37 +70,36 @@ export function ChatPanelFooter() {
   const isWorkingRef = useRef(isWorking);
   isWorkingRef.current = isWorking;
 
-  // History is only used inside abortAgent (via ref) — subscribe with a
-  // stable empty-array fallback so the selector doesn't trigger re-renders
-  // from new [] allocations, while Immer structural sharing keeps the
-  // actual history reference stable between unrelated state changes.
-  const history = useKartonState((s) =>
-    openAgent
+  // History & inputState are NEVER used during rendering — only inside
+  // callbacks via refs.  We use a silent-subscription pattern: the
+  // selector writes to a ref as a side-effect but always returns `null`,
+  // so useSyncExternalStore never sees a changed snapshot and never
+  // triggers a re-render.  This eliminates the entire footer re-render
+  // cascade that previously fired on every streaming chunk.
+  const historyRef = useRef<AgentMessage[]>(EMPTY_HISTORY);
+  useKartonState((s) => {
+    historyRef.current = openAgent
       ? (s.agents.instances[openAgent]?.state.history ?? EMPTY_HISTORY)
-      : EMPTY_HISTORY,
-  );
-  const historyRef = useRef(history);
-  historyRef.current = history;
+      : EMPTY_HISTORY;
+    return null;
+  });
 
-  // Read server-side input state only to initialize / re-initialize on agent
-  // switch.  We do NOT use this value for rendering — localInputState drives
-  // the editor.  Subscribing here is intentional so the ref stays fresh for
-  // the openAgent-change effect below.
-  const chatInputState = useKartonState((s) =>
-    openAgent ? s.agents.instances[openAgent]?.state.inputState : null,
-  );
-  const chatInputStateRef = useRef(chatInputState);
-  chatInputStateRef.current = chatInputState;
+  const chatInputStateRef = useRef<string | null>(null);
+  useKartonState((s) => {
+    chatInputStateRef.current = openAgent
+      ? (s.agents.instances[openAgent]?.state.inputState ?? null)
+      : null;
+    return null;
+  });
 
   const setChatInputState = useKartonProcedure(
     (p) => p.agents.updateInputState,
   );
 
-  const [localInputState, setLocalInputState] = useState<Content | null>(() =>
-    chatInputState && chatInputState.length > 0
-      ? JSON.parse(chatInputState)
-      : null,
-  );
+  const [localInputState, setLocalInputState] = useState<Content | null>(() => {
+    const initial = chatInputStateRef.current;
+    return initial && initial.length > 0 ? JSON.parse(initial) : null;
+  });
 
   // Re-sync local input state when the active agent changes
   const prevOpenAgentRef = useRef(openAgent);
@@ -107,16 +107,21 @@ export function ChatPanelFooter() {
     if (openAgent === prevOpenAgentRef.current) return;
     prevOpenAgentRef.current = openAgent;
     const serverState = chatInputStateRef.current;
-    setLocalInputState(
-      serverState && serverState.length > 0 ? JSON.parse(serverState) : null,
-    );
+    const parsed =
+      serverState && serverState.length > 0 ? JSON.parse(serverState) : null;
+    localInputStateRef.current = parsed;
+    setLocalInputState(parsed);
   }, [openAgent]);
 
   const [canSendMessage, setCanSendMessage] = useState(false);
 
   const updateChatInputState = useCallback(
     (newInputState: Content) => {
-      setLocalInputState(newInputState);
+      // Write directly to ref — avoids a setState on every keystroke which
+      // would re-render the entire footer (Select, WorkspaceBadge, etc.).
+      // The state variable is only updated for rare events (submit, error
+      // restore, agent switch) where ChatInput needs an external reset.
+      localInputStateRef.current = newInputState;
       setCanSendMessage(
         (chatInputRef.current?.getTextContent()?.trim().length ?? 0) > 2,
       );
@@ -222,23 +227,35 @@ export function ChatPanelFooter() {
     });
   }, []);
 
+  // Stabilize mentionContext: these values change frequently (every stream
+  // chunk, tab switch) but are only read when the user opens the mention
+  // popup.  Store in refs so the context object identity stays stable.
+  const mentionTabsRef = useRef(mentionTabs);
+  mentionTabsRef.current = mentionTabs;
+  const mentionActiveTabIdRef = useRef(mentionActiveTabId);
+  mentionActiveTabIdRef.current = mentionActiveTabId;
+  const mentionMountsRef = useRef(mentionMounts);
+  mentionMountsRef.current = mentionMounts;
+  const searchMentionFilesRef = useRef(searchMentionFiles);
+  searchMentionFilesRef.current = searchMentionFiles;
+
   const mentionContext = useMemo<MentionContext>(
     () => ({
       agentInstanceId: openAgent,
-      searchFiles: searchMentionFiles,
-      tabs: mentionTabs,
-      activeTabId: mentionActiveTabId,
-      mounts: mentionMounts,
+      searchFiles: (...args: Parameters<typeof searchMentionFiles>) =>
+        searchMentionFilesRef.current(...args),
+      get tabs() {
+        return mentionTabsRef.current;
+      },
+      get activeTabId() {
+        return mentionActiveTabIdRef.current;
+      },
+      get mounts() {
+        return mentionMountsRef.current;
+      },
       onFileMentionSelected,
     }),
-    [
-      openAgent,
-      searchMentionFiles,
-      mentionTabs,
-      mentionActiveTabId,
-      mentionMounts,
-      onFileMentionSelected,
-    ],
+    [openAgent, onFileMentionSelected],
   );
 
   const isConnected = useKartonConnected();
@@ -282,7 +299,11 @@ export function ChatPanelFooter() {
         const tiptapContent = enrichTipTapContent(parsed, {
           attachments: message.metadata?.attachments,
         });
+        // Must update both ref AND state so ChatInput (memo'd) re-renders
+        // with the restored content.  updateChatInputState only writes to
+        // the ref (perf optimisation for keystrokes).
         updateChatInputState(tiptapContent);
+        setLocalInputState(tiptapContent);
         requestAnimationFrame(() => {
           chatInputRef.current?.focus();
         });
@@ -339,7 +360,11 @@ export function ChatPanelFooter() {
       const tiptapContent = enrichTipTapContent(parsed, {
         attachments: nextUserMessage.metadata?.attachments,
       });
+      // Must update both ref AND state so ChatInput (memo'd) re-renders
+      // with the restored content.  updateChatInputState only writes to
+      // the ref (perf optimisation for keystrokes).
       updateChatInputState(tiptapContent);
+      setLocalInputState(tiptapContent);
       requestAnimationFrame(() => {
         chatInputRef.current?.focus();
       });
@@ -465,8 +490,11 @@ export function ChatPanelFooter() {
   // fileAttachments, canSendMessage) which in turn
   // keeps the onSubmit prop passed to ChatInputActions referentially stable
   // across keystrokes and streaming updates.
+  // localInputStateRef is the source of truth — updated on every keystroke
+  // in updateChatInputState (without triggering re-renders).  The state
+  // variable `localInputState` is only set for rare events that need to
+  // push content back into ChatInput (submit clear, error restore).
   const localInputStateRef = useRef(localInputState);
-  localInputStateRef.current = localInputState;
 
   const fileAttachmentsRef = useRef(fileAttachments);
   fileAttachmentsRef.current = fileAttachments;
@@ -535,6 +563,7 @@ export function ChatPanelFooter() {
       type: 'doc',
       content: [{ type: 'paragraph' }],
     };
+    localInputStateRef.current = emptyDoc;
     setLocalInputState(emptyDoc);
     setCanSendMessage(false);
     if (openAgent) void setChatInputState(openAgent, JSON.stringify(emptyDoc));
@@ -569,6 +598,7 @@ export function ChatPanelFooter() {
       }, 0);
     } catch (error) {
       // Restore input on failure
+      localInputStateRef.current = previousContent;
       setLocalInputState(previousContent);
       // Remove the optimistic message on failure
       window.dispatchEvent(
@@ -591,9 +621,15 @@ export function ChatPanelFooter() {
     interruptQuestionWithMessage,
   ]);
 
-  const usedTokens = useKartonState((s) =>
-    openAgent ? s.agents.instances[openAgent]?.state.usedTokens : 0,
-  );
+  // Quantize to nearest 1 000 tokens so the value only changes when
+  // crossing a 1K boundary — prevents ChatInput memo-busting on every
+  // streaming chunk.
+  const usedTokens = useKartonState((s) => {
+    const raw = openAgent
+      ? (s.agents.instances[openAgent]?.state.usedTokens ?? 0)
+      : 0;
+    return Math.round(raw / 1000) * 1000;
+  });
   const activeModelId = useKartonState((s) =>
     openAgent ? s.agents.instances[openAgent]?.state.activeModelId : null,
   );
@@ -967,6 +1003,11 @@ export function ChatPanelFooter() {
   const allowUserInput = useKartonState((s) =>
     openAgent ? s.agents.instances[openAgent]?.allowUserInput : false,
   );
+
+  const handleModelChange = useCallback(() => {
+    chatInputRef.current?.focus();
+  }, []);
+
   if (!allowUserInput) return null;
 
   return (
@@ -1016,7 +1057,7 @@ export function ChatPanelFooter() {
           }
           attachmentCount={fileAttachments.length}
           showModelSelect
-          onModelChange={() => chatInputRef.current?.focus()}
+          onModelChange={handleModelChange}
           showContextUsageRing={
             !!usedTokens && (isVerboseMode || contextUsed > 80)
           }
@@ -1050,4 +1091,4 @@ export function ChatPanelFooter() {
       </div>
     </footer>
   );
-}
+});

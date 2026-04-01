@@ -109,8 +109,9 @@ const StreamdownProvider = ({
   isStreaming: boolean;
   children: ReactNode;
 }) => {
+  const value = useMemo(() => ({ isStreaming }), [isStreaming]);
   return (
-    <StreamdownContext.Provider value={{ isStreaming }}>
+    <StreamdownContext.Provider value={value}>
       {children}
     </StreamdownContext.Provider>
   );
@@ -223,64 +224,7 @@ export function InlineMarkdown({ children }: { children: string }) {
   );
 }
 
-export const Streamdown = ({
-  isAnimating,
-  children,
-}: {
-  isAnimating: boolean;
-  children: string;
-}) => {
-  return (
-    <StreamdownProvider isStreaming={isAnimating}>
-      <StreamdownBase
-        animated={{
-          animation: 'fadeIn',
-          duration: 100,
-          easing: 'ease-out',
-          sep: 'word',
-        }}
-        isAnimating={isAnimating}
-        mode={isAnimating ? 'streaming' : 'static'}
-        shikiTheme={['light-plus', 'dark-plus']}
-        controls={{
-          code: false,
-          mermaid: false,
-          table: false,
-        }}
-        plugins={{
-          math,
-        }}
-        components={{
-          code: MemoCode,
-          a: MemoAnchor,
-          hr: MemoHr,
-          p: MemoP,
-          blockquote: MemoBlockquote,
-          img: MemoImg,
-          h1: MemoH1,
-          h2: MemoH2,
-          h3: MemoH3,
-          h4: MemoH4,
-          h5: MemoH5,
-          h6: MemoH6,
-          ul: MemoUl,
-          ol: MemoOl,
-          li: MemoLi,
-          table: MemoTable,
-          thead: MemoThead,
-          tbody: MemoTbody,
-          tr: MemoTr,
-          th: MemoTh,
-          td: MemoTd,
-          input: MemoInput,
-        }}
-        rehypePlugins={[defaultRehypePlugins.raw!]}
-      >
-        {preprocessMarkdown(children)}
-      </StreamdownBase>
-    </StreamdownProvider>
-  );
-};
+// Streamdown is defined at the bottom of the file, after all Memo* components.
 
 const CodeComponent = ({
   node,
@@ -977,3 +921,76 @@ const MemoInput = memo<
     p.type === n.type && p.checked === n.checked && p.className === n.className,
 );
 MemoInput.displayName = 'MarkdownInput';
+
+// ── Static Streamdown config (hoisted here so Memo* consts are initialized) ──
+
+const STREAMDOWN_ANIMATED = {
+  animation: 'fadeIn',
+  duration: 100,
+  easing: 'ease-out',
+  sep: 'word',
+} as const;
+
+const STREAMDOWN_SHIKI_THEME: ['light-plus', 'dark-plus'] = [
+  'light-plus',
+  'dark-plus',
+];
+
+const STREAMDOWN_CONTROLS = {
+  code: false,
+  mermaid: false,
+  table: false,
+} as const;
+
+const STREAMDOWN_PLUGINS = { math } as const;
+
+const STREAMDOWN_COMPONENTS = {
+  code: MemoCode,
+  a: MemoAnchor,
+  hr: MemoHr,
+  p: MemoP,
+  blockquote: MemoBlockquote,
+  img: MemoImg,
+  h1: MemoH1,
+  h2: MemoH2,
+  h3: MemoH3,
+  h4: MemoH4,
+  h5: MemoH5,
+  h6: MemoH6,
+  ul: MemoUl,
+  ol: MemoOl,
+  li: MemoLi,
+  table: MemoTable,
+  thead: MemoThead,
+  tbody: MemoTbody,
+  tr: MemoTr,
+  th: MemoTh,
+  td: MemoTd,
+  input: MemoInput,
+} as const;
+
+const STREAMDOWN_REHYPE_PLUGINS = [defaultRehypePlugins.raw!];
+
+export const Streamdown = memo(
+  ({ isAnimating, children }: { isAnimating: boolean; children: string }) => {
+    const processed = useMemo(() => preprocessMarkdown(children), [children]);
+
+    return (
+      <StreamdownProvider isStreaming={isAnimating}>
+        <StreamdownBase
+          animated={STREAMDOWN_ANIMATED}
+          isAnimating={isAnimating}
+          mode={isAnimating ? 'streaming' : 'static'}
+          shikiTheme={STREAMDOWN_SHIKI_THEME}
+          controls={STREAMDOWN_CONTROLS}
+          plugins={STREAMDOWN_PLUGINS}
+          components={STREAMDOWN_COMPONENTS}
+          rehypePlugins={STREAMDOWN_REHYPE_PLUGINS}
+        >
+          {processed}
+        </StreamdownBase>
+      </StreamdownProvider>
+    );
+  },
+);
+Streamdown.displayName = 'Streamdown';
