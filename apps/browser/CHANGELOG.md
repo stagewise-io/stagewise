@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.0-alpha.46 (2026-04-01)
+
+### Features
+
+* new file attachment pipeline (be78e29)
+
+### Bug Fixes
+
+* fix 'overwriteFile' reference in plan mode check (3d3043c)
+* fix tool-names for plan-toolparts (3f248e1)
+* more debug utilities and fixed unstable file context pipeline (e213326)
+* old call signatures in test cases (6bc8709)
+
+### Other Changes
+
+* simplify read pipeline to always output content (3f560e5)
+* standardize and update env snapshot rendering (60714d8)
+* make file change env info more compact (e45c368)
+* re-structure system prompt and reintroduce ls tool (fb9c8c7)
+* convert dom elements into files in attachment folder (231db10)
+* convert text clips from extra attachments to files (82044a7)
+* standardize file reference and attachments format for both agents and users (417395b)
+
 ## 1.0.0-alpha.45 (2026-03-30)
 
 ### Bug Fixes
