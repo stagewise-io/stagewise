@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  memo,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -42,63 +43,67 @@ interface SlashSuggestionPopupProps {
   clientRect: (() => DOMRect | null) | null;
 }
 
-function SlashSuggestionItem({
-  item,
-  isSelected,
-  onSelect,
-  onMouseEnter,
-  onRef,
-}: {
-  item: SlashItem;
-  isSelected: boolean;
-  onSelect: () => void;
-  onMouseEnter: () => void;
-  onRef: (el: HTMLButtonElement | null) => void;
-}) {
-  const isBuiltin = item.group === 'builtin';
-  const isSynthetic = Boolean(item.expandGroup);
-  const Icon =
-    isBuiltin && !isSynthetic
-      ? (COMMAND_ICONS[item.id] ?? TerminalSquareIcon)
-      : null;
+const SlashSuggestionItem = memo(
+  function SlashSuggestionItem({
+    item,
+    isSelected,
+    onSelect,
+    onMouseEnter,
+    onRef,
+  }: {
+    item: SlashItem;
+    isSelected: boolean;
+    onSelect: () => void;
+    onMouseEnter: () => void;
+    onRef: (el: HTMLButtonElement | null) => void;
+  }) {
+    const isBuiltin = item.group === 'builtin';
+    const isSynthetic = Boolean(item.expandGroup);
+    const Icon =
+      isBuiltin && !isSynthetic
+        ? (COMMAND_ICONS[item.id] ?? TerminalSquareIcon)
+        : null;
 
-  return (
-    <button
-      ref={onRef}
-      type="button"
-      className={cn(
-        'flex w-full cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-left text-xs outline-none transition-colors duration-150 ease-out',
-        isSelected ? 'bg-surface-1 text-foreground' : 'text-foreground',
-      )}
-      onClick={onSelect}
-      onMouseEnter={onMouseEnter}
-      onMouseDown={(e) => e.preventDefault()}
-    >
-      {Icon && <Icon className="size-3 shrink-0 text-muted-foreground" />}
-      {isSynthetic ? (
-        <span
-          className={cn(
-            'min-w-0 shrink-0',
-            isSelected ? 'text-muted-foreground' : 'text-subtle-foreground',
-          )}
-        >
-          {item.label}
-        </span>
-      ) : (
-        <>
-          <span className="min-w-0 truncate font-medium">
-            {`/${item.label}`}
+    return (
+      <button
+        ref={onRef}
+        type="button"
+        className={cn(
+          'flex w-full cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-left text-xs outline-none transition-colors duration-150 ease-out',
+          isSelected ? 'bg-surface-1 text-foreground' : 'text-foreground',
+        )}
+        onClick={onSelect}
+        onMouseEnter={onMouseEnter}
+        onMouseDown={(e) => e.preventDefault()}
+      >
+        {Icon && <Icon className="size-3 shrink-0 text-muted-foreground" />}
+        {isSynthetic ? (
+          <span
+            className={cn(
+              'min-w-0 shrink-0',
+              isSelected ? 'text-muted-foreground' : 'text-subtle-foreground',
+            )}
+          >
+            {item.label}
           </span>
-          {item.description && (
-            <span className="min-w-0 flex-1 truncate font-normal text-subtle-foreground text-xs">
-              {item.description}
+        ) : (
+          <>
+            <span className="min-w-0 truncate font-medium">
+              {`/${item.label}`}
             </span>
-          )}
-        </>
-      )}
-    </button>
-  );
-}
+            {item.description && (
+              <span className="min-w-0 flex-1 truncate font-normal text-subtle-foreground text-xs">
+                {item.description}
+              </span>
+            )}
+          </>
+        )}
+      </button>
+    );
+  },
+  (prev, next) =>
+    prev.item === next.item && prev.isSelected === next.isSelected,
+);
 
 /**
  * Side panel that previews the hidden items behind a "Show N more" row.

@@ -12,7 +12,7 @@ import { getBaseName } from '@shared/path-utils';
 import { stripMountPrefix } from '@ui/utils';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { useKartonState } from '@ui/hooks/use-karton';
-import { useMemo, useCallback, useState } from 'react';
+import { memo, useMemo, useCallback, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
@@ -30,14 +30,69 @@ import {
  * Dedicated tool-part UI for plan file creation / update.
  * Replaces the generic write diff view when the target path
  * is inside `plans/`.
+ *
+ * Streaming and error states are handled here without any
+ * Karton subscriptions. The settled card is a separate component
+ * that only mounts once the tool completes, avoiding unnecessary
+ * re-renders during streaming.
  */
-export const CreatePlanToolPart = ({ part }: { part: WritePart }) => {
-  const streaming =
-    part.state === 'input-streaming' || part.state === 'input-available';
-  const isError = part.state === 'output-error';
+export const CreatePlanToolPart = memo(
+  function CreatePlanToolPart({ part }: { part: WritePart }) {
+    const streaming =
+      part.state === 'input-streaming' || part.state === 'input-available';
+    const isError = part.state === 'output-error';
+
+    // Streaming state — plain shimmer label
+    if (streaming) {
+      return (
+        <div className="flex h-6 w-full items-center gap-1 font-medium text-muted-foreground">
+          <IconClipboardOutline18 className="size-3 shrink-0 text-primary-foreground" />
+          <span className="shimmer-text-primary text-xs">Creating plan…</span>
+        </div>
+      );
+    }
+
+    // Error state — matches standard tool error style (muted inline text)
+    if (isError) {
+      const errorText = part.errorText ?? 'Failed to create plan';
+      return (
+        <div className="flex max-w-full cursor-default items-center gap-1 text-muted-foreground text-xs hover:text-foreground">
+          <IconXmarkOutline18 className="size-3 shrink-0" />
+          <Tooltip>
+            <TooltipTrigger>
+              <span className="min-w-0 truncate text-xs">{errorText}</span>
+            </TooltipTrigger>
+            <TooltipContent>{errorText}</TooltipContent>
+          </Tooltip>
+        </div>
+      );
+    }
+
+    // Success — delegate to settled card (subscribes to Karton only when needed)
+    return <CreatePlanSettledCard part={part} />;
+  },
+  (prev, next) => {
+    // During streaming, only part.state matters (shimmer label is static)
+    if (
+      prev.part.state === next.part.state &&
+      (next.part.state === 'input-streaming' ||
+        next.part.state === 'input-available')
+    ) {
+      return true;
+    }
+    // Once settled, use default identity check
+    return prev.part === next.part;
+  },
+);
+
+/**
+ * Settled (success) card for a completed plan write.
+ * Extracted so Karton subscriptions only run after streaming finishes.
+ */
+function CreatePlanSettledCard({ part }: { part: WritePart }) {
+  const relativePath = part.input?.path ?? '';
 
   // Plan lifecycle phase — controls whether footer buttons are shown
-  const relativePath = part.input?.path ?? '';
   const phase = usePlanPhase(relativePath || null);
 
   // Parse plan content from the tool input (static, used as fallback)
@@ -101,33 +156,6 @@ export const CreatePlanToolPart = ({ part }: { part: WritePart }) => {
     }
   }, [filename, tabs, switchTab, goToUrl, createTab]);
 
-  // Streaming state — plain text label like ask-user-questions
-  if (streaming) {
-    return (
-      <div className="flex h-6 w-full items-center gap-1 font-medium text-muted-foreground">
-        <IconClipboardOutline18 className="size-3 shrink-0 text-primary-foreground" />
-        <span className="shimmer-text-primary text-xs">Creating plan…</span>
-      </div>
-    );
-  }
-
-  // Error state — matches standard tool error style (muted inline text)
-  if (isError) {
-    const errorText = part.errorText ?? 'Failed to create plan';
-    return (
-      <div className="flex max-w-full cursor-default items-center gap-1 text-muted-foreground text-xs hover:text-foreground">
-        <IconXmarkOutline18 className="size-3 shrink-0" />
-        <Tooltip>
-          <TooltipTrigger>
-            <span className="min-w-0 truncate text-xs">{errorText}</span>
-          </TooltipTrigger>
-          <TooltipContent>{errorText}</TooltipContent>
-        </Tooltip>
-      </div>
-    );
-  }
-
-  // Success state — rich card
   return (
     <div className="mt-6 w-full overflow-hidden rounded-lg border border-border-subtle bg-background shadow-xs dark:border-border dark:bg-surface-1">
       {/* Body: title + description + tasks */}
@@ -188,7 +216,7 @@ export const CreatePlanToolPart = ({ part }: { part: WritePart }) => {
       </div>
     </div>
   );
-};
+}
 
 function TaskPreviewRow({ task }: { task: PlanTask }) {
   return (

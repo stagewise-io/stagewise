@@ -336,17 +336,26 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   openAgentHasHistoryRef.current = openAgentHasHistory;
 
   // Load more history entries when the user scrolls to the bottom of the list.
-  const loadMoreHistory = useCallback(() => {
-    if (!hasMoreHistory || isLoadingMoreRef.current) return;
-    isLoadingMoreRef.current = true;
-    getAgentsHistoryList(rawFetchedCountRef.current, PAGE_SIZE).then((res) => {
-      rawFetchedCountRef.current += res.length;
-      isLoadingMoreRef.current = false;
-      if (res.length < PAGE_SIZE) setHasMoreHistory(false);
+  // Uses refs for all dependencies so the callback identity is fully stable and
+  // doesn't defeat AgentsSelector's memo on onEndReached.
+  const hasMoreHistoryRef = useRef(hasMoreHistory);
+  hasMoreHistoryRef.current = hasMoreHistory;
+  const getAgentsHistoryListRef = useRef(getAgentsHistoryList);
+  getAgentsHistoryListRef.current = getAgentsHistoryList;
 
-      if (res.length > 0) setAgentsList((prev) => [...prev, ...res]);
-    });
-  }, [hasMoreHistory, getAgentsHistoryList]);
+  const loadMoreHistory = useCallback(() => {
+    if (!hasMoreHistoryRef.current || isLoadingMoreRef.current) return;
+    isLoadingMoreRef.current = true;
+    getAgentsHistoryListRef
+      .current(rawFetchedCountRef.current, PAGE_SIZE)
+      .then((res) => {
+        rawFetchedCountRef.current += res.length;
+        isLoadingMoreRef.current = false;
+        if (res.length < PAGE_SIZE) setHasMoreHistory(false);
+
+        if (res.length > 0) setAgentsList((prev) => [...prev, ...res]);
+      });
+  }, []);
 
   const handleDeleteAgent = useCallback((id: string) => {
     void deleteAgentRef.current(id).catch((e) => {

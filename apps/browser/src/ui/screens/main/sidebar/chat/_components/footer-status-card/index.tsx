@@ -96,11 +96,22 @@ export function StatusCard() {
 
   const globalPlans = useKartonState((s) => s.plans);
 
-  // Message history for the open agent (used to resolve all-time mounts from env snapshots)
-  const agentHistory = useKartonState((s) =>
-    openAgentId
+  // agentHistory is used for plan ownership/phases but NOT for rendering.
+  // Subscribe silently via ref so streaming chunks (which mutate the last
+  // message in-place and produce a new Immer reference) don't trigger
+  // re-renders.  `historyLen` is a primitive that only changes when
+  // messages are added/removed — use it as the useMemo trigger.
+  const agentHistoryRef = useRef<AgentMessage[]>(EMPTY_HISTORY);
+  useKartonState((s) => {
+    agentHistoryRef.current = openAgentId
       ? (s.agents.instances[openAgentId]?.state.history ?? EMPTY_HISTORY)
-      : EMPTY_HISTORY,
+      : EMPTY_HISTORY;
+    return null;
+  });
+  const historyLen = useKartonState((s) =>
+    openAgentId
+      ? (s.agents.instances[openAgentId]?.state.history?.length ?? 0)
+      : 0,
   );
 
   const isAgentWorking = useKartonState((s) =>
@@ -109,22 +120,42 @@ export function StatusCard() {
       : false,
   );
 
-  // All mounts ever seen in env snapshots (survives workspace disconnects)
-  const resolvedMounts = useMemo<Mount[]>(() => {
-    const mountsByPrefix = new Map<string, Mount>();
-    for (const msg of agentHistory) {
-      const mounts = msg?.metadata?.environmentSnapshot?.workspace?.mounts;
-      if (!mounts) continue;
-      for (const mount of mounts) {
-        if (!mountsByPrefix.has(mount.prefix)) {
-          mountsByPrefix.set(mount.prefix, mount);
+  // All mounts ever seen in env snapshots (survives workspace disconnects).
+  // Extraction is done inside the selector so we don't subscribe to the
+  // full history array (which gets a new Immer reference on every streaming
+  // chunk).  `useComparingSelector` ensures we only re-render when the
+  // actual set of mount prefixes changes.
+  const resolvedMounts = useKartonState(
+    useComparingSelector(
+      (s): Mount[] => {
+        const history = openAgentId
+          ? s.agents.instances[openAgentId]?.state.history
+          : undefined;
+        if (!history || history.length === 0) return EMPTY_MOUNTS_SNAPSHOT;
+        const mountsByPrefix = new Map<string, Mount>();
+        for (const msg of history) {
+          const mounts = msg?.metadata?.environmentSnapshot?.workspace?.mounts;
+          if (!mounts) continue;
+          for (const mount of mounts) {
+            if (!mountsByPrefix.has(mount.prefix)) {
+              mountsByPrefix.set(mount.prefix, mount);
+            }
+          }
         }
-      }
-    }
-    return mountsByPrefix.size > 0
-      ? Array.from(mountsByPrefix.values())
-      : EMPTY_MOUNTS_SNAPSHOT;
-  }, [agentHistory]);
+        return mountsByPrefix.size > 0
+          ? Array.from(mountsByPrefix.values())
+          : EMPTY_MOUNTS_SNAPSHOT;
+      },
+      (a, b) => {
+        if (a === b) return true;
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+          if (a[i]?.prefix !== b[i]?.prefix) return false;
+        }
+        return true;
+      },
+    ),
+  );
 
   // Set of currently connected mount paths
   const activeMountPaths = useMemo(() => {
@@ -406,7 +437,7 @@ export function StatusCard() {
 
   // Active plans owned by this agent (excluding dismissed and just-created)
   const ownedPlans = useMemo(() => {
-    const ownedPaths = getAgentOwnedPlanPaths(agentHistory);
+    const ownedPaths = getAgentOwnedPlanPaths(agentHistoryRef.current);
     if (ownedPaths.size === 0) return [];
 
     // Build live data map for phase computation
@@ -422,7 +453,7 @@ export function StatusCard() {
 
     // Derive phases for all owned plans in a single history pass
     const phases = getPlanUIPhases(
-      agentHistory,
+      agentHistoryRef.current,
       ownedPaths,
       isAgentWorking,
       livePlanDataByPath,
@@ -447,7 +478,7 @@ export function StatusCard() {
     }
 
     return plans;
-  }, [agentHistory, globalPlans, isAgentWorking]);
+  }, [historyLen, globalPlans, isAgentWorking]);
 
   const handleOpenPlan = useCallback(
     (filename: string) => {

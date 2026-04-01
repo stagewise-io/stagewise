@@ -5,6 +5,7 @@ import {
   type ComponentProps,
   type ComponentRef,
   forwardRef,
+  memo,
   useCallback,
 } from 'react';
 import { cn } from '../lib/utils';
@@ -224,24 +225,25 @@ export type ComboboxItemProps = ComponentProps<typeof ComboboxBase.Item> & {
   size?: ComboboxSize;
 };
 
-export const ComboboxItem = forwardRef<
-  ComponentRef<typeof ComboboxBase.Item>,
-  ComboboxItemProps
->(({ className, size = 'sm', ...props }, ref) => (
-  <ComboboxBase.Item
-    ref={ref}
-    className={cn(
-      'group/item grid w-full min-w-24 cursor-default items-center gap-2 rounded-md',
-      'grid-cols-[0.75rem_1fr]',
-      'text-foreground outline-none transition-colors duration-150 ease-out',
-      'data-highlighted:bg-hover-derived',
-      'data-disabled:pointer-events-none data-disabled:opacity-50',
-      sizes.item[size],
-      className,
-    )}
-    {...props}
-  />
-));
+export const ComboboxItem = memo(
+  forwardRef<ComponentRef<typeof ComboboxBase.Item>, ComboboxItemProps>(
+    ({ className, size = 'sm', ...props }, ref) => (
+      <ComboboxBase.Item
+        ref={ref}
+        className={cn(
+          'group/item grid w-full min-w-24 cursor-default items-center gap-2 rounded-md',
+          'grid-cols-[0.75rem_1fr]',
+          'text-foreground outline-none transition-colors duration-150 ease-out',
+          'data-highlighted:bg-hover-derived',
+          'data-disabled:pointer-events-none data-disabled:opacity-50',
+          sizes.item[size],
+          className,
+        )}
+        {...props}
+      />
+    ),
+  ),
+);
 ComboboxItem.displayName = 'ComboboxItem';
 
 // --- ComboboxItemIndicator ---
@@ -250,18 +252,20 @@ export type ComboboxItemIndicatorProps = ComponentProps<
   typeof ComboboxBase.ItemIndicator
 >;
 
-export const ComboboxItemIndicator = forwardRef<
-  ComponentRef<typeof ComboboxBase.ItemIndicator>,
-  ComboboxItemIndicatorProps
->(({ className, children, ...props }, ref) => (
-  <ComboboxBase.ItemIndicator
-    ref={ref}
-    className={cn('col-start-1 shrink-0', className)}
-    {...props}
-  >
-    {children ?? <CheckIcon className="size-full text-muted-foreground" />}
-  </ComboboxBase.ItemIndicator>
-));
+export const ComboboxItemIndicator = memo(
+  forwardRef<
+    ComponentRef<typeof ComboboxBase.ItemIndicator>,
+    ComboboxItemIndicatorProps
+  >(({ className, children, ...props }, ref) => (
+    <ComboboxBase.ItemIndicator
+      ref={ref}
+      className={cn('col-start-1 shrink-0', className)}
+      {...props}
+    >
+      {children ?? <CheckIcon className="size-full text-muted-foreground" />}
+    </ComboboxBase.ItemIndicator>
+  )),
+);
 ComboboxItemIndicator.displayName = 'ComboboxItemIndicator';
 
 // --- ComboboxItemText ---

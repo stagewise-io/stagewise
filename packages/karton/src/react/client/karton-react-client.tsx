@@ -65,10 +65,23 @@ export function createKartonReactClient<T>(
 
   // Create client at module scope so it survives React remounts (e.g., StrictMode)
   // This prevents the state from resetting to fallbackState on remount
+
+  // Coalesce rapid state changes (e.g. streaming chunks) into a single
+  // React notification per animation frame.  The underlying client.state
+  // is updated synchronously, so useSyncExternalStore always reads the
+  // latest snapshot — we only defer the *notification* that triggers a
+  // re-render, eliminating 4-9× redundant render cycles per frame.
+  let rafScheduled = false;
   const client = createKartonClient({
     ...config,
     onStateChange: () => {
-      listeners.forEach((listener) => listener());
+      if (!rafScheduled) {
+        rafScheduled = true;
+        requestAnimationFrame(() => {
+          rafScheduled = false;
+          listeners.forEach((listener) => listener());
+        });
+      }
     },
   });
 

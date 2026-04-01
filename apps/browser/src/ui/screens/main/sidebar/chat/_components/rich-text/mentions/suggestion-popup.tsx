@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -147,52 +148,56 @@ interface SuggestionPopupProps {
   mounts: MountEntry[];
 }
 
-function SuggestionItem({
-  item,
-  isSelected,
-  onSelect,
-  onMouseEnter,
-  onRef,
-}: {
-  item: ResolvedMentionItem;
-  isSelected: boolean;
-  onSelect: () => void;
-  onMouseEnter: () => void;
-  onRef: (el: HTMLButtonElement | null) => void;
-}) {
-  return (
-    <button
-      ref={onRef}
-      type="button"
-      className={cn(
-        'flex w-full cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-left text-xs outline-none transition-colors duration-150 ease-out',
-        isSelected ? 'bg-surface-1 text-foreground' : 'text-foreground',
-      )}
-      onClick={onSelect}
-      onMouseEnter={onMouseEnter}
-      onMouseDown={(e) => e.preventDefault()}
-    >
-      <MentionIcon
-        providerType={item.providerType}
-        id={item.id}
-        className="size-3 shrink-0 text-muted-foreground"
-      />
-      <span className="min-w-0 truncate">{item.label}</span>
-      {item.description && (
-        <span
-          className="min-w-0 flex-1 truncate font-normal text-subtle-foreground text-xs"
-          dir={item.descriptionTruncation === 'start' ? 'rtl' : undefined}
-        >
-          {item.descriptionTruncation === 'start' ? (
-            <span dir="ltr">{item.description}</span>
-          ) : (
-            item.description
-          )}
-        </span>
-      )}
-    </button>
-  );
-}
+const SuggestionItem = memo(
+  function SuggestionItem({
+    item,
+    isSelected,
+    onSelect,
+    onMouseEnter,
+    onRef,
+  }: {
+    item: ResolvedMentionItem;
+    isSelected: boolean;
+    onSelect: () => void;
+    onMouseEnter: () => void;
+    onRef: (el: HTMLButtonElement | null) => void;
+  }) {
+    return (
+      <button
+        ref={onRef}
+        type="button"
+        className={cn(
+          'flex w-full cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-left text-xs outline-none transition-colors duration-150 ease-out',
+          isSelected ? 'bg-surface-1 text-foreground' : 'text-foreground',
+        )}
+        onClick={onSelect}
+        onMouseEnter={onMouseEnter}
+        onMouseDown={(e) => e.preventDefault()}
+      >
+        <MentionIcon
+          providerType={item.providerType}
+          id={item.id}
+          className="size-3 shrink-0 text-muted-foreground"
+        />
+        <span className="min-w-0 truncate">{item.label}</span>
+        {item.description && (
+          <span
+            className="min-w-0 flex-1 truncate font-normal text-subtle-foreground text-xs"
+            dir={item.descriptionTruncation === 'start' ? 'rtl' : undefined}
+          >
+            {item.descriptionTruncation === 'start' ? (
+              <span dir="ltr">{item.description}</span>
+            ) : (
+              item.description
+            )}
+          </span>
+        )}
+      </button>
+    );
+  },
+  (prev, next) =>
+    prev.item === next.item && prev.isSelected === next.isSelected,
+);
 
 export function SuggestionPopup({
   items,
