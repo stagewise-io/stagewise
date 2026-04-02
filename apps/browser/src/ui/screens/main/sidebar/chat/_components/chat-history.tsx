@@ -770,7 +770,6 @@ export const ChatHistory = () => {
     }
 
     return ++cacheGenRef.current;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredMessages.length, paddingRight, openAgent, isWorking]);
   // Keep the gen ref in sync (unused directly, but ensures the dep is used)
   cacheGenRef.current = cacheGen;
@@ -956,7 +955,6 @@ export const ChatHistory = () => {
     // cache is invalidated (structural changes or isWorking toggle).
     // Cached assistant messages return their cached element (React skips)
     // while evicted user messages get a fresh element with correct canEdit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       paddingRight,
       lastUserMessageRef,
