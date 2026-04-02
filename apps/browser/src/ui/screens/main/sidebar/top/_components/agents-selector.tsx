@@ -155,7 +155,7 @@ export const AgentsSelector = memo(
       );
       observer.observe(sentinel);
       return () => observer.disconnect();
-    }, [hasResults, isOpen]);
+    }, [hasResults, isOpen, !!onEndReached]);
 
     const handleValueChange = useCallback(
       (v: string | null) => {

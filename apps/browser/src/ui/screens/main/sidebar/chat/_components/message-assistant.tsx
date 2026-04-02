@@ -213,6 +213,11 @@ const SinglePartRenderer = memo(
       if (pMeta?.endedAt !== nMeta?.endedAt) return false;
       if (pMeta?.startedAt !== nMeta?.startedAt) return false;
     }
+    // Attachments can be appended after the part settles (e.g. screenshots)
+    if (prev.item.part.type === 'tool-executeSandboxJs') {
+      if (prev.msg.metadata?.attachments !== next.msg.metadata?.attachments)
+        return false;
+    }
     return true;
   },
 );
