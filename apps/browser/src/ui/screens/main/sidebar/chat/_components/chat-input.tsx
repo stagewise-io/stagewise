@@ -556,11 +556,13 @@ export const ChatInput = ({
             // Breathing room around inline attachment nodes (all types)
             // These pseudo-elements provide visual spacing for cursor positioning
             // Height constraint (h-[1em]) prevents taller cursor when no text follows the attachment
+            '[&_.react-renderer.node-attachment]:align-middle',
             '[&_.react-renderer.node-attachment]:before:content-[""] [&_.react-renderer.node-attachment]:after:content-[""]',
             '[&_.react-renderer.node-attachment]:before:inline-block [&_.react-renderer.node-attachment]:after:inline-block',
             '[&_.react-renderer.node-attachment]:before:w-0.5 [&_.react-renderer.node-attachment]:after:w-0.5',
             '[&_.react-renderer.node-attachment]:before:h-[1em] [&_.react-renderer.node-attachment]:after:h-[1em]',
             '[&_.react-renderer.node-attachment]:before:align-middle [&_.react-renderer.node-attachment]:after:align-middle',
+            '[&_.react-renderer.node-elementAttachment]:align-middle',
             '[&_.react-renderer.node-elementAttachment]:before:content-[""] [&_.react-renderer.node-elementAttachment]:after:content-[""]',
             '[&_.react-renderer.node-elementAttachment]:before:inline-block [&_.react-renderer.node-elementAttachment]:after:inline-block',
             '[&_.react-renderer.node-elementAttachment]:before:w-0.5 [&_.react-renderer.node-elementAttachment]:after:w-0.5',

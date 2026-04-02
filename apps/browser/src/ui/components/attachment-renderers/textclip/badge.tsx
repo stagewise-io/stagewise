@@ -148,7 +148,7 @@ export function TextClipBadge(props: BadgeProps) {
 
   return (
     <InlineBadgeWrapper viewOnly={viewOnly} previewContent={previewContent}>
-      <span className="group/badge relative inline-flex items-center">
+      <span className="group/badge relative inline-flex items-center align-middle">
         <InlineBadge
           icon={<ClipboardPaste className="size-3 text-foreground" />}
           label={displayLabel}
