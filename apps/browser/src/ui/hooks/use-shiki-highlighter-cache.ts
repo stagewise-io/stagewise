@@ -122,6 +122,14 @@ export class HighlightCache {
     compactDiff?: boolean,
   ): CacheEntry | undefined {
     const key = generateCacheKey(code, language, preClassName, compactDiff);
+    return this.getByKey(key);
+  }
+
+  /**
+   * Gets a cached entry by pre-computed key.
+   * Use when the caller has already computed the key to avoid re-hashing.
+   */
+  getByKey(key: string): CacheEntry | undefined {
     const entry = this.cache.get(key);
     if (entry) entry.accessTime = Date.now();
     return entry;
@@ -139,7 +147,14 @@ export class HighlightCache {
     html: string,
   ): void {
     const key = generateCacheKey(code, language, preClassName, compactDiff);
+    this.setByKey(key, html);
+  }
 
+  /**
+   * Sets a cache entry by pre-computed key.
+   * Use when the caller has already computed the key to avoid re-hashing.
+   */
+  setByKey(key: string, html: string): void {
     // Evict oldest entries if at capacity
     if (this.cache.size >= this.maxSize && !this.cache.has(key))
       this.evictOldest();

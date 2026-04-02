@@ -718,7 +718,9 @@ interface WorkspaceSelectProps {
   onWorkspaceChange?: () => void;
 }
 
-export function WorkspaceSelect({ onWorkspaceChange }: WorkspaceSelectProps) {
+export const WorkspaceSelect = memo(function WorkspaceSelect({
+  onWorkspaceChange,
+}: WorkspaceSelectProps) {
   const [openAgent] = useOpenAgent();
 
   const recentlyOpenedWorkspaces = useKartonState(
@@ -995,4 +997,4 @@ export function WorkspaceSelect({ onWorkspaceChange }: WorkspaceSelectProps) {
       )}
     </>
   );
-}
+});

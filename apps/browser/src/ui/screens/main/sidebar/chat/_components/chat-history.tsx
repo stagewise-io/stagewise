@@ -1,4 +1,5 @@
 import {
+  type ReactNode,
   useCallback,
   useMemo,
   useState,
@@ -253,11 +254,17 @@ export const ChatHistory = () => {
     setRemovedSuggestionIds((prev) => new Set([...Array.from(prev), id]));
   };
 
-  // All messages after filtering and merging consecutive assistant messages
+  // All messages after filtering and merging consecutive assistant messages.
+  // Preserves object identity for messages that haven't changed so Virtuoso
+  // can skip re-rendering them.
+  const prevServerMessagesRef = useRef<AgentMessage[]>([]);
   const serverMessages = useMemo(() => {
-    if (!history) return [];
+    if (!history) {
+      prevServerMessagesRef.current = [];
+      return [];
+    }
 
-    return history
+    const newMessages = history
       .filter(
         (message) => message.role === 'user' || message.role === 'assistant',
       )
@@ -284,6 +291,35 @@ export const ChatHistory = () => {
 
         return curr;
       }, []);
+
+    // Reuse previous objects for messages that haven't changed.
+    // During streaming only the last message mutates (new parts or last
+    // part content updated).  Earlier messages usually keep their Immer
+    // identity, but non-last messages CAN change when e.g. a tool
+    // approval is skipped (state flips from approval-requested to
+    // output-denied).  We therefore verify parts count + per-part
+    // type/state before reusing the cached reference.
+    const prev = prevServerMessagesRef.current;
+    for (let i = 0; i < newMessages.length - 1; i++) {
+      const prevMsg = prev[i];
+      const newMsg = newMessages[i]!;
+      if (
+        prevMsg &&
+        prevMsg.id === newMsg.id &&
+        prevMsg.parts.length === newMsg.parts.length &&
+        prevMsg.parts.every((p, j) => {
+          const n = newMsg.parts[j];
+          return (
+            n && p.type === n.type && (p as any).state === (n as any).state
+          );
+        })
+      ) {
+        newMessages[i] = prevMsg;
+      }
+    }
+
+    prevServerMessagesRef.current = newMessages;
+    return newMessages;
   }, [history]);
 
   // For each user/assistant message, check if any subsequent messages contain
@@ -400,6 +436,7 @@ export const ChatHistory = () => {
     return displayMessages;
   }, [serverMessages, optimisticMessages, replacedMessageId]);
 
+  const prevResolvedMountsRef = useRef<Mount[]>([]);
   const resolvedMounts = useMemo<Mount[]>(() => {
     const mountsByPrefix = new Map<string, Mount>();
     for (const msg of filteredMessages) {
@@ -411,7 +448,19 @@ export const ChatHistory = () => {
         }
       }
     }
-    return Array.from(mountsByPrefix.values());
+    const next = Array.from(mountsByPrefix.values());
+    const prev = prevResolvedMountsRef.current;
+    // Preserve reference identity when mount data hasn't changed
+    if (
+      prev.length === next.length &&
+      prev.every(
+        (m, i) => m.prefix === next[i]!.prefix && m.path === next[i]!.path,
+      )
+    ) {
+      return prev;
+    }
+    prevResolvedMountsRef.current = next;
+    return next;
   }, [filteredMessages]);
 
   // Cache for height calculations - keyed by message ID + parts length + width
@@ -422,7 +471,6 @@ export const ChatHistory = () => {
   const estimatedHeights = useMemo(() => {
     if (filteredMessages.length === 0 || containerWidth === 0) return [];
 
-    const DEFAULT_STREAMING_HEIGHT = 200;
     const cache = heightCacheRef.current;
 
     // Find the last user message index to calculate spacer height
@@ -457,10 +505,6 @@ export const ChatHistory = () => {
     return filteredMessages.map((msg, index) => {
       const isLastMsg = index === filteredMessages.length - 1;
 
-      // For the last message while agent is working, use default + spacer
-      if (isLastMsg && isWorking)
-        return DEFAULT_STREAMING_HEIGHT + spacerHeight;
-
       // Create cache key from message ID + parts count + width
       const cacheKey = `${msg.id}:${msg.parts.length}:${containerWidth}`;
 
@@ -477,7 +521,7 @@ export const ChatHistory = () => {
 
       return height;
     });
-  }, [filteredMessages, containerWidth, containerHeight, isWorking, error]);
+  }, [filteredMessages, containerWidth, containerHeight, error]);
 
   // Calculate average estimated height for defaultItemHeight
 
@@ -619,6 +663,41 @@ export const ChatHistory = () => {
     return -1;
   }, [filteredMessages]);
 
+  // --- Refs for itemContent stabilisation ---
+  // These mirror frequently-changing derived values so that the
+  // itemContent callback can read them at call time without including
+  // them in its dependency array.  This keeps the callback identity
+  // stable during streaming, which prevents Virtuoso from re-invoking
+  // it for every visible item on each chunk.
+  const filteredMessagesRef = useRef(filteredMessages);
+  filteredMessagesRef.current = filteredMessages;
+  const lastUserMsgIndexRef = useRef(lastUserMsgIndex);
+  lastUserMsgIndexRef.current = lastUserMsgIndex;
+  const hasFileModsAfterMapRef = useRef(hasFileModsAfterMap);
+  hasFileModsAfterMapRef.current = hasFileModsAfterMap;
+  const showWorkingIndicatorRef = useRef(showWorkingIndicator);
+  showWorkingIndicatorRef.current = showWorkingIndicator;
+  const showBetweenStepsIndicatorRef = useRef(showBetweenStepsIndicator);
+  showBetweenStepsIndicatorRef.current = showBetweenStepsIndicator;
+  const canRetryRef = useRef(false); // updated below after canRetry is defined
+  const errorRef = useRef(error);
+  errorRef.current = error;
+  const isWorkingRef = useRef(isWorking);
+  isWorkingRef.current = isWorking;
+
+  // Cache browser context per message ID so the same value object is reused
+  // across streaming chunks.  Environment snapshots are baked into message
+  // metadata and never change for a given position, so the cache is safe.
+  const browserContextCacheRef = useRef(
+    new Map<
+      string,
+      {
+        sessionId: string | null;
+        tabs: Map<string, BrowserTabSnapshot> | null;
+      }
+    >(),
+  );
+
   // Set spacer height synchronously before paint
   useLayoutEffect(() => {
     // Update ref so callback ref can access latest value
@@ -637,57 +716,139 @@ export const ChatHistory = () => {
     const lastMessage = filteredMessages[filteredMessages.length - 1];
     return lastMessage?.role === 'user';
   }, [error, isWorking, filteredMessages]);
+  canRetryRef.current = canRetry;
 
-  // Render individual message item
+  // Render individual message item.
+  // All frequently-changing values (filteredMessages, isWorking, error,
+  // showWorkingIndicator, etc.) are read from refs at call time so the
+  // callback identity stays stable during streaming.  Virtuoso only
+  // re-invokes this for items whose `data[index]` reference changed.
+  // --- Element cache for settled messages ---
+  // Virtuoso calls itemContent for ALL visible items whenever data changes.
+  // By caching the ReactNode for settled messages, we return the exact same
+  // object reference.  React sees === and skips the entire subtree instantly
+  // (no memo comparison, no reconciliation, zero overhead).
+  const elementCacheRef = useRef(new Map<string, ReactNode>());
+  const userMsgIdsInCacheRef = useRef(new Set<string>());
+  const cacheGenRef = useRef(0);
+  const prevIsWorkingCacheRef = useRef(isWorking);
+  const prevStructuralDepsRef = useRef({
+    msgLen: filteredMessages.length,
+    paddingRight,
+    openAgent,
+  });
+  // Incremented on every invalidation so `itemContent` (which depends on
+  // `cacheGen`) is re-invoked by Virtuoso.  Uses refs to diff previous vs
+  // current dep values inside the memo body — this is intentional: the
+  // deps array triggers re-execution, and the refs let us distinguish
+  // *which* dep changed to apply the right eviction strategy.
+  const cacheGen = useMemo(() => {
+    const prev = prevStructuralDepsRef.current;
+    const structuralChange =
+      prev.msgLen !== filteredMessages.length ||
+      prev.paddingRight !== paddingRight ||
+      prev.openAgent !== openAgent;
+    const isWorkingChange = prevIsWorkingCacheRef.current !== isWorking;
+    prevStructuralDepsRef.current = {
+      msgLen: filteredMessages.length,
+      paddingRight,
+      openAgent,
+    };
+    prevIsWorkingCacheRef.current = isWorking;
+
+    if (structuralChange) {
+      elementCacheRef.current.clear();
+      userMsgIdsInCacheRef.current.clear();
+    } else if (isWorkingChange) {
+      // Only user messages need re-rendering (canEdit depends on
+      // isWorking).  Assistant messages with expensive DiffPreview /
+      // CodeBlock subtrees stay cached.
+      userMsgIdsInCacheRef.current.forEach((id) => {
+        elementCacheRef.current.delete(id);
+      });
+      userMsgIdsInCacheRef.current.clear();
+    }
+
+    return ++cacheGenRef.current;
+  }, [filteredMessages.length, paddingRight, openAgent, isWorking]);
+  // Keep the gen ref in sync (unused directly, but ensures the dep is used)
+  cacheGenRef.current = cacheGen;
+
   const itemContent = useCallback(
     (index: number, message: AgentMessage) => {
-      const isLastMessage = index === filteredMessages.length - 1;
-      const isLastUserMessage = index === lastUserMsgIndex;
+      const msgs = filteredMessagesRef.current;
+      const isLastMessage = index === msgs.length - 1;
+
+      // Short-circuit: return cached React element for settled (non-last)
+      // messages.  React sees the same object reference (===) and skips
+      // the entire subtree — no memo comparison, no reconciliation.
+      const elCache = elementCacheRef.current;
+      if (!isLastMessage) {
+        const cached = elCache.get(message.id);
+        if (cached) return cached;
+      }
+
+      const isLastUserMessage = index === lastUserMsgIndexRef.current;
       const isLastAssistantMessage =
         isLastMessage && message.role === 'assistant';
+      const curIsWorking = isWorkingRef.current ?? false;
+      const curError = errorRef.current;
+      const curShowWorking = showWorkingIndicatorRef.current;
+      const curShowBetweenSteps = showBetweenStepsIndicatorRef.current;
+      const curCanRetry = canRetryRef.current;
+      const curHasFileMods = hasFileModsAfterMapRef.current;
 
-      // Resolve browser context at this message's position by walking backward
-      // through sparse snapshots — same logic as resolveEffectiveSnapshot.
-      let messageBrowserSessionId: string | null = null;
-      let messageTabs: Map<string, BrowserTabSnapshot> | null = null;
-      for (let i = index; i >= 0; i--) {
-        const snapshot = filteredMessages[i]?.metadata?.environmentSnapshot;
-        if (snapshot !== undefined) {
-          if (
-            messageBrowserSessionId === null &&
-            snapshot.browserSessionId !== undefined
-          )
-            messageBrowserSessionId = snapshot.browserSessionId;
-          if (messageTabs === null && snapshot.browser?.tabs) {
-            messageTabs = new Map(snapshot.browser.tabs.map((t) => [t.id, t]));
+      // Resolve browser context — reuse cached value when available so the
+      // context provider value identity stays stable across streaming chunks.
+      const ctxCache = browserContextCacheRef.current;
+      let browserCtx = ctxCache.get(message.id);
+      if (!browserCtx) {
+        let messageBrowserSessionId: string | null = null;
+        let messageTabs: Map<string, BrowserTabSnapshot> | null = null;
+        for (let i = index; i >= 0; i--) {
+          const snapshot = msgs[i]?.metadata?.environmentSnapshot;
+          if (snapshot !== undefined) {
+            if (
+              messageBrowserSessionId === null &&
+              snapshot.browserSessionId !== undefined
+            )
+              messageBrowserSessionId = snapshot.browserSessionId;
+            if (messageTabs === null && snapshot.browser?.tabs) {
+              messageTabs = new Map(
+                snapshot.browser.tabs.map((t) => [t.id, t]),
+              );
+            }
+            if (messageBrowserSessionId !== null && messageTabs !== null) break;
           }
-          if (messageBrowserSessionId !== null && messageTabs !== null) break;
         }
+        browserCtx = {
+          sessionId: messageBrowserSessionId,
+          tabs: messageTabs,
+        };
+        ctxCache.set(message.id, browserCtx);
       }
 
       const messageComponent = (
-        <MessageBrowserContextProvider
-          value={{ sessionId: messageBrowserSessionId, tabs: messageTabs }}
-        >
+        <MessageBrowserContextProvider value={browserCtx}>
           {message.role === 'user' ? (
             <MessageUser
               message={message as AgentMessage & { role: 'user' }}
               isLastMessage={isLastMessage}
-              isWorking={isWorking ?? false}
+              isWorking={curIsWorking}
               hasSubsequentFileModifications={
-                hasFileModsAfterMap.get(message.id) ?? false
+                curHasFileMods.get(message.id) ?? false
               }
             />
           ) : (
             <MessageAssistant
               message={message as AgentMessage & { role: 'assistant' }}
               isLastMessage={isLastMessage}
-              isWorking={isWorking ?? false}
+              isWorking={curIsWorking}
               showBetweenStepsIndicator={
-                isLastMessage ? showBetweenStepsIndicator : false
+                isLastMessage ? curShowBetweenSteps : false
               }
               hasSubsequentFileModifications={
-                hasFileModsAfterMap.get(message.id) ?? false
+                curHasFileMods.get(message.id) ?? false
               }
             />
           )}
@@ -705,12 +866,12 @@ export const ChatHistory = () => {
           >
             <div className="mx-auto w-full max-w-3xl">
               {messageComponent}
-              {showWorkingIndicator && <MessageLoading />}
-              {error && isLastMessage && openAgent && (
+              {curShowWorking && <MessageLoading />}
+              {curError && isLastMessage && openAgent && (
                 <MessageRuntimeError
                   agentInstanceId={openAgent}
-                  error={error}
-                  canRetry={canRetry}
+                  error={curError}
+                  canRetry={curCanRetry}
                   onRetry={() => void retryLastUserMessage(openAgent)}
                 />
               )}
@@ -731,13 +892,13 @@ export const ChatHistory = () => {
               {/* Spacer element receives minHeight to fill viewport below user message.
                   Error card and loading indicator live INSIDE the spacer (same pattern
                   as the assistant branch) so they don't overflow the measured area. */}
-              <div ref={lastAssistantMessageRef}>
-                {showWorkingIndicator && <MessageLoading />}
-                {error && isLastMessage && openAgent && (
+              <div ref={lastAssistantMessageRef} className="overflow-hidden">
+                {curShowWorking && <MessageLoading />}
+                {curError && isLastMessage && openAgent && (
                   <MessageRuntimeError
                     agentInstanceId={openAgent}
-                    error={error}
-                    canRetry={canRetry}
+                    error={curError}
+                    canRetry={curCanRetry}
                     onRetry={() => void retryLastUserMessage(openAgent)}
                   />
                 )}
@@ -749,7 +910,7 @@ export const ChatHistory = () => {
 
       // Last user message but NOT the last message overall (assistant came after)
       if (isLastUserMessage) {
-        return (
+        const el = (
           <div
             className={cn('flex flex-col pl-4', index === 0 && 'pt-2.5')}
             style={{ paddingRight }}
@@ -759,37 +920,48 @@ export const ChatHistory = () => {
             </div>
           </div>
         );
+        elCache.set(message.id, el);
+        if (message.role === 'user')
+          userMsgIdsInCacheRef.current.add(message.id);
+        return el;
       }
 
-      return (
+      const el = (
         <div
           className={cn('pl-4', index === 0 && 'pt-2.5')}
           style={{ paddingRight }}
         >
           <div className="mx-auto w-full max-w-3xl">
             {messageComponent}
-            {error && isLastMessage && openAgent && (
+            {curError && isLastMessage && openAgent && (
               <MessageRuntimeError
                 agentInstanceId={openAgent}
-                error={error}
-                canRetry={canRetry}
+                error={curError}
+                canRetry={curCanRetry}
                 onRetry={() => void retryLastUserMessage(openAgent)}
               />
             )}
           </div>
         </div>
       );
+      if (!isLastMessage) {
+        elCache.set(message.id, el);
+        if (message.role === 'user')
+          userMsgIdsInCacheRef.current.add(message.id);
+      }
+      return el;
     },
+    // cacheGen: forces Virtuoso to re-invoke itemContent when the element
+    // cache is invalidated (structural changes or isWorking toggle).
+    // Cached assistant messages return their cached element (React skips)
+    // while evicted user messages get a fresh element with correct canEdit.
     [
-      filteredMessages,
-      lastUserMsgIndex,
-      showWorkingIndicator,
-      showBetweenStepsIndicator,
       paddingRight,
-      isWorking,
       lastUserMessageRef,
       lastAssistantMessageRef,
-      error,
+      openAgent,
+      retryLastUserMessage,
+      cacheGen,
     ],
   );
 

@@ -10,19 +10,7 @@ import { ChevronDownIcon } from 'lucide-react';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useAutoScroll } from '@ui/hooks/use-auto-scroll';
 
-export const ToolPartUI = ({
-  trigger,
-  content,
-  contentClassName,
-  contentFooter,
-  contentFooterClassName,
-  expanded: controlledExpanded,
-  setExpanded: controlledSetExpanded,
-  showBorder = false,
-  autoScroll = true,
-  isShimmering = false,
-  hideChevron = false,
-}: {
+type ToolPartUIProps = {
   trigger?: React.ReactNode;
   content?: React.ReactNode;
   contentClassName?: string;
@@ -34,7 +22,44 @@ export const ToolPartUI = ({
   autoScroll?: boolean;
   isShimmering?: boolean;
   hideChevron?: boolean;
-}) => {
+};
+
+export const ToolPartUI = (props: ToolPartUIProps) => {
+  if (props.content === undefined) {
+    return (
+      <div
+        className={cn(
+          'flex h-6 w-full items-center gap-1 truncate font-normal text-muted-foreground',
+          props.showBorder &&
+            'rounded-lg border border-border-subtle bg-background px-2.5 shadow-xs dark:border-border dark:bg-surface-1',
+        )}
+      >
+        {props.trigger}
+      </div>
+    );
+  }
+
+  return <ToolPartUIWithContent {...props} content={props.content} />;
+};
+
+/**
+ * Inner component that only mounts when content is defined.
+ * Keeps useAutoScroll / useScrollFadeMask hooks out of the
+ * content-less (trigger-only) render path.
+ */
+const ToolPartUIWithContent = ({
+  trigger,
+  content,
+  contentClassName,
+  contentFooter,
+  contentFooterClassName,
+  expanded: controlledExpanded,
+  setExpanded: controlledSetExpanded,
+  showBorder = false,
+  autoScroll = true,
+  isShimmering = false,
+  hideChevron = false,
+}: Omit<ToolPartUIProps, 'content'> & { content: React.ReactNode }) => {
   // Internal state for uncontrolled mode
   const [internalExpanded, setInternalExpanded] = useState(true);
 
@@ -75,20 +100,6 @@ export const ToolPartUI = ({
     fadeDistance: 16,
   });
 
-  if (content === undefined) {
-    return (
-      <div
-        className={cn(
-          'flex h-6 w-full items-center gap-1 truncate font-normal text-muted-foreground',
-          showBorder &&
-            'rounded-lg border border-border-subtle bg-background px-2.5 shadow-xs dark:border-border dark:bg-surface-1',
-        )}
-      >
-        {trigger}
-      </div>
-    );
-  }
-
   return (
     <div
       className={cn(
@@ -103,9 +114,7 @@ export const ToolPartUI = ({
           size="condensed"
           className={cn(
             `group/trigger gap-1 px-0 font-normal text-muted-foreground`,
-            content !== undefined
-              ? 'cursor-pointer'
-              : 'cursor-default hover:bg-transparent active:bg-transparent',
+            'cursor-pointer',
             showBorder &&
               'h-6 rounded-t-lg rounded-b-none border-b bg-background px-2.5 dark:bg-surface-1',
             // Always have border-b, toggle color to avoid transition-all animating border
@@ -135,43 +144,41 @@ export const ToolPartUI = ({
             />
           )}
         </CollapsibleTrigger>
-        {content && (
-          <CollapsibleContent
+        <CollapsibleContent
+          className={cn(
+            'relative pb-0 text-xs duration-0!',
+            !showBorder && 'pt-1',
+          )}
+        >
+          <div
             className={cn(
-              'relative pb-0 text-xs duration-0!',
-              !showBorder && 'pt-1',
+              'mask-alpha',
+              showBorder ? 'max-h-64' : 'max-h-none',
+              contentFooter && 'mb-6',
             )}
+            style={maskStyle}
           >
+            <OverlayScrollbar
+              contentClassName={cn('py-0.5', contentClassName)}
+              options={{
+                overflow: { x: 'scroll', y: 'scroll' },
+              }}
+              onViewportRef={handleViewportRef}
+            >
+              {content}
+            </OverlayScrollbar>
+          </div>
+          {contentFooter && (
             <div
               className={cn(
-                'mask-alpha',
-                showBorder ? 'max-h-64' : 'max-h-none',
-                contentFooter && 'mb-6',
+                'absolute right-0 bottom-0 left-0 flex h-6 flex-row items-center justify-start gap-1 rounded-b-lg border-border/30 border-t bg-background px-2 py-1 text-muted-foreground dark:border-border/70 dark:bg-surface-1',
+                contentFooterClassName,
               )}
-              style={maskStyle}
             >
-              <OverlayScrollbar
-                contentClassName={cn('py-0.5', contentClassName)}
-                options={{
-                  overflow: { x: 'scroll', y: 'scroll' },
-                }}
-                onViewportRef={handleViewportRef}
-              >
-                {content}
-              </OverlayScrollbar>
+              {contentFooter}
             </div>
-            {contentFooter && (
-              <div
-                className={cn(
-                  'absolute right-0 bottom-0 left-0 flex h-6 flex-row items-center justify-start gap-1 rounded-b-lg border-border/30 border-t bg-background px-2 py-1 text-muted-foreground dark:border-border/70 dark:bg-surface-1',
-                  contentFooterClassName,
-                )}
-              >
-                {contentFooter}
-              </div>
-            )}
-          </CollapsibleContent>
-        )}
+          )}
+        </CollapsibleContent>
       </Collapsible>
     </div>
   );

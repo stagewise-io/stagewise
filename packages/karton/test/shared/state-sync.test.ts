@@ -193,11 +193,23 @@ describe('State Synchronization', () => {
       });
     });
 
-    it('should provide read-only state access', () => {
-      const state = clientManager.getState();
-      expect(() => {
-        (state as any).counter = 100;
-      }).toThrow();
+    it('should return structurally shared state across patches', () => {
+      clientManager.handleMessage(createStateSyncMessage({
+        counter: 10,
+        users: ['Alice', 'Bob']
+      }));
+
+      const stateBefore = clientManager.getState();
+
+      // Patch only counter — users array should keep same reference
+      const patches: Patch[] = [
+        { op: 'replace', path: ['counter'], value: 20 },
+      ];
+      clientManager.handleMessage(createStatePatchMessage(patches));
+
+      const stateAfter = clientManager.getState();
+      expect(stateAfter.counter).toBe(20);
+      expect(stateAfter.users).toBe(stateBefore.users);
     });
 
     it('should ignore non-state messages', () => {

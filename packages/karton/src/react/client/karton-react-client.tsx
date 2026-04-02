@@ -65,10 +65,64 @@ export function createKartonReactClient<T>(
 
   // Create client at module scope so it survives React remounts (e.g., StrictMode)
   // This prevents the state from resetting to fallbackState on remount
+
+  // Double-buffered notification with persistent cooldown.
+  //
+  // State machine (4 variables):
+  //
+  //   IDLE (microtaskScheduled=false, rafCooldown=false)
+  //     │  onStateChange()
+  //     ▼
+  //   MICROTASK_PENDING (microtaskScheduled=true, rafCooldown=false)
+  //     │  queueMicrotask fires → notify listeners
+  //     ▼
+  //   COOLDOWN (microtaskScheduled=false, rafCooldown=true)
+  //     │  subsequent onStateChange() → hasDeferredChanges=true (no notify)
+  //     │  setTimeout(MIN_COOLDOWN_MS) fires → flushDeferred()
+  //     ▼
+  //   if hasDeferredChanges: notify → re-enter COOLDOWN
+  //   else: → IDLE
+  //
+  // Why queueMicrotask for the first notification:
+  //   Microtasks run before paint, so scroll-position-dependent
+  //   components (e.g. react-virtuoso) see updated data in the same
+  //   frame. rAF would defer by one frame, causing scroll flicker.
+  //
+  // Why setTimeout for the cooldown (not rAF):
+  //   rAF fires at vSync boundaries which can be as short as 1-2ms
+  //   after scheduling. A precise setTimeout ensures the cooldown
+  //   window is respected regardless of display refresh rate (60/120Hz).
+  let microtaskScheduled = false;
+  let rafCooldown = false;
+  let hasDeferredChanges = false;
+  const MIN_COOLDOWN_MS = 12;
+
+  function flushDeferred() {
+    rafCooldown = false;
+    if (hasDeferredChanges) {
+      hasDeferredChanges = false;
+      listeners.forEach((listener) => listener());
+      rafCooldown = true;
+      setTimeout(flushDeferred, MIN_COOLDOWN_MS);
+    }
+  }
+
   const client = createKartonClient({
     ...config,
     onStateChange: () => {
-      listeners.forEach((listener) => listener());
+      if (rafCooldown) {
+        hasDeferredChanges = true;
+        return;
+      }
+      if (!microtaskScheduled) {
+        microtaskScheduled = true;
+        queueMicrotask(() => {
+          microtaskScheduled = false;
+          listeners.forEach((listener) => listener());
+          rafCooldown = true;
+          setTimeout(flushDeferred, MIN_COOLDOWN_MS);
+        });
+      }
     },
   });
 

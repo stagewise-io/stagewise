@@ -2363,7 +2363,42 @@ export abstract class BaseAgent<
             return draft.history[draft.history.length - 1];
           })();
 
-        existingMessage.parts = uiMessage.parts;
+        // Fine-grained merge: only touch parts that are still actively
+        // changing so Immer produces small, targeted patches and settled
+        // part references survive all the way to React (SinglePartRenderer
+        // relies on reference equality for memoisation).
+        //
+        // Contract: once a part reaches a settled state, its content
+        // (type, input, output) is considered final and will not be
+        // re-emitted with different values by the AI SDK stream.  If
+        // this assumption is violated, the stale part will persist until
+        // a non-settled state change forces an update.
+        const incoming = uiMessage.parts;
+        const existing = existingMessage.parts;
+        const settled = new Set([
+          'output-available',
+          'output-error',
+          'output-denied',
+          'done',
+        ]);
+        for (let i = 0; i < incoming.length; i++) {
+          if (i >= existing.length) {
+            existing.push(incoming[i]);
+          } else {
+            const ep = existing[i] as Record<string, unknown>;
+            const ip = incoming[i] as Record<string, unknown>;
+            if (
+              ep.type === ip.type &&
+              ep.state === ip.state &&
+              settled.has(ep.state as string)
+            )
+              continue;
+
+            existing[i] = incoming[i];
+          }
+        }
+        if (existing.length > incoming.length)
+          existing.length = incoming.length;
 
         existingMessage.metadata ??= {
           createdAt: new Date(),

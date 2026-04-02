@@ -18,19 +18,31 @@ import { useOpenAgent, OpenAgentContext } from '@ui/hooks/use-open-chat';
 export function ChatPanel() {
   const { forwardDropEvent } = useMessageEditState();
   const [openAgent, setOpenAgent, removeFromHistory] = useOpenAgent();
-  const agents = useKartonState((s) => s.agents.instances);
 
+  // Narrow selectors: only extract primitive/stable values so streaming
+  // chunks on unrelated agents don't trigger a re-render.
+  const firstAgentId = useKartonState(
+    (s) => Object.keys(s.agents.instances)[0] ?? null,
+  );
+  const openAgentExists = useKartonState((s) =>
+    openAgent ? !!s.agents.instances[openAgent] : false,
+  );
   // Defer heavy chat rendering so the sidebar updates instantly while the
   // chat area stays empty during the transition.
   const deferredAgent = useDeferredValue(openAgent);
   const isTransitioning = openAgent !== deferredAgent;
 
+  const deferredAgentHistoryLen = useKartonState((s) =>
+    deferredAgent
+      ? (s.agents.instances[deferredAgent]?.state.history?.length ?? 0)
+      : 0,
+  );
+
   useEffect(() => {
-    if (openAgent === null && Object.keys(agents).length > 0) {
-      const firstAgent = Object.keys(agents)[0]!;
-      setOpenAgent(firstAgent);
+    if (openAgent === null && firstAgentId) {
+      setOpenAgent(firstAgentId);
     }
-  }, [agents, openAgent]);
+  }, [firstAgentId, openAgent, setOpenAgent]);
 
   // Track drag-over state for visual feedback
   const [isDragOver, setIsDragOver] = useState(false);
@@ -89,7 +101,7 @@ export function ChatPanel() {
     [deferredAgent, setOpenAgent, removeFromHistory],
   );
 
-  if (openAgent === null || openAgent === undefined || !agents[openAgent])
+  if (openAgent === null || openAgent === undefined || !openAgentExists)
     return (
       <div className="flex size-full items-center justify-center text-muted-foreground">
         No agent selected
@@ -111,13 +123,7 @@ export function ChatPanel() {
     >
       <OpenAgentContext.Provider value={deferredContext}>
         {isTransitioning ? (
-          <div
-            className={
-              agents[deferredAgent ?? '']?.state.history?.length
-                ? 'flex-1'
-                : 'h-0'
-            }
-          />
+          <div className={deferredAgentHistoryLen > 0 ? 'flex-1' : 'h-0'} />
         ) : (
           <ChatHistory />
         )}

@@ -123,7 +123,7 @@ export interface ChatInputHandle {
   ) => void;
 }
 
-export const ChatInput = ({
+export const ChatInput = memo(function ChatInput({
   value,
   defaultValue,
   onChange,
@@ -157,7 +157,7 @@ export const ChatInput = ({
 
   className,
   ref,
-}: ChatInputProps) => {
+}: ChatInputProps) {
   const focusChatHotkeyText = HotkeyComboText({
     action: HotkeyActions.TOGGLE_CONTEXT_SELECTOR,
   });
@@ -524,6 +524,33 @@ export const ChatInput = ({
     },
   }));
 
+  // Stable callbacks for ModelSelect/WorkspaceSelect — avoids creating
+  // new closures on every ChatInput render which would bust their memo().
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+  const onModelChangeRef = useRef(onModelChange);
+  onModelChangeRef.current = onModelChange;
+  const onWorkspaceChangeRef = useRef(onWorkspaceChange);
+  onWorkspaceChangeRef.current = onWorkspaceChange;
+
+  const handleModelSelectChange = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        editorRef.current?.commands.focus('end');
+        onModelChangeRef.current?.();
+      });
+    });
+  }, []);
+
+  const handleWorkspaceChange = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        editorRef.current?.commands.focus('end');
+        onWorkspaceChangeRef.current?.();
+      });
+    });
+  }, []);
+
   return (
     <div className={cn('flex flex-1 flex-col items-stretch gap-1', className)}>
       {/* Rich text input area */}
@@ -597,29 +624,10 @@ export const ChatInput = ({
             )}
           >
             {showWorkspaceSelect && (
-              <WorkspaceSelect
-                onWorkspaceChange={() => {
-                  requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                      editor?.commands.focus('end');
-                      onWorkspaceChange?.();
-                    });
-                  });
-                }}
-              />
+              <WorkspaceSelect onWorkspaceChange={handleWorkspaceChange} />
             )}
             {showModelSelect && (
-              <ModelSelect
-                onModelChange={() => {
-                  // Defer focus until after popover closes using double rAF
-                  requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                      editor?.commands.focus('end');
-                      onModelChange?.();
-                    });
-                  });
-                }}
-              />
+              <ModelSelect onModelChange={handleModelSelectChange} />
             )}
             {showContextUsageRing && contextUsedPercentage > 0 && (
               <ContextUsageRing
@@ -632,7 +640,7 @@ export const ChatInput = ({
         )}
     </div>
   );
-};
+});
 
 export interface ChatInputActionsProps {
   /** Whether the agent is currently working (used to determine stop/send button visibility) */

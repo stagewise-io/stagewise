@@ -3,7 +3,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { cn } from '@ui/utils';
 
 interface ContextUsageRingProps {
@@ -13,7 +13,7 @@ interface ContextUsageRingProps {
   className?: string;
 }
 
-export function ContextUsageRing({
+export const ContextUsageRing = memo(function ContextUsageRing({
   percentage,
   usedKb,
   maxKb,
@@ -77,4 +77,4 @@ export function ContextUsageRing({
       </TooltipContent>
     </Tooltip>
   );
-}
+});
