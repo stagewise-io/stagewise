@@ -113,7 +113,7 @@ export const AgentCard = memo(
           )}
         </div>
 
-        <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 rounded-r-[calc(var(--radius-md)-2px)] bg-linear-to-r from-transparent to-[20px] to-surface-2 pr-2 pl-6 opacity-0 transition-opacity group-hover/card:opacity-100">
+        <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 rounded-r-[calc(var(--radius-md)-2px)] bg-linear-to-r from-transparent to-[20px] to-surface-2 pr-2 pl-6 opacity-0 transition-opacity focus-within:opacity-100 group-hover/card:opacity-100">
           <Tooltip>
             <TooltipTrigger delay={500}>
               <Button

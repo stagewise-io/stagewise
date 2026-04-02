@@ -350,10 +350,14 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
       .current(rawFetchedCountRef.current, PAGE_SIZE)
       .then((res) => {
         rawFetchedCountRef.current += res.length;
-        isLoadingMoreRef.current = false;
         if (res.length < PAGE_SIZE) setHasMoreHistory(false);
-
         if (res.length > 0) setAgentsList((prev) => [...prev, ...res]);
+      })
+      .catch(() => {
+        // Swallow — pagination will retry on next scroll.
+      })
+      .finally(() => {
+        isLoadingMoreRef.current = false;
       });
   }, []);
 

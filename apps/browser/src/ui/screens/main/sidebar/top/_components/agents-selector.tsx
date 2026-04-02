@@ -155,7 +155,7 @@ export const AgentsSelector = memo(
       );
       observer.observe(sentinel);
       return () => observer.disconnect();
-    }, [hasResults]);
+    }, [hasResults, isOpen]);
 
     const handleValueChange = useCallback(
       (v: string | null) => {
@@ -274,7 +274,7 @@ export const AgentsSelector = memo(
                           </span>
                           <button
                             type="button"
-                            className="col-start-3 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground group-hover/item:opacity-100"
+                            className="col-start-3 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
                             data-agent-id={agent.id}
                             onClick={handleDeleteClick}
                           >
