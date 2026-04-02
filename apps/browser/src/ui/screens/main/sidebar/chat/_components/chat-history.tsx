@@ -729,11 +729,46 @@ export const ChatHistory = () => {
   // object reference.  React sees === and skips the entire subtree instantly
   // (no memo comparison, no reconciliation, zero overhead).
   const elementCacheRef = useRef(new Map<string, ReactNode>());
+  const userMsgIdsInCacheRef = useRef(new Set<string>());
   const cacheGenRef = useRef(0);
+  const prevIsWorkingCacheRef = useRef(isWorking);
+  const prevStructuralDepsRef = useRef({
+    msgLen: filteredMessages.length,
+    paddingRight,
+    openAgent,
+  });
+  // Incremented on every invalidation so `itemContent` (which depends on
+  // `cacheGen`) is re-invoked by Virtuoso.  Uses refs to diff previous vs
+  // current dep values inside the memo body — this is intentional: the
+  // deps array triggers re-execution, and the refs let us distinguish
+  // *which* dep changed to apply the right eviction strategy.
   const cacheGen = useMemo(() => {
-    // Invalidate cache when structural layout properties change.
-    // During streaming none of these change, so the cache stays valid.
-    elementCacheRef.current.clear();
+    const prev = prevStructuralDepsRef.current;
+    const structuralChange =
+      prev.msgLen !== filteredMessages.length ||
+      prev.paddingRight !== paddingRight ||
+      prev.openAgent !== openAgent;
+    const isWorkingChange = prevIsWorkingCacheRef.current !== isWorking;
+    prevStructuralDepsRef.current = {
+      msgLen: filteredMessages.length,
+      paddingRight,
+      openAgent,
+    };
+    prevIsWorkingCacheRef.current = isWorking;
+
+    if (structuralChange) {
+      elementCacheRef.current.clear();
+      userMsgIdsInCacheRef.current.clear();
+    } else if (isWorkingChange) {
+      // Only user messages need re-rendering (canEdit depends on
+      // isWorking).  Assistant messages with expensive DiffPreview /
+      // CodeBlock subtrees stay cached.
+      userMsgIdsInCacheRef.current.forEach((id) => {
+        elementCacheRef.current.delete(id);
+      });
+      userMsgIdsInCacheRef.current.clear();
+    }
+
     return ++cacheGenRef.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredMessages.length, paddingRight, openAgent, isWorking]);
@@ -887,6 +922,8 @@ export const ChatHistory = () => {
           </div>
         );
         elCache.set(message.id, el);
+        if (message.role === 'user')
+          userMsgIdsInCacheRef.current.add(message.id);
         return el;
       }
 
@@ -908,15 +945,25 @@ export const ChatHistory = () => {
           </div>
         </div>
       );
-      if (!isLastMessage) elCache.set(message.id, el);
+      if (!isLastMessage) {
+        elCache.set(message.id, el);
+        if (message.role === 'user')
+          userMsgIdsInCacheRef.current.add(message.id);
+      }
       return el;
     },
+    // cacheGen: forces Virtuoso to re-invoke itemContent when the element
+    // cache is invalidated (structural changes or isWorking toggle).
+    // Cached assistant messages return their cached element (React skips)
+    // while evicted user messages get a fresh element with correct canEdit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       paddingRight,
       lastUserMessageRef,
       lastAssistantMessageRef,
       openAgent,
       retryLastUserMessage,
+      cacheGen,
     ],
   );
 

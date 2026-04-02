@@ -16,7 +16,8 @@ export function useIsTruncated(ref: RefObject<HTMLElement | null>) {
     const observer = new ResizeObserver(check);
     observer.observe(el);
     return () => observer.disconnect();
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ref object is stable; ResizeObserver handles changes
+  }, []);
 
   return { isTruncated, tooltipOpen, setTooltipOpen };
 }

@@ -1,12 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
 
+interface ScrollState {
+  canScrollLeft: boolean;
+  canScrollRight: boolean;
+  canScrollUp: boolean;
+  canScrollDown: boolean;
+}
+
+const INITIAL_STATE: ScrollState = {
+  canScrollLeft: false,
+  canScrollRight: false,
+  canScrollUp: false,
+  canScrollDown: false,
+};
+
 export function useIsContainerScrollable(
   containerRef: React.RefObject<HTMLElement | null>,
 ) {
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-  const [canScrollUp, setCanScrollUp] = useState(false);
-  const [canScrollDown, setCanScrollDown] = useState(false);
+  const [state, setState] = useState<ScrollState>(INITIAL_STATE);
   // Track the element via state so we can re-run the effect when ref becomes available
   const [element, setElement] = useState<HTMLElement | null>(null);
 
@@ -19,10 +30,7 @@ export function useIsContainerScrollable(
   const update = useCallback(() => {
     const el = element;
     if (!el) {
-      setCanScrollLeft(false);
-      setCanScrollRight(false);
-      setCanScrollUp(false);
-      setCanScrollDown(false);
+      setState(INITIAL_STATE);
       return;
     }
 
@@ -38,13 +46,23 @@ export function useIsContainerScrollable(
     // Small threshold to handle subpixel rendering precision issues
     const threshold = 1;
 
-    // Horizontal scroll
-    setCanScrollLeft(scrollLeft > threshold);
-    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - threshold);
+    const next: ScrollState = {
+      canScrollLeft: scrollLeft > threshold,
+      canScrollRight: scrollLeft + clientWidth < scrollWidth - threshold,
+      canScrollUp: scrollTop > threshold,
+      canScrollDown: scrollTop + clientHeight < scrollHeight - threshold,
+    };
 
-    // Vertical scroll
-    setCanScrollUp(scrollTop > threshold);
-    setCanScrollDown(scrollTop + clientHeight < scrollHeight - threshold);
+    setState((prev) => {
+      if (
+        prev.canScrollLeft === next.canScrollLeft &&
+        prev.canScrollRight === next.canScrollRight &&
+        prev.canScrollUp === next.canScrollUp &&
+        prev.canScrollDown === next.canScrollDown
+      )
+        return prev;
+      return next;
+    });
   }, [element]);
 
   useEffect(() => {
@@ -85,10 +103,5 @@ export function useIsContainerScrollable(
     };
   }, [element, update]);
 
-  return {
-    canScrollLeft,
-    canScrollRight,
-    canScrollUp,
-    canScrollDown,
-  };
+  return state;
 }

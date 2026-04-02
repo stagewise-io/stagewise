@@ -1,12 +1,22 @@
 'use client';
 
 import posthog from 'posthog-js';
-import { type HTMLAttributes, useEffect, useRef, useState, memo } from 'react';
+import {
+  type HTMLAttributes,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  memo,
+} from 'react';
 import type { BundledLanguage, ThemeRegistrationAny } from 'shiki';
 import { cn } from '@ui/utils';
 import CodeBlockLightTheme from './code-block-light-theme.json';
 import CodeBlockDarkTheme from './code-block-dark-theme.json';
-import { getHighlightCache } from '@ui/hooks/use-shiki-highlighter-cache';
+import {
+  getHighlightCache,
+  generateCacheKey,
+} from '@ui/hooks/use-shiki-highlighter-cache';
 import { getShikiWorkerProxy } from './shiki-worker-proxy';
 
 export type CodeBlockTheme = {
@@ -205,13 +215,14 @@ export const CodeBlock = memo(
     theme = defaultCodeBlockTheme,
     ...rest
   }: CodeBlockProps) => {
-    // Check cache FIRST - if we have a cache hit, use it immediately
-    const cachedEntry = highlightCache.get(
-      code,
-      language,
-      preClassName,
-      compactDiff,
+    // Compute cache key once per render — avoids repeated cyrb53 hashing
+    const cacheKey = useMemo(
+      () => generateCacheKey(code, language, preClassName, compactDiff),
+      [code, language, preClassName, compactDiff],
     );
+
+    // Check cache FIRST - if we have a cache hit, use it immediately
+    const cachedEntry = highlightCache.getByKey(cacheKey);
 
     // State holds worker results for cache misses
     const [workerHtml, setWorkerHtml] = useState<string>('');
@@ -227,15 +238,8 @@ export const CodeBlock = memo(
     useEffect(() => {
       mountedRef.current = true;
 
-      // Check cache first
-      const cached = highlightCache.get(
-        code,
-        language,
-        preClassName,
-        compactDiff,
-      );
-
-      if (cached) {
+      // Check cache — uses pre-computed key (no re-hash)
+      if (highlightCache.getByKey(cacheKey)) {
         // Cache hit: sync render path already uses cachedEntry.html,
         // so skip the worker call entirely.
         return () => {
@@ -247,14 +251,8 @@ export const CodeBlock = memo(
       getShikiWorkerProxy()
         .highlightCode(code, language, preClassName, compactDiff, 'full')
         .then((highlighted) => {
-          // Cache the result
-          highlightCache.set(
-            code,
-            language,
-            preClassName,
-            compactDiff,
-            highlighted,
-          );
+          // Cache the result using pre-computed key
+          highlightCache.setByKey(cacheKey, highlighted);
 
           // Update state only if still mounted
           if (mountedRef.current) {
@@ -272,7 +270,7 @@ export const CodeBlock = memo(
       return () => {
         mountedRef.current = false;
       };
-    }, [code, language, preClassName, compactDiff]);
+    }, [cacheKey, code, language, preClassName, compactDiff]);
 
     // Plain-text fallback while waiting for worker (prevents layout shift)
     if (!html) {
