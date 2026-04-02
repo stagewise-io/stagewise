@@ -67,18 +67,24 @@ export function createKartonReactClient<T>(
   // This prevents the state from resetting to fallbackState on remount
 
   // Coalesce rapid state changes (e.g. streaming chunks) into a single
-  // React notification per animation frame.  The underlying client.state
-  // is updated synchronously, so useSyncExternalStore always reads the
-  // latest snapshot — we only defer the *notification* that triggers a
-  // re-render, eliminating 4-9× redundant render cycles per frame.
-  let rafScheduled = false;
+  // React notification per microtask checkpoint.  The underlying
+  // client.state is updated synchronously, so useSyncExternalStore always
+  // reads the latest snapshot — we only defer the *notification* that
+  // triggers a re-render.
+  //
+  // queueMicrotask (not rAF) is used intentionally: microtasks run before
+  // the browser paints, so scroll-position-dependent components (e.g.
+  // react-virtuoso) see the updated data in the same frame as the state
+  // change.  rAF would defer the notification by one frame, causing a
+  // visible scroll flicker when Virtuoso adjusts layout.
+  let microtaskScheduled = false;
   const client = createKartonClient({
     ...config,
     onStateChange: () => {
-      if (!rafScheduled) {
-        rafScheduled = true;
-        requestAnimationFrame(() => {
-          rafScheduled = false;
+      if (!microtaskScheduled) {
+        microtaskScheduled = true;
+        queueMicrotask(() => {
+          microtaskScheduled = false;
           listeners.forEach((listener) => listener());
         });
       }
