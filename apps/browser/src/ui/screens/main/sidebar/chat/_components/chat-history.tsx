@@ -471,7 +471,6 @@ export const ChatHistory = () => {
   const estimatedHeights = useMemo(() => {
     if (filteredMessages.length === 0 || containerWidth === 0) return [];
 
-    const DEFAULT_STREAMING_HEIGHT = 200;
     const cache = heightCacheRef.current;
 
     // Find the last user message index to calculate spacer height
@@ -506,10 +505,6 @@ export const ChatHistory = () => {
     return filteredMessages.map((msg, index) => {
       const isLastMsg = index === filteredMessages.length - 1;
 
-      // For the last message while agent is working, use default + spacer
-      if (isLastMsg && isWorking)
-        return DEFAULT_STREAMING_HEIGHT + spacerHeight;
-
       // Create cache key from message ID + parts count + width
       const cacheKey = `${msg.id}:${msg.parts.length}:${containerWidth}`;
 
@@ -526,7 +521,7 @@ export const ChatHistory = () => {
 
       return height;
     });
-  }, [filteredMessages, containerWidth, containerHeight, isWorking, error]);
+  }, [filteredMessages, containerWidth, containerHeight, error]);
 
   // Calculate average estimated height for defaultItemHeight
 
@@ -863,7 +858,7 @@ export const ChatHistory = () => {
               {/* Spacer element receives minHeight to fill viewport below user message.
                   Error card and loading indicator live INSIDE the spacer (same pattern
                   as the assistant branch) so they don't overflow the measured area. */}
-              <div ref={lastAssistantMessageRef}>
+              <div ref={lastAssistantMessageRef} className="overflow-hidden">
                 {curShowWorking && <MessageLoading />}
                 {curError && isLastMessage && openAgent && (
                   <MessageRuntimeError
