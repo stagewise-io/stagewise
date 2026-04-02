@@ -294,12 +294,26 @@ export const ChatHistory = () => {
 
     // Reuse previous objects for messages that haven't changed.
     // During streaming only the last message mutates (new parts or last
-    // part content updated).  Earlier messages keep their Immer identity
-    // in the source history, so matching by ID is sufficient.
+    // part content updated).  Earlier messages usually keep their Immer
+    // identity, but non-last messages CAN change when e.g. a tool
+    // approval is skipped (state flips from approval-requested to
+    // output-denied).  We therefore verify parts count + per-part
+    // type/state before reusing the cached reference.
     const prev = prevServerMessagesRef.current;
     for (let i = 0; i < newMessages.length - 1; i++) {
       const prevMsg = prev[i];
-      if (prevMsg && prevMsg.id === newMessages[i]!.id) {
+      const newMsg = newMessages[i]!;
+      if (
+        prevMsg &&
+        prevMsg.id === newMsg.id &&
+        prevMsg.parts.length === newMsg.parts.length &&
+        prevMsg.parts.every((p, j) => {
+          const n = newMsg.parts[j];
+          return (
+            n && p.type === n.type && (p as any).state === (n as any).state
+          );
+        })
+      ) {
         newMessages[i] = prevMsg;
       }
     }
@@ -849,10 +863,7 @@ export const ChatHistory = () => {
               {/* Spacer element receives minHeight to fill viewport below user message.
                   Error card and loading indicator live INSIDE the spacer (same pattern
                   as the assistant branch) so they don't overflow the measured area. */}
-              <div
-                ref={lastAssistantMessageRef}
-                style={{ minHeight: spacerHeightRef.current }}
-              >
+              <div ref={lastAssistantMessageRef}>
                 {curShowWorking && <MessageLoading />}
                 {curError && isLastMessage && openAgent && (
                   <MessageRuntimeError
