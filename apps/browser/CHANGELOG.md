@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.48 (2026-04-06)
+
+### Features
+
+* add /preview to commands (35cfc09)
+
 ## 1.0.0-alpha.47 (2026-04-06)
 
 ### Bug Fixes
