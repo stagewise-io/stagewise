@@ -14,8 +14,10 @@ const SAVED_DISPLAY_MS = 2000;
 interface MarkdownEditorProps {
   /** Raw markdown content */
   rawContent: string;
-  /** Callback to persist the markdown */
-  onSave: (content: string) => Promise<void>;
+  /** Callback to persist the markdown. Ignored when readOnly is true. */
+  onSave?: (content: string) => Promise<void>;
+  /** When true, the editor is non-editable and all save logic is disabled. */
+  readOnly?: boolean;
   className?: string;
 }
 
@@ -24,6 +26,7 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 export function MarkdownEditor({
   rawContent,
   onSave,
+  readOnly = false,
   className,
 }: MarkdownEditorProps) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,7 +54,7 @@ export function MarkdownEditor({
   const save = useCallback(async (markdown: string) => {
     setSaveStatus('saving');
     try {
-      await onSaveRef.current(markdown);
+      await onSaveRef.current?.(markdown);
       if (isMountedRef.current) setSaveStatus('saved');
     } catch {
       if (isMountedRef.current) setSaveStatus('error');
@@ -83,10 +86,13 @@ export function MarkdownEditor({
       }),
     ],
     content: rawContent,
-    onUpdate: ({ editor: e }) => {
-      const md = (e.storage as any).markdown.getMarkdown();
-      debouncedSave(md);
-    },
+    editable: !readOnly,
+    onUpdate: readOnly
+      ? undefined
+      : ({ editor: e }) => {
+          const md = (e.storage as any).markdown.getMarkdown();
+          debouncedSave(md);
+        },
     editorProps: {
       attributes: {
         class: 'markdown-editor-content outline-none',
@@ -95,22 +101,23 @@ export function MarkdownEditor({
     },
   });
 
-  // Flush any pending save on unmount
+  // Flush any pending save on unmount (only relevant when editable)
   useEffect(() => {
+    if (readOnly) return;
     return () => {
       if (saveTimerRef.current && editor) {
         clearTimeout(saveTimerRef.current);
         const md = (editor.storage as any).markdown.getMarkdown();
         // Fire-and-forget save
-        onSaveRef.current(md).catch(() => {});
+        onSaveRef.current?.(md).catch(() => {});
       }
     };
-  }, [editor]);
+  }, [editor, readOnly]);
 
   return (
     <div className={cn('relative', className)}>
       <EditorContent editor={editor} />
-      <SaveIndicator status={saveStatus} />
+      {!readOnly && <SaveIndicator status={saveStatus} />}
     </div>
   );
 }

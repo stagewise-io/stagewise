@@ -5,7 +5,13 @@ import {
 } from '@tiptap/react';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 
-export function TaskItemNodeView({ node, updateAttributes }: NodeViewProps) {
+export function TaskItemNodeView({
+  node,
+  updateAttributes,
+  editor,
+}: NodeViewProps) {
+  const isEditable = editor.isEditable;
+
   return (
     <NodeViewWrapper
       as="li"
@@ -16,9 +22,12 @@ export function TaskItemNodeView({ node, updateAttributes }: NodeViewProps) {
       <Checkbox
         size="xs"
         checked={node.attrs.checked}
-        onCheckedChange={(checked) =>
-          updateAttributes({ checked: checked === true })
+        onCheckedChange={
+          isEditable
+            ? (checked) => updateAttributes({ checked: checked === true })
+            : undefined
         }
+        disabled={!isEditable}
         className="mt-0.5 shrink-0"
         contentEditable={false}
       />
