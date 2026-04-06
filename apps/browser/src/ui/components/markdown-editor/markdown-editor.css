@@ -6,6 +6,11 @@
   line-height: 1.6;
 }
 
+/* Allow text selection in read-only mode */
+.markdown-editor-content[contenteditable='false'] {
+  user-select: text;
+}
+
 /* Headings */
 .markdown-editor-content h1 {
   font-size: 1.5rem;
