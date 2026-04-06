@@ -1033,6 +1033,7 @@ export abstract class BaseAgent<
       this._fileReadCacheInitPromise = (async () => {
         try {
           const dbDir = getAgentDir(this.instanceId);
+          await fs.mkdir(dbDir, { recursive: true });
           const url = `file:${dbDir}/file-read-cache.sqlite`;
           this.fileReadCacheService = await FileReadCacheService.createWithUrl(
             url,
