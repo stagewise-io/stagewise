@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.47 (2026-04-06)
+
+### Bug Fixes
+
+* create dirs for agent runtime that may be missing (d3bd903)
+
 ## 1.0.0-alpha.46 (2026-04-02)
 
 ### Features
