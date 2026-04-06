@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha.49 (2026-04-06)
+
+### Bug Fixes
+
+* fix misinterpretation of files as binary (c9edd7f)
+* make plan-view readonly (cf6f487)
+
 ## 1.0.0-alpha.48 (2026-04-06)
 
 ### Features
