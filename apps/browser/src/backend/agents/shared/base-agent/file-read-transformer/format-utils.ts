@@ -100,10 +100,15 @@ export function inferLanguage(ext: string): string | undefined {
  * Checks for:
  *  1. Null bytes (`\x00`) in the first 8 KB — almost never appear in
  *     legitimate text/code files but are ubiquitous in binary formats.
- *  2. Unicode replacement characters (`\uFFFD`) indicating invalid UTF-8
- *     sequences that could not be decoded.
- *  3. UTF-8 round-trip mismatch — if re-encoding the decoded string
+ *  2. UTF-8 round-trip mismatch — if re-encoding the decoded string
  *     produces a different byte length, the original was not valid UTF-8.
+ *     This catches invalid byte sequences that Node's decoder replaces
+ *     with `\uFFFD` — the replacement changes the byte count.
+ *
+ * Note: we intentionally do NOT check for `\uFFFD` presence, because
+ * `U+FFFD` is a legitimate Unicode codepoint that can appear in valid
+ * UTF-8 source files (e.g. in test assertions). The round-trip check
+ * already catches decoder-inserted replacement characters.
  *
  * Returns `true` when the content should be treated as binary.
  */
@@ -114,9 +119,8 @@ export function isBinaryBuffer(buf: Buffer): boolean {
     if (buf[i] === 0x00) return true;
   }
 
-  // Decode and check for replacement chars + round-trip fidelity.
+  // Decode and check round-trip fidelity.
   const text = buf.toString('utf-8');
-  if (text.includes('\uFFFD')) return true;
   if (Buffer.from(text, 'utf-8').length !== buf.length) return true;
 
   return false;
