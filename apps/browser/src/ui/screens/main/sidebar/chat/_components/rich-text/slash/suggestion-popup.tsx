@@ -10,7 +10,10 @@ import {
 import type { ComponentType } from 'react';
 import { cn } from '@ui/utils';
 import { TerminalSquareIcon } from 'lucide-react';
-import { IconClipboardOutline18 } from 'nucleo-ui-outline-18';
+import {
+  IconClipboardOutline18,
+  IconImageSparkle3Outline18,
+} from 'nucleo-ui-outline-18';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { SuggestionPopupContainer, SuggestionSidePanel } from '../shared';
 import type { SlashItem } from './types';
@@ -18,6 +21,7 @@ import type { SlashItem } from './types';
 /** Map of builtin command IDs to their icon components. */
 const COMMAND_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   'command:plan': IconClipboardOutline18,
+  'command:preview': IconImageSparkle3Outline18,
 };
 
 /** Group labels — `builtin` has no header. */
