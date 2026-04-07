@@ -292,6 +292,9 @@ function DownloadItemRow({
 export function DownloadsControlButton({ isActive }: { isActive: boolean }) {
   const downloads = useKartonState((state) => state.downloads);
   const markSeen = useKartonProcedure((p) => p.downloads.markSeen);
+  const togglePanelKeyboardFocus = useKartonProcedure(
+    (p) => p.browser.layout.togglePanelKeyboardFocus,
+  );
   const pauseDownload = useKartonProcedure((p) => p.downloads.pause);
   const resumeDownload = useKartonProcedure((p) => p.downloads.resume);
   const cancelDownload = useKartonProcedure((p) => p.downloads.cancel);
@@ -310,10 +313,11 @@ export function DownloadsControlButton({ isActive }: { isActive: boolean }) {
   }, [isActive]);
 
   // CMD/CTRL+J hotkey to show downloads
-  const handleShowDownloads = useCallback(() => {
+  const handleShowDownloads = useCallback(async () => {
+    await togglePanelKeyboardFocus('stagewise-ui');
     setIsOpen(true);
     void markSeen();
-  }, [markSeen]);
+  }, [markSeen, togglePanelKeyboardFocus]);
 
   useHotKeyListener(handleShowDownloads, HotkeyActions.DOWNLOADS);
 
