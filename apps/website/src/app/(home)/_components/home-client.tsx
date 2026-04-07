@@ -1,7 +1,7 @@
 'use client';
 import { IconGithub } from 'nucleo-social-media';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
-import { Input } from '@stagewise/stage-ui/components/input';
+import { IconDownload4FillDuo18 } from 'nucleo-ui-fill-duo-18';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { usePostHog } from 'posthog-js/react';
 import { useState, useEffect } from 'react';
@@ -19,8 +19,6 @@ import fullDemoDark from './feature-images/full-demo-dark.png';
 import fullDemoLight from './feature-images/full-demo-light.png';
 import bgDark from './feature-images/bg-dark.jpg';
 import bgLight from './feature-images/bg-light.jpg';
-import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
-import { IconCheckOutline18 } from 'nucleo-ui-outline-18';
 import { NewsSection } from './news-section';
 
 interface NewsPost {
@@ -29,85 +27,74 @@ interface NewsPost {
   date: string;
 }
 
-function WaitlistForm({
-  className,
-  align = 'start',
-}: {
-  className?: string;
-  align?: 'start' | 'center';
-}) {
-  const [email, setEmail] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function DownloadButtons({ className }: { className?: string }) {
+  const [userOS, setUserOS] = useState<string>('your OS');
+  const [downloadUrl, setDownloadUrl] = useState<string>('#');
+  const [isMobile, setIsMobile] = useState(false);
+  const [isOsSupported, setIsOsSupported] = useState(true);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
+  useEffect(() => {
+    const platform =
+      (
+        navigator as Navigator & {
+          userAgentData?: { platform?: string };
+        }
+      ).userAgentData?.platform?.toLowerCase() ?? '';
+    const userAgent = navigator.userAgent.toLowerCase();
 
-    try {
-      const response = await fetch(
-        `https://waitlister.me/s/${process.env.NEXT_PUBLIC_WAITLISTER_WAITLIST_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ email }),
-        },
+    const mobileCheck =
+      /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
+        userAgent,
       );
+    setIsMobile(mobileCheck);
 
-      const data = await response.json();
-
-      if (data.success) setSuccess(true);
-      else
-        setError(
-          data.error?.message || 'Failed to join waitlist. Please try again.',
-        );
-    } catch {
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setSubmitting(false);
+    if (platform.includes('mac') || userAgent.includes('mac')) {
+      setUserOS('macOS');
+      setDownloadUrl(
+        'https://dl.stagewise.io/download/stagewise/alpha/macos/arm64',
+      );
+    } else if (platform.includes('win') || userAgent.includes('win')) {
+      setUserOS('Windows');
+      setDownloadUrl(
+        'https://dl.stagewise.io/download/stagewise/alpha/win/x64',
+      );
+    } else if (platform.includes('linux') || userAgent.includes('linux')) {
+      setUserOS('Linux');
+      setDownloadUrl(
+        'https://dl.stagewise.io/download/stagewise/alpha/linux/deb/x86_64',
+      );
+    } else {
+      setIsOsSupported(false);
     }
-  };
+  }, []);
 
-  if (success) {
+  if (!isOsSupported) {
     return (
-      <div className={`flex items-center gap-2 text-sm ${className ?? ''}`}>
-        <IconCheckOutline18 className="size-3.5 text-foreground" />
-        <span className="text-foreground">You're on the list!</span>
-      </div>
+      <Button size="lg" variant="primary" disabled className={className}>
+        OS not supported
+      </Button>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <Button size="lg" variant="primary" disabled className={className}>
+        Download on Desktop
+      </Button>
     );
   }
 
   return (
-    <div className={className}>
-      <form
-        className={cn(
-          'flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center',
-          align === 'start' ? 'items-start' : 'items-center',
-        )}
-        onSubmit={handleSubmit}
-      >
-        <Input
-          type="email"
-          value={email}
-          onValueChange={(value) => setEmail(value as string)}
-          placeholder="Enter your email"
-          size="md"
-          className="h-12 w-full sm:w-64"
-          required
-          disabled={submitting}
-        />
-        <Button type="submit" size="lg" variant="primary" disabled={submitting}>
-          {submitting ? 'Joining...' : 'Join waitlist'}
-          <IconArrowRightFill18 className="size-4" />
-        </Button>
-      </form>
-      {error && <p className="mt-2 text-error-foreground text-sm">{error}</p>}
-    </div>
+    <a
+      href={downloadUrl}
+      className={cn(
+        buttonVariants({ size: 'lg', variant: 'primary' }),
+        className,
+      )}
+    >
+      Download for {userOS}
+      <IconDownload4FillDuo18 className="size-4" />
+    </a>
   );
 }
 
@@ -276,7 +263,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                 </span>
 
                 <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-                  <WaitlistForm />
+                  <DownloadButtons />
                   <a
                     href="https://github.com/stagewise-io/stagewise"
                     onClick={() => posthog?.capture('hero_github_star_click')}
@@ -343,7 +330,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
               </h2>
 
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <WaitlistForm align="center" />
+                <DownloadButtons className="w-full sm:w-auto" />
               </div>
             </div>
           </ScrollReveal>
