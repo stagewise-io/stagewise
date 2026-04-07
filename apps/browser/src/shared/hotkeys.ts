@@ -88,7 +88,7 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.DOWNLOADS]: {
     accelerator: 'Mod+J',
-    captureDominantly: true,
+    captureDominantly: false,
   },
 
   // Tab & window navigation

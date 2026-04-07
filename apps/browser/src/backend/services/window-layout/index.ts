@@ -838,6 +838,7 @@ export class WindowLayoutService extends DisposableService {
     });
 
     tab.on('handleKeyDown', (keyDownEvent) => {
+      if (id !== this.activeTabId) return;
       const def = getHotkeyDefinitionForEvent(keyDownEvent as KeyboardEvent);
       if (def) this.uiController?.forwardKeyDownEvent(keyDownEvent);
     });
@@ -1263,7 +1264,7 @@ export class WindowLayoutService extends DisposableService {
       // FIX 3 (Win32): On Windows, the tab's Win32 child window intercepts keyboard
       // events when it is topmost. We must put the UI on top BEFORE calling focus().
       // See focus-handling.md Invariant #3 and Bug 9.5.
-      if (process.platform === 'win32' && this.isWebContentInteractive) {
+      if (this.isWebContentInteractive) {
         this.isWebContentInteractive = false;
         this.updateZOrder();
       }
