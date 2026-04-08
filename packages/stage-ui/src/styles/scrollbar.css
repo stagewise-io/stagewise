@@ -1,0 +1,19 @@
+/**
+ * Scrollbar Utilities
+ *
+ * Native CSS scrollbar styling using theme tokens.
+ * Provides thin, subtle scrollbars consistent with the product style.
+ */
+
+@utility scrollbar-subtle {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-2) transparent;
+}
+
+@utility scrollbar-hover-only {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  &:hover {
+    scrollbar-color: var(--color-surface-2) transparent;
+  }
+}

@@ -98,19 +98,7 @@
   -electron-interaction: passthrough;
 }
 
-/* Scrollbar utilities */
-@utility scrollbar-subtle {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-surface-2) transparent;
-}
-
-@utility scrollbar-hover-only {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  &:hover {
-    scrollbar-color: var(--color-surface-2) transparent;
-  }
-}
+/* scrollbar-subtle and scrollbar-hover-only are now in stage-ui/src/styles/scrollbar.css */
 
 @utility scrollbar-visible {
   @apply scrollbar-thin scrollbar-thumb-foreground/20 scrollbar-track-muted-foreground/10;
