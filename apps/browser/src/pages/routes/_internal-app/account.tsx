@@ -5,6 +5,7 @@ import { Input } from '@stagewise/stage-ui/components/input';
 import { InputOtp } from '@stagewise/stage-ui/components/input-otp';
 import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { cn } from '@pages/utils';
 import { produceWithPatches } from 'immer';
 import type { TelemetryLevel } from '@shared/karton-contracts/ui/shared-types';
@@ -42,8 +43,8 @@ function Page() {
       </div>
 
       {/* Content */}
-      <div className="flex w-full flex-1 flex-col items-center overflow-y-auto px-6 pt-6 pb-24">
-        <div className="flex w-full max-w-3xl shrink-0 flex-col gap-8">
+      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
+        <div className="mx-auto w-full max-w-3xl shrink-0 flex-col gap-8">
           {userAccount?.status === 'authenticated' ? (
             <AuthenticatedView
               email={userAccount.user?.email}
@@ -55,7 +56,7 @@ function Page() {
             <LoginView sendOtp={sendOtp} verifyOtp={verifyOtp} />
           )}
         </div>
-      </div>
+      </OverlayScrollbar>
     </div>
   );
 }

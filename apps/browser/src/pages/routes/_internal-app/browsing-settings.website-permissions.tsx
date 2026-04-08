@@ -181,7 +181,7 @@ function Page() {
     return (
       <div className="flex h-full w-full flex-col">
         {/* Header */}
-        <div className="flex items-center border-border/30 border-b px-6 py-4">
+        <div className="flex items-center border-border-subtle border-b px-6 py-4">
           <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
             <Button
               variant="ghost"

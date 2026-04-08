@@ -26,6 +26,7 @@ import {
 import { IconGithub } from 'nucleo-social-media';
 import { IconRefreshAnticlockwiseOutline18 } from 'nucleo-ui-outline-18';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import agplLicenseText from '@assets/agpl-3.0-license.txt?raw';
 import {
   Tooltip,
@@ -435,15 +436,15 @@ function Page() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <div className="flex flex-col items-center border-border/30 border-b px-6 py-4">
+      <div className="flex flex-col items-center border-border-subtle border-b px-6 py-4">
         <div className="w-full max-w-3xl">
           <h1 className="font-semibold text-foreground text-xl">About</h1>
         </div>
       </div>
 
       {/* Content */}
-      <div className="scrollbar-subtle flex w-full flex-1 flex-col items-center overflow-y-auto px-6 pt-6 pb-24">
-        <div className="flex w-full max-w-3xl shrink-0 flex-col gap-8">
+      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
+        <div className="mx-auto w-full max-w-3xl shrink-0 flex-col gap-8">
           {/* App Name Section */}
           <div className="flex flex-col gap-2">
             <div className="flex items-baseline gap-2">
@@ -596,7 +597,7 @@ function Page() {
           {/* Open Source Licenses */}
           <OpenSourceLicenses />
         </div>
-      </div>
+      </OverlayScrollbar>
 
       <LicenseTextDialog
         entry={{

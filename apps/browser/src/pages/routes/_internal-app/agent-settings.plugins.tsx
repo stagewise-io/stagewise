@@ -336,7 +336,7 @@ function PluginDetailView({
   return (
     <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <div className="flex items-center border-derived-subtle border-b px-6 py-4">
+      <div className="flex items-center border-border-subtle border-b px-6 py-4">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon-sm" onClick={onBack}>
@@ -464,49 +464,57 @@ function Page() {
   }
 
   return (
-    <OverlayScrollbar className="h-full w-full p-8">
-      <div className="mx-auto w-full max-w-4xl">
-        <h1 className="font-semibold text-foreground text-xl">Plugins</h1>
-        <p className="mt-1 text-muted-foreground text-sm">
-          Enable or disable plugins to extend the agent's capabilities with
-          additional skills.
-        </p>
-
-        {enabledPlugins.length > 0 && (
-          <>
-            <div className="mt-6 pb-1.5 text-muted-foreground text-xs">
-              Enabled
-            </div>
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {enabledPlugins.map((plugin) => (
-                <PluginCard
-                  key={plugin.id}
-                  plugin={plugin}
-                  isEnabled={!disabledPluginIds.has(plugin.id)}
-                  onOpenDetails={() => setSelectedPluginId(plugin.id)}
-                />
-              ))}
-            </div>
-          </>
-        )}
-        {disabledPlugins.length > 0 && (
-          <>
-            <div className="mt-6 pb-1.5 text-subtle-foreground text-xs">
-              Disabled
-            </div>
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {disabledPlugins.map((plugin) => (
-                <PluginCard
-                  key={plugin.id}
-                  plugin={plugin}
-                  isEnabled={false}
-                  onOpenDetails={() => setSelectedPluginId(plugin.id)}
-                />
-              ))}
-            </div>
-          </>
-        )}
+    <div className="flex h-full w-full flex-col">
+      {/* Header */}
+      <div className="flex items-center border-border-subtle border-b px-6 py-4">
+        <div className="mx-auto w-full max-w-3xl">
+          <h1 className="font-semibold text-foreground text-xl">Plugins</h1>
+          <p className="text-muted-foreground text-sm">
+            Enable or disable plugins to extend the agent's capabilities with
+            additional skills.
+          </p>
+        </div>
       </div>
-    </OverlayScrollbar>
+
+      {/* Content */}
+      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
+        <div className="mx-auto max-w-3xl">
+          {enabledPlugins.length > 0 && (
+            <>
+              <div className="pb-1.5 text-muted-foreground text-xs">
+                Enabled
+              </div>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {enabledPlugins.map((plugin) => (
+                  <PluginCard
+                    key={plugin.id}
+                    plugin={plugin}
+                    isEnabled={!disabledPluginIds.has(plugin.id)}
+                    onOpenDetails={() => setSelectedPluginId(plugin.id)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {disabledPlugins.length > 0 && (
+            <>
+              <div className="mt-6 pb-1.5 text-subtle-foreground text-xs">
+                Disabled
+              </div>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {disabledPlugins.map((plugin) => (
+                  <PluginCard
+                    key={plugin.id}
+                    plugin={plugin}
+                    isEnabled={false}
+                    onOpenDetails={() => setSelectedPluginId(plugin.id)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </OverlayScrollbar>
+    </div>
   );
 }

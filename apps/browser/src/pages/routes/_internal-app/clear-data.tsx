@@ -214,7 +214,7 @@ function Page() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <div className="flex items-center border-derived border-b bg-background px-6 py-4">
+      <div className="flex items-center border-border-subtle border-b px-6 py-4">
         <div className="mx-auto w-full max-w-3xl">
           <h1 className="font-semibold text-foreground text-xl">Clear Data</h1>
         </div>

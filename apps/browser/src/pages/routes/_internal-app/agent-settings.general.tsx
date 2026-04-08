@@ -88,8 +88,8 @@ function Page() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Header */}
-      <div className="flex items-center border-derived border-b px-6 py-4">
-        <div className="mx-auto w-full max-w-4xl">
+      <div className="flex items-center border-border-subtle border-b px-6 py-4">
+        <div className="mx-auto w-full max-w-3xl">
           <h1 className="font-semibold text-foreground text-xl">General</h1>
           <p className="text-muted-foreground text-sm">
             General agent behavior and environment settings.
@@ -99,7 +99,7 @@ function Page() {
 
       {/* Content */}
       <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
-        <div className="mx-auto max-w-4xl space-y-8">
+        <div className="mx-auto max-w-3xl space-y-8">
           <section className="space-y-6">
             <IdeSelectionSetting />
           </section>
