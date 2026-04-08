@@ -83,14 +83,7 @@ export const WebContentsBoundsSyncer = () => {
         const isOmniboxModalActive =
           document.querySelector('[data-omnibox-modal-active]') !== null;
 
-        const isNotificationToastActive =
-          document.querySelector('[data-notification-toast-active]') !== null;
-
-        if (
-          !isElementSelectorOverlay &&
-          !isOmniboxModalActive &&
-          !isNotificationToastActive
-        ) {
+        if (!isElementSelectorOverlay && !isOmniboxModalActive) {
           const hoverContainer = elementAtPoint.closest(
             '[id^="dev-app-preview-container-"]',
           );
@@ -162,7 +155,6 @@ export const WebContentsBoundsSyncer = () => {
     // and re-evaluate hover state when exclusion attributes change. ---
     const exclusionAttributes = [
       'data-omnibox-modal-active',
-      'data-notification-toast-active',
       'data-element-selector-overlay',
     ];
     const mutationObserver = new MutationObserver((mutations) => {
