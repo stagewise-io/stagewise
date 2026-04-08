@@ -4,14 +4,19 @@ unhandled();
 import { app, protocol } from 'electron';
 import started from 'electron-squirrel-startup';
 import path from 'node:path';
-import { main } from './main';
 
-// CI smoke test: all static imports (including the entire main.ts import tree)
-// have resolved by this point. If we got here, the bundle is intact.
+// CRITICAL: `main` is imported dynamically (below in the 'ready' handler)
+// instead of statically. On Windows machines without the VC++ redistributable
+// installed system-wide, static imports eagerly load native .node addons
+// (@libsql, sharp, etc.) whose transitive vcruntime140.dll dependency cannot be
+// resolved when the process is launched by Squirrel's Update.exe (different
+// working directory). Keeping the import dynamic ensures Squirrel install/
+// uninstall/update events are handled cleanly without touching native code.
+
 const isSmokeTest = process.argv.includes('--smoke-test');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (started || isSmokeTest) {
+if (started) {
   app.quit();
 }
 
@@ -116,12 +121,21 @@ if (!singleInstanceLock) {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', () => {
+app.on('ready', async () => {
+  // Don't load native modules during Squirrel install/uninstall events.
+  // The process is about to quit — loading them would crash on Windows
+  // machines without system-wide VC++ redistributable.
+  if (started) return;
+
   if (isSmokeTest) {
+    // Validate the full import tree is intact, then exit.
+    await import('./main');
     console.log('[smoke-test] App ready — all modules loaded successfully.');
     app.exit(0);
     return;
   }
+
+  const { main } = await import('./main');
   main({ launchOptions: { verbose: true } });
 });
 
