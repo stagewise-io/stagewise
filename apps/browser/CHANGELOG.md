@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.0-alpha.50 (2026-04-08)
+
+### Bug Fixes
+
+* ensure dynamic import of main module to prevent crashes on windows (9a87fc5)
+* fix locked scroll-position on scroll via scrollbar-thumb (5b79c87)
+* align layouts in settings sections (ed2447e)
+* don't allow stacking update notifications (cd439ad)
+* fix auto-updating and add manual update button in about-page (4aad15e)
+
+### Other Changes
+
+* show notifications above chat-input instead of overlay (31cf81d)
+
 ## 1.0.0-alpha.49 (2026-04-08)
 
 ### Bug Fixes

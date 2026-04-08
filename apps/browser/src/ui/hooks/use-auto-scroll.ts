@@ -68,14 +68,23 @@ export function useAutoScroll(
   // Store the viewport element directly
   const viewportRef = useRef<HTMLElement | null>(null);
   const isAutoScrollLockedRef = useRef(true);
-  const pendingScrollEndOptInRef = useRef(false);
   const observerRef = useRef<MutationObserver | null>(null);
+  // Guards against the `scroll` listener misinterpreting our own
+  // programmatic scrolls as user-initiated upward movement.
+  const isProgrammaticScrollRef = useRef(false);
+  const prevScrollTopRef = useRef<number | null>(null);
 
   // Scroll to the very bottom
   const scrollToBottom = useCallback(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
+    // Flag so the `scroll` listener ignores this movement
+    isProgrammaticScrollRef.current = true;
     viewport.scrollTop = viewport.scrollHeight;
+    // Clear after the browser dispatches the resulting `scroll` event
+    requestAnimationFrame(() => {
+      isProgrammaticScrollRef.current = false;
+    });
   }, []);
 
   // Force enable auto-scroll (for external triggers like sending a message)
@@ -92,23 +101,38 @@ export function useAutoScroll(
     return isAutoScrollLockedRef.current;
   }, []);
 
-  // Handle wheel events for immediate opt-in/opt-out
+  // Handle wheel events for immediate opt-out (fires before `scroll`)
   const handleWheel = useCallback((e: WheelEvent) => {
     if (e.deltaY < 0) {
       // Scrolling UP → immediate opt-out
       isAutoScrollLockedRef.current = false;
-      pendingScrollEndOptInRef.current = false;
-    } else if (e.deltaY > 0) {
-      // Scrolling DOWN → mark pending opt-in, will be handled by scrollend
-      pendingScrollEndOptInRef.current = true;
     }
   }, []);
 
-  // Handle scrollend event for opt-in after scroll animation completes
-  const handleScrollEnd = useCallback(() => {
-    if (!pendingScrollEndOptInRef.current) return;
-    pendingScrollEndOptInRef.current = false;
+  // Handle scroll events for thumb / keyboard / touch opt-out.
+  // Compares scrollTop against the previous value to detect upward movement.
+  const handleScroll = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const current = viewport.scrollTop;
+    // Always keep prevScrollTopRef warm — even during programmatic scrolls —
+    // so the first real user scroll event has an accurate baseline.
+    if (isProgrammaticScrollRef.current) {
+      prevScrollTopRef.current = current;
+      return;
+    }
+    const prev = prevScrollTopRef.current;
+    if (prev !== null && current < prev) {
+      // User scrolled up via a non-wheel input → opt out
+      isAutoScrollLockedRef.current = false;
+    }
+    prevScrollTopRef.current = current;
+  }, []);
 
+  // Handle scrollend event — re-enable auto-scroll if the user has
+  // scrolled back near the bottom (works for wheel, thumb, keyboard, etc.)
+  const handleScrollEnd = useCallback(() => {
+    if (isProgrammaticScrollRef.current) return;
     const viewport = viewportRef.current;
     if (!viewport) return;
 
@@ -126,6 +150,7 @@ export function useAutoScroll(
       const prevViewport = viewportRef.current;
       if (prevViewport) {
         prevViewport.removeEventListener('wheel', handleWheel);
+        prevViewport.removeEventListener('scroll', handleScroll);
         prevViewport.removeEventListener('scrollend', handleScrollEnd);
         observerRef.current?.disconnect();
         observerRef.current = null;
@@ -145,7 +170,11 @@ export function useAutoScroll(
 
       // Attach event listeners
       viewport.addEventListener('wheel', handleWheel, { passive: true });
+      viewport.addEventListener('scroll', handleScroll, { passive: true });
       viewport.addEventListener('scrollend', handleScrollEnd);
+
+      // Seed prevScrollTop so the first `scroll` event has a baseline
+      prevScrollTopRef.current = viewport.scrollTop;
 
       // Setup MutationObserver for auto-scroll on content changes
       // Use requestAnimationFrame to defer scroll, allowing spacer height
@@ -181,7 +210,14 @@ export function useAutoScroll(
         });
       }
     },
-    [enabled, initializeAtBottom, handleWheel, handleScrollEnd, scrollToBottom],
+    [
+      enabled,
+      initializeAtBottom,
+      handleWheel,
+      handleScroll,
+      handleScrollEnd,
+      scrollToBottom,
+    ],
   );
 
   // Sync observer and listeners when `enabled` changes.
@@ -194,12 +230,13 @@ export function useAutoScroll(
       const viewport = viewportRef.current;
       if (viewport) {
         viewport.removeEventListener('wheel', handleWheel);
+        viewport.removeEventListener('scroll', handleScroll);
         viewport.removeEventListener('scrollend', handleScrollEnd);
       }
       observerRef.current?.disconnect();
       observerRef.current = null;
     }
-  }, [enabled, scrollerRef, handleWheel, handleScrollEnd]);
+  }, [enabled, scrollerRef, handleWheel, handleScroll, handleScrollEnd]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -207,11 +244,12 @@ export function useAutoScroll(
       const viewport = viewportRef.current;
       if (viewport) {
         viewport.removeEventListener('wheel', handleWheel);
+        viewport.removeEventListener('scroll', handleScroll);
         viewport.removeEventListener('scrollend', handleScrollEnd);
       }
       observerRef.current?.disconnect();
     };
-  }, [handleWheel, handleScrollEnd]);
+  }, [handleWheel, handleScroll, handleScrollEnd]);
 
   return {
     scrollerRef,
