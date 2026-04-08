@@ -124,6 +124,9 @@ export class PagesService extends DisposableService {
   private getUsageHistoryHandler?: (params: {
     days?: number;
   }) => Promise<UsageHistoryResponse>;
+  // Auto-update handlers (delegated to AutoUpdateService via wiring)
+  private autoUpdateCheckHandler?: () => void;
+  private autoUpdateQuitAndInstallHandler?: () => void;
 
   private readonly telemetryService: TelemetryService;
 
@@ -1895,6 +1898,56 @@ export class PagesService extends DisposableService {
   }
 
   /**
+   * Sync auto-update state to the Pages API Karton state.
+   * Called by pages-state-sync when uiKarton autoUpdate state changes.
+   */
+  public syncAutoUpdateState(
+    state: PagesApiContract['state']['autoUpdate'],
+  ): void {
+    this.kartonServer.setState((draft) => {
+      draft.autoUpdate = state;
+    });
+  }
+
+  /**
+   * Set auto-update action handlers.
+   * Called by pages-handler-wiring to wire up to AutoUpdateService.
+   */
+  public setAutoUpdateHandlers(handlers: {
+    checkForUpdates: () => void;
+    quitAndInstall: () => void;
+  }): void {
+    this.autoUpdateCheckHandler = handlers.checkForUpdates;
+    this.autoUpdateQuitAndInstallHandler = handlers.quitAndInstall;
+
+    this.kartonServer.registerServerProcedureHandler(
+      'autoUpdate.checkForUpdates',
+      async (_callingClientId: string) => {
+        if (!this.autoUpdateCheckHandler) {
+          this.logger.warn(
+            '[PagesService] autoUpdate.checkForUpdates called but no handler registered',
+          );
+          return;
+        }
+        this.autoUpdateCheckHandler();
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'autoUpdate.quitAndInstall',
+      async (_callingClientId: string) => {
+        if (!this.autoUpdateQuitAndInstallHandler) {
+          this.logger.warn(
+            '[PagesService] autoUpdate.quitAndInstall called but no handler registered',
+          );
+          return;
+        }
+        this.autoUpdateQuitAndInstallHandler();
+      },
+    );
+  }
+
+  /**
    * Close all connections and clean up resources.
    */
   protected async onTeardown(): Promise<void> {
@@ -1940,6 +1993,10 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler(
       'getConfiguredCredentialIds',
     );
+    this.kartonServer.removeServerProcedureHandler(
+      'autoUpdate.checkForUpdates',
+    );
+    this.kartonServer.removeServerProcedureHandler('autoUpdate.quitAndInstall');
 
     // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');
@@ -1947,6 +2004,8 @@ export class PagesService extends DisposableService {
     ses.protocol.unhandle('plans');
 
     // Clean up all port close listeners
+    this.autoUpdateCheckHandler = undefined;
+    this.autoUpdateQuitAndInstallHandler = undefined;
     for (const [port, listener] of this.portCloseListeners.entries()) {
       port.off('close', listener);
     }

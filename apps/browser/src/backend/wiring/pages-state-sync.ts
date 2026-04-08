@@ -111,6 +111,13 @@ export async function wirePagesStateSync(deps: {
     (plans) => pagesService.syncPlansState(plans),
   );
 
+  // --- Auto-update state sync (uiKarton -> pages) ---
+  syncDerivedState(
+    uiKarton,
+    (state) => state.autoUpdate,
+    (autoUpdate) => pagesService.syncAutoUpdateState(autoUpdate),
+  );
+
   // --- Search engines sync (webDataService -> uiKarton + pages) ---
   const syncSearchEnginesToUiKarton = async () => {
     const engines = await webDataService.getSearchEngines();

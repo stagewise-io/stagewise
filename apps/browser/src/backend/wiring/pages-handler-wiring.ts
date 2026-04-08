@@ -6,6 +6,7 @@ import type { ToolboxService } from '../services/toolbox';
 import type { AgentManagerService } from '../services/agent-manager';
 import type { AuthService } from '../services/auth';
 import type { UserExperienceService } from '../services/experience';
+import type { AutoUpdateService } from '../services/auto-update';
 import type { Logger } from '../services/logger';
 
 export function wirePagesHandlers(deps: {
@@ -17,6 +18,7 @@ export function wirePagesHandlers(deps: {
   agentManagerService: AgentManagerService;
   authService: AuthService;
   userExperienceService: UserExperienceService;
+  autoUpdateService: AutoUpdateService;
   logger: Logger;
 }): void {
   const {
@@ -28,6 +30,7 @@ export function wirePagesHandlers(deps: {
     agentManagerService,
     authService,
     userExperienceService,
+    autoUpdateService,
     logger,
   } = deps;
 
@@ -156,4 +159,10 @@ export function wirePagesHandlers(deps: {
       await diffHistoryService.acceptAndRejectHunks([], hunkIds);
     },
   );
+
+  // --- Auto-update handlers ---
+  pagesService.setAutoUpdateHandlers({
+    checkForUpdates: () => autoUpdateService.checkForUpdates(),
+    quitAndInstall: () => autoUpdateService.quitAndInstall(),
+  });
 }

@@ -16,6 +16,7 @@ import type { Logger } from './logger';
 import type { NotificationService } from './notification';
 import type { TelemetryService } from './telemetry';
 import type { PreferencesService } from './preferences';
+import type { KartonService } from './karton';
 import type { UpdateChannel } from '@shared/karton-contracts/ui/shared-types';
 
 declare const __APP_RELEASE_CHANNEL__: 'dev' | 'prerelease' | 'release';
@@ -28,6 +29,7 @@ export class AutoUpdateService extends DisposableService {
   private readonly notificationService: NotificationService;
   private readonly telemetryService: TelemetryService;
   private readonly preferencesService: PreferencesService;
+  private readonly uiKarton: KartonService;
   private updateDownloaded = false;
   private updateInfo: {
     releaseName?: string;
@@ -45,12 +47,14 @@ export class AutoUpdateService extends DisposableService {
     notificationService: NotificationService,
     telemetryService: TelemetryService,
     preferencesService: PreferencesService,
+    uiKarton: KartonService,
   ) {
     super();
     this.logger = logger;
     this.notificationService = notificationService;
     this.telemetryService = telemetryService;
     this.preferencesService = preferencesService;
+    this.uiKarton = uiKarton;
   }
 
   private report(
@@ -70,12 +74,14 @@ export class AutoUpdateService extends DisposableService {
     notificationService: NotificationService,
     telemetryService: TelemetryService,
     preferencesService: PreferencesService,
+    uiKarton: KartonService,
   ): Promise<AutoUpdateService> {
     const instance = new AutoUpdateService(
       logger,
       notificationService,
       telemetryService,
       preferencesService,
+      uiKarton,
     );
     await instance.initialize();
     return instance;
@@ -88,6 +94,7 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(
         '[AutoUpdateService] Auto-updates not supported on this platform, skipping initialization',
       );
+      this.setAutoUpdateState('unsupported');
       return;
     }
 
@@ -96,6 +103,7 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(
         '[AutoUpdateService] Auto-updates disabled for dev builds, skipping initialization',
       );
+      this.setAutoUpdateState('unsupported');
       return;
     }
 
@@ -141,6 +149,20 @@ export class AutoUpdateService extends DisposableService {
           this.onUpdateChannelChanged();
         }
       });
+
+      // Register Karton procedure handlers
+      this.uiKarton.registerServerProcedureHandler(
+        'autoUpdate.checkForUpdates',
+        async (_callingClientId: string) => {
+          this.checkForUpdates();
+        },
+      );
+      this.uiKarton.registerServerProcedureHandler(
+        'autoUpdate.quitAndInstall',
+        async (_callingClientId: string) => {
+          this.quitAndInstall();
+        },
+      );
     } catch (error) {
       this.logger.error(
         '[AutoUpdateService] Failed to initialize auto-updater',
@@ -169,6 +191,20 @@ export class AutoUpdateService extends DisposableService {
 
     try {
       autoUpdater.setFeedURL({ url: feedURL });
+
+      // Reset downloaded state so the guard in checkForUpdates() allows
+      // re-checking against the new channel's update feed.
+      this.updateDownloaded = false;
+      this.updateInfo = null;
+      this.setAutoUpdateState('idle');
+
+      // Re-start periodic checks if they were stopped after a previous download
+      if (!this.updateCheckIntervalId) {
+        this.updateCheckIntervalId = setInterval(() => {
+          if (!this.disposed) this.checkForUpdates();
+        }, this.UPDATE_CHECK_INTERVAL_MS);
+      }
+
       // Trigger an immediate check with the new channel
       this.checkForUpdates();
     } catch (error) {
@@ -254,22 +290,26 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(`[AutoUpdateService] Error message: ${error.message}`);
       this.logger.debug(`[AutoUpdateService] Error stack: ${error.stack}`);
       this.report(error, 'autoUpdaterError');
+      this.setAutoUpdateState('error', null, error.message);
     });
 
     autoUpdater.on('checking-for-update', () => {
       this.logger.debug('[AutoUpdateService] Checking for updates...');
+      this.setAutoUpdateState('checking');
     });
 
     autoUpdater.on('update-available', () => {
       this.logger.debug(
         '[AutoUpdateService] Update available, download starting automatically',
       );
+      this.setAutoUpdateState('downloading');
     });
 
     autoUpdater.on('update-not-available', () => {
       this.logger.debug(
         '[AutoUpdateService] No update available, app is up to date',
       );
+      this.setAutoUpdateState('not-available');
     });
 
     autoUpdater.on(
@@ -289,8 +329,20 @@ export class AutoUpdateService extends DisposableService {
         this.logger.debug(`[AutoUpdateService] Release date: ${releaseDate}`);
         this.logger.debug(`[AutoUpdateService] Update URL: ${updateURL}`);
 
+        // Stop periodic checks — no need to re-check once an update is ready
+        if (this.updateCheckIntervalId) {
+          clearInterval(this.updateCheckIntervalId);
+          this.updateCheckIntervalId = null;
+        }
+
         // Show notification to user
         this.showUpdateReadyNotification(releaseName);
+
+        // Sync state to UI
+        this.setAutoUpdateState('ready', {
+          releaseName,
+          releaseNotes,
+        });
       },
     );
 
@@ -334,6 +386,13 @@ export class AutoUpdateService extends DisposableService {
    */
   public checkForUpdates(): void {
     this.assertNotDisposed();
+
+    if (this.updateDownloaded) {
+      this.logger.debug(
+        '[AutoUpdateService] Skipping update check - update already downloaded and ready to install',
+      );
+      return;
+    }
 
     const platform = this.getPlatform();
     if (platform !== 'macos' && platform !== 'win') {
@@ -388,11 +447,37 @@ export class AutoUpdateService extends DisposableService {
     return this.updateInfo;
   }
 
+  /**
+   * Push auto-update status to the UI via Karton state.
+   */
+  private setAutoUpdateState(
+    status:
+      | 'idle'
+      | 'checking'
+      | 'downloading'
+      | 'ready'
+      | 'not-available'
+      | 'error'
+      | 'unsupported',
+    updateInfo?: { releaseName?: string; releaseNotes?: string } | null,
+    errorMessage?: string | null,
+  ): void {
+    this.uiKarton.setState((draft) => {
+      draft.autoUpdate.status = status;
+      if (updateInfo !== undefined) {
+        draft.autoUpdate.updateInfo = updateInfo;
+      }
+      draft.autoUpdate.errorMessage = errorMessage ?? null;
+    });
+  }
+
   protected onTeardown(): void {
     if (this.updateCheckIntervalId) {
       clearInterval(this.updateCheckIntervalId);
       this.updateCheckIntervalId = null;
     }
+    this.uiKarton.removeServerProcedureHandler('autoUpdate.checkForUpdates');
+    this.uiKarton.removeServerProcedureHandler('autoUpdate.quitAndInstall');
     this.logger.debug('[AutoUpdateService] Teardown complete');
   }
 }
