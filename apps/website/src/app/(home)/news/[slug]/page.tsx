@@ -28,7 +28,7 @@ export default async function PostPage(props: {
         <div className="flex flex-row gap-4">
           <Link
             href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-              `https://stagewise.io${post.url}`,
+              `https://stagewise.io${post.url}?utm_source=linkedin&utm_medium=social&utm_campaign=news-user-share`,
             )}`}
             target="_blank"
             rel="noopener noreferrer"
@@ -40,7 +40,7 @@ export default async function PostPage(props: {
           <Link
             href={`https://x.com/intent/tweet?text=${encodeURIComponent(
               `Check out the news from @stagewise_io: ${post.title}`,
-            )}&url=${encodeURIComponent(`https://stagewise.io${post.url}`)}`}
+            )}&url=${encodeURIComponent(`https://stagewise.io${post.url}?utm_source=x&utm_medium=social&utm_campaign=news-user-share`)}`}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Share this post on X"
