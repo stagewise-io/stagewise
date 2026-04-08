@@ -540,6 +540,22 @@ export type AppState = {
     arch: string; // Architecture (e.g., 'x64', 'arm64').
     otherVersions: Record<string, string | undefined>; // Other versions of the app.
   };
+  /** Auto-update status synced from the backend AutoUpdateService */
+  autoUpdate: {
+    status:
+      | 'idle'
+      | 'checking'
+      | 'downloading'
+      | 'ready'
+      | 'not-available'
+      | 'error'
+      | 'unsupported';
+    updateInfo: {
+      releaseName?: string;
+      releaseNotes?: string;
+    } | null;
+    errorMessage: string | null;
+  };
   // The global configuration of the CLI.
   globalConfig: GlobalConfig;
   // State of the current user experience (getting started etc.)
@@ -793,6 +809,12 @@ export type KartonContract = {
     notifications: {
       triggerAction: (id: string, actionIndex: number) => Promise<void>;
       dismiss: (id: string) => Promise<void>;
+    };
+    autoUpdate: {
+      /** Manually trigger an update check */
+      checkForUpdates: () => Promise<void>;
+      /** Quit the app and install the downloaded update */
+      quitAndInstall: () => Promise<void>;
     };
     config: {
       set: (config: GlobalConfig) => Promise<void>;
@@ -1054,6 +1076,11 @@ export const defaultState: KartonContract['state'] = {
     homepage: __APP_HOMEPAGE__,
     arch: __APP_ARCH__,
     otherVersions: {},
+  },
+  autoUpdate: {
+    status: 'idle',
+    updateInfo: null,
+    errorMessage: null,
   },
   globalConfig: {
     telemetryLevel: 'full',

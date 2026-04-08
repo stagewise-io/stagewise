@@ -201,11 +201,12 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   );
 
   // Initialize auto-update service (only runs on macOS and Windows, skipped for dev builds)
-  const _autoUpdateService = await AutoUpdateService.create(
+  const autoUpdateService = await AutoUpdateService.create(
     logger,
     notificationService,
     telemetryService,
     preferencesService,
+    uiKarton,
   );
 
   const globalConfigService = await GlobalConfigService.create(
@@ -381,6 +382,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     agentManagerService,
     authService,
     userExperienceService,
+    autoUpdateService,
     logger,
   });
 
@@ -416,6 +418,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     diffHistoryService.teardown();
     assetCacheService.teardown();
     processedImageCacheService?.teardown();
+    autoUpdateService.teardown();
     logger.debug('[Main] Services shut down');
   };
 

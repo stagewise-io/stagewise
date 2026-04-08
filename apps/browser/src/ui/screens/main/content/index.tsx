@@ -1,14 +1,7 @@
 import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import {
   TabsContainer,
@@ -21,26 +14,6 @@ import {
   PerTabContent,
   type PerTabContentRef,
 } from './_components/per-tab-content';
-
-function useNotificationToastActive() {
-  const [active, setActive] = useState(false);
-  useLayoutEffect(() => {
-    const check = () => {
-      setActive(
-        document.querySelector('[data-notification-toast-active]') !== null,
-      );
-    };
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.body, {
-      attributes: true,
-      subtree: true,
-      attributeFilter: ['data-notification-toast-active'],
-    });
-    return () => observer.disconnect();
-  }, []);
-  return active;
-}
 
 export function MainSection({
   isSidebarCollapsed,
@@ -184,8 +157,6 @@ export function MainSection({
     return activeTabIndex !== 0 || isSidebarCollapsed;
   }, [activeTabIndex, isSidebarCollapsed]);
 
-  const isNotificationActive = useNotificationToastActive();
-
   return (
     <ResizablePanel
       id="opened-content-panel"
@@ -239,14 +210,6 @@ export function MainSection({
                   ? `dev-app-preview-container-${activeTabId}`
                   : undefined
               }
-            />
-
-            {/* Dim overlay over web content when a notification toast is active */}
-            <div
-              className={cn(
-                'pointer-events-none absolute inset-0 z-1 rounded-[inherit] bg-black/30 transition-opacity duration-300',
-                isNotificationActive ? 'opacity-100' : 'opacity-0',
-              )}
             />
 
             {/* Per-tab content instances */}

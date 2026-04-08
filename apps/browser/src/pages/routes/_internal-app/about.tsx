@@ -18,8 +18,13 @@ import {
   DialogHeader,
 } from '@stagewise/stage-ui/components/dialog';
 import { Input } from '@stagewise/stage-ui/components/input';
-import { ExternalLinkIcon, ScrollTextIcon } from 'lucide-react';
+import {
+  ExternalLinkIcon,
+  LoaderCircleIcon,
+  ScrollTextIcon,
+} from 'lucide-react';
 import { IconGithub } from 'nucleo-social-media';
+import { IconRefreshAnticlockwiseOutline18 } from 'nucleo-ui-outline-18';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import agplLicenseText from '@assets/agpl-3.0-license.txt?raw';
 import {
@@ -48,6 +53,88 @@ interface LicenseEntry {
   repository: string;
   publisher: string;
   licenseText: string;
+}
+
+function AppUpdateStatus() {
+  const autoUpdate = useKartonState((s) => s.autoUpdate);
+  const autoUpdateProcedures = useKartonProcedure((s) => s.autoUpdate);
+
+  if (autoUpdate.status === 'unsupported') {
+    return null;
+  }
+
+  const renderButton = () => {
+    switch (autoUpdate.status) {
+      case 'checking':
+        return (
+          <Button variant="ghost" size="sm" className="px-0" disabled>
+            <IconRefreshAnticlockwiseOutline18 className="size-3 animate-spin" />
+            Checking for Updates
+          </Button>
+        );
+      case 'downloading':
+        return (
+          <Button variant="secondary" size="sm" disabled>
+            <LoaderCircleIcon className="size-3.5 animate-spin" />
+            Downloading Update...
+          </Button>
+        );
+      case 'not-available':
+        return (
+          <>
+            <span className="text-muted-foreground text-sm">Up to date</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-0"
+              onClick={() => autoUpdateProcedures.checkForUpdates()}
+            >
+              <IconRefreshAnticlockwiseOutline18 className="size-3" />
+              Check Again
+            </Button>
+          </>
+        );
+      case 'ready':
+        return (
+          <Button
+            size="sm"
+            onClick={() => autoUpdateProcedures.quitAndInstall()}
+          >
+            Install Update & Restart
+          </Button>
+        );
+      case 'error':
+      case 'idle':
+      default:
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-0"
+            onClick={() => autoUpdateProcedures.checkForUpdates()}
+          >
+            <IconRefreshAnticlockwiseOutline18 className="size-3" />
+            Check for Updates
+          </Button>
+        );
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {autoUpdate.status === 'ready' && autoUpdate.updateInfo?.releaseName && (
+        <p className="text-muted-foreground text-sm">
+          Version {autoUpdate.updateInfo.releaseName} available
+        </p>
+      )}
+      {autoUpdate.status === 'error' && autoUpdate.errorMessage && (
+        <p className="text-error-foreground text-xs">
+          {autoUpdate.errorMessage}
+        </p>
+      )}
+      <div className="flex items-center gap-3">{renderButton()}</div>
+    </div>
+  );
 }
 
 function UpdateChannelSetting() {
@@ -236,6 +323,7 @@ function OpenSourceLicenses() {
         <Button
           variant="secondary"
           size="sm"
+          className="shrink-0"
           onClick={expanded ? () => setExpanded(false) : loadLicenses}
           disabled={loading}
         >
@@ -358,16 +446,28 @@ function Page() {
         <div className="flex w-full max-w-3xl shrink-0 flex-col gap-8">
           {/* App Name Section */}
           <div className="flex flex-col gap-2">
-            <h2 className="font-bold text-3xl text-foreground">
-              {appInfo.name}
-            </h2>
+            <div className="flex items-baseline gap-2">
+              <h2 className="font-bold text-3xl text-foreground leading-none">
+                stagewise
+              </h2>
+              <p className="relative bottom-[2px] text-lg text-subtle-foreground leading-none">
+                {appInfo.version}
+                {appInfo.name !== 'stagewise' && (
+                  <span>
+                    {' ('}
+                    {appInfo.name
+                      .replace(/^stagewise\s*/, '')
+                      .replace(/[()]/g, '')}
+                    {')'}
+                  </span>
+                )}
+              </p>
+            </div>
+
             <div className="flex flex-col gap-1">
-              <p className="text-lg text-muted-foreground">
-                {appInfo.baseName}
-              </p>
-              <p className="text-lg text-muted-foreground">
-                Version {appInfo.version}
-              </p>
+              <div className="mt-2">
+                <AppUpdateStatus />
+              </div>
             </div>
           </div>
 

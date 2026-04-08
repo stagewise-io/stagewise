@@ -100,6 +100,22 @@ export type PagesApiState = {
     arch: string; // Architecture (e.g., 'x64', 'arm64').
     otherVersions: Record<string, string | undefined>; // Other versions of the app.
   };
+  /** Auto-update status synced from the backend AutoUpdateService */
+  autoUpdate: {
+    status:
+      | 'idle'
+      | 'checking'
+      | 'downloading'
+      | 'ready'
+      | 'not-available'
+      | 'error'
+      | 'unsupported';
+    updateInfo: {
+      releaseName?: string;
+      releaseNotes?: string;
+    } | null;
+    errorMessage: string | null;
+  };
 };
 
 export type PagesApiContract = {
@@ -247,6 +263,13 @@ export type PagesApiContract = {
     ) => Promise<void>;
     /** Save content to a plan file in the global plans directory */
     savePlanFile: (filename: string, content: string) => Promise<void>;
+    /** Auto-update actions */
+    autoUpdate: {
+      /** Manually trigger an update check */
+      checkForUpdates: () => Promise<void>;
+      /** Quit the app and install the downloaded update */
+      quitAndInstall: () => Promise<void>;
+    };
   };
 };
 
@@ -288,5 +311,10 @@ export const defaultState: PagesApiState = {
     homepage: __APP_HOMEPAGE__,
     arch: __APP_ARCH__,
     otherVersions: {},
+  },
+  autoUpdate: {
+    status: 'idle',
+    updateInfo: null,
+    errorMessage: null,
   },
 };
