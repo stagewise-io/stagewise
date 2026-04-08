@@ -31,6 +31,7 @@ export class AutoUpdateService extends DisposableService {
   private readonly preferencesService: PreferencesService;
   private readonly uiKarton: KartonService;
   private updateDownloaded = false;
+  private updateNotificationId: string | null = null;
   private updateInfo: {
     releaseName?: string;
     releaseNotes?: string;
@@ -356,7 +357,11 @@ export class AutoUpdateService extends DisposableService {
   private showUpdateReadyNotification(releaseName: string): void {
     const versionDisplay = releaseName || 'a new version';
 
-    this.notificationService.showNotification({
+    // Dismiss any previous update notification before showing a new one
+    if (this.updateNotificationId)
+      this.notificationService.dismissNotification(this.updateNotificationId);
+
+    this.updateNotificationId = this.notificationService.showNotification({
       title: 'Update Ready',
       message: `${versionDisplay} has been downloaded and is ready to install.`,
       type: 'info',
