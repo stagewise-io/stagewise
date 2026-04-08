@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0-alpha.49 (2026-04-08)
+
+### Bug Fixes
+
+* hotkey behavior for downloads popover (80bedcf)
+* fix misinterpretation of files as binary (c9edd7f)
+* make plan-view readonly (cf6f487)
+
 ## 1.0.0-alpha.48 (2026-04-06)
 
 ### Features
