@@ -123,7 +123,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       // restore, agent switch) where ChatInput needs an external reset.
       localInputStateRef.current = newInputState;
       setCanSendMessage(
-        (chatInputRef.current?.getTextContent()?.trim().length ?? 0) > 2,
+        (chatInputRef.current?.getTextContent()?.trim().length ?? 0) > 0,
       );
       if (openAgent) {
         void setChatInputState(openAgent, JSON.stringify(newInputState));
@@ -156,7 +156,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         chatInputRef.current?.focus();
         const textLength =
           chatInputRef.current?.getTextContent()?.trim().length ?? 0;
-        setCanSendMessage(textLength > 2);
+        setCanSendMessage(textLength > 0);
       });
   }, [openAgent]);
 

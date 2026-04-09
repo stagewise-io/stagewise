@@ -344,7 +344,7 @@ export const ChatInput = memo(function ChatInput({
   if (slashCommands) slashSkillsRef.current = slashCommands;
 
   const canSendMessage = useMemo(() => {
-    return !disabled && textContent.trim().length > 2;
+    return !disabled && textContent.trim().length > 0;
   }, [disabled, textContent]);
 
   const handleSubmit = useCallback(() => {
