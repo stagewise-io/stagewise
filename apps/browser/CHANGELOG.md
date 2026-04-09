@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.51 (2026-04-09)
+
+### Bug Fixes
+
+* include more detailed sandbox-explanation in system-prompt (227d2cf)
+
 ## 1.0.0-alpha.50 (2026-04-08)
 
 ### Bug Fixes
