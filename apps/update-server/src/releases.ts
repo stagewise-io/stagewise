@@ -57,6 +57,13 @@ function buildMacOSZipPattern(
   return new RegExp(pattern, 'i');
 }
 
+// Arch aliases: .deb uses "amd64" while .rpm uses "x86_64" for the same arch.
+// Map either name to both so requests work regardless of which convention the URL uses.
+const archAliases: Record<string, string[]> = {
+  x86_64: ['x86_64', 'amd64'],
+  amd64: ['x86_64', 'amd64'],
+};
+
 // For Linux packages that use different version formats and separators
 // Example deb: stagewise-prerelease_1.0.0.beta.1_amd64.deb
 // Example rpm: stagewise-prerelease-1.0.0.beta.1-1.x86_64.rpm
@@ -67,12 +74,15 @@ function findLinuxAsset(
   extension: string,
 ): GitHubAsset | null {
   const ext = extension.toLowerCase();
+  const candidates = (archAliases[arch.toLowerCase()] ?? [arch]).map((a) =>
+    a.toLowerCase(),
+  );
   for (const asset of release.assets) {
     const name = asset.name.toLowerCase();
     if (
       name.startsWith(appName.toLowerCase()) &&
       name.endsWith(ext) &&
-      name.includes(arch.toLowerCase())
+      candidates.some((a) => name.includes(a))
     ) {
       return asset;
     }
