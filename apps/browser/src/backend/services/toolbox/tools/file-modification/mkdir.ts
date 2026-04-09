@@ -60,7 +60,7 @@ export const mkdir = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: mkdirToolInputSchema,
-    strict: true,
+    strict: false,
     execute: async (args) => {
       return mkdirToolExecute(args, mountedRuntimes);
     },

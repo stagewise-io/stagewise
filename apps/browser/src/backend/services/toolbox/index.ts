@@ -301,7 +301,7 @@ export class ToolboxService extends DisposableService {
     return tool({
       description,
       inputSchema: inputSchema as z.ZodType<TParams>,
-      strict: true,
+      strict: false,
       execute: async (params, options) => {
         const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
         if (!mountedRuntimes) throw new Error('No mounted workspaces found');
@@ -399,7 +399,7 @@ export class ToolboxService extends DisposableService {
     return tool({
       description: DELETE_FILE_DESCRIPTION,
       inputSchema: deleteToolInputSchema as z.ZodType<{ path: string }>,
-      strict: true,
+      strict: false,
       execute: async (params, options) => {
         const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
         if (!mountedRuntimes) throw new Error('No mounted workspaces found');
@@ -580,7 +580,7 @@ export class ToolboxService extends DisposableService {
     return tool({
       description: COPY_DESCRIPTION,
       inputSchema: copyToolInputSchema,
-      strict: true,
+      strict: false,
       execute: async (params: CopyToolInput, options) => {
         const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
         if (!mountedRuntimes) throw new Error('No mounted workspaces found');

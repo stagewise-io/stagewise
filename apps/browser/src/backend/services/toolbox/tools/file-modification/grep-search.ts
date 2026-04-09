@@ -158,7 +158,7 @@ export const grepSearch = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: grepSearchToolInputSchema,
-    strict: true,
+    strict: false,
     execute: async (args) => {
       return grepSearchToolExecute(args, mountedRuntimes);
     },

@@ -107,7 +107,7 @@ export const glob = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: globToolInputSchema,
-    strict: true,
+    strict: false,
     execute: async (args) => {
       return globToolExecute(args, mountedRuntimes);
     },

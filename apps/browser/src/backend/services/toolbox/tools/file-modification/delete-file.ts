@@ -77,7 +77,7 @@ export const deleteTool = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: deleteToolInputSchema,
-    strict: true,
+    strict: false,
     execute: async (args) => {
       return deleteToolExecute(args, mountedRuntimes);
     },

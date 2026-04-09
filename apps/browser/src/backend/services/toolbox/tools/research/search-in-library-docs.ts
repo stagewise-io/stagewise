@@ -57,7 +57,7 @@ export const searchInLibraryDocs = (apiClient: ApiClient) =>
   tool({
     description: DESCRIPTION,
     inputSchema: searchInLibraryDocsToolInputSchema,
-    strict: true,
+    strict: false,
     execute: async (args) => {
       return searchInLibraryDocsToolExecute(args, apiClient);
     },
