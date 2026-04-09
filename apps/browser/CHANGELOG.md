@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0-alpha.52 (2026-04-09)
+
+### Bug Fixes
+
+* fix notification-placement (6fedc35)
+* fix attachment-display in toolcall outputs (2364db0)
+* fix schema-errors with direct anthropic-provider (b9c58c0)
+* allow sending 1-char messages (ca87e94)
+
 ## 1.0.0-alpha.51 (2026-04-09)
 
 ### Bug Fixes
