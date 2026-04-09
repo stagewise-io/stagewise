@@ -45,6 +45,24 @@ export function ChatPanel() {
     }
   }, [firstAgentId, openAgent, setOpenAgent]);
 
+  // Track whether the status card is visible to align horizontal margins
+  const [statusCardVisible, setStatusCardVisible] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      const val = getComputedStyle(document.documentElement)
+        .getPropertyValue('--status-card-height')
+        .trim();
+      setStatusCardVisible(val !== '' && val !== '0px');
+    };
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+    return () => observer.disconnect();
+  }, []);
+
   // Track drag-over state for visual feedback
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
@@ -130,9 +148,19 @@ export function ChatPanel() {
         )}
       </OpenAgentContext.Provider>
       <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col items-stretch">
-        <InternalAppFrame />
-        <NotificationBanners />
-        <UsageWarningBadge />
+        <div
+          className={cn(
+            'flex flex-col gap-2',
+            statusCardVisible ? 'mx-3' : 'mx-1',
+          )}
+          style={{
+            marginBottom: 'calc(var(--status-card-height, 0px) + 0.5rem)',
+          }}
+        >
+          <InternalAppFrame />
+          <NotificationBanners />
+          <UsageWarningBadge />
+        </div>
         <ChatPanelFooter key={openAgent} />
       </div>
     </div>

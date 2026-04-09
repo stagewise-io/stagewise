@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { cn } from '@stagewise/stage-ui/lib/utils';
 import { XIcon, TriangleAlertIcon } from 'lucide-react';
 
 let usageWarningDismissedThisSession = false;
@@ -18,38 +17,13 @@ export function UsageWarningBadge() {
     return s.agents.instances[openAgent]?.state.usageWarning;
   });
 
-  const [statusCardVisible, setStatusCardVisible] = useState(false);
-  useEffect(() => {
-    const check = () => {
-      const val = getComputedStyle(document.documentElement)
-        .getPropertyValue('--status-card-height')
-        .trim();
-      setStatusCardVisible(val !== '' && val !== '0px');
-    };
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['style'],
-    });
-    return () => observer.disconnect();
-  }, []);
-
   if (dismissed || !usageWarning) return null;
 
   const pct = Math.round(usageWarning.usedPercent);
   const window = usageWarning.windowType;
 
   return (
-    <div
-      className={cn(
-        'relative flex shrink-0 flex-row items-start gap-2 rounded-md bg-background p-2.5 shadow-elevation-1 ring-1 ring-derived-strong dark:bg-surface-1',
-        statusCardVisible ? 'mx-3' : 'mx-1',
-      )}
-      style={{
-        marginBottom: 'calc(var(--status-card-height, 0px) + 0.5rem)',
-      }}
-    >
+    <div className="relative flex shrink-0 flex-row items-start gap-2 rounded-md bg-background p-2.5 shadow-elevation-1 ring-1 ring-derived-strong dark:bg-surface-1">
       <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0 text-warning-foreground" />
       <span className="text-foreground text-xs">
         You&apos;ve used {pct}% of your {window} limit. Consider switching to a

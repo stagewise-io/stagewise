@@ -1,9 +1,8 @@
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { cn } from '@stagewise/stage-ui/lib/utils';
 import { XIcon } from 'lucide-react';
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 
 let cachedVarNames: Set<string> | null = null;
 
@@ -105,36 +104,14 @@ export function InternalAppFrame() {
     return () => mq.removeEventListener('change', handler);
   }, [activeApp]);
 
-  // Track whether the status card is visible to align horizontal margins
-  const [statusCardVisible, setStatusCardVisible] = useState(false);
-  useEffect(() => {
-    const check = () => {
-      const val = getComputedStyle(document.documentElement)
-        .getPropertyValue('--status-card-height')
-        .trim();
-      setStatusCardVisible(val !== '' && val !== '0px');
-    };
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['style'],
-    });
-    return () => observer.disconnect();
-  }, []);
-
   if (!activeApp) return null;
 
   return (
     <div
-      className={cn(
-        'scrollbar-subtle relative shrink-0 overflow-hidden rounded-md bg-background shadow-elevation-1 ring-1 ring-derived-strong dark:bg-surface-1',
-        statusCardVisible ? 'mx-3' : 'mx-1',
-      )}
+      className="scrollbar-subtle relative shrink-0 overflow-hidden rounded-md bg-background shadow-elevation-1 ring-1 ring-derived-strong dark:bg-surface-1"
       style={{
         height: activeApp.height ?? 300,
         maxHeight: '50vh',
-        marginBottom: 'calc(var(--status-card-height, 0px) + 0.5rem)',
       }}
     >
       <Button
