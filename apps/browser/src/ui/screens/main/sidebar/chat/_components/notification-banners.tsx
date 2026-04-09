@@ -19,7 +19,7 @@ export function NotificationBanners() {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="mx-1 mb-2 flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       {notifications.map((notification) => (
         <div
           key={notification.id}
