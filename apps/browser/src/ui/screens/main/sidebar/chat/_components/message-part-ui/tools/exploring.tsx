@@ -302,7 +302,7 @@ export const ExploringToolParts = memo(
           />
         );
       });
-    }, [items]);
+    }, [items, messageAttachments]);
 
     const explorationMetadata = useMemo(() => {
       let filesRead = 0;
@@ -800,6 +800,7 @@ export const ExploringToolParts = memo(
     }
     if (prev.isAutoExpanded !== next.isAutoExpanded) return false;
     if (prev.isShimmering !== next.isShimmering) return false;
+    if (prev.messageAttachments !== next.messageAttachments) return false;
     return true;
   },
 );
