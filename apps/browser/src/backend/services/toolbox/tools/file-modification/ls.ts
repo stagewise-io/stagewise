@@ -48,7 +48,7 @@ export const ls = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: lsToolInputSchema,
-    strict: true,
+    strict: false,
     execute: async (args) => {
       return lsToolExecute(args, mountedRuntimes);
     },

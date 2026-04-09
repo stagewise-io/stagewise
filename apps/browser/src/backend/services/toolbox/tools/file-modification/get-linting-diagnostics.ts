@@ -173,7 +173,7 @@ export const getLintingDiagnostics = (mountedLspServices: MountedLspServices) =>
   tool({
     description: DESCRIPTION,
     inputSchema: getLintingDiagnosticsToolInputSchema,
-    strict: true,
+    strict: false,
     execute: async ({ paths }) => {
       return getLintingDiagnosticsToolExecute(mountedLspServices, paths);
     },

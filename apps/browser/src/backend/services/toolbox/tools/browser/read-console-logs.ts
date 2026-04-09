@@ -70,7 +70,7 @@ export const readConsoleLogs = (windowLayoutService: WindowLayoutService) => {
   return tool({
     description: DESCRIPTION,
     inputSchema: readConsoleLogsToolInputSchema,
-    strict: true,
+    strict: false,
     execute: (params) =>
       readConsoleLogsToolExecute(params, windowLayoutService),
   });

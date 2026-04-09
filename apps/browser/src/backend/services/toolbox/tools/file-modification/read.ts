@@ -64,7 +64,7 @@ export const readFile = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: readToolInputSchema,
-    strict: true,
+    strict: false,
     execute: async (args) => {
       return readToolExecute(args, mountedRuntimes);
     },

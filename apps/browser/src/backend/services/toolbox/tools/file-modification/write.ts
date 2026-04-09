@@ -93,7 +93,7 @@ export const write = (mountedRuntimes: MountedClientRuntimes) =>
   tool({
     description: DESCRIPTION,
     inputSchema: writeToolInputSchema,
-    strict: true,
+    strict: false,
     execute: async (args) => {
       return writeToolExecute(args, mountedRuntimes);
     },
