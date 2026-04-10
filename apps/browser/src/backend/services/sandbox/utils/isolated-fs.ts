@@ -60,7 +60,7 @@ function resolveSandboxPath(
     );
   }
 
-  const safePart = path.resolve('/', relativePart);
+  const safePart = path.posix.resolve('/', relativePart);
   const absolute = path.join(mount.absolutePath, safePart);
 
   if (!absolute.startsWith(mount.absolutePath)) {
