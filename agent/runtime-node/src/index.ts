@@ -1,6 +1,7 @@
 import { dirname, resolve, join, relative, extname } from 'node:path';
 import { grep } from './grep/index.js';
 import { glob } from './glob/index.js';
+import { toPosixPath } from './glob/utils.js';
 import { promises as fs } from 'node:fs';
 import { minimatch } from 'minimatch';
 import ignore from 'ignore';
@@ -524,7 +525,7 @@ export class NodeFileSystemProvider {
     return join(...relativePaths);
   }
   getRelativePath(from: string, to: string): string {
-    return relative(from, to);
+    return toPosixPath(relative(from, to));
   }
   getFileExtension(relativePath: string): string {
     return extname(relativePath);

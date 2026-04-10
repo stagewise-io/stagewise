@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 export function cleanupTestDir(dir: string): void {
   if (fs.existsSync(dir)) {
     try {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     } catch (error) {
       console.warn(`Failed to cleanup test directory ${dir}:`, error);
     }
