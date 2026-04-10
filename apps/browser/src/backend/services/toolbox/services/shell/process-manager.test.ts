@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import os from 'node:os';
 import fs from 'node:fs';
+import path from 'node:path';
 import { applyHeadTailCap, ProcessManager } from './process-manager';
 import { detectShell } from './detect-shell';
 import { sanitizeEnv } from './sanitize-env';
@@ -132,11 +133,23 @@ describeIfShell('ProcessManager (integration)', () => {
   });
 
   it('respects cwd', async () => {
-    pm = createPM();
-    const { result } = pm.spawn('agent-test', { command: 'pwd', cwd }, env);
-    const r = await result;
+    // Use a uniquely-named subdir so we can assert on its basename.
+    // Git Bash on Windows translates paths (e.g. C:\...\Temp → /tmp),
+    // so comparing the full path from `pwd` against os.tmpdir() fails.
+    const uniqueDir = fs.mkdtempSync(path.join(cwd, 'pm-cwd-test-'));
+    try {
+      pm = createPM();
+      const { result } = pm.spawn(
+        'agent-test',
+        { command: 'pwd', cwd: uniqueDir },
+        env,
+      );
+      const r = await result;
 
-    expect(r.output).toContain(cwd);
+      expect(r.output).toContain(path.basename(uniqueDir));
+    } finally {
+      fs.rmSync(uniqueDir, { recursive: true, force: true });
+    }
   });
 
   it('streams output via onOutput callback', async () => {
