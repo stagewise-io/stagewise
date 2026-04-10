@@ -26,11 +26,7 @@ import type { AgentTypeMap } from '../../agents-map';
 import type { ToolboxService } from '@/services/toolbox';
 import type { TelemetryService } from '@/services/telemetry';
 import type { Logger } from '@/services/logger';
-import {
-  type ModelProviderService,
-  type ModelWithOptions,
-  deepMergeProviderOptions,
-} from '../../model-provider';
+import type { ModelProviderService } from '../../model-provider';
 import {
   convertAgentMessagesToModelMessages,
   capitalizeFirstLetter,
@@ -1466,14 +1462,11 @@ export abstract class BaseAgent<
 
     this.logger.debug(`[BaseAgent:${this.instanceId}] Running step`);
 
-    const resolvedProviderOptions =
-      this.resolvePreferredProvider(modelWithOptions);
-
     this.stepAbortController = new AbortController();
 
     const stream = streamText({
       model: modelWithOptions.model,
-      providerOptions: resolvedProviderOptions,
+      providerOptions: modelWithOptions.providerOptions,
       headers: modelWithOptions.headers,
       messages: modelMessages,
       tools: tools as StagewiseToolSet,
@@ -1495,26 +1488,6 @@ export abstract class BaseAgent<
       onFinish: async (result) => {
         // Guard: ignore if a newer step has started (e.g. queue flush)
         if (this._stepGeneration !== stepGen) return;
-
-        // Backfeed stagewise gateway routing metadata onto the
-        // assistant message so subsequent steps can read it back.
-        const swMeta = result.providerMetadata?.stagewise;
-        if (swMeta?.finalProvider && swMeta?.finalModel) {
-          this.state.set((draft) => {
-            const last = draft.history[draft.history.length - 1];
-            if (last?.role === 'assistant') {
-              last.metadata ??= { createdAt: new Date(), partsMetadata: [] };
-              last.metadata.stagewiseProvider = {
-                finalProvider: String(swMeta.finalProvider),
-                finalModel: String(swMeta.finalModel),
-                limits:
-                  typeof swMeta.limits === 'object'
-                    ? (swMeta.limits as Record<string, never>)
-                    : {},
-              };
-            }
-          });
-        }
 
         // Log step completion details
         this.logger.debug(
@@ -2552,69 +2525,6 @@ export abstract class BaseAgent<
     const trailing = messages.splice(lastToolIdx + 1);
     messages.splice(assistantIdx, 0, ...trailing);
     return messages;
-  }
-
-  /**
-   * Searches the chat history backwards for the most recent stagewise
-   * provider metadata containing `finalProvider` / `finalModel`. When the
-   * recorded `finalModel` matches the currently active model, the
-   * `preferredProvider` hint is merged into the provider options so the
-   * gateway can route to the same upstream provider.
-   *
-   * The metadata is read from `msg.metadata.stagewiseProvider` which is
-   * backfed from `result.providerMetadata.stagewise` after each step.
-   *
-   * The gateway returns `finalModel` in prefixed form (`<provider>/<id>`,
-   * e.g. `anthropic/claude-sonnet-4-20250514`) because model IDs sent to
-   * the stagewise gateway are always provider-prefixed. We strip the
-   * prefix before comparing against `activeModelId` which stores the
-   * bare model identifier.
-   *
-   * The hint is only useful while the gateway's routing state is still
-   * warm. After 30 minutes the gateway will have discarded any affinity,
-   * so there is no benefit in sending the hint — we bail out early to
-   * avoid unnecessary history traversal.
-   */
-  private resolvePreferredProvider(
-    modelWithOptions: ModelWithOptions,
-  ): ModelWithOptions['providerOptions'] {
-    const activeModelId = this.state.get().activeModelId;
-    const history = this.state.get().history;
-    const now = Date.now();
-    const stalenessThresholdMs = 30 * 60 * 1000; // 30 minutes
-
-    for (let i = history.length - 1; i >= 0; i--) {
-      const msg = history[i];
-      if (msg.role !== 'assistant') continue;
-
-      // Once we reach a message older than the staleness window the
-      // gateway will have recycled its routing state — stop searching.
-      const createdAt = msg.metadata?.createdAt;
-      if (
-        createdAt &&
-        now - new Date(createdAt).getTime() > stalenessThresholdMs
-      ) {
-        return modelWithOptions.providerOptions;
-      }
-
-      const sw = msg.metadata?.stagewiseProvider;
-      if (!sw || !sw.finalModel || !sw.finalProvider) continue;
-
-      // Strip the provider prefix (e.g. "anthropic/claude-sonnet-4-…" → "claude-sonnet-4-…")
-      const unprefixedModel = sw.finalModel.includes('/')
-        ? sw.finalModel.slice(sw.finalModel.indexOf('/') + 1)
-        : sw.finalModel;
-
-      if (unprefixedModel === activeModelId) {
-        return deepMergeProviderOptions(
-          modelWithOptions.providerOptions as Record<string, unknown>,
-          { stagewise: { preferredProvider: sw.finalProvider } },
-        );
-      }
-      return modelWithOptions.providerOptions;
-    }
-
-    return modelWithOptions.providerOptions;
   }
 
   private static extractApiErrorContext(error: Error): Record<string, unknown> {
