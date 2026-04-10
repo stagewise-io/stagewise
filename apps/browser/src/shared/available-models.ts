@@ -583,7 +583,7 @@ export const availableModels = [
   },
   {
     officialProvider: 'alibaba',
-    modelId: 'qwen-3-32b',
+    modelId: 'qwen3-32b',
     modelDisplayName: 'Qwen 3-32B',
     modelDescription:
       'Qwen3-32B is a world-class model with comparable quality to DeepSeek R1 while outperforming GPT-4.1 and Claude Sonnet 3.7.',

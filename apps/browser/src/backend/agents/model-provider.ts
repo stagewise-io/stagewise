@@ -265,7 +265,14 @@ export class ModelProviderService {
     if (mode === 'stagewise') {
       const proxyBaseUrl =
         process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
-      const prefixedModelId = `${officialProvider}/${modelSettings.modelId}`;
+      // OpenRouter uses different provider prefixes for some vendors
+      const OPENROUTER_PROVIDER_MAP: Partial<Record<ModelProvider, string>> = {
+        alibaba: 'qwen',
+      };
+      const routerProvider = officialProvider
+        ? (OPENROUTER_PROVIDER_MAP[officialProvider] ?? officialProvider)
+        : officialProvider;
+      const prefixedModelId = `${routerProvider}/${modelSettings.modelId}`;
       const stagewiseProvider = createStagewise({
         apiKey: this.authService.accessToken ?? '',
         baseURL: proxyBaseUrl,

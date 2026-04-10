@@ -267,14 +267,6 @@ export type EnvironmentSnapshot = z.infer<typeof environmentSnapshotSchema>;
  */
 export type FullEnvironmentSnapshot = Required<EnvironmentSnapshot>;
 
-const stagewiseProviderSchema = z.object({
-  finalProvider: z.string().optional(),
-  finalModel: z.string().optional(),
-  limits: z.object({}),
-});
-
-export type StagewiseProviderMeta = z.infer<typeof stagewiseProviderSchema>;
-
 const metadataSchema = z.object({
   createdAt: z.date(),
   partsMetadata: z.array(
@@ -307,8 +299,6 @@ const metadataSchema = z.object({
    * once across the conversation unless the hash changes.
    */
   pathReferences: z.record(z.string(), z.string()).optional(),
-  /** Provider routing metadata returned by the stagewise gateway. */
-  stagewiseProvider: stagewiseProviderSchema.optional(),
 });
 
 export type UserMessageMetadata = z.infer<typeof metadataSchema>;
