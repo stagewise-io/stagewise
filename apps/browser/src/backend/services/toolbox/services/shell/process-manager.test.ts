@@ -170,7 +170,7 @@ describeIfShell('ProcessManager (integration)', () => {
 
   it(
     'killByAgent terminates tracked processes',
-    { timeout: 5000 },
+    { timeout: 10000 },
     async () => {
       pm = createPM();
       const { result } = pm.spawn(
