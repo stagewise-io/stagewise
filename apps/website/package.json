@@ -32,7 +32,7 @@
     "nucleo-ui-fill-duo-18": "^1.3.2",
     "nucleo-ui-outline-18": "^1.3.2",
     "nucleo-ui-outline-duo-18": "^1.3.2",
-    "posthog-js": "^1.257.0",
+    "posthog-js": "^1.367.0",
     "posthog-node": "^4.17.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

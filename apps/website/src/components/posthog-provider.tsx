@@ -10,66 +10,62 @@ import { getCookieConsent } from '@/lib/cookie-consent-utils';
 // Avoids depending on posthog.__loaded (private API, may break without notice).
 let posthogInitialized = false;
 
-/**
- * Applies the correct PostHog capture mode based on the current consent status.
- *
- * - 'accepted' → opt in with cookie persistence (full tracking)
- * - 'denied'   → opt out (no capture, no storage)
- * - null       → memory-only mode (anonymous session, no cookies — GDPR safe)
- */
-function applyConsent(consent: 'accepted' | 'denied' | null) {
-  if (consent === 'accepted') {
-    posthog.set_config({ persistence: 'cookie' });
-    posthog.opt_in_capturing();
-  } else if (consent === 'denied') {
-    posthog.opt_out_capturing();
-    posthog.reset();
-  }
-  // null → do nothing; posthog already runs in memory-only mode
-}
-
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return;
+    if (posthogInitialized) return;
 
     const consent = getCookieConsent();
 
-    // Always initialize — memory persistence means no cookies are written,
-    // so this is GDPR compliant even without consent.
-    if (!posthogInitialized) {
-      posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-        api_host: '/ingest',
-        ui_host: 'https://eu.posthog.com',
-        capture_pageview: false, // Captured manually in PostHogPageView
-        capture_pageleave: true,
-        debug: process.env.NODE_ENV === 'development',
-        // Start with memory — no cookies written until the user accepts.
-        persistence: 'memory',
-        // opt_out_capturing_by_default is intentionally omitted:
-        // applyConsent() below is the single source of truth for opt-out state.
-        // Using opt_out_capturing_by_default would write to localStorage as a
-        // side effect, bypassing our memory-only persistence setup.
-      });
-      posthogInitialized = true;
-    }
+    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+      api_host: '/ingest',
+      ui_host: 'https://eu.posthog.com',
+      capture_pageview: false, // Captured manually in PostHogPageView
+      capture_pageleave: true,
+      debug: process.env.NODE_ENV === 'development',
 
-    // Apply the stored consent state immediately on mount.
-    applyConsent(consent);
+      // --- Consent-aware persistence ---
+      // Write the opt-out flag to a cookie (not localStorage) so that
+      // server-side middleware can read it too.
+      opt_out_capturing_persistence_type: 'cookie',
+      // Start fully opted out by default — no events, no cookies, no storage.
+      // We explicitly opt in/out below based on stored consent.
+      opt_out_capturing_by_default: true,
+      // Also disable all persistence (distinct ID, session, etc.) by default.
+      // Only enabled once the user accepts.
+      opt_out_persistence_by_default: true,
+    });
 
-    // Capture the initial pageview here — in the parent — rather than relying
-    // on PostHogPageView's child effect. React runs child effects before parent
-    // effects, so by the time PostHogPageView fires on first mount, __loaded is
-    // still false and its guard blocks the capture. The child's effect correctly
-    // handles all subsequent navigation changes (pathname/searchParams deps).
-    if (!posthog.has_opted_out_capturing()) {
+    posthogInitialized = true;
+
+    // Apply the correct state based on stored consent.
+    if (consent === 'accepted') {
+      // User previously accepted: opt in and capture this pageview.
+      posthog.opt_in_capturing();
       posthog.capture('$pageview', {
         $current_url:
           window.origin + window.location.pathname + window.location.search,
       });
     }
+    // For 'denied' and null (undecided), opt_out_capturing_by_default: true
+    // already ensures nothing is sent. No further action needed.
 
-    // React to consent changes triggered by the cookie banner (no page reload needed).
-    const handler = () => applyConsent(getCookieConsent());
+    // React to consent changes from the cookie banner without a page reload.
+    const handler = () => {
+      const updated = getCookieConsent();
+      if (updated === 'accepted') {
+        posthog.opt_in_capturing();
+        // Capture the pageview that was missed while the user was deciding.
+        posthog.capture('$pageview', {
+          $current_url:
+            window.origin + window.location.pathname + window.location.search,
+        });
+      } else if (updated === 'denied') {
+        posthog.opt_out_capturing();
+        posthog.reset();
+      }
+    };
+
     window.addEventListener('posthog-consent-change', handler);
     return () => window.removeEventListener('posthog-consent-change', handler);
   }, []);
@@ -87,11 +83,9 @@ function PostHogPageView() {
   const searchParams = useSearchParams();
   const posthog = usePostHog();
 
-  // Tracks pageviews on navigation. The initial pageview on first mount is
-  // intentionally handled by the parent PostHogProvider's useEffect (which runs
-  // after this child effect), so we skip the first render via isFirstRender.
-  // Subsequent pathname/searchParams changes re-run this effect once
-  // posthogInitialized is true, so SPA navigation tracking works correctly.
+  // Tracks SPA navigations. The initial pageview is handled in PostHogProvider's
+  // useEffect (parent, runs after this child). isFirstRender skips the first
+  // mount so we don't double-count with the parent's capture.
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
