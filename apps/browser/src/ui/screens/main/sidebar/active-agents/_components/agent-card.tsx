@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { cn } from '@ui/utils';
 import {
   Tooltip,
@@ -8,6 +8,7 @@ import {
 import { Button } from '@stagewise/stage-ui/components/button';
 import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
 import { IconSleepingTimeOutline18 } from 'nucleo-ui-outline-18';
+import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import TimeAgo from 'javascript-time-ago';
 import en from 'javascript-time-ago/locale/en';
 
@@ -56,6 +57,7 @@ export const AgentCard = memo(
     onDelete,
   }: AgentCardProps) {
     const subtitle = hasError ? 'Error' : activityText;
+    const [deleteOpen, setDeleteOpen] = useState(false);
 
     return (
       <div
@@ -143,7 +145,7 @@ export const AgentCard = memo(
                 aria-label="Delete agent permanently"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDelete(id);
+                  setDeleteOpen(true);
                 }}
               >
                 <IconTrash2Outline24 className="size-4 cursor-pointer" />
@@ -153,6 +155,14 @@ export const AgentCard = memo(
               <span>Delete agent permanently</span>
             </TooltipContent>
           </Tooltip>
+          <DeleteConfirmPopover
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            onConfirm={() => {
+              setDeleteOpen(false);
+              onDelete(id);
+            }}
+          />
         </div>
       </div>
     );
