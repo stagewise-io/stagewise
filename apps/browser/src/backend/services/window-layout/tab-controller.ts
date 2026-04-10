@@ -2659,6 +2659,9 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
    * @returns true if the entry was added, false if it was a duplicate
    */
   private addConsoleLogEntry(entry: ConsoleLogEntry): boolean {
+    // Drop Electron-internal logs (e.g., security warnings from sandbox_bundle)
+    if (entry.stackTrace?.includes('node:electron/')) return false;
+
     // Check for duplicates in recent logs (same message and level within 50ms)
     const isDuplicate = this.consoleLogs.slice(-30).some((log) => {
       // Check if levels are equivalent ('log' and 'info' are functionally identical)

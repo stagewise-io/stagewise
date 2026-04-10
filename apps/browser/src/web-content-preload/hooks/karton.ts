@@ -24,7 +24,6 @@ let currentPort: MessagePort;
 
 function setupPortListeners(port: MessagePort) {
   port.onmessageerror = () => {
-    console.error('[Tab Karton] MessagePort error');
     attemptReconnect();
   };
 
@@ -38,7 +37,6 @@ function setupPortListeners(port: MessagePort) {
 function attemptReconnect() {
   if (isReconnecting) return;
   if (reconnectAttempts >= RECONNECT_CONFIG.MAX_ATTEMPTS) {
-    console.error('[Tab Karton] Max reconnection attempts reached');
     return;
   }
 
@@ -48,10 +46,6 @@ function attemptReconnect() {
   const delay = Math.min(
     RECONNECT_CONFIG.BASE_DELAY * 2 ** (reconnectAttempts - 1),
     RECONNECT_CONFIG.MAX_DELAY,
-  );
-
-  console.log(
-    `[Tab Karton] Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${RECONNECT_CONFIG.MAX_ATTEMPTS})`,
   );
 
   reconnectTimer = setTimeout(() => {
@@ -67,11 +61,9 @@ function performReconnect() {
     currentPort = newChannel.port1;
     setupPortListeners(currentPort);
 
-    console.log('[Tab Karton] Reconnection successful');
     reconnectAttempts = 0;
     isReconnecting = false;
-  } catch (error) {
-    console.error('[Tab Karton] Reconnection failed:', error);
+  } catch (_error) {
     isReconnecting = false;
     attemptReconnect();
   }
@@ -90,15 +82,13 @@ const kartonMessagePort: MessagePortProxy = {
     };
 
     currentPort.onmessageerror = () => {
-      console.error('[Tab Karton] MessagePort error');
       attemptReconnect();
     };
   },
   postMessage: (message: KartonMessage) => {
     try {
       currentPort.postMessage(message);
-    } catch (error) {
-      console.error('[Tab Karton] Failed to post message:', error);
+    } catch (_error) {
       attemptReconnect();
     }
   },
