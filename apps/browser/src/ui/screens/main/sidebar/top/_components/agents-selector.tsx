@@ -20,6 +20,7 @@ import { Switch } from '@stagewise/stage-ui/components/switch';
 import { IconHistoryFill18 } from 'nucleo-ui-fill-18';
 import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
 import { cn } from '@ui/utils';
+import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -120,6 +121,7 @@ export const AgentsSelector = memo(
     onEndReached,
   }: AgentsSelectorProps) {
     const [inputValue, setInputValue] = useState('');
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
     const [isOpen, setIsOpen] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
     const sentinelRef = useRef<HTMLDivElement>(null);
@@ -168,14 +170,17 @@ export const AgentsSelector = memo(
       (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
         const agentId = e.currentTarget.dataset.agentId;
-        if (agentId) onDelete(agentId);
+        if (agentId) setPendingDeleteId(agentId);
       },
-      [onDelete],
+      [],
     );
 
     const handleOpenChange = useCallback((open: boolean) => {
       setIsOpen(open);
-      if (!open) setInputValue('');
+      if (!open) {
+        setInputValue('');
+        setPendingDeleteId(null);
+      }
     }, []);
 
     const showActiveAgents = useKartonState(
@@ -272,14 +277,28 @@ export const AgentsSelector = memo(
                               />
                             </span>
                           </span>
-                          <button
-                            type="button"
-                            className="col-start-3 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
-                            data-agent-id={agent.id}
-                            onClick={handleDeleteClick}
-                          >
-                            <IconTrash2Outline24 className="size-3" />
-                          </button>
+                          <div className="relative col-start-3">
+                            <button
+                              type="button"
+                              className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
+                              data-agent-id={agent.id}
+                              onClick={handleDeleteClick}
+                            >
+                              <IconTrash2Outline24 className="size-3" />
+                            </button>
+                            {pendingDeleteId === agent.id && (
+                              <DeleteConfirmPopover
+                                open={true}
+                                onOpenChange={(open) => {
+                                  if (!open) setPendingDeleteId(null);
+                                }}
+                                onConfirm={() => {
+                                  setPendingDeleteId(null);
+                                  onDelete(agent.id);
+                                }}
+                              />
+                            )}
+                          </div>
                         </ComboboxItem>
                       );
                     })}
