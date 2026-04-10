@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha.53 (2026-04-10)
+
+### Bug Fixes
+
+* fix runtime-node issues on windows (4007ea2)
+* fix isolated-fs path resolution on windows (ed59ce6)
+
 ## 1.0.0-alpha.52 (2026-04-09)
 
 ### Bug Fixes
