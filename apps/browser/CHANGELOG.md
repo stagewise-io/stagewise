@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0-alpha.54 (2026-04-10)
+
+### Bug Fixes
+
+* add delete-confirmation-popup for agents (d3706f9)
+* fix tab-sorting (9aeffe6)
+* remove stagewise-logs from webcontents (eac29d7)
+
 ## 1.0.0-alpha.53 (2026-04-10)
 
 ### Bug Fixes
