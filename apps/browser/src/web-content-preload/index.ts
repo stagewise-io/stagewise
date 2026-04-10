@@ -103,8 +103,6 @@ function invalidatePagesApiConnection() {
 
   isPagesApiReconnecting = false;
   pagesApiReconnectAttempts = 0;
-
-  console.warn('[PagesAPI] Connection invalidated due to origin change');
 }
 
 /**
@@ -113,24 +111,17 @@ function invalidatePagesApiConnection() {
 function setupPagesApiPortListeners(port: MessagePort) {
   // Check if connection was invalidated
   if (isPagesApiConnectionInvalidated) {
-    console.warn(
-      '[PagesAPI] Connection was invalidated - refusing to setup port listeners',
-    );
     return;
   }
 
   // Validate origin before setting up listeners
   if (!isValidOrigin()) {
-    console.warn(
-      '[PagesAPI] Origin check failed - refusing to setup port listeners',
-    );
     invalidatePagesApiConnection();
     return;
   }
 
   // Handle message errors (connection issues)
-  port.onmessageerror = (error) => {
-    console.error('[PagesAPI] MessagePort error:', error);
+  port.onmessageerror = (_error) => {
     attemptPagesApiReconnect();
   };
 
@@ -144,9 +135,6 @@ function setupPagesApiPortListeners(port: MessagePort) {
 
       // Validate origin on every message
       if (!isValidOrigin()) {
-        console.warn(
-          '[PagesAPI] Origin check failed on message - invalidating connection',
-        );
         invalidatePagesApiConnection();
         return;
       }
@@ -166,7 +154,6 @@ function attemptPagesApiReconnect() {
 
   // Validate origin before attempting reconnection
   if (!isValidOrigin()) {
-    console.warn('[PagesAPI] Origin check failed - invalidating connection');
     invalidatePagesApiConnection();
     return;
   }
@@ -177,7 +164,6 @@ function attemptPagesApiReconnect() {
   }
 
   if (pagesApiReconnectAttempts >= RECONNECT_CONFIG.MAX_ATTEMPTS) {
-    console.error('[PagesAPI] Max reconnection attempts reached');
     return;
   }
 
@@ -188,10 +174,6 @@ function attemptPagesApiReconnect() {
   const delay = Math.min(
     RECONNECT_CONFIG.BASE_DELAY * Math.pow(2, pagesApiReconnectAttempts - 1),
     RECONNECT_CONFIG.MAX_DELAY,
-  );
-
-  console.log(
-    `[PagesAPI] Reconnecting in ${delay}ms (attempt ${pagesApiReconnectAttempts}/${RECONNECT_CONFIG.MAX_ATTEMPTS})`,
   );
 
   _pagesApiReconnectTimer = setTimeout(() => {
@@ -212,7 +194,6 @@ function performPagesApiReconnect() {
 
   // Validate origin before reconnecting
   if (!isValidOrigin()) {
-    console.warn('[PagesAPI] Origin check failed - invalidating connection');
     invalidatePagesApiConnection();
     isPagesApiReconnecting = false;
     return;
@@ -240,13 +221,10 @@ function performPagesApiReconnect() {
     // Setup listeners on new port (this will also re-apply the message handler)
     setupPagesApiPortListeners(currentPagesApiPort);
 
-    console.log('[PagesAPI] Reconnection successful');
-
     // Reset reconnection state
     pagesApiReconnectAttempts = 0;
     isPagesApiReconnecting = false;
-  } catch (error) {
-    console.error('[PagesAPI] Reconnection failed:', error);
+  } catch (_error) {
     isPagesApiReconnecting = false;
 
     // Try again
@@ -260,9 +238,6 @@ function performPagesApiReconnect() {
 function initializePagesApiConnection(): MessagePortProxy | null {
   // Use the cached constant - checked once at script load time
   if (!IS_VALID_PAGES_CONTEXT) {
-    console.debug(
-      '[PagesAPI] Origin check failed - PagesAPI connection not available',
-    );
     return null;
   }
 
@@ -280,17 +255,11 @@ function initializePagesApiConnection(): MessagePortProxy | null {
     setOnMessage: (handler: (message: KartonMessage) => void) => {
       // Check if connection was invalidated
       if (isPagesApiConnectionInvalidated) {
-        console.warn(
-          '[PagesAPI] Connection was invalidated - refusing to set message handler',
-        );
         return;
       }
 
       // Validate origin before setting message handler
       if (!isValidOrigin()) {
-        console.warn(
-          '[PagesAPI] Origin check failed - invalidating connection',
-        );
         invalidatePagesApiConnection();
         return;
       }
@@ -299,7 +268,6 @@ function initializePagesApiConnection(): MessagePortProxy | null {
       currentPagesApiMessageHandler = handler;
 
       if (!currentPagesApiPort) {
-        console.error('[PagesAPI] Port not available');
         return;
       }
 
@@ -312,9 +280,6 @@ function initializePagesApiConnection(): MessagePortProxy | null {
 
         // Validate origin on every message
         if (!isValidOrigin()) {
-          console.warn(
-            '[PagesAPI] Origin check failed on message - invalidating connection',
-          );
           invalidatePagesApiConnection();
           return;
         }
@@ -322,38 +287,29 @@ function initializePagesApiConnection(): MessagePortProxy | null {
       };
 
       // Setup error handler for detecting connection issues
-      currentPagesApiPort.onmessageerror = (error) => {
-        console.error('[PagesAPI] MessagePort error:', error);
+      currentPagesApiPort.onmessageerror = (_error) => {
         attemptPagesApiReconnect();
       };
     },
     postMessage: (message: KartonMessage) => {
       // Check if connection was invalidated
       if (isPagesApiConnectionInvalidated) {
-        console.warn(
-          '[PagesAPI] Connection was invalidated - refusing to post message',
-        );
         return;
       }
 
       // Validate origin before posting message
       if (!isValidOrigin()) {
-        console.warn(
-          '[PagesAPI] Origin check failed - invalidating connection',
-        );
         invalidatePagesApiConnection();
         return;
       }
 
       if (!currentPagesApiPort) {
-        console.error('[PagesAPI] Port not available');
         return;
       }
 
       try {
         currentPagesApiPort.postMessage(message);
-      } catch (error) {
-        console.error('[PagesAPI] Failed to post message:', error);
+      } catch (_error) {
         // Trigger reconnection if post fails
         attemptPagesApiReconnect();
       }
@@ -450,9 +406,7 @@ window.addEventListener(
       createRoot(host).render(
         createElement(StrictMode, null, createElement(App)),
       );
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (_error) {}
   },
   { capture: true, once: true, passive: true },
 );
