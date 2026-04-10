@@ -158,7 +158,7 @@ export class ProcessManager {
     const pid = child.pid;
     if (pid === undefined) return false;
 
-    if (process.platform === 'win32') return this.killWindows(pid);
+    if (process.platform === 'win32') return this.killWindows(tracked, pid);
 
     return this.killUnix(tracked, pid);
   }
@@ -191,14 +191,27 @@ export class ProcessManager {
     return true;
   }
 
-  private killWindows(pid: number): Promise<boolean> {
-    return new Promise((resolve) => {
+  private async killWindows(
+    tracked: TrackedProcess,
+    pid: number,
+  ): Promise<boolean> {
+    const killed = await new Promise<boolean>((resolve) => {
       const taskkill = cpSpawn('taskkill', ['/F', '/T', '/PID', String(pid)], {
         stdio: 'ignore',
       });
       taskkill.on('exit', () => resolve(true));
       taskkill.on('error', () => resolve(false));
     });
+
+    // taskkill /F bypasses the normal process exit flow, so Node.js
+    // may never receive the 'close' event on the child. Force it
+    // after a short grace period so the result promise resolves.
+    if (killed && !tracked.exited) {
+      await sleep(500);
+      if (!tracked.exited) tracked.child.emit('close', 1);
+    }
+
+    return killed;
   }
 
   getToolCallIdsForAgent(agentInstanceId: string): string[] {
