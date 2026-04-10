@@ -140,6 +140,10 @@ jobs:
     env:
       NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
     steps:
+      - name: Disable Windows Defender real-time monitoring
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+        shell: powershell
+
       - name: Checkout
         uses: actions/checkout@v4
 
