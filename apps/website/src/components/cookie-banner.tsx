@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import posthog from 'posthog-js';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { getCookieConsent, setCookieConsent } from '@/lib/cookie-consent-utils';
 
@@ -9,9 +8,7 @@ export function CookieBanner() {
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
-    // Check if user has already made a choice
-    const consent = getCookieConsent();
-    if (consent === null) {
+    if (getCookieConsent() === null) {
       setShowBanner(true);
     }
   }, []);
@@ -19,16 +16,15 @@ export function CookieBanner() {
   const handleAccept = () => {
     setCookieConsent('accepted');
     setShowBanner(false);
-    // Reload the page to reinitialize PostHog with cookies
-    window.location.reload();
+    // Notify the PostHogProvider to upgrade to cookie persistence — no page reload needed.
+    window.dispatchEvent(new Event('posthog-consent-change'));
   };
 
   const handleDeny = () => {
     setCookieConsent('denied');
     setShowBanner(false);
-    // Immediately opt out and clear any PostHog identifiers
-    posthog.opt_out_capturing();
-    posthog.reset();
+    // Notify the PostHogProvider to opt out.
+    window.dispatchEvent(new Event('posthog-consent-change'));
   };
 
   if (!showBanner) {
@@ -36,6 +32,7 @@ export function CookieBanner() {
   }
 
   return (
+    // Non-blocking: fixed overlay in the corner, page stays fully interactive.
     <div className="slide-in-from-bottom fixed right-4 bottom-4 z-50 w-full max-w-[calc(100%-2rem)] animate-in duration-300 sm:w-sm">
       <div className="flex flex-col items-start gap-3 rounded-2xl border border-border bg-background/80 p-4 backdrop-blur-lg dark:bg-background/80">
         <div className="flex flex-col items-start gap-1">
