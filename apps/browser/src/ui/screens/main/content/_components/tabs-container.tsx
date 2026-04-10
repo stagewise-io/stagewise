@@ -5,7 +5,11 @@ import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AgentPreviewBadge } from './agent-preview-badge';
-import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import {
+  useComparingSelector,
+  useKartonProcedure,
+  useKartonState,
+} from '@ui/hooks/use-karton';
 import { IconBrush2Outline18 } from 'nucleo-ui-outline-18';
 import {
   Tooltip,
@@ -37,7 +41,7 @@ import {
 } from '@dnd-kit/modifiers';
 import { SortableTab } from './sortable-tab';
 import { Tab } from './tab';
-import type { TabState } from '@shared/karton-contracts/ui';
+import type { KartonContract, TabState } from '@shared/karton-contracts/ui';
 
 const DEFAULT_BORDER_RADIUS = 8;
 
@@ -99,8 +103,14 @@ export function TabsContainer({
 
   const reorderTabs = useKartonProcedure((p) => p.browser.reorderTabs);
 
-  // Server tab IDs order
-  const serverTabIds = useMemo(() => Object.keys(tabs), [tabs]);
+  // Server tab IDs order — stable reference unless the actual set/order of IDs changes.
+  // Without this, any tab property mutation (title, URL, loading state) would produce
+  // a new array reference via Object.keys and reset the optimistic drag order.
+  const tabIdsSelector = useComparingSelector<KartonContract, string[]>(
+    (s) => Object.keys(s.browser.tabs),
+    (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
+  );
+  const serverTabIds = useKartonState(tabIdsSelector);
 
   // Optimistic local tab order - syncs with server but can be updated immediately on drag
   const [optimisticTabIds, setOptimisticTabIds] =
