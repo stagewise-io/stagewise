@@ -132,6 +132,37 @@ jobs:
       - name: Run Tests
         run: pnpm test
 
+  # Cross-platform unit tests - catches platform-specific bugs (e.g. path handling on Windows)
+  test-windows:
+    name: Unit Tests (Windows)
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    env:
+      NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build All Packages
+        run: pnpm build
+
+      - name: Run Tests
+        run: pnpm test
+
   # Cross-platform stagewise builds - only on PRs to main/release-tests
   # Required for merge
   build-stagewise:
@@ -263,7 +294,7 @@ jobs:
   ci-full:
     name: Full CI (PR)
     if: github.event_name == 'pull_request' && always()
-    needs: [lint, test, build, build-stagewise]
+    needs: [lint, test, build, test-windows, build-stagewise]
     runs-on: ubuntu-latest
     steps:
       - name: Check Full CI Status
@@ -271,6 +302,7 @@ jobs:
           if [ "${{ needs.lint.result }}" != "success" ] || \
              [ "${{ needs.test.result }}" != "success" ] || \
              [ "${{ needs.build.result }}" != "success" ] || \
+             [ "${{ needs.test-windows.result }}" != "success" ] || \
              [ "${{ needs.build-stagewise.result }}" != "success" ]; then
             echo "## CI Failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -278,6 +310,7 @@ jobs:
             echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
             echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| Test | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Test (Windows) | ${{ needs.test-windows.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| Build Browser | ${{ needs.build-stagewise.result }} |" >> $GITHUB_STEP_SUMMARY
             exit 1
