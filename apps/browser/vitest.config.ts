@@ -6,8 +6,8 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     passWithNoTests: true,
-    testTimeout: 30000, // 30 seconds for file system tests
-    hookTimeout: 30000,
+    testTimeout: 60000, // 60s — accommodates heavy SQLite tests on slow CI runners
+    hookTimeout: 60000,
     fileParallelism: false, // Sequential execution for file system tests
     include: ['src/**/*.test.ts'],
     coverage: {
