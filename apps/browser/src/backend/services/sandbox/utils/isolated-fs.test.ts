@@ -139,7 +139,8 @@ describe('security', () => {
     ).toThrow();
   });
 
-  it('blocks symlink escape', () => {
+  // Windows requires admin privileges to create symlinks
+  it.skipIf(process.platform === 'win32')('blocks symlink escape', () => {
     const mounts = [mount('w1', mountA)];
     const { isolatedFs } = createIsolatedFs(mounts, null);
 
