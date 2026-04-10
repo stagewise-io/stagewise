@@ -2,9 +2,10 @@
  * Source of a skill definition.
  * - `builtin` — shipped with the app (bundled/skills/)
  * - `workspace` — discovered from a mounted workspace skill
+ * - `global` — user-level skills from ~/.stagewise/skills/ or ~/.agents/skills/
  * - `plugin` — discovered from a bundled plugin skill
  */
-export type SkillSource = 'builtin' | 'workspace' | 'plugin';
+export type SkillSource = 'builtin' | 'workspace' | 'global' | 'plugin';
 
 /**
  * Full skill definition used by the backend.

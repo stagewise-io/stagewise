@@ -31,17 +31,15 @@ export function renderFullEnvironmentContext(
   // All symlinks — user workspaces + always-available — in one table
   const { workspace } = snapshot;
   const systemPrefixes = new Set(['att', 'plugins', 'apps']);
-  const userMounts = workspace.mounts.filter(
-    (m) => !systemPrefixes.has(m.prefix),
-  );
-  const systemMounts = workspace.mounts.filter((m) =>
-    systemPrefixes.has(m.prefix),
-  );
+  const isSystemMount = (prefix: string) =>
+    systemPrefixes.has(prefix) || prefix.startsWith('globalskills-');
+  const userMounts = workspace.mounts.filter((m) => !isSystemMount(m.prefix));
+  const systemMounts = workspace.mounts.filter((m) => isSystemMount(m.prefix));
   const allMounts = [...userMounts, ...systemMounts];
 
   if (allMounts.length > 0) {
     const rows = allMounts.map((m) => {
-      const isUser = !systemPrefixes.has(m.prefix);
+      const isUser = !isSystemMount(m.prefix);
       const addr = isUser ? `use '${m.prefix}/...' to address files` : '';
       const perms = m.permissions ? m.permissions.join(', ') : '';
       return `| ${m.prefix} | ${m.path} | ${addr} | ${perms} |`;

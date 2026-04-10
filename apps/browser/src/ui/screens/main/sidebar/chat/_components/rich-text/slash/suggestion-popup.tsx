@@ -250,7 +250,8 @@ function useGroupedItems(items: SlashItem[]) {
   return useMemo(() => {
     const buckets = new Map<string, SlashItem[]>();
     for (const item of items) {
-      const group = item.group || 'builtin';
+      const group =
+        item.group === 'global' ? 'workspace' : item.group || 'builtin';
       let bucket = buckets.get(group);
       if (!bucket) {
         bucket = [];

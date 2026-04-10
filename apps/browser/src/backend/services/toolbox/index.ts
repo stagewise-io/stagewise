@@ -32,7 +32,7 @@ import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import { createFileDiffHandler } from './utils/sandbox-callbacks';
 import { deleteAgentBlobs, getAgentBlobDir } from '@/utils/attachment-blobs';
 import { getDataRoot, getPlansDir, getTempRoot } from '@/utils/paths';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import type { ApiClient } from '@stagewise/api-client';
 import {
@@ -105,6 +105,7 @@ import type { ContextFilesResult } from '@shared/karton-contracts/pages-api/type
 import {
   getSkills,
   discoverSkills,
+  discoverGlobalSkills,
 } from '@/agents/shared/prompts/utils/get-skills';
 import type { SkillDefinition } from '@shared/skills';
 import { toSkillDefinitionUI } from '@shared/skills';
@@ -114,9 +115,27 @@ import { resolveMountedRelativePath } from './utils/path-mounting';
 import { normalizePath } from '@shared/path-utils';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import chokidar, { type FSWatcher } from 'chokidar';
+import { homedir } from 'node:os';
 
 type MountedPrefix = string;
 type MountedPath = string;
+
+function getGlobalSkillsMounts(): Array<{
+  prefix: string;
+  absolutePath: string;
+}> {
+  const home = homedir();
+  return [
+    {
+      prefix: 'globalskills-sw',
+      absolutePath: path.resolve(home, '.stagewise', 'skills'),
+    },
+    {
+      prefix: 'globalskills-agents',
+      absolutePath: path.resolve(home, '.agents', 'skills'),
+    },
+  ];
+}
 
 export class ToolboxService extends DisposableService {
   private readonly logger: Logger;
@@ -133,6 +152,7 @@ export class ToolboxService extends DisposableService {
   private sandboxService: SandboxService | null = null;
   private shellService: ShellService | null = null;
   private pluginsRuntime: ClientRuntimeNode | null = null;
+  private globalSkillsRuntimes = new Map<string, ClientRuntimeNode>();
   private appsRuntimes = new Map<string, ClientRuntimeNode>();
   private attRuntimes = new Map<string, ClientRuntimeNode>();
 
@@ -158,6 +178,13 @@ export class ToolboxService extends DisposableService {
       this.mountManagerService?.getMountedRuntimes(agentInstanceId);
     if (!runtimes) return undefined;
     if (this.pluginsRuntime) runtimes.set('plugins', this.pluginsRuntime);
+    for (const mount of getGlobalSkillsMounts()) {
+      const rt = this.getOrCreateGlobalSkillsRuntime(
+        mount.prefix,
+        mount.absolutePath,
+      );
+      if (rt) runtimes.set(mount.prefix, rt);
+    }
     runtimes.set('apps', this.getOrCreateAppsRuntime(agentInstanceId));
     runtimes.set(PLANS_PREFIX, this.getOrCreatePlansRuntime());
     runtimes.set('att', this.getOrCreateAttRuntime(agentInstanceId));
@@ -180,6 +207,21 @@ export class ToolboxService extends DisposableService {
       rgBinaryBasePath: getRipgrepBasePath(),
     });
     return this.plansRuntime;
+  }
+
+  private getOrCreateGlobalSkillsRuntime(
+    prefix: string,
+    absolutePath: string,
+  ): ClientRuntimeNode | null {
+    const existing = this.globalSkillsRuntimes.get(prefix);
+    if (existing) return existing;
+    if (!existsSync(absolutePath)) return null;
+    const runtime = new ClientRuntimeNode({
+      workingDirectory: absolutePath,
+      rgBinaryBasePath: getRipgrepBasePath(),
+    });
+    this.globalSkillsRuntimes.set(prefix, runtime);
+    return runtime;
   }
 
   private getOrCreateAppsRuntime(agentInstanceId: string): ClientRuntimeNode {
@@ -935,6 +977,16 @@ export class ToolboxService extends DisposableService {
       permissions: READ_ONLY_PERMISSIONS,
     });
 
+    for (const gs of getGlobalSkillsMounts()) {
+      if (existsSync(gs.absolutePath)) {
+        mounts.push({
+          prefix: gs.prefix,
+          absolutePath: gs.absolutePath,
+          permissions: READ_ONLY_PERMISSIONS,
+        });
+      }
+    }
+
     const appsDir = getAgentAppsDir(agentInstanceId);
     mkdirSync(appsDir, { recursive: true });
     mounts.push({
@@ -1039,6 +1091,13 @@ export class ToolboxService extends DisposableService {
         path: getPluginsPath(),
         permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
       },
+      ...getGlobalSkillsMounts()
+        .filter((gs) => existsSync(gs.absolutePath))
+        .map((gs) => ({
+          prefix: gs.prefix,
+          path: gs.absolutePath,
+          permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
+        })),
       {
         prefix: 'apps',
         path: getAgentAppsDir(agentInstanceId),
@@ -1166,6 +1225,28 @@ export class ToolboxService extends DisposableService {
   ): Promise<SkillDefinition[]> {
     const result: SkillDefinition[] = [...this.builtinSkills];
     const seen = new Set(result.map((c) => c.id));
+
+    // Global (user-level) skills
+    const globalSkills = await discoverGlobalSkills();
+    const globalMounts = getGlobalSkillsMounts();
+    for (const skill of globalSkills) {
+      const id = `skill:${skill.name}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const isStageiwse = skill.path.includes('.stagewise');
+      const mount = isStageiwse ? globalMounts[0] : globalMounts[1];
+      const relativePath = path.relative(mount.absolutePath, skill.path);
+      result.push({
+        id,
+        displayName: skill.name,
+        description: skill.description,
+        source: 'global',
+        contentPath: path.resolve(skill.path, 'SKILL.md'),
+        skillPath: `${mount.prefix}/${relativePath}`,
+        userInvocable: skill.userInvocable,
+        agentInvocable: skill.agentInvocable,
+      });
+    }
 
     // Workspace skills
     const mounts =
@@ -1405,6 +1486,12 @@ export class ToolboxService extends DisposableService {
     result.set('apps', getAgentAppsDir(agentInstanceId));
     result.set('att', getAgentBlobDir(agentInstanceId));
     result.set(PLANS_PREFIX, getPlansDir());
+
+    for (const gs of getGlobalSkillsMounts()) {
+      if (existsSync(gs.absolutePath)) {
+        result.set(gs.prefix, gs.absolutePath);
+      }
+    }
 
     return result;
   }

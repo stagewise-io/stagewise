@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import type { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { resolve } from 'node:path';
+import { homedir } from 'node:os';
 import matter from 'gray-matter';
 
 export interface Skill {
@@ -66,6 +67,34 @@ export async function discoverSkills(skillsDir: string): Promise<Skill[]> {
   }
 
   return skills;
+}
+
+/**
+ * Discover user-level global skills from ~/.stagewise/skills/
+ * and ~/.agents/skills/. Does not require a workspace runtime.
+ * Deduplicates by name; .stagewise wins over .agents.
+ */
+export async function discoverGlobalSkills(): Promise<Skill[]> {
+  const home = homedir();
+  const stagewisePath = resolve(home, '.stagewise', 'skills');
+  const agentsPath = resolve(home, '.agents', 'skills');
+
+  const [stagewiseSkills, agentsSkills] = await Promise.all([
+    discoverSkills(stagewisePath),
+    discoverSkills(agentsPath),
+  ]);
+
+  stagewiseSkills.sort((a, b) => a.name.localeCompare(b.name));
+  agentsSkills.sort((a, b) => a.name.localeCompare(b.name));
+
+  const seen = new Set<string>();
+  const result: Skill[] = [];
+  for (const skill of [...stagewiseSkills, ...agentsSkills]) {
+    if (seen.has(skill.name)) continue;
+    seen.add(skill.name);
+    result.push(skill);
+  }
+  return result;
 }
 
 export async function getSkills(

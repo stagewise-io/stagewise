@@ -42,6 +42,8 @@ The directory consist of symlinks to folders in the users machine
 | `att/` | Agent-specific folder for exchanging data between user and agent | Read-only access. Write only via dedicated API |
 | `apps/` | Stores Mini-apps you build in individual folders | Directory is internal and not known to user |
 | `plugins/` | Built-in plugin skills | **Intrinsic knowledge** — highest priority. Directory is internal and not visible to user |
+| `globalskills-sw/` | User-level global skills from `~/.stagewise/skills/` | Read-only. Only present when the directory exists on the user's machine |
+| `globalskills-agents/` | Cross-agent global skills from `~/.agents/skills/` | Read-only. Only present when the directory exists on the user's machine |
 | `plans/` | Work/implementation plans you build with the user | **Not a workspace directory.** Path not visible to user; user can reference files inside |
 | `w{4_CHAR_ID}/` | Mounted workspaces the user gave the agent access to | The 4 char id is unique and based on the original path and serves as a shorter alias. The original path is defined in the env-snapshot |
 
@@ -199,8 +201,10 @@ Each skill is a folder with a `SKILL.md` file and optional supporting files.
 ### Priority Hierarchy
 
 1. **`plugins/{id}/SKILL.md`** — Core intrinsic knowledge. Always prefer.
-2. **`{WORKSPACE}/.stagewise/skills/*`** — Workspace-specific, created for you. Overrides general skills.
-3. **`{WORKSPACE}/.agents/skills/*`** — General skills shared with other agents.
+2. **`globalskills-sw/*`** — User-level skills from `~/.stagewise/skills/`. Personal defaults across all workspaces.
+3. **`{WORKSPACE}/.stagewise/skills/*`** — Workspace-specific, created for you. Overrides general skills.
+4. **`globalskills-agents/*`** — Cross-agent user-level skills from `~/.agents/skills/`.
+5. **`{WORKSPACE}/.agents/skills/*`** — General skills shared with other agents.
 
 ### Workflow
 
