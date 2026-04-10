@@ -104,7 +104,7 @@ describeIfShell('ProcessManager (integration)', () => {
     expect(r.output).toContain('err');
   });
 
-  it('times out long-running commands', { timeout: 5000 }, async () => {
+  it('times out long-running commands', async () => {
     pm = createPM();
     const { result } = pm.spawn(
       'agent-test',
@@ -116,7 +116,7 @@ describeIfShell('ProcessManager (integration)', () => {
     expect(r.timedOut).toBe(true);
   });
 
-  it('aborts via AbortSignal', { timeout: 5000 }, async () => {
+  it('aborts via AbortSignal', async () => {
     pm = createPM();
     const ac = new AbortController();
 
@@ -168,21 +168,17 @@ describeIfShell('ProcessManager (integration)', () => {
     expect(chunks.join('')).toContain('streamed');
   });
 
-  it(
-    'killByAgent terminates tracked processes',
-    { timeout: 10000 },
-    async () => {
-      pm = createPM();
-      const { result } = pm.spawn(
-        'agent-kill-test',
-        { command: 'sleep 60', cwd },
-        env,
-      );
+  it('killByAgent terminates tracked processes', async () => {
+    pm = createPM();
+    const { result } = pm.spawn(
+      'agent-kill-test',
+      { command: 'sleep 60', cwd },
+      env,
+    );
 
-      pm.killByAgent('agent-kill-test');
-      const r = await result;
+    pm.killByAgent('agent-kill-test');
+    const r = await result;
 
-      expect(r.exitCode).not.toBe(0);
-    },
-  );
+    expect(r.exitCode).not.toBe(0);
+  });
 });
