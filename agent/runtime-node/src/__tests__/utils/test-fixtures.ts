@@ -167,7 +167,7 @@ export function createRealisticProject(basePath: string): void {
  */
 export function removeDir(dir: string): void {
   if (fs.existsSync(dir)) {
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 }
 

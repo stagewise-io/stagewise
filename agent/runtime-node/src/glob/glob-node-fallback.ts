@@ -6,6 +6,7 @@ import type {
   GlobResult,
 } from '../types.js';
 import { makeRe as makeGlobRe, minimatch } from 'minimatch';
+import { toPosixPath } from './utils.js';
 
 export async function globNodeFallback(
   pattern: string,
@@ -38,9 +39,8 @@ export async function globNodeFallback(
           [];
         for await (const dirent of dirHandle) {
           const full = join(dir, dirent.name);
-          const rel = path.relative(
-            fileSystem.getCurrentWorkingDirectory(),
-            full,
+          const rel = toPosixPath(
+            path.relative(fileSystem.getCurrentWorkingDirectory(), full),
           );
           entries.push({ dirent, full, rel });
         }

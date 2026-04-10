@@ -8,6 +8,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import path from 'node:path';
 import { getRipgrepPath } from '../vscode-ripgrep/get-path.js';
+import { toPosixPath } from './utils.js';
 
 /**
  * Builds ripgrep command-line arguments for file listing (glob).
@@ -77,7 +78,7 @@ async function parseRipgrepGlobOutput(
       if (limitReached || !line.trim()) return;
 
       try {
-        paths.push(line);
+        paths.push(toPosixPath(line));
 
         if (options?.maxResults && paths.length >= options.maxResults) {
           limitReached = true;
