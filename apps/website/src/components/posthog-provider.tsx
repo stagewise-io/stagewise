@@ -7,7 +7,6 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { getCookieConsent } from '@/lib/cookie-consent-utils';
 
 // Module-level flag — set synchronously after posthog.init() returns.
-// Avoids depending on posthog.__loaded (private API, may break without notice).
 let posthogInitialized = false;
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
@@ -24,42 +23,57 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       capture_pageleave: true,
       debug: process.env.NODE_ENV === 'development',
 
-      // --- Consent-aware persistence ---
-      // Write the opt-out flag to a cookie (not localStorage) so that
-      // server-side middleware can read it too.
+      // --- GDPR-compliant cookieless tracking ---
+      //
+      // cookieless_mode: 'on_reject' means:
+      //   • Until the user decides (pending): no cookies, no localStorage, no
+      //     events sent. PostHog queues internally.
+      //   • On accept (opt_in_capturing): upgrades to full persistence — cookies,
+      //     localStorage, cross-session identity. All queued events are flushed.
+      //   • On deny (opt_out_capturing): no cookies/storage. PostHog counts this
+      //     visit via a server-side privacy-preserving hash (irreversible, daily
+      //     salt). No personal data stored or sent.
+      //
+      // Net result: ALL visitors are counted. Accepted users get full analytics.
+      // Denied/pending users appear in aggregate counts only. Fully GDPR-compliant.
+      //
+      // Requires "Cookieless server hash mode" enabled in PostHog project settings:
+      // Project Settings → Web analytics → Cookieless server hash mode
+      //
+      // Note: cookieless_mode + defaults are runtime config present in posthog-js
+      // v1.367.0 but not yet reflected in the TypeScript config types — cast needed.
+      ...({ cookieless_mode: 'on_reject', defaults: '2026-01-30' } as any),
+
+      // Write the opt-in/out flag to a cookie so server-side middleware can read it.
       opt_out_capturing_persistence_type: 'cookie',
-      // Start fully opted out by default — no events, no cookies, no storage.
-      // We explicitly opt in/out below based on stored consent.
-      opt_out_capturing_by_default: true,
-      // Also disable all persistence (distinct ID, session, etc.) by default.
-      // Only enabled once the user accepts.
-      opt_out_persistence_by_default: true,
     });
 
     posthogInitialized = true;
 
-    // Apply the correct state based on stored consent.
+    // Apply stored consent immediately on init.
     if (consent === 'accepted') {
-      // User previously accepted: opt in and capture this pageview.
+      // Full persistence: cookies + localStorage + cross-session identity.
       posthog.opt_in_capturing();
-      posthog.capture('$pageview', {
-        $current_url:
-          window.origin + window.location.pathname + window.location.search,
-      });
+    } else if (consent === 'denied') {
+      // No storage, no events. PostHog counts this visit via server-side hash.
+      posthog.opt_out_capturing();
     }
-    // For 'denied' and null (undecided), opt_out_capturing_by_default: true
-    // already ensures nothing is sent. No further action needed.
+    // null (pending): cookieless_mode holds events until the user decides.
+    // The cookie banner will call opt_in/opt_out when ready.
+
+    // Capture the initial pageview.
+    // With opt_in: fires immediately. With opt_out: suppressed. With pending:
+    // PostHog queues it internally until the user decides.
+    posthog.capture('$pageview', {
+      $current_url:
+        window.origin + window.location.pathname + window.location.search,
+    });
 
     // React to consent changes from the cookie banner without a page reload.
     const handler = () => {
       const updated = getCookieConsent();
       if (updated === 'accepted') {
         posthog.opt_in_capturing();
-        // Capture the pageview that was missed while the user was deciding.
-        posthog.capture('$pageview', {
-          $current_url:
-            window.origin + window.location.pathname + window.location.search,
-        });
       } else if (updated === 'denied') {
         posthog.opt_out_capturing();
         posthog.reset();
@@ -83,21 +97,15 @@ function PostHogPageView() {
   const searchParams = useSearchParams();
   const posthog = usePostHog();
 
-  // Tracks SPA navigations. The initial pageview is handled in PostHogProvider's
-  // useEffect (parent, runs after this child). isFirstRender skips the first
-  // mount so we don't double-count with the parent's capture.
+  // Handles SPA navigations. The initial pageview is captured in PostHogProvider
+  // above — isFirstRender skips the first mount to avoid double-counting.
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
-    if (
-      pathname &&
-      posthog &&
-      posthogInitialized &&
-      !posthog.has_opted_out_capturing()
-    ) {
+    if (pathname && posthog && posthogInitialized) {
       let url = window.origin + pathname;
       const search = searchParams.toString();
       if (search) {
