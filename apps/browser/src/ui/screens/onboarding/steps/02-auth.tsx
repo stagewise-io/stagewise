@@ -39,12 +39,17 @@ export function StepAuth({
   const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
   const authStatus = useKartonState((s) => s.userAccount.status);
   const userEmail = useKartonState((s) =>
-    s.userAccount.status === 'authenticated' ? s.userAccount.user?.email : null,
+    s.userAccount.status === 'authenticated' ||
+    s.userAccount.status === 'server_unreachable'
+      ? s.userAccount.user?.email
+      : null,
   );
 
   const [mode, setMode] = useState<AuthMode>('stagewise');
   const [phase, setPhase] = useState<AuthPhase>(
-    authStatus === 'authenticated' ? 'authentication-validated' : 'form-input',
+    authStatus === 'authenticated' || authStatus === 'server_unreachable'
+      ? 'authentication-validated'
+      : 'form-input',
   );
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -71,7 +76,7 @@ export function StepAuth({
 
   useEffect(() => {
     if (
-      authStatus !== 'authenticated' &&
+      authStatus === 'unauthenticated' &&
       phase === 'authentication-validated'
     ) {
       setPhase('form-input');
