@@ -44,7 +44,7 @@ function Page() {
 
       {/* Content */}
       <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
-        <div className="mx-auto w-full max-w-3xl shrink-0 flex-col gap-8">
+        <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-8">
           {userAccount?.status === 'authenticated' ? (
             <AuthenticatedView
               email={userAccount.user?.email}
