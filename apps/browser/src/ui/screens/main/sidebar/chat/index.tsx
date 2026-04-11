@@ -5,7 +5,9 @@ import { cn } from '@ui/utils';
 
 export function SidebarChatSection() {
   const signedIn = useKartonState(
-    (s) => s.userAccount?.status === 'authenticated',
+    (s) =>
+      s.userAccount?.status === 'authenticated' ||
+      s.userAccount?.status === 'server_unreachable',
   );
   const allProvidersUseStagewise = useKartonState((s) => {
     const configs = s.preferences?.providerConfigs;

@@ -287,15 +287,25 @@ export class AuthService extends DisposableService {
 
       if (error || !data) {
         this.logger.warn(
-          `[AuthService] Session refresh failed: ${error?.message ?? 'no session'}`,
+          `[AuthService] Session refresh failed: ${error?.message ?? 'no session'} (status: ${error?.status ?? 'unknown'})`,
         );
-        this.persistCredentials(null);
-        this.updateAuthState((draft) => {
-          draft.userAccount = {
-            status: 'unauthenticated',
-            machineId: this.identifierService.getMachineId(),
-          };
-        });
+        // Only treat definitive auth rejections as unauthenticated.
+        // 5xx, 429, or any other non-auth HTTP error means the server is
+        // temporarily unavailable — keep credentials intact.
+        const isAuthRejection = error?.status === 401 || error?.status === 403;
+        if (isAuthRejection) {
+          this.persistCredentials(null);
+          this.updateAuthState((draft) => {
+            draft.userAccount = {
+              status: 'unauthenticated',
+              machineId: this.identifierService.getMachineId(),
+            };
+          });
+        } else {
+          this.updateAuthState((draft) => {
+            draft.userAccount.status = 'server_unreachable';
+          });
+        }
         return;
       }
 
