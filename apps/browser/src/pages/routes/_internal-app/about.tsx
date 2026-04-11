@@ -444,7 +444,7 @@ function Page() {
 
       {/* Content */}
       <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
-        <div className="mx-auto w-full max-w-3xl shrink-0 flex-col gap-8">
+        <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-8">
           {/* App Name Section */}
           <div className="flex flex-col gap-2">
             <div className="flex items-baseline gap-2">
