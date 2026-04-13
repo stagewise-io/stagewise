@@ -290,6 +290,14 @@ Chronological record of z-order/focus bugs and their fixes. Read these to unders
   3. **Win32 z-order in `handleTogglePanelKeyboardFocus`:** When `panel === 'stagewise-ui'` and `isWebContentInteractive` is `true` on Win32, set `isWebContentInteractive = false` and call `updateZOrder()` *before* `uiController.focus()`. This was documented in Invariant 3 and Bug 9.5 but had been lost during a code reset.
 - **Key insight:** On Win32, `removeChildView`/`addChildView` is not idempotent for keyboard focus. The operation is cheap for z-order but destructive for focus. Any call to `updateZOrder()` must be guarded against redundancy.
 
+### 9.10 Search bar leaves web contents non-interactive
+
+- **Symptom:** After pressing CMD+F to open the search bar, web content lost mouse interactivity. Clicking into the web content or pressing ESC to close the search bar didn't restore it. The user had to move the mouse off the content area and back.
+- **Root cause:** `handleTogglePanelKeyboardFocus('stagewise-ui')` was missing the `process.platform === 'win32'` guard — it changed `isWebContentInteractive` to `false` and called `updateZOrder()` on **all** platforms. On macOS/Linux, this violates Invariant #2 (z-order and keyboard focus are independent). The `WebContentsBoundsSyncer`'s local `lastInteractive` cache remained `true` (stale), and on the next `mousemove` over content the syncer saw `isHovering = true` matching its stale `lastInteractive = true`, skipping the `movePanelToForeground('tab-content')` call.
+- **Fix (two parts):**
+  1. **Restored `process.platform === 'win32'` guard** on the `'stagewise-ui'` path in `handleTogglePanelKeyboardFocus`. This is the primary fix — on macOS/Linux, z-order no longer changes when keyboard focus moves to the UI, so the syncer cache stays consistent.
+  2. **Added `handleMovePanelToForeground('tab-content')` in `handleDeactivateSearchBar`** as a safety net for Win32, where the z-order change is required. This explicitly restores web content z-order when the search bar closes. The existing short-circuit and startup guard in `handleMovePanelToForeground` make this safe and no-op on macOS/Linux.
+
 ---
 
 ## 10. Invariants
