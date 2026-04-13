@@ -5,6 +5,8 @@ user-invocable: true
 agent-invocable: false
 ---
 
+# Learn by writing skills
+
 ## Core workflows
 
 ### 1. New skills from group up
