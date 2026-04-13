@@ -1,16 +1,27 @@
-import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import {
+  useKartonConnected,
+  useKartonProcedure,
+  useKartonState,
+} from '@ui/hooks/use-karton';
 import { useLayoutEffect } from 'react';
 
 type Bounds = { x: number; y: number; width: number; height: number };
 
 export const WebContentsBoundsSyncer = () => {
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const connected = useKartonConnected();
   const updateLayout = useKartonProcedure((p) => p.browser.layout.update);
   const movePanelToForeground = useKartonProcedure(
     (p) => p.browser.layout.movePanelToForeground,
   );
 
   useLayoutEffect(() => {
+    // Don't set up observers if Karton isn't connected yet. Bounds fired
+    // before the connection is established are silently dropped by the
+    // Karton client, and lastBounds would be cached as "sent" even though
+    // the backend never received them — keeping the tab invisible.
+    // Re-running when `connected` becomes true ensures a fresh send.
+    if (!connected) return;
     if (!activeTabId) return;
 
     const containerId = `dev-app-preview-container-${activeTabId}`;
@@ -20,12 +31,15 @@ export const WebContentsBoundsSyncer = () => {
     let containerElement: HTMLElement | null = null;
     let containerVisible = false;
     let lastMousePos: { x: number; y: number } | null = null;
+    let cancelled = false;
 
     // --- Bounds update logic ---
     // Uses Karton RPC fire-and-forget (.fire) to send bounds without
     // waiting for a response — no Promise, no timeout tracking.
 
     const sendBoundsUpdate = () => {
+      if (cancelled) return;
+
       if (!containerElement || !containerVisible) {
         if (lastBounds !== null) {
           updateLayout.fire(null);
@@ -38,7 +52,14 @@ export const WebContentsBoundsSyncer = () => {
 
       const rect = containerElement.getBoundingClientRect();
 
-      if (rect.width <= 0 || rect.height <= 0) return;
+      if (rect.width <= 0 || rect.height <= 0) {
+        // Element exists but hasn't been laid out yet (common during Electron
+        // startup before the compositor has settled). Retry next frame instead
+        // of silently dropping the update — without this the web content never
+        // receives its bounds and stays invisible until the window is resized.
+        requestAnimationFrame(sendBoundsUpdate);
+        return;
+      }
 
       const newBounds: Bounds = {
         x: rect.x,
@@ -190,6 +211,9 @@ export const WebContentsBoundsSyncer = () => {
     document.addEventListener('mousemove', handleMouseMove);
 
     return () => {
+      // Cancel any in-flight requestAnimationFrame retry so it cannot fire
+      // after cleanup and call into a stale Karton transport.
+      cancelled = true;
       resizeObserver.disconnect();
       mutationObserver.disconnect();
       window.removeEventListener('resize', sendBoundsUpdate);
@@ -203,7 +227,7 @@ export const WebContentsBoundsSyncer = () => {
       // Clean up by hiding
       updateLayout.fire(null);
     };
-  }, [activeTabId]);
+  }, [activeTabId, connected]);
 
   return null;
 };
