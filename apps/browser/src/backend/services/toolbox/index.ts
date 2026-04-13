@@ -198,6 +198,10 @@ export class ToolboxService extends DisposableService {
   private plansWatcher: FSWatcher | null = null;
   private plansWatcherDebounce: ReturnType<typeof setTimeout> | null = null;
 
+  private globalSkillsWatchers: FSWatcher[] = [];
+  private globalSkillsWatcherDebounce: ReturnType<typeof setTimeout> | null =
+    null;
+
   private getOrCreatePlansRuntime(): ClientRuntimeNode {
     if (this.plansRuntime) return this.plansRuntime;
     const plansDir = getPlansDir();
@@ -1643,6 +1647,9 @@ export class ToolboxService extends DisposableService {
     // Start watching the global plans directory
     this.startPlansWatcher();
 
+    // Start watching global skills directories (~/.stagewise/skills, ~/.agents/skills)
+    this.startGlobalSkillsWatchers();
+
     const fileDiffHandler = createFileDiffHandler({
       mountManager: this.mountManagerService,
       diffHistoryService: this.diffHistoryService,
@@ -1814,6 +1821,77 @@ export class ToolboxService extends DisposableService {
       });
   }
 
+  /**
+   * Watch parent dirs (`~/.stagewise/`, `~/.agents/`) for changes to their
+   * `skills/` subdirectories. Follows the workspace watcher pattern: watch
+   * parents with an ignored filter so we detect `skills/` being created
+   * for the first time.
+   */
+  private startGlobalSkillsWatchers(): void {
+    const scheduleRefresh = () => {
+      if (this.globalSkillsWatcherDebounce)
+        clearTimeout(this.globalSkillsWatcherDebounce);
+      this.globalSkillsWatcherDebounce = setTimeout(() => {
+        this.globalSkillsWatcherDebounce = null;
+        // Evict stale runtimes for directories that were removed.
+        for (const mount of getGlobalSkillsMounts()) {
+          if (
+            this.globalSkillsRuntimes.has(mount.prefix) &&
+            !existsSync(mount.absolutePath)
+          )
+            this.globalSkillsRuntimes.delete(mount.prefix);
+        }
+        // Rebuild skills list for all active agents.
+        const activeIds = Object.keys(this.uiKarton.state.agents.instances);
+        for (const id of activeIds) void this.rebuildSkillsList(id);
+      }, 400);
+    };
+
+    for (const mount of getGlobalSkillsMounts()) {
+      const parentDir = path.dirname(mount.absolutePath);
+      if (!existsSync(parentDir)) continue;
+
+      const watcher = chokidar.watch(parentDir, {
+        persistent: true,
+        ignoreInitial: true,
+        depth: 3,
+        awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
+        ignored: (filePath: string) => {
+          if (filePath === parentDir) return false;
+          const rel = path.relative(parentDir, filePath);
+          const segments = rel.split(path.sep);
+          // Only allow the 'skills' subdirectory.
+          if (segments.length === 1) return segments[0] !== 'skills';
+          return segments[0] !== 'skills';
+        },
+      });
+
+      watcher
+        .on('add', scheduleRefresh)
+        .on('change', scheduleRefresh)
+        .on('unlink', scheduleRefresh)
+        .on('addDir', scheduleRefresh)
+        .on('unlinkDir', scheduleRefresh)
+        .on('error', (error) => {
+          this.logger.debug('[ToolboxService] Global skills watcher error', {
+            error,
+          });
+        });
+
+      this.globalSkillsWatchers.push(watcher);
+    }
+  }
+
+  private stopGlobalSkillsWatchers(): void {
+    if (this.globalSkillsWatcherDebounce) {
+      clearTimeout(this.globalSkillsWatcherDebounce);
+      this.globalSkillsWatcherDebounce = null;
+    }
+    for (const watcher of this.globalSkillsWatchers) void watcher.close();
+
+    this.globalSkillsWatchers = [];
+  }
+
   private stopPlansWatcher(): void {
     if (this.plansWatcherDebounce) {
       clearTimeout(this.plansWatcherDebounce);
@@ -1854,6 +1932,7 @@ export class ToolboxService extends DisposableService {
     this.apiClient = null;
 
     this.stopPlansWatcher();
+    this.stopGlobalSkillsWatchers();
 
     void this.mountManagerService?.teardown();
     this.mountManagerService = null;

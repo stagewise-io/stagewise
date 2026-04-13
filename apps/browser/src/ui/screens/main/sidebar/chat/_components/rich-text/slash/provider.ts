@@ -56,7 +56,8 @@ export function querySlashItems(query: string): SlashItem[] {
   // Bucket by group, preserving discovery order within each bucket.
   const buckets = new Map<string, SlashItem[]>();
   for (const item of all) {
-    const group = item.group || 'builtin';
+    const group =
+      item.group === 'global' ? 'workspace' : item.group || 'builtin';
     let bucket = buckets.get(group);
     if (!bucket) {
       bucket = [];
