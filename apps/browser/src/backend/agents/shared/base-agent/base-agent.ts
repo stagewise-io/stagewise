@@ -969,6 +969,7 @@ export abstract class BaseAgent<
       history,
       this.modelProviderService,
       this.instanceId,
+      this.state.get().activeModelId,
     );
   }
 

@@ -1,6 +1,7 @@
 import { generateText } from 'ai';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import type { ModelProviderService } from '@/agents/model-provider';
+import type { ModelId } from '@shared/available-models';
 
 // Import for local use + re-export so existing imports keep working.
 import {
@@ -41,10 +42,72 @@ const HISTORY_COMPRESSION_TIMEOUT_MS = 30_000;
 /** Minimum acceptable compression length; shorter results trigger a fallback. */
 const COMPRESSION_MIN_LENGTH = 30;
 
+/**
+ * Attempts a single compression call against the given model.
+ * Returns the compressed text on success, or throws on failure.
+ */
+const tryCompressWithModel = async (
+  modelId: string,
+  modelProviderService: ModelProviderService,
+  agentInstanceId: string,
+  compactHistory: string,
+  previousBriefingChars: number,
+): Promise<string> => {
+  const modelWithOptions = modelProviderService.getModelWithOptions(
+    modelId as ModelId,
+    `${agentInstanceId}`,
+    {
+      $ai_span_name: 'history-compression',
+      $ai_parent_id: `${agentInstanceId}`,
+    },
+  );
+
+  const abortController = new AbortController();
+  const timeout = setTimeout(
+    () => abortController.abort(),
+    HISTORY_COMPRESSION_TIMEOUT_MS,
+  );
+
+  try {
+    const compactionResult = await generateText({
+      model: modelWithOptions.model,
+      providerOptions: modelWithOptions.providerOptions,
+      headers: modelWithOptions.headers,
+      abortSignal: abortController.signal,
+      messages: [
+        {
+          role: 'system',
+          content: COMPRESSION_SYSTEM_PROMPT,
+        },
+        {
+          role: 'user',
+          content: buildCompressionUserMessage(
+            compactHistory,
+            previousBriefingChars,
+          ),
+        },
+      ],
+      temperature: 0.1,
+      maxOutputTokens: 20000,
+    }).then((result) => result.text.trim());
+
+    if (compactionResult.length < COMPRESSION_MIN_LENGTH) {
+      throw new Error(
+        `Compression too short (${compactionResult.length} chars)`,
+      );
+    }
+
+    return compactionResult;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 export const generateSimpleCompressedHistory = async (
   messages: AgentMessage[],
   modelProviderService: ModelProviderService,
   agentInstanceId: string,
+  fallbackModelId?: ModelId,
 ): Promise<string> => {
   const compactConvertedChatHistory =
     convertAgentMessagesToCompactMessageHistoryString(messages);
@@ -59,57 +122,37 @@ export const generateSimpleCompressedHistory = async (
 
   for (const modelId of HISTORY_COMPRESSION_MODELS) {
     try {
-      const modelWithOptions = modelProviderService.getModelWithOptions(
+      return await tryCompressWithModel(
         modelId,
-        `${agentInstanceId}`,
-        {
-          $ai_span_name: 'history-compression',
-          $ai_parent_id: `${agentInstanceId}`,
-        },
+        modelProviderService,
+        agentInstanceId,
+        compactConvertedChatHistory,
+        previousBriefingChars,
       );
-
-      const abortController = new AbortController();
-      const timeout = setTimeout(
-        () => abortController.abort(),
-        HISTORY_COMPRESSION_TIMEOUT_MS,
-      );
-
-      try {
-        const compactionResult = await generateText({
-          model: modelWithOptions.model,
-          providerOptions: modelWithOptions.providerOptions,
-          headers: modelWithOptions.headers,
-          abortSignal: abortController.signal,
-          messages: [
-            {
-              role: 'system',
-              content: COMPRESSION_SYSTEM_PROMPT,
-            },
-            {
-              role: 'user',
-              content: buildCompressionUserMessage(
-                compactConvertedChatHistory,
-                previousBriefingChars,
-              ),
-            },
-          ],
-          temperature: 0.1,
-          maxOutputTokens: 20000,
-        }).then((result) => result.text.trim());
-
-        if (compactionResult.length < COMPRESSION_MIN_LENGTH) {
-          throw new Error(
-            `Compression too short (${compactionResult.length} chars)`,
-          );
-        }
-
-        return compactionResult;
-      } finally {
-        clearTimeout(timeout);
-      }
     } catch (e) {
       lastError = e as Error;
       // Continue to the next fallback model
+    }
+  }
+
+  // Last resort: try the active chat model if it wasn't already attempted.
+  if (
+    fallbackModelId &&
+    !(HISTORY_COMPRESSION_MODELS as readonly string[]).includes(fallbackModelId)
+  ) {
+    console.warn(
+      `History compression: all preferred models failed, falling back to active model: ${fallbackModelId}`,
+    );
+    try {
+      return await tryCompressWithModel(
+        fallbackModelId,
+        modelProviderService,
+        agentInstanceId,
+        compactConvertedChatHistory,
+        previousBriefingChars,
+      );
+    } catch (e) {
+      lastError = e as Error;
     }
   }
 
