@@ -169,7 +169,7 @@ export const lastViewedChatsSchema = z.record(z.string(), z.number());
 
 export const storedExperienceDataSchema = z.object({
   recentlyOpenedWorkspaces: recentlyOpenedWorkspacesArraySchema,
-  hasSeenOnboardingFlow: z.boolean(),
+  hasSeenOnboardingFlow: z.boolean().nullable(),
   lastViewedChats: lastViewedChatsSchema,
 });
 
@@ -1090,7 +1090,7 @@ export const defaultState: KartonContract['state'] = {
   userExperience: {
     storedExperienceData: {
       recentlyOpenedWorkspaces: [],
-      hasSeenOnboardingFlow: false,
+      hasSeenOnboardingFlow: null,
       lastViewedChats: {},
     },
     pendingOnboardingSuggestion: null,
