@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-alpha.56 (2026-04-13)
+
+### Bug Fixes
+
+* fix document-search focus-bug (b1bb219)
+* use chat-model as compression fallback (8e67a38)
+
+### Other Changes
+
+* adapt browser to new backend-requirements (7851a62)
+
 ## 1.0.0-alpha.55 (2026-04-13)
 
 ### Features
