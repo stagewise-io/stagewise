@@ -1224,6 +1224,99 @@ describe('generateSimpleCompressedHistory', () => {
       'The assistant provided a provider-fallback summary of events.',
     );
   });
+
+  // -----------------------------------------------------------------------
+  // fallbackModelId (active chat model as last resort)
+  // -----------------------------------------------------------------------
+
+  it('tries fallbackModelId after all cheap models fail', async () => {
+    generateTextMock
+      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Haiku failed'))
+      .mockResolvedValueOnce({
+        text: 'The assistant provided a fallback-model summary of events.',
+      } as any);
+
+    const mps = makeMockModelProviderService();
+    const result = await generateSimpleCompressedHistory(
+      makeMessages(4),
+      mps,
+      'agent-1',
+      'claude-sonnet-4-6' as any,
+    );
+
+    expect(result).toBe(
+      'The assistant provided a fallback-model summary of events.',
+    );
+    expect(generateTextMock).toHaveBeenCalledTimes(4);
+    expect(mps.getModelWithOptions).toHaveBeenNthCalledWith(
+      4,
+      'claude-sonnet-4-6',
+      'agent-1',
+      expect.objectContaining({ $ai_span_name: 'history-compression' }),
+    );
+  });
+
+  it('skips fallbackModelId if it matches a cheap model ID', async () => {
+    generateTextMock
+      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Haiku failed'));
+
+    const mps = makeMockModelProviderService();
+    await expect(
+      generateSimpleCompressedHistory(
+        makeMessages(4),
+        mps,
+        'agent-1',
+        'claude-haiku-4-5' as any,
+      ),
+    ).rejects.toThrow('Haiku failed');
+    expect(mps.getModelWithOptions).toHaveBeenCalledTimes(3);
+  });
+
+  it('throws when fallback model also fails', async () => {
+    generateTextMock
+      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Haiku failed'))
+      .mockRejectedValueOnce(new Error('Sonnet failed'));
+
+    const mps = makeMockModelProviderService();
+    await expect(
+      generateSimpleCompressedHistory(
+        makeMessages(4),
+        mps,
+        'agent-1',
+        'claude-sonnet-4-6' as any,
+      ),
+    ).rejects.toThrow('Sonnet failed');
+    expect(generateTextMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not try fallbackModelId when a cheap model succeeds', async () => {
+    generateTextMock.mockResolvedValueOnce({
+      text: 'The user asked the assistant to help with a task.',
+    } as any);
+
+    const mps = makeMockModelProviderService();
+    const result = await generateSimpleCompressedHistory(
+      makeMessages(4),
+      mps,
+      'agent-1',
+      'claude-sonnet-4-6' as any,
+    );
+
+    expect(result).toBe('The user asked the assistant to help with a task.');
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
+    expect(mps.getModelWithOptions).toHaveBeenCalledTimes(1);
+    expect(mps.getModelWithOptions).toHaveBeenCalledWith(
+      'gemini-3.1-flash-lite-preview',
+      'agent-1',
+      expect.any(Object),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
