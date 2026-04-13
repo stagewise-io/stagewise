@@ -32,6 +32,7 @@ export const WebContentsBoundsSyncer = () => {
     let containerVisible = false;
     let lastMousePos: { x: number; y: number } | null = null;
     let cancelled = false;
+    let pendingFrameId: number | null = null;
 
     // --- Bounds update logic ---
     // Uses Karton RPC fire-and-forget (.fire) to send bounds without
@@ -57,7 +58,13 @@ export const WebContentsBoundsSyncer = () => {
         // startup before the compositor has settled). Retry next frame instead
         // of silently dropping the update — without this the web content never
         // receives its bounds and stays invisible until the window is resized.
-        requestAnimationFrame(sendBoundsUpdate);
+        // De-duplicate: if a retry is already pending, don't queue another one.
+        if (pendingFrameId === null) {
+          pendingFrameId = requestAnimationFrame(() => {
+            pendingFrameId = null;
+            sendBoundsUpdate();
+          });
+        }
         return;
       }
 
@@ -214,6 +221,10 @@ export const WebContentsBoundsSyncer = () => {
       // Cancel any in-flight requestAnimationFrame retry so it cannot fire
       // after cleanup and call into a stale Karton transport.
       cancelled = true;
+      if (pendingFrameId !== null) {
+        cancelAnimationFrame(pendingFrameId);
+        pendingFrameId = null;
+      }
       resizeObserver.disconnect();
       mutationObserver.disconnect();
       window.removeEventListener('resize', sendBoundsUpdate);
