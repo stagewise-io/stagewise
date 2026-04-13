@@ -1264,7 +1264,10 @@ export class WindowLayoutService extends DisposableService {
       // FIX 3 (Win32): On Windows, the tab's Win32 child window intercepts keyboard
       // events when it is topmost. We must put the UI on top BEFORE calling focus().
       // See focus-handling.md Invariant #3 and Bug 9.5.
-      if (this.isWebContentInteractive) {
+      // On macOS/Linux, keyboard focus is independent of z-order (Invariant #2) —
+      // changing z-order here would desynchronize the WebContentsBoundsSyncer's
+      // lastInteractive cache, leaving web content non-interactive (Bug 9.10).
+      if (process.platform === 'win32' && this.isWebContentInteractive) {
         this.isWebContentInteractive = false;
         this.updateZOrder();
       }
@@ -1657,6 +1660,12 @@ export class WindowLayoutService extends DisposableService {
     });
     // Also stop any active search
     this.activeTab?.stopSearch();
+    // Restore web content z-order — CMD+F sets isWebContentInteractive = false
+    // via togglePanelKeyboardFocus('stagewise-ui'), and nothing restores it on
+    // search bar close. Without this, the syncer's lastInteractive cache stays
+    // stale and the short-circuit prevents movePanelToForeground('tab-content')
+    // from ever firing until the user moves the mouse out and back.
+    this.handleMovePanelToForeground('tab-content');
   };
 
   // Permission Handling
