@@ -1226,29 +1226,9 @@ export class ToolboxService extends DisposableService {
     const result: SkillDefinition[] = [...this.builtinSkills];
     const seen = new Set(result.map((c) => c.id));
 
-    // Global (user-level) skills
-    const globalSkills = await discoverGlobalSkills();
-    const globalMounts = getGlobalSkillsMounts();
-    for (const skill of globalSkills) {
-      const id = `skill:${skill.name}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      const isStagewise = skill.path.includes('.stagewise');
-      const mount = isStagewise ? globalMounts[0] : globalMounts[1];
-      const relativePath = path.relative(mount.absolutePath, skill.path);
-      result.push({
-        id,
-        displayName: skill.name,
-        description: skill.description,
-        source: 'global',
-        contentPath: path.resolve(skill.path, 'SKILL.md'),
-        skillPath: `${mount.prefix}/${relativePath}`,
-        userInvocable: skill.userInvocable,
-        agentInvocable: skill.agentInvocable,
-      });
-    }
-
-    // Workspace skills
+    // Workspace skills first — workspace overrides global.
+    // Also collect disabled skill names so globals can be suppressed.
+    const allDisabled = new Set<string>();
     const mounts =
       this.mountManagerService?.getMountedPathsWithRuntimes(agentInstanceId);
     if (mounts) {
@@ -1259,6 +1239,7 @@ export class ToolboxService extends DisposableService {
           disabledSkills: [],
         };
         const disabled = new Set(settings.disabledSkills);
+        for (const name of disabled) allDisabled.add(name);
         const skills = await getSkills(mount.clientRuntime);
 
         for (const skill of skills) {
@@ -1280,6 +1261,34 @@ export class ToolboxService extends DisposableService {
           });
         }
       }
+    }
+
+    // Global (user-level) skills — after workspace so workspace wins on dupes.
+    // Also suppressed by workspace-level disabledSkills.
+    const globalSkills = await discoverGlobalSkills();
+    const globalMounts = getGlobalSkillsMounts();
+    for (const skill of globalSkills) {
+      if (allDisabled.has(skill.name)) continue;
+      const id = `skill:${skill.name}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const mount = globalMounts.find(
+        (m) =>
+          skill.path === m.absolutePath ||
+          skill.path.startsWith(m.absolutePath + path.sep),
+      );
+      if (!mount) continue;
+      const relativePath = path.relative(mount.absolutePath, skill.path);
+      result.push({
+        id,
+        displayName: skill.name,
+        description: skill.description,
+        source: 'global',
+        contentPath: path.resolve(skill.path, 'SKILL.md'),
+        skillPath: `${mount.prefix}/${relativePath}`,
+        userInvocable: skill.userInvocable,
+        agentInvocable: skill.agentInvocable,
+      });
     }
 
     // Plugin skills
