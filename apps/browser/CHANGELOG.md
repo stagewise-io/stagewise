@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0-alpha.55 (2026-04-13)
+
+### Features
+
+* support global skills (d96ea43)
+
+### Bug Fixes
+
+* add file-watcher for global skills (24cd233)
+* correct global skill override logic and path matching (e9850e5)
+* fix typo in 'isStagewise' (5b1c088)
+* ui sometimes not showing up (89eed4a)
+* show loader in app startup screen (8b8ff5f)
+* dont show login form on unreachable server (d0ac0d5)
+
 ## 1.0.0-alpha.54 (2026-04-10)
 
 ### Bug Fixes
