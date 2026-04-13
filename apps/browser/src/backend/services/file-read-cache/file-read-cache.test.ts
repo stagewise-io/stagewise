@@ -31,9 +31,24 @@ const noopLogger = {
 
 const tmpDir = path.join(os.tmpdir(), 'file-read-cache-tests');
 
+/**
+ * Returns a unique file-backed SQLite URL. Used only for tests that explicitly
+ * require persistence across multiple connections (e.g. reopen test).
+ */
 async function freshDbUrl(): Promise<string> {
   await fs.mkdir(tmpDir, { recursive: true });
   return `file:${path.join(tmpDir, `${randomUUID()}.sqlite`)}`;
+}
+
+/**
+ * Returns an in-memory SQLite URL.
+ *
+ * Avoids disk I/O (fsync) entirely, which makes sequential-write tests
+ * orders-of-magnitude faster on Linux CI. Each @libsql/client instance
+ * created with ':memory:' gets its own isolated database.
+ */
+function freshInMemoryUrl(): string {
+  return ':memory:';
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +158,7 @@ describe('FileReadCacheService – last_used_at update on hit', () => {
 
   beforeEach(async () => {
     svc = await FileReadCacheService.createWithUrl(
-      await freshDbUrl(),
+      freshInMemoryUrl(),
       noopLogger,
     );
   });
@@ -183,7 +198,7 @@ describe('FileReadCacheService – last_used_at update on hit', () => {
 describe('FileReadCacheService – LRU eviction', () => {
   it('evicts the least-recently-used entry when exceeding 500 entries', async () => {
     const svc = await FileReadCacheService.createWithUrl(
-      await freshDbUrl(),
+      freshInMemoryUrl(),
       noopLogger,
     );
 
@@ -214,7 +229,7 @@ describe('FileReadCacheService – LRU eviction', () => {
 
   it('does not evict when under the limit', async () => {
     const svc = await FileReadCacheService.createWithUrl(
-      await freshDbUrl(),
+      freshInMemoryUrl(),
       noopLogger,
     );
 
