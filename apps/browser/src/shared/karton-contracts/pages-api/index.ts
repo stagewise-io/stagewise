@@ -294,7 +294,7 @@ export const defaultState: PagesApiState = {
   homePage: {
     storedExperienceData: {
       recentlyOpenedWorkspaces: [],
-      hasSeenOnboardingFlow: false,
+      hasSeenOnboardingFlow: null,
       lastViewedChats: {},
     },
     localPorts: [],

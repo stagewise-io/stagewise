@@ -18,7 +18,7 @@ export function ScreenRouter() {
 
   return (
     <div className="fixed inset-0">
-      {!connected && (
+      {!connected || hasSeenOnboarding === null ? (
         <div className="absolute inset-0 flex size-full flex-col items-center justify-center gap-4">
           <Logo
             color="white"
@@ -44,9 +44,7 @@ export function ScreenRouter() {
             </div>
           )}
         </div>
-      )}
-
-      {hasSeenOnboarding ? (
+      ) : hasSeenOnboarding ? (
         <>
           <DefaultLayout show />
           <WebContentsBoundsSyncer />
