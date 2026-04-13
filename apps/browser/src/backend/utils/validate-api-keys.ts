@@ -30,7 +30,7 @@ const providerConfigs: Record<
   ) => Parameters<typeof generateText>[0]['model']
 > = {
   anthropic: (apiKey, baseURL) =>
-    createAnthropic({ apiKey, baseURL })('claude-haiku-4-5'),
+    createAnthropic({ apiKey, baseURL })('claude-haiku-4.5'),
   openai: (apiKey, baseURL) => createOpenAI({ apiKey, baseURL })('gpt-5-nano'),
   google: (apiKey, baseURL) =>
     createGoogleGenerativeAI({ apiKey, baseURL })('gemini-2.5-flash-lite'),

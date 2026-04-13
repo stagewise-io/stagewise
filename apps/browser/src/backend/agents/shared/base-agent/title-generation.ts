@@ -13,7 +13,7 @@ import {
 const TITLE_GENERATION_MODELS = [
   'gemini-3.1-flash-lite-preview',
   'gpt-5.4-nano',
-  'claude-haiku-4-5',
+  'claude-haiku-4.5',
 ] as const;
 
 /** Maximum time (ms) allowed for a single title generation attempt. */

@@ -107,7 +107,7 @@ describe('generateSimpleTitle', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(3);
     expect(mps.getModelWithOptions).toHaveBeenNthCalledWith(
       3,
-      'claude-haiku-4-5',
+      'claude-haiku-4.5',
       'agent-1',
       expect.any(Object),
     );
@@ -245,7 +245,7 @@ describe('generateSimpleTitle', () => {
     );
     expect(mps.getModelWithOptions).toHaveBeenNthCalledWith(
       3,
-      'claude-haiku-4-5',
+      'claude-haiku-4.5',
       'agent-1',
       expect.any(Object),
     );
