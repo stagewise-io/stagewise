@@ -1233,8 +1233,8 @@ export class ToolboxService extends DisposableService {
       const id = `skill:${skill.name}`;
       if (seen.has(id)) continue;
       seen.add(id);
-      const isStageiwse = skill.path.includes('.stagewise');
-      const mount = isStageiwse ? globalMounts[0] : globalMounts[1];
+      const isStagewise = skill.path.includes('.stagewise');
+      const mount = isStagewise ? globalMounts[0] : globalMounts[1];
       const relativePath = path.relative(mount.absolutePath, skill.path);
       result.push({
         id,
