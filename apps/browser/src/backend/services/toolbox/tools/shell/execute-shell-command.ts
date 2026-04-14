@@ -45,6 +45,15 @@ export const executeShellCommand = (
     ) => {
       try {
         // Kill mode — terminate session immediately
+        if (params.kill && !params.session_id) {
+          return {
+            session_id: null,
+            output: 'kill requires a session_id.',
+            exit_code: null,
+            session_exited: false,
+            timed_out: false,
+          };
+        }
         if (params.kill && params.session_id) {
           const killed = shellService.killSession(params.session_id);
           return {
