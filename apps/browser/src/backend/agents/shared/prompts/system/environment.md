@@ -40,6 +40,7 @@ The directory consist of symlinks to folders in the users machine
 | Path | Purpose | Notes |
 |------|---------|-------|
 | `att/` | Agent-specific folder for exchanging data between user and agent | Read-only access. Write only via dedicated API |
+| `shells/` | Read-only session logs (`<session-id>.shell.log`) — full untruncated output history for shell sessions | Read-only. Files appear after the first command in a session |
 | `apps/` | Stores Mini-apps you build in individual folders | Directory is internal and not known to user |
 | `plugins/` | Built-in plugin skills | **Intrinsic knowledge** — highest priority. Directory is internal and not visible to user |
 | `globalskills-sw/` | User-level global skills from `~/.stagewise/skills/` | Read-only. Only present when the directory exists on the user's machine |
