@@ -7,6 +7,7 @@ import type {
   EnvironmentSnapshot,
   FullEnvironmentSnapshot,
   PlansSnapshot,
+  ShellSnapshot,
   WorkspaceMdSnapshot,
   WorkspaceSnapshot,
 } from '@shared/karton-contracts/ui/agent/metadata';
@@ -34,6 +35,7 @@ export function resolveEffectiveSnapshot(
   let enabledSkills: EnabledSkillsSnapshot | undefined;
   let browserSessionId: string | undefined;
   let plans: PlansSnapshot | undefined;
+  let shells: ShellSnapshot | undefined;
 
   for (let i = upToIndex; i >= 0; i--) {
     const snap = messages[i]?.metadata?.environmentSnapshot;
@@ -57,6 +59,7 @@ export function resolveEffectiveSnapshot(
     if (browserSessionId === undefined && snap.browserSessionId !== undefined)
       browserSessionId = snap.browserSessionId;
     if (plans === undefined && snap.plans !== undefined) plans = snap.plans;
+    if (shells === undefined && snap.shells !== undefined) shells = snap.shells;
     if (
       browser !== undefined &&
       workspace !== undefined &&
@@ -67,7 +70,8 @@ export function resolveEffectiveSnapshot(
       workspaceMd !== undefined &&
       enabledSkills !== undefined &&
       browserSessionId !== undefined &&
-      plans !== undefined
+      plans !== undefined &&
+      shells !== undefined
     )
       break;
   }
@@ -92,6 +96,7 @@ export function resolveEffectiveSnapshot(
     enabledSkills: enabledSkills ?? { paths: [] },
     browserSessionId: browserSessionId ?? '',
     plans: plans ?? { entries: [] },
+    shells: shells ?? { sessions: [] },
   };
 }
 
@@ -99,6 +104,17 @@ export function resolveEffectiveSnapshot(
  * Shallow-recursive deep equality check that short-circuits on first
  * difference. Avoids the string allocation overhead of JSON.stringify.
  */
+/**
+ * Returns a copy of the shell snapshot with `tailContent` stripped from
+ * each session. Used to prevent ephemeral preview data from triggering
+ * false-positive diffs in sparsification.
+ */
+function shellsWithoutTail(snap: ShellSnapshot): ShellSnapshot {
+  return {
+    sessions: snap.sessions.map(({ tailContent: _, ...rest }) => rest),
+  };
+}
+
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
@@ -162,6 +178,13 @@ export function sparsifySnapshot(
   if (full.browserSessionId !== previous.browserSessionId)
     sparse.browserSessionId = full.browserSessionId;
   if (!deepEqual(full.plans, previous.plans)) sparse.plans = full.plans;
+  if (
+    !deepEqual(
+      shellsWithoutTail(full.shells),
+      shellsWithoutTail(previous.shells),
+    )
+  )
+    sparse.shells = full.shells;
 
   return sparse;
 }

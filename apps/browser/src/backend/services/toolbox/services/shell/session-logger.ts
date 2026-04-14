@@ -1,4 +1,11 @@
-import { mkdirSync, appendFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  appendFileSync,
+  statSync,
+  openSync,
+  readSync,
+  closeSync,
+} from 'node:fs';
 import path from 'node:path';
 
 /** Debounce interval (ms) for flushing buffered output to disk. */
@@ -76,6 +83,31 @@ export class SessionLogger {
       // Disk full, path invalid, or other I/O failure — stop writing.
       this._closed = true;
       this._buffer = '';
+    }
+  }
+
+  /**
+   * Returns the last `maxChars` characters of the log file.
+   * Flushes the buffer first to ensure all data is on disk.
+   */
+  getTail(maxChars: number): string {
+    this.flush();
+    try {
+      const stat = statSync(this.filePath);
+      if (stat.size === 0) return '';
+      const start = Math.max(0, stat.size - maxChars * 4); // over-read for multi-byte safety
+      const fd = openSync(this.filePath, 'r');
+      try {
+        const buf = Buffer.alloc(stat.size - start);
+        readSync(fd, buf, 0, buf.length, start);
+        const text = buf.toString('utf-8');
+        if (text.length <= maxChars) return text;
+        return text.slice(-maxChars);
+      } finally {
+        closeSync(fd);
+      }
+    } catch {
+      return '';
     }
   }
 

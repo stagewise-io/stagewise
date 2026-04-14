@@ -35,6 +35,7 @@ function makeSnapshot(
     enabledSkills: { paths: [] },
     browserSessionId: 'test-browser-session-id',
     plans: { entries: [] },
+    shells: { sessions: [] },
     ...overrides,
   };
 }

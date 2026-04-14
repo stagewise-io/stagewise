@@ -1221,6 +1221,16 @@ export class ToolboxService extends DisposableService {
       plans: {
         entries: planEntries,
       },
+      shells: (() => {
+        const shellSnap = this.shellService?.getShellSnapshot(
+          agentInstanceId,
+        ) ?? {
+          sessions: [],
+        };
+        return shellSnap;
+      })() ?? {
+        sessions: [],
+      },
     };
 
     return snapshot;
