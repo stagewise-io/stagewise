@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-alpha.57 (2026-04-14)
+
+### Features
+
+* add learning skill that creates and updates skills (ab1421d)
+
+### Bug Fixes
+
+* fix model-ids for all models (c364f8c)
+* fix ask-user-tool (efa3a00)
+
 ## 1.0.0-alpha.56 (2026-04-13)
 
 ### Bug Fixes
