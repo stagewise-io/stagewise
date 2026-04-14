@@ -7,6 +7,8 @@ import { sanitizeEnv } from './sanitize-env';
 import { SessionManager, stripAnsi } from './session-manager';
 import { getAgentShellLogsDir } from '@/utils/paths';
 import fs from 'node:fs/promises';
+import path from 'node:path';
+import type { ShellSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
 import type {
   DetectedShell,
   SessionCommandRequest,
@@ -233,6 +235,33 @@ export class ShellService extends DisposableService {
 
   destroyAgent(agentInstanceId: string): void {
     this.sessionManager?.destroyAgent(agentInstanceId);
+  }
+
+  getShellSnapshot(agentInstanceId: string): ShellSnapshot {
+    if (!this.sessionManager) {
+      return { sessions: [] };
+    }
+    const sessions = this.sessionManager.getSessionsForAgent(agentInstanceId);
+    const TAIL_CHARS = 400;
+    const snapshot: ShellSnapshot = {
+      sessions: sessions.map((s) => {
+        const lineCount = s.logger?.lineCount ?? 0;
+        const logPath = s.logger
+          ? `shells/${path.basename(s.logger.filePath)}`
+          : '';
+        const tailContent =
+          lineCount > 0 && s.logger ? s.logger.getTail(TAIL_CHARS) : undefined;
+        return {
+          id: s.id,
+          exited: s.exited,
+          exitCode: s.exitCode,
+          lineCount,
+          logPath,
+          tailContent: tailContent || undefined,
+        };
+      }),
+    };
+    return snapshot;
   }
 
   deleteShellLogs(agentInstanceId: string): void {
