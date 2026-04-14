@@ -1268,6 +1268,16 @@ export class ToolboxService extends DisposableService {
             token: this.logIngestService.getToken(),
           }
         : null,
+      shells: (() => {
+        const shellSnap = this.shellService?.getShellSnapshot(
+          agentInstanceId,
+        ) ?? {
+          sessions: [],
+        };
+        return shellSnap;
+      })() ?? {
+        sessions: [],
+      },
     };
 
     return snapshot;

@@ -251,6 +251,23 @@ export const logsSnapshotSchema = z.object({
 });
 
 export type LogsSnapshot = z.infer<typeof logsSnapshotSchema>;
+export const shellSessionSnapshotSchema = z.object({
+  id: z.string(),
+  exited: z.boolean(),
+  exitCode: z.number().nullable(),
+  lineCount: z.number(),
+  logPath: z.string(),
+  /** Last ~400 chars of log output. Only populated when lineCount > 0. */
+  tailContent: z.string().optional(),
+});
+
+export type ShellSessionSnapshot = z.infer<typeof shellSessionSnapshotSchema>;
+
+export const shellSnapshotSchema = z.object({
+  sessions: z.array(shellSessionSnapshotSchema),
+});
+
+export type ShellSnapshot = z.infer<typeof shellSnapshotSchema>;
 
 export const environmentSnapshotSchema = z.object({
   browser: browserSnapshotSchema.optional(),
@@ -273,6 +290,7 @@ export const environmentSnapshotSchema = z.object({
     .object({ port: z.number(), token: z.string() })
     .nullable()
     .optional(),
+  shells: shellSnapshotSchema.optional(),
 });
 
 export type EnvironmentSnapshot = z.infer<typeof environmentSnapshotSchema>;

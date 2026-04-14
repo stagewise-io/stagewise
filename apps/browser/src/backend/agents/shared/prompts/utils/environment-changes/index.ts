@@ -7,6 +7,7 @@ import { computePlansChanges } from './plans-changes';
 import { computeLogChanges } from './log-changes';
 import { computeLogIngestChanges } from './log-ingest-changes';
 import { computeSandboxChanges } from './sandbox-changes';
+import { computeShellChanges } from './shell-changes';
 import { computeSkillsChanges } from './skills-changes';
 import type { EnvironmentChangeEntry } from './types';
 import { computeWorkspaceChanges } from './workspace-changes';
@@ -20,6 +21,7 @@ export { computePlansChanges } from './plans-changes';
 export { computeLogChanges } from './log-changes';
 export { computeLogIngestChanges } from './log-ingest-changes';
 export { computeSandboxChanges } from './sandbox-changes';
+export { computeShellChanges } from './shell-changes';
 export { computeSkillsChanges } from './skills-changes';
 export { computeWorkspaceChanges } from './workspace-changes';
 export { computeWorkspaceMdChanges } from './workspace-md-changes';
@@ -49,6 +51,7 @@ export function computeAllEnvironmentChanges(
       previous.sandboxSessionId,
       current.sandboxSessionId,
     ),
+    ...computeShellChanges(previous.shells, current.shells),
     ...computeBrowserChanges(
       previous.browser,
       current.browser,
