@@ -217,6 +217,9 @@ describeIfShell('SessionManager (integration)', () => {
       const r = await sm.executeCommand(sid, { command: 'pwd' });
       expect(r.output).toContain(path.basename(uniqueDir));
     } finally {
+      sm?.killAll();
+      // Windows needs time to release PTY directory locks after kill
+      await new Promise((r) => setTimeout(r, 300));
       fs.rmSync(uniqueDir, { recursive: true, force: true });
     }
   });
@@ -234,6 +237,9 @@ describeIfShell('SessionManager (integration)', () => {
 
       expect(r.output).toContain(path.basename(uniqueDir));
     } finally {
+      sm?.killAll();
+      // Windows needs time to release PTY directory locks after kill
+      await new Promise((r) => setTimeout(r, 300));
       fs.rmSync(uniqueDir, { recursive: true, force: true });
     }
   });
