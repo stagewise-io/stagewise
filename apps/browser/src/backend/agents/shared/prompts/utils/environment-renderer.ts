@@ -30,7 +30,7 @@ export function renderFullEnvironmentContext(
 
   // All symlinks — user workspaces + always-available — in one table
   const { workspace } = snapshot;
-  const systemPrefixes = new Set(['att', 'plugins', 'apps']);
+  const systemPrefixes = new Set(['att', 'plugins', 'apps', 'shells']);
   const isSystemMount = (prefix: string) =>
     systemPrefixes.has(prefix) || prefix.startsWith('globalskills-');
   const userMounts = workspace.mounts.filter((m) => !isSystemMount(m.prefix));

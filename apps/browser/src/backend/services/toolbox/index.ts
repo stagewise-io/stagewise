@@ -31,7 +31,12 @@ import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import { createFileDiffHandler } from './utils/sandbox-callbacks';
 import { deleteAgentBlobs, getAgentBlobDir } from '@/utils/attachment-blobs';
-import { getDataRoot, getPlansDir, getTempRoot } from '@/utils/paths';
+import {
+  getAgentShellLogsDir,
+  getDataRoot,
+  getPlansDir,
+  getTempRoot,
+} from '@/utils/paths';
 import { existsSync, mkdirSync } from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import type { ApiClient } from '@stagewise/api-client';
@@ -155,6 +160,7 @@ export class ToolboxService extends DisposableService {
   private globalSkillsRuntimes = new Map<string, ClientRuntimeNode>();
   private appsRuntimes = new Map<string, ClientRuntimeNode>();
   private attRuntimes = new Map<string, ClientRuntimeNode>();
+  private shellsRuntimes = new Map<string, ClientRuntimeNode>();
 
   private mountManagerService: MountManagerService | null = null;
   private unsubPreferenceSync: (() => void) | null = null;
@@ -188,6 +194,7 @@ export class ToolboxService extends DisposableService {
     runtimes.set('apps', this.getOrCreateAppsRuntime(agentInstanceId));
     runtimes.set(PLANS_PREFIX, this.getOrCreatePlansRuntime());
     runtimes.set('att', this.getOrCreateAttRuntime(agentInstanceId));
+    runtimes.set('shells', this.getOrCreateShellsRuntime(agentInstanceId));
     return runtimes;
   }
 
@@ -251,6 +258,19 @@ export class ToolboxService extends DisposableService {
       rgBinaryBasePath: getRipgrepBasePath(),
     });
     this.attRuntimes.set(agentInstanceId, runtime);
+    return runtime;
+  }
+
+  private getOrCreateShellsRuntime(agentInstanceId: string): ClientRuntimeNode {
+    const existing = this.shellsRuntimes.get(agentInstanceId);
+    if (existing) return existing;
+    const shellLogsDir = getAgentShellLogsDir(agentInstanceId);
+    mkdirSync(shellLogsDir, { recursive: true });
+    const runtime = new ClientRuntimeNode({
+      workingDirectory: shellLogsDir,
+      rgBinaryBasePath: getRipgrepBasePath(),
+    });
+    this.shellsRuntimes.set(agentInstanceId, runtime);
     return runtime;
   }
 
@@ -975,6 +995,14 @@ export class ToolboxService extends DisposableService {
       permissions: READ_ONLY_PERMISSIONS,
     });
 
+    const shellLogsDir = getAgentShellLogsDir(agentInstanceId);
+    mkdirSync(shellLogsDir, { recursive: true });
+    mounts.push({
+      prefix: 'shells',
+      absolutePath: shellLogsDir,
+      permissions: READ_ONLY_PERMISSIONS,
+    });
+
     mounts.push({
       prefix: 'plugins',
       absolutePath: getPluginsPath(),
@@ -1088,6 +1116,11 @@ export class ToolboxService extends DisposableService {
       {
         prefix: 'att',
         path: getAgentBlobDir(agentInstanceId),
+        permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
+      },
+      {
+        prefix: 'shells',
+        path: getAgentShellLogsDir(agentInstanceId),
         permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
       },
       {
@@ -1583,6 +1616,7 @@ export class ToolboxService extends DisposableService {
     this.appsRuntimes.delete(agentInstanceId);
     if (deleteBlobs) {
       void deleteAgentBlobs(agentInstanceId);
+      this.shellService?.deleteShellLogs(agentInstanceId);
     }
     this.cancelPendingQuestions(agentInstanceId);
   }

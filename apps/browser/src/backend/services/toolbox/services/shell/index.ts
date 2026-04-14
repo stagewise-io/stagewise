@@ -4,7 +4,9 @@ import type { KartonService } from '@/services/karton';
 import { detectShell } from './detect-shell';
 import { resolveShellEnv } from './resolve-shell-env';
 import { sanitizeEnv } from './sanitize-env';
-import { SessionManager } from './session-manager';
+import { SessionManager, stripAnsi } from './session-manager';
+import { getAgentShellLogsDir } from '@/utils/paths';
+import fs from 'node:fs/promises';
 import type {
   DetectedShell,
   SessionCommandRequest,
@@ -90,7 +92,9 @@ export class ShellService extends DisposableService {
         }
       }
 
-      this.sessionManager = new SessionManager(this.shell);
+      this.sessionManager = new SessionManager(this.shell, (agentId) =>
+        getAgentShellLogsDir(agentId),
+      );
     } else {
       this.logger.warn(
         '[ShellService] No usable shell detected — shell tool will be unavailable',
@@ -138,7 +142,7 @@ export class ShellService extends DisposableService {
         if (!this.outputBuffers.has(targetToolCallId)) {
           this.outputBuffers.set(targetToolCallId, []);
         }
-        this.outputBuffers.get(targetToolCallId)!.push(chunk);
+        this.outputBuffers.get(targetToolCallId)!.push(stripAnsi(chunk));
         this.scheduleFlush(agentInstanceId, targetToolCallId);
       };
     };
@@ -229,6 +233,13 @@ export class ShellService extends DisposableService {
 
   destroyAgent(agentInstanceId: string): void {
     this.sessionManager?.destroyAgent(agentInstanceId);
+  }
+
+  deleteShellLogs(agentInstanceId: string): void {
+    void fs.rm(getAgentShellLogsDir(agentInstanceId), {
+      recursive: true,
+      force: true,
+    });
   }
 
   private scheduleFlush(agentId: string, toolCallId: string): void {
