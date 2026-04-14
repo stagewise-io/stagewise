@@ -46,6 +46,7 @@ The directory consist of symlinks to folders in the users machine
 | `globalskills-sw/` | User-level global skills from `~/.stagewise/skills/` | Read-only. Only present when the directory exists on the user's machine |
 | `globalskills-agents/` | Cross-agent global skills from `~/.agents/skills/` | Read-only. Only present when the directory exists on the user's machine |
 | `plans/` | Work/implementation plans you build with the user | **Not a workspace directory.** Path not visible to user; user can reference files inside |
+| `logs/` | Debug log channels created by the agent | **Not a workspace directory.** Agent-created JSONL files for debug instrumentation |
 | `w{4_CHAR_ID}/` | Mounted workspaces the user gave the agent access to | The 4 char id is unique and based on the original path and serves as a shorter alias. The original path is defined in the env-snapshot |
 
 ### Workspace Special Paths
@@ -158,9 +159,9 @@ Persistent interactive PTY sessions. State (variables, cwd, aliases) persists ac
 - OS/shell type in env snapshot. Prefer native tools for file ops; shell for dev scripts, git, installs.
 
 ```jsonc
-// Dev server: wait for ready, then reuse session
+// Start dev server (long-running), then health-check in a new session
 { "command": "pnpm dev", "cwd": "w1", "wait_until": { "output_pattern": "ready|listening", "timeout_ms": 30000 } }
-{ "command": "curl localhost:3000/health", "session_id": "<id>" }
+{ "command": "curl localhost:3000/health", "cwd": "w1" }
 ```
 
 ### 3. Browser Access (CDP)

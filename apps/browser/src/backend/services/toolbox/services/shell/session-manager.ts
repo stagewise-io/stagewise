@@ -352,6 +352,13 @@ export class SessionManager {
 
     const commandId = randomUUID().slice(0, 12);
 
+    // If there's already an in-flight command, resolve it early so it
+    // doesn't get orphaned when we overwrite the sessionCommandMap entry.
+    const existingCommandId = this.sessionCommandMap.get(sessionId);
+    if (existingCommandId && this.pendingCommands.has(existingCommandId)) {
+      this.resolveCommandWithTimeout(existingCommandId);
+    }
+
     return new Promise<SessionCommandResult>((resolve) => {
       const pending: PendingCommand = {
         resolve,
@@ -506,7 +513,7 @@ export class SessionManager {
     });
   }
 
-  private resolveCommand(commandId: string, exitCode: number): void {
+  private resolveCommand(commandId: string, exitCode: number | null): void {
     const pending = this.pendingCommands.get(commandId);
     if (!pending) return;
 
@@ -614,7 +621,7 @@ export class SessionManager {
       try {
         const re = new RegExp(pending.waitUntil.outputPattern);
         if (re.test(pending.rawOutput)) {
-          this.resolveCommand(pending.commandId, 0);
+          this.resolveCommand(pending.commandId, null);
         }
       } catch {
         // Invalid regex — ignore
@@ -750,7 +757,8 @@ export class SessionManager {
   private getSessionCountForAgent(agentInstanceId: string): number {
     let count = 0;
     for (const session of this.sessions.values()) {
-      if (session.agentInstanceId === agentInstanceId) count++;
+      if (session.agentInstanceId === agentInstanceId && !session.exited)
+        count++;
     }
     return count;
   }

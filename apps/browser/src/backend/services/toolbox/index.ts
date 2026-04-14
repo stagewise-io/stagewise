@@ -1707,6 +1707,7 @@ export class ToolboxService extends DisposableService {
     this.sandboxService?.destroyAgent(agentInstanceId);
     this.shellService?.destroyAgent(agentInstanceId);
     this.appsRuntimes.delete(agentInstanceId);
+    this.shellsRuntimes.delete(agentInstanceId);
     if (deleteBlobs) {
       void deleteAgentBlobs(agentInstanceId);
       this.shellService?.deleteShellLogs(agentInstanceId);
