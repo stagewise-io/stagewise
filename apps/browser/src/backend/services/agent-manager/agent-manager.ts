@@ -476,7 +476,7 @@ export class AgentManagerService extends DisposableService {
       isWorking: false,
       history: [],
       queuedMessages: [],
-      activeModelId: 'claude-sonnet-4-6',
+      activeModelId: 'claude-sonnet-4.6',
       inputState: initialInputState ?? '',
       usedTokens: 0,
     };

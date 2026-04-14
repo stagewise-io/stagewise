@@ -94,7 +94,7 @@ export const availableModels = [
   // Anthropic Models
   {
     officialProvider: 'anthropic',
-    modelId: 'claude-opus-4-6',
+    modelId: 'claude-opus-4.6',
     modelDisplayName: 'Opus 4.6',
     modelDescription:
       "Anthropic's most capable model, excels at complex reasoning and architectural decisions.",
@@ -178,7 +178,7 @@ export const availableModels = [
   },
   {
     officialProvider: 'google',
-    modelId: 'gemini-3-1-pro-preview',
+    modelId: 'gemini-3.1-pro-preview',
     modelDisplayName: 'Gemini 3.1 Pro (Preview)',
     modelDescription:
       "Google's latest model with strong reasoning and multimodal capabilities. Preview version (may be unstable).",
@@ -261,7 +261,7 @@ export const availableModels = [
   },
   {
     officialProvider: 'anthropic',
-    modelId: 'claude-sonnet-4-6',
+    modelId: 'claude-sonnet-4.6',
 
     modelDisplayName: 'Sonnet 4.6',
     modelDescription:
@@ -426,7 +426,7 @@ export const availableModels = [
   },
   {
     officialProvider: 'google',
-    modelId: 'gemini-3-flash',
+    modelId: 'gemini-3-flash-preview',
     modelDisplayName: 'Gemini 3 Flash',
     modelDescription:
       "Google's most intelligent model built for speed, combining frontier intelligence with superior search and grounding.",
@@ -464,7 +464,7 @@ export const availableModels = [
   },
   {
     officialProvider: 'anthropic',
-    modelId: 'claude-haiku-4-5',
+    modelId: 'claude-haiku-4.5',
     modelDisplayName: 'Haiku 4.5',
     modelDescription:
       'Fast and cost-effective, ideal for quick iterations and simple edits.',
@@ -621,7 +621,7 @@ export const availableModels = [
   },
   {
     officialProvider: 'alibaba',
-    modelId: 'qwen3-coder-30b-a3b',
+    modelId: 'qwen3-coder-30b-a3b-instruct',
     modelDisplayName: 'Qwen 3-Coder 30B-A3B',
     modelDescription:
       'Efficient coding specialist balancing performance with cost-effectiveness for daily development tasks while maintaining strong tool integration capabilities.',

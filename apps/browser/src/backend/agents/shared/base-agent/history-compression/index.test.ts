@@ -991,7 +991,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(3);
     expect(mps.getModelWithOptions).toHaveBeenNthCalledWith(
       3,
-      'claude-haiku-4-5',
+      'claude-haiku-4.5',
       'agent-1',
       expect.any(Object),
     );
@@ -1098,7 +1098,7 @@ describe('generateSimpleCompressedHistory', () => {
     );
     expect(mps.getModelWithOptions).toHaveBeenNthCalledWith(
       3,
-      'claude-haiku-4-5',
+      'claude-haiku-4.5',
       'agent-1',
       expect.any(Object),
     );
@@ -1243,7 +1243,7 @@ describe('generateSimpleCompressedHistory', () => {
       makeMessages(4),
       mps,
       'agent-1',
-      'claude-sonnet-4-6' as any,
+      'claude-sonnet-4.6' as any,
     );
 
     expect(result).toBe(
@@ -1252,7 +1252,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(4);
     expect(mps.getModelWithOptions).toHaveBeenNthCalledWith(
       4,
-      'claude-sonnet-4-6',
+      'claude-sonnet-4.6',
       'agent-1',
       expect.objectContaining({ $ai_span_name: 'history-compression' }),
     );
@@ -1270,7 +1270,7 @@ describe('generateSimpleCompressedHistory', () => {
         makeMessages(4),
         mps,
         'agent-1',
-        'claude-haiku-4-5' as any,
+        'claude-haiku-4.5' as any,
       ),
     ).rejects.toThrow('Haiku failed');
     expect(mps.getModelWithOptions).toHaveBeenCalledTimes(3);
@@ -1289,7 +1289,7 @@ describe('generateSimpleCompressedHistory', () => {
         makeMessages(4),
         mps,
         'agent-1',
-        'claude-sonnet-4-6' as any,
+        'claude-sonnet-4.6' as any,
       ),
     ).rejects.toThrow('Sonnet failed');
     expect(generateTextMock).toHaveBeenCalledTimes(4);
@@ -1305,7 +1305,7 @@ describe('generateSimpleCompressedHistory', () => {
       makeMessages(4),
       mps,
       'agent-1',
-      'claude-sonnet-4-6' as any,
+      'claude-sonnet-4.6' as any,
     );
 
     expect(result).toBe('The user asked the assistant to help with a task.');

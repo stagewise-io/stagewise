@@ -12,7 +12,7 @@ export class ChatAgent extends BaseAgent<never, undefined> {
   public static readonly agentType = AgentTypes.CHAT;
   public static readonly config = {
     persistent: true,
-    defaultModelId: 'claude-sonnet-4-6' as const,
+    defaultModelId: 'claude-sonnet-4.6' as const,
     allowModelSelection: true,
     requiredCapabilities: {
       inputModalities: {

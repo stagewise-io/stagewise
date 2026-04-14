@@ -20,7 +20,7 @@ export class WorkspaceMdAgent extends BaseAgent<
   public static readonly agentType = AgentTypes.WORKSPACE_MD;
   public static readonly config = {
     persistent: false, // Background task, no persistence needed
-    defaultModelId: 'claude-haiku-4-5' as const,
+    defaultModelId: 'claude-haiku-4.5' as const,
     allowModelSelection: false, // Fixed model for consistency
     requiredCapabilities: {
       inputModalities: {

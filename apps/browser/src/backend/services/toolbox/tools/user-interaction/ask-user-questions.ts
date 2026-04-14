@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { randomUUID } from 'node:crypto';
 import {
-  askUserQuestionsToolInputSchema,
+  askUserQuestionsToolInputSchemaFlat,
   type AskUserQuestionsToolInput,
   type AskUserQuestionsToolOutput,
   type QuestionAnswerValue,
@@ -157,9 +157,11 @@ export const askUserQuestions = (
 ) => {
   return tool({
     description: DESCRIPTION,
-    inputSchema: askUserQuestionsToolInputSchema,
+    inputSchema: askUserQuestionsToolInputSchemaFlat,
     strict: false,
-    execute: async (params: AskUserQuestionsToolInput) => {
+    execute: async (flatParams) => {
+      const params = flatParams as unknown as AskUserQuestionsToolInput;
+
       // Cancel any existing pending question for this agent before creating
       // a new one, so the old deferred promise doesn't leak.
       cleanupQuestionsForAgent(agentInstanceId, uiKarton);
