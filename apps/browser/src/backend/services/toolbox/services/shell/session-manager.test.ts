@@ -77,6 +77,19 @@ describe('stripAnsi', () => {
   it('returns empty string for empty input', () => {
     expect(stripAnsi('')).toBe('');
   });
+
+  it('strips DEC Private Mode sequences (bracketed paste, cursor visibility)', () => {
+    expect(stripAnsi('\x1b[?2004htext\x1b[?2004l')).toBe('text');
+    expect(stripAnsi('\x1b[?25lhidden\x1b[?25h')).toBe('hidden');
+  });
+
+  it('strips cursor shape sequences (CSI with space intermediate)', () => {
+    expect(stripAnsi('\x1b[0 qtext\x1b[6 q')).toBe('text');
+  });
+
+  it('strips DEC save/restore cursor', () => {
+    expect(stripAnsi('before\x1b7\x1b8after')).toBe('beforeafter');
+  });
 });
 
 // ─── Section C: Integration tests (real PTY sessions) ────────────

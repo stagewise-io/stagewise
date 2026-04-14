@@ -57,6 +57,9 @@ export const getAgentAttachmentPath = (
 export const getAgentAppsDir = (agentId: string): string =>
   path.join(getDataRoot(), 'agents', agentId, 'apps');
 
+export const getAgentShellLogsDir = (agentId: string): string =>
+  path.join(getDataRoot(), 'agents', agentId, 'shell-logs');
+
 export const getDiffHistoryDir = (): string =>
   path.join(getDataRoot(), 'diff-history');
 

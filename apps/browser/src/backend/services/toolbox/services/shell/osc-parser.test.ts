@@ -235,6 +235,28 @@ describe('OscParser — sentinel mode', () => {
 
     expect(spy).not.toHaveBeenCalled();
   });
+
+  it('emits output events for command data in sentinel mode', () => {
+    const outputSpy = vi.fn();
+    parser.on('output', outputSpy);
+
+    parser.write('file1.txt\nfile2.txt\n');
+    parser.write(`${sentinel('cmd4', 0)}\n`);
+
+    // Output should have been emitted for both chunks
+    expect(outputSpy).toHaveBeenCalledTimes(2);
+    expect(outputSpy).toHaveBeenNthCalledWith(1, 'file1.txt\nfile2.txt\n');
+  });
+
+  it('emits output before sentinelDone fires', () => {
+    const order: string[] = [];
+    parser.on('output', () => order.push('output'));
+    parser.on('sentinelDone', () => order.push('sentinelDone'));
+
+    parser.write(`hello world\n${sentinel('cmd5', 0)}`);
+
+    expect(order).toEqual(['output', 'sentinelDone']);
+  });
 });
 
 // ─── Detecting mode ──────────────────────────────────────────────
