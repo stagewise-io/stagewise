@@ -722,27 +722,49 @@ export const executeShellCommandToolInputSchema = z.object({
     .describe(
       'Concise (max 5 words) explanation of what this command does. Examples: "Install dependencies", "Check git status", "List project files", "Run test suite", "Build the project"',
     ),
-  command: z.string().describe('Shell command to execute.'),
+  command: z
+    .string()
+    .optional()
+    .describe('The command to run. Required unless kill is true.'),
   cwd: z
     .string()
-    .describe(
-      'Root directory the command should be executed in (e.g. "att", "wm84i", "apps/my-app").',
-    ),
-  timeout_ms: z
-    .number()
-    .int()
-    .positive()
     .optional()
-    .describe('Timeout in milliseconds. Defaults to 120000 (2 minutes).'),
+    .describe('Mount prefix for cwd. Only used when creating a new session.'),
+  session_id: z
+    .string()
+    .optional()
+    .describe('Session ID to reuse. Omit to create a new session.'),
+  kill: z
+    .boolean()
+    .optional()
+    .describe('Hard-kill the session. Mutually exclusive with command.'),
+  wait_until: z
+    .object({
+      timeout_ms: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Return after N ms regardless.'),
+      exited: z
+        .boolean()
+        .optional()
+        .describe('Wait for the shell process to exit.'),
+      output_pattern: z
+        .string()
+        .optional()
+        .describe('Return when output matches this regex.'),
+    })
+    .optional()
+    .describe('Controls when the tool returns.'),
 });
 
 export const executeShellCommandToolOutputSchema = z.object({
-  message: z.string(),
+  session_id: z.string(),
   output: z.string(),
-  stderr: z.string(),
   exit_code: z.number().nullable(),
+  session_exited: z.boolean(),
   timed_out: z.boolean(),
-  aborted: z.boolean(),
 });
 
 export type ExecuteShellCommandToolInput = z.infer<

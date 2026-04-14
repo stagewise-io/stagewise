@@ -838,12 +838,11 @@ export function createExecuteShellCommandToolPart(
   options?: {
     toolCallId?: string;
     output?: string;
-    stderr?: string;
     exit_code?: number | null;
     timed_out?: boolean;
-    aborted?: boolean;
+    session_id?: string;
+    session_exited?: boolean;
     errorText?: string;
-    message?: string;
     approvalId?: string;
     approved?: boolean;
     approvalReason?: string;
@@ -857,7 +856,7 @@ export function createExecuteShellCommandToolPart(
       type: 'tool-executeShellCommand',
       toolCallId,
       state: 'input-streaming',
-      input: { command },
+      input: { explanation: 'Run command', command },
     } as AgentToolUIPart;
   }
 
@@ -866,7 +865,7 @@ export function createExecuteShellCommandToolPart(
       type: 'tool-executeShellCommand',
       toolCallId,
       state: 'input-available',
-      input: { command },
+      input: { explanation: 'Run command', command },
     } as AgentToolUIPart;
   }
 
@@ -875,7 +874,7 @@ export function createExecuteShellCommandToolPart(
       type: 'tool-executeShellCommand',
       toolCallId,
       state: 'approval-requested',
-      input: { command },
+      input: { explanation: 'Run command', command },
       approval: { id: approvalId },
     } as AgentToolUIPart;
   }
@@ -885,7 +884,7 @@ export function createExecuteShellCommandToolPart(
       type: 'tool-executeShellCommand',
       toolCallId,
       state: 'approval-responded',
-      input: { command },
+      input: { explanation: 'Run command', command },
       approval: {
         id: approvalId,
         approved: options?.approved ?? true,
@@ -899,7 +898,7 @@ export function createExecuteShellCommandToolPart(
       type: 'tool-executeShellCommand',
       toolCallId,
       state: 'output-denied',
-      input: { command },
+      input: { explanation: 'Run command', command },
       approval: {
         id: approvalId,
         approved: false,
@@ -913,7 +912,7 @@ export function createExecuteShellCommandToolPart(
       type: 'tool-executeShellCommand',
       toolCallId,
       state: 'output-error',
-      input: { command },
+      input: { explanation: 'Run command', command },
       errorText:
         options?.errorText ??
         'Shell service is not available — no shell detected.',
@@ -924,16 +923,13 @@ export function createExecuteShellCommandToolPart(
     type: 'tool-executeShellCommand',
     toolCallId,
     state: 'output-available',
-    input: { command },
+    input: { explanation: 'Run command', command },
     output: {
-      message:
-        options?.message ??
-        `Command exited with code ${options?.exit_code ?? 0}`,
+      session_id: options?.session_id ?? 'session-1',
       output: options?.output ?? '',
-      stderr: options?.stderr ?? '',
       exit_code: options?.exit_code ?? 0,
+      session_exited: options?.session_exited ?? false,
       timed_out: options?.timed_out ?? false,
-      aborted: options?.aborted ?? false,
     },
   } as AgentToolUIPart;
 }
