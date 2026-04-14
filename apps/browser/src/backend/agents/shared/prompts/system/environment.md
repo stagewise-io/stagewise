@@ -144,12 +144,23 @@ return `Saved as ${fileName}`;
 
 **Read the `javascript-sandbox` plugin** for CDP domain rules, credential details, runtime/module lists, and advanced patterns.
 
-### 2. Ephemeral Shell (`executeShellCommand`)
+### 2. Shell (`executeShellCommand`)
 
-- State not persisted across calls. Has filesystem access.
-- OS and shell type are specified in the env snapshot.
-- Prefer standard tools (`read`, `multiEdit`, `copy`, etc.) for file operations. Use shell only when necessary (dev scripts, git, installs).
-- Shell runs in a workspace subfolder (via `mount` param), never in the filesystem root.
+Persistent interactive PTY sessions. State (variables, cwd, aliases) persists across commands in a session.
+
+- **New session:** Omit `session_id`, set `cwd` (mount prefix). **Reuse:** pass the `session_id` from the result. `cwd` is ignored on reuse — the shell stays wherever `cd` left it.
+- **`wait_until`:** Controls when the tool returns. `timeout_ms` = time cap, `output_pattern` = regex match on output, `exited` = wait for process exit. Omitting `wait_until` defaults to **20 s**. When `wait_until` is provided without an explicit `timeout_ms`, the cap is **120 s**.
+- **Timeout ≠ error.** `timed_out: true` returns partial output; session stays alive. Reuse `session_id` to continue.
+- **Interrupt:** send `\x03` as command. **Terminate:** `exit\r` or `kill: true`.
+- Sessions auto-close after 10 min idle or on agent suspension.
+- Result includes `session_id`, `output`, `exit_code` (`null` if still running), `session_exited`, `timed_out`.
+- OS/shell type in env snapshot. Prefer native tools for file ops; shell for dev scripts, git, installs.
+
+```jsonc
+// Dev server: wait for ready, then reuse session
+{ "command": "pnpm dev", "cwd": "w1", "wait_until": { "output_pattern": "ready|listening", "timeout_ms": 30000 } }
+{ "command": "curl localhost:3000/health", "session_id": "<id>" }
+```
 
 ### 3. Browser Access (CDP)
 

@@ -58,8 +58,6 @@ export async function resolveShellEnv(
       break;
     case 'powershell':
       return null;
-    case 'cmd':
-      return null;
   }
 
   // On macOS/Linux, desktop-launched Electron apps may inherit a nearly

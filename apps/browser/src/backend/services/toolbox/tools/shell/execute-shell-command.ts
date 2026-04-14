@@ -44,27 +44,45 @@ export const executeShellCommand = (
       { toolCallId, abortSignal },
     ) => {
       try {
-        const cwd = resolveCwd(params.cwd, getMountedPaths);
-        const result = await shellService.execute(agentInstanceId, toolCallId, {
-          command: params.command,
-          cwd,
-          timeoutMs: params.timeout_ms,
-          abortSignal,
-        });
+        // Kill mode — terminate session immediately
+        if (params.kill && params.session_id) {
+          const killed = shellService.killSession(params.session_id);
+          return {
+            session_id: params.session_id,
+            output: killed
+              ? 'Session killed.'
+              : 'Session not found (may have already exited).',
+            exit_code: null,
+            session_exited: true,
+            timed_out: false,
+          };
+        }
 
-        const message = result.aborted
-          ? 'Shell execution was cancelled.'
-          : result.timedOut
-            ? 'Shell execution timed out.'
-            : `Command exited with code ${result.exitCode}`;
+        const cwd = resolveCwd(params.cwd, getMountedPaths);
+        const result = await shellService.executeInSession(
+          agentInstanceId,
+          toolCallId,
+          {
+            command: params.command ?? '',
+            cwd,
+            sessionId: params.session_id,
+            waitUntil: params.wait_until
+              ? {
+                  timeoutMs: params.wait_until.timeout_ms,
+                  exited: params.wait_until.exited,
+                  outputPattern: params.wait_until.output_pattern,
+                }
+              : undefined,
+            abortSignal,
+          },
+        );
 
         return {
-          message,
+          session_id: result.sessionId,
           output: capToolOutput(result.output).result,
-          stderr: capToolOutput(result.stderr).result,
           exit_code: result.exitCode,
+          session_exited: result.sessionExited,
           timed_out: result.timedOut,
-          aborted: result.aborted,
         };
       } finally {
         shellService.clearPendingOutputs(agentInstanceId, toolCallId);
