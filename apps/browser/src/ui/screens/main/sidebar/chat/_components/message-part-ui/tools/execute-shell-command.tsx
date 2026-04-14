@@ -30,8 +30,8 @@ export const ExecuteShellCommandToolPart = ({
   const sendApproval = useKartonProcedure(
     (p) => p.agents.sendToolApprovalResponse,
   );
-  const cancelShellCommand = useKartonProcedure(
-    (p) => p.toolbox.cancelShellCommand,
+  const killShellSession = useKartonProcedure(
+    (p) => p.toolbox.killShellSession,
   );
 
   const finished = useMemo(
@@ -45,6 +45,12 @@ export const ExecuteShellCommandToolPart = ({
   const pendingOutputs = useKartonState((s) =>
     openAgentId
       ? s.toolbox[openAgentId]?.pendingShellOutputs?.[part.toolCallId]
+      : undefined,
+  );
+
+  const pendingSessionId = useKartonState((s) =>
+    openAgentId
+      ? s.toolbox[openAgentId]?.pendingShellSessionIds?.[part.toolCallId]
       : undefined,
   );
 
@@ -100,10 +106,15 @@ export const ExecuteShellCommandToolPart = ({
     sendApproval(openAgentId, part.approval.id, true);
   }, [openAgentId, part.state, part.approval, sendApproval]);
 
+  const sessionId =
+    (part.output as ExecuteShellCommandToolOutput | undefined)?.session_id ??
+    pendingSessionId ??
+    part.input?.session_id;
+
   const handleCancel = useCallback(() => {
-    if (!openAgentId || !part.toolCallId) return;
-    cancelShellCommand(openAgentId, part.toolCallId);
-  }, [openAgentId, part.toolCallId, cancelShellCommand]);
+    if (!openAgentId || !sessionId) return;
+    killShellSession(openAgentId, sessionId);
+  }, [openAgentId, sessionId, killShellSession]);
 
   const handleDeny = useCallback(() => {
     if (
@@ -182,15 +193,15 @@ export const ExecuteShellCommandToolPart = ({
     }
 
     const exitCode = output?.exit_code;
-    const aborted = output?.aborted;
     const timedOut = output?.timed_out;
+    const sessionExited = output?.session_exited;
 
-    if (!aborted && !timedOut) {
+    if (!timedOut) {
       return (
         <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
           <IconTerminalOutline18 className="size-3 shrink-0" />
           <span className="flex min-w-0 gap-1 text-xs">
-            {exitCode === 0 ? (
+            {exitCode === 0 || exitCode == null ? (
               <span className="shrink-0 font-medium">
                 {explanation || 'Ran command'}
               </span>
@@ -205,8 +216,8 @@ export const ExecuteShellCommandToolPart = ({
     }
 
     let statusLabel: string;
-    if (aborted) statusLabel = 'cancelled';
-    else if (timedOut) statusLabel = 'timed out';
+    if (timedOut) statusLabel = 'timed out';
+    else if (sessionExited) statusLabel = 'session exited';
     else if (exitCode === 0) statusLabel = 'exit 0';
     else if (exitCode !== null && exitCode !== undefined)
       statusLabel = `exit ${exitCode}`;
@@ -228,8 +239,8 @@ export const ExecuteShellCommandToolPart = ({
     explanation,
     part.errorText,
     output?.exit_code,
-    output?.aborted,
     output?.timed_out,
+    output?.session_exited,
   ]);
 
   const content = useMemo(() => {
@@ -240,7 +251,7 @@ export const ExecuteShellCommandToolPart = ({
       state === 'approval-responded' ||
       state === 'denied'
         ? null
-        : effectiveOutputText || output?.message || null;
+        : effectiveOutputText || null;
 
     return (
       <div className="px-2 py-1">
@@ -260,7 +271,7 @@ export const ExecuteShellCommandToolPart = ({
         )}
       </div>
     );
-  }, [state, effectiveOutputText, command, output?.message]);
+  }, [state, effectiveOutputText, command]);
 
   const contentFooter = useMemo(() => {
     if (

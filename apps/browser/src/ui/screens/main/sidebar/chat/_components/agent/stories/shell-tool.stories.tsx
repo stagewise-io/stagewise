@@ -212,10 +212,6 @@ export const ShellNonZeroExit: Story = {
                 ' Tests       2 failed | 3 passed (5)',
                 ' Duration    1.23s',
               ].join('\n'),
-              stderr: [
-                'FAIL src/shell.test.ts > detects zsh on macOS',
-                'AssertionError: expected null to be "/bin/zsh"',
-              ].join('\n'),
             }),
           ],
         },
@@ -239,7 +235,6 @@ export const ShellTimedOut: Story = {
             createExecuteShellCommandToolPart('pnpm dev', 'output-available', {
               exit_code: null,
               timed_out: true,
-              message: 'Shell execution timed out.',
               output:
                 'Starting dev server...\nCompiling packages...\n[vite] watching for changes...',
             }),
@@ -267,8 +262,7 @@ export const ShellAborted: Story = {
               'output-available',
               {
                 exit_code: null,
-                aborted: true,
-                message: 'Shell execution was cancelled.',
+                session_exited: true,
                 output: 'Building packages...\n@stagewise/karton: build...',
               },
             ),

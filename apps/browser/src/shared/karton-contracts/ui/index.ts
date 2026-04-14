@@ -503,6 +503,8 @@ export type AppState = {
       pendingSandboxOutputs?: Record<string, string[]>;
       pendingSandboxAttachments?: Record<string, AttachmentMetadata[]>;
       pendingShellOutputs?: Record<string, string[]>;
+      /** Maps toolCallId → sessionId for in-flight shell commands. */
+      pendingShellSessionIds?: Record<string, string>;
       activeApp?: {
         appId: string;
         pluginId?: string;
@@ -761,9 +763,9 @@ export type KartonContract = {
         agentInstanceId: string,
         questionId: string,
       ) => Promise<void>;
-      cancelShellCommand: (
+      killShellSession: (
         agentInstanceId: string,
-        toolCallId: string,
+        sessionId: string,
       ) => Promise<void>;
       searchMentionFiles: (
         agentInstanceId: string,
