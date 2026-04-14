@@ -15,6 +15,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     if (posthogInitialized) return;
 
     const consent = getCookieConsent();
+    const isAccepted = consent === 'accepted';
 
     posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
       api_host: '/ingest',
@@ -23,26 +24,29 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       capture_pageleave: true,
       debug: process.env.NODE_ENV === 'development',
 
-      // --- GDPR-compliant cookieless tracking ---
+      // --- GDPR-compliant tracking strategy ---
       //
-      // cookieless_mode: 'on_reject' means:
-      //   • Until the user decides (pending): no cookies, no localStorage, no
-      //     events sent. PostHog queues internally.
-      //   • On accept (opt_in_capturing): upgrades to full persistence — cookies,
-      //     localStorage, cross-session identity. All queued events are flushed.
-      //   • On deny (opt_out_capturing): no cookies/storage. PostHog counts this
-      //     visit via a server-side privacy-preserving hash (irreversible, daily
-      //     salt). No personal data stored or sent.
+      // Cookieless mode (server-side privacy-preserving hash) is active for ALL
+      // non-accepted users — both pending (no decision yet) and declined.
+      // No cookies, no localStorage, no personal data → no explicit consent needed.
       //
-      // Net result: ALL visitors are counted. Accepted users get full analytics.
-      // Denied/pending users appear in aggregate counts only. Fully GDPR-compliant.
+      // The consent banner gates cookie/storage use only, NOT aggregate counting.
       //
+      // Flow:
+      //   pending:  cookieless hash (anonymous aggregate counts).
+      //   declined: cookieless hash (same — declining means no cookies, not no
+      //             analytics; the hash is irreversible and stores nothing).
+      //   accepted: full persistence — cookies + localStorage for cross-session
+      //             identity. Activated immediately via opt_in_capturing(); full
+      //             effect guaranteed on the next page load.
+      //
+      // Cookieless hash: IP + user-agent hashed with a daily-rotated salt.
       // Requires "Cookieless server hash mode" enabled in PostHog project settings:
-      // Project Settings → Web analytics → Cookieless server hash mode
+      //   Project Settings → Web analytics → Cookieless server hash mode
       //
-      // Note: cookieless_mode + defaults are runtime config present in posthog-js
+      // cookieless_mode and defaults are runtime options present in posthog-js
       // v1.367.0 but not yet reflected in the TypeScript config types — cast needed.
-      ...({ cookieless_mode: 'on_reject', defaults: '2026-01-30' } as any),
+      ...(!isAccepted ? ({ cookieless_mode: true } as any) : {}),
 
       // Write the opt-in/out flag to a cookie so server-side middleware can read it.
       opt_out_capturing_persistence_type: 'cookie',
@@ -50,20 +54,13 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
 
     posthogInitialized = true;
 
-    // Apply stored consent immediately on init.
-    if (consent === 'accepted') {
-      // Full persistence: cookies + localStorage + cross-session identity.
+    if (isAccepted) {
+      // Ensure full persistence is active (clears any leftover opt-out cookie).
       posthog.opt_in_capturing();
-    } else if (consent === 'denied') {
-      // No storage, no events. PostHog counts this visit via server-side hash.
-      posthog.opt_out_capturing();
     }
-    // null (pending): cookieless_mode holds events until the user decides.
-    // The cookie banner will call opt_in/opt_out when ready.
+    // pending / declined: cookieless mode is already active — no call needed.
 
     // Capture the initial pageview.
-    // With opt_in: fires immediately. With opt_out: suppressed. With pending:
-    // PostHog queues it internally until the user decides.
     posthog.capture('$pageview', {
       $current_url:
         window.origin + window.location.pathname + window.location.search,
@@ -73,11 +70,12 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     const handler = () => {
       const updated = getCookieConsent();
       if (updated === 'accepted') {
+        // Attempt a live upgrade to full persistence for the current session.
+        // If PostHog can't hot-swap from cookieless mode, full cookies activate
+        // on the next page load (the consent cookie is already persisted).
         posthog.opt_in_capturing();
-      } else if (updated === 'denied') {
-        posthog.opt_out_capturing();
-        posthog.reset();
       }
+      // 'denied': no action — already running in cookieless mode.
     };
 
     window.addEventListener('posthog-consent-change', handler);
