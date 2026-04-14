@@ -565,6 +565,52 @@ export const questionFieldSchema = z.discriminatedUnion('type', [
 
 export type QuestionField = z.infer<typeof questionFieldSchema>;
 
+/**
+ * Flattened version of questionFieldSchema for the model-facing tool input.
+ * Merges all 4 field variants into a single object with an enum `type`
+ * discriminator, eliminating the `oneOf` that weaker models can't follow.
+ * Accepts a superset of what the discriminated union accepts.
+ */
+const questionFieldFlatSchema = z.object({
+  type: z.enum(['input', 'radio-group', 'checkbox', 'checkbox-group']),
+  questionId: z.string(),
+  label: z.string(),
+  description: z.string().optional(),
+  // input-specific
+  inputType: z.enum(['text', 'email', 'number', 'password']).optional(),
+  placeholder: z.string().optional(),
+  defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  minLength: z.number().optional(),
+  maxLength: z.number().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  required: z.boolean().optional(),
+  // radio-group / checkbox-group specific
+  options: z.array(questionFieldOptionSchema).min(1).optional(),
+  allowOther: z.boolean().optional(),
+  // checkbox-group specific
+  defaultValues: z.array(z.string()).optional(),
+});
+
+export const askUserQuestionsToolInputSchemaFlat = z.object({
+  title: z.string().describe('Form title shown in the collapsible header.'),
+  description: z
+    .string()
+    .optional()
+    .describe('Optional top-level description.'),
+  steps: z
+    .array(
+      z.object({
+        title: z.string().optional(),
+        description: z.string().optional(),
+        fields: z.array(questionFieldFlatSchema).min(1).max(10),
+      }),
+    )
+    .min(1)
+    .max(5)
+    .describe('Array of form steps. Single-step forms have one entry.'),
+});
+
 export const askUserQuestionsToolInputSchema = z.object({
   title: z.string().describe('Form title shown in the collapsible header.'),
   description: z
