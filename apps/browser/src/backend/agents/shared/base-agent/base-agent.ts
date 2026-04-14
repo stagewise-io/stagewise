@@ -1588,17 +1588,28 @@ export abstract class BaseAgent<
 
         // InvalidToolInputError: check whether the input JSON is
         // truncated (output token limit) vs. a schema mismatch.
+        const inputLen = toolCall.input?.length ?? 0;
+        let jsonValid = false;
         try {
           JSON.parse(toolCall.input);
+          jsonValid = true;
         } catch {
-          // JSON is unparseable — almost certainly truncated by the
-          // output token limit.
+          // JSON is unparseable
+        }
+
+        if (!jsonValid) {
+          // Distinguish empty/tiny input from genuinely truncated long input
+          if (inputLen < 10) {
+            throw new Error(
+              `Tool call for "${toolCall.toolName}" had empty or near-empty input. The model failed to generate the required parameters.`,
+            );
+          }
           throw new Error(
             'Tool call inputs were too long and most likely exceeded maximum token output limits. Create more compact tool calls, i.e. by chunking edits into smaller pieces.',
           );
         }
 
-        // JSON is valid but doesn't match the schema.
+        // JSON is valid but doesn't match the schema
         throw new Error(
           `Tool call inputs for "${toolCall.toolName}" did not match the expected schema. Check the tool's parameter requirements and try again.`,
         );
