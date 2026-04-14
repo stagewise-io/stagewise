@@ -1067,8 +1067,8 @@ export class ToolboxService extends DisposableService {
     return this.shellService?.getShellInfo() ?? null;
   }
 
-  public cancelShellCommand(toolCallId: string): void {
-    this.shellService?.cancelCommand(toolCallId);
+  public killShellSession(sessionId: string): void {
+    this.shellService?.killSession(sessionId);
   }
 
   public getBrowserSnapshot(): BrowserSnapshot {
@@ -1850,13 +1850,13 @@ export class ToolboxService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
-      'toolbox.cancelShellCommand',
+      'toolbox.killShellSession',
       async (
         _callingClientId: string,
         _agentInstanceId: string,
-        toolCallId: string,
+        sessionId: string,
       ) => {
-        this.cancelShellCommand(toolCallId);
+        this.killShellSession(sessionId);
       },
     );
 

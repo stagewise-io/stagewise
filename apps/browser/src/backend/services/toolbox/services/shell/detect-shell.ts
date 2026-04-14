@@ -32,7 +32,6 @@ function deriveShellType(shellPath: string): ShellType {
   if (name === 'bash') return 'bash';
   if (name === 'sh') return 'sh';
   if (name === 'pwsh' || name === 'powershell') return 'powershell';
-  if (name === 'cmd') return 'cmd';
   return 'sh';
 }
 
@@ -125,10 +124,6 @@ function detectWindows(): DetectedShell | null {
     }
   }
 
-  const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
-  const cmdPath = path.join(systemRoot, 'System32', 'cmd.exe');
-  if (fileExists(cmdPath)) return { type: 'cmd', path: cmdPath };
-
   return null;
 }
 
@@ -142,27 +137,5 @@ export function detectShell(): DetectedShell | null {
       return detectWindows();
     default:
       return detectLinux();
-  }
-}
-
-export function getShellArgs(
-  shell: DetectedShell,
-  command: string,
-  options?: { loginFallback?: boolean },
-): [string, string[]] {
-  switch (shell.type) {
-    case 'bash':
-    case 'zsh':
-    case 'sh':
-      // Use `-c` (not `-lc`): resolveShellEnv already captured the full
-      // login+interactive env at startup. A login shell here would re-source
-      // /etc/profile which can overwrite PATH (e.g. stripping nvm paths on Linux).
-      // However, if env resolution failed, fall back to `-lc` so the shell
-      // sources login profiles and gets a usable PATH.
-      return [shell.path, [options?.loginFallback ? '-lc' : '-c', command]];
-    case 'powershell':
-      return [shell.path, ['-NoProfile', '-Command', command]];
-    case 'cmd':
-      return [shell.path, ['/c', command]];
   }
 }

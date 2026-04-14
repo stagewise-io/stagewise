@@ -4,11 +4,11 @@ import type { KartonService } from '@/services/karton';
 import { detectShell } from './detect-shell';
 import { resolveShellEnv } from './resolve-shell-env';
 import { sanitizeEnv } from './sanitize-env';
-import { ProcessManager } from './process-manager';
+import { SessionManager } from './session-manager';
 import type {
   DetectedShell,
-  ShellExecutionRequest,
-  ShellExecutionResult,
+  SessionCommandRequest,
+  SessionCommandResult,
 } from './types';
 
 export class ShellService extends DisposableService {
@@ -16,7 +16,7 @@ export class ShellService extends DisposableService {
   private readonly kartonService?: KartonService;
 
   private shell: DetectedShell | null = null;
-  private processManager: ProcessManager | null = null;
+  private sessionManager: SessionManager | null = null;
   private resolvedEnv: Record<string, string> | null = null;
 
   private readonly preDetectedShell: DetectedShell | null;
@@ -90,10 +90,7 @@ export class ShellService extends DisposableService {
         }
       }
 
-      // When env resolution failed, use login shell (-lc) as fallback so
-      // commands still get a usable PATH from the user's shell profiles.
-      const loginFallback = this.resolvedEnv === null;
-      this.processManager = new ProcessManager(this.shell, loginFallback);
+      this.sessionManager = new SessionManager(this.shell);
     } else {
       this.logger.warn(
         '[ShellService] No usable shell detected — shell tool will be unavailable',
@@ -109,43 +106,90 @@ export class ShellService extends DisposableService {
     return this.shell;
   }
 
-  async execute(
+  /**
+   * Execute a command in a persistent PTY session.
+   *
+   * If `request.sessionId` is provided, the command runs in that existing session.
+   * Otherwise a new session is created (using `cwd` for the initial working directory).
+   */
+  async executeInSession(
     agentInstanceId: string,
     toolCallId: string,
-    request: ShellExecutionRequest,
-  ): Promise<ShellExecutionResult> {
+    request: SessionCommandRequest & { cwd: string },
+  ): Promise<SessionCommandResult> {
     this.assertNotDisposed();
 
-    if (!this.shell || !this.processManager) {
+    if (!this.shell || !this.sessionManager) {
       return {
-        output: '',
-        stderr: 'Shell service is not available — no shell detected.',
+        sessionId: '',
+        output: 'Shell service is not available — no shell detected.',
         exitCode: null,
+        sessionExited: true,
         timedOut: false,
-        aborted: false,
       };
     }
 
     const env = sanitizeEnv(this.resolvedEnv);
 
-    const onOutput = (chunk: string) => {
-      if (!this.kartonService) return;
-      if (!this.outputBuffers.has(toolCallId)) {
-        this.outputBuffers.set(toolCallId, []);
-      }
-      this.outputBuffers.get(toolCallId)!.push(chunk);
-      this.scheduleFlush(agentInstanceId, toolCallId);
+    // Build a streaming callback targeting the current toolCallId
+    const makeOnData = (targetToolCallId: string) => {
+      return (_sid: string, chunk: string) => {
+        if (!this.kartonService) return;
+        if (!this.outputBuffers.has(targetToolCallId)) {
+          this.outputBuffers.set(targetToolCallId, []);
+        }
+        this.outputBuffers.get(targetToolCallId)!.push(chunk);
+        this.scheduleFlush(agentInstanceId, targetToolCallId);
+      };
     };
 
-    const { result } = this.processManager.spawn(
-      agentInstanceId,
-      request,
-      env,
-      onOutput,
-      toolCallId,
-    );
+    // Reuse existing session or create a new one
+    let sessionId = request.sessionId;
+    if (!sessionId) {
+      try {
+        sessionId = this.sessionManager.createSession(
+          agentInstanceId,
+          request.cwd,
+          env,
+          makeOnData(toolCallId),
+        );
+      } catch (err) {
+        return {
+          sessionId: '',
+          output:
+            err instanceof Error
+              ? err.message
+              : 'Failed to create shell session.',
+          exitCode: null,
+          sessionExited: true,
+          timedOut: false,
+        };
+      }
+    } else {
+      // Re-target streaming output to the current tool call
+      this.sessionManager.setOnData(sessionId, makeOnData(toolCallId));
+    }
 
-    return result;
+    // Publish session ID to Karton state so the UI can cancel in-flight commands
+    if (this.kartonService) {
+      this.kartonService.setState((draft) => {
+        if (!draft.toolbox[agentInstanceId]) {
+          draft.toolbox[agentInstanceId] = {
+            workspace: { mounts: [] },
+            pendingFileDiffs: [],
+            editSummary: [],
+            pendingUserQuestion: null,
+          };
+        }
+        if (!draft.toolbox[agentInstanceId].pendingShellSessionIds) {
+          draft.toolbox[agentInstanceId].pendingShellSessionIds = {};
+        }
+        draft.toolbox[agentInstanceId].pendingShellSessionIds![toolCallId] =
+          sessionId!;
+      });
+    }
+
+    return this.sessionManager.executeCommand(sessionId, request);
   }
 
   clearPendingOutputs(agentId: string, toolCallId: string): void {
@@ -164,26 +208,27 @@ export class ShellService extends DisposableService {
 
     if (!this.kartonService) return;
     const agentToolbox = this.kartonService.state.toolbox[agentId];
-    if (!agentToolbox?.pendingShellOutputs?.[toolCallId]) return;
+    const hasOutputs = !!agentToolbox?.pendingShellOutputs?.[toolCallId];
+    const hasSessionId = !!agentToolbox?.pendingShellSessionIds?.[toolCallId];
+    if (!hasOutputs && !hasSessionId) return;
 
     this.kartonService.setState((draft) => {
       const tb = draft.toolbox[agentId];
       if (tb?.pendingShellOutputs?.[toolCallId]) {
         delete tb.pendingShellOutputs[toolCallId];
       }
+      if (tb?.pendingShellSessionIds?.[toolCallId]) {
+        delete tb.pendingShellSessionIds[toolCallId];
+      }
     });
   }
 
-  cancelCommand(toolCallId: string): void {
-    this.processManager?.killByToolCallId(toolCallId);
+  killSession(sessionId: string): boolean {
+    return this.sessionManager?.killSession(sessionId) ?? false;
   }
 
   destroyAgent(agentInstanceId: string): void {
-    const toolCallIds =
-      this.processManager?.getToolCallIdsForAgent(agentInstanceId) ?? [];
-    this.processManager?.killByAgent(agentInstanceId);
-    for (const toolCallId of toolCallIds)
-      this.clearPendingOutputs(agentInstanceId, toolCallId);
+    this.sessionManager?.destroyAgent(agentInstanceId);
   }
 
   private scheduleFlush(agentId: string, toolCallId: string): void {
@@ -251,8 +296,8 @@ export class ShellService extends DisposableService {
   }
 
   protected onTeardown(): Promise<void> | void {
-    this.processManager?.killAll();
-    this.processManager = null;
+    this.sessionManager?.killAll();
+    this.sessionManager = null;
 
     for (const timer of this.outputFlushTimers.values()) clearTimeout(timer);
 
