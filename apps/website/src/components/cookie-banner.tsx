@@ -23,8 +23,8 @@ export function CookieBanner() {
   const handleDeny = () => {
     setCookieConsent('denied');
     setShowBanner(false);
-    // Notify the PostHogProvider to opt out.
-    window.dispatchEvent(new Event('posthog-consent-change'));
+    // No posthog-consent-change event needed: cookieless mode is already active
+    // and declining doesn't change the tracking mode — only acceptance does.
   };
 
   if (!showBanner) {
@@ -40,8 +40,10 @@ export function CookieBanner() {
             Cookie Consent
           </h2>
           <p className="text-muted-foreground text-sm">
-            We use analytics cookies to understand how you use our website and
-            improve your experience.
+            We use analytics to improve our website. Accepting enables
+            personalized, cross-session analytics. Declining limits tracking to
+            anonymous aggregate counts only — no cookies or personal data
+            stored.
           </p>
         </div>
         <div className="flex w-full flex-row-reverse items-start justify-start gap-2">
