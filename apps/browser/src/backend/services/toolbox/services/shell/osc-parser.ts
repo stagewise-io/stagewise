@@ -138,6 +138,9 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     }
 
     if (this.mode === 'sentinel') {
+      // Emit raw output so command output is accumulated
+      // by appendToCommandOutput even without OSC 133 framing.
+      this.emit('output', processable);
       this.processSentinel(processable);
     }
 

@@ -1,5 +1,6 @@
 import type { IPty } from 'node-pty';
 import type { OscParser } from './osc-parser';
+import type { SessionLogger } from './session-logger';
 
 // ─── Shell detection types (unchanged) ────────────────────────────
 
@@ -62,6 +63,8 @@ export interface PtySession {
   readyResolve: () => void;
   /** Re-assignable data callback for streaming output to the current tool call. */
   onData: ((sessionId: string, data: string) => void) | null;
+  /** Append-only log writer for the session's full output history. */
+  logger: SessionLogger | null;
 }
 
 export interface SessionCommandRequest {

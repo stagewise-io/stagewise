@@ -1,6 +1,8 @@
 import * as pty from 'node-pty';
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { OscParser, wrapWithSentinel } from './osc-parser';
+import { SessionLogger } from './session-logger';
 import {
   DEFAULT_TIMEOUT_MS,
   DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS,
@@ -18,10 +20,12 @@ import {
 } from './types';
 
 // ─── ANSI stripping ──────────────────────────────────────────────
-// Strips common ANSI escape sequences from PTY output for clean text.
+// Strips ANSI/VT escape sequences from PTY output for clean text.
+// CSI branch covers all ECMA-48 control sequences including DEC Private
+// Mode (\x1b[?2004h) and intermediate-byte forms (\x1b[6 q).
 const ANSI_RE =
   // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional
-  /\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-B]|\x1b[>=<]|\r/g;
+  /\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-B]|\x1b[>=<78]|\r/g;
 
 export function stripAnsi(str: string): string {
   return str.replace(ANSI_RE, '');
@@ -169,9 +173,17 @@ export class SessionManager {
   private readonly pendingCommands = new Map<string, PendingCommand>();
   /** Maps sessionId → latest pending command ID */
   private readonly sessionCommandMap = new Map<string, string>();
+  /** Optional factory that resolves the shell-logs directory for an agent. */
+  private readonly getShellLogsDir:
+    | ((agentInstanceId: string) => string)
+    | null;
 
-  constructor(shell: DetectedShell) {
+  constructor(
+    shell: DetectedShell,
+    getShellLogsDir?: (agentInstanceId: string) => string,
+  ) {
     this.shell = shell;
+    this.getShellLogsDir = getShellLogsDir ?? null;
   }
 
   // ─── Session creation ────────────────────────────────────────
@@ -221,6 +233,14 @@ export class SessionManager {
       readyPromise: null!,
       readyResolve: null!,
       onData: onData ?? null,
+      logger: this.getShellLogsDir
+        ? new SessionLogger(
+            path.join(
+              this.getShellLogsDir(agentInstanceId),
+              `${sessionId}.shell.log`,
+            ),
+          )
+        : null,
     };
 
     // Wire ready promise
@@ -237,6 +257,7 @@ export class SessionManager {
       // (i.e. after the integration script has been consumed).
       if (session.ready) {
         session.onData?.(sessionId, data);
+        session.logger?.append(stripAnsi(data));
       }
     });
 
@@ -543,7 +564,14 @@ export class SessionManager {
   private collectOutput(pending: PendingCommand): string {
     if (pending.outputLines.length === 0) return '';
     const capped = applyHeadTailCap(pending.outputLines);
-    return stripAnsi(capped);
+    let cleaned = stripAnsi(capped);
+    // Strip sentinel artifacts that appear in sentinel-mode output.
+    // These are no-ops when shell integration (OSC 133) is active.
+    // 1. Echoed eval wrapper line (contains the %d printf specifier)
+    cleaned = cleaned.replace(/^[^\n]*__STAGE_DONE_[^\n]*%d[^\n]*\n?/, '');
+    // 2. Resolved sentinel marker line
+    cleaned = cleaned.replace(/__STAGE_DONE_[a-zA-Z0-9_-]+_-?\d+__\n?/g, '');
+    return cleaned.trimEnd();
   }
 
   private cleanupPending(commandId: string): void {
@@ -652,6 +680,7 @@ export class SessionManager {
       }
     }
 
+    session.logger?.close();
     session.parser.reset();
     this.sessions.delete(session.id);
     this.sessionCommandMap.delete(session.id);
@@ -700,7 +729,7 @@ export class SessionManager {
     if (script) {
       // Source via eval to avoid temp-file creation.
       // Use printf to write the script, then eval it.
-      session.pty.write(`eval "${escapeForShell(script)}"\r`);
+      session.pty.write(`eval $'${escapeForShell(script)}'\r`);
     }
   }
 
@@ -734,10 +763,8 @@ export class SessionManager {
  * in a shell eval context.
  */
 function escapeForShell(s: string): string {
-  return s
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\$/g, '\\$')
-    .replace(/`/g, '\\`')
-    .replace(/\n/g, '\\n');
+  // Escape for ANSI-C quoting ($'...'): backslashes and single quotes
+  // must be escaped; \n becomes a real newline inside $'...'.
+  // Dollar signs and backticks are literal in $'...' — no escaping needed.
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
 }
