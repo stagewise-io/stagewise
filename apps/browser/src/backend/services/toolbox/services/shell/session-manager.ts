@@ -389,6 +389,10 @@ export class SessionManager {
 
       // Abort signal handling
       if (request.abortSignal) {
+        if (request.abortSignal.aborted) {
+          this.resolveCommandWithTimeout(commandId);
+          return;
+        }
         const onAbort = () => {
           this.resolveCommandWithTimeout(commandId);
         };
