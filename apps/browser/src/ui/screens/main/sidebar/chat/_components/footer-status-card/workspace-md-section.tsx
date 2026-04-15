@@ -1,6 +1,5 @@
 import { Button } from '@stagewise/stage-ui/components/button';
 import { IconMediaStopFill18 } from 'nucleo-ui-fill-18';
-import { IconMagicWandSparkleFill18 } from 'nucleo-ui-fill-18';
 import { stripMountPrefix } from '@ui/utils';
 import { getBaseName } from '@shared/path-utils';
 import { Loader2Icon, XIcon } from 'lucide-react';
@@ -15,12 +14,7 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 
-export type WorkspaceMdStatus =
-  | 'hidden'
-  | 'prompt'
-  | 'running'
-  | 'completed'
-  | 'error';
+export type WorkspaceMdStatus = 'hidden' | 'running' | 'completed' | 'error';
 
 export interface WorkspaceMdStatusSectionProps {
   status: WorkspaceMdStatus;
@@ -140,7 +134,6 @@ export function WorkspaceMdStatusSection({
 }: WorkspaceMdStatusSectionProps): StatusCardSection | null {
   if (status === 'hidden') return null;
 
-  const isPrompt = status === 'prompt';
   const isRunning = status === 'running';
   const isError = status === 'error';
   const statusText = getStatusText(history);
@@ -149,52 +142,7 @@ export function WorkspaceMdStatusSection({
     defaultOpen: true,
     trigger: () => (
       <div className="flex h-6 w-full flex-row items-center justify-between gap-2 pl-1.5 text-muted-foreground text-xs hover:text-foreground has-[button:hover]:text-muted-foreground">
-        {isPrompt ? (
-          <>
-            <Tooltip>
-              <TooltipTrigger>
-                <div className="flex min-w-0 shrink cursor-default flex-row items-center gap-1 truncate">
-                  <span className="truncate font-normal text-foreground">
-                    {workspaceName
-                      ? `Improve context for ${workspaceName}?`
-                      : 'Improve context for the agent?'}
-                  </span>
-                  <IconMagicWandSparkleFill18 className="size-3 shrink-0 text-muted-foreground" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="break-word max-w-80">
-                  This will automatically generate a WORKSPACE.md file to
-                  improve agent performance.
-                </div>
-              </TooltipContent>
-            </Tooltip>
-            <div className="ml-auto flex shrink-0 flex-row items-center justify-start gap-1">
-              <Button
-                variant="ghost"
-                size="xs"
-                className="shrink-0 cursor-pointer"
-                onClick={(e: MouseEvent) => {
-                  e.stopPropagation();
-                  onDismiss();
-                }}
-              >
-                Dismiss
-              </Button>
-              <Button
-                variant="primary"
-                size="xs"
-                className="shrink-0 cursor-pointer"
-                onClick={(e: MouseEvent) => {
-                  e.stopPropagation();
-                  onGenerate?.();
-                }}
-              >
-                Generate Context
-              </Button>
-            </div>
-          </>
-        ) : isRunning ? (
+        {isRunning ? (
           <div className="flex w-full shrink cursor-default flex-row items-center gap-1">
             <TooltipWrapper showTooltip={isRunning} content={statusText}>
               <div className="-ml-1 flex min-w-0 shrink flex-row items-center gap-1">
