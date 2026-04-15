@@ -1,8 +1,10 @@
+import { getNewsTypeBadgeLabel } from '@/lib/news';
 import { getAllNewsParams, getNewsPost } from '@/lib/source';
+import { getMDXComponents } from '@/mdx-components';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { MDXRemote } from 'next-mdx-remote/rsc';
+import { compileMDX } from 'next-mdx-remote/rsc';
 
 export default async function PostPage(props: {
   params: Promise<{ slug: string }>;
@@ -11,8 +13,14 @@ export default async function PostPage(props: {
   const post = getNewsPost(slug);
   if (!post) notFound();
 
+  const { content } = await compileMDX({
+    source: post.source,
+    options: { development: true } as never,
+    components: getMDXComponents(),
+  });
+
   return (
-    <div className="flex w-full max-w-6xl flex-col gap-12 p-4">
+    <div className="flex w-full max-w-5xl flex-col gap-12 p-4">
       <div className="flex flex-col items-start gap-4 text-left">
         <span className="text-base text-muted-foreground">
           {post.date.toLocaleString('en-US', {
@@ -24,6 +32,9 @@ export default async function PostPage(props: {
         <h1 className="font-medium text-3xl text-foreground tracking-tight md:text-5xl">
           {post.title}
         </h1>
+        <span className="inline-flex items-center rounded-full border border-derived-subtle bg-surface-tinted px-2 py-1 font-medium text-[11px] text-primary-foreground">
+          {getNewsTypeBadgeLabel(post.type)}
+        </span>
         <p className="text-lg text-muted-foreground">{post.description}</p>
         <div className="flex flex-row gap-4">
           <Link
@@ -50,8 +61,8 @@ export default async function PostPage(props: {
           </Link>
         </div>
       </div>
-      <div className="prose prose-zinc dark:prose-invert max-w-none">
-        <MDXRemote source={post.source} />
+      <div className="news-prose prose prose-zinc dark:prose-invert max-w-none">
+        {content}
       </div>
     </div>
   );

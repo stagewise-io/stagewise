@@ -1,0 +1,73 @@
+---
+title: "Why Controlled Learning Makes Agents More Useful"
+author: stagewise team
+type: technical
+description: "A closer look at the new Learn command in stagewise, why skills matter, what makes them hard to maintain, and why controlled learning is a better starting point for agents."
+date: 2026-04-15T10:00:00.000Z
+---
+
+## Skills are already one of the best ways to teach agents
+
+[Agent Skills](https://agentskills.io/home) are already an established standard. In practice, they are small markdown files that give agents **instructions, workflows, and examples** for specific tasks.
+
+That is useful for a simple reason: good skills make knowledge reusable. Instead of repeating the same guidance in every conversation, teams can standardize how work should be done and share that guidance across agents and workflows.
+
+In other words, skills turn *one-off guidance* into something a team can reuse.
+
+The idea did not start with stagewise. The standard was originally proposed by Anthropic, and it has since grown into a more open and extensible format.
+
+But there is a real gap between the promise of skills and how they work in practice today.
+
+People who actively use skills often end up loading too many of them into context. Once that happens, agents have a harder time figuring out what is relevant and what should be ignored. A skill system meant to improve precision can start doing the opposite.
+
+There is also a safety problem. Skills can ship scripts, and there is no good shared standard yet for how those scripts should be reviewed, executed, or trusted. That is one reason stagewise does not support direct execution of scripts inside skills today.
+
+## The hard part is not having skills. It is writing good ones.
+
+A useful skill needs the **right level of detail**. Too high level, and it becomes vague. Too detailed, and it becomes heavy, repetitive, and harder for the agent to use efficiently.
+
+Good skills also benefit from *progressive disclosure*. The agent should not need to read everything every time. It should be able to read the part that matters when it matters.
+
+That sounds obvious, but it changes how a skill has to be written. A good skill is not just a dump of rules split into separate files. It has to be structured around actual workflows so the agent can enter at the right point and load only what it needs.
+
+Descriptions matter too. If a skill description is vague, the agent may load it when it should not. If the description is too weak, the agent may miss it when it would have helped.
+
+Then there is the maintenance problem. Redundancy creeps in. Similar guidance gets repeated across skills. And over time, skills go stale.
+
+## The current setup is still awkward
+
+Right now, many users pull skills from the internet. Few write their own.
+
+That is a problem because some of the most valuable skills are not generic. They are local. They teach an agent how to behave in a specific workspace, repository, or team environment.
+
+Today, a lot of that information still ends up in [AGENTS.md](https://agents.md/) files. Those files are useful, but they are also heavily criticized for getting outdated too quickly. The pattern works just well enough to be common, and just poorly enough to keep causing friction.
+
+## The goal of Learn is to make skill-building practical
+
+If you want the simpler product overview first, read [Learning Arrives in stagewise](/news/learning-feature-launch).
+
+To make workflows more efficient while keeping control in the hands of the user, stagewise introduces a built-in Learn skill.
+
+That skill powers the **`/Learn`** command in stagewise. The name is direct: the agent learns new skills.
+
+More importantly, Learn is built around three concrete jobs:
+
+- extract knowledge from a previous conversation into a new skill
+- update or consolidate existing skills based on what happened in a conversation
+- create new skills from scratch together with the user
+
+That makes the feature less about vague memory and more about **controlled knowledge capture**.
+
+The Learn feature also includes best-practice guidance for writing skills that are efficient and reusable. That guidance can keep improving as we learn more about what makes a skill actually useful in day-to-day work.
+
+## Why controlled learning is the right starting point
+
+The long-term direction is clear: the future will rely more on autonomous continuous learning.
+
+But that does not mean autonomy should come first.
+
+For now, the Learn command gives users a controllable way to decide when something should be remembered and turned into reusable guidance. That matters because learning is only useful when the resulting knowledge stays relevant, readable, and safe to apply.
+
+In other words, *controlled learning* is not a limitation. It is the practical starting point.
+
+It lets users build up reusable knowledge on purpose, instead of hoping an agent will infer the right lessons automatically.
