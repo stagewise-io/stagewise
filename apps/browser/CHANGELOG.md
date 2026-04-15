@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha.58 (2026-04-15)
+
+### Bug Fixes
+
+* strip backticks from rich text examples (1b98e57)
+* remove prompt for context-generation (b74f991)
+
 ## 1.0.0-alpha.57 (2026-04-14)
 
 ### Features
