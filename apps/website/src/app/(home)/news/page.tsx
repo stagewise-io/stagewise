@@ -1,7 +1,9 @@
+import { ScrollReveal } from '@/components/landing/scroll-reveal';
+import { NewsGrid } from '../_components/news-section';
+import { getNewsTypeLabel, newsTypes, type NewsType } from '@/lib/news';
 import { getAllNewsPosts } from '@/lib/source';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ScrollReveal } from '@/components/landing/scroll-reveal';
 
 export const metadata: Metadata = {
   title: 'Newsroom · stagewise',
@@ -22,8 +24,23 @@ export const metadata: Metadata = {
   category: 'technology',
 };
 
-export default function BlogPage() {
-  const posts = getAllNewsPosts();
+const filterOptions: Array<{ value: 'all' | NewsType; label: string }> = [
+  { value: 'all', label: 'All' },
+  ...newsTypes.map((value) => ({ value, label: getNewsTypeLabel(value) })),
+];
+
+export default async function BlogPage(props: {
+  searchParams: Promise<{ type?: string | string[] }>;
+}) {
+  const { type } = await props.searchParams;
+  const selectedType =
+    typeof type === 'string' && newsTypes.includes(type as NewsType)
+      ? (type as NewsType)
+      : 'all';
+
+  const posts = getAllNewsPosts().filter(
+    (post) => selectedType === 'all' || post.type === selectedType,
+  );
 
   return (
     <div className="relative mx-auto w-full max-w-7xl px-4">
@@ -36,6 +53,10 @@ export default function BlogPage() {
             Find out what we're up to, what we're thinking, and what we're doing
             at stagewise.
           </p>
+        </div>
+      </ScrollReveal>
+      <ScrollReveal delay={100}>
+        <div className="mb-8 flex w-full flex-wrap items-center justify-between gap-4">
           <div className="flex flex-row gap-4">
             <Link
               href="https://www.ycombinator.com/companies/stagewise"
@@ -65,33 +86,41 @@ export default function BlogPage() {
               𝕏
             </Link>
           </div>
+          <div className="ml-auto flex flex-wrap gap-2">
+            {filterOptions.map((option) => {
+              const isActive = option.value === selectedType;
+              return (
+                <Link
+                  key={option.value}
+                  href={
+                    option.value === 'all'
+                      ? '/news'
+                      : `/news?type=${option.value}`
+                  }
+                  aria-pressed={isActive}
+                  className={
+                    isActive
+                      ? 'inline-flex items-center rounded-full border border-derived bg-primary-solid px-3 py-1.5 font-medium text-sm text-solid-foreground'
+                      : 'inline-flex items-center rounded-full border border-derived-subtle bg-surface-1 px-3 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-hover-derived hover:text-foreground'
+                  }
+                >
+                  {option.label}
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </ScrollReveal>
-      <div className="flex flex-col gap-6 md:ml-24">
-        {posts.map((post, index) => (
-          <ScrollReveal key={post.slug} delay={200 + index * 100}>
-            <Link href={post.url}>
-              <div className="flex w-full flex-col items-start justify-center gap-1 rounded-xl border border-derived bg-surface-1 p-4 transition-colors">
-                <p className="font-semibold text-foreground text-xl tracking-tight">
-                  {post.title}
-                </p>
-                <span className="text-base text-muted-foreground">
-                  {post.description}
-                </span>
-                <div className="mt-1 flex w-full flex-row items-end justify-end gap-6">
-                  <span className="text-muted-foreground text-sm">
-                    {post.date.toLocaleString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </span>
-                </div>
-              </div>
-            </Link>
-          </ScrollReveal>
-        ))}
-      </div>
+      <NewsGrid
+        revealDelay={200}
+        posts={posts.map((post) => ({
+          title: post.title,
+          url: post.url,
+          date: post.date.toISOString(),
+          type: post.type,
+          description: post.description,
+        }))}
+      />
     </div>
   );
 }

@@ -150,5 +150,6 @@
   }
 }
 
-
-
+.news-prose p {
+  text-align: left;
+}

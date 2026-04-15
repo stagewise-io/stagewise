@@ -1,0 +1,42 @@
+---
+title: "Release Week: April 6–12"
+author: stagewise team
+type: releases
+description: "This week’s stagewise updates focus on everyday product improvements: `/preview` for quick experiments, safer agent deletion, a more responsive UI, and better Windows reliability."
+ogImage: /news/release-week-april-6-12-preview.png
+date: 2026-04-13
+---
+
+## What Shipped This Week
+
+### `/preview` for fast mockups and experiments
+
+The most useful addition this week is **`/preview`**. You can ask the agent to generate a small app that shows a mockup, pulls in data from the page you’re looking at, or tests an idea before you touch the real codebase. It’s a quick way to explore directions in context instead of describing them abstractly.
+
+These previews are basically *throwaway mini-websites* the agent builds on the fly. You can iterate on them, use them to decide what should become a real change, and discard them when they’ve done their job.
+
+![Preview-generated mini-app showing button variants created from a prompt.](/news/release-week-april-6-12-preview.png)
+
+### Avoiding accidental agent deletion
+
+We also fixed a sharp edge in the product: deleting an agent used to happen immediately. That was too easy to trigger by mistake, especially when the cost is losing the conversation with it.
+
+Now there’s a **confirmation dialog** before deletion. Small change, obvious in hindsight, and much better.
+
+![Delete confirmation dialog shown before removing an agent and its chat history.](/news/release-week-april-6-12-delete-confirmation.png)
+
+### Performance improvements across the app
+
+A lot of the work this week went into **responsiveness**. We’ve been tightening up the UI so the app feels quicker when you move around, interact with agents, and work through longer sessions.
+
+This kind of work usually doesn’t make for dramatic release notes. It does make the product feel less sticky and less fragile, which matters more.
+
+### Windows path and tooling fixes
+
+We also fixed a set of Windows issues in the agent tooling. Some Windows users were running into path resolution problems in the sandbox and related tools, which could break tasks that depended on correct file handling.
+
+Those fixes should make Windows workflows *much more reliable*, especially when the agent needs to move across files, tools, and generated outputs.
+
+## What the Week Adds Up To
+
+This wasn’t a week of headline features. It was a week of making stagewise easier to trust: quicker ways to try ideas, fewer destructive mistakes, a faster UI, and fewer platform-specific failures.

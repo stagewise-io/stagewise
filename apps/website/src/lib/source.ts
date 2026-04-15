@@ -2,6 +2,7 @@ import 'server-only';
 import fs from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import { getNewsTypeLabel, normalizeNewsType, type NewsType } from '@/lib/news';
 
 const contentRoot = path.join(process.cwd(), 'content');
 
@@ -12,6 +13,7 @@ export interface NewsPost {
   description: string;
   author: string;
   date: Date;
+  type: NewsType;
   ogImage?: string;
   /** Raw MDX source string */
   source: string;
@@ -44,6 +46,7 @@ function loadNewsPost(filename: string): NewsPost {
     description: data.description as string,
     author: data.author as string,
     date: new Date(data.date as string),
+    type: normalizeNewsType(data.type),
     ogImage: data.ogImage as string | undefined,
     source: content,
   };
@@ -76,6 +79,8 @@ export function getNewsPost(slug: string): NewsPost | null {
 export function getAllNewsParams(): { slug: string[] }[] {
   return getAllNewsPosts().map((p) => ({ slug: [p.slug] }));
 }
+
+export { getNewsTypeLabel };
 
 // ---------------------------------------------------------------------------
 // Legal

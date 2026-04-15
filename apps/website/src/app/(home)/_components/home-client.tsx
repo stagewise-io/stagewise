@@ -3,6 +3,7 @@ import { IconGithub } from 'nucleo-social-media';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { IconDownload4FillDuo18 } from 'nucleo-ui-fill-duo-18';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
+import type { NewsType } from '@/lib/news';
 import { usePostHog } from 'posthog-js/react';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
@@ -25,6 +26,7 @@ interface NewsPost {
   title: string;
   url: string;
   date: string;
+  type: NewsType;
 }
 
 function DownloadButtons({ className }: { className?: string }) {
@@ -107,7 +109,7 @@ function FeatureSection() {
             <h2 className="mb-4 font-medium text-2xl tracking-tight md:text-3xl">
               Built for developers
             </h2>
-            <p className="font-light text-base text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               stagewise delivers a browsing experience that prioritizes the
               needs of web developers.
             </p>
@@ -117,94 +119,94 @@ function FeatureSection() {
 
       <div className="flex flex-col items-stretch gap-10 md:gap-20">
         <ScrollReveal delay={100}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-lg border border-border bg-surface-1 p-4 md:flex-row md:items-center md:gap-12 md:p-6">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row md:items-center md:gap-12">
             <div className="space-y-2">
-              <h3 className="text-foreground text-xl">
+              <h3 className="font-medium text-xl">
                 Full access to the devtools
               </h3>
-              <p className="font-light text-base text-muted-foreground">
+              <p className="text-base text-muted-foreground">
                 The stagewise agent has console and debugger access on all tabs.
               </p>
             </div>
             <Image
               src={debuggerAccessLight}
-              className="block w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:hidden"
+              className="block w-full shrink-0 rounded-md border border-border/30 md:max-w-[60%] dark:hidden"
               alt="Image showing a browser with an integrated coding agent"
             />
             <Image
               src={debuggerAccessDark}
-              className="hidden w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:block"
+              className="hidden w-full shrink-0 rounded-md border border-border/30 md:max-w-[60%] dark:block"
               alt="Image showing a browser with an integrated coding agent"
             />
           </div>
         </ScrollReveal>
 
         <ScrollReveal delay={200}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-lg border border-border bg-surface-1 p-4 md:flex-row-reverse md:items-center md:gap-12 md:p-6">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row-reverse md:items-center md:gap-12">
             <div className="space-y-2">
-              <h3 className="text-foreground text-xl">
+              <h3 className="font-medium text-xl">
                 Temporary or permanent changes
               </h3>
-              <p className="font-light text-base text-muted-foreground">
+              <p className="text-base text-muted-foreground">
                 Make quick test changes to any page, or connect a codebase for
                 permanent edits.
               </p>
             </div>
             <Image
               src={experimentsImage}
-              className="block w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:hidden"
+              className="block w-full shrink-0 rounded-md md:max-w-[60%] dark:hidden"
               alt="Image showing a browser with an integrated coding agent"
             />
             <Image
               src={experimentsImageDark}
-              className="hidden w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:block"
+              className="hidden w-full shrink-0 rounded-md md:max-w-[60%] dark:block"
               alt="Image showing a browser with an integrated coding agent"
             />
           </div>
         </ScrollReveal>
 
         <ScrollReveal delay={300}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-lg border border-border bg-surface-1 p-4 md:flex-row md:items-center md:gap-12 md:p-6">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row md:items-center md:gap-12">
             <div className="space-y-2">
-              <h3 className="text-foreground text-xl">
+              <h3 className="font-medium text-xl">
                 Powerful reverse engineering tools
               </h3>
-              <p className="font-light text-base text-muted-foreground">
+              <p className="text-base text-muted-foreground">
                 Understand and re-use components, style systems and color
                 palettes from any website.
               </p>
             </div>
             <Image
               src={reverseEngineeringLight}
-              className="block w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:hidden"
+              className="block w-full shrink-0 rounded-md md:max-w-[60%] dark:hidden"
               alt="Reverse engineering tools extracting styles from websites"
             />
             <Image
               src={reverseEngineeringDark}
-              className="hidden w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:block"
+              className="hidden w-full shrink-0 rounded-md md:max-w-[60%] dark:block"
               alt="Reverse engineering tools extracting styles from websites"
             />
           </div>
         </ScrollReveal>
 
         <ScrollReveal delay={400}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-lg border border-border bg-surface-1 p-4 md:flex-row-reverse md:items-center md:gap-12 md:p-6">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row-reverse md:items-center md:gap-12">
             <div className="space-y-2">
-              <h3 className="text-foreground text-xl">
+              <h3 className="font-medium text-xl">
                 Integrated with your setup
               </h3>
-              <p className="font-light text-base text-muted-foreground">
+              <p className="text-base text-muted-foreground">
                 Opt-in to view relevant and modified files in your favorite IDE
               </p>
             </div>
             <Image
               src={agentIdeIntegrationLight}
-              className="block w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:hidden"
+              className="block w-full shrink-0 rounded-md md:max-w-[60%] dark:hidden"
               alt="IDE integration showing code changes in your favorite editor"
             />
             <Image
               src={agentIdeIntegrationDark}
-              className="hidden w-full shrink-0 rounded-md border border-border md:max-w-[60%] dark:block"
+              className="hidden w-full shrink-0 rounded-md md:max-w-[60%] dark:block"
               alt="IDE integration showing code changes in your favorite editor"
             />
           </div>
@@ -257,7 +259,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                     The coding agent built for the web
                   </span>
                 </h1>
-                <span className="mb-8 text-md text-muted-foreground">
+                <span className="mb-8 text-lg text-muted-foreground leading-relaxed">
                   stagewise is a purpose-built browser for developers with a
                   coding agent built right in.
                 </span>
