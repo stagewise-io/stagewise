@@ -1040,6 +1040,14 @@ export class ToolboxService extends DisposableService {
       }
     }
 
+    const logsDir = getLogsDir();
+    mkdirSync(logsDir, { recursive: true });
+    mounts.push({
+      prefix: LOGS_PREFIX,
+      absolutePath: logsDir,
+      permissions: FULL_PERMISSIONS,
+    });
+
     const appsDir = getAgentAppsDir(agentInstanceId);
     mkdirSync(appsDir, { recursive: true });
     mounts.push({

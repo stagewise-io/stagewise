@@ -70,7 +70,7 @@ fetch('http://127.0.0.1:54321/ingest/react-renders?token=abc-123', {
 }
 ```
 
-Only `data` is required. `level` defaults to `"log"`, `source` is optional.
+Body must be a JSON object. All fields are optional. `level` defaults to `"log"`. The server prepends a `ts` field (epoch milliseconds) automatically — do not send your own.
 
 ### 5. Read logs
 
@@ -78,7 +78,7 @@ Only `data` is required. `level` defaults to `"log"`, `source` is optional.
 read('logs/react-renders.jsonl')
 ```
 
-Each line is a JSON object: `{ "ts": 1713000000000, "level": "info", "source": "useEffect-mount", "data": { ... } }`.
+Each line is a JSON object with a server-injected timestamp: `{ "ts": 1713000000000, "level": "info", "source": "useEffect-mount", "data": { ... } }`.
 
 Use `grepSearch` with `mount_prefix` targeting `logs` for filtered searches.
 
