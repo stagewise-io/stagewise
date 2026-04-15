@@ -439,6 +439,12 @@ export type PlanEntry = {
   }>;
 };
 
+export type LogChannelEntry = {
+  filename: string;
+  byteSize: number;
+  lineCount: number;
+};
+
 export type MountEntry = {
   prefix: string;
   path: string;
@@ -641,6 +647,11 @@ export type AppState = {
 
   /** Global plans (workspace-independent, from user-data/plans/) */
   plans: PlanEntry[];
+
+  /** Global debug log channels (from user-data/logs/) */
+  logChannels: LogChannelEntry[];
+  /** Ingest server info — null when server not yet started */
+  logIngest: { port: number; token: string } | null;
 };
 
 export type AuthStatus =
@@ -1125,4 +1136,6 @@ export const defaultState: KartonContract['state'] = {
   plugins: [],
   skills: [],
   plans: [],
+  logChannels: [],
+  logIngest: null,
 };

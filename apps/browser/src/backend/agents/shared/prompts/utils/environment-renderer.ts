@@ -2,6 +2,7 @@ import type { FullEnvironmentSnapshot } from '@shared/karton-contracts/ui/agent/
 import { renderBrowserTabsXml, esc } from './browser-tabs-renderer';
 import type { SkillInfo } from './skills';
 import { PLANS_PREFIX } from '@shared/plan-ownership';
+import { LOGS_PREFIX } from '@shared/log-ownership';
 import { prefixLineNumbers } from '../../base-agent/file-read-transformer/format-utils';
 
 export interface ShellInfo {
@@ -131,6 +132,22 @@ export function renderFullEnvironmentContext(
       return `- **${p.name}** (${progress})${desc}\n  File: \`${file}\`${next}`;
     });
     sections.push(`<active_plans>\n${planLines.join('\n')}\n</active_plans>`);
+  }
+
+  // Log instrumentation
+  const { logs, logIngest } = snapshot;
+  if (logIngest) {
+    const logLines: string[] = [
+      `<log-ingest port="${logIngest.port}" token="${esc(logIngest.token)}" />`,
+    ];
+    if (logs.entries.length > 0) {
+      for (const ch of logs.entries) {
+        logLines.push(
+          `<log-channel file="${LOGS_PREFIX}/${esc(ch.filename)}" lines="${ch.lineCount}" bytes="${ch.byteSize}" />`,
+        );
+      }
+    }
+    sections.push(logLines.join('\n'));
   }
 
   // Active app

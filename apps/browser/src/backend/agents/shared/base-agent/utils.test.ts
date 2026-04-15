@@ -36,6 +36,8 @@ function makeSnapshot(
     browserSessionId: 'test-browser-session-id',
     plans: { entries: [] },
     shells: { sessions: [] },
+    logs: { entries: [] },
+    logIngest: null,
     ...overrides,
   };
 }

@@ -14,6 +14,7 @@ import {
   IconClipboardOutline18,
   IconImageSparkle3Outline18,
   IconSideProfileSparkleOutline18,
+  IconBugOutline18,
 } from 'nucleo-ui-outline-18';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { SuggestionPopupContainer, SuggestionSidePanel } from '../shared';
@@ -24,6 +25,7 @@ const COMMAND_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   'command:plan': IconClipboardOutline18,
   'command:preview': IconImageSparkle3Outline18,
   'command:learn': IconSideProfileSparkleOutline18,
+  'command:debug': IconBugOutline18,
 };
 
 /** Group labels — `builtin` has no header. */

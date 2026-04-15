@@ -6,6 +6,7 @@ import type {
   EnabledSkillsSnapshot,
   EnvironmentSnapshot,
   FullEnvironmentSnapshot,
+  LogsSnapshot,
   PlansSnapshot,
   ShellSnapshot,
   WorkspaceMdSnapshot,
@@ -36,6 +37,8 @@ export function resolveEffectiveSnapshot(
   let browserSessionId: string | undefined;
   let plans: PlansSnapshot | undefined;
   let shells: ShellSnapshot | undefined;
+  let logs: LogsSnapshot | undefined;
+  let logIngest: { port: number; token: string } | null | undefined;
 
   for (let i = upToIndex; i >= 0; i--) {
     const snap = messages[i]?.metadata?.environmentSnapshot;
@@ -60,6 +63,9 @@ export function resolveEffectiveSnapshot(
       browserSessionId = snap.browserSessionId;
     if (plans === undefined && snap.plans !== undefined) plans = snap.plans;
     if (shells === undefined && snap.shells !== undefined) shells = snap.shells;
+    if (logs === undefined && snap.logs !== undefined) logs = snap.logs;
+    if (logIngest === undefined && snap.logIngest !== undefined)
+      logIngest = snap.logIngest;
     if (
       browser !== undefined &&
       workspace !== undefined &&
@@ -71,7 +77,9 @@ export function resolveEffectiveSnapshot(
       enabledSkills !== undefined &&
       browserSessionId !== undefined &&
       plans !== undefined &&
-      shells !== undefined
+      shells !== undefined &&
+      logs !== undefined &&
+      logIngest !== undefined
     )
       break;
   }
@@ -97,6 +105,8 @@ export function resolveEffectiveSnapshot(
     browserSessionId: browserSessionId ?? '',
     plans: plans ?? { entries: [] },
     shells: shells ?? { sessions: [] },
+    logs: logs ?? { entries: [] },
+    logIngest: logIngest ?? null,
   };
 }
 
@@ -178,6 +188,9 @@ export function sparsifySnapshot(
   if (full.browserSessionId !== previous.browserSessionId)
     sparse.browserSessionId = full.browserSessionId;
   if (!deepEqual(full.plans, previous.plans)) sparse.plans = full.plans;
+  if (!deepEqual(full.logs, previous.logs)) sparse.logs = full.logs;
+  if (!deepEqual(full.logIngest, previous.logIngest))
+    sparse.logIngest = full.logIngest;
   if (
     !deepEqual(
       shellsWithoutTail(full.shells),
