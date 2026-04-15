@@ -26,7 +26,9 @@ import {
 import { UserQuestionSection } from './user-question-section';
 import { getBaseName } from '@shared/path-utils';
 import { getAgentOwnedPlanPaths, PLANS_PREFIX } from '@shared/plan-ownership';
+import { getAgentOwnedLogPaths, LOGS_PREFIX } from '@shared/log-ownership';
 import { buildPlanSections, type PlanEntry } from './plan-section';
+import { buildLogChannelSections } from './log-channel-section';
 import { getPlanUIPhases, type LivePlanData } from '@shared/plan-lifecycle';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
 
@@ -81,6 +83,7 @@ export function StatusCard() {
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const goToUrl = useKartonProcedure((p) => p.browser.goto);
   const tabs = useKartonState((s) => s.browser.tabs);
+  const clearLogChannel = useKartonProcedure((p) => p.toolbox.clearLogChannel);
 
   const messageQueue = useKartonState((s) =>
     openAgentId
@@ -95,6 +98,7 @@ export function StatusCard() {
   );
 
   const globalPlans = useKartonState((s) => s.plans);
+  const globalLogChannels = useKartonState((s) => s.logChannels);
 
   // agentHistory is used for plan ownership/phases but NOT for rendering.
   // Subscribe silently via ref so streaming chunks (which mutate the last
@@ -482,6 +486,16 @@ export function StatusCard() {
 
   const handleImplement = useSendImplement();
 
+  // Owned log channels (same ownership pattern as plans)
+  const ownedLogChannels = useMemo(() => {
+    const ownedPaths = getAgentOwnedLogPaths(agentHistoryRef.current);
+    if (ownedPaths.size === 0) return [];
+    return globalLogChannels.filter((ch) => {
+      const toolPath = `${LOGS_PREFIX}/${ch.filename}`;
+      return ownedPaths.has(toolPath);
+    });
+  }, [historyLen, globalLogChannels]);
+
   // Create status card items
   const items = useMemo(() => {
     const result: StatusCardSection[] = [];
@@ -525,6 +539,15 @@ export function StatusCard() {
     });
     for (const section of planSections) result.push(section);
 
+    const logChannelSections = buildLogChannelSections({
+      channels: ownedLogChannels.map((ch) => ({
+        ...ch,
+        tailLines: ch.tailLines ?? [],
+      })),
+      onClear: (filename) => void clearLogChannel(filename),
+    });
+    for (const section of logChannelSections) result.push(section);
+
     const fileDiffSection = FileDiffSection({
       pendingDiffs: formattedPendingDiffs,
       diffSummary: formattedDiffSummary,
@@ -557,6 +580,7 @@ export function StatusCard() {
     submitUserQuestionStep,
     cancelUserQuestion,
     goBackUserQuestion,
+    ownedLogChannels,
   ]);
 
   // Sync card height with CSS variable for ChatHistory padding

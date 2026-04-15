@@ -20,6 +20,7 @@ vi.mock('@/utils/paths', async () => {
     getAgentAppsDir: (agentId: string) =>
       path.join(testTempDir, 'agents', agentId, 'apps'),
     getPlansDir: () => path.join(testTempDir, 'plans'),
+    getLogsDir: () => path.join(testTempDir, 'logs'),
   };
 });
 

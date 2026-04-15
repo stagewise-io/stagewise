@@ -443,6 +443,7 @@ export type LogChannelEntry = {
   filename: string;
   byteSize: number;
   lineCount: number;
+  tailLines: string[];
 };
 
 export type MountEntry = {
@@ -778,6 +779,7 @@ export type KartonContract = {
         data: unknown,
       ) => Promise<void>;
       clearPendingAppMessage: (agentInstanceId: string) => Promise<void>;
+      clearLogChannel: (filename: string) => Promise<void>;
     };
     userAccount: {
       sendOtp: (email: string) => Promise<{ error?: string }>;

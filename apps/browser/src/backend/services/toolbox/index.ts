@@ -38,7 +38,7 @@ import {
   getPlansDir,
   getTempRoot,
 } from '@/utils/paths';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, truncateSync } from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import type { ApiClient } from '@stagewise/api-client';
 import {
@@ -1921,6 +1921,22 @@ export class ToolboxService extends DisposableService {
         });
       },
     );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.clearLogChannel',
+      async (_callingClientId: string, filename: string) => {
+        if (
+          !filename.endsWith('.jsonl') ||
+          filename.includes('/') ||
+          filename.includes('\\')
+        ) {
+          throw new Error(`Invalid log channel filename: ${filename}`);
+        }
+        const target = path.join(getLogsDir(), filename);
+        if (!existsSync(target)) return;
+        truncateSync(target, 0);
+      },
+    );
   }
 
   /**
@@ -2081,6 +2097,7 @@ export class ToolboxService extends DisposableService {
           filename: ch.filename,
           byteSize: ch.byteSize,
           lineCount: ch.lineCount,
+          tailLines: ch.tailLines,
         }));
       });
     } catch (error) {
