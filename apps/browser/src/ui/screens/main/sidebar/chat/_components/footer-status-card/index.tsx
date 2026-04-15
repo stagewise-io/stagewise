@@ -202,10 +202,6 @@ export function StatusCard() {
   );
 
   // Per-workspace-path local state for lifecycle tracking
-  const [dismissedPaths, setDismissedPaths] = useState<Set<string>>(
-    () => new Set(),
-  );
-
   const [completedPaths, setCompletedPaths] = useState<Set<string>>(
     () => new Set(),
   );
@@ -360,11 +356,6 @@ export function StatusCard() {
       } else if (errorsByPath.has(mount.path)) {
         status = 'error';
         errorMessage = errorsByPath.get(mount.path) ?? null;
-      } else if (
-        mount.workspaceMdContent === null &&
-        !dismissedPaths.has(mount.path)
-      ) {
-        status = 'prompt';
       } else {
         continue;
       }
@@ -380,13 +371,6 @@ export function StatusCard() {
         history,
         errorMessage,
         onDismiss: () => {
-          if (status === 'prompt') {
-            setDismissedPaths((s) => {
-              const copy = new Set(s);
-              copy.add(mountPath);
-              return copy;
-            });
-          }
           setCompletedPaths((s) => {
             if (!s.has(mountPath)) return s;
             const copy = new Set(s);
@@ -426,7 +410,6 @@ export function StatusCard() {
     workspaceMounts,
     workspaceMdAgents,
     workspaceMdHistoriesByAgentId,
-    dismissedPaths,
     completedPaths,
     errorsByPath,
     handleShowFile,
