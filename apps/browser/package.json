@@ -47,7 +47,7 @@
     "react-virtuoso": "^4.18.1",
     "sharp": "^0.34.5",
     "tiptap-markdown": "^0.9.0",
-    "yauzl": "^3.2.0"
+    "yauzl": "^3.3.0"
   },
   "devDependencies": {
     "@ai-sdk/amazon-bedrock": "^4.0.77",
