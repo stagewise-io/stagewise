@@ -1544,7 +1544,20 @@ export abstract class BaseAgent<
       onError: (ev) => {
         // Guard: ignore if a newer step has started (e.g. queue flush)
         if (this._stepGeneration !== stepGen) return;
-        const error = ev.error as Error;
+        // ev.error may not be a real Error instance (e.g. network abort
+        // events, plain objects from the AI SDK). Normalize so every
+        // downstream consumer (logger, PostHog, UI state) gets a proper Error.
+        const raw = ev.error;
+        const error =
+          raw instanceof Error
+            ? raw
+            : new Error(
+                typeof raw === 'string'
+                  ? raw
+                  : (raw as Record<string, unknown>)?.message
+                    ? String((raw as Record<string, unknown>).message)
+                    : 'Unknown error',
+              );
         this.logger.error(
           `[BaseAgent:${this.instanceId}] Error in 'streamText': ${this.formatError(error)}`,
         );
@@ -1663,9 +1676,19 @@ export abstract class BaseAgent<
         stream.consumeStream(),
       ]);
     } catch (err) {
-      const error = err as Error;
+      const raw = err;
+      const error =
+        raw instanceof Error
+          ? raw
+          : new Error(
+              typeof raw === 'string'
+                ? raw
+                : (raw as Record<string, unknown>)?.message
+                  ? String((raw as Record<string, unknown>).message)
+                  : 'Unknown error',
+            );
       this.logger.error(
-        `[BaseAgent:${this.instanceId}] Error in 'runStep': $this.formatError(error)`,
+        `[BaseAgent:${this.instanceId}] Error in 'runStep': ${this.formatError(error)}`,
       );
       this.report(error, 'runStep');
       // Invalidate step generation so any pending onFinish callback won't
@@ -1679,7 +1702,7 @@ export abstract class BaseAgent<
         draft.isWorking = false;
         draft.unread = true;
         draft.error = {
-          message: `Internal error: $error.message ?? 'Unknown error'`,
+          message: `Internal error: ${error.message}`,
           stack: error.stack,
         };
       });
