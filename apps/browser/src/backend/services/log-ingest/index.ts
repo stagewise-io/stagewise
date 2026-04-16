@@ -180,7 +180,11 @@ export class LogIngestService {
         return;
       }
 
-      if (typeof parsed !== 'object' || parsed === null) {
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        Array.isArray(parsed)
+      ) {
         this.respond(res, 400, { error: 'Body must be a JSON object.' });
         return;
       }
