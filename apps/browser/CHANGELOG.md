@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-alpha.59 (2026-04-16)
+
+### Features
+
+* add opus-4-7 (e6bad3a)
+
+### Bug Fixes
+
+* normalize error handling in streamText and runStep methods (6ffbf62)
+
 ## 1.0.0-alpha.58 (2026-04-15)
 
 ### Bug Fixes
