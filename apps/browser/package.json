@@ -73,7 +73,7 @@
     "@electron-forge/plugin-vite": "^7.10.2",
     "@electron/fuses": "^1.8.0",
     "@posthog/ai": "7.3.0",
-    "@posthog/cli": "^0.5.30",
+    "@posthog/cli": "^0.7.8",
     "@react-three/fiber": "^9.3.0",
     "@shikijs/colorized-brackets": "3.21.0",
     "@stagewise/agent-runtime-node": "workspace:*",
