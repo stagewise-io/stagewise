@@ -494,7 +494,7 @@ export const defaultUserPreferences: UserPreferences = {
   sidebar: { showActiveAgents: true },
   agent: {
     workspaceSettings: {},
-    disabledModelIds: [],
+    disabledModelIds: ['claude-opus-4.6'],
     disabledPluginIds: [],
   },
   providerConfigs: {

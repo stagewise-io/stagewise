@@ -94,10 +94,51 @@ export const availableModels = [
   // Anthropic Models
   {
     officialProvider: 'anthropic',
+    modelId: 'claude-opus-4.7',
+    modelDisplayName: 'Opus 4.7',
+    modelDescription:
+      "Anthropic's most capable model, excels at complex reasoning and architectural decisions.",
+    modelContext: '1M context',
+    modelContextRaw: 1000000,
+    headers: anthropicHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      anthropic: {
+        thinking: { type: 'adaptive' },
+        effort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 5.0,
+      outputPerMillion: 25.0,
+      relativeMultiplier: 5.3,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: ANTHROPIC_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'anthropic',
     modelId: 'claude-opus-4.6',
     modelDisplayName: 'Opus 4.6',
     modelDescription:
-      "Anthropic's most capable model, excels at complex reasoning and architectural decisions.",
+      'Previous-generation Opus model. Still highly capable for complex reasoning tasks.',
     modelContext: '200k context',
     modelContextRaw: 200000,
     headers: anthropicHeaders,
