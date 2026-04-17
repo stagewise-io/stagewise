@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0-alpha.60 (2026-04-17)
+
+### Features
+
+* enhance skill definition sorting for builtin commands (abb6009)
+* add debug-command (cce574f)
+* implement HMAC-SHA256 signing for fetch requests (c538138)
+
+### Bug Fixes
+
+* try-catch ingest-server startup (076cf2e)
+* streamline log ingestion and validation in environment renderer and toolbox service (5119df9)
+
 ## 1.0.0-alpha.59 (2026-04-16)
 
 ### Features
