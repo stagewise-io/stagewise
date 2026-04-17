@@ -31,8 +31,13 @@ import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import { createFileDiffHandler } from './utils/sandbox-callbacks';
 import { deleteAgentBlobs, getAgentBlobDir } from '@/utils/attachment-blobs';
-import { getDataRoot, getPlansDir, getTempRoot } from '@/utils/paths';
-import { existsSync, mkdirSync } from 'node:fs';
+import {
+  getDataRoot,
+  getLogsDir,
+  getPlansDir,
+  getTempRoot,
+} from '@/utils/paths';
+import { existsSync, mkdirSync, truncateSync } from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import type { ApiClient } from '@stagewise/api-client';
 import {
@@ -110,7 +115,10 @@ import {
 import type { SkillDefinition } from '@shared/skills';
 import { toSkillDefinitionUI } from '@shared/skills';
 import { readPlans } from '@/agents/shared/prompts/utils/read-plans';
+import { readLogChannels } from '@/agents/shared/prompts/utils/read-logs';
 import { PLANS_PREFIX, getAgentOwnedPlanPaths } from '@shared/plan-ownership';
+import { LOGS_PREFIX, getAgentOwnedLogPaths } from '@shared/log-ownership';
+import { LogIngestService } from '../log-ingest';
 import { resolveMountedRelativePath } from './utils/path-mounting';
 import { normalizePath } from '@shared/path-utils';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
@@ -187,6 +195,7 @@ export class ToolboxService extends DisposableService {
     }
     runtimes.set('apps', this.getOrCreateAppsRuntime(agentInstanceId));
     runtimes.set(PLANS_PREFIX, this.getOrCreatePlansRuntime());
+    runtimes.set(LOGS_PREFIX, this.getOrCreateLogsRuntime());
     runtimes.set('att', this.getOrCreateAttRuntime(agentInstanceId));
     return runtimes;
   }
@@ -197,6 +206,11 @@ export class ToolboxService extends DisposableService {
   private plansRuntime: ClientRuntimeNode | null = null;
   private plansWatcher: FSWatcher | null = null;
   private plansWatcherDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  private logsRuntime: ClientRuntimeNode | null = null;
+  private logsWatcher: FSWatcher | null = null;
+  private logsWatcherDebounce: ReturnType<typeof setTimeout> | null = null;
+  private logIngestService: LogIngestService | null = null;
 
   private globalSkillsWatchers: FSWatcher[] = [];
   private globalSkillsWatcherDebounce: ReturnType<typeof setTimeout> | null =
@@ -211,6 +225,17 @@ export class ToolboxService extends DisposableService {
       rgBinaryBasePath: getRipgrepBasePath(),
     });
     return this.plansRuntime;
+  }
+
+  private getOrCreateLogsRuntime(): ClientRuntimeNode {
+    if (this.logsRuntime) return this.logsRuntime;
+    const logsDir = getLogsDir();
+    mkdirSync(logsDir, { recursive: true });
+    this.logsRuntime = new ClientRuntimeNode({
+      workingDirectory: logsDir,
+      rgBinaryBasePath: getRipgrepBasePath(),
+    });
+    return this.logsRuntime;
   }
 
   private getOrCreateGlobalSkillsRuntime(
@@ -999,6 +1024,12 @@ export class ToolboxService extends DisposableService {
       permissions: FULL_PERMISSIONS,
     });
 
+    mounts.push({
+      prefix: LOGS_PREFIX,
+      absolutePath: getLogsDir(),
+      permissions: FULL_PERMISSIONS,
+    });
+
     return mounts;
   }
 
@@ -1112,15 +1143,26 @@ export class ToolboxService extends DisposableService {
         path: getPlansDir(),
         permissions: [...FULL_PERMISSIONS] as MountPermission[],
       },
+      {
+        prefix: LOGS_PREFIX,
+        path: getLogsDir(),
+        permissions: [...FULL_PERMISSIONS] as MountPermission[],
+      },
     ];
 
-    const [agentsMdEntries, workspaceMdEntries, commands, planEntries] =
-      await Promise.all([
-        this.getAllAgentsMdEntries(agentInstanceId),
-        this.getWorkspaceMd(agentInstanceId),
-        this.getSkillsList(agentInstanceId),
-        this.getPlansList(agentInstanceId),
-      ]);
+    const [
+      agentsMdEntries,
+      workspaceMdEntries,
+      commands,
+      planEntries,
+      logEntries,
+    ] = await Promise.all([
+      this.getAllAgentsMdEntries(agentInstanceId),
+      this.getWorkspaceMd(agentInstanceId),
+      this.getSkillsList(agentInstanceId),
+      this.getPlansList(agentInstanceId),
+      this.getLogsList(agentInstanceId),
+    ]);
 
     const mounts =
       this.mountManagerService?.getMountedPathsWithRuntimes(agentInstanceId);
@@ -1188,6 +1230,15 @@ export class ToolboxService extends DisposableService {
       plans: {
         entries: planEntries,
       },
+      logs: {
+        entries: logEntries,
+      },
+      logIngest: this.logIngestService
+        ? {
+            port: this.logIngestService.getPort(),
+            token: this.logIngestService.getToken(),
+          }
+        : null,
     };
 
     return snapshot;
@@ -1347,6 +1398,26 @@ export class ToolboxService extends DisposableService {
     });
   }
 
+  private async getLogsList(agentInstanceId: string): Promise<
+    Array<{
+      filename: string;
+      byteSize: number;
+      lineCount: number;
+      tailLines: string[];
+    }>
+  > {
+    const agentEntry = this.uiKarton.state.agents.instances[agentInstanceId];
+    const ownedPaths = agentEntry
+      ? getAgentOwnedLogPaths(agentEntry.state.history)
+      : new Set<string>();
+
+    const logs = await readLogChannels(getLogsDir());
+    return logs.filter((log) => {
+      const toolPath = `${LOGS_PREFIX}/${log.filename}`;
+      return ownedPaths.has(toolPath);
+    });
+  }
+
   public getWorkspaceAgentSettings(
     agentInstanceId: string,
   ): Map<string, WorkspaceAgentSettings> {
@@ -1499,6 +1570,7 @@ export class ToolboxService extends DisposableService {
     result.set('apps', getAgentAppsDir(agentInstanceId));
     result.set('att', getAgentBlobDir(agentInstanceId));
     result.set(PLANS_PREFIX, getPlansDir());
+    result.set(LOGS_PREFIX, getLogsDir());
 
     for (const gs of getGlobalSkillsMounts()) {
       if (existsSync(gs.absolutePath)) {
@@ -1647,6 +1719,20 @@ export class ToolboxService extends DisposableService {
     // Start watching the global plans directory
     this.startPlansWatcher();
 
+    // Start watching the global logs directory
+    this.startLogsWatcher();
+
+    // Start the log ingest HTTP server
+    this.logIngestService = await LogIngestService.create();
+    this.uiKarton.setState((draft) => {
+      draft.logIngest = this.logIngestService
+        ? {
+            port: this.logIngestService.getPort(),
+            token: this.logIngestService.getToken(),
+          }
+        : null;
+    });
+
     // Start watching global skills directories (~/.stagewise/skills, ~/.agents/skills)
     this.startGlobalSkillsWatchers();
 
@@ -1789,6 +1875,21 @@ export class ToolboxService extends DisposableService {
         });
       },
     );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.clearLogChannel',
+      async (_callingClientId: string, filename: string) => {
+        if (typeof filename !== 'string' || !filename.endsWith('.jsonl')) {
+          throw new Error('Invalid log channel filename.');
+        }
+        const filePath = path.join(getLogsDir(), filename);
+        try {
+          truncateSync(filePath, 0);
+        } catch {
+          // File may not exist — ignore
+        }
+      },
+    );
   }
 
   /**
@@ -1892,6 +1993,48 @@ export class ToolboxService extends DisposableService {
     this.globalSkillsWatchers = [];
   }
 
+  /**
+   * Start a chokidar watcher on the global logs directory.
+   * On any change, re-reads all log channels and pushes updated list to Karton state.
+   */
+  private startLogsWatcher(): void {
+    const logsDir = getLogsDir();
+    mkdirSync(logsDir, { recursive: true });
+    this.logsWatcher = chokidar.watch(logsDir, {
+      persistent: true,
+      ignoreInitial: false,
+      depth: 0,
+      awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
+    });
+
+    const scheduleRefresh = () => {
+      if (this.logsWatcherDebounce) clearTimeout(this.logsWatcherDebounce);
+      this.logsWatcherDebounce = setTimeout(() => {
+        this.logsWatcherDebounce = null;
+        void this.refreshGlobalLogs();
+      }, 400);
+    };
+
+    this.logsWatcher
+      .on('add', scheduleRefresh)
+      .on('change', scheduleRefresh)
+      .on('unlink', scheduleRefresh)
+      .on('error', (error) => {
+        this.logger.debug('[ToolboxService] Logs watcher error', { error });
+      });
+  }
+
+  private stopLogsWatcher(): void {
+    if (this.logsWatcherDebounce) {
+      clearTimeout(this.logsWatcherDebounce);
+      this.logsWatcherDebounce = null;
+    }
+    if (this.logsWatcher) {
+      void this.logsWatcher.close();
+      this.logsWatcher = null;
+    }
+  }
+
   private stopPlansWatcher(): void {
     if (this.plansWatcherDebounce) {
       clearTimeout(this.plansWatcherDebounce);
@@ -1900,6 +2043,26 @@ export class ToolboxService extends DisposableService {
     if (this.plansWatcher) {
       void this.plansWatcher.close();
       this.plansWatcher = null;
+    }
+  }
+
+  /** Re-read all log channels from disk and push to top-level Karton state. */
+  private async refreshGlobalLogs(): Promise<void> {
+    try {
+      const logs = await readLogChannels(getLogsDir());
+      this.uiKarton.setState((draft) => {
+        draft.logChannels = logs.map((ch) => ({
+          filename: ch.filename,
+          byteSize: ch.byteSize,
+          lineCount: ch.lineCount,
+          tailLines: ch.tailLines,
+        }));
+      });
+    } catch (error) {
+      this.logger.debug('[ToolboxService] Failed to refresh global logs', {
+        error,
+      });
+      this.report(error as Error, 'refreshGlobalLogs');
     }
   }
 
@@ -1932,7 +2095,11 @@ export class ToolboxService extends DisposableService {
     this.apiClient = null;
 
     this.stopPlansWatcher();
+    this.stopLogsWatcher();
     this.stopGlobalSkillsWatchers();
+
+    void this.logIngestService?.teardown();
+    this.logIngestService = null;
 
     void this.mountManagerService?.teardown();
     this.mountManagerService = null;

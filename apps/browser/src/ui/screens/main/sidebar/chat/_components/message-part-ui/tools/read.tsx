@@ -1,11 +1,15 @@
 import { useMemo } from 'react';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
-import { IconEyeOutline18 } from 'nucleo-ui-outline-18';
-import { IconBookOpenOutline18 } from 'nucleo-ui-outline-18';
+import {
+  IconEyeOutline18,
+  IconBookOpenOutline18,
+  IconBugOutline18,
+} from 'nucleo-ui-outline-18';
 import { cn, resolveDisplayPath } from '@ui/utils';
 import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
 import { useKartonState } from '@ui/hooks/use-karton';
+import { isLogPath, LOGS_PREFIX } from '@shared/log-ownership';
 
 const PLUGIN_SKILL_RE = /^plugins\/([^/]+)\/SKILL\.md$/;
 const WORKSPACE_SKILL_RE =
@@ -33,6 +37,13 @@ export const ReadToolPart = ({
   const workspaceSkillName = useMemo(() => {
     const match = relativePath.match(WORKSPACE_SKILL_RE);
     return match?.[1] ?? null;
+  }, [relativePath]);
+
+  const logChannelName = useMemo(() => {
+    if (!isLogPath(relativePath)) return null;
+    return relativePath
+      .replace(new RegExp(`^${LOGS_PREFIX}/`), '')
+      .replace(/\.jsonl$/, '');
   }, [relativePath]);
 
   const attachmentMetadata = useAttachmentMetadata();
@@ -92,6 +103,31 @@ export const ReadToolPart = ({
     return (
       <ToolPartUINotCollapsible
         icon={<IconBookOpenOutline18 className="size-3 shrink-0" />}
+        part={part}
+        minimal={minimal}
+        disableShimmer={disableShimmer}
+        streamingText={streamingText}
+        finishedText={finishedText}
+      />
+    );
+  }
+
+  if (logChannelName) {
+    const streamingText = `Reading log ${logChannelName}…`;
+
+    const finishedText =
+      part.state === 'output-available' ? (
+        <span className="flex min-w-0 gap-1">
+          <span className="shrink-0 font-medium">Read log</span>
+          <span className="truncate font-normal opacity-75">
+            {logChannelName}
+          </span>
+        </span>
+      ) : undefined;
+
+    return (
+      <ToolPartUINotCollapsible
+        icon={<IconBugOutline18 className="size-3 shrink-0" />}
         part={part}
         minimal={minimal}
         disableShimmer={disableShimmer}

@@ -4,6 +4,8 @@ import { computeAppChanges } from './app-changes';
 import { computeBrowserChanges } from './browser-changes';
 import { computeFileDiffChanges } from './file-diff-changes';
 import { computePlansChanges } from './plans-changes';
+import { computeLogChanges } from './log-changes';
+import { computeLogIngestChanges } from './log-ingest-changes';
 import { computeSandboxChanges } from './sandbox-changes';
 import { computeSkillsChanges } from './skills-changes';
 import type { EnvironmentChangeEntry } from './types';
@@ -15,6 +17,8 @@ export { computeAppChanges } from './app-changes';
 export { computeBrowserChanges } from './browser-changes';
 export { computeFileDiffChanges } from './file-diff-changes';
 export { computePlansChanges } from './plans-changes';
+export { computeLogChanges } from './log-changes';
+export { computeLogIngestChanges } from './log-ingest-changes';
 export { computeSandboxChanges } from './sandbox-changes';
 export { computeSkillsChanges } from './skills-changes';
 export { computeWorkspaceChanges } from './workspace-changes';
@@ -62,5 +66,7 @@ export function computeAllEnvironmentChanges(
     ...computeWorkspaceMdChanges(previous.workspaceMd, current.workspaceMd),
     ...computeSkillsChanges(previous.enabledSkills, current.enabledSkills),
     ...computePlansChanges(previous.plans, current.plans),
+    ...computeLogChanges(previous.logs, current.logs),
+    ...computeLogIngestChanges(previous.logIngest, current.logIngest),
   ];
 }
