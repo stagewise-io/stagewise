@@ -136,17 +136,18 @@ export function renderFullEnvironmentContext(
 
   // Log instrumentation
   const { logs, logIngest } = snapshot;
+  const logLines: string[] = [];
   if (logIngest) {
-    const logLines: string[] = [
+    logLines.push(
       `<log-ingest port="${logIngest.port}" token="${esc(logIngest.token)}" />`,
-    ];
-    if (logs.entries.length > 0) {
-      for (const ch of logs.entries) {
-        logLines.push(
-          `<log-channel file="${LOGS_PREFIX}/${esc(ch.filename)}" lines="${ch.lineCount}" bytes="${ch.byteSize}" />`,
-        );
-      }
-    }
+    );
+  }
+  for (const ch of logs.entries) {
+    logLines.push(
+      `<log-channel file="${LOGS_PREFIX}/${esc(ch.filename)}" lines="${ch.lineCount}" bytes="${ch.byteSize}" />`,
+    );
+  }
+  if (logLines.length > 0) {
     sections.push(logLines.join('\n'));
   }
 
