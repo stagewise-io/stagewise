@@ -6,6 +6,7 @@ import type {
   EnabledSkillsSnapshot,
   EnvironmentSnapshot,
   FullEnvironmentSnapshot,
+  LogsSnapshot,
   PlansSnapshot,
   WorkspaceMdSnapshot,
   WorkspaceSnapshot,
@@ -34,6 +35,8 @@ export function resolveEffectiveSnapshot(
   let enabledSkills: EnabledSkillsSnapshot | undefined;
   let browserSessionId: string | undefined;
   let plans: PlansSnapshot | undefined;
+  let logs: LogsSnapshot | undefined;
+  let logIngest: { port: number; token: string } | null | undefined;
 
   for (let i = upToIndex; i >= 0; i--) {
     const snap = messages[i]?.metadata?.environmentSnapshot;
@@ -57,6 +60,9 @@ export function resolveEffectiveSnapshot(
     if (browserSessionId === undefined && snap.browserSessionId !== undefined)
       browserSessionId = snap.browserSessionId;
     if (plans === undefined && snap.plans !== undefined) plans = snap.plans;
+    if (logs === undefined && snap.logs !== undefined) logs = snap.logs;
+    if (logIngest === undefined && snap.logIngest !== undefined)
+      logIngest = snap.logIngest;
     if (
       browser !== undefined &&
       workspace !== undefined &&
@@ -67,7 +73,9 @@ export function resolveEffectiveSnapshot(
       workspaceMd !== undefined &&
       enabledSkills !== undefined &&
       browserSessionId !== undefined &&
-      plans !== undefined
+      plans !== undefined &&
+      logs !== undefined &&
+      logIngest !== undefined
     )
       break;
   }
@@ -92,6 +100,8 @@ export function resolveEffectiveSnapshot(
     enabledSkills: enabledSkills ?? { paths: [] },
     browserSessionId: browserSessionId ?? '',
     plans: plans ?? { entries: [] },
+    logs: logs ?? { entries: [] },
+    logIngest: logIngest ?? null,
   };
 }
 
@@ -162,6 +172,9 @@ export function sparsifySnapshot(
   if (full.browserSessionId !== previous.browserSessionId)
     sparse.browserSessionId = full.browserSessionId;
   if (!deepEqual(full.plans, previous.plans)) sparse.plans = full.plans;
+  if (!deepEqual(full.logs, previous.logs)) sparse.logs = full.logs;
+  if (!deepEqual(full.logIngest, previous.logIngest))
+    sparse.logIngest = full.logIngest;
 
   return sparse;
 }

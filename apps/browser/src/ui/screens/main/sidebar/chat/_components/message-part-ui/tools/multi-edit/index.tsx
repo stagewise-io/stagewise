@@ -1,6 +1,8 @@
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { isPlanPath } from '@shared/plan-ownership';
+import { isLogPath } from '@shared/log-ownership';
 import { PlanCheckoffToolPart } from './plan-checkoff';
+import { LogEditToolPart } from './log-edit';
 import { GenericMultiEditToolPart } from './generic-multi-edit';
 
 export type MultiEditPart = Extract<
@@ -68,6 +70,11 @@ function isPureCheckboxToggle(
 
 export const MultiEditToolPart = ({ part }: { part: MultiEditPart }) => {
   const relativePath = part.input?.path ?? '';
+
+  // Route to compact log-edit UI for log channel files
+  if (isLogPath(relativePath)) {
+    return <LogEditToolPart part={part} />;
+  }
 
   // Route to compact plan-checkoff UI when:
   // 1. The file is a plan

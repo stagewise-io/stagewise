@@ -25,7 +25,7 @@ export const APPEND_ONLY_PERMISSIONS: MountPermission[] = [
   'create',
 ];
 
-export const NON_WORKSPACE_PREFIXES = new Set(['att', 'plugins']);
+export const NON_WORKSPACE_PREFIXES = new Set(['att', 'plugins', 'logs']);
 
 export interface MountDescriptor {
   prefix: string;

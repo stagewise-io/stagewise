@@ -15,6 +15,7 @@ import {
   getDiffHistoryBlobsDir,
   getAgentAppsDir,
   getPlansDir,
+  getLogsDir,
 } from '@/utils/paths';
 import {
   type FileDiff,
@@ -354,9 +355,11 @@ export class DiffHistoryService extends DisposableService {
 
     const appsDir = getAgentAppsDir(agentInstanceId);
     const plansDir = getPlansDir();
+    const logsDir = getLogsDir();
     const isInternalPath = (d: { path: string }) =>
       d.path.startsWith(appsDir + path.sep) ||
-      d.path.startsWith(plansDir + path.sep);
+      d.path.startsWith(plansDir + path.sep) ||
+      d.path.startsWith(logsDir + path.sep);
 
     const pendingFileDiffs = (
       await this.getPendingFileDiffsForAgentInstanceId(agentInstanceId)

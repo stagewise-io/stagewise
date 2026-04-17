@@ -240,6 +240,18 @@ export const plansSnapshotSchema = z.object({
 
 export type PlansSnapshot = z.infer<typeof plansSnapshotSchema>;
 
+export const logChannelSnapshotEntrySchema = z.object({
+  filename: z.string(),
+  byteSize: z.number(),
+  lineCount: z.number(),
+});
+
+export const logsSnapshotSchema = z.object({
+  entries: z.array(logChannelSnapshotEntrySchema),
+});
+
+export type LogsSnapshot = z.infer<typeof logsSnapshotSchema>;
+
 export const environmentSnapshotSchema = z.object({
   browser: browserSnapshotSchema.optional(),
   workspace: workspaceSnapshotSchema.optional(),
@@ -256,6 +268,11 @@ export const environmentSnapshotSchema = z.object({
    */
   browserSessionId: z.string().optional(),
   plans: plansSnapshotSchema.optional(),
+  logs: logsSnapshotSchema.optional(),
+  logIngest: z
+    .object({ port: z.number(), token: z.string() })
+    .nullable()
+    .optional(),
 });
 
 export type EnvironmentSnapshot = z.infer<typeof environmentSnapshotSchema>;

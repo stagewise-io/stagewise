@@ -26,7 +26,12 @@ import {
 import { UserQuestionSection } from './user-question-section';
 import { getBaseName } from '@shared/path-utils';
 import { getAgentOwnedPlanPaths, PLANS_PREFIX } from '@shared/plan-ownership';
+import { getAgentOwnedLogPaths, LOGS_PREFIX } from '@shared/log-ownership';
 import { buildPlanSections, type PlanEntry } from './plan-section';
+import {
+  buildLogChannelSections,
+  type LogChannelDisplayEntry,
+} from './log-channel-section';
 import { getPlanUIPhases, type LivePlanData } from '@shared/plan-lifecycle';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
 
@@ -95,6 +100,8 @@ export function StatusCard() {
   );
 
   const globalPlans = useKartonState((s) => s.plans);
+  const globalLogChannels = useKartonState((s) => s.logChannels);
+  const clearLogChannel = useKartonProcedure((p) => p.toolbox.clearLogChannel);
 
   // agentHistory is used for plan ownership/phases but NOT for rendering.
   // Subscribe silently via ref so streaming chunks (which mutate the last
@@ -463,6 +470,20 @@ export function StatusCard() {
     return plans;
   }, [historyLen, globalPlans, isAgentWorking]);
 
+  // Log channels owned by this agent
+  const ownedLogChannels = useMemo(() => {
+    const ownedPaths = getAgentOwnedLogPaths(agentHistoryRef.current);
+    if (ownedPaths.size === 0) return [];
+
+    const channels: LogChannelDisplayEntry[] = [];
+    for (const ch of globalLogChannels) {
+      const toolPath = `${LOGS_PREFIX}/${ch.filename}`;
+      if (!ownedPaths.has(toolPath)) continue;
+      channels.push(ch);
+    }
+    return channels;
+  }, [historyLen, globalLogChannels]);
+
   const handleOpenPlan = useCallback(
     (filename: string) => {
       const baseUrl = `stagewise://internal/plan/${encodeURIComponent(filename)}`;
@@ -525,6 +546,14 @@ export function StatusCard() {
     });
     for (const section of planSections) result.push(section);
 
+    const logSections = buildLogChannelSections({
+      channels: ownedLogChannels,
+      onClear: (filename) => {
+        void clearLogChannel(filename);
+      },
+    });
+    for (const section of logSections) result.push(section);
+
     const fileDiffSection = FileDiffSection({
       pendingDiffs: formattedPendingDiffs,
       diffSummary: formattedDiffSummary,
@@ -540,10 +569,12 @@ export function StatusCard() {
   }, [
     workspaceMdSections,
     ownedPlans,
+    ownedLogChannels,
+    openAgentId,
+    clearLogChannel,
     handleOpenPlan,
     handleImplement,
     messageQueue,
-    openAgentId,
     deleteQueuedMessage,
     flushQueue,
     formattedPendingDiffs,

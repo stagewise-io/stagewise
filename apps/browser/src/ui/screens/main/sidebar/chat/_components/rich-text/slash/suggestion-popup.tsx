@@ -11,6 +11,7 @@ import type { ComponentType } from 'react';
 import { cn } from '@ui/utils';
 import { TerminalSquareIcon } from 'lucide-react';
 import {
+  IconBugOutline18,
   IconClipboardOutline18,
   IconImageSparkle3Outline18,
   IconSideProfileSparkleOutline18,
@@ -24,6 +25,7 @@ const COMMAND_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   'command:plan': IconClipboardOutline18,
   'command:preview': IconImageSparkle3Outline18,
   'command:learn': IconSideProfileSparkleOutline18,
+  'command:debug': IconBugOutline18,
 };
 
 /** Group labels — `builtin` has no header. */
