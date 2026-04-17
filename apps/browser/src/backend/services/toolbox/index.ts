@@ -1723,15 +1723,24 @@ export class ToolboxService extends DisposableService {
     this.startLogsWatcher();
 
     // Start the log ingest HTTP server
-    this.logIngestService = await LogIngestService.create();
-    this.uiKarton.setState((draft) => {
-      draft.logIngest = this.logIngestService
-        ? {
-            port: this.logIngestService.getPort(),
-            token: this.logIngestService.getToken(),
-          }
-        : null;
-    });
+    try {
+      this.logIngestService = await LogIngestService.create();
+      this.uiKarton.setState((draft) => {
+        draft.logIngest = {
+          port: this.logIngestService!.getPort(),
+          token: this.logIngestService!.getToken(),
+        };
+      });
+    } catch (err) {
+      this.logIngestService = null;
+      this.uiKarton.setState((draft) => {
+        draft.logIngest = null;
+      });
+      this.logger.error(
+        '[ToolboxService] Failed to start LogIngestService:',
+        err,
+      );
+    }
 
     // Start watching global skills directories (~/.stagewise/skills, ~/.agents/skills)
     this.startGlobalSkillsWatchers();
