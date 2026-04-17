@@ -1879,10 +1879,18 @@ export class ToolboxService extends DisposableService {
     this.uiKarton.registerServerProcedureHandler(
       'toolbox.clearLogChannel',
       async (_callingClientId: string, filename: string) => {
-        if (typeof filename !== 'string' || !filename.endsWith('.jsonl')) {
+        if (
+          typeof filename !== 'string' ||
+          !filename.endsWith('.jsonl') ||
+          filename !== path.basename(filename)
+        )
           throw new Error('Invalid log channel filename.');
-        }
-        const filePath = path.join(getLogsDir(), filename);
+
+        const logsDir = path.resolve(getLogsDir());
+        const filePath = path.resolve(logsDir, filename);
+        if (!filePath.startsWith(logsDir + path.sep))
+          throw new Error('Invalid log channel filename.');
+
         try {
           truncateSync(filePath, 0);
         } catch {
