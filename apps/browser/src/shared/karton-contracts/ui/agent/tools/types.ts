@@ -734,10 +734,23 @@ export const executeShellCommandToolInputSchema = z.object({
     .string()
     .optional()
     .describe('Session ID to reuse. Omit to create a new session.'),
+  stdin: z
+    .string()
+    .optional()
+    .describe(
+      'Raw bytes to write to the PTY. No \\r is appended — include it explicitly if needed. ' +
+        'Mutually exclusive with `command` and `kill`. Requires `session_id`. ' +
+        'Supports `wait_until` for output capture (default timeout: 5s without wait_until). ' +
+        'Common sequences: "\\x03" (Ctrl+C / interrupt), "\\x1b[A" (Up), "\\x1b[B" (Down), ' +
+        '"\\x1b[C" (Right), "\\x1b[D" (Left), "\\x1b" (Escape), "\\t" (Tab), "\\r" (Enter), ' +
+        '"y\\r" (type y + Enter).',
+    ),
   kill: z
     .boolean()
     .optional()
-    .describe('Hard-kill the session. Mutually exclusive with command.'),
+    .describe(
+      'Hard-kill the session. Mutually exclusive with command and stdin.',
+    ),
   wait_until: z
     .object({
       timeout_ms: z

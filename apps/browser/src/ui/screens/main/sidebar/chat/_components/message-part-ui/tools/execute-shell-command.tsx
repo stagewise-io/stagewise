@@ -83,6 +83,8 @@ export const ExecuteShellCommandToolPart = ({
 
   const command = part.input?.command ?? '';
   const explanation = part.input?.explanation ?? '';
+  const isStdin = !!part.input?.stdin && !command;
+  const isKill = !!part.input?.kill;
 
   const effectiveOutputText = useMemo(() => {
     if (output?.output) return output.output;
@@ -172,7 +174,15 @@ export const ExecuteShellCommandToolPart = ({
           <IconLoader6Outline18 className="size-3 shrink-0 animate-spin text-primary-foreground" />
           <span className="flex min-w-0 gap-1 text-xs">
             <TruncatedCommandText
-              text={explanation || `Running ${command}` || '...'}
+              text={
+                explanation ||
+                (isStdin
+                  ? 'Sending input'
+                  : isKill
+                    ? 'Killing session'
+                    : `Running ${command}`) ||
+                '...'
+              }
               className="shimmer-text-primary"
             />
           </span>
@@ -203,11 +213,22 @@ export const ExecuteShellCommandToolPart = ({
           <span className="flex min-w-0 gap-1 text-xs">
             {exitCode === 0 || exitCode == null ? (
               <span className="shrink-0 font-medium">
-                {explanation || 'Ran command'}
+                {explanation ||
+                  (isStdin
+                    ? 'Sent input'
+                    : isKill
+                      ? 'Killed session'
+                      : 'Ran command')}
               </span>
             ) : (
               <span className="shrink-0 font-medium">
-                {explanation || 'Ran command'} ({exitCode})
+                {explanation ||
+                  (isStdin
+                    ? 'Sent input'
+                    : isKill
+                      ? 'Killed session'
+                      : 'Ran command')}{' '}
+                ({exitCode})
               </span>
             )}
           </span>
@@ -261,8 +282,23 @@ export const ExecuteShellCommandToolPart = ({
             outputText && 'pb-4',
           )}
         >
-          <span className="select-none text-subtle-foreground">$ </span>
-          {command}
+          {isStdin ? (
+            <>
+              <span className="select-none text-subtle-foreground">→ </span>
+              {humanizeStdin(part.input?.stdin ?? '')}
+            </>
+          ) : isKill ? (
+            <>
+              <span className="select-none text-subtle-foreground">⊘ </span>
+              Kill session
+              {part.input?.session_id ? ` ${part.input.session_id}` : ''}
+            </>
+          ) : (
+            <>
+              <span className="select-none text-subtle-foreground">$ </span>
+              {command}
+            </>
+          )}
         </div>
         {outputText && (
           <div className="mt-1 whitespace-pre-wrap break-all font-mono font-normal text-subtle-foreground text-xs">
@@ -271,7 +307,15 @@ export const ExecuteShellCommandToolPart = ({
         )}
       </div>
     );
-  }, [state, effectiveOutputText, command]);
+  }, [
+    state,
+    effectiveOutputText,
+    command,
+    isStdin,
+    isKill,
+    part.input?.stdin,
+    part.input?.session_id,
+  ]);
 
   const contentFooter = useMemo(() => {
     if (
@@ -324,6 +368,53 @@ export const ExecuteShellCommandToolPart = ({
     />
   );
 };
+
+const STDIN_SEQUENCES: [string, string][] = [
+  ['\x1b[A', 'Up'],
+  ['\x1b[B', 'Down'],
+  ['\x1b[C', 'Right'],
+  ['\x1b[D', 'Left'],
+  ['\x1b', 'Esc'],
+  ['\x03', 'Ctrl+C'],
+  ['\x04', 'Ctrl+D'],
+  ['\x1a', 'Ctrl+Z'],
+  ['\r', '↵'],
+  ['\n', '↵'],
+  ['\t', 'Tab'],
+];
+
+const CONTROL_LABELS = new Set(STDIN_SEQUENCES.map(([, label]) => label));
+
+function humanizeStdin(raw: string): string {
+  const tokens: string[] = [];
+  let printable = '';
+  let i = 0;
+
+  while (i < raw.length) {
+    let matched = false;
+    for (const [pattern, label] of STDIN_SEQUENCES) {
+      if (raw.startsWith(pattern, i)) {
+        if (printable) {
+          tokens.push(printable);
+          printable = '';
+        }
+        tokens.push(label);
+        i += pattern.length;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      printable += raw[i];
+      i++;
+    }
+  }
+  if (printable) tokens.push(printable);
+  if (tokens.length === 0) return raw || '(empty)';
+
+  const allControl = tokens.every((t) => CONTROL_LABELS.has(t));
+  return allControl ? tokens.join(' ') : tokens.join('');
+}
 
 function TruncatedCommandText({
   text,

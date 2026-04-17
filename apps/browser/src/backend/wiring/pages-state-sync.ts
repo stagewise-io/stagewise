@@ -118,6 +118,68 @@ export async function wirePagesStateSync(deps: {
     (autoUpdate) => pagesService.syncAutoUpdateState(autoUpdate),
   );
 
+  // --- Shell sessions sync (uiKarton -> pages) ---
+  syncDerivedState(
+    uiKarton,
+    (state) => {
+      const result: Record<
+        string,
+        (typeof state.toolbox)[string]['shells'] extends
+          | { sessions: infer S }
+          | undefined
+          ? S extends Array<infer T>
+            ? T[]
+            : never
+          : never
+      > = {};
+      for (const agentId in state.toolbox) {
+        const shells = state.toolbox[agentId]?.shells;
+        if (shells?.sessions?.length) result[agentId] = shells.sessions;
+      }
+      return result;
+    },
+    (sessions) => pagesService.syncShellSessionsState(sessions),
+  );
+
+  // --- Shell terminal streaming chunks sync (uiKarton -> pages) ---
+  // Uses a flat key `agentInstanceId:sessionId` for the pages contract.
+  // Track last-synced array refs so we only push when Immer produces new data.
+  const lastSyncedChunkRefs = new Map<string, string[]>();
+  uiKarton.registerStateChangeCallback((state) => {
+    const chunks: Record<string, string[]> = {};
+    let hasNew = false;
+    const seenKeys = new Set<string>();
+    for (const agentId in state.toolbox) {
+      const pending = state.toolbox[agentId]?.pendingShellTerminalChunks;
+      if (!pending) continue;
+      for (const sessionId in pending) {
+        const arr = pending[sessionId];
+        if (!arr?.length) continue;
+        const key = `${agentId}:${sessionId}`;
+        chunks[key] = arr;
+        seenKeys.add(key);
+        if (lastSyncedChunkRefs.get(key) !== arr) hasNew = true;
+      }
+    }
+    // Detect removed keys as changes too
+    if (!hasNew) {
+      for (const key of lastSyncedChunkRefs.keys()) {
+        if (!seenKeys.has(key)) {
+          hasNew = true;
+          break;
+        }
+      }
+    }
+    if (hasNew) {
+      // Update tracked refs
+      lastSyncedChunkRefs.clear();
+      for (const [key, arr] of Object.entries(chunks))
+        lastSyncedChunkRefs.set(key, arr);
+
+      pagesService.syncPendingShellTerminalChunks(chunks);
+    }
+  });
+
   // --- Search engines sync (webDataService -> uiKarton + pages) ---
   const syncSearchEnginesToUiKarton = async () => {
     const engines = await webDataService.getSearchEngines();

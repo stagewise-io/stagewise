@@ -7,12 +7,17 @@ import {
   closeSync,
 } from 'node:fs';
 import path from 'node:path';
+import xtermHeadless from '@xterm/headless';
+const { Terminal } = xtermHeadless;
 
 /** Debounce interval (ms) for flushing buffered output to disk. */
 const FLUSH_DEBOUNCE_MS = 100;
 
 /** Soft cap (bytes) per log file. Writing stops after this threshold. */
 const MAX_LOG_BYTES = 50 * 1024 * 1024;
+
+/** Maximum bytes retained in the in-memory raw PTY circular buffer (for future xterm replay). */
+const MAX_RAW_BUFFER_BYTES = 100 * 1024;
 
 /**
  * Append-only logger for a single PTY session.
@@ -30,9 +35,24 @@ export class SessionLogger {
   private _buffer = '';
   private _flushTimer: NodeJS.Timeout | null = null;
 
+  // Raw circular buffer for future xterm replay (unstripped PTY bytes).
+  private _rawChunks: Buffer[] = [];
+  private _rawBytes = 0;
+
+  // Headless terminal emulator for accurate screen-state reads.
+  private _terminal: InstanceType<typeof Terminal>;
+  /** Cached last line, populated on close() so reads remain safe after dispose. */
+  private _cachedLastLine: string | null = null;
+
   constructor(filePath: string) {
     this.filePath = filePath;
     mkdirSync(path.dirname(filePath), { recursive: true });
+    this._terminal = new Terminal({
+      cols: 120,
+      rows: 30,
+      scrollback: 5000,
+      allowProposedApi: true,
+    });
   }
 
   get lineCount(): number {
@@ -111,11 +131,144 @@ export class SessionLogger {
     }
   }
 
+  /**
+   * Append raw (unstripped) PTY bytes to the in-memory circular buffer.
+   * Oldest chunks are evicted when the total exceeds MAX_RAW_BUFFER_BYTES.
+   */
+  appendRaw(data: Buffer): void {
+    // MUST use writeSync so the terminal buffer is immediately up-to-date
+    // when the OscParser fires synchronous resolution events that read it
+    // via serializeFrom(). The async write() queues data internally and
+    // the buffer would still be stale at resolution time.
+    (this._terminal as any)._core.writeSync(data);
+    this._rawChunks.push(data);
+    this._rawBytes += data.byteLength;
+    // Evict oldest chunks until we are within the cap.
+    while (
+      this._rawBytes > MAX_RAW_BUFFER_BYTES &&
+      this._rawChunks.length > 0
+    ) {
+      this._rawBytes -= this._rawChunks[0]!.byteLength;
+      this._rawChunks.shift();
+    }
+  }
+
+  /**
+   * Returns a single concatenated Buffer containing all retained raw PTY bytes.
+   * This is the replay source for a future xterm renderer.
+   */
+  getRawBuffer(): Buffer {
+    return Buffer.concat(this._rawChunks);
+  }
+
+  /**
+   * Returns the last non-empty line visible in the headless terminal buffer.
+   * This is always accurate because the terminal maintains proper 2D grid state.
+   */
+  getLastLine(): string {
+    if (this._cachedLastLine !== null) return this._cachedLastLine;
+    const buf = this._terminal.buffer.active;
+    for (let y = buf.cursorY; y >= 0; y--) {
+      const line = buf.getLine(y)?.translateToString(true).trimEnd();
+      if (line && line.length > 0) return line;
+    }
+    return '';
+  }
+
+  // ─── Buffer serialization ──────────────────────────────────────
+
+  /** Resize the headless terminal to match the frontend/PTY dimensions. */
+  resize(cols: number, rows: number): void {
+    this._terminal.resize(cols, rows);
+  }
+
+  /** Expose the headless terminal for mark-position reads. */
+  get terminal(): InstanceType<typeof Terminal> {
+    return this._terminal;
+  }
+
+  /**
+   * Returns the current absolute cursor position in the normal buffer.
+   * Used to record a "mark" before a command is written to the PTY.
+   */
+  getMarkPosition(): number {
+    const buf = this._terminal.buffer.normal;
+    return buf.baseY + buf.cursorY;
+  }
+
+  /** Whether the terminal is currently showing the alternate buffer (TUI mode). */
+  isAlternateBufferActive(): boolean {
+    return this._terminal.buffer.active.type === 'alternate';
+  }
+
+  /**
+   * Serialize terminal buffer lines from `markLine` to the current cursor.
+   * Returns an array of logical lines (wrapped rows joined) with trailing
+   * whitespace trimmed per line.
+   */
+  serializeFrom(markLine: number): string[] {
+    const buf = this._terminal.buffer.normal;
+    const cursorLine = buf.baseY + buf.cursorY;
+
+    // When interactive CLIs (e.g. prompts library) collapse multi-line
+    // selection menus, the cursor can rewind above the mark. In that case
+    // swap the range so we still capture the rewritten region.
+    let startY: number;
+    let endY: number;
+
+    if (cursorLine < markLine) {
+      startY = cursorLine;
+      endY = markLine;
+    } else {
+      startY = markLine;
+      endY = cursorLine;
+    }
+
+    // Eviction fallback: if the start has scrolled out of the buffer, start at 0
+    if (buf.getLine(startY) === undefined) startY = 0;
+
+    // Walk backward if the start lands on a wrapped continuation
+    while (startY > 0 && buf.getLine(startY)?.isWrapped) startY--;
+
+    return this.readLines(buf, startY, endY);
+  }
+
+  /**
+   * Serialize the current alternate buffer viewport.
+   * Used when a TUI (vim, htop, less) is active at resolution time.
+   */
+  serializeAlternate(): string[] {
+    const buf = this._terminal.buffer.active;
+    if (buf.type !== 'alternate') return [];
+    return this.readLines(buf, 0, this._terminal.rows - 1);
+  }
+
+  /**
+   * Read logical lines from a buffer range, joining wrapped rows.
+   */
+  private readLines(
+    buf: InstanceType<typeof Terminal>['buffer']['normal'],
+    startY: number,
+    endY: number,
+  ): string[] {
+    const lines: string[] = [];
+    for (let y = startY; y <= endY; y++) {
+      const row = buf.getLine(y);
+      if (!row) continue;
+      const text = row.translateToString(true);
+      if (row.isWrapped && lines.length > 0) lines[lines.length - 1] += text;
+      else lines.push(text);
+    }
+    return lines;
+  }
+
   /** Flush remaining data and mark the logger as closed. */
   close(): void {
     if (this._closed) return;
     this._closed = true;
+    this._cachedLastLine = this.getLastLine();
     this.flush();
+    this._terminal.dispose();
   }
 
   private scheduleFlush(): void {

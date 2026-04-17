@@ -1092,6 +1092,42 @@ export class ToolboxService extends DisposableService {
     this.shellService?.killSession(sessionId);
   }
 
+  public getShellReplayBuffer(
+    agentInstanceId: string,
+    sessionId: string,
+  ): {
+    found: boolean;
+    data: string;
+    exited: boolean;
+    exitCode: number | null;
+  } {
+    return (
+      this.shellService?.getShellReplayBuffer(agentInstanceId, sessionId) ?? {
+        found: false,
+        data: '',
+        exited: true,
+        exitCode: null,
+      }
+    );
+  }
+
+  public openTerminalStream(agentInstanceId: string, sessionId: string): void {
+    this.shellService?.openTerminalStream(agentInstanceId, sessionId);
+  }
+
+  public closeTerminalStream(agentInstanceId: string, sessionId: string): void {
+    this.shellService?.closeTerminalStream(agentInstanceId, sessionId);
+  }
+
+  public resizeTerminal(
+    agentInstanceId: string,
+    sessionId: string,
+    cols: number,
+    rows: number,
+  ): void {
+    this.shellService?.resizeTerminal(agentInstanceId, sessionId, cols, rows);
+  }
+
   public getBrowserSnapshot(): BrowserSnapshot {
     const browser = this.uiKarton.state.browser;
     const activeTab = browser.activeTabId

@@ -20,6 +20,8 @@ function makeSnapshot(
       lineCount: s.lineCount ?? 0,
       logPath: s.logPath ?? `shells/${s.id}.shell.log`,
       tailContent: s.tailContent,
+      cwd: '/',
+      createdAt: Date.now(),
     })),
   };
 }
