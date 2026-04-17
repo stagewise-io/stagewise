@@ -305,16 +305,30 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 
   // Push bundled skill definitions via the toolbox so it can
   // merge them with workspace/plugin skills on mount changes.
+  // Display order for builtin slash commands (unlisted ones sort last).
+  const BUILTIN_ORDER: Record<string, number> = {
+    plan: 0,
+    debug: 1,
+    preview: 2,
+    learn: 3,
+  };
+
   discoverSkills(getBuiltinSkillsPath()).then((skills) => {
-    const builtins: SkillDefinition[] = skills.map((s) => ({
-      id: `command:${s.name.toLowerCase()}`,
-      displayName: s.name,
-      description: s.description,
-      source: 'builtin' as const,
-      contentPath: `${s.path}/SKILL.md`,
-      userInvocable: s.userInvocable,
-      agentInvocable: s.agentInvocable,
-    }));
+    const builtins: SkillDefinition[] = skills
+      .map((s) => ({
+        id: `command:${s.name.toLowerCase()}`,
+        displayName: s.name,
+        description: s.description,
+        source: 'builtin' as const,
+        contentPath: `${s.path}/SKILL.md`,
+        userInvocable: s.userInvocable,
+        agentInvocable: s.agentInvocable,
+      }))
+      .sort(
+        (a, b) =>
+          (BUILTIN_ORDER[a.displayName.toLowerCase()] ?? 99) -
+          (BUILTIN_ORDER[b.displayName.toLowerCase()] ?? 99),
+      );
     toolboxService.setBuiltinSkills(builtins);
     if (verbose)
       logger.debug(
