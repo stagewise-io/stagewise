@@ -4,6 +4,7 @@ import {
   type ModelProviderService,
   deepMergeProviderOptions,
 } from '@/agents/model-provider';
+import { TITLE_GENERATION_SYSTEM_PROMPT } from './prompt';
 
 /**
  * Ordered list of model IDs to try for title generation.
@@ -21,6 +22,35 @@ const TITLE_GENERATION_TIMEOUT_MS = 15_000;
 
 /** Minimum acceptable title length; shorter results trigger a fallback. */
 const TITLE_MIN_LENGTH = 6;
+
+/** Minimum acceptable word count; single-word titles are never useful. */
+const TITLE_MIN_WORDS = 2;
+
+/**
+ * Post-process a raw title string from the LLM.
+ * Strips wrapping quotes, markdown formatting, and trailing punctuation.
+ */
+const sanitizeTitle = (raw: string): string => {
+  let title = raw.trim();
+
+  // Strip wrapping quotes
+  if (
+    (title.startsWith('"') && title.endsWith('"')) ||
+    (title.startsWith("'") && title.endsWith("'"))
+  ) {
+    title = title.slice(1, -1);
+  }
+
+  // Strip markdown formatting (targeted to preserve # inside words like C#)
+  title = title.replace(/^#+\s*/gm, ''); // leading heading hashes
+  title = title.replace(/`([^`]*)`/g, '$1'); // unwrap backtick spans
+  title = title.replace(/\*+([^*]+)\*+/g, '$1'); // unwrap emphasis
+
+  // Remove trailing punctuation
+  title = title.replace(/[.…:!?]+$/, '');
+
+  return title.trim();
+};
 
 export const generateSimpleTitle = async (
   messages: AgentMessage[],
@@ -71,22 +101,27 @@ export const generateSimpleTitle = async (
           messages: [
             {
               role: 'system',
-              content:
-                'Summarize the current intention of the user into a very short and precise title with a maximum of 7 words. Only output the short title, nothing else. Don\'t use markdown formatting. Output a single, raw, simple sentence. Don\'t mention "user" or "assistant". Write from the perspective of the user.',
+              content: TITLE_GENERATION_SYSTEM_PROMPT,
             },
             {
               role: 'user',
-              content: `<conversation>${messageList}</conversation> Generate a short title for this conversation.`,
+              content: `<conversation>
+${messageList}
+</conversation>`,
             },
           ],
           temperature: 0.15,
           maxOutputTokens: 100,
-        }).then((result) => result.text.trim());
+        }).then((result) => sanitizeTitle(result.text));
 
         if (title.length < TITLE_MIN_LENGTH) {
           throw new Error(
             `Title too short (${title.length} chars): "${title}"`,
           );
+        }
+
+        if (title.split(/\s+/).length < TITLE_MIN_WORDS) {
+          throw new Error(`Title too few words: "${title}"`);
         }
 
         return title;

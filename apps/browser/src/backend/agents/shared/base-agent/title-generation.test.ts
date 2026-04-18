@@ -263,10 +263,7 @@ describe('generateSimpleTitle', () => {
     // Should contain at most 10 message entries
     const messageLines = userContent
       .replace('<conversation>', '')
-      .replace(
-        '</conversation> Generate a short title for this conversation.',
-        '',
-      )
+      .replace('</conversation>', '')
       .split('\n')
       .filter((l: string) => l.trim().length > 0);
     expect(messageLines.length).toBeLessThanOrEqual(10);
@@ -285,12 +282,12 @@ describe('generateSimpleTitle', () => {
   });
 
   it('accepts a title that is exactly 6 characters', async () => {
-    generateTextMock.mockResolvedValueOnce({ text: '123456' } as any);
+    generateTextMock.mockResolvedValueOnce({ text: 'Fix It' } as any);
 
     const mps = makeMockModelProviderService();
     const title = await generateSimpleTitle(makeMessages(2), mps, 'agent-1');
 
-    expect(title).toBe('123456');
+    expect(title).toBe('Fix It');
     expect(generateTextMock).toHaveBeenCalledTimes(1);
   });
 
