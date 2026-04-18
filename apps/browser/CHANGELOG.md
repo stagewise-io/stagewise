@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha.61 (2026-04-18)
+
+### Bug Fixes
+
+* fix title generation logic and system prompt for conversations (b7a5c68)
+* add file system documentation to workspace-md-agent (dcb3b97)
+
 ## 1.0.0-alpha.60 (2026-04-17)
 
 ### Features
